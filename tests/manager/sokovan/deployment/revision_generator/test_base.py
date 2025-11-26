@@ -9,19 +9,24 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.data.deployment.types import (
-    DefinitionFiles,
     ExecutionSpec,
     ImageEnvironment,
     ImageIdentifierDraft,
+    ModelRevisionSpec,
     ModelRevisionSpecDraft,
     ModelServiceDefinition,
     MountMetadata,
+    ResourceSpec,
     ResourceSpecDraft,
 )
+from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.errors.deployment import DefinitionFileNotFound
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.revision_generator.base import BaseRevisionGenerator
+from ai.backend.manager.sokovan.deployment.revision_generator.custom import CustomRevisionGenerator
 
 
 @dataclass
@@ -208,11 +213,8 @@ class TestLoadServiceDefinition:
     ) -> None:
         """Test load_service_definition with various override scenarios."""
         # Given: Service definition
-        mock_deployment_repository.fetch_definition_files = AsyncMock(
-            return_value=DefinitionFiles(
-                model_definition={},
-                service_definition=test_case.service_definition_dict,
-            )
+        mock_deployment_repository.fetch_service_definition = AsyncMock(
+            return_value=test_case.service_definition_dict
         )
 
         # When: Loading service definition
@@ -239,12 +241,7 @@ class TestLoadServiceDefinition:
     ) -> None:
         """Test when service definition is None."""
         # Given: No service definition
-        mock_deployment_repository.fetch_definition_files = AsyncMock(
-            return_value=DefinitionFiles(
-                model_definition={},
-                service_definition=None,
-            )
-        )
+        mock_deployment_repository.fetch_service_definition = AsyncMock(return_value=None)
 
         # When: Loading service definition
         result = await base_generator.load_service_definition(
@@ -542,11 +539,8 @@ class TestCompleteOverridePipeline:
     ) -> None:
         """Test complete pipeline: Root → Variant → Request."""
         # Given: Service definition
-        mock_deployment_repository.fetch_definition_files = AsyncMock(
-            return_value=DefinitionFiles(
-                model_definition={},
-                service_definition=test_case.service_definition_dict,
-            )
+        mock_deployment_repository.fetch_service_definition = AsyncMock(
+            return_value=test_case.service_definition_dict
         )
 
         # And: API request
@@ -582,3 +576,315 @@ class TestCompleteOverridePipeline:
         assert result.image_identifier.architecture == test_case.expected.architecture
         assert result.resource_spec.resource_slots == test_case.expected.resource_slots
         assert result.execution.environ == test_case.expected.environ
+
+
+class TestDefinitionFileRequirement:
+    """
+    Test that model definition is only required for CUSTOM runtime variant.
+    """
+
+    @pytest.fixture
+    def mock_deployment_repository(self) -> MagicMock:
+        return MagicMock(spec=DeploymentRepository)
+
+    @pytest.fixture
+    def base_generator(self, mock_deployment_repository: MagicMock) -> BaseRevisionGenerator:
+        return BaseRevisionGenerator(mock_deployment_repository)
+
+    @pytest.fixture
+    def vfolder_id(self) -> UUID:
+        return uuid4()
+
+    @pytest.fixture
+    def custom_generator(self, mock_deployment_repository: MagicMock):
+        return CustomRevisionGenerator(mock_deployment_repository)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "runtime_variant",
+        [
+            RuntimeVariant.VLLM,
+            RuntimeVariant.NIM,
+            RuntimeVariant.HUGGINGFACE_TGI,
+            RuntimeVariant.SGLANG,
+            RuntimeVariant.MODULAR_MAX,
+            RuntimeVariant.CMD,
+        ],
+        ids=lambda v: v.value,
+    )
+    async def test_non_custom_variants_should_not_require_model_definition(
+        self,
+        runtime_variant: RuntimeVariant,
+        base_generator: BaseRevisionGenerator,
+        mock_deployment_repository: MagicMock,
+        vfolder_id: UUID,
+    ) -> None:
+        """
+        Test that non-CUSTOM runtime variants do NOT require model-definition.yaml
+        """
+        # Given: Only service definition exists (no model definition)
+        mock_deployment_repository.fetch_service_definition = AsyncMock(
+            return_value={
+                "environment": {
+                    "image": "test-image:latest",
+                    "architecture": "x86_64",
+                },
+                "resource_slots": {
+                    "cpu": 4,
+                    "mem": "8gb",
+                },
+            }
+        )
+
+        # When: Generating revision (should NOT call fetch_model_definition)
+        result = await base_generator.generate_revision(
+            draft_revision=ModelRevisionSpecDraft(
+                image_identifier=ImageIdentifierDraft(
+                    canonical="request-image:latest",
+                    architecture="aarch64",
+                ),
+                resource_spec=ResourceSpecDraft(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                    resource_slots={"cpu": 2, "mem": "4gb"},
+                    resource_opts=None,
+                ),
+                mounts=MountMetadata(
+                    model_vfolder_id=vfolder_id,
+                    model_mount_destination="/models",
+                    model_definition_path=None,
+                    extra_mounts=[],
+                ),
+                execution=ExecutionSpec(
+                    runtime_variant=runtime_variant,
+                    startup_command="python -m test",
+                    bootstrap_script=None,
+                    environ=None,
+                ),
+            ),
+            vfolder_id=vfolder_id,
+            model_definition_path=None,
+        )
+
+        # Then: Should succeed without requiring model definition
+        assert result is not None
+        # Then: Should have called fetch_service_definition (not fetch_model_definition)
+        mock_deployment_repository.fetch_service_definition.assert_called_once_with(vfolder_id)
+
+    @pytest.mark.asyncio
+    async def test_non_custom_variants_work_without_service_definition(
+        self,
+        base_generator: BaseRevisionGenerator,
+        mock_deployment_repository: MagicMock,
+        vfolder_id: UUID,
+    ) -> None:
+        """
+        Test that non-CUSTOM variants work even when service definition is missing.
+        Service definition is optional for all variants.
+        """
+        # Given: No service definition at all
+        mock_deployment_repository.fetch_service_definition = AsyncMock(return_value=None)
+
+        # And: API request provides all required fields
+        draft_revision = ModelRevisionSpecDraft(
+            image_identifier=ImageIdentifierDraft(
+                canonical="request-image:latest",
+                architecture="x86_64",
+            ),
+            resource_spec=ResourceSpecDraft(
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                resource_slots={"cpu": 4, "mem": "8gb"},
+                resource_opts=None,
+            ),
+            mounts=MountMetadata(
+                model_vfolder_id=vfolder_id,
+                model_mount_destination="/models",
+                model_definition_path=None,
+                extra_mounts=[],
+            ),
+            execution=ExecutionSpec(
+                runtime_variant=RuntimeVariant.VLLM,
+                startup_command="python -m vllm",
+                bootstrap_script=None,
+                environ={"MY_VAR": "value"},
+            ),
+        )
+
+        # When: Generating revision
+        result = await base_generator.generate_revision(
+            draft_revision=draft_revision,
+            vfolder_id=vfolder_id,
+            model_definition_path=None,
+        )
+
+        # Then: Should succeed using only API request values
+        assert result is not None
+
+    @pytest.mark.asyncio
+    async def test_custom_variant_requires_model_definition_success(
+        self,
+        custom_generator: CustomRevisionGenerator,
+        mock_deployment_repository: MagicMock,
+        vfolder_id: UUID,
+    ) -> None:
+        """
+        Test that CUSTOM variant requires and validates model definition (success case).
+        """
+        # Given: Valid model definition
+        valid_model_definition = {
+            "models": [
+                {
+                    "name": "test-model",
+                    "model-path": "/models/test-model",
+                }
+            ]
+        }
+        mock_deployment_repository.fetch_model_definition = AsyncMock(
+            return_value=valid_model_definition
+        )
+
+        # And: CUSTOM variant revision (already converted to ModelRevisionSpec)
+        revision = ModelRevisionSpec(
+            image_identifier=ImageIdentifier(
+                canonical="custom-image:latest",
+                architecture="x86_64",
+            ),
+            resource_spec=ResourceSpec(
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                resource_slots={"cpu": 4, "mem": "8gb"},
+                resource_opts=None,
+            ),
+            mounts=MountMetadata(
+                model_vfolder_id=vfolder_id,
+                model_mount_destination="/models",
+                model_definition_path=None,
+                extra_mounts=[],
+            ),
+            execution=ExecutionSpec(
+                runtime_variant=RuntimeVariant.CUSTOM,
+                startup_command="python app.py",
+                bootstrap_script=None,
+                environ=None,
+            ),
+        )
+
+        # When: Validating revision (should call fetch_model_definition)
+        await custom_generator.validate_revision(revision)
+
+        # Then: Should call fetch_model_definition (not fetch_service_definition)
+        mock_deployment_repository.fetch_model_definition.assert_called_once_with(
+            vfolder_id=vfolder_id,
+            model_definition_path=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_custom_variant_requires_model_definition_failure_not_found(
+        self,
+        custom_generator: CustomRevisionGenerator,
+        mock_deployment_repository: MagicMock,
+        vfolder_id: UUID,
+    ) -> None:
+        """
+        Test that CUSTOM variant fails when model definition file is NOT FOUND.
+
+        This is the critical failure case: CUSTOM variant MUST have model-definition.yaml,
+        unlike non-CUSTOM variants which can work without it.
+        """
+        # Given: Model definition file does not exist
+        mock_deployment_repository.fetch_model_definition = AsyncMock(
+            side_effect=DefinitionFileNotFound
+        )
+
+        # And: CUSTOM variant revision
+        revision = ModelRevisionSpec(
+            image_identifier=ImageIdentifier(
+                canonical="custom-image:latest",
+                architecture="x86_64",
+            ),
+            resource_spec=ResourceSpec(
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                resource_slots={"cpu": 4, "mem": "8gb"},
+                resource_opts=None,
+            ),
+            mounts=MountMetadata(
+                model_vfolder_id=vfolder_id,
+                model_mount_destination="/models",
+                model_definition_path=None,
+                extra_mounts=[],
+            ),
+            execution=ExecutionSpec(
+                runtime_variant=RuntimeVariant.CUSTOM,
+                startup_command="python app.py",
+                bootstrap_script=None,
+                environ=None,
+            ),
+        )
+
+        # When/Then: Should raise DefinitionFileNotFound
+        with pytest.raises(DefinitionFileNotFound):
+            await custom_generator.validate_revision(revision)
+
+        # And: Should have attempted to call fetch_model_definition
+        mock_deployment_repository.fetch_model_definition.assert_called_once_with(
+            vfolder_id=vfolder_id,
+            model_definition_path=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_custom_variant_requires_valid_model_definition_schema(
+        self,
+        custom_generator: CustomRevisionGenerator,
+        mock_deployment_repository: MagicMock,
+        vfolder_id: UUID,
+    ) -> None:
+        """
+        Test that CUSTOM variant rejects INVALID model definition schema.
+        """
+        # Given: Invalid model definition (wrong type for models field)
+        invalid_model_definition = {
+            "models": "should_be_a_list_not_a_string",  # Invalid type
+        }
+        mock_deployment_repository.fetch_model_definition = AsyncMock(
+            return_value=invalid_model_definition
+        )
+
+        # And: CUSTOM variant revision
+        revision = ModelRevisionSpec(
+            image_identifier=ImageIdentifier(
+                canonical="custom-image:latest",
+                architecture="x86_64",
+            ),
+            resource_spec=ResourceSpec(
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                resource_slots={"cpu": 4, "mem": "8gb"},
+                resource_opts=None,
+            ),
+            mounts=MountMetadata(
+                model_vfolder_id=vfolder_id,
+                model_mount_destination="/models",
+                model_definition_path=None,
+                extra_mounts=[],
+            ),
+            execution=ExecutionSpec(
+                runtime_variant=RuntimeVariant.CUSTOM,
+                startup_command="python app.py",
+                bootstrap_script=None,
+                environ=None,
+            ),
+        )
+
+        # When/Then: Should raise InvalidAPIParameters due to invalid schema
+        with pytest.raises(InvalidAPIParameters) as exc_info:
+            await custom_generator.validate_revision(revision)
+
+        assert "Invalid model definition for CUSTOM variant" in str(exc_info.value)
+
+        # And: Should have called fetch_model_definition
+        mock_deployment_repository.fetch_model_definition.assert_called_once_with(
+            vfolder_id=vfolder_id,
+            model_definition_path=None,
+        )

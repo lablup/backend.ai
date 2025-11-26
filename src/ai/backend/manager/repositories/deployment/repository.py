@@ -323,21 +323,18 @@ class DeploymentRepository:
         return yaml.load(model_definition_bytes)
 
     @deployment_repository_resilience.apply()
-    async def fetch_definition_files(
+    async def fetch_service_definition(
         self,
         vfolder_id: uuid.UUID,
-        model_definition_path: Optional[str],
-    ) -> DefinitionFiles:
+    ) -> Optional[dict[str, Any]]:
         """
-        Fetch definition file from model vfolder.
+        Fetch service definition file from model vfolder.
 
         Args:
             vfolder_id: ID of the model vfolder
-            definition_path: Path to the definition file
         Returns:
-            DefinitionFiles: Contains service definition and model definition bytes
+            dict: Parsed service definition content
         """
-        # Get vfolder info from DB
         vfolder_location = await self._db_source.get_vfolder_by_id(vfolder_id)
         if vfolder_location.ownership_type == VFolderOwnershipType.GROUP:
             raise InvalidAPIParameters(
@@ -355,23 +352,30 @@ class DeploymentRepository:
         except DefinitionFileNotFound:
             # Service definition is optional
             pass
-        # Check file existence in storage
-        model_definition_candidates = (
-            [
-                model_definition_path,
-            ]
-            if model_definition_path
-            else [
-                "model-definition.yaml",
-                "model-definition.yml",
-            ]
+
+        return service_definition_content
+
+    @deployment_repository_resilience.apply()
+    async def fetch_definition_files(
+        self,
+        vfolder_id: uuid.UUID,
+        model_definition_path: Optional[str],
+    ) -> DefinitionFiles:
+        """
+        Fetch definition files(Both service and model definitions) from model vfolder.
+
+        Args:
+            vfolder_id: ID of the model vfolder
+            definition_path: Path to the definition file
+        Returns:
+            DefinitionFiles: Contains service definition and model definition bytes
+        """
+        model_definition_content: dict[str, Any] = await self.fetch_model_definition(
+            vfolder_id, model_definition_path
         )
-        model_definition_bytes = await self._storage_source.fetch_definition_file(
-            vfolder_location,
-            model_definition_candidates,
+        service_definition_content: Optional[dict[str, Any]] = await self.fetch_service_definition(
+            vfolder_id
         )
-        yaml = YAML()
-        model_definition_content: dict[str, Any] = yaml.load(model_definition_bytes)
 
         return DefinitionFiles(
             service_definition=service_definition_content,
