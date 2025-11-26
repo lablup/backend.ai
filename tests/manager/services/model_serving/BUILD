@@ -4,3 +4,7 @@ python_test_utils(
         "fixtures.py",
     ]
 )
+
+python_tests(
+    name="tests",
+)
