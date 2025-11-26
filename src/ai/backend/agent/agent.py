@@ -3703,7 +3703,7 @@ class AbstractAgent(
         last_registry_file = f"last_registry.{self.id}.dat"
         try:
             with open(var_base_path / last_registry_file, "wb") as f:
-                pickle.dump(self.kernel_registry, f)
+                pickle.dump(dict(self.kernel_registry), f)
             self.last_registry_written_time = now
             log.debug("saved {}", last_registry_file)
         except Exception as e:
