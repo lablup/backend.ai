@@ -1,21 +1,8 @@
+from typing import Optional
+
 from aiohttp import web
 
-from ai.backend.common.exception import (
-    BackendAIError,
-    ErrorCode,
-    ErrorDetail,
-    ErrorDomain,
-    ErrorOperation,
-)
 
-
-class UnauthorizedPurityClient(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/purity-unauthorized-client"
-    error_title = "Unauthorized Purity Client"
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.STORAGE,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.UNAUTHORIZED,
-        )
+class UnauthorizedPurityClient(web.HTTPInternalServerError):
+    def __init__(self, msg: Optional[str] = None) -> None:
+        super().__init__(reason=msg)
