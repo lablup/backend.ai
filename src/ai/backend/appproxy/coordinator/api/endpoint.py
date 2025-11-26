@@ -18,7 +18,6 @@ from ai.backend.appproxy.common.types import (
     CORSOptions,
     EndpointConfig,
     FrontendMode,
-    HealthCheckConfig,
     ProxyProtocol,
     PydanticResponse,
     WebMiddleware,
@@ -28,6 +27,7 @@ from ai.backend.appproxy.common.utils import (
     pydantic_api_response_handler,
 )
 from ai.backend.appproxy.coordinator.models.worker import add_circuit
+from ai.backend.common.config import ModelHealthCheck
 
 from ..models import Circuit, Endpoint, Worker
 from ..models.utils import execute_with_txn_retry
@@ -72,7 +72,7 @@ class EndpointCreationRequestModel(BaseModel):
     ] = None
 
     health_check: Annotated[
-        HealthCheckConfig | None,
+        ModelHealthCheck | None,
         Field(
             default=None,
             description=textwrap.dedent(
@@ -237,14 +237,14 @@ async def remove_endpoint(request: web.Request) -> PydanticResponse[StubResponse
     return PydanticResponse(StubResponseModel(success=True))
 
 
-class UpdateHealthCheckConfigRequestModel(BaseModel):
-    health_check: HealthCheckConfig | None
+class UpdateModelHealthCheckRequestModel(BaseModel):
+    health_check: ModelHealthCheck | None
 
 
 @auth_required("manager")
-@pydantic_api_handler(UpdateHealthCheckConfigRequestModel)
+@pydantic_api_handler(UpdateModelHealthCheckRequestModel)
 async def inject_health_check_information(
-    request: web.Request, params: UpdateHealthCheckConfigRequestModel
+    request: web.Request, params: UpdateModelHealthCheckRequestModel
 ) -> PydanticResponse[StubResponseModel]:
     """
     Creates and returns API token required for execution of model service apps hosted by AppProxy.
