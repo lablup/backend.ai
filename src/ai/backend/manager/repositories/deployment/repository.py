@@ -332,7 +332,6 @@ class DeploymentRepository:
 
         Args:
             vfolder_id: ID of the model vfolder
-            definition_path: Path to the service definition file
         Returns:
             dict: Parsed service definition content
         """
@@ -363,7 +362,7 @@ class DeploymentRepository:
         model_definition_path: Optional[str],
     ) -> DefinitionFiles:
         """
-        Fetch definition file(Both service and model definitions) from model vfolder.
+        Fetch definition files(Both service and model definitions) from model vfolder.
 
         Args:
             vfolder_id: ID of the model vfolder
