@@ -2230,6 +2230,14 @@ class AbstractAgent(
         ipc_base_path = self.local_config.agent.ipc_base_path
         var_base_path = self.local_config.agent.var_base_path
         last_registry_file = f"last_registry.{self.id}.dat"
+        if not (var_base_path / last_registry_file).is_file():
+            log.warning(
+                "Registry file with name {} not found. "
+                "Falling back to name based on local instance ID {}...",
+                last_registry_file,
+                self.local_instance_id,
+            )
+            last_registry_file = f"last_registry.{self.local_instance_id}.dat"
         if os.path.isfile(ipc_base_path / last_registry_file):
             shutil.move(ipc_base_path / last_registry_file, var_base_path / last_registry_file)
         try:
