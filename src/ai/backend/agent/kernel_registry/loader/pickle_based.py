@@ -76,7 +76,7 @@ class KernelRegistryPickleRecovery(AbstractKernelRegistryRecovery):
         last_registry_file = self._get_last_registry_file_path()
         try:
             with open(last_registry_file, "wb") as f:
-                pickle.dump(registry, f)
+                pickle.dump(dict(registry), f)
             self._last_saved_time = now
             log.debug("Saved kernel registry to {}", str(last_registry_file))
         except Exception as e:
