@@ -65,10 +65,11 @@ class KernelRegistryRecovery:
                 loaded = await loader.load_kernel_registry()
                 for kernel_id, kernel in loaded.items():
                     result[kernel_id] = kernel
-            except Exception:
+            except Exception as e:
                 log.warning(
-                    "Failed to load kernel registry using loader {}",
+                    "Failed to load kernel registry using loader {}, skip (err: {})",
                     loader.__class__.__name__,
+                    str(e),
                 )
                 continue
         return result
