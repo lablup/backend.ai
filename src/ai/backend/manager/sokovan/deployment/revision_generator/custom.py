@@ -5,7 +5,6 @@ from typing import override
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.data.deployment.types import (
-    DefinitionFiles,
     ModelRevisionSpec,
 )
 from ai.backend.manager.sokovan.deployment.revision_generator.base import BaseRevisionGenerator
@@ -24,14 +23,12 @@ class CustomRevisionGenerator(BaseRevisionGenerator):
         """
         Validate CUSTOM variant revision by checking model definition.
         """
-        definition_files: DefinitionFiles = (
-            await self._deployment_repository.fetch_definition_files(
-                vfolder_id=revision.mounts.model_vfolder_id,
-                model_definition_path=revision.mounts.model_definition_path,
-            )
+        model_definition_content = await self._deployment_repository.fetch_model_definition(
+            vfolder_id=revision.mounts.model_vfolder_id,
+            model_definition_path=revision.mounts.model_definition_path,
         )
 
         try:
-            ModelDefinition.model_validate(definition_files.model_definition)
+            ModelDefinition.model_validate(model_definition_content)
         except Exception as e:
             raise InvalidAPIParameters(f"Invalid model definition for CUSTOM variant: {e}") from e

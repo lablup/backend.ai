@@ -18,8 +18,8 @@ class CustomModelDefinitionGenerator(ModelDefinitionGenerator):
 
     @override
     async def generate_model_definition(self, model_revision: ModelRevisionSpec) -> ModelDefinition:
-        definition_files = await self._deployment_repository.fetch_definition_files(
+        model_definition_content = await self._deployment_repository.fetch_model_definition(
             vfolder_id=model_revision.mounts.model_vfolder_id,
             model_definition_path=model_revision.mounts.model_definition_path,
         )
-        return ModelDefinition.model_validate(definition_files.model_definition)
+        return ModelDefinition.model_validate(model_definition_content)
