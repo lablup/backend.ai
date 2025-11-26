@@ -3,6 +3,7 @@ import logging
 import secrets
 import uuid
 from http import HTTPStatus
+from typing import Any
 
 import aiohttp
 import tomli
@@ -32,6 +33,7 @@ from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import (
     AgentId,
     ImageAlias,
+    RuntimeVariant,
     SessionTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -40,10 +42,12 @@ from ai.backend.manager.data.deployment.types import ModelServiceDefinition
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.creator import EndpointCreator
 from ai.backend.manager.data.model_serving.types import (
+    ApiRequestedServiceConfig,
     CompactServiceInfo,
     ErrorInfo,
     RequesterCtx,
     RouteInfo,
+    ServiceDefinitionOverrideResult,
     ServiceInfo,
 )
 from ai.backend.manager.data.model_serving.types import (
@@ -179,6 +183,91 @@ class ModelServingService:
             f"./{filename}",
         )
 
+    def _apply_service_definition_overrides(
+        self,
+        service_definition_toml: str,
+        runtime_variant: str,
+        user_requested_variables: ApiRequestedServiceConfig,
+    ) -> ServiceDefinitionOverrideResult:
+        """
+        Apply service definition overrides to existing values.
+
+        Legacy compatibility helper with 3-stage merge:
+        1. Root level (base configuration)
+        2. Runtime variant section (field-level override of root)
+        3. API request parameters (final override)
+
+        Override priority (later overrides earlier):
+        Root → Variant → Request
+        """
+        service_definition = tomli.loads(service_definition_toml)
+
+        # Stage 1: Extract root level (excluding variant keys)
+        all_variant_keys = {variant.value for variant in RuntimeVariant}
+        root_level_dict = {k: v for k, v in service_definition.items() if k not in all_variant_keys}
+
+        # Stage 2: Get variant overrides and merge with root (field-level)
+        variant_overrides = service_definition.get(runtime_variant, {})
+        merged_dict = self._merge_dicts(root_level_dict, variant_overrides)
+
+        # Parse merged service definition
+        try:
+            variant_def = ModelServiceDefinition.model_validate(merged_dict)
+        except Exception:
+            # If parsing fails, fall back to empty definition
+            variant_def = ModelServiceDefinition.model_validate({})
+
+        # Stage 3: Apply API request overrides (highest priority)
+        result: dict[str, Any] = {}
+
+        # Image and architecture: request > definition
+        if variant_def.environment is not None:
+            result["image"] = variant_def.environment.image
+            result["architecture"] = variant_def.environment.architecture
+        if user_requested_variables.image is not None:
+            result["image"] = user_requested_variables.image
+        if user_requested_variables.architecture is not None:
+            result["architecture"] = user_requested_variables.architecture
+
+        # Resource slots: field-level merge (definition + request)
+        if variant_def.resource_slots or user_requested_variables.resource_slots:
+            base_slots = variant_def.resource_slots or {}
+            request_slots = user_requested_variables.resource_slots or {}
+            result["resource_slots"] = {**base_slots, **request_slots}
+
+        # Environ: field-level merge (definition + request)
+        service_environ = variant_def.environ or {}
+        request_environ = user_requested_variables.environ or {}
+        merged_environ = {**service_environ, **request_environ}
+        if merged_environ:
+            result["environ"] = merged_environ
+
+        return ServiceDefinitionOverrideResult(
+            image=result.get("image"),
+            architecture=result.get("architecture"),
+            resource_slots=result.get("resource_slots"),
+            environ=result.get("environ"),
+        )
+
+    def _merge_dicts(self, base: dict, override: dict) -> dict:
+        """
+        Merge dictionaries with field-level override.
+
+        For nested dicts (environment, resource_slots, environ),
+        merge field by field rather than replacing the entire dict.
+        """
+        merged = base.copy()
+
+        for key, value in override.items():
+            if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+                # Deep merge for nested dicts (field-level override)
+                merged[key] = {**merged[key], **value}
+            else:
+                # Simple override for non-dict values
+                merged[key] = value
+
+        return merged
+
     async def create(self, action: CreateModelServiceAction) -> CreateModelServiceActionResult:
         service_prepare_ctx = action.creator.model_service_prepare_ctx
 
@@ -199,22 +288,25 @@ class ModelServingService:
             chunks = None
 
         if chunks:
-            raw_service_definition = chunks.decode("utf-8")
-            service_definition = tomli.loads(raw_service_definition)
+            overrides = self._apply_service_definition_overrides(
+                service_definition_toml=chunks.decode("utf-8"),
+                runtime_variant=action.creator.runtime_variant,
+                user_requested_variables=ApiRequestedServiceConfig(
+                    image=action.creator.image,
+                    architecture=action.creator.architecture,
+                    resource_slots=action.creator.config.resources,
+                    environ=action.creator.config.environ,
+                ),
+            )
 
-            definition = action.creator.runtime_variant
-            if definition in service_definition:
-                variant_def = ModelServiceDefinition.model_validate(service_definition[definition])
-                if variant_def.resource_slots:
-                    action.creator.config.resources = variant_def.resource_slots
-                if variant_def.environment:
-                    action.creator.image = variant_def.environment.image
-                    action.creator.architecture = variant_def.environment.architecture
-                if variant_def.environ:
-                    if action.creator.config.environ:
-                        action.creator.config.environ.update(variant_def.environ)
-                    else:
-                        action.creator.config.environ = variant_def.environ
+            if overrides.image is not None:
+                action.creator.image = overrides.image
+            if overrides.architecture is not None:
+                action.creator.architecture = overrides.architecture
+            if overrides.resource_slots is not None:
+                action.creator.config.resources = overrides.resource_slots
+            if overrides.environ is not None:
+                action.creator.config.environ = overrides.environ
 
         creation_config = action.creator.config.to_dict()
         creation_config["mounts"] = [
@@ -408,6 +500,38 @@ class ModelServingService:
     async def dry_run(self, action: DryRunModelServiceAction) -> DryRunModelServiceActionResult:
         # TODO: Seperate background task definition and trigger into different layer
         service_prepare_ctx = action.model_service_prepare_ctx
+
+        # Get model vfolder for service definition
+        model_vfolder_row = await self._repository.get_vfolder_by_id(service_prepare_ctx.model_id)
+        if model_vfolder_row:
+            try:
+                chunks = await self._fetch_file_from_storage_proxy(
+                    "service-definition.toml", model_vfolder_row
+                )
+            except UnexpectedStorageProxyResponseError:
+                chunks = None
+
+            if chunks:
+                overrides = self._apply_service_definition_overrides(
+                    service_definition_toml=chunks.decode("utf-8"),
+                    runtime_variant=action.runtime_variant,
+                    user_requested_variables=ApiRequestedServiceConfig(
+                        image=action.image,
+                        architecture=action.architecture,
+                        resource_slots=action.config.resources,
+                        environ=action.config.environ,
+                    ),
+                )
+
+                if overrides.image is not None:
+                    action.image = overrides.image
+                if overrides.architecture is not None:
+                    action.architecture = overrides.architecture
+                if overrides.resource_slots is not None:
+                    action.config.resources = overrides.resource_slots
+                if overrides.environ is not None:
+                    action.config.environ = overrides.environ
+
         # Get user with keypair
         created_user = await self._repository.get_user_with_keypair(action.request_user_id)
         if not created_user:

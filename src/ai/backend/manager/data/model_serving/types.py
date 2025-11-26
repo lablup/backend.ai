@@ -27,12 +27,34 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.deployment.types import RouteStatus
 
 __all__ = [
-    "EndpointLifecycle",
-    "EndpointData",
-    "RoutingData",
-    "EndpointTokenData",
+    "ApiRequestedServiceConfig",
     "EndpointAutoScalingRuleData",
+    "EndpointData",
+    "EndpointLifecycle",
+    "EndpointTokenData",
+    "RoutingData",
+    "ServiceDefinitionOverrideResult",
 ]
+
+
+@dataclass
+class ApiRequestedServiceConfig:
+    """Service configuration values from API request."""
+
+    image: Optional[str]
+    architecture: Optional[str]
+    resource_slots: Optional[dict[str, Any]]
+    environ: Optional[dict[str, str]]
+
+
+@dataclass
+class ServiceDefinitionOverrideResult:
+    """Result of merging service definition with API request."""
+
+    image: Optional[str]
+    architecture: Optional[str]
+    resource_slots: Optional[dict[str, Any]]
+    environ: Optional[dict[str, str]]
 
 
 @dataclass
