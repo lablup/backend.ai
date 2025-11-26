@@ -37,7 +37,7 @@ class AgentInfo(BaseModel):
     @field_validator("slot_key_and_units", mode="before")
     @classmethod
     def normalize_slot_keys(
-        cls, value: dict[str, SlotTypes] | dict[SlotName, SlotTypes]
+        cls, value: dict[str | SlotName, SlotTypes]
     ) -> dict[SlotName, SlotTypes]:
         """Convert string keys to SlotName instances for backward compatibility with older agents."""
         if not isinstance(value, dict):
