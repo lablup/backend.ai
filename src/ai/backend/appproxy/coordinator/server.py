@@ -74,7 +74,6 @@ from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiv
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK, RedisRole
-from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.event_types.model_serving.anycast import (
@@ -112,7 +111,7 @@ from ai.backend.logging.otel import OpenTelemetrySpec
 from . import __version__
 from .config import ServerConfig
 from .config import load as load_config
-from .defs import EVENT_DISPATCHER_CONSUMER_GROUP, LockID
+from .defs import EVENT_DISPATCHER_CONSUMER_GROUP
 from .health.database import DatabaseHealthChecker
 from .models import Circuit, Endpoint, Worker
 from .models.utils import execute_with_txn_retry
@@ -352,6 +351,89 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @asynccontextmanager
+async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    """
+    Initialize leader election for distributed periodic task coordination.
+
+    This replaces the GlobalTimer-based approach with a leader-based approach
+    where only the elected leader coordinator instance runs periodic tasks.
+    """
+    import socket
+
+    from ai.backend.appproxy.common.events import (
+        DoCheckWorkerLostEvent,
+        DoHealthCheckEvent,
+    )
+    from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
+    from ai.backend.common.leader import ValkeyLeaderElection, ValkeyLeaderElectionConfig
+    from ai.backend.common.leader.tasks import (
+        EventProducerTask,
+        EventTaskSpec,
+        LeaderCron,
+        PeriodicTask,
+    )
+
+    # Create ValkeyLeaderClient for leader election
+    redis_profile_target = RedisProfileTarget.from_dict(root_ctx.local_config.redis.to_dict())
+    valkey_leader_client = await ValkeyLeaderClient.create(
+        valkey_target=redis_profile_target.profile_target(RedisRole.STREAM).to_valkey_target(),
+        db_id=REDIS_STREAM_LOCK,
+        human_readable_name="appproxy-leader",
+    )
+
+    # Create leader election configuration
+    server_id = f"appproxy-coordinator-{socket.gethostname()}-{root_ctx.pidx}"
+    leader_config = ValkeyLeaderElectionConfig(
+        server_id=server_id,
+        leader_key="leader:appproxy:coordinator",
+        lease_duration=30,
+        renewal_interval=10.0,
+        failure_threshold=3,
+    )
+
+    # Create leader election instance
+    root_ctx.leader_election = ValkeyLeaderElection(
+        leader_client=valkey_leader_client,
+        config=leader_config,
+    )
+
+    # Create task specs for all periodic tasks
+    task_specs: list[EventTaskSpec] = [
+        EventTaskSpec(
+            name="health_check",
+            event_factory=lambda: DoHealthCheckEvent(),
+            interval=root_ctx.local_config.proxy_coordinator.health_check_timer_interval,
+            initial_delay=5.0,
+        ),
+        EventTaskSpec(
+            name="unused_port_collection",
+            event_factory=lambda: DoCheckUnusedPortEvent(),
+            interval=10.0,
+            initial_delay=5.0,
+        ),
+        EventTaskSpec(
+            name="worker_lost_check",
+            event_factory=lambda: DoCheckWorkerLostEvent(),
+            interval=15.0,
+            initial_delay=10.0,
+        ),
+    ]
+
+    # Create and register LeaderCron
+    leader_tasks: list[PeriodicTask] = [
+        EventProducerTask(spec, root_ctx.event_producer) for spec in task_specs
+    ]
+    leader_cron = LeaderCron(tasks=leader_tasks)
+    root_ctx.leader_election.register_task(leader_cron)
+
+    await root_ctx.leader_election.start()
+    try:
+        yield
+    finally:
+        await root_ctx.leader_election.stop()
+
+
+@asynccontextmanager
 async def etcd_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     if root_ctx.local_config.proxy_coordinator.enable_traefik:
         traefik_config = root_ctx.local_config.proxy_coordinator.traefik
@@ -536,19 +618,10 @@ async def health_check_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         None,
         _check_health,
     )
-    health_check_timer = GlobalTimer(
-        root_ctx.distributed_lock_factory(LockID.LOCKID_HEALTH_CHECK, 10.0),
-        root_ctx.event_producer,
-        lambda: DoHealthCheckEvent(),
-        root_ctx.local_config.proxy_coordinator.health_check_timer_interval,
-        initial_delay=5.0,
-        task_name="health_check_task",
-    )
-    await health_check_timer.join()
+    # Note: Timer is now managed by leader_election_ctx via LeaderCron
     try:
         yield
     finally:
-        await health_check_timer.leave()
         root_ctx.event_dispatcher.unconsume(health_check_evh)
         await health_engine.stop()
 
@@ -620,20 +693,10 @@ async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[Non
         None,
         _collect,
     )
-    unused_port_collection_timer = GlobalTimer(
-        root_ctx.distributed_lock_factory(LockID.LOCKID_UNUSED_PORT, 10.0),
-        root_ctx.event_producer,
-        lambda: DoCheckUnusedPortEvent(),
-        # this number does not represent inactivity threshold; actual limit value is defined at root_ctx.local_config
-        10.0,
-        initial_delay=5.0,
-        task_name="check_unused_port_task",
-    )
-    await unused_port_collection_timer.join()
+    # Note: Timer is now managed by leader_election_ctx via LeaderCron
     try:
         yield
     finally:
-        await unused_port_collection_timer.leave()
         root_ctx.event_dispatcher.unconsume(unused_port_collection_evh)
 
 
@@ -889,6 +952,7 @@ def build_root_app(
             distributed_lock_ctx,
             database_ctx,
             event_dispatcher_ctx,
+            leader_election_ctx,
             etcd_ctx,
             circuit_manager_ctx,
             health_probe_ctx,
