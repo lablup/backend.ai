@@ -58,9 +58,9 @@ class ScalingGroup(Node):
             wsproxy_addr=data.wsproxy_addr,
             wsproxy_api_token=data.wsproxy_api_token,
             driver=data.driver,
-            driver_opts=data.driver_opts,
+            driver_opts=JSONString.serialize(data.driver_opts),
             scheduler=data.scheduler,
-            scheduler_opts=data.scheduler_opts,
+            scheduler_opts=JSONString.serialize(data.scheduler_opts),
             use_host_network=data.use_host_network,
         )
 
