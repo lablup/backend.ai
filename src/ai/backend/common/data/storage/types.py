@@ -19,7 +19,7 @@ class ArtifactStorageImportStep(enum.StrEnum):
 
 
 @dataclass
-class SharedObjectStorageData:
+class ObjectStorageStatefulData:
     """
     Shared object storage data type for common components.
     This is a copy of manager's ObjectStorageData without the to_dto method.
@@ -35,7 +35,7 @@ class SharedObjectStorageData:
 
 
 @dataclass
-class SharedVFSStorageData:
+class VFSStorageStatefulData:
     """
     Shared VFS storage data type for common components.
     This is a copy of manager's VFSStorageData.
