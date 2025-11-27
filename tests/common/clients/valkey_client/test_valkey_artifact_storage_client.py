@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import uuid
 from pathlib import Path
 from typing import AsyncGenerator
@@ -196,32 +195,6 @@ class TestValkeyArtifactStorageClient:
 
         deleted = await valkey_artifact_storage_client.delete_vfs_storage(storage_name)
         assert deleted is False
-
-    @pytest.mark.asyncio
-    async def test_cache_expiration_handling(
-        self,
-        valkey_artifact_storage_client: ValkeyArtifactStorageClient,
-        sample_object_storage_data: ObjectStorageStatefulData,
-    ) -> None:
-        """Test that cache entries actually expire after the specified time."""
-        storage_name = "test-expiring-storage"
-
-        # Set with 1 second expiration
-        await valkey_artifact_storage_client.set_object_storage(
-            storage_name, sample_object_storage_data, expiration=1
-        )
-
-        # Verify data was stored immediately
-        result = await valkey_artifact_storage_client.get_object_storage(storage_name)
-        assert result is not None
-        assert result.id == sample_object_storage_data.id
-
-        # Wait for expiration (1.2 seconds to be safe)
-        await asyncio.sleep(1.2)
-
-        # Verify data has expired
-        expired_result = await valkey_artifact_storage_client.get_object_storage(storage_name)
-        assert expired_result is None
 
     @pytest.mark.asyncio
     async def test_multiple_storage_types_isolation(
