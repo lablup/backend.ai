@@ -102,7 +102,6 @@ class AgentProcessors(AbstractProcessorPackage):
             WatcherAgentStopAction.spec(),
             RecalculateUsageAction.spec(),
             GetTotalResourcesAction.spec(),
-            HandleHeartbeatAction.spec(),
             RemoveAgentFromImagesAction.spec(),
             RemoveAgentFromImagesByCanonicalsAction.spec(),
         ]
