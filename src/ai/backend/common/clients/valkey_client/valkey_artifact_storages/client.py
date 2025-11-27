@@ -12,6 +12,7 @@ from ai.backend.common.clients.valkey_client.client import (
     create_valkey_client,
 )
 from ai.backend.common.data.object_storage.types import ObjectStorageData
+from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.data.vfs_storage.types import VFSStorageData
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.json import dump_json_str, load_json
@@ -103,15 +104,15 @@ class ValkeyArtifactStorageClient:
         """Ping the Valkey server to check connection health."""
         await self._client.ping()
 
-    def _make_storage_key(self, storage_type: str, storage_name: str) -> str:
+    def _make_storage_key(self, storage_type: ArtifactStorageType, storage_name: str) -> str:
         """
         Generate a cache key for artifact storage.
 
-        :param storage_type: The type of storage (e.g., 'object_storage', 'vfs_storage').
+        :param storage_type: The type of storage.
         :param storage_name: The name of the storage.
         :return: The formatted cache key.
         """
-        return f"artifact_storages.{storage_type}.{storage_name}"
+        return f"artifact_storages.{storage_type.value}.{storage_name}"
 
     @valkey_artifact_storages_resilience.apply()
     async def set_object_storage(
@@ -127,7 +128,7 @@ class ValkeyArtifactStorageClient:
         :param storage_data: The storage data to cache.
         :param expiration: The cache expiration time in seconds.
         """
-        key = self._make_storage_key("object_storage", storage_name)
+        key = self._make_storage_key(ArtifactStorageType.OBJECT_STORAGE, storage_name)
         value = dump_json_str(dataclasses.asdict(storage_data))
         await self._client.client.set(
             key=key,
@@ -147,7 +148,7 @@ class ValkeyArtifactStorageClient:
         :param storage_name: The name of the object storage.
         :return: The cached storage data or None if not found.
         """
-        key = self._make_storage_key("object_storage", storage_name)
+        key = self._make_storage_key(ArtifactStorageType.OBJECT_STORAGE, storage_name)
         value = await self._client.client.get(key)
         if value is None:
             log.debug("Cache miss for object storage {}", storage_name)
@@ -171,7 +172,7 @@ class ValkeyArtifactStorageClient:
         :param storage_name: The name of the object storage.
         :return: True if the key was deleted, False otherwise.
         """
-        key = self._make_storage_key("object_storage", storage_name)
+        key = self._make_storage_key(ArtifactStorageType.OBJECT_STORAGE, storage_name)
         result = await self._client.client.delete([key])
         deleted = result > 0
         if deleted:
@@ -192,7 +193,7 @@ class ValkeyArtifactStorageClient:
         :param storage_data: The storage data to cache.
         :param expiration: The cache expiration time in seconds.
         """
-        key = self._make_storage_key("vfs_storage", storage_name)
+        key = self._make_storage_key(ArtifactStorageType.VFS_STORAGE, storage_name)
         # Convert Path to string for JSON serialization
         data_dict = dataclasses.asdict(storage_data)
         data_dict["base_path"] = str(data_dict["base_path"])
@@ -215,7 +216,7 @@ class ValkeyArtifactStorageClient:
         :param storage_name: The name of the VFS storage.
         :return: The cached storage data or None if not found.
         """
-        key = self._make_storage_key("vfs_storage", storage_name)
+        key = self._make_storage_key(ArtifactStorageType.VFS_STORAGE, storage_name)
         value = await self._client.client.get(key)
         if value is None:
             log.debug("Cache miss for VFS storage {}", storage_name)
@@ -243,7 +244,7 @@ class ValkeyArtifactStorageClient:
         :param storage_name: The name of the VFS storage.
         :return: True if the key was deleted, False otherwise.
         """
-        key = self._make_storage_key("vfs_storage", storage_name)
+        key = self._make_storage_key(ArtifactStorageType.VFS_STORAGE, storage_name)
         result = await self._client.client.delete([key])
         deleted = result > 0
         if deleted:
