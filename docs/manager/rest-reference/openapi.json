@@ -51,7 +51,8 @@
           "gitlab",
           "ecr",
           "ecr-public",
-          "local"
+          "local",
+          "ocp"
         ],
         "title": "ContainerRegistryType",
         "type": "string"

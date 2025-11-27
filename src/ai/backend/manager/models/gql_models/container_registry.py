@@ -319,7 +319,7 @@ class CreateContainerRegistryNode(graphene.Mutation):
         url = graphene.String(required=True, description="Added in 24.09.0.")
         type = ContainerRegistryTypeField(
             required=True,
-            description=f"Added in 24.09.0. Registry type. One of {ContainerRegistryTypeField.allowed_values}.",
+            description=f"Added in 24.09.0. Container Registry type. One of {ContainerRegistryTypeField.allowed_values}.",
         )
         registry_name = graphene.String(required=True, description="Added in 24.09.0.")
         is_global = graphene.Boolean(description="Added in 24.09.0.")
@@ -401,7 +401,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):
         )
         url = graphene.String(description="Added in 24.09.0.")
         type = ContainerRegistryTypeField(
-            description=f"Registry type. One of {ContainerRegistryTypeField.allowed_values}. Added in 24.09.0."
+            description=f"Container Registry type. One of {ContainerRegistryTypeField.allowed_values}. Added in 24.09.0."
         )
         registry_name = graphene.String(description="Added in 24.09.0.")
         is_global = graphene.Boolean(description="Added in 24.09.0.")

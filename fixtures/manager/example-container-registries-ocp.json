@@ -1,0 +1,13 @@
+{
+    "container_registries": [
+        {
+            "id": "7a92d3c1-5f4e-4829-b8e6-2d9c1a3f7e56",
+            "registry_name": "default-route-openshift-image-registry.apps-crc.testing",
+            "url": "https://default-route-openshift-image-registry.apps-crc.testing",
+            "type": "ocp",
+            "project": "openshift",
+            "username": "kubeadmin",
+            "password": "<ocp_token>"
+        }
+    ]
+}
