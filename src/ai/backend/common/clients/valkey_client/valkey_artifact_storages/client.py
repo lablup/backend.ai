@@ -49,7 +49,7 @@ valkey_artifact_storages_resilience = Resilience(
     ]
 )
 
-_DEFAULT_CACHE_EXPIRATION = 60 * 60  # 1 hour
+_EXPIRATION = 60 * 60 * 24  # 24 hours
 
 
 class ValkeyArtifactStorageClient:
@@ -121,21 +121,19 @@ class ValkeyArtifactStorageClient:
         self,
         storage_name: str,
         storage_data: ObjectStorageStatefulData,
-        expiration: int = _DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         """
         Cache object storage data.
 
         :param storage_name: The name of the object storage.
         :param storage_data: The storage data to cache.
-        :param expiration: The cache expiration time in seconds.
         """
         key = self._make_storage_key(ArtifactStorageType.OBJECT_STORAGE, storage_name)
         value = dump_json_str(dataclasses.asdict(storage_data))
         await self._client.client.set(
             key=key,
             value=value,
-            expiry=ExpirySet(ExpiryType.SEC, expiration),
+            expiry=ExpirySet(ExpiryType.SEC, _EXPIRATION),
         )
         log.debug("Cached object storage data for {}", storage_name)
 
@@ -186,14 +184,12 @@ class ValkeyArtifactStorageClient:
         self,
         storage_name: str,
         storage_data: VFSStorageStatefulData,
-        expiration: int = _DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         """
         Cache VFS storage data.
 
         :param storage_name: The name of the VFS storage.
         :param storage_data: The storage data to cache.
-        :param expiration: The cache expiration time in seconds.
         """
         key = self._make_storage_key(ArtifactStorageType.VFS_STORAGE, storage_name)
         # Convert Path to string for JSON serialization
@@ -203,7 +199,7 @@ class ValkeyArtifactStorageClient:
         await self._client.client.set(
             key=key,
             value=value,
-            expiry=ExpirySet(ExpiryType.SEC, expiration),
+            expiry=ExpirySet(ExpiryType.SEC, _EXPIRATION),
         )
         log.debug("Cached VFS storage data for {}", storage_name)
 
