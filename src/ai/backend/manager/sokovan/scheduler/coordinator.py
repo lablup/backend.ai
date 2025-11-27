@@ -41,6 +41,7 @@ from .handlers import (
     StartSessionsHandler,
     SweepLostAgentKernelsHandler,
     SweepSessionsHandler,
+    SweepStaleKernelsHandler,
     TerminateSessionsHandler,
 )
 from .kernel import KernelStateEngine
@@ -139,6 +140,9 @@ class ScheduleCoordinator:
             ScheduleType.SWEEP: SweepSessionsHandler(self._scheduler, self._scheduler._repository),
             ScheduleType.SWEEP_LOST_AGENT_KERNELS: SweepLostAgentKernelsHandler(
                 self._scheduler, self._scheduler._repository
+            ),
+            ScheduleType.SWEEP_STALE_KERNELS: SweepStaleKernelsHandler(
+                self._valkey_schedule, self._scheduler, self._scheduler._repository
             ),
             ScheduleType.CHECK_PULLING_PROGRESS: CheckPullingProgressHandler(
                 self._scheduler, self._scheduling_controller, self._event_producer
@@ -384,6 +388,13 @@ class ScheduleCoordinator:
             # Sweep lost agent kernels - maintenance task to clean up kernels with lost agents
             SchedulerTaskSpec(
                 ScheduleType.SWEEP_LOST_AGENT_KERNELS,
+                short_interval=None,  # No short-cycle task for maintenance
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            # Sweep stale kernels - maintenance task to clean up kernels with stale presence
+            SchedulerTaskSpec(
+                ScheduleType.SWEEP_STALE_KERNELS,
                 short_interval=None,  # No short-cycle task for maintenance
                 long_interval=60.0,
                 initial_delay=30.0,

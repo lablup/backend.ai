@@ -139,7 +139,7 @@ class TerminatingKernelWithAgentData:
     session_id: SessionId
     status: KernelStatus
     agent_id: Optional[AgentId]
-    agent_status: Optional[str]  # Agent status from AgentRow  # Agent status from AgentRow
+    agent_status: Optional[str]  # Agent status from AgentRow
 
 
 @dataclass

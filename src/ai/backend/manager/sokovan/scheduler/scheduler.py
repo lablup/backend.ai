@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from itertools import groupby
 from typing import Any, Awaitable, Optional
+from uuid import UUID
 
 import aiotools
 import async_timeout
@@ -13,6 +14,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
+from ai.backend.common.clients.valkey_client.valkey_schedule import HealthCheckStatus
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events.dispatcher import EventProducer
@@ -81,6 +83,7 @@ from .types import (
     SessionDataForPull,
     SessionDataForStart,
     SessionRunningData,
+    SessionTransitionData,
     SessionWorkload,
     SystemSnapshot,
 )
@@ -780,6 +783,136 @@ class Scheduler:
         )
 
         return ScheduleResult()
+
+    async def sweep_stale_kernels(self) -> ScheduleResult:
+        """
+        Sweep kernels with stale presence status.
+
+        This method:
+        1. Gets RUNNING sessions with RUNNING kernels
+        2. Checks presence status in Redis
+        3. Filters STALE kernels
+        4. Calls agent RPC to confirm if kernel is truly dead
+        5. Marks sessions with confirmed dead kernels as TERMINATING
+
+        Returns:
+            ScheduleResult with processed session info for post-processing
+        """
+        # 1. Get RUNNING sessions with RUNNING kernels
+        running_sessions = await self._repository.get_sessions_for_transition(
+            session_statuses=[SessionStatus.RUNNING],
+            kernel_statuses=[KernelStatus.RUNNING],
+        )
+
+        if not running_sessions:
+            log.debug("No running sessions to check for staleness")
+            return ScheduleResult()
+
+        # 2. Extract kernel IDs and check presence status in Redis
+        running_kernel_ids = [
+            KernelId(UUID(k.kernel_id)) for session in running_sessions for k in session.kernels
+        ]
+
+        if not running_kernel_ids:
+            log.debug("No running kernels to check for staleness")
+            return ScheduleResult()
+
+        log.debug("Checking presence status for {} running kernels", len(running_kernel_ids))
+
+        statuses = await self._valkey_schedule.check_kernel_presence_status_batch(
+            running_kernel_ids
+        )
+
+        # 3. Filter STALE kernels (status is None or presence == STALE)
+        stale_kernel_id_set = {
+            str(kernel_id)
+            for kernel_id in running_kernel_ids
+            if (status := statuses.get(kernel_id)) is None
+            or status.presence == HealthCheckStatus.STALE
+        }
+
+        if not stale_kernel_id_set:
+            log.debug("No stale kernels found")
+            return ScheduleResult()
+
+        # 4. Filter sessions with stale kernels
+        sessions_with_stale_kernels = [
+            session
+            for session in running_sessions
+            if any(k.kernel_id in stale_kernel_id_set for k in session.kernels)
+        ]
+
+        log.info(
+            "Found {} stale kernels, checking {} sessions via agent RPC",
+            len(stale_kernel_id_set),
+            len(sessions_with_stale_kernels),
+        )
+
+        # 5. Check with agent RPC (only explicit False terminates)
+        dead_sessions: list[SessionTransitionData] = []
+
+        for session in sessions_with_stale_kernels:
+            for kernel in session.kernels:
+                if kernel.kernel_id not in stale_kernel_id_set:
+                    continue
+                try:
+                    agent_client = self._agent_pool.get_agent_client(kernel.agent_id)
+                    is_running = await agent_client.check_running(kernel.kernel_id)
+                    if is_running is False:
+                        log.info(
+                            "Kernel {} confirmed not running on agent {}",
+                            kernel.kernel_id,
+                            kernel.agent_id,
+                        )
+                        dead_sessions.append(session)
+                        break  # One dead kernel is enough to terminate the session
+                except Exception as e:
+                    # RPC failed - skip, will retry in next sweep
+                    log.warning(
+                        "Failed to check kernel {} status on agent {}: {}. Skipping.",
+                        kernel.kernel_id,
+                        kernel.agent_id,
+                        e,
+                    )
+
+        if not dead_sessions:
+            log.debug("No dead kernels confirmed after agent RPC checks")
+            return ScheduleResult()
+
+        log.info("Confirmed {} sessions with dead kernels", len(dead_sessions))
+
+        # 6. Mark sessions as TERMINATING
+        dead_session_ids = [s.session_id for s in dead_sessions]
+        mark_result = await self._repository.mark_sessions_terminating(
+            dead_session_ids,
+            reason="STALE_KERNEL",
+        )
+
+        log.info(
+            "Marked {} sessions for termination due to stale kernels "
+            "(cancelled: {}, terminating: {}, skipped: {})",
+            len(dead_session_ids),
+            len(mark_result.cancelled_sessions),
+            len(mark_result.terminating_sessions),
+            len(mark_result.skipped_sessions),
+        )
+
+        # 7. Build ScheduleResult with processed session info
+        processed_session_ids = set(
+            mark_result.cancelled_sessions + mark_result.terminating_sessions
+        )
+        scheduled_sessions = [
+            ScheduledSessionData(
+                session_id=session.session_id,
+                creation_id=session.creation_id,
+                access_key=session.access_key,
+                reason="STALE_KERNEL",
+            )
+            for session in dead_sessions
+            if session.session_id in processed_session_ids
+        ]
+
+        return ScheduleResult(scheduled_sessions=scheduled_sessions)
 
     async def check_pulling_progress(self) -> ScheduleResult:
         """
