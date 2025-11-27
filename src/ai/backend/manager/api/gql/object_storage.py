@@ -8,6 +8,7 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
+from ai.backend.common.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
@@ -21,7 +22,6 @@ from ai.backend.manager.services.storage_namespace.actions.get_multi import (
 
 from ...data.object_storage.creator import ObjectStorageCreator
 from ...data.object_storage.modifier import ObjectStorageModifier
-from ...data.object_storage.types import ObjectStorageData
 from ...services.object_storage.actions.create import CreateObjectStorageAction
 from ...services.object_storage.actions.delete import DeleteObjectStorageAction
 from ...services.object_storage.actions.get import GetObjectStorageAction

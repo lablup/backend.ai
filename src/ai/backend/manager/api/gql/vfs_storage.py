@@ -7,11 +7,11 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
+from ai.backend.common.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.api.gql.base import to_global_id
 
 from ...data.vfs_storage.creator import VFSStorageCreator
 from ...data.vfs_storage.modifier import VFSStorageModifier
-from ...data.vfs_storage.types import VFSStorageData
 from ...services.vfs_storage.actions.create import CreateVFSStorageAction
 from ...services.vfs_storage.actions.delete import DeleteVFSStorageAction
 from ...services.vfs_storage.actions.get import GetVFSStorageAction
