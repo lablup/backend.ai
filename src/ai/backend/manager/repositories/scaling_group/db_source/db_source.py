@@ -49,7 +49,7 @@ class ScalingGroupDBSource:
                 fallback_count_table=ScalingGroupRow,
             )
 
-            items = [row.ScalingGroupRow.to_data() for row in result.rows]
+            items = [row.ScalingGroupRow.to_dataclass() for row in result.rows]
 
             return ScalingGroupListResult(
                 items=items,
