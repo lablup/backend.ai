@@ -80,6 +80,7 @@ from ai.backend.common.clients.valkey_client.valkey_container_log.client import 
     ValkeyContainerLogClient,
 )
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
+from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import model_definition_iv
@@ -89,6 +90,7 @@ from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
     REDIS_CONTAINER_LOG,
     REDIS_IMAGE_DB,
+    REDIS_LIVE_DB,
     REDIS_STATISTICS_DB,
     REDIS_STREAM_DB,
     UNKNOWN_CONTAINER_ID,
@@ -238,6 +240,7 @@ from .kernel import (
 )
 from .observer.heartbeat import HeartbeatObserver
 from .observer.host_port import HostPortObserver
+from .observer.kernel_presence import KernelPresenceObserver
 from .resources import (
     AbstractComputePlugin,
     ComputerContext,
@@ -943,6 +946,11 @@ class AbstractAgent(
             human_readable_name="agent.image",
             db_id=REDIS_IMAGE_DB,
         )
+        self.valkey_schedule_client = await ValkeyScheduleClient.create(
+            redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target(),
+            human_readable_name="agent.kernel_presence",
+            db_id=REDIS_LIVE_DB,
+        )
         self.background_task_manager = BackgroundTaskManager(
             self.event_producer,
             valkey_client=self.valkey_bgtask_client,
@@ -997,8 +1005,10 @@ class AbstractAgent(
         self._agent_runner = Runner(resources=[])
         container_observer = HeartbeatObserver(self, self.event_producer)
         host_port_observer = HostPortObserver(self)
+        kernel_presence_observer = KernelPresenceObserver(self, self.valkey_schedule_client)
         await self._agent_runner.register_observer(container_observer)
         await self._agent_runner.register_observer(host_port_observer)
+        await self._agent_runner.register_observer(kernel_presence_observer)
         await self._agent_runner.start()
 
         if abuse_report_path := self.local_config.agent.abuse_report_path:
