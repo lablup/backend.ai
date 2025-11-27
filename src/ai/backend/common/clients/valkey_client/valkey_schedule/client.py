@@ -692,7 +692,9 @@ class ValkeyScheduleClient:
                 continue
 
             hash_data = cast(dict[bytes, bytes], hgetall_result)
-            if not hash_data:
+            # Check for presence field - if missing, key was accidentally created by hset
+            # and should be treated as not found
+            if not hash_data or b"presence" not in hash_data:
                 result[kernel_id] = None
                 continue
 
