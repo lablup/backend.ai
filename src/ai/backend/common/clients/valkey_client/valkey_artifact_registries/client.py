@@ -49,7 +49,7 @@ valkey_artifact_registries_resilience = Resilience(
     ]
 )
 
-_DEFAULT_CACHE_EXPIRATION = 60 * 60  # 1 hour
+_EXPIRATION = 60 * 60 * 24  # 24 hours
 
 
 class ValkeyArtifactRegistryClient:
@@ -121,21 +121,19 @@ class ValkeyArtifactRegistryClient:
         self,
         registry_name: str,
         registry_data: HuggingFaceRegistryStatefulData,
-        expiration: int = _DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         """
         Cache HuggingFace registry data.
 
         :param registry_name: The name of the HuggingFace registry.
         :param registry_data: The registry data to cache.
-        :param expiration: The cache expiration time in seconds.
         """
         key = self._make_registry_key(ArtifactRegistryType.HUGGINGFACE, registry_name)
         value = dump_json_str(dataclasses.asdict(registry_data))
         await self._client.client.set(
             key=key,
             value=value,
-            expiry=ExpirySet(ExpiryType.SEC, expiration),
+            expiry=ExpirySet(ExpiryType.SEC, _EXPIRATION),
         )
         log.debug("Cached HuggingFace registry data for {}", registry_name)
 
@@ -186,21 +184,19 @@ class ValkeyArtifactRegistryClient:
         self,
         registry_name: str,
         registry_data: ReservoirRegistryStatefulData,
-        expiration: int = _DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         """
         Cache Reservoir registry data.
 
         :param registry_name: The name of the Reservoir registry.
         :param registry_data: The registry data to cache.
-        :param expiration: The cache expiration time in seconds.
         """
         key = self._make_registry_key(ArtifactRegistryType.RESERVOIR, registry_name)
         value = dump_json_str(dataclasses.asdict(registry_data))
         await self._client.client.set(
             key=key,
             value=value,
-            expiry=ExpirySet(ExpiryType.SEC, expiration),
+            expiry=ExpirySet(ExpiryType.SEC, _EXPIRATION),
         )
         log.debug("Cached Reservoir registry data for {}", registry_name)
 

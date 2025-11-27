@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import uuid
 from typing import AsyncGenerator
 
@@ -157,34 +156,6 @@ class TestValkeyArtifactRegistryClient:
         assert result.access_key == sample_reservoir_registry_data.access_key
         assert result.secret_key == sample_reservoir_registry_data.secret_key
         assert result.api_version == sample_reservoir_registry_data.api_version
-
-    @pytest.mark.asyncio
-    async def test_cache_expiration_handling(
-        self,
-        valkey_artifact_registry_client: ValkeyArtifactRegistryClient,
-        sample_huggingface_registry_data: HuggingFaceRegistryStatefulData,
-    ) -> None:
-        """Test that cache entries expire after the specified TTL."""
-        # Set with 1 second expiration
-        await valkey_artifact_registry_client.set_huggingface_registry(
-            sample_huggingface_registry_data.name, sample_huggingface_registry_data, expiration=1
-        )
-
-        # Verify data was stored
-        result = await valkey_artifact_registry_client.get_huggingface_registry(
-            sample_huggingface_registry_data.name
-        )
-        assert result is not None
-        assert result.name == sample_huggingface_registry_data.name
-
-        # Wait for expiration (1 second + small buffer for safety)
-        await asyncio.sleep(1.2)
-
-        # Verify data has expired
-        result_after_expiration = await valkey_artifact_registry_client.get_huggingface_registry(
-            sample_huggingface_registry_data.name
-        )
-        assert result_after_expiration is None
 
     @pytest.mark.asyncio
     async def test_multiple_registries_isolation(
