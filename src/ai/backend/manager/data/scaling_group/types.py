@@ -18,3 +18,11 @@ class ScalingGroupData:
     scheduler: str
     scheduler_opts: Mapping[str, Any]
     use_host_network: bool
+
+
+@dataclass
+class ScalingGroupListResult:
+    """Result of searching scaling groups."""
+
+    items: list[ScalingGroupData]
+    total_count: int

@@ -1,6 +1,7 @@
 import logging
 
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
     SearchScalingGroupsActionResult,
@@ -10,10 +11,20 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ScalingGroupService:
-    def __init__(self) -> None:
-        pass
+    _repository: ScalingGroupRepository
+
+    def __init__(self, repository: ScalingGroupRepository) -> None:
+        self._repository = repository
 
     async def search_scaling_groups(
         self, action: SearchScalingGroupsAction
     ) -> SearchScalingGroupsActionResult:
-        raise NotImplementedError("search_scaling_groups is not yet implemented")
+        """Searches scaling groups."""
+        result = await self._repository.search_scaling_groups(
+            querier=action.querier,
+        )
+
+        return SearchScalingGroupsActionResult(
+            scaling_groups=result.items,
+            total_count=result.total_count,
+        )
