@@ -8,6 +8,7 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
+from ai.backend.common.data.artifact_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
@@ -15,7 +16,6 @@ from ai.backend.manager.data.artifact_registries.types import (
 )
 from ai.backend.manager.data.huggingface_registry.creator import HuggingFaceRegistryCreator
 from ai.backend.manager.data.huggingface_registry.modifier import HuggingFaceRegistryModifier
-from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
 )

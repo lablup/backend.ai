@@ -8,7 +8,7 @@ import yarl
 from dateutil.tz import tzutc
 
 from ai.backend.common.auth.utils import generate_signature
-from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
+from ai.backend.common.data.artifact_registry.types import ReservoirRegistryData
 from ai.backend.manager.dto.request import (
     DelegateImportArtifactsReq,
     DelegateScanArtifactsReq,

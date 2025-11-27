@@ -10,7 +10,7 @@ from ai.backend.manager.data.artifact_registries.types import (
 )
 from ai.backend.manager.data.reservoir_registry.creator import ReservoirRegistryCreator
 from ai.backend.manager.data.reservoir_registry.modifier import ReservoirRegistryModifier
-from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
+from ai.backend.common.data.artifact_registry.types import ReservoirRegistryData
 from ai.backend.manager.errors.artifact import ArtifactNotFoundError
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact import ArtifactRow
