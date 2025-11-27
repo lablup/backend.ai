@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Optional, override
 
+from ai.backend.common.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.services.object_storage.actions.base import ObjectStorageAction
 
 

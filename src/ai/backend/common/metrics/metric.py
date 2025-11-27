@@ -447,6 +447,7 @@ class LayerType(enum.StrEnum):
 
     # Valkey client layers
     VALKEY_ARTIFACT = "valkey_artifact"
+    VALKEY_ARTIFACT_STORAGES = "valkey_artifact_storages"
     VALKEY_CONTAINER_LOG = "valkey_container_log"
     VALKEY_IMAGE = "valkey_image"
     VALKEY_LIVE = "valkey_live"

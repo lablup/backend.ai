@@ -2,6 +2,8 @@ import logging
 from typing import Callable
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.object_storage.types import ObjectStorageData
+from ai.backend.common.data.vfs_storage.types import VFSStorageData
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
     DoScanReservoirRegistryEvent,
 )
@@ -14,8 +16,6 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
-from ai.backend.manager.data.object_storage.types import ObjectStorageData
-from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.errors.artifact_registry import ReservoirConnectionError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository

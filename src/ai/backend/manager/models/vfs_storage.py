@@ -6,8 +6,8 @@ from pathlib import Path
 import sqlalchemy as sa
 from sqlalchemy.orm import foreign, relationship
 
+from ai.backend.common.data.vfs_storage.types import VFSStorageData
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 
 from .base import (

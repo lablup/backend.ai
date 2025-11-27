@@ -5,8 +5,8 @@ import logging
 import sqlalchemy as sa
 from sqlalchemy.orm import foreign, relationship
 
+from ai.backend.common.data.object_storage.types import ObjectStorageData
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 
 from .base import (
