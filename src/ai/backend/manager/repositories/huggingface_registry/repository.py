@@ -1,6 +1,5 @@
 import uuid
 
-from ai.backend.common.data.artifact_registry.types import HuggingFaceRegistryData
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -12,6 +11,7 @@ from ai.backend.manager.data.artifact_registries.types import (
 )
 from ai.backend.manager.data.huggingface_registry.creator import HuggingFaceRegistryCreator
 from ai.backend.manager.data.huggingface_registry.modifier import HuggingFaceRegistryModifier
+from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.huggingface_registry.db_source.db_source import (
     HuggingFaceDBSource,
