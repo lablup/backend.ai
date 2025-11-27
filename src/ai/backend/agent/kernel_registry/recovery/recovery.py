@@ -1,5 +1,4 @@
 import logging
-from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
@@ -7,9 +6,10 @@ from typing import Self
 from ai.backend.common.types import AgentId, KernelId
 from ai.backend.logging import BraceStyleAdapter
 
-from ....agent.kernel import AbstractKernel
+from ...kernel import AbstractKernel
 from ..loader.abc import AbstractKernelRegistryLoader
 from ..loader.pickle import PickleBasedKernelRegistryLoader
+from ..types import KernelRegistryType
 from ..writer.abc import AbstractKernelRegistryWriter
 from ..writer.pickle import PickleBasedKernelRegistryWriter
 from ..writer.types import KernelRegistrySaveMetadata
@@ -54,17 +54,16 @@ class KernelRegistryRecovery:
         )
 
     async def save_kernel_registry(
-        self, registry: Mapping[KernelId, AbstractKernel], metadata: KernelRegistrySaveMetadata
+        self, data: KernelRegistryType, metadata: KernelRegistrySaveMetadata
     ) -> None:
-        await self._writer.save_kernel_registry(registry, metadata)
+        await self._writer.save_kernel_registry(data, metadata)
 
-    async def load_kernel_registry(self) -> dict[KernelId, AbstractKernel]:
+    async def load_kernel_registry(self) -> KernelRegistryType:
         result: dict[KernelId, AbstractKernel] = {}
         for loader in self._loaders:
             try:
                 loaded = await loader.load_kernel_registry()
-                for kernel_id, kernel in loaded.items():
-                    result[kernel_id] = kernel
+                result.update(loaded)
             except Exception as e:
                 log.warning(
                     "Failed to load kernel registry using loader {}, skip (err: {})",

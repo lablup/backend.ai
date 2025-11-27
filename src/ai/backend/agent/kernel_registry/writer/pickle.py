@@ -2,14 +2,12 @@ import logging
 import os
 import pickle
 import time
-from collections.abc import Mapping
 from pathlib import Path
 from typing import override
 
-from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
 
-from ....agent.kernel import AbstractKernel
+from ..types import KernelRegistryType
 from .abc import AbstractKernelRegistryWriter
 from .types import KernelRegistrySaveMetadata
 
@@ -26,7 +24,7 @@ class PickleBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
 
     @override
     async def save_kernel_registry(
-        self, registry: Mapping[KernelId, AbstractKernel], metadata: KernelRegistrySaveMetadata
+        self, data: KernelRegistryType, metadata: KernelRegistrySaveMetadata
     ) -> None:
         now = time.monotonic()
         if (not metadata.force) and (now <= self._last_saved_time + SAVE_COOL_DOWN_SECONDS):
@@ -34,14 +32,14 @@ class PickleBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
         last_registry_file = self._last_registry_file_path
         try:
             with open(last_registry_file, "wb") as f:
-                pickle.dump(dict(registry), f)
+                pickle.dump(dict(data), f)
             self._last_saved_time = now
             log.debug("Saved kernel registry to {}", str(last_registry_file))
         except Exception as e:
             log.exception(
-                "Failed to save kernel registry to {} (registry: {})",
+                "Failed to save kernel registry to {} (error: {})",
                 str(last_registry_file),
-                str(registry),
+                str(e),
                 exc_info=e,
             )
             try:
