@@ -5,9 +5,9 @@ import logging
 import sqlalchemy as sa
 from sqlalchemy.orm import foreign, relationship
 
+from ai.backend.common.data.artifact_registry.types import HuggingFaceRegistryData
 from ai.backend.common.exception import RelationNotLoadedError
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 
 from .base import (
     Base,
