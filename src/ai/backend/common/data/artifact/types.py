@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import enum
-import uuid
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
@@ -145,21 +143,3 @@ class CombinedDownloadProgress(BaseModel):
         default=None,
         description="Remote download progress and status. None if not RESERVOIR type, required object if RESERVOIR type",
     )
-
-
-@dataclass
-class HuggingFaceRegistryData:
-    id: uuid.UUID
-    name: str
-    url: str
-    token: Optional[str]
-
-
-@dataclass
-class ReservoirRegistryData:
-    id: uuid.UUID
-    name: str
-    endpoint: str
-    access_key: str
-    secret_key: str
-    api_version: str
