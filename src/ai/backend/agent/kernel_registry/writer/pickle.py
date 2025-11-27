@@ -40,7 +40,6 @@ class PickleBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
                 "Failed to save kernel registry to {} (error: {})",
                 str(last_registry_file),
                 str(e),
-                exc_info=e,
             )
             try:
                 os.remove(last_registry_file)

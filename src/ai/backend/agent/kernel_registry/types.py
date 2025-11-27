@@ -15,6 +15,12 @@ KernelRegistryType = Mapping[KernelId, AbstractKernel]
 
 
 class KernelRecoveryData(BaseModel):
+    """
+    Data required for recovering a Kernel.
+    Agent should load and write Kernel data using this structure
+    rather than directly manipulating AbstractKernel instances.
+    """
+
     kernel_backend: AgentBackend
 
     id: KernelId
