@@ -3,7 +3,7 @@ import logging
 import secrets
 import uuid
 from http import HTTPStatus
-from typing import Any
+from typing import Any, cast
 
 import aiohttp
 import tomli
@@ -537,8 +537,9 @@ class ModelServingService:
             raise InvalidAPIParameters("User not found")
 
         image_row = await self._repository.resolve_image_for_endpoint_creation([
-            ImageIdentifier(action.image, action.architecture),
-            ImageAlias(action.image),
+            # image and architecture must be provided either from service definition or API request
+            ImageIdentifier(cast(str, action.image), cast(str, action.architecture)),
+            ImageAlias(cast(str, action.image)),
         ])
 
         creation_config = action.config.to_dict()
