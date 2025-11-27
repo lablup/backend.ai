@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from pathlib import Path
 from typing import AsyncGenerator
@@ -39,17 +40,12 @@ class TestValkeyArtifactStorageClient:
             await client.flush_database()
             await client.close()
 
-    @pytest.mark.asyncio
-    async def test_set_and_get_object_storage(
-        self,
-        valkey_artifact_storage_client: ValkeyArtifactStorageClient,
-    ) -> None:
-        """Test caching and retrieving object storage data."""
-        storage_uuid = uuid.uuid4()
-        storage_name = "test-object-storage"
-        storage_data = ObjectStorageData(
-            id=storage_uuid,
-            name=storage_name,
+    @pytest.fixture
+    def sample_object_storage_data(self) -> ObjectStorageData:
+        """Sample ObjectStorageData for testing"""
+        return ObjectStorageData(
+            id=uuid.uuid4(),
+            name="test-object-storage",
             host="s3.example.com",
             access_key="test-access-key",
             secret_key="test-secret-key",
@@ -57,20 +53,41 @@ class TestValkeyArtifactStorageClient:
             region="us-west-2",
         )
 
+    @pytest.fixture
+    def sample_vfs_storage_data(self) -> VFSStorageData:
+        """Sample VFSStorageData for testing"""
+        return VFSStorageData(
+            id=uuid.uuid4(),
+            name="test-vfs-storage",
+            host="vfs.example.com",
+            base_path=Path("/mnt/vfs/storage"),
+        )
+
+    @pytest.mark.asyncio
+    async def test_set_and_get_object_storage(
+        self,
+        valkey_artifact_storage_client: ValkeyArtifactStorageClient,
+        sample_object_storage_data: ObjectStorageData,
+    ) -> None:
+        """Test caching and retrieving object storage data."""
+        storage_name = "test-object-storage"
+
         # Set storage data
-        await valkey_artifact_storage_client.set_object_storage(storage_name, storage_data)
+        await valkey_artifact_storage_client.set_object_storage(
+            storage_name, sample_object_storage_data
+        )
 
         # Get storage data
         result = await valkey_artifact_storage_client.get_object_storage(storage_name)
 
         assert result is not None
-        assert result.id == storage_uuid
-        assert result.name == storage_name
-        assert result.host == "s3.example.com"
-        assert result.access_key == "test-access-key"
-        assert result.secret_key == "test-secret-key"
-        assert result.endpoint == "https://s3.example.com"
-        assert result.region == "us-west-2"
+        assert result.id == sample_object_storage_data.id
+        assert result.name == sample_object_storage_data.name
+        assert result.host == sample_object_storage_data.host
+        assert result.access_key == sample_object_storage_data.access_key
+        assert result.secret_key == sample_object_storage_data.secret_key
+        assert result.endpoint == sample_object_storage_data.endpoint
+        assert result.region == sample_object_storage_data.region
 
     @pytest.mark.asyncio
     async def test_get_nonexistent_object_storage(
@@ -88,22 +105,15 @@ class TestValkeyArtifactStorageClient:
     async def test_delete_object_storage(
         self,
         valkey_artifact_storage_client: ValkeyArtifactStorageClient,
+        sample_object_storage_data: ObjectStorageData,
     ) -> None:
         """Test deleting object storage cache."""
-        storage_uuid = uuid.uuid4()
         storage_name = "test-object-storage"
-        storage_data = ObjectStorageData(
-            id=storage_uuid,
-            name=storage_name,
-            host="s3.example.com",
-            access_key="test-access-key",
-            secret_key="test-secret-key",
-            endpoint="https://s3.example.com",
-            region="us-west-2",
-        )
 
         # Set storage data
-        await valkey_artifact_storage_client.set_object_storage(storage_name, storage_data)
+        await valkey_artifact_storage_client.set_object_storage(
+            storage_name, sample_object_storage_data
+        )
 
         # Delete storage data
         deleted = await valkey_artifact_storage_client.delete_object_storage(storage_name)
@@ -128,28 +138,22 @@ class TestValkeyArtifactStorageClient:
     async def test_set_and_get_vfs_storage(
         self,
         valkey_artifact_storage_client: ValkeyArtifactStorageClient,
+        sample_vfs_storage_data: VFSStorageData,
     ) -> None:
         """Test caching and retrieving VFS storage data."""
-        storage_uuid = uuid.uuid4()
         storage_name = "test-vfs-storage"
-        storage_data = VFSStorageData(
-            id=storage_uuid,
-            name=storage_name,
-            host="vfs.example.com",
-            base_path=Path("/mnt/vfs/storage"),
-        )
 
         # Set storage data
-        await valkey_artifact_storage_client.set_vfs_storage(storage_name, storage_data)
+        await valkey_artifact_storage_client.set_vfs_storage(storage_name, sample_vfs_storage_data)
 
         # Get storage data
         result = await valkey_artifact_storage_client.get_vfs_storage(storage_name)
 
         assert result is not None
-        assert result.id == storage_uuid
-        assert result.name == storage_name
-        assert result.host == "vfs.example.com"
-        assert result.base_path == Path("/mnt/vfs/storage")
+        assert result.id == sample_vfs_storage_data.id
+        assert result.name == sample_vfs_storage_data.name
+        assert result.host == sample_vfs_storage_data.host
+        assert result.base_path == sample_vfs_storage_data.base_path
 
     @pytest.mark.asyncio
     async def test_get_nonexistent_vfs_storage(
@@ -167,19 +171,13 @@ class TestValkeyArtifactStorageClient:
     async def test_delete_vfs_storage(
         self,
         valkey_artifact_storage_client: ValkeyArtifactStorageClient,
+        sample_vfs_storage_data: VFSStorageData,
     ) -> None:
         """Test deleting VFS storage cache."""
-        storage_uuid = uuid.uuid4()
         storage_name = "test-vfs-storage"
-        storage_data = VFSStorageData(
-            id=storage_uuid,
-            name=storage_name,
-            host="vfs.example.com",
-            base_path=Path("/mnt/vfs/storage"),
-        )
 
         # Set storage data
-        await valkey_artifact_storage_client.set_vfs_storage(storage_name, storage_data)
+        await valkey_artifact_storage_client.set_vfs_storage(storage_name, sample_vfs_storage_data)
 
         # Delete storage data
         deleted = await valkey_artifact_storage_client.delete_vfs_storage(storage_name)
@@ -204,30 +202,27 @@ class TestValkeyArtifactStorageClient:
     async def test_cache_expiration_handling(
         self,
         valkey_artifact_storage_client: ValkeyArtifactStorageClient,
+        sample_object_storage_data: ObjectStorageData,
     ) -> None:
-        """Test setting cache with custom expiration."""
-        storage_uuid = uuid.uuid4()
+        """Test that cache entries actually expire after the specified time."""
         storage_name = "test-expiring-storage"
-        storage_data = ObjectStorageData(
-            id=storage_uuid,
-            name=storage_name,
-            host="s3.example.com",
-            access_key="test-access-key",
-            secret_key="test-secret-key",
-            endpoint="https://s3.example.com",
-            region="us-west-2",
-        )
 
-        # Set with short expiration (1 second for testing purposes would be ideal,
-        # but for this test we just verify the API accepts the parameter)
+        # Set with 1 second expiration
         await valkey_artifact_storage_client.set_object_storage(
-            storage_name, storage_data, expiration=60
+            storage_name, sample_object_storage_data, expiration=1
         )
 
-        # Verify data was stored
+        # Verify data was stored immediately
         result = await valkey_artifact_storage_client.get_object_storage(storage_name)
         assert result is not None
-        assert result.name == storage_name
+        assert result.id == sample_object_storage_data.id
+
+        # Wait for expiration (1.2 seconds to be safe)
+        await asyncio.sleep(1.2)
+
+        # Verify data has expired
+        expired_result = await valkey_artifact_storage_client.get_object_storage(storage_name)
+        assert expired_result is None
 
     @pytest.mark.asyncio
     async def test_multiple_storage_types_isolation(
