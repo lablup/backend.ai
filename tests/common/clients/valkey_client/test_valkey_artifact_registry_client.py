@@ -10,8 +10,8 @@ from ai.backend.common.clients.valkey_client.valkey_artifact_registries.client i
     ValkeyArtifactRegistryClient,
 )
 from ai.backend.common.data.artifact_registry.types import (
-    HuggingFaceRegistrySharedData,
-    ReservoirRegistrySharedData,
+    HuggingFaceRegistryStatefulData,
+    ReservoirRegistryStatefulData,
 )
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import ValkeyTarget
@@ -42,9 +42,9 @@ class TestValkeyArtifactRegistryClient:
             await client.close()
 
     @pytest.fixture
-    def sample_huggingface_registry_data(self) -> HuggingFaceRegistrySharedData:
+    def sample_huggingface_registry_data(self) -> HuggingFaceRegistryStatefulData:
         """Sample HuggingFace registry data for testing."""
-        return HuggingFaceRegistrySharedData(
+        return HuggingFaceRegistryStatefulData(
             id=uuid.uuid4(),
             name="test-hf-registry",
             url="https://huggingface.co",
@@ -52,9 +52,9 @@ class TestValkeyArtifactRegistryClient:
         )
 
     @pytest.fixture
-    def sample_reservoir_registry_data(self) -> ReservoirRegistrySharedData:
+    def sample_reservoir_registry_data(self) -> ReservoirRegistryStatefulData:
         """Sample Reservoir registry data for testing."""
-        return ReservoirRegistrySharedData(
+        return ReservoirRegistryStatefulData(
             id=uuid.uuid4(),
             name="test-reservoir-registry",
             endpoint="https://reservoir.example.com",
@@ -67,7 +67,7 @@ class TestValkeyArtifactRegistryClient:
     async def test_set_and_get_huggingface_registry(
         self,
         valkey_artifact_registry_client: ValkeyArtifactRegistryClient,
-        sample_huggingface_registry_data: HuggingFaceRegistrySharedData,
+        sample_huggingface_registry_data: HuggingFaceRegistryStatefulData,
     ) -> None:
         """Test caching and retrieving HuggingFace registry data."""
         # Set registry data
@@ -102,7 +102,7 @@ class TestValkeyArtifactRegistryClient:
     async def test_delete_huggingface_registry(
         self,
         valkey_artifact_registry_client: ValkeyArtifactRegistryClient,
-        sample_huggingface_registry_data: HuggingFaceRegistrySharedData,
+        sample_huggingface_registry_data: HuggingFaceRegistryStatefulData,
     ) -> None:
         """Test deleting HuggingFace registry cache."""
         # Set registry data
@@ -137,7 +137,7 @@ class TestValkeyArtifactRegistryClient:
     async def test_set_and_get_reservoir_registry(
         self,
         valkey_artifact_registry_client: ValkeyArtifactRegistryClient,
-        sample_reservoir_registry_data: ReservoirRegistrySharedData,
+        sample_reservoir_registry_data: ReservoirRegistryStatefulData,
     ) -> None:
         """Test caching and retrieving Reservoir registry data."""
         # Set registry data
@@ -162,7 +162,7 @@ class TestValkeyArtifactRegistryClient:
     async def test_cache_expiration_handling(
         self,
         valkey_artifact_registry_client: ValkeyArtifactRegistryClient,
-        sample_huggingface_registry_data: HuggingFaceRegistrySharedData,
+        sample_huggingface_registry_data: HuggingFaceRegistryStatefulData,
     ) -> None:
         """Test that cache entries expire after the specified TTL."""
         # Set with 1 second expiration
@@ -190,8 +190,8 @@ class TestValkeyArtifactRegistryClient:
     async def test_multiple_registries_isolation(
         self,
         valkey_artifact_registry_client: ValkeyArtifactRegistryClient,
-        sample_huggingface_registry_data: HuggingFaceRegistrySharedData,
-        sample_reservoir_registry_data: ReservoirRegistrySharedData,
+        sample_huggingface_registry_data: HuggingFaceRegistryStatefulData,
+        sample_reservoir_registry_data: ReservoirRegistryStatefulData,
     ) -> None:
         """Test that different registry types are isolated from each other."""
         # Set both types with different names

@@ -6,8 +6,8 @@ from typing import Optional
 
 
 @dataclass
-class HuggingFaceRegistrySharedData:
-    """Shared data type for HuggingFace registry used in Valkey client."""
+class HuggingFaceRegistryStatefulData:
+    """Stateful data type for HuggingFace registry used in Valkey client."""
 
     id: uuid.UUID
     name: str
@@ -16,8 +16,8 @@ class HuggingFaceRegistrySharedData:
 
 
 @dataclass
-class ReservoirRegistrySharedData:
-    """Shared data type for Reservoir registry used in Valkey client."""
+class ReservoirRegistryStatefulData:
+    """Stateful data type for Reservoir registry used in Valkey client."""
 
     id: uuid.UUID
     name: str
