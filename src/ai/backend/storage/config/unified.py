@@ -643,6 +643,14 @@ class VFSStorageConfig(BaseConfigSchema):
         """,
         examples=["models", "datasets", "user-data"],
     )
+    temporary: bool = Field(
+        default=False,
+        description="""
+        If True, all files in the storage will be cleared when the server starts.
+        Useful for temporary storage that should be cleaned up on restart.
+        """,
+        examples=[True, False],
+    )
     upload_chunk_size: int = Field(
         default=65536,  # 64KB
         ge=1024,  # Minimum 1KB
