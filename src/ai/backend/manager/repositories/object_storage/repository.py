@@ -1,5 +1,6 @@
 import uuid
 
+from ai.backend.common.data.object_storage.types import ObjectStorageData
 from ai.backend.common.exception import (
     BackendAIError,
 )
@@ -9,7 +10,6 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.object_storage.creator import ObjectStorageCreator
 from ai.backend.manager.data.object_storage.modifier import ObjectStorageModifier
-from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.object_storage.db_source.db_source import ObjectStorageDBSource
 

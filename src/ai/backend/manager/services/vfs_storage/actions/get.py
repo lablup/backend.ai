@@ -2,8 +2,8 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
+from ai.backend.common.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.services.vfs_storage.actions.base import VFSStorageAction
 
 

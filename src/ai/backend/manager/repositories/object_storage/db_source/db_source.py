@@ -3,9 +3,9 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.data.object_storage.creator import ObjectStorageCreator
 from ai.backend.manager.data.object_storage.modifier import ObjectStorageModifier
-from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.errors.object_storage import (
     ObjectStorageNotFoundError,
 )
