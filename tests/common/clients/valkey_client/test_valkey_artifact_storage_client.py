@@ -10,8 +10,7 @@ import pytest
 from ai.backend.common.clients.valkey_client.valkey_artifact_storages.client import (
     ValkeyArtifactStorageClient,
 )
-from ai.backend.common.data.object_storage.types import ObjectStorageData
-from ai.backend.common.data.vfs_storage.types import VFSStorageData
+from ai.backend.common.data.storage.types import SharedObjectStorageData, SharedVFSStorageData
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import ValkeyTarget
 
@@ -41,9 +40,9 @@ class TestValkeyArtifactStorageClient:
             await client.close()
 
     @pytest.fixture
-    def sample_object_storage_data(self) -> ObjectStorageData:
-        """Sample ObjectStorageData for testing"""
-        return ObjectStorageData(
+    def sample_object_storage_data(self) -> SharedObjectStorageData:
+        """Sample SharedObjectStorageData for testing"""
+        return SharedObjectStorageData(
             id=uuid.uuid4(),
             name="test-object-storage",
             host="s3.example.com",
@@ -54,9 +53,9 @@ class TestValkeyArtifactStorageClient:
         )
 
     @pytest.fixture
-    def sample_vfs_storage_data(self) -> VFSStorageData:
-        """Sample VFSStorageData for testing"""
-        return VFSStorageData(
+    def sample_vfs_storage_data(self) -> SharedVFSStorageData:
+        """Sample SharedVFSStorageData for testing"""
+        return SharedVFSStorageData(
             id=uuid.uuid4(),
             name="test-vfs-storage",
             host="vfs.example.com",
@@ -67,7 +66,7 @@ class TestValkeyArtifactStorageClient:
     async def test_set_and_get_object_storage(
         self,
         valkey_artifact_storage_client: ValkeyArtifactStorageClient,
-        sample_object_storage_data: ObjectStorageData,
+        sample_object_storage_data: SharedObjectStorageData,
     ) -> None:
         """Test caching and retrieving object storage data."""
         storage_name = "test-object-storage"
@@ -105,7 +104,7 @@ class TestValkeyArtifactStorageClient:
     async def test_delete_object_storage(
         self,
         valkey_artifact_storage_client: ValkeyArtifactStorageClient,
-        sample_object_storage_data: ObjectStorageData,
+        sample_object_storage_data: SharedObjectStorageData,
     ) -> None:
         """Test deleting object storage cache."""
         storage_name = "test-object-storage"
@@ -138,7 +137,7 @@ class TestValkeyArtifactStorageClient:
     async def test_set_and_get_vfs_storage(
         self,
         valkey_artifact_storage_client: ValkeyArtifactStorageClient,
-        sample_vfs_storage_data: VFSStorageData,
+        sample_vfs_storage_data: SharedVFSStorageData,
     ) -> None:
         """Test caching and retrieving VFS storage data."""
         storage_name = "test-vfs-storage"
@@ -171,7 +170,7 @@ class TestValkeyArtifactStorageClient:
     async def test_delete_vfs_storage(
         self,
         valkey_artifact_storage_client: ValkeyArtifactStorageClient,
-        sample_vfs_storage_data: VFSStorageData,
+        sample_vfs_storage_data: SharedVFSStorageData,
     ) -> None:
         """Test deleting VFS storage cache."""
         storage_name = "test-vfs-storage"
@@ -202,7 +201,7 @@ class TestValkeyArtifactStorageClient:
     async def test_cache_expiration_handling(
         self,
         valkey_artifact_storage_client: ValkeyArtifactStorageClient,
-        sample_object_storage_data: ObjectStorageData,
+        sample_object_storage_data: SharedObjectStorageData,
     ) -> None:
         """Test that cache entries actually expire after the specified time."""
         storage_name = "test-expiring-storage"
@@ -232,7 +231,7 @@ class TestValkeyArtifactStorageClient:
         """Test that different storage types are isolated from each other."""
         object_uuid = uuid.uuid4()
         object_name = "object-storage"
-        object_data = ObjectStorageData(
+        object_data = SharedObjectStorageData(
             id=object_uuid,
             name=object_name,
             host="s3.example.com",
@@ -244,7 +243,7 @@ class TestValkeyArtifactStorageClient:
 
         vfs_uuid = uuid.uuid4()
         vfs_name = "vfs-storage"
-        vfs_data = VFSStorageData(
+        vfs_data = SharedVFSStorageData(
             id=vfs_uuid,
             name=vfs_name,
             host="vfs.example.com",
@@ -274,7 +273,7 @@ class TestValkeyArtifactStorageClient:
         object_uuid = uuid.uuid4()
         vfs_uuid = uuid.uuid4()
 
-        object_data = ObjectStorageData(
+        object_data = SharedObjectStorageData(
             id=object_uuid,
             name=storage_name,
             host="s3.example.com",
@@ -284,7 +283,7 @@ class TestValkeyArtifactStorageClient:
             region="us-west-2",
         )
 
-        vfs_data = VFSStorageData(
+        vfs_data = SharedVFSStorageData(
             id=vfs_uuid,
             name=storage_name,
             host="vfs.example.com",
@@ -326,7 +325,7 @@ class TestValkeyArtifactStorageClient:
         storage_name = "path-test-storage"
         complex_path = Path("/complex/path/with/multiple/levels")
 
-        storage_data = VFSStorageData(
+        storage_data = SharedVFSStorageData(
             id=storage_uuid,
             name=storage_name,
             host="vfs.example.com",
