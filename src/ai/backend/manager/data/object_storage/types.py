@@ -1,6 +1,8 @@
 import uuid
 from dataclasses import dataclass
+from typing import Self
 
+from ai.backend.common.data.storage.types import ObjectStorageStatefulData
 from ai.backend.common.dto.manager.response import ObjectStorageResponse
 
 
@@ -17,6 +19,29 @@ class ObjectStorageData:
     def to_dto(self) -> ObjectStorageResponse:
         return ObjectStorageResponse(
             id=str(self.id),
+            name=self.name,
+            host=self.host,
+            access_key=self.access_key,
+            secret_key=self.secret_key,
+            endpoint=self.endpoint,
+            region=self.region,
+        )
+
+    @classmethod
+    def from_stateful_data(cls, data: ObjectStorageStatefulData) -> Self:
+        return cls(
+            id=data.id,
+            name=data.name,
+            host=data.host,
+            access_key=data.access_key,
+            secret_key=data.secret_key,
+            endpoint=data.endpoint,
+            region=data.region,
+        )
+
+    def to_stateful_data(self) -> ObjectStorageStatefulData:
+        return ObjectStorageStatefulData(
+            id=self.id,
             name=self.name,
             host=self.host,
             access_key=self.access_key,
