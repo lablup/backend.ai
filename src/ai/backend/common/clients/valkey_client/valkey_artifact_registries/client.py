@@ -11,6 +11,7 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.artifact_registry.types import (
     HuggingFaceRegistryData,
     ReservoirRegistryData,
@@ -105,15 +106,15 @@ class ValkeyArtifactRegistryClient:
         """Ping the Valkey server to check connection health."""
         await self._client.ping()
 
-    def _make_registry_key(self, registry_type: str, registry_name: str) -> str:
+    def _make_registry_key(self, registry_type: ArtifactRegistryType, registry_name: str) -> str:
         """
         Generate a cache key for artifact registry.
 
-        :param registry_type: The type of registry (e.g., 'huggingface', 'reservoir').
+        :param registry_type: The type of registry (e.g., ArtifactRegistryType.HUGGINGFACE).
         :param registry_name: The name of the registry.
         :return: The formatted cache key.
         """
-        return f"artifact_registries.{registry_type}.{registry_name}"
+        return f"artifact_registries.{registry_type.value}.{registry_name}"
 
     @valkey_artifact_registries_resilience.apply()
     async def set_huggingface_registry(
@@ -129,7 +130,7 @@ class ValkeyArtifactRegistryClient:
         :param registry_data: The registry data to cache.
         :param expiration: The cache expiration time in seconds.
         """
-        key = self._make_registry_key("huggingface", registry_name)
+        key = self._make_registry_key(ArtifactRegistryType.HUGGINGFACE, registry_name)
         value = dump_json_str(dataclasses.asdict(registry_data))
         await self._client.client.set(
             key=key,
@@ -149,7 +150,7 @@ class ValkeyArtifactRegistryClient:
         :param registry_name: The name of the HuggingFace registry.
         :return: The cached registry data or None if not found.
         """
-        key = self._make_registry_key("huggingface", registry_name)
+        key = self._make_registry_key(ArtifactRegistryType.HUGGINGFACE, registry_name)
         value = await self._client.client.get(key)
         if value is None:
             log.debug("Cache miss for HuggingFace registry {}", registry_name)
@@ -173,7 +174,7 @@ class ValkeyArtifactRegistryClient:
         :param registry_name: The name of the HuggingFace registry.
         :return: True if the key was deleted, False otherwise.
         """
-        key = self._make_registry_key("huggingface", registry_name)
+        key = self._make_registry_key(ArtifactRegistryType.HUGGINGFACE, registry_name)
         result = await self._client.client.delete([key])
         deleted = result > 0
         if deleted:
@@ -194,7 +195,7 @@ class ValkeyArtifactRegistryClient:
         :param registry_data: The registry data to cache.
         :param expiration: The cache expiration time in seconds.
         """
-        key = self._make_registry_key("reservoir", registry_name)
+        key = self._make_registry_key(ArtifactRegistryType.RESERVOIR, registry_name)
         value = dump_json_str(dataclasses.asdict(registry_data))
         await self._client.client.set(
             key=key,
@@ -214,7 +215,7 @@ class ValkeyArtifactRegistryClient:
         :param registry_name: The name of the Reservoir registry.
         :return: The cached registry data or None if not found.
         """
-        key = self._make_registry_key("reservoir", registry_name)
+        key = self._make_registry_key(ArtifactRegistryType.RESERVOIR, registry_name)
         value = await self._client.client.get(key)
         if value is None:
             log.debug("Cache miss for Reservoir registry {}", registry_name)
@@ -238,7 +239,7 @@ class ValkeyArtifactRegistryClient:
         :param registry_name: The name of the Reservoir registry.
         :return: True if the key was deleted, False otherwise.
         """
-        key = self._make_registry_key("reservoir", registry_name)
+        key = self._make_registry_key(ArtifactRegistryType.RESERVOIR, registry_name)
         result = await self._client.client.delete([key])
         deleted = result > 0
         if deleted:
