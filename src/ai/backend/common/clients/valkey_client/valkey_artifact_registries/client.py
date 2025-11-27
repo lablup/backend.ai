@@ -13,8 +13,8 @@ from ai.backend.common.clients.valkey_client.client import (
 )
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.artifact_registry.types import (
-    HuggingFaceRegistryData,
-    ReservoirRegistryData,
+    HuggingFaceRegistrySharedData,
+    ReservoirRegistrySharedData,
 )
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.json import dump_json_str, load_json
@@ -120,7 +120,7 @@ class ValkeyArtifactRegistryClient:
     async def set_huggingface_registry(
         self,
         registry_name: str,
-        registry_data: HuggingFaceRegistryData,
+        registry_data: HuggingFaceRegistrySharedData,
         expiration: int = _DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         """
@@ -143,7 +143,7 @@ class ValkeyArtifactRegistryClient:
     async def get_huggingface_registry(
         self,
         registry_name: str,
-    ) -> Optional[HuggingFaceRegistryData]:
+    ) -> Optional[HuggingFaceRegistrySharedData]:
         """
         Get cached HuggingFace registry data.
 
@@ -161,7 +161,7 @@ class ValkeyArtifactRegistryClient:
         # Convert UUID string back to UUID object
         if "id" in data and isinstance(data["id"], str):
             data["id"] = uuid.UUID(data["id"])
-        return HuggingFaceRegistryData(**data)
+        return HuggingFaceRegistrySharedData(**data)
 
     @valkey_artifact_registries_resilience.apply()
     async def delete_huggingface_registry(
@@ -185,7 +185,7 @@ class ValkeyArtifactRegistryClient:
     async def set_reservoir_registry(
         self,
         registry_name: str,
-        registry_data: ReservoirRegistryData,
+        registry_data: ReservoirRegistrySharedData,
         expiration: int = _DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         """
@@ -208,7 +208,7 @@ class ValkeyArtifactRegistryClient:
     async def get_reservoir_registry(
         self,
         registry_name: str,
-    ) -> Optional[ReservoirRegistryData]:
+    ) -> Optional[ReservoirRegistrySharedData]:
         """
         Get cached Reservoir registry data.
 
@@ -226,7 +226,7 @@ class ValkeyArtifactRegistryClient:
         # Convert UUID string back to UUID object
         if "id" in data and isinstance(data["id"], str):
             data["id"] = uuid.UUID(data["id"])
-        return ReservoirRegistryData(**data)
+        return ReservoirRegistrySharedData(**data)
 
     @valkey_artifact_registries_resilience.apply()
     async def delete_reservoir_registry(

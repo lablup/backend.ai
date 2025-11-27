@@ -2,10 +2,10 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
-from ai.backend.common.data.artifact_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryModifierMeta
 from ai.backend.manager.data.huggingface_registry.modifier import HuggingFaceRegistryModifier
+from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.services.artifact_registry.actions.base import ArtifactRegistryAction
 
 
