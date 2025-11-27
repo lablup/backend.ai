@@ -229,7 +229,6 @@ class NotificationDBSource:
                 db_sess,
                 query,
                 querier,
-                fallback_count_table=NotificationChannelRow,
             )
 
             items = [row.NotificationChannelRow.to_data() for row in result.rows]
@@ -254,7 +253,6 @@ class NotificationDBSource:
                 db_sess,
                 query,
                 querier,
-                fallback_count_table=NotificationRuleRow,
             )
 
             items = [row.NotificationRuleRow.to_data() for row in result.rows]
