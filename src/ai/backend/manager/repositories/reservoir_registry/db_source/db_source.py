@@ -4,13 +4,13 @@ import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.artifact_registry.types import ReservoirRegistryData
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
 )
 from ai.backend.manager.data.reservoir_registry.creator import ReservoirRegistryCreator
 from ai.backend.manager.data.reservoir_registry.modifier import ReservoirRegistryModifier
-from ai.backend.common.data.artifact_registry.types import ReservoirRegistryData
 from ai.backend.manager.errors.artifact import ArtifactNotFoundError
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact import ArtifactRow
