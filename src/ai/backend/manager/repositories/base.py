@@ -242,6 +242,10 @@ async def execute_querier(
     # Fallback: Get total_count from window function without pagination
     # Re-execute query with conditions and orders but without pagination
 
+    if querier:
+        for condition in querier.conditions:
+            init_query = init_query.where(condition())
+
     result = await db_sess.execute(init_query)
     first_row = result.first()
     total_count = first_row.total_count if first_row else 0
