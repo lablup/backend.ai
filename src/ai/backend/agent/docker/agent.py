@@ -1089,6 +1089,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 LabelName.BLOCK_SERVICE_PORTS: (
                     "1" if self.internal_data.get("block_service_ports", False) else "0"
                 ),
+                LabelName.JSONIFIED_IMAGE_REF: self.image_ref.to_json(),
+                LabelName.NETWORK_ID: str(self.kernel_config["network_id"]),
+                LabelName.SESSION_TYPE: str(self.kernel_config["session_type"]),
             },
             "HostConfig": {
                 "Init": True,

@@ -32,6 +32,7 @@ from . import validators as tx
 from .arch import arch_name_aliases
 from .enum_extension import StringSetFlag
 from .exception import InvalidImageName, InvalidImageTag, ProjectMismatchWithCanonical
+from .json import dump_json_str, load_json
 from .service_ports import parse_service_ports
 from .utils import is_ip_address_format, join_non_empty
 
@@ -84,12 +85,15 @@ class LabelName(enum.StrEnum):
     BASE_DISTRO = "ai.backend.base-distro"
     RUNTIME_TYPE = "ai.backend.runtime-type"
     RUNTIME_PATH = "ai.backend.runtime-path"
+    JSONIFIED_IMAGE_REF = "ai.backend.jsonified-image-ref"
 
     ROLE = "ai.backend.role"
     ENVS_CORECOUNT = "ai.backend.envs.corecount"
     ACCELERATORS = "ai.backend.accelerators"
     SERVICE_PORTS = "ai.backend.service-ports"
     BLOCK_SERVICE_PORTS = "ai.backend.internal.block-service-ports"
+    NETWORK_ID = "ai.backend.network-id"
+    SESSION_TYPE = "ai.backend.session-type"
 
     # Identification
     AGENT_ID = "ai.backend.agent-id"
@@ -694,3 +698,25 @@ class ImageRef:
                     if parsed_version_self != parsed_version_other:
                         return parsed_version_self < parsed_version_other
         return len(ptagset_self) > len(ptagset_other)
+
+    def to_json(self) -> str:
+        return dump_json_str({
+            "name": self.name,
+            "project": self.project,
+            "tag": self.tag,
+            "registry": self.registry,
+            "architecture": self.architecture,
+            "is_local": self.is_local,
+        })
+
+    @classmethod
+    def from_json(cls, val: str) -> Self:
+        data = load_json(val)
+        return cls(
+            name=data["name"],
+            project=data["project"],
+            tag=data["tag"],
+            registry=data["registry"],
+            architecture=data["architecture"],
+            is_local=data["is_local"],
+        )
