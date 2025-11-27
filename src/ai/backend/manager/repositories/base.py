@@ -229,6 +229,7 @@ async def execute_querier(
     Returns:
         QuerierResult containing rows and total_count
     """
+    init_query = query
     if querier:
         query = _apply_querier(query, querier)
 
@@ -238,16 +239,11 @@ async def execute_querier(
     if rows:
         return QuerierResult(rows=rows, total_count=rows[0].total_count)
 
-    # Fallback: count with conditions only when rows is empty
-    # Build a count query using the same FROM clause with conditions
-    # but without pagination and without the window function
-    count_query = sa.select(sa.func.count())
-    if query.froms:
-        count_query = count_query.select_from(query.froms[0])
+    # Fallback: Get total_count from window function without pagination
+    # Re-execute query with conditions and orders but without pagination
 
-    if querier:
-        for condition in querier.conditions:
-            count_query = count_query.where(condition())
-    total_count = await db_sess.scalar(count_query) or 0
+    result = await db_sess.execute(init_query)
+    first_row = result.first()
+    total_count = first_row.total_count if first_row else 0
 
     return QuerierResult(rows=rows, total_count=total_count)
