@@ -538,7 +538,18 @@ class libcudart(LibraryBase):
 
 class nvmlMemoryInfo_t(ctypes.Structure):
     _fields_ = [
-        ("total", ctypes.c_uint),
+        ("total", ctypes.c_ulonglong),
+        ("free", ctypes.c_ulonglong),
+        ("used", ctypes.c_ulonglong),
+    ]
+
+
+# NVML v2 memory info structure for unified memory systems (Grace Blackwell, etc.)
+class nvmlMemoryInfo_v2_t(ctypes.Structure):
+    _fields_ = [
+        ("version", ctypes.c_uint),
+        ("total", ctypes.c_ulonglong),
+        ("reserved", ctypes.c_ulonglong),
         ("free", ctypes.c_ulonglong),
         ("used", ctypes.c_ulonglong),
     ]
@@ -626,19 +637,54 @@ class libnvml(LibraryBase):
     def get_device_stats(cls, device_idx: int) -> DeviceStat:
         """
         Returns the current usage information of the given CUDA device.
+        For unified memory systems (Grace Blackwell GB10, etc.) where nvmlDeviceGetMemoryInfo
+        returns NOT_SUPPORTED (error 3), we fall back to reporting total memory from cudart
+        with used=0 (since we can't query actual usage).
         """
         cls.ensure_init()
         handle = ctypes.c_void_p()
-        mem_info = nvmlMemoryInfo_t()
-        util_info = nvmlUtilization_t()
         cls.invoke("nvmlDeviceGetHandleByIndex_v2", device_idx, ctypes.byref(handle))
-        cls.invoke("nvmlDeviceGetMemoryInfo", handle, ctypes.byref(mem_info))
-        cls.invoke("nvmlDeviceGetUtilizationRates", handle, ctypes.byref(util_info))
+
+        # Try to get memory info - may fail on unified memory systems
+        mem_total = 0
+        mem_used = 0
+        mem_free = 0
+        try:
+            mem_info = nvmlMemoryInfo_t()
+            cls.invoke("nvmlDeviceGetMemoryInfo", handle, ctypes.byref(mem_info))
+            mem_total = mem_info.total
+            mem_used = mem_info.used
+            mem_free = mem_info.free
+        except LibraryError as e:
+            if e.code == 3:  # NVML_ERROR_NOT_SUPPORTED
+                # Fall back to cudart for total memory (unified memory systems like GB10)
+                props = libcudart.get_device_props(device_idx)
+                mem_total = props["totalGlobalMem"]
+                mem_used = 0  # Can't query actual usage on unified memory
+                mem_free = mem_total
+            else:
+                raise
+
+        # Try to get utilization - may also fail on some systems
+        gpu_util = 0
+        mem_util = 0
+        try:
+            util_info = nvmlUtilization_t()
+            cls.invoke("nvmlDeviceGetUtilizationRates", handle, ctypes.byref(util_info))
+            gpu_util = util_info.gpu
+            mem_util = util_info.memory
+        except LibraryError as e:
+            if e.code == 3:  # NVML_ERROR_NOT_SUPPORTED
+                # Can't query utilization on this device
+                pass
+            else:
+                raise
+
         return DeviceStat(
             device_idx=device_idx,
-            mem_total=mem_info.total,
-            mem_used=mem_info.used,
-            mem_free=mem_info.free,
-            gpu_util=util_info.gpu,
-            mem_util=util_info.memory,
+            mem_total=mem_total,
+            mem_used=mem_used,
+            mem_free=mem_free,
+            gpu_util=gpu_util,
+            mem_util=mem_util,
         )

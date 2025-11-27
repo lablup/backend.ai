@@ -94,6 +94,7 @@ _optimized_glob_search_patterns = {
     "backendai_webapp_v20": ["ai/backend/*"],
     "backendai_scheduler_v10": ["ai/backend/manager"],
     "backendai_agentselector_v10": ["ai/backend/manager"],
+    "backendai_accelerator_v21": ["ai/backend/accelerator/*"],
 }
 
 

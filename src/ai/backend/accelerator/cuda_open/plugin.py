@@ -106,32 +106,42 @@ class CUDAPlugin(AbstractComputePlugin):
     enabled: bool = True
 
     async def init(self, context: Optional[Any] = None) -> None:
-        rx_triple_version = re.compile(r"(\d+\.\d+\.\d+)")
+        # Check if running in Kubernetes mode
+        # Kubernetes backend sets this config or we can detect via environment
+        is_kubernetes = self.plugin_config.get("kubernetes_mode", False)
+        if not is_kubernetes:
+            # Also check environment variable (set by K8s agent)
+            import os
 
-        # Basic docker version & nvidia container runtime check
-        try:
-            async with closing_async(aiodocker.Docker()) as docker:
-                docker_info = await docker.system.info()
-        except DockerError:
-            log.info("CUDA acceleration is disabled.")
-            self.enabled = False
-            return
+            is_kubernetes = os.environ.get("BACKEND_AGENT_MODE") == "kubernetes"
 
-        if "nvidia" not in docker_info["Runtimes"]:
-            log.error("could not detect valid NVIDIA Container Runtime!")
-            log.info("CUDA acceleration is disabled.")
-            self.enabled = False
-            return
-
-        rx_triple_version = re.compile(r"(\d+\.\d+\.\d+)")
-        m = rx_triple_version.search(docker_info["ServerVersion"])
-        if m:
-            self.docker_version = tuple(map(int, m.group(1).split(".")))
+        if is_kubernetes:
+            log.info("Running in Kubernetes mode - skipping Docker runtime check")
         else:
-            log.error("could not detect docker version!")
-            log.info("CUDA acceleration is disabled.")
-            self.enabled = False
-            return
+            # Basic docker version & nvidia container runtime check (Docker backend only)
+            rx_triple_version = re.compile(r"(\d+\.\d+\.\d+)")
+            try:
+                async with closing_async(aiodocker.Docker()) as docker:
+                    docker_info = await docker.system.info()
+            except DockerError:
+                log.info("CUDA acceleration is disabled (Docker not available).")
+                self.enabled = False
+                return
+
+            if "nvidia" not in docker_info["Runtimes"]:
+                log.error("could not detect valid NVIDIA Container Runtime!")
+                log.info("CUDA acceleration is disabled.")
+                self.enabled = False
+                return
+
+            m = rx_triple_version.search(docker_info["ServerVersion"])
+            if m:
+                self.docker_version = tuple(map(int, m.group(1).split(".")))
+            else:
+                log.error("could not detect docker version!")
+                log.info("CUDA acceleration is disabled.")
+                self.enabled = False
+                return
 
         raw_device_mask = self.plugin_config.get("device_mask")
         if raw_device_mask is not None:
@@ -415,6 +425,41 @@ class CUDAPlugin(AbstractComputePlugin):
         )
         data["CUDA_RESOURCE_VIRTUALIZED"] = "0"
         return data
+
+    async def generate_resource_spec(
+        self,
+        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+    ) -> Mapping[str, Any]:
+        """Generate Kubernetes resource spec for CUDA devices."""
+
+        if not self.enabled:
+            return {}
+
+        # Collect GPU UUIDs from allocation
+        gpu_uuids: List[str] = []
+        for slot_type, per_device_alloc in device_alloc.items():
+            for dev_id, alloc in per_device_alloc.items():
+                if alloc > 0:
+                    gpu_uuids.append(str(dev_id))
+
+        if not gpu_uuids:
+            return {}
+
+        return {
+            "resources": {
+                "limits": {
+                    "nvidia.com/gpu": str(len(gpu_uuids)),
+                },
+                "requests": {
+                    "nvidia.com/gpu": str(len(gpu_uuids)),
+                },
+            },
+            "env": {
+                "NVIDIA_VISIBLE_DEVICES": ",".join(gpu_uuids),
+                "NVIDIA_DRIVER_CAPABILITIES": "all",
+            },
+            "runtimeClass": "nvidia",
+        }
 
     async def get_docker_networks(
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]

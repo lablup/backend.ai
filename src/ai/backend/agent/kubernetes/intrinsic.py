@@ -8,8 +8,6 @@ from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence
 import aiohttp
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
-from kubernetes_asyncio import client as K8sClient
-from kubernetes_asyncio import config as K8sConfig
 
 from ai.backend.common.types import (
     AcceleratorMetadata,
@@ -35,6 +33,7 @@ from ..resources import (
 from ..stats import ContainerMeasurement, NodeMeasurement, ProcessMeasurement, StatContext
 from .agent import Container
 from .resources import get_resource_spec_from_container
+from .utils import ensure_kube_client_initialized, get_core_api
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -105,24 +104,50 @@ class CPUPlugin(AbstractComputePlugin):
         pass
 
     async def list_devices(self) -> Collection[CPUDevice]:
-        await K8sConfig.load_kube_config()
-        core_api = K8sClient.CoreV1Api()
+        ensure_kube_client_initialized()
+        core_api = get_core_api()
 
-        nodes = (await core_api.list_node()).to_dict()["items"]
+        try:
+            node_list = await core_api.list_node()
+            nodes = node_list.to_dict()["items"]
+            log.debug("K8s CPUPlugin.list_devices: Found {} nodes", len(nodes))
+        except Exception as e:
+            log.error("Failed to list Kubernetes nodes for CPU devices: {}", e)
+            nodes = []
+
+        if not nodes:
+            log.warning(
+                "No Kubernetes nodes found for CPU resource allocation. "
+                "Agent may not have proper RBAC permissions or is not running in a K8s cluster."
+            )
+
         overcommit_factor = int(os.environ.get("BACKEND_CPU_OVERCOMMIT_FACTOR", "1"))
         assert 1 <= overcommit_factor <= 10
 
-        return [
+        devices = [
             CPUDevice(
                 device_id=DeviceId(node["metadata"]["uid"]),
+                device_name=self.key,
                 hw_location="root",
-                numa_node=None,
+                # Use numa_node=0 to match MemoryDevice's numa_node for affinity grouping.
+                # K8s doesn't expose NUMA topology in the same way as bare metal,
+                # so we treat all resources as belonging to the same NUMA domain.
+                numa_node=0,
                 memory_size=0,
                 processing_units=int(node["status"]["capacity"]["cpu"]) * overcommit_factor,
             )
             for i, node in zip(range(len(nodes)), nodes)
             # if 'node-role.kubernetes.io/master' not in node['metadata']['labels'].keys()
         ]
+
+        log.info(
+            "K8s CPUPlugin: Detected {} CPU devices with total {} cores",
+            len(devices),
+            sum(dev.processing_units for dev in devices),
+        )
+        log.debug("K8s CPUPlugin.list_devices: device_ids={}", [dev.device_id for dev in devices])
+
+        return devices
 
     async def available_slots(self) -> Mapping[SlotName, Decimal]:
         devices = await self.list_devices()
@@ -162,14 +187,32 @@ class CPUPlugin(AbstractComputePlugin):
 
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()
-        return DiscretePropertyAllocMap(
-            device_slots={
-                dev.device_id: DeviceSlotInfo(
-                    SlotTypes.COUNT, SlotName("cpu"), Decimal(dev.processing_units)
-                )
-                for dev in devices
-            },
+        log.info(
+            "K8s CPUPlugin.create_alloc_map: list_devices returned {} devices with ids: {}",
+            len(devices),
+            [dev.device_id for dev in devices],
         )
+        device_slots = {
+            dev.device_id: DeviceSlotInfo(
+                SlotTypes.COUNT, SlotName("cpu"), Decimal(dev.processing_units)
+            )
+            for dev in devices
+        }
+        log.info(
+            "K8s CPUPlugin.create_alloc_map: Creating allocation map with {} devices, "
+            "total capacity: {} cores, device_slots keys: {}",
+            len(device_slots),
+            sum(info.amount for info in device_slots.values()),
+            list(device_slots.keys()),
+        )
+        alloc_map = DiscretePropertyAllocMap(
+            device_slots=device_slots,
+        )
+        log.info(
+            "K8s CPUPlugin.create_alloc_map: Created alloc_map, checking allocations dict: {}",
+            dict(alloc_map.allocations),
+        )
+        return alloc_map
 
     async def get_hooks(self, distro: str, arch: str) -> Sequence[Path]:
         # TODO: move the sysconf hook in libbaihook.so here
@@ -265,10 +308,23 @@ class MemoryPlugin(AbstractComputePlugin):
         pass
 
     async def list_devices(self) -> Collection[MemoryDevice]:
-        await K8sConfig.load_kube_config()
-        core_api = K8sClient.CoreV1Api()
+        ensure_kube_client_initialized()
+        core_api = get_core_api()
 
-        nodes = (await core_api.list_node()).to_dict()["items"]
+        try:
+            node_list = await core_api.list_node()
+            nodes = node_list.to_dict()["items"]
+            log.debug("K8s MemoryPlugin.list_devices: Found {} nodes", len(nodes))
+        except Exception as e:
+            log.error("Failed to list Kubernetes nodes for memory devices: {}", e)
+            nodes = []
+
+        if not nodes:
+            log.warning(
+                "No Kubernetes nodes found for memory resource allocation. "
+                "Agent may not have proper RBAC permissions or is not running in a K8s cluster."
+            )
+
         overcommit_factor = int(os.environ.get("BACKEND_MEM_OVERCOMMIT_FACTOR", "1"))
         assert 1 <= overcommit_factor <= 10
         mem = 0
@@ -276,15 +332,28 @@ class MemoryPlugin(AbstractComputePlugin):
             # if 'node-role.kubernetes.io/master' in node['metadata']['labels'].keys():
             #     continue
             mem += int(node["status"]["capacity"]["memory"][:-2]) * 1024
-        return [
+
+        log.info(
+            "K8s MemoryPlugin: Detected total {} bytes ({:.2f} GiB) memory",
+            mem * overcommit_factor,
+            (mem * overcommit_factor) / (1024**3),
+        )
+
+        devices = [
             MemoryDevice(
                 device_id=DeviceId("root"),
+                device_name=self.key,
                 hw_location="root",
                 numa_node=0,
                 memory_size=mem * overcommit_factor,
                 processing_units=0,
             ),
         ]
+        log.debug(
+            "K8s MemoryPlugin.list_devices: device_ids={}", [dev.device_id for dev in devices]
+        )
+
+        return devices
 
     async def available_slots(self) -> Mapping[SlotName, Decimal]:
         devices = await self.list_devices()
@@ -315,15 +384,34 @@ class MemoryPlugin(AbstractComputePlugin):
 
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()
-        return DiscretePropertyAllocMap(
-            allocation_strategy=AllocationStrategy.FILL,
-            device_slots={
-                dev.device_id: DeviceSlotInfo(
-                    SlotTypes.BYTES, SlotName("mem"), Decimal(dev.memory_size)
-                )
-                for dev in devices
-            },
+        log.info(
+            "K8s MemoryPlugin.create_alloc_map: list_devices returned {} devices with ids: {}",
+            len(devices),
+            [dev.device_id for dev in devices],
         )
+        device_slots = {
+            dev.device_id: DeviceSlotInfo(
+                SlotTypes.BYTES, SlotName("mem"), Decimal(dev.memory_size)
+            )
+            for dev in devices
+        }
+        log.info(
+            "K8s MemoryPlugin.create_alloc_map: Creating allocation map with {} devices, "
+            "total capacity: {} bytes ({:.2f} GiB), device_slots keys: {}",
+            len(device_slots),
+            sum(info.amount for info in device_slots.values()) if device_slots else 0,
+            sum(info.amount for info in device_slots.values()) / (1024**3) if device_slots else 0,
+            list(device_slots.keys()),
+        )
+        alloc_map = DiscretePropertyAllocMap(
+            allocation_strategy=AllocationStrategy.FILL,
+            device_slots=device_slots,
+        )
+        log.info(
+            "K8s MemoryPlugin.create_alloc_map: Created alloc_map, checking allocations dict: {}",
+            dict(alloc_map.allocations),
+        )
+        return alloc_map
 
     async def get_hooks(self, distro: str, arch: str) -> Sequence[Path]:
         return []

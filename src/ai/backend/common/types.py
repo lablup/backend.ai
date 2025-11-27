@@ -1514,6 +1514,7 @@ class ContainerKernelId:
 class KernelCreationResult(TypedDict):
     id: KernelId
     container_id: ContainerId
+    session_id: SessionId
     service_ports: Sequence[ServicePort]
     kernel_host: str
     resource_spec: Mapping[str, Any]

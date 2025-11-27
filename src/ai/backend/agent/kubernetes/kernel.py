@@ -3,16 +3,14 @@ import logging
 import lzma
 import os
 import shutil
+import tarfile
 import textwrap
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, FrozenSet, Mapping, Optional, Tuple, override
 
 import pkg_resources
 import zmq
-from aiodocker.docker import Docker
 from aiotools import TaskGroup
-from kubernetes_asyncio import client as kube_client
-from kubernetes_asyncio import config as kube_config
 from kubernetes_asyncio import watch
 
 from ai.backend.agent.utils import get_arch_name
@@ -26,6 +24,7 @@ from ai.backend.plugin.entrypoint import scan_entrypoints
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
 from ..types import AgentEventData, KernelOwnershipData
+from .utils import ensure_kube_client_initialized, get_apps_api, get_core_api
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -106,52 +105,73 @@ class KubernetesKernel(AbstractKernel):
         return runner
 
     async def scale(self, num: int):
-        await kube_config.load_kube_config()
-        apps_api = kube_client.AppsV1Api()
+        ensure_kube_client_initialized()
+        apps_api = get_apps_api()
+        namespace = os.environ.get("POD_NAMESPACE", "backend-ai-test")
         try:
             return await apps_api.replace_namespaced_deployment_scale(
                 self.deployment_name,
-                "backend-ai",
+                namespace,
                 body={
                     "apiVersion": "autoscaling/v1",
                     "kind": "Scale",
                     "metadata": {
                         "name": self.deployment_name,
-                        "namespace": "backend-ai",
+                        "namespace": namespace,
                     },
                     "spec": {"replicas": num},
                     "status": {"replicas": num, "selector": f"run={self.deployment_name}"},
                 },
             )
         except Exception as e:
+            # Check if it's a 404 Not Found error (deployment already deleted)
+            if hasattr(e, "status") and e.status == 404:
+                log.debug(
+                    "scale({}) deployment {} not found (already deleted)",
+                    num,
+                    self.deployment_name,
+                )
+                return None
             log.exception("scale failed: {}", e)
 
     async def is_scaled(self):
-        await kube_config.load_kube_config()
-        apps_api = kube_client.AppsV1Api()
-        core_api = kube_client.CoreV1Api()
-        scale = await apps_api.read_namespaced_deployment(self.deployment_name, "backend-ai")
+        ensure_kube_client_initialized()
+        apps_api = get_apps_api()
+        core_api = get_core_api()
+        namespace = os.environ.get("POD_NAMESPACE", "backend-ai-test")
+        scale = await apps_api.read_namespaced_deployment(self.deployment_name, namespace)
 
-        if scale.to_dict()["status"]["replicas"] == 0:
+        scale_dict = scale.to_dict()
+        status = scale_dict.get("status")
+        if not status:
             return False
-        for condition in scale.to_dict()["status"]["conditions"]:
-            if not condition["status"]:
-                return False
+
+        if status.get("replicas", 0) == 0:
+            return False
+
+        conditions = status.get("conditions")
+        if conditions:
+            for condition in conditions:
+                if not condition.get("status"):
+                    return False
 
         pods = await core_api.list_namespaced_pod(
-            "backend-ai",
+            namespace,
             label_selector=f"run=kernel-{self.kernel_id}",
         )
         pods = pods.to_dict()["items"] or []
         if len(pods) == 0:
             return False
         for pod in pods:
-            containers = pod["status"]["container_statuses"] or []
+            pod_status = pod.get("status")
+            if not pod_status:
+                return False
+            containers = pod_status.get("container_statuses") or []
             if len(containers) == 0:
                 return False
             for container in containers:
                 started = container.get("started")
-                if not container["ready"] or started is not None and not started:
+                if not container.get("ready") or (started is not None and not started):
                     return False
         return True
 
@@ -169,10 +189,11 @@ class KubernetesKernel(AbstractKernel):
 
     @override
     async def get_logs(self):
-        await kube_config.load_kube_config()
-        core_api = kube_client.CoreV1Api()
+        ensure_kube_client_initialized()
+        core_api = get_core_api()
 
-        result = await core_api.read_namespaced_pod_log(self.kernel_id, "backend-ai")
+        namespace = os.environ.get("POD_NAMESPACE", "backend-ai-test")
+        result = await core_api.read_namespaced_pod_log(self.kernel_id, namespace)
         return {"logs": result.data.decode("utf-8")}
 
     @override
@@ -268,18 +289,19 @@ class KubernetesKernel(AbstractKernel):
     @override
     async def download_file(self, container_path: os.PathLike | str) -> bytes:
         # TODO: Implement file operations with pure Kubernetes API
-        await kube_config.load_kube_config()
-        core_api = kube_client.CoreV1Api()
+        ensure_kube_client_initialized()
+        core_api = get_core_api()
 
         container_home_path = PurePosixPath("/home/work")
         container_abspath = PurePosixPath(os.path.normpath(container_home_path / container_path))
         if not container_abspath.is_relative_to(container_home_path):
             raise PermissionError("You cannot download files outside /home/work")
 
+        namespace = os.environ.get("POD_NAMESPACE", "backend-ai-test")
         async with watch.Watch().stream(
             core_api.connect_get_namespaced_pod_exec,
             self.kernel_id,
-            "backend-ai",
+            namespace,
             command=["tar", "cf", "-", container_abspath],
             stderr=True,
             stdin=True,
@@ -301,8 +323,8 @@ class KubernetesKernel(AbstractKernel):
     @override
     async def list_files(self, container_path: os.PathLike | str):
         # TODO: Implement file operations with pure Kubernetes API
-        await kube_config.load_kube_config()
-        core_api = kube_client.CoreV1Api()
+        ensure_kube_client_initialized()
+        core_api = get_core_api()
 
         # Confine the lookable paths in the home directory
         container_home_path = PurePosixPath("/home/work")
@@ -338,10 +360,11 @@ class KubernetesKernel(AbstractKernel):
         )
 
         command = ["/opt/backend.ai/bin/python", "-c", code, str(container_path)]
+        namespace = os.environ.get("POD_NAMESPACE", "backend-ai-test")
         async with watch.Watch().stream(
             core_api.connect_get_namespaced_pod_exec,
             self.kernel_id,
-            "backend-ai",
+            namespace,
             command=command,
             stderr=True,
             stdin=True,
@@ -400,7 +423,13 @@ class KubernetesCodeRunner(AbstractCodeRunner):
 async def prepare_krunner_env_impl(
     distro: str, entrypoint_name: str, root_path: str
 ) -> Tuple[str, Optional[str]]:
-    docker = Docker()
+    """
+    Kubernetes-specific krunner environment preparation.
+
+    Unlike the Docker backend, this doesn't use Docker commands to extract
+    krunner environments. Instead, it directly extracts the tar.xz archives
+    using Python's tarfile module.
+    """
     arch = get_arch_name()
     current_version = int(
         Path(
@@ -413,81 +442,36 @@ async def prepare_krunner_env_impl(
     )
     krunner_folder_name = f"backendai-krunner.v{current_version}.{arch}.{distro}"
     target_path = Path(root_path) / krunner_folder_name
-    extractor_image = "backendai-krunner-extractor:latest"
 
     try:
-        for item in await docker.images.list():
-            if item["RepoTags"] is None or len(item["RepoTags"]) == 0:
-                continue
-            if item["RepoTags"][0] == extractor_image:
-                break
-        else:
-            log.info("preparing the Docker image for krunner extractor...")
-            extractor_archive = pkg_resources.resource_filename(
-                "ai.backend.runner", f"krunner-extractor.img.{arch}.tar.xz"
-            )
-            with lzma.open(extractor_archive, "rb") as reader:
-                proc = await asyncio.create_subprocess_exec(*["docker", "load"], stdin=reader)
-                if await proc.wait() != 0:
-                    raise RuntimeError("loading krunner extractor image has failed!")
-
         log.info("checking krunner-env for {}.{}...", distro, arch)
 
         if not target_path.exists():
             log.info("populating {} volume version {}", krunner_folder_name, current_version)
-            target_path.mkdir(exist_ok=False)
+            target_path.mkdir(parents=True, exist_ok=True)
             archive_path = Path(
                 pkg_resources.resource_filename(
                     f"ai.backend.krunner.{entrypoint_name}", f"krunner-env.{distro}.{arch}.tar.xz"
                 )
             ).resolve()
-            extractor_path = Path(
-                pkg_resources.resource_filename("ai.backend.runner", "krunner-extractor.sh")
-            ).resolve()
 
-            log.debug(
-                "Executing {}",
-                " ".join([
-                    "docker",
-                    "run",
-                    "--rm",
-                    "-i",
-                    "-v",
-                    f"{archive_path}:/root/archive.tar.xz",
-                    "-v",
-                    f"{extractor_path}:/root/krunner-extractor.sh",
-                    "-v",
-                    f"{target_path.absolute().as_posix()}:/root/volume",
-                    "-e",
-                    f"KRUNNER_VERSION={current_version}",
-                    extractor_image,
-                    "/root/krunner-extractor.sh",
-                ]),
-            )
+            log.debug("Extracting krunner archive: {} -> {}", archive_path, target_path)
 
-            proc = await asyncio.create_subprocess_exec(*[
-                "docker",
-                "run",
-                "--rm",
-                "-i",
-                "-v",
-                f"{archive_path}:/root/archive.tar.xz",
-                "-v",
-                f"{extractor_path}:/root/krunner-extractor.sh",
-                "-v",
-                f"{target_path.absolute().as_posix()}:/root/volume",
-                "-e",
-                f"KRUNNER_VERSION={current_version}",
-                extractor_image,
-                "/root/krunner-extractor.sh",
-            ])
-            if await proc.wait() != 0:
-                raise RuntimeError("extracting krunner environment has failed!")
+            # Extract the tar.xz archive directly without Docker
+            with lzma.open(archive_path, "rb") as xz_file:
+                with tarfile.open(fileobj=xz_file, mode="r") as tar:
+                    # Write version file
+                    version_file = target_path / "VERSION"
+                    version_file.write_text(str(current_version))
+
+                    # Extract all files
+                    tar.extractall(path=target_path)
+
+            log.info("Successfully extracted krunner environment to {}", target_path)
     except Exception:
-        log.exception("unexpected error")
+        log.exception("unexpected error preparing krunner environment")
         return distro, None
-    finally:
-        await docker.close()
+
     return distro, krunner_folder_name
 
 

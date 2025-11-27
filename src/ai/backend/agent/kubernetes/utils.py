@@ -9,6 +9,8 @@ from typing import Any, Final, Mapping, Optional, Tuple
 import pkg_resources
 from aiodocker.docker import Docker
 from aiodocker.exceptions import DockerError
+from kubernetes_asyncio import client as kube_client
+from kubernetes_asyncio import config as kube_config
 
 from ai.backend.logging import BraceStyleAdapter
 
@@ -18,6 +20,71 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 IMAGE_CHUNK_SIZE: Final[int] = 1 * 1024 * 1024 * 1024  # 1MiB
+
+# Global Kubernetes client state to avoid repeated initialization
+_kube_initialized = False
+_api_client: Optional[kube_client.ApiClient] = None
+_core_api: Optional[kube_client.CoreV1Api] = None
+_apps_api: Optional[kube_client.AppsV1Api] = None
+_batch_api: Optional[kube_client.BatchV1Api] = None
+
+
+def ensure_kube_client_initialized() -> None:
+    """
+    Ensure Kubernetes client is initialized exactly once.
+
+    This prevents creating multiple aiohttp sessions by calling
+    load_incluster_config() repeatedly. Safe to call multiple times.
+    """
+    global _kube_initialized, _api_client, _core_api, _apps_api, _batch_api
+    if not _kube_initialized:
+        log.debug("Initializing Kubernetes client (first call)")
+        kube_config.load_incluster_config()
+        _api_client = kube_client.ApiClient()
+        _core_api = kube_client.CoreV1Api(_api_client)
+        _apps_api = kube_client.AppsV1Api(_api_client)
+        _batch_api = kube_client.BatchV1Api(_api_client)
+        _kube_initialized = True
+
+
+def get_core_api() -> kube_client.CoreV1Api:
+    """Get cached CoreV1Api instance."""
+    ensure_kube_client_initialized()
+    assert _core_api is not None
+    return _core_api
+
+
+def get_apps_api() -> kube_client.AppsV1Api:
+    """Get cached AppsV1Api instance."""
+    ensure_kube_client_initialized()
+    assert _apps_api is not None
+    return _apps_api
+
+
+def get_batch_api() -> kube_client.BatchV1Api:
+    """Get cached BatchV1Api instance."""
+    ensure_kube_client_initialized()
+    assert _batch_api is not None
+    return _batch_api
+
+
+async def cleanup_kube_client() -> None:
+    """
+    Clean up Kubernetes API client resources.
+
+    Should be called during agent shutdown to properly close aiohttp sessions.
+    """
+    global _kube_initialized, _api_client, _core_api, _apps_api, _batch_api
+
+    if _api_client is not None:
+        await _api_client.close()
+        log.debug("Kubernetes API client closed")
+
+    _api_client = None
+    _core_api = None
+    _apps_api = None
+    _batch_api = None
+    _kube_initialized = False
 
 
 class PersistentServiceContainer:

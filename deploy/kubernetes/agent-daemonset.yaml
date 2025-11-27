@@ -1,0 +1,399 @@
+# Backend.AI Agent DaemonSet for Standalone K8s Testing
+# This deploys the agent on each K8s node for testing purposes
+# Uses ISOLATED services (etcd 2479, Redis 6479) to avoid conflicts with production
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backendai-agent-config
+  namespace: backend-ai-test
+data:
+  agent.toml: |
+    # Kubernetes Agent Configuration for Standalone Testing
+    # Running inside K8s pod - uses default ports (no conflicts due to network isolation)
+    # NodePort service maps external ports: 30001 -> 6001 (RPC), 30003 -> 6003 (HTTP)
+
+    [etcd]
+    # ISOLATED etcd instance for testing (not production halfstack)
+    namespace = "test-standalone"  # Separate from production "local"
+    # host.k8s.internal should resolve to host IP in most k8s distros
+    # If it doesn't work, replace with actual node IP
+    addr = { host = "host.k8s.internal", port = 2479 }
+    user = ""
+    password = ""
+
+
+    [agent]
+    # Backend mode for Kubernetes
+    backend = "kubernetes"
+
+    # Default RPC port (no conflict - pod has isolated network)
+    rpc-listen-addr = { host = "0.0.0.0", port = 6001 }
+
+    # Default HTTP API port for /health and /metrics
+    internal-addr = { host = "0.0.0.0", port = 6003 }
+
+    # SSL disabled for testing
+    ssl-enabled = false
+
+    # Default agent socket port
+    agent-sock-port = 6007
+
+    scaling-group = "default"
+    pid-file = "/tmp/agent.pid"
+    event-loop = "uvloop"
+
+    # Enable CUDA plugin for GPU support
+    allow-compute-plugins = ["ai.backend.accelerator.cuda_open"]
+
+    # Use relative paths to avoid permission issues with host mounts
+    # These will be relative to the agent's working directory inside the container
+    # ipc-base-path defaults to "./ipc"
+    # var-base-path defaults to "./var"
+    # image-commit-path defaults to "./commit"
+    # mount-path defaults to "./vfroot"
+    cohabiting-storage-proxy = false
+
+    # Use non-conflicting aiomonitor ports (isolated pod network)
+    # These won't conflict with host since pod has separate network namespace
+
+
+    [container]
+    # Default container port range (no conflict - kernel pods are isolated)
+    port-range = [30000, 31000]
+
+    kernel-uid = -1
+    kernel-gid = -1
+
+    # bind-host auto-detected from etcd container subnet config
+    bind-host = ""  # Empty for auto-detection
+
+    # CRITICAL FOR K8S: Scratch storage type
+    # - "k8s-nfs": Use NFS server for shared storage across nodes (production)
+    # - "hostdir": Use host filesystem directly (testing, single-node)
+    scratch-type = "hostdir"
+
+    # CRITICAL FOR K8S: For hostdir mode, specify the host path
+    # This directory must exist and be writable on all K8s nodes
+    # Using the same path as NFS data directory for testing
+    scratch-root = "/tmp/backend-ai-nfs-data"
+
+    # NFS configuration (only for k8s-nfs mode)
+    # scratch-nfs-address = "10.100.66.2:/"
+    # scratch-nfs-options = "rw,sync,hard,intr"
+
+    scratch-size = "10G"  # Per-kernel scratch disk size
+
+
+    [resource]
+    reserved-cpu = 1
+    reserved-mem = "1G"
+    reserved-disk = "8G"
+    allocation-order = ["cuda", "rocm", "tpu", "cpu", "mem"]
+    affinity-policy = "INTERLEAVED"
+
+
+    [logging]
+    level = "DEBUG"
+    drivers = ["console"]
+
+    [logging.pkg-ns]
+    "" = "WARNING"
+    "aiodocker" = "INFO"
+    "aiotools" = "INFO"
+    "aiohttp" = "INFO"
+    "ai.backend" = "DEBUG"
+    "ai.backend.agent.kubernetes" = "DEBUG"
+
+    [logging.console]
+    colored = false  # No colors for K8s logs
+    format = "verbose"
+
+
+    [debug]
+    enabled = true
+    skip-container-deletion = false  # Set to true to keep containers for debugging
+    log-events = true
+    log-heartbeats = false
+    log-alloc-map = true
+
+
+    [otel]
+    # OpenTelemetry disabled for testing
+    enabled = false
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: backendai-agent
+  namespace: backend-ai-test
+  labels:
+    app: backendai-agent
+    component: agent
+spec:
+  selector:
+    matchLabels:
+      app: backendai-agent
+  template:
+    metadata:
+      labels:
+        app: backendai-agent
+        component: agent
+    spec:
+      # Service account with RBAC permissions for K8s API
+      serviceAccountName: backendai-agent
+
+      # Use NVIDIA container runtime
+      runtimeClassName: nvidia
+
+      # Use pod network (not host network) for proper port isolation
+      # Access to host services via hostPort or external IPs
+      hostNetwork: false
+      dnsPolicy: ClusterFirst
+
+      # Map host.k8s.internal to node IP (get this with: kubectl get nodes -o wide)
+      hostAliases:
+        - hostnames:
+            - host.k8s.internal
+          ip: "10.100.66.2" # CHANGE THIS to your node's INTERNAL-IP
+
+      containers:
+        - name: agent
+          image: backendai-agent:latest
+          imagePullPolicy: Never # Use local image from build
+
+          args:
+            - "-f"
+            - "/etc/backend.ai/agent.toml"
+
+          env:
+            # NVIDIA GPU support
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "all"
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: "compute,utility"
+
+            # Inject node name for K8s agent (REQUIRED)
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+
+            # Inject node IP for etcd access
+            - name: NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+
+            # Inject pod namespace for K8s resource management
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+
+          ports:
+            # Agent RPC port (default port inside pod)
+            - name: rpc
+              containerPort: 6001
+              protocol: TCP
+            # Agent HTTP port (default port inside pod)
+            - name: http
+              containerPort: 6003
+              protocol: TCP
+
+          volumeMounts:
+            # Agent configuration
+            - name: config
+              mountPath: /etc/backend.ai
+              readOnly: true
+            # Docker socket (not used by K8s backend, but keep for compatibility)
+            - name: docker-sock
+              mountPath: /var/run/docker.sock
+              readOnly: true
+            # Scratch root directory for krunner files
+            - name: scratch-root
+              mountPath: /tmp/backend-ai-nfs-data
+              readOnly: false
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 6003 # Default HTTP port
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 6003 # Default HTTP port
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          resources:
+            # Use same values for requests and limits to get Guaranteed QoS class
+            # This matches the reserved resources in agent.toml
+            requests:
+              cpu: "1"
+              memory: "1Gi"
+              # NOTE: Agent does NOT request nvidia.com/gpu
+              # The agent only needs NVML access (for GPU discovery/monitoring),
+              # NOT exclusive GPU allocation. NVIDIA_VISIBLE_DEVICES=all gives
+              # NVML visibility to all GPUs without consuming GPU resources.
+              # Kernel pods will request nvidia.com/gpu for exclusive compute access.
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+
+          securityContext:
+            privileged: false # Don't need privileged for K8s backend
+            capabilities:
+              add:
+                - NET_ADMIN # For network configuration
+
+      volumes:
+        - name: config
+          configMap:
+            name: backendai-agent-config
+        - name: docker-sock
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket
+        - name: scratch-root
+          hostPath:
+            path: /tmp/backend-ai-nfs-data
+            type: DirectoryOrCreate
+
+      # Node selection (optional - deploy only on GPU nodes)
+      nodeSelector:
+        # Example: Only deploy on nodes with GPUs
+        # nvidia.com/gpu: "true"
+        # Or deploy on all nodes:
+        kubernetes.io/os: linux
+
+      # Tolerations to allow scheduling on all nodes
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+
+---
+# Service Account for agent to access K8s API
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: backendai-agent
+  namespace: backend-ai-test
+
+---
+# ClusterRole for agent operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backendai-agent
+rules:
+  # Pod management
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "pods/status"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # PersistentVolume management (cluster-scoped, for scratch storage)
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+
+  # PVC management (for scratch storage)
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Service management (for kernel pod networking)
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+
+  # ConfigMap management (for kernel configuration)
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+
+  # Secret access (read-only)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+
+  # Node information (for resource allocation)
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+
+  # Namespace management (for krunner PV management)
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch", "create"]
+
+  # Deployment management (for kernel pods)
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    verbs: ["get", "update", "patch"]
+
+  # Job management (for NFS population)
+  - apiGroups: ["batch"]
+    resources: ["jobs", "jobs/status"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+
+  # Events (for debugging)
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+
+---
+# ClusterRoleBinding to grant agent SA the permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: backendai-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: backendai-agent
+subjects:
+  - kind: ServiceAccount
+    name: backendai-agent
+    namespace: backend-ai-test
+
+---
+# NodePort Service to expose agent RPC externally
+# This allows the manager stub running outside K8s to connect to the agent
+# Maps external ports 30001/30003 to internal ports 6001/6003
+apiVersion: v1
+kind: Service
+metadata:
+  name: backendai-agent-rpc
+  namespace: backend-ai-test
+  labels:
+    app: backendai-agent
+    component: agent
+spec:
+  type: NodePort
+  selector:
+    app: backendai-agent
+  ports:
+    # Agent RPC port: external 30001 -> pod 6001
+    - name: rpc
+      port: 6001
+      targetPort: 6001
+      nodePort: 30001 # External access port
+      protocol: TCP
+    # Agent HTTP port: external 30003 -> pod 6003
+    - name: http
+      port: 6003
+      targetPort: 6003
+      nodePort: 30003 # External access port
+      protocol: TCP

@@ -1,4 +1,5 @@
 import logging
+import os
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Mapping, MutableMapping, Optional
@@ -25,6 +26,11 @@ async def load_resources(
     local_config: Mapping[str, Any],
 ) -> Mapping[DeviceName, AbstractComputePlugin]:
     compute_device_types: MutableMapping[DeviceName, AbstractComputePlugin] = {}
+
+    # Set environment variable to indicate Kubernetes backend mode
+    # This allows compute plugins (like CUDA) to skip Docker-specific checks
+    os.environ["BACKEND_AGENT_MODE"] = "kubernetes"
+    log.info("Set BACKEND_AGENT_MODE=kubernetes for compute plugin initialization")
 
     # Initialize intrinsic plugins by ourselves.
     from .intrinsic import CPUPlugin, MemoryPlugin

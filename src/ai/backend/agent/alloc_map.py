@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from .resources import AbstractComputeDevice
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-log_alloc_map: bool = False
+log_alloc_map: bool = True
 T = TypeVar("T")
 
 
@@ -92,8 +92,26 @@ class AbstractAllocMap(metaclass=ABCMeta):
         self.slot_types = {info.slot_name: info.slot_type for info in self.device_slots.values()}
         self.device_mask = frozenset(device_mask) if device_mask is not None else frozenset()
         self.allocations = defaultdict(lambda: defaultdict(Decimal))
+        if log_alloc_map:
+            log.debug(
+                "AbstractAllocMap.__init__: device_slots={!r}",
+                {
+                    dev_id: {
+                        "slot_name": info.slot_name,
+                        "slot_type": info.slot_type,
+                        "amount": info.amount,
+                    }
+                    for dev_id, info in self.device_slots.items()
+                },
+            )
         for dev_id, dev_slot_info in self.device_slots.items():
             self.allocations[dev_slot_info.slot_name][dev_id] = Decimal(0)
+            if log_alloc_map:
+                log.debug(
+                    "AbstractAllocMap.__init__: initialized allocation for slot_name={}, dev_id={}, amount=0",
+                    dev_slot_info.slot_name,
+                    dev_id,
+                )
 
     @final
     def clear(self) -> None:
@@ -132,12 +150,30 @@ class AbstractAllocMap(metaclass=ABCMeta):
     ) -> Sequence[tuple[DeviceId, Decimal]]:
         device_name = DeviceName(slot_name.partition(".")[0])
 
+        log.error(
+            "get_current_allocations called: slot_name={}, affinity_hint={}, device_name={}",
+            slot_name,
+            affinity_hint,
+            device_name,
+        )
+
         if affinity_hint is None:  # for legacy
-            return sorted(
+            if log_alloc_map:
+                log.debug(
+                    "get_current_allocations: slot_name={}, device_slots keys={}, allocations keys={}, allocations[{}]={}",
+                    slot_name,
+                    list(self.device_slots.keys()),
+                    list(self.allocations.keys()),
+                    slot_name,
+                    dict(self.allocations.get(slot_name, {})),
+                )
+            result = sorted(
                 self.allocations[slot_name].items(),  # k: slot_name, v: per-device alloc
                 key=lambda pair: self.device_slots[pair[0]].amount - pair[1],
                 reverse=True,
             )
+            log.error("get_current_allocations (affinity_hint is None): returning {}", result)
+            return result
 
         # Use the affinity hint to reorder the device sets to prioritize allocation.
         if not affinity_hint.devices:
@@ -152,8 +188,21 @@ class AbstractAllocMap(metaclass=ABCMeta):
             # we build the device clusters based on the device sets allocated for the previous resource slot.
             # This logic is particularly important to seamlessly support specific GDS solutions like WEKA,
             # as it requires alignment of CPU cores and GPU devices to have consistent NUMA nodes.
+            log.error(
+                "get_current_allocations: calling get_distance_ordered_neighbors with "
+                "src_devices={} (numa_nodes={}), target device_name={}",
+                [(d.device_id, d.device_name) for d in affinity_hint.devices],
+                [d.numa_node for d in affinity_hint.devices],
+                device_name,
+            )
             primary_sets, secondary_set = affinity_hint.affinity_map.get_distance_ordered_neighbors(
                 affinity_hint.devices, device_name
+            )
+            log.error(
+                "get_current_allocations: get_distance_ordered_neighbors returned "
+                "primary_sets={}, secondary_set={}",
+                [[(d.device_id, d.numa_node) for d in pset] for pset in primary_sets],
+                [(d.device_id, d.numa_node) for d in secondary_set],
             )
 
         if not primary_sets:
@@ -207,17 +256,38 @@ class AbstractAllocMap(metaclass=ABCMeta):
         if not affinity_hint.devices:  # first-allocated device
             match affinity_hint.policy:
                 case AffinityPolicy.PREFER_SINGLE_NODE:
-                    return [
+                    result = [
                         *itertools.chain(*primary_sorted_dev_allocs)
                     ] + secondary_sorted_dev_alloc
+                    log.error(
+                        "get_current_allocations (PREFER_SINGLE_NODE): primary_sets={}, secondary_set={}, returning {}",
+                        len(primary_sets),
+                        len(secondary_set),
+                        result,
+                    )
+                    return result
                 case AffinityPolicy.INTERLEAVED:
-                    return [
+                    result = [
                         *more_itertools.interleave_longest(*primary_sorted_dev_allocs)
                     ] + secondary_sorted_dev_alloc
+                    log.error(
+                        "get_current_allocations (INTERLEAVED): primary_sets={}, secondary_set={}, returning {}",
+                        len(primary_sets),
+                        len(secondary_set),
+                        result,
+                    )
+                    return result
         else:
-            return [
+            result = [
                 *more_itertools.interleave_longest(*primary_sorted_dev_allocs)
             ] + secondary_sorted_dev_alloc
+            log.error(
+                "get_current_allocations (affinity_hint.devices exists): primary_sets={}, secondary_set={}, returning {}",
+                len(primary_sets),
+                len(secondary_set),
+                result,
+            )
+            return result
 
     @final
     def update_affinity_hint(
@@ -238,6 +308,15 @@ class AbstractAllocMap(metaclass=ABCMeta):
 
     @final
     def update_device_slot_amounts(self, slot_amounts: Mapping[SlotName, Decimal]) -> None:
+        if log_alloc_map:
+            log.debug(
+                "update_device_slot_amounts: BEFORE - device_slots={!r}, slot_amounts={!r}",
+                {
+                    dev_id: {"slot_name": info.slot_name, "amount": info.amount}
+                    for dev_id, info in self.device_slots.items()
+                },
+                dict(slot_amounts),
+            )
         self.device_slots = {
             device_id: DeviceSlotInfo(
                 slot_type=slot_info.slot_type,
@@ -246,6 +325,15 @@ class AbstractAllocMap(metaclass=ABCMeta):
             )
             for device_id, slot_info in self.device_slots.items()
         }
+        if log_alloc_map:
+            log.debug(
+                "update_device_slot_amounts: AFTER - device_slots={!r}, allocations={!r}",
+                {
+                    dev_id: {"slot_name": info.slot_name, "amount": info.amount}
+                    for dev_id, info in self.device_slots.items()
+                },
+                {slot_name: dict(allocs) for slot_name, allocs in self.allocations.items()},
+            )
 
     @abstractmethod
     def allocate(
@@ -373,6 +461,20 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                 assert slot_name == self.device_slots[dev_id].slot_name
                 total_allocatable += int(self.device_slots[dev_id].amount - current_alloc)
             if total_allocatable < requested_alloc:
+                log.error(
+                    "InsufficientResource (DiscretePropertyAllocMap FILL) about to be raised: slot_name={}, requested={}, total_allocatable={}, "
+                    "sorted_dev_allocs={}, device_slots={}, allocations[{}]={}",
+                    slot_name,
+                    requested_alloc,
+                    total_allocatable,
+                    sorted_dev_allocs,
+                    {
+                        dev_id: {"slot_name": info.slot_name, "amount": info.amount}
+                        for dev_id, info in self.device_slots.items()
+                    },
+                    slot_name,
+                    dict(self.allocations.get(slot_name, {})),
+                )
                 raise InsufficientResource(
                     "DiscretePropertyAllocMap: insufficient allocatable amount!",
                     context_tag=context_tag,
@@ -435,6 +537,20 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                 )
                 # if the sum of remaining slot is less than the remaining alloc, fail.
                 if total_allocatable < remaining_alloc:
+                    log.error(
+                        "InsufficientResource (EVENLY) about to be raised: slot_name={}, requested={}, total_allocatable={}, "
+                        "sorted_dev_allocs={}, device_slots={}, allocations[{}]={}",
+                        slot_name,
+                        requested_alloc,
+                        total_allocatable,
+                        sorted_dev_allocs,
+                        {
+                            dev_id: {"slot_name": info.slot_name, "amount": info.amount}
+                            for dev_id, info in self.device_slots.items()
+                        },
+                        slot_name,
+                        dict(self.allocations.get(slot_name, {})),
+                    )
                     raise InsufficientResource(
                         "DiscretePropertyAllocMap: insufficient allocatable amount!",
                         context_tag=context_tag,
@@ -451,6 +567,20 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                     if self.device_slots[dev_id].amount - current_alloc - new_alloc[dev_id] > 0
                 ]
                 if len(nonzero_devs) == 0:
+                    log.error(
+                        "InsufficientResource (EVENLY - no devices) about to be raised: slot_name={}, requested={}, "
+                        "total_allocatable={}, sorted_dev_allocs={}, device_slots={}, allocations[{}]={}",
+                        slot_name,
+                        requested_alloc,
+                        total_allocatable,
+                        sorted_dev_allocs,
+                        {
+                            dev_id: {"slot_name": info.slot_name, "amount": info.amount}
+                            for dev_id, info in self.device_slots.items()
+                        },
+                        slot_name,
+                        dict(self.allocations.get(slot_name, {})),
+                    )
                     raise InsufficientResource(
                         "DiscretePropertyAllocMap: insufficient allocatable candidate devices!",
                         context_tag=context_tag,
@@ -643,6 +773,20 @@ class FractionAllocMap(AbstractAllocMap):
                 assert slot_name == self.device_slots[dev_id].slot_name
                 total_allocatable += self.device_slots[dev_id].amount - current_alloc
             if total_allocatable < alloc:
+                log.error(
+                    "InsufficientResource (FractionAllocMap FILL) about to be raised: slot_name={}, requested={}, "
+                    "total_allocatable={}, sorted_dev_allocs={}, device_slots={}, allocations[{}]={}",
+                    slot_name,
+                    alloc,
+                    total_allocatable,
+                    sorted_dev_allocs,
+                    {
+                        dev_id: {"slot_name": info.slot_name, "amount": info.amount}
+                        for dev_id, info in self.device_slots.items()
+                    },
+                    slot_name,
+                    dict(self.allocations.get(slot_name, {})),
+                )
                 raise InsufficientResource(
                     "FractionAllocMap: insufficient allocatable amount!",
                     context_tag=context_tag,
@@ -777,6 +921,20 @@ class FractionAllocMap(AbstractAllocMap):
                 current_alloc = self.allocations[slot_name][dev_id]
                 total_allocatable += self.device_slots[dev_id].amount - current_alloc
             if total_allocatable.quantize(self.digits) < remaining_alloc.quantize(self.digits):
+                log.error(
+                    "InsufficientResource (FractionAllocMap EVENLY) about to be raised: slot_name={}, requested={}, "
+                    "total_allocatable={}, sorted_dev_allocs={}, device_slots={}, allocations[{}]={}",
+                    slot_name,
+                    alloc,
+                    total_allocatable,
+                    sorted_dev_allocs,
+                    {
+                        dev_id: {"slot_name": info.slot_name, "amount": info.amount}
+                        for dev_id, info in self.device_slots.items()
+                    },
+                    slot_name,
+                    dict(self.allocations.get(slot_name, {})),
+                )
                 raise InsufficientResource(
                     "FractionAllocMap: insufficient allocatable amount!",
                     context_tag=context_tag,

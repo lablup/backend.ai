@@ -130,6 +130,22 @@ class AffinityMap(nx.Graph):
                 "This is a logic error trying to allocate the same resource slots twice in a single allocation run."
             )
         src_numa_nodes = set(src_device.numa_node for src_device in src_devices)
+
+        # Debug logging
+        import logging
+
+        from ai.backend.logging import BraceStyleAdapter
+
+        log = BraceStyleAdapter(logging.getLogger(__name__))
+        log.error(
+            "get_distance_ordered_neighbors: searching for device_name={}, src_numa_nodes={}, "
+            "affinity_map.nodes={} (device_names: {})",
+            device_name,
+            src_numa_nodes,
+            len(self.nodes),
+            {(u.device_id, u.device_name, u.numa_node) for u in self.nodes},
+        )
+
         primary_sets = []
         secondary_set = set()
         for numa_node in src_numa_nodes:
@@ -141,6 +157,13 @@ class AffinityMap(nx.Graph):
                     else:
                         secondary_set.add(u)
             primary_sets.append(primary_set)
+
+        log.error(
+            "get_distance_ordered_neighbors: found primary_sets={}, secondary_set={}",
+            [[(d.device_id, d.numa_node) for d in pset] for pset in primary_sets],
+            [(d.device_id, d.numa_node) for d in secondary_set],
+        )
+
         for primary_set in primary_sets:
             secondary_set -= primary_set
         return [*(list(primary_set) for primary_set in primary_sets)], list(secondary_set)

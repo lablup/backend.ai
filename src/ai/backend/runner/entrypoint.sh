@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/bash
 
 USER_ID=${LOCAL_USER_ID:-9001}
 GROUP_ID=${LOCAL_GROUP_ID:-9001}
@@ -15,6 +15,90 @@ fi
 # NOTE: /home/work may have vfolder bind-mounts containing a LOT of files (e.g., more than 10K!).
 #       Therefore, we must AVOID any filesystem operation applied RECURSIVELY to /home/work,
 #       to prevent indefinite "hangs" during a container startup.
+
+# For Kubernetes deployments: Create symlinks to files/dirs in scratch volume
+# This must be done in the main container (not init container) since symlinks don't persist across containers
+if [ -d "/mnt/scratch" ]; then
+  # Find the krunner directory (matches backendai-krunner.v*.*.static-gnu pattern)
+  KRUNNER_DIR=$(find /mnt/scratch -maxdepth 1 -type d -name "backendai-krunner.v*.*.static-gnu" 2>/dev/null | head -1)
+  if [ -n "$KRUNNER_DIR" ]; then
+    echo "Creating /opt/backend.ai symlink to $KRUNNER_DIR"
+    echo "Verifying krunner directory contents:"
+    ls -la "$KRUNNER_DIR" | head -10
+    mkdir -p /opt
+    rm -rf /opt/backend.ai
+    ln -sf "$KRUNNER_DIR" /opt/backend.ai
+    echo "Symlink created, verifying:"
+    ls -la /opt/backend.ai | head -10
+  else
+    echo "ERROR: Could not find krunner directory in /mnt/scratch"
+    echo "Contents of /mnt/scratch:"
+    ls -la /mnt/scratch
+  fi
+
+  # Find the kernel-specific scratch directory (UUID pattern)
+  KERNEL_SCRATCH=$(find /mnt/scratch -maxdepth 1 -type d -regextype posix-extended -regex '.*/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' 2>/dev/null | head -1)
+  if [ -n "$KERNEL_SCRATCH" ]; then
+    echo "Found kernel scratch directory: $KERNEL_SCRATCH"
+
+    # Create symlinks for /home/work and /home/config
+    if [ -d "$KERNEL_SCRATCH/work" ]; then
+      echo "Creating /home/work symlink"
+      mkdir -p /home
+      rm -rf /home/work
+      ln -sf "$KERNEL_SCRATCH/work" /home/work
+    fi
+
+    if [ -d "$KERNEL_SCRATCH/config" ]; then
+      echo "Creating /home/config symlink"
+      mkdir -p /home
+      rm -rf /home/config
+      ln -sf "$KERNEL_SCRATCH/config" /home/config
+    fi
+
+    # Create symlink for agent.sock
+    if [ -f "$KERNEL_SCRATCH/agent.sock" ]; then
+      echo "Creating /opt/kernel/agent.sock symlink"
+      mkdir -p /opt/kernel
+      rm -rf /opt/kernel/agent.sock
+      ln -sf "$KERNEL_SCRATCH/agent.sock" /opt/kernel/agent.sock
+    fi
+  fi
+fi
+
+# For Kubernetes deployments: Create symlinks from /opt/kernel-runner/* to /opt/kernel/*
+# This allows us to mount the entire runner/ directory once instead of 20+ individual files
+# Only needed if /opt/kernel-runner exists (K8s deployment)
+if [ -d "/opt/kernel-runner" ]; then
+  echo "Setting up runner file symlinks from /opt/kernel-runner to /opt/kernel..."
+  mkdir -p /opt/kernel /usr/local/bin /usr/local/share/man/man1
+
+  # Create symlinks for all runner files
+  for file in /opt/kernel-runner/*; do
+    if [ -f "$file" ]; then
+      filename=$(basename "$file")
+
+      # Determine target location based on file purpose
+      case "$filename" in
+        all-smi.*.bin)
+          # all-smi goes to /usr/local/bin
+          ln -sf "$file" /usr/local/bin/all-smi
+          ;;
+        all-smi.1)
+          # Man page for all-smi
+          ln -sf "$file" /usr/local/share/man/man1/all-smi.1
+          ;;
+        *)
+          # Everything else goes to /opt/kernel
+          # Remove architecture suffixes for cleaner names (e.g., su-exec.aarch64.bin -> su-exec)
+          target_name=$(echo "$filename" | sed -E 's/\.(aarch64|x86_64)\.(bin|so)$//; s/\.(ubuntu[0-9.]+|alpine[0-9.]+)\.//; s/\.bin$//')
+          ln -sf "$file" "/opt/kernel/$target_name"
+          ;;
+      esac
+    fi
+  done
+  echo "Runner file symlinks created successfully"
+fi
 
 # Symlink the scp binary
 if [ ! -f "/usr/bin/scp" ]; then
@@ -131,8 +215,10 @@ else
     fi
   fi
 
-  # Correct the ownership of agent socket.
-  chown $USER_ID:$GROUP_ID /opt/kernel/agent.sock
+  # Correct the ownership of agent socket (if it exists).
+  if [ -e /opt/kernel/agent.sock ]; then
+    chown $USER_ID:$GROUP_ID /opt/kernel/agent.sock
+  fi
 
   # Extract dotfiles
   /opt/kernel/su-exec $USER_ID:$GROUP_ID /opt/backend.ai/bin/python -s /opt/kernel/extract_dotfiles.py
@@ -179,6 +265,12 @@ else
 
   # The gid 42 is a reserved gid for "shadow" to allow passwrd-based SSH login. (lablup/backend.ai#751)
   # Note that we also need to use our own patched version of su-exec to support multiple gids.
+
+  # Change to /home/work to ensure the working directory is accessible to the non-root user
+  # This prevents "pwd: couldn't find directory entry in '..'" errors when Python's getpath
+  # tries to resolve paths during initialization
+  cd /home/work
+
   echo "Executing the main program: /opt/kernel/su-exec \"$USER_ID:$GROUP_ID${ADDITIONAL_GIDS:+,$ADDITIONAL_GIDS},42\" \"$@\"..."
   exec /opt/kernel/su-exec "$USER_ID:$GROUP_ID${ADDITIONAL_GIDS:+,$ADDITIONAL_GIDS},42" "$@"
 

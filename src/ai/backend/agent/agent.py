@@ -1356,29 +1356,15 @@ class AbstractAgent(
                         ev.kernel_id,
                         ev.container_id,
                     )
-                    if ev.container_id is None:
-                        await self.reconstruct_resource_usage()
-                        if not ev.suppress_events:
-                            await self.anycast_and_broadcast_event(
-                                KernelTerminatedAnycastEvent(
-                                    ev.kernel_id,
-                                    ev.session_id,
-                                    reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
-                                ),
-                                KernelTerminatedBroadcastEvent(
-                                    ev.kernel_id,
-                                    ev.session_id,
-                                    reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
-                                ),
-                            )
-                        ev.set_done_future_result(None)
-                        return
                 else:
                     kernel_obj.state = KernelLifecycleStatus.TERMINATING
                     kernel_obj.termination_reason = ev.reason
                     if kernel_obj.runner is not None:
                         await kernel_obj.runner.close()
                     kernel_obj.clean_event = ev.done_future
+                # Always try to destroy the kernel/container, even if not in registry.
+                # For Kubernetes, the implementation can find deployments by label.
+                # For Docker, container_id is needed but may still clean up orphaned resources.
                 try:
                     await self.destroy_kernel(ev.kernel_id, ev.container_id)
                 except Exception as e:
@@ -1970,19 +1956,24 @@ class AbstractAgent(
 
         for device_name, plugin in self.computers.items():
             tasks.append(_get(device_name, plugin.instance))
+        log.debug("gather_hwinfo: computers={}", list(self.computers.keys()))
         results = await asyncio.gather(*tasks)
         for device_name, result in results:
-            match result:
-                case NotImplementedError():
-                    continue
-                case Exception():
-                    hwinfo[device_name] = {
-                        "status": "unavailable",
-                        "status_info": str(result),
-                        "metadata": {},
-                    }
-                case dict():  # HardwareMetadata
-                    hwinfo[device_name] = result
+            if isinstance(result, NotImplementedError):
+                # Plugin doesn't implement get_node_hwinfo, skip it
+                log.debug("gather_hwinfo: {} does not implement get_node_hwinfo", device_name)
+                continue
+            elif isinstance(result, Exception):
+                hwinfo[device_name] = {
+                    "status": "unavailable",
+                    "status_info": str(result),
+                    "metadata": {},
+                }
+                log.debug("gather_hwinfo: {} returned error: {}", device_name, result)
+            elif isinstance(result, dict):
+                hwinfo[device_name] = result
+                log.debug("gather_hwinfo: {} returned metadata", device_name)
+        log.debug("gather_hwinfo: returning hwinfo for devices: {}", list(hwinfo.keys()))
         return hwinfo
 
     async def _cleanup_reported_kernels(self, interval: float):
@@ -2327,7 +2318,15 @@ class AbstractAgent(
 
         log.info("starting with resource allocations")
         for computer_name, computer_ctx in self.computers.items():
-            log.info("{}: {!r}", computer_name, dict(computer_ctx.alloc_map.allocations))
+            log.info(
+                "{}: device_slots={!r}, allocations={!r}",
+                computer_name,
+                {
+                    dev_id: {"slot_name": slot_info.slot_name, "amount": slot_info.amount}
+                    for dev_id, slot_info in computer_ctx.alloc_map.device_slots.items()
+                },
+                dict(computer_ctx.alloc_map.allocations),
+            )
 
     @abstractmethod
     async def init_kernel_context(
@@ -3179,6 +3178,7 @@ class AbstractAgent(
                         "scaling_group": kernel_config["scaling_group"],
                         "agent_addr": kernel_config["agent_addr"],
                         "attached_devices": attached_devices,
+                        "session_id": session_id,
                     }
 
                     if ctx.kernel_config["cluster_role"] in ("main", "master") and model_definition:

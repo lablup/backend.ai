@@ -316,13 +316,43 @@ class BaseRunner(metaclass=ABCMeta):
             kconfig_file = kconfigdir / "ipython_kernel_config.py"
             kconfig_file.write_text("c.InteractiveShellApp.matplotlib = 'inline'")
 
+            # Create a custom kernelspec that uses the runtime_path
+            # This ensures we use the correct Python executable (the container's Python)
+            # rather than relying on the image's kernelspec which may have relative paths
+            custom_kspec_dir = Path("/tmp/backendai-kernelspec/python3")
+            custom_kspec_dir.mkdir(parents=True, exist_ok=True)
+            custom_kernel_json = {
+                "argv": [
+                    str(self.runtime_path),
+                    "-m",
+                    "ipykernel_launcher",
+                    "-f",
+                    "{connection_file}",
+                ],
+                "display_name": "Python 3 (Backend.AI)",
+                "language": "python",
+            }
+            (custom_kspec_dir / "kernel.json").write_text(json.dumps(custom_kernel_json))
+            log.debug(
+                "Created custom kernelspec at {} with runtime_path={}",
+                custom_kspec_dir,
+                self.runtime_path,
+            )
+
+            # Use our custom kernelspec directory
             kernelspec_mgr = KernelSpecManager()
             kernelspec_mgr.ensure_native_kernel = False
+            # Add our custom kernelspec directory to the search path
+            kernelspec_mgr.kernel_dirs = ["/tmp/backendai-kernelspec"] + list(
+                kernelspec_mgr.kernel_dirs
+            )
             kspecs = kernelspec_mgr.get_all_specs()
             for kname in kspecs:
                 if self.jupyter_kspec_name in kname:
                     log.debug("starting " + kname + " kernel...")
                     self.kernel_mgr = AsyncKernelManager(kernel_name=kname)
+                    # Also set kernel_dirs on the manager so it finds our custom spec
+                    self.kernel_mgr.kernel_spec_manager.kernel_dirs = kernelspec_mgr.kernel_dirs
                     await self.kernel_mgr.start_kernel()
                     if not await self.kernel_mgr.is_alive():
                         log.error("jupyter query mode is disabled: failed to start jupyter kernel")

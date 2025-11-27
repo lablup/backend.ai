@@ -400,6 +400,27 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         """
         return {}
 
+    async def generate_resource_spec(
+        self,
+        device_alloc: DeviceAllocation,
+    ) -> Mapping[str, Any]:
+        """
+        Generate Kubernetes resource specifications for this device type.
+
+        Returns a dict with:
+        - "resources": {"limits": {...}, "requests": {...}}
+        - "env": {ENV_VAR: value, ...}
+        - "mounts": [{"name": ..., "mountPath": ..., "hostPath": ...}, ...]
+        - "runtimeClass": "nvidia" | "rebellions" | ... (optional)
+
+        Default implementation returns empty spec.
+        Plugins override this for Kubernetes-specific requirements.
+
+        Note: Each node typically has only one device type (e.g., NVIDIA GPUs OR
+        Rebellions NPUs), so only one plugin per node will return a runtimeClass.
+        """
+        return {}
+
     @abstractmethod
     async def restore_from_container(
         self,
@@ -575,9 +596,18 @@ class ResourceAllocator(aobject):
 
     def _calculate_total_slots(self) -> SlotsMap:
         total_slots: dict[SlotName, Decimal] = defaultdict(lambda: Decimal("0"))
-        for device in self.computers.values():
+        for device_name, device in self.computers.items():
+            log.debug(
+                "_calculate_total_slots: device={}, device_slots={!r}",
+                device_name,
+                {
+                    dev_id: {"slot_name": slot_info.slot_name, "amount": slot_info.amount}
+                    for dev_id, slot_info in device.alloc_map.device_slots.items()
+                },
+            )
             for slot_info in device.alloc_map.device_slots.values():
                 total_slots[slot_info.slot_name] += slot_info.amount
+        log.info("_calculate_total_slots: total_slots={!r}", dict(total_slots))
         return total_slots
 
     def _calculate_available_total_slots(self, total_slots: SlotsMap) -> SlotsMap:
