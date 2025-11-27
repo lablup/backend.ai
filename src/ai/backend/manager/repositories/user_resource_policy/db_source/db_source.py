@@ -105,8 +105,17 @@ class UserResourcePolicyDBSource:
     async def delete(self, name: str) -> UserResourcePolicyData:
         """Deletes a user resource policy."""
         async with self._db.begin_session() as db_sess:
-            query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
-            row: Optional[UserResourcePolicyRow] = await db_sess.scalar(query)
+            delete_stmt = (
+                sa.delete(UserResourcePolicyRow)
+                .where(UserResourcePolicyRow.name == name)
+                .returning(UserResourcePolicyRow)
+            )
+            query_stms = (
+                sa.select(UserResourcePolicyRow)
+                .from_statement(delete_stmt)
+                .execution_options(populate_existing=True)
+            )
+            row: Optional[UserResourcePolicyRow] = await db_sess.scalar(query_stms)
             if row is None:
                 raise UserResourcePolicyNotFound(
                     f"User resource policy with name {name} not found."
