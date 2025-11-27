@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from ai.backend.common.data.artifact_registry.types import ReservoirRegistryStatefulData
+from ai.backend.common.data.artifact_registry.types import ReservoirRegistryStatefulData
 
 
 @dataclass
@@ -33,8 +31,6 @@ class ReservoirRegistryData:
 
     def to_stateful_data(self) -> ReservoirRegistryStatefulData:
         """Convert ReservoirRegistryData to ReservoirRegistryStatefulData for caching."""
-        from ai.backend.common.data.artifact_registry.types import ReservoirRegistryStatefulData
-
         return ReservoirRegistryStatefulData(
             id=self.id,
             name=self.name,

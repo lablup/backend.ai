@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
-if TYPE_CHECKING:
-    from ai.backend.common.data.artifact_registry.types import HuggingFaceRegistryStatefulData
+from ai.backend.common.data.artifact_registry.types import HuggingFaceRegistryStatefulData
 
 
 @dataclass
@@ -29,8 +28,6 @@ class HuggingFaceRegistryData:
 
     def to_stateful_data(self) -> HuggingFaceRegistryStatefulData:
         """Convert HuggingFaceRegistryData to HuggingFaceRegistryStatefulData for caching."""
-        from ai.backend.common.data.artifact_registry.types import HuggingFaceRegistryStatefulData
-
         return HuggingFaceRegistryStatefulData(
             id=self.id,
             name=self.name,
