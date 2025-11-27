@@ -2602,7 +2602,7 @@ type DomainNode implements Node
   allowed_docker_registries: [String] @join__field(graph: GRAPHENE)
   dotfiles: Bytes @join__field(graph: GRAPHENE)
   integration_id: String @join__field(graph: GRAPHENE)
-  scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalinGroupConnection @join__field(graph: GRAPHENE)
+  scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalingGroupConnection @join__field(graph: GRAPHENE)
 }
 
 """
@@ -6286,6 +6286,33 @@ type ScalingGroup
 }
 
 """Added in 24.12.0."""
+type ScalingGroupConnection
+  @join__type(graph: GRAPHENE)
+{
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ScalingGroupEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Added in 24.12.0. A Relay edge containing a `ScalingGroup` and its cursor.
+"""
+type ScalingGroupEdge
+  @join__type(graph: GRAPHENE)
+{
+  """The item at the end of the edge"""
+  node: ScalingGroupNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""Added in 24.12.0."""
 type ScalingGroupNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
   @join__type(graph: GRAPHENE, key: "id")
@@ -6305,33 +6332,6 @@ type ScalingGroupNode implements Node
   scheduler: String @join__field(graph: GRAPHENE)
   scheduler_opts: JSONString @join__field(graph: GRAPHENE)
   use_host_network: Boolean @join__field(graph: GRAPHENE)
-}
-
-"""Added in 24.12.0."""
-type ScalinGroupConnection
-  @join__type(graph: GRAPHENE)
-{
-  """Pagination data for this connection."""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection."""
-  edges: [ScalinGroupEdge]!
-
-  """Total count of the GQL nodes of the query."""
-  count: Int
-}
-
-"""
-Added in 24.12.0. A Relay edge containing a `ScalinGroup` and its cursor.
-"""
-type ScalinGroupEdge
-  @join__type(graph: GRAPHENE)
-{
-  """The item at the end of the edge"""
-  node: ScalingGroupNode
-
-  """A cursor for use in pagination"""
-  cursor: String!
 }
 
 """Added in 25.16.0"""

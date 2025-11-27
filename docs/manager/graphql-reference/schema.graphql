@@ -702,28 +702,28 @@ type DomainNode implements Node @key(fields: "id") {
   allowed_docker_registries: [String]
   dotfiles: Bytes
   integration_id: String
-  scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalinGroupConnection
+  scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalingGroupConnection
 }
 
 """Added in 24.09.1."""
 scalar Bytes
 
 """Added in 24.12.0."""
-type ScalinGroupConnection {
+type ScalingGroupConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
 
   """Contains the nodes in this connection."""
-  edges: [ScalinGroupEdge]!
+  edges: [ScalingGroupEdge]!
 
   """Total count of the GQL nodes of the query."""
   count: Int
 }
 
 """
-Added in 24.12.0. A Relay edge containing a `ScalinGroup` and its cursor.
+Added in 24.12.0. A Relay edge containing a `ScalingGroup` and its cursor.
 """
-type ScalinGroupEdge {
+type ScalingGroupEdge {
   """The item at the end of the edge"""
   node: ScalingGroupNode
 

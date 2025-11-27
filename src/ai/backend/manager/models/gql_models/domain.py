@@ -70,7 +70,7 @@ from ..rbac.permission_defs import DomainPermission, ScalingGroupPermission
 from ..scaling_group import get_scaling_groups
 from ..user import UserRole
 from .base import Bytes
-from .scaling_group import ScalingGroup, ScalinGroupConnection
+from .scaling_group import ScalingGroup, ScalingGroupConnection
 
 if TYPE_CHECKING:
     from ..domain import DomainModel
@@ -150,7 +150,7 @@ class DomainNode(graphene.ObjectType):
     integration_id = graphene.String()
 
     # Dynamic fields.
-    scaling_groups = PaginatedConnectionField(ScalinGroupConnection)
+    scaling_groups = PaginatedConnectionField(ScalingGroupConnection)
 
     @classmethod
     def from_rbac_model(
