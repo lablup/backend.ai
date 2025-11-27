@@ -1,6 +1,5 @@
 import uuid
 
-from ai.backend.common.data.vfs_storage.types import VFSStorageData
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -8,6 +7,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.vfs_storage.creator import VFSStorageCreator
 from ai.backend.manager.data.vfs_storage.modifier import VFSStorageModifier
+from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.vfs_storage.db_source.db_source import VFSStorageDBSource
 

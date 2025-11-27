@@ -2,9 +2,9 @@ import uuid
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.data.vfs_storage.creator import VFSStorageCreator
 from ai.backend.manager.data.vfs_storage.modifier import VFSStorageModifier
+from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.errors.vfs_storage import (
     VFSStorageNotFoundError,
 )

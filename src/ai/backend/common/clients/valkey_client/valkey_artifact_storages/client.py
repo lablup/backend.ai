@@ -11,9 +11,11 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
-from ai.backend.common.data.object_storage.types import ObjectStorageData
-from ai.backend.common.data.storage.types import ArtifactStorageType
-from ai.backend.common.data.vfs_storage.types import VFSStorageData
+from ai.backend.common.data.storage.types import (
+    ArtifactStorageType,
+    SharedObjectStorageData,
+    SharedVFSStorageData,
+)
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -118,7 +120,7 @@ class ValkeyArtifactStorageClient:
     async def set_object_storage(
         self,
         storage_name: str,
-        storage_data: ObjectStorageData,
+        storage_data: SharedObjectStorageData,
         expiration: int = _DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         """
@@ -141,7 +143,7 @@ class ValkeyArtifactStorageClient:
     async def get_object_storage(
         self,
         storage_name: str,
-    ) -> Optional[ObjectStorageData]:
+    ) -> Optional[SharedObjectStorageData]:
         """
         Get cached object storage data.
 
@@ -159,7 +161,7 @@ class ValkeyArtifactStorageClient:
         # Convert UUID string back to UUID object
         if "id" in data and isinstance(data["id"], str):
             data["id"] = uuid.UUID(data["id"])
-        return ObjectStorageData(**data)
+        return SharedObjectStorageData(**data)
 
     @valkey_artifact_storages_resilience.apply()
     async def delete_object_storage(
@@ -183,7 +185,7 @@ class ValkeyArtifactStorageClient:
     async def set_vfs_storage(
         self,
         storage_name: str,
-        storage_data: VFSStorageData,
+        storage_data: SharedVFSStorageData,
         expiration: int = _DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         """
@@ -209,7 +211,7 @@ class ValkeyArtifactStorageClient:
     async def get_vfs_storage(
         self,
         storage_name: str,
-    ) -> Optional[VFSStorageData]:
+    ) -> Optional[SharedVFSStorageData]:
         """
         Get cached VFS storage data.
 
@@ -231,7 +233,7 @@ class ValkeyArtifactStorageClient:
             from pathlib import Path
 
             data["base_path"] = Path(data["base_path"])
-        return VFSStorageData(**data)
+        return SharedVFSStorageData(**data)
 
     @valkey_artifact_storages_resilience.apply()
     async def delete_vfs_storage(
