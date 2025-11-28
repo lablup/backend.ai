@@ -37,70 +37,110 @@ __all__ = (
 )
 
 
-@strawberry.type
+@strawberry.type(description="Added in 25.18.0. Status information for a scaling group")
 class ScalingGroupStatus:
-    """Status information for a scaling group."""
+    is_active: bool = strawberry.field(
+        description="Whether the scaling group can accept new session creation requests. Inactive scaling groups are excluded from scheduling and cannot start new sessions."
+    )
+    is_public: bool = strawberry.field(
+        description="Whether this scaling group is available for regular user sessions (interactive/batch/inference). When false, the scaling group is reserved for internal SYSTEM-type sessions only, such as management or infrastructure sessions."
+    )
 
-    is_active: bool
-    is_public: bool
 
-
-@strawberry.type
+@strawberry.type(description="Added in 25.18.0. Metadata information for a scaling group")
 class ScalingGroupMetadata:
-    """Metadata for a scaling group."""
+    description: str = strawberry.field(
+        description="Human-readable description of the scaling group's purpose"
+    )
+    created_at: datetime = strawberry.field(
+        description="Timestamp when the scaling group was created"
+    )
 
-    description: str
-    created_at: datetime
 
-
-@strawberry.type
+@strawberry.type(description="Added in 25.18.0. Network configuration for a scaling group")
 class ScalingGroupNetworkConfig:
-    """Network configuration for a scaling group."""
+    wsproxy_addr: str = strawberry.field(
+        description="WebSocket proxy server address for terminal/web service access in interactive sessions. Used when clients connect to running session services."
+    )
+    wsproxy_api_token: str = strawberry.field(
+        description="Authentication token for the WebSocket proxy API. Required for proxy server to validate and route client connections."
+    )
+    use_host_network: bool = strawberry.field(
+        description="Whether session containers use the host's network namespace instead of isolated container networking. Enables direct host port binding but reduces isolation."
+    )
 
-    wsproxy_addr: str
-    wsproxy_api_token: str
-    use_host_network: bool
 
-
-@strawberry.type
+@strawberry.type(description="Added in 25.18.0. Driver configuration for resource allocation")
 class ScalingGroupDriverConfig:
-    """Driver configuration for a scaling group."""
+    name: str = strawberry.field(
+        description="Agent resource driver implementation name. 'static' uses a predefined set of agents registered to this scaling group. 'kubernetes' dynamically provisions agents as Kubernetes pods."
+    )
+    options: JSON = strawberry.field(
+        description="Driver-specific configuration options. Contents vary by driver type - static driver may specify agent registration constraints, while kubernetes driver configures pod specifications."
+    )
 
-    name: str
-    options: JSON
 
-
-@strawberry.type
+@strawberry.type(description="Added in 25.18.0. Scheduler configuration options")
 class ScalingGroupSchedulerOptions:
-    """Scheduler options for a scaling group."""
+    allowed_session_types: list[str] = strawberry.field(
+        description="Session types that can be scheduled in this scaling group. Valid values: 'interactive' (user terminals/notebooks), 'batch' (background jobs), 'inference' (model serving endpoints). Requests for unlisted types are rejected."
+    )
+    pending_timeout: float = strawberry.field(
+        description="Maximum time in seconds a session can wait in PENDING state before automatic cancellation. Zero means no timeout. Used to prevent indefinite resource waiting when no agents are available."
+    )
+    config: JSON = strawberry.field(
+        description="Scheduler-specific configuration options. Contents depend on the scheduler implementation (fifo/lifo/drf). Used for advanced scheduling behavior customization."
+    )
+    agent_selection_strategy: str = strawberry.field(
+        description="Algorithm for selecting target agents when scheduling sessions. 'dispersed' spreads sessions across available agents, 'concentrated' packs sessions onto fewer agents, 'roundrobin' cycles through agents sequentially."
+    )
+    agent_selector_config: JSON = strawberry.field(
+        description="Configuration for the agent selection strategy. Structure varies by strategy - for example, concentrated strategy may specify endpoint spreading rules."
+    )
+    enforce_spreading_endpoint_replica: bool = strawberry.field(
+        description="When true with concentrated strategy, forces inference service replicas to be distributed across different agents instead of co-locating on same agent. Improves fault tolerance for model serving."
+    )
+    allow_fractional_resource_fragmentation: bool = strawberry.field(
+        description="Whether agents accept session requests that allocate fractional resources (e.g., 0.5 GPU) causing resource fragmentation. When false, agents reject sessions that would prevent future efficient resource allocation."
+    )
+    route_cleanup_target_statuses: list[str] = strawberry.field(
+        description="List of route health statuses that trigger automatic cleanup of service routes. Valid values: 'healthy', 'unhealthy', 'degraded'. Default: ['unhealthy']."
+    )
 
-    allowed_session_types: list[str]
-    pending_timeout: float
-    config: JSON
-    agent_selection_strategy: str
-    agent_selector_config: JSON
-    enforce_spreading_endpoint_replica: bool
-    allow_fractional_resource_fragmentation: bool
-    route_cleanup_target_statuses: list[str]
 
-
-@strawberry.type
+@strawberry.type(description="Added in 25.18.0. Scheduler configuration for session scheduling")
 class ScalingGroupSchedulerConfig:
-    """Scheduler configuration for a scaling group."""
+    name: str = strawberry.field(
+        description="Scheduling algorithm implementation. 'fifo' schedules oldest pending sessions first, 'lifo' schedules newest first, 'drf' (Dominant Resource Fairness) balances resource usage across users."
+    )
+    options: ScalingGroupSchedulerOptions = strawberry.field(
+        description="Detailed scheduler behavior configuration including session type restrictions, timeouts, agent selection strategy, and resource allocation policies."
+    )
 
-    name: str
-    options: ScalingGroupSchedulerOptions
 
-
-@strawberry.type
+@strawberry.type(description="Added in 25.18.0. Scaling group with structured configuration")
 class ScalingGroupV2(Node):
-    id: NodeID[str]
-    name: str
-    status: ScalingGroupStatus
-    metadata: ScalingGroupMetadata
-    wsproxy: ScalingGroupNetworkConfig
-    driver: ScalingGroupDriverConfig
-    scheduler: ScalingGroupSchedulerConfig
+    id: NodeID[str] = strawberry.field(
+        description="Relay-style global node identifier for the scaling group"
+    )
+    name: str = strawberry.field(
+        description="Unique name identifying the scaling group. Used as primary key and referenced by agents, sessions, and resource presets."
+    )
+    status: ScalingGroupStatus = strawberry.field(
+        description="Operational status controlling whether this scaling group accepts new sessions and its visibility to users without explicit access grants."
+    )
+    metadata: ScalingGroupMetadata = strawberry.field(
+        description="Administrative metadata including human-readable description and creation timestamp for audit and documentation purposes."
+    )
+    wsproxy: ScalingGroupNetworkConfig = strawberry.field(
+        description="Network configuration for connecting clients to interactive session services (terminals, notebooks, web apps) through WebSocket proxy infrastructure."
+    )
+    driver: ScalingGroupDriverConfig = strawberry.field(
+        description="Agent resource management driver determining how compute agents are provisioned and registered to this scaling group (static registration vs dynamic provisioning)."
+    )
+    scheduler: ScalingGroupSchedulerConfig = strawberry.field(
+        description="Session scheduling configuration controlling queue management, agent selection strategy, resource allocation policies, and session lifecycle timeouts."
+    )
 
     @classmethod
     def from_dataclass(cls, data: ScalingGroupData) -> Self:
