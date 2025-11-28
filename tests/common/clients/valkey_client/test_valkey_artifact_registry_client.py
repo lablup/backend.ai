@@ -71,12 +71,12 @@ class TestValkeyArtifactRegistryClient:
         """Test caching and retrieving HuggingFace registry data."""
         # Set registry data
         await valkey_artifact_registry_client.set_huggingface_registry(
-            sample_huggingface_registry_data.name, sample_huggingface_registry_data
+            sample_huggingface_registry_data.id, sample_huggingface_registry_data
         )
 
         # Get registry data
         result = await valkey_artifact_registry_client.get_huggingface_registry(
-            sample_huggingface_registry_data.name
+            sample_huggingface_registry_data.id
         )
 
         assert result is not None
@@ -91,9 +91,9 @@ class TestValkeyArtifactRegistryClient:
         valkey_artifact_registry_client: ValkeyArtifactRegistryClient,
     ) -> None:
         """Test retrieving nonexistent HuggingFace registry data."""
-        registry_name = "nonexistent-registry"
+        registry_id = uuid.uuid4()
 
-        result = await valkey_artifact_registry_client.get_huggingface_registry(registry_name)
+        result = await valkey_artifact_registry_client.get_huggingface_registry(registry_id)
 
         assert result is None
 
@@ -106,18 +106,18 @@ class TestValkeyArtifactRegistryClient:
         """Test deleting HuggingFace registry cache."""
         # Set registry data
         await valkey_artifact_registry_client.set_huggingface_registry(
-            sample_huggingface_registry_data.name, sample_huggingface_registry_data
+            sample_huggingface_registry_data.id, sample_huggingface_registry_data
         )
 
         # Delete registry data
         deleted = await valkey_artifact_registry_client.delete_huggingface_registry(
-            sample_huggingface_registry_data.name
+            sample_huggingface_registry_data.id
         )
         assert deleted is True
 
         # Verify deletion
         result = await valkey_artifact_registry_client.get_huggingface_registry(
-            sample_huggingface_registry_data.name
+            sample_huggingface_registry_data.id
         )
         assert result is None
 
@@ -127,9 +127,9 @@ class TestValkeyArtifactRegistryClient:
         valkey_artifact_registry_client: ValkeyArtifactRegistryClient,
     ) -> None:
         """Test deleting nonexistent HuggingFace registry cache."""
-        registry_name = "nonexistent-registry"
+        registry_id = uuid.uuid4()
 
-        deleted = await valkey_artifact_registry_client.delete_huggingface_registry(registry_name)
+        deleted = await valkey_artifact_registry_client.delete_huggingface_registry(registry_id)
         assert deleted is False
 
     @pytest.mark.asyncio
@@ -141,12 +141,12 @@ class TestValkeyArtifactRegistryClient:
         """Test caching and retrieving Reservoir registry data."""
         # Set registry data
         await valkey_artifact_registry_client.set_reservoir_registry(
-            sample_reservoir_registry_data.name, sample_reservoir_registry_data
+            sample_reservoir_registry_data.id, sample_reservoir_registry_data
         )
 
         # Get registry data
         result = await valkey_artifact_registry_client.get_reservoir_registry(
-            sample_reservoir_registry_data.name
+            sample_reservoir_registry_data.id
         )
 
         assert result is not None
@@ -165,20 +165,20 @@ class TestValkeyArtifactRegistryClient:
         sample_reservoir_registry_data: ReservoirRegistryStatefulData,
     ) -> None:
         """Test that different registry types are isolated from each other."""
-        # Set both types with different names
+        # Set both types with different IDs
         await valkey_artifact_registry_client.set_huggingface_registry(
-            sample_huggingface_registry_data.name, sample_huggingface_registry_data
+            sample_huggingface_registry_data.id, sample_huggingface_registry_data
         )
         await valkey_artifact_registry_client.set_reservoir_registry(
-            sample_reservoir_registry_data.name, sample_reservoir_registry_data
+            sample_reservoir_registry_data.id, sample_reservoir_registry_data
         )
 
         # Verify both are stored separately
         hf_result = await valkey_artifact_registry_client.get_huggingface_registry(
-            sample_huggingface_registry_data.name
+            sample_huggingface_registry_data.id
         )
         reservoir_result = await valkey_artifact_registry_client.get_reservoir_registry(
-            sample_reservoir_registry_data.name
+            sample_reservoir_registry_data.id
         )
 
         assert hf_result is not None
