@@ -23,9 +23,10 @@ __all__ = ("Service",)
 _default_fields: Sequence[FieldSpec] = (
     service_fields["endpoint_id"],
     service_fields["name"],
-    service_fields["image"],
+    service_fields["image_object"],
     service_fields["replicas"],
     service_fields["routings"],
+    service_fields["url"],
     service_fields["session_owner"],
     service_fields["open_to_public"],
 )
