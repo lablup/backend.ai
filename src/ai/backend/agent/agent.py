@@ -2250,9 +2250,10 @@ class AbstractAgent(
         """
         ipc_base_path = self.local_config.agent.ipc_base_path
         var_base_path = self.local_config.agent.var_base_path
-        last_registry_file = self.last_registry_file
-        if os.path.isfile(ipc_base_path / last_registry_file):
-            shutil.move(ipc_base_path / last_registry_file, var_base_path / last_registry_file)
+        ipc_last_registry_file = self.resolve_conflicting_registry_file(ipc_base_path)
+        last_registry_file = self.resolve_conflicting_registry_file(var_base_path)
+        if (ipc_base_path / ipc_last_registry_file).is_file():
+            shutil.move(ipc_base_path / ipc_last_registry_file, var_base_path / last_registry_file)
         try:
             with open(var_base_path / last_registry_file, "rb") as f:
                 kernel_registry: MutableMapping[KernelId, AbstractKernel] = pickle.load(f)
@@ -3741,6 +3742,23 @@ class AbstractAgent(
                 return f"last_registry.{self.local_instance_id}.dat"
             case AgentClass.AUXILIARY:
                 return f"last_registry.{self.id}.dat"
+
+    def resolve_conflicting_registry_file(self, base_dir: Path) -> str:
+        primary_agent_filename = f"last_registry.{self.local_instance_id}.dat"
+        auxiliary_agent_filename = f"last_registry.{self.id}.dat"
+
+        primary_agent_file = base_dir / primary_agent_filename
+        auxiliary_agent_file = base_dir / auxiliary_agent_filename
+        if primary_agent_file.is_file() and auxiliary_agent_file.is_file():
+            primary_modification_time = primary_agent_file.stat().st_mtime
+            auxiliary_modification_time = auxiliary_agent_file.stat().st_mtime
+
+            if primary_modification_time > auxiliary_modification_time:
+                return primary_agent_filename
+            else:
+                return auxiliary_agent_filename
+        else:
+            return self.last_registry_file
 
 
 async def handle_volume_mount(
