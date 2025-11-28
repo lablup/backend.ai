@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import logging
+from collections.abc import MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Self
+from typing import TYPE_CHECKING, Self
 
 from ai.backend.common.types import AgentId, KernelId
 from ai.backend.logging import BraceStyleAdapter
@@ -10,10 +13,12 @@ from ...kernel import AbstractKernel
 from ..loader.abc import AbstractKernelRegistryLoader
 from ..loader.pickle import PickleBasedKernelRegistryLoader
 from ..loader.scratch import ScratchBasedKernelRegistryLoader
-from ..types import KernelRegistryType
 from ..writer.abc import AbstractKernelRegistryWriter
 from ..writer.pickle import PickleBasedKernelRegistryWriter
 from ..writer.types import KernelRegistrySaveMetadata
+
+if TYPE_CHECKING:
+    from ai.backend.agent.agent import AbstractAgent
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -25,6 +30,9 @@ class KernelRegistryRecoveryArgs:
     var_base_path: Path
     agent_id: AgentId
     local_instance_id: str
+
+    # To allow scratch-based loader to list containers
+    agent: AbstractAgent
 
 
 class KernelRegistryRecovery:
@@ -53,17 +61,18 @@ class KernelRegistryRecovery:
                 ),
                 ScratchBasedKernelRegistryLoader(
                     scratch_root=args.scratch_root,
+                    agent=args.agent,
                 ),
             ],
             writer=PickleBasedKernelRegistryWriter(last_registry_file_path),
         )
 
     async def save_kernel_registry(
-        self, data: KernelRegistryType, metadata: KernelRegistrySaveMetadata
+        self, data: MutableMapping[KernelId, AbstractKernel], metadata: KernelRegistrySaveMetadata
     ) -> None:
         await self._writer.save_kernel_registry(data, metadata)
 
-    async def load_kernel_registry(self) -> KernelRegistryType:
+    async def load_kernel_registry(self) -> MutableMapping[KernelId, AbstractKernel]:
         result: dict[KernelId, AbstractKernel] = {}
         for loader in self._loaders:
             try:

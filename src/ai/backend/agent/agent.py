@@ -5,7 +5,6 @@ import logging
 import os
 import pickle
 import re
-import shutil
 import signal
 import sys
 import time
@@ -238,6 +237,8 @@ from .kernel import (
     KernelRegistry,
     match_distro_data,
 )
+from .kernel_registry.recovery.recovery import KernelRegistryRecovery, KernelRegistryRecoveryArgs
+from .kernel_registry.writer.types import KernelRegistrySaveMetadata
 from .observer.heartbeat import HeartbeatObserver
 from .observer.host_port import HostPortObserver
 from .observer.kernel_presence import KernelPresenceObserver
@@ -887,6 +888,17 @@ class AbstractAgent(
         self._ongoing_exec_batch_tasks = weakref.WeakSet()
         self._ongoing_destruction_tasks = weakref.WeakValueDictionary()
         self._metric_registry = CommonMetricRegistry.instance()
+
+        self._kernel_registry_recovery = KernelRegistryRecovery.create(
+            KernelRegistryRecoveryArgs(
+                scratch_root=local_config.container.scratch_root,
+                ipc_base_path=local_config.agent.ipc_base_path,
+                var_base_path=local_config.agent.var_base_path,
+                agent_id=self.id,
+                local_instance_id=self.local_instance_id,
+                agent=self,
+            )
+        )
 
         # Initialize health monitoring tracking maps
         self._active_pulls = {}
@@ -2239,30 +2251,11 @@ class AbstractAgent(
         Scan currently running kernels and recreate the kernel objects in
         ``self.kernel_registry`` if any missing.
         """
-        ipc_base_path = self.local_config.agent.ipc_base_path
-        var_base_path = self.local_config.agent.var_base_path
-        last_registry_file = f"last_registry.{self.id}.dat"
-        if not (var_base_path / last_registry_file).is_file():
-            log.warning(
-                "Registry file with name {} not found. "
-                "Falling back to name based on local instance ID {}...",
-                last_registry_file,
-                self.local_instance_id,
-            )
-            last_registry_file = f"last_registry.{self.local_instance_id}.dat"
-        if os.path.isfile(ipc_base_path / last_registry_file):
-            shutil.move(ipc_base_path / last_registry_file, var_base_path / last_registry_file)
-        try:
-            with open(var_base_path / last_registry_file, "rb") as f:
-                kernel_registry: MutableMapping[KernelId, AbstractKernel] = pickle.load(f)
-                for kernel_id, kernel in kernel_registry.items():
-                    self.kernel_registry[kernel_id] = kernel
-        except EOFError:
-            log.warning(
-                "Failed to load the last kernel registry: {}", (var_base_path / last_registry_file)
-            )
-        except FileNotFoundError:
-            pass
+        self.kernel_registry = await self._kernel_registry_recovery.load_kernel_registry()
+        from pprint import pprint
+
+        print("self.kernel_registry : ")
+        pprint(self.kernel_registry)
         for kernel_obj in self.kernel_registry.values():
             kernel_obj.agent_config = self.local_config.model_dump(by_alias=True)
             try:
@@ -3716,22 +3709,10 @@ class AbstractAgent(
         return await self.kernel_registry[kernel_id].ping()
 
     async def save_last_registry(self, force=False) -> None:
-        now = time.monotonic()
-        if (not force) and (now <= self.last_registry_written_time + 60):
-            return  # don't save too frequently
-        var_base_path = self.local_config.agent.var_base_path
-        last_registry_file = f"last_registry.{self.id}.dat"
-        try:
-            with open(var_base_path / last_registry_file, "wb") as f:
-                pickle.dump(dict(self.kernel_registry), f)
-            self.last_registry_written_time = now
-            log.debug("saved {}", last_registry_file)
-        except Exception as e:
-            log.exception("unable to save {}", last_registry_file, exc_info=e)
-            try:
-                os.remove(var_base_path / last_registry_file)
-            except FileNotFoundError:
-                pass
+        await self._kernel_registry_recovery.save_kernel_registry(
+            self.kernel_registry,
+            KernelRegistrySaveMetadata(force),
+        )
 
 
 async def handle_volume_mount(

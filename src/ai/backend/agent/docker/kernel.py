@@ -129,7 +129,7 @@ class DockerKernel(AbstractKernel):
     @classmethod
     @override
     def from_recovery_data(cls, data: KernelRecoveryData) -> Self:
-        return cls(
+        result = cls(
             ownership_data=data.ownership_data,
             network_id=data.network_id,
             image=data.image_ref,
@@ -146,6 +146,9 @@ class DockerKernel(AbstractKernel):
                 "block_service_ports": data.block_service_ports,
             },
         )
+        result.session_type = data.session_type
+        result.state = data.state
+        return result
 
     @override
     async def create_code_runner(

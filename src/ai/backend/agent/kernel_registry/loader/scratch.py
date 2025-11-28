@@ -1,19 +1,25 @@
+from __future__ import annotations
+
 import logging
+from collections.abc import MutableMapping
 from pathlib import Path
-from typing import override
+from typing import TYPE_CHECKING, override
 
 from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
 
-from ...docker.kernel import DockerKernel
-from ...dummy.kernel import DummyKernel
-from ...kernel import AbstractKernel
-from ...kubernetes.kernel import KubernetesKernel
 from ...scratch.utils import ScratchConfigManager, ScratchUtils
 from ...types import AgentBackend
 from ..exception import KernelRegistryNotFound
-from ..types import KernelRecoveryData, KernelRegistryType
+from ..types import KernelRecoveryData
 from .abc import AbstractKernelRegistryLoader
+
+if TYPE_CHECKING:
+    from ai.backend.agent.agent import AbstractAgent
+    from ai.backend.agent.docker.kernel import DockerKernel
+    from ai.backend.agent.dummy.kernel import DummyKernel
+    from ai.backend.agent.kernel import AbstractKernel
+    from ai.backend.agent.kubernetes.kernel import KubernetesKernel
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -22,8 +28,10 @@ class ScratchBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
     def __init__(
         self,
         scratch_root: Path,
+        agent: AbstractAgent,
     ) -> None:
         self._scratch_root = scratch_root
+        self._agent = agent
 
     def _parse_kernel_obj_from_recovery_data(
         self,
@@ -53,11 +61,14 @@ class ScratchBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
         return recovery_data
 
     @override
-    async def load_kernel_registry(self) -> KernelRegistryType:
+    async def load_kernel_registry(self) -> MutableMapping[KernelId, AbstractKernel]:
         result: dict[KernelId, AbstractKernel] = {}
-        for kernel_id, config_path in ScratchUtils.list_kernel_id_and_config_path(
-            self._scratch_root
-        ):
+        containers = await self._agent.enumerate_containers()
+        for kernel_id, _ in containers:
+            config_path = ScratchUtils.get_scratch_kernel_config_dir(
+                self._scratch_root,
+                kernel_id,
+            )
             if not config_path.is_dir():
                 continue
             try:
