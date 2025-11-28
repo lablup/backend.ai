@@ -2115,10 +2115,7 @@ class ScheduleDBSource:
             stmt = (
                 sa.update(KernelRow)
                 .where(
-                    sa.and_(
-                        KernelRow.id == kernel_id,
-                        KernelRow.status == KernelStatus.TERMINATING,
-                    )
+                    KernelRow.id == kernel_id,
                 )
                 .values(
                     status=KernelStatus.TERMINATED,
@@ -2139,6 +2136,39 @@ class ScheduleDBSource:
             )
             result = await db_sess.execute(stmt)
             return result.rowcount > 0
+
+    async def update_kernels_to_terminated(self, kernel_ids: list[str], reason: str) -> int:
+        """
+        Update multiple kernels to TERMINATED status.
+
+        :param kernel_ids: List of kernel ID strings to update
+        :param reason: Termination reason
+        :return: Number of kernels updated
+        """
+        if not kernel_ids:
+            return 0
+
+        now = datetime.now(tzutc())
+        kernel_uuids = [UUID(kid) for kid in kernel_ids]
+
+        async with self._begin_session_read_committed() as db_sess:
+            stmt = (
+                sa.update(KernelRow)
+                .where(KernelRow.id.in_(kernel_uuids))
+                .values(
+                    status=KernelStatus.TERMINATED,
+                    status_info=reason,
+                    status_changed=now,
+                    terminated_at=now,
+                    status_history=sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {KernelStatus.TERMINATED.name: now.isoformat()},
+                    ),
+                )
+            )
+            result = await db_sess.execute(stmt)
+            return result.rowcount
 
     async def update_kernel_heartbeat(self, kernel_id: UUID) -> bool:
         """

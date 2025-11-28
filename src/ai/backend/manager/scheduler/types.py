@@ -65,6 +65,9 @@ class ScheduleType(StrEnum):
     RETRY_PREPARING = "retry_preparing"  # Retry stuck PREPARING/PULLING sessions
     RETRY_CREATING = "retry_creating"  # Retry stuck CREATING sessions
     SWEEP_STALE_KERNELS = "sweep_stale_kernels"  # Sweep kernels with stale presence status
+    CHECK_RUNNING_SESSION_TERMINATION = (
+        "check_running_session_termination"  # Check RUNNING sessions with all kernels TERMINATED
+    )
 
 
 def merge_resource(
