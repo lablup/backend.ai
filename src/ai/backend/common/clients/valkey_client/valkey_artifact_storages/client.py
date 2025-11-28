@@ -57,7 +57,7 @@ class ValkeyArtifactStorageClient:
     Client for caching artifact storage information using Valkey.
 
     This client caches storage data like object storage and VFS storage configurations
-    using keys in the format: artifact_storages.{type}.{storage_name}
+    using keys in the format: artifact_storages.{type}.{storage_id}
     """
 
     _client: AbstractValkeyClient
@@ -106,52 +106,52 @@ class ValkeyArtifactStorageClient:
         """Ping the Valkey server to check connection health."""
         await self._client.ping()
 
-    def _make_storage_key(self, storage_type: ArtifactStorageType, storage_name: str) -> str:
+    def _make_storage_key(self, storage_type: ArtifactStorageType, storage_id: uuid.UUID) -> str:
         """
         Generate a cache key for artifact storage.
 
         :param storage_type: The type of storage.
-        :param storage_name: The name of the storage.
+        :param storage_id: The UUID of the storage.
         :return: The formatted cache key.
         """
-        return f"artifact_storages.{storage_type.value}.{storage_name}"
+        return f"artifact_storages.{storage_type.value}.{storage_id}"
 
     @valkey_artifact_storages_resilience.apply()
     async def set_object_storage(
         self,
-        storage_name: str,
+        storage_id: uuid.UUID,
         storage_data: ObjectStorageStatefulData,
     ) -> None:
         """
         Cache object storage data.
 
-        :param storage_name: The name of the object storage.
+        :param storage_id: The UUID of the object storage.
         :param storage_data: The storage data to cache.
         """
-        key = self._make_storage_key(ArtifactStorageType.OBJECT_STORAGE, storage_name)
+        key = self._make_storage_key(ArtifactStorageType.OBJECT_STORAGE, storage_id)
         value = dump_json_str(dataclasses.asdict(storage_data))
         await self._client.client.set(
             key=key,
             value=value,
             expiry=ExpirySet(ExpiryType.SEC, _EXPIRATION),
         )
-        log.debug("Cached object storage data for {}", storage_name)
+        log.debug("Cached object storage data for storage_id={}", storage_id)
 
     @valkey_artifact_storages_resilience.apply()
     async def get_object_storage(
         self,
-        storage_name: str,
+        storage_id: uuid.UUID,
     ) -> Optional[ObjectStorageStatefulData]:
         """
         Get cached object storage data.
 
-        :param storage_name: The name of the object storage.
+        :param storage_id: The UUID of the object storage.
         :return: The cached storage data or None if not found.
         """
-        key = self._make_storage_key(ArtifactStorageType.OBJECT_STORAGE, storage_name)
+        key = self._make_storage_key(ArtifactStorageType.OBJECT_STORAGE, storage_id)
         value = await self._client.client.get(key)
         if value is None:
-            log.debug("Cache miss for object storage {}", storage_name)
+            log.debug("Cache miss for object storage with storage_id={}", storage_id)
             return None
 
         json_value = value.decode()
@@ -164,34 +164,34 @@ class ValkeyArtifactStorageClient:
     @valkey_artifact_storages_resilience.apply()
     async def delete_object_storage(
         self,
-        storage_name: str,
+        storage_id: uuid.UUID,
     ) -> bool:
         """
         Delete cached object storage data.
 
-        :param storage_name: The name of the object storage.
+        :param storage_id: The UUID of the object storage.
         :return: True if the key was deleted, False otherwise.
         """
-        key = self._make_storage_key(ArtifactStorageType.OBJECT_STORAGE, storage_name)
+        key = self._make_storage_key(ArtifactStorageType.OBJECT_STORAGE, storage_id)
         result = await self._client.client.delete([key])
         deleted = result > 0
         if deleted:
-            log.debug("Deleted cached object storage data for {}", storage_name)
+            log.debug("Deleted cached object storage data for storage_id={}", storage_id)
         return deleted
 
     @valkey_artifact_storages_resilience.apply()
     async def set_vfs_storage(
         self,
-        storage_name: str,
+        storage_id: uuid.UUID,
         storage_data: VFSStorageStatefulData,
     ) -> None:
         """
         Cache VFS storage data.
 
-        :param storage_name: The name of the VFS storage.
+        :param storage_id: The UUID of the VFS storage.
         :param storage_data: The storage data to cache.
         """
-        key = self._make_storage_key(ArtifactStorageType.VFS_STORAGE, storage_name)
+        key = self._make_storage_key(ArtifactStorageType.VFS_STORAGE, storage_id)
         # Convert Path to string for JSON serialization
         data_dict = dataclasses.asdict(storage_data)
         data_dict["base_path"] = str(data_dict["base_path"])
@@ -201,23 +201,23 @@ class ValkeyArtifactStorageClient:
             value=value,
             expiry=ExpirySet(ExpiryType.SEC, _EXPIRATION),
         )
-        log.debug("Cached VFS storage data for {}", storage_name)
+        log.debug("Cached VFS storage data for storage_id={}", storage_id)
 
     @valkey_artifact_storages_resilience.apply()
     async def get_vfs_storage(
         self,
-        storage_name: str,
+        storage_id: uuid.UUID,
     ) -> Optional[VFSStorageStatefulData]:
         """
         Get cached VFS storage data.
 
-        :param storage_name: The name of the VFS storage.
+        :param storage_id: The UUID of the VFS storage.
         :return: The cached storage data or None if not found.
         """
-        key = self._make_storage_key(ArtifactStorageType.VFS_STORAGE, storage_name)
+        key = self._make_storage_key(ArtifactStorageType.VFS_STORAGE, storage_id)
         value = await self._client.client.get(key)
         if value is None:
-            log.debug("Cache miss for VFS storage {}", storage_name)
+            log.debug("Cache miss for VFS storage with storage_id={}", storage_id)
             return None
 
         json_value = value.decode()
@@ -234,19 +234,19 @@ class ValkeyArtifactStorageClient:
     @valkey_artifact_storages_resilience.apply()
     async def delete_vfs_storage(
         self,
-        storage_name: str,
+        storage_id: uuid.UUID,
     ) -> bool:
         """
         Delete cached VFS storage data.
 
-        :param storage_name: The name of the VFS storage.
+        :param storage_id: The UUID of the VFS storage.
         :return: True if the key was deleted, False otherwise.
         """
-        key = self._make_storage_key(ArtifactStorageType.VFS_STORAGE, storage_name)
+        key = self._make_storage_key(ArtifactStorageType.VFS_STORAGE, storage_id)
         result = await self._client.client.delete([key])
         deleted = result > 0
         if deleted:
-            log.debug("Deleted cached VFS storage data for {}", storage_name)
+            log.debug("Deleted cached VFS storage data for storage_id={}", storage_id)
         return deleted
 
     @valkey_artifact_storages_resilience.apply()
