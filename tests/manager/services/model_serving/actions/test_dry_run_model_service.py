@@ -6,6 +6,8 @@ import pytest
 
 from ai.backend.common.types import AccessKey, ClusterMode, RuntimeVariant
 from ai.backend.manager.data.model_serving.types import ModelServicePrepareCtx, ServiceConfig
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
+from ai.backend.manager.errors.storage import UnexpectedStorageProxyResponseError
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.dry_run_model_service import (
     DryRunModelServiceAction,
@@ -23,9 +25,24 @@ def mock_get_vfolder_by_id_dry_run(mocker, mock_repositories):
     mock = mocker.patch.object(
         mock_repositories.repository,
         "get_vfolder_by_id",
-        new_callable=MagicMock,
+        new_callable=AsyncMock,
     )
-    mock.return_value = MagicMock(id=uuid.uuid4())
+    mock.return_value = MagicMock(
+        id=uuid.uuid4(),
+        ownership_type=VFolderOwnershipType.USER,
+    )
+    return mock
+
+
+@pytest.fixture
+def mock_fetch_file_from_storage_proxy_dry_run(mocker, model_serving_service):
+    mock = mocker.patch.object(
+        model_serving_service,
+        "_fetch_file_from_storage_proxy",
+        new_callable=AsyncMock,
+    )
+    # Simulate no service-definition.toml file
+    mock.side_effect = UnexpectedStorageProxyResponseError(extra_msg="File not found")
     return mock
 
 
@@ -120,6 +137,7 @@ class TestDryRunModelService:
         scenario: ScenarioBase[DryRunModelServiceAction, DryRunModelServiceActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_get_vfolder_by_id_dry_run,
+        mock_fetch_file_from_storage_proxy_dry_run,
         mock_get_user_with_keypair,
         mock_resolve_image_for_endpoint_creation_dry_run,
         mock_background_task_manager_start,
