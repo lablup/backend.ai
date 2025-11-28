@@ -3,12 +3,22 @@ Tests for ScalingGroupService functionality.
 Tests the service layer with mocked repository operations.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.manager.data.scaling_group.types import ScalingGroupData, ScalingGroupListResult
+from ai.backend.common.types import AgentSelectionStrategy, SessionTypes
+from ai.backend.manager.data.scaling_group.types import (
+    ScalingGroupData,
+    ScalingGroupDriverConfig,
+    ScalingGroupListResult,
+    ScalingGroupMetadata,
+    ScalingGroupNetworkConfig,
+    ScalingGroupSchedulerConfig,
+    ScalingGroupSchedulerOptions,
+    ScalingGroupStatus,
+)
 from ai.backend.manager.repositories.base import Querier
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
@@ -35,17 +45,40 @@ class TestScalingGroupService:
         """Create sample scaling group data"""
         return ScalingGroupData(
             name="default",
-            description="Default scaling group",
-            is_active=True,
-            is_public=True,
-            created_at=datetime.now(),
-            wsproxy_addr="",
-            wsproxy_api_token="",
-            driver="static",
-            driver_opts={},
-            scheduler="fifo",
-            scheduler_opts={},
-            use_host_network=False,
+            status=ScalingGroupStatus(
+                is_active=True,
+                is_public=True,
+            ),
+            metadata=ScalingGroupMetadata(
+                description="Default scaling group",
+                created_at=datetime.now(),
+            ),
+            wsproxy=ScalingGroupNetworkConfig(
+                wsproxy_addr="",
+                wsproxy_api_token="",
+                use_host_network=False,
+            ),
+            driver=ScalingGroupDriverConfig(
+                name="static",
+                options={},
+            ),
+            scheduler=ScalingGroupSchedulerConfig(
+                name="fifo",
+                options=ScalingGroupSchedulerOptions(
+                    allowed_session_types=[
+                        SessionTypes.INTERACTIVE,
+                        SessionTypes.BATCH,
+                        SessionTypes.INFERENCE,
+                    ],
+                    pending_timeout=timedelta(seconds=0),
+                    config={},
+                    agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
+                    agent_selector_config={},
+                    enforce_spreading_endpoint_replica=False,
+                    allow_fractional_resource_fragmentation=True,
+                    route_cleanup_target_statuses=["unhealthy"],
+                ),
+            ),
         )
 
     @pytest.mark.asyncio
@@ -103,17 +136,40 @@ class TestScalingGroupService:
         scaling_groups = [
             ScalingGroupData(
                 name=f"sgroup-{i}",
-                description=f"Scaling group {i}",
-                is_active=True,
-                is_public=True,
-                created_at=datetime.now(),
-                wsproxy_addr="",
-                wsproxy_api_token="",
-                driver="static",
-                driver_opts={},
-                scheduler="fifo",
-                scheduler_opts={},
-                use_host_network=False,
+                status=ScalingGroupStatus(
+                    is_active=True,
+                    is_public=True,
+                ),
+                metadata=ScalingGroupMetadata(
+                    description=f"Scaling group {i}",
+                    created_at=datetime.now(),
+                ),
+                wsproxy=ScalingGroupNetworkConfig(
+                    wsproxy_addr="",
+                    wsproxy_api_token="",
+                    use_host_network=False,
+                ),
+                driver=ScalingGroupDriverConfig(
+                    name="static",
+                    options={},
+                ),
+                scheduler=ScalingGroupSchedulerConfig(
+                    name="fifo",
+                    options=ScalingGroupSchedulerOptions(
+                        allowed_session_types=[
+                            SessionTypes.INTERACTIVE,
+                            SessionTypes.BATCH,
+                            SessionTypes.INFERENCE,
+                        ],
+                        pending_timeout=timedelta(seconds=0),
+                        config={},
+                        agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
+                        agent_selector_config={},
+                        enforce_spreading_endpoint_replica=False,
+                        allow_fractional_resource_fragmentation=True,
+                        route_cleanup_target_statuses=["unhealthy"],
+                    ),
+                ),
             )
             for i in range(3)
         ]
@@ -180,9 +236,26 @@ class TestScalingGroupService:
         if result.scaling_groups:
             first_item = result.scaling_groups[0]
             assert hasattr(first_item, "name")
-            assert hasattr(first_item, "description")
-            assert hasattr(first_item, "is_active")
-            assert hasattr(first_item, "is_public")
-            assert hasattr(first_item, "created_at")
+            assert hasattr(first_item, "status")
+            assert hasattr(first_item, "metadata")
+            assert hasattr(first_item, "wsproxy")
             assert hasattr(first_item, "driver")
             assert hasattr(first_item, "scheduler")
+            # Verify nested structure
+            assert hasattr(first_item.status, "is_active")
+            assert hasattr(first_item.status, "is_public")
+            assert hasattr(first_item.metadata, "description")
+            assert hasattr(first_item.metadata, "created_at")
+            assert hasattr(first_item.wsproxy, "wsproxy_addr")
+            assert hasattr(first_item.wsproxy, "wsproxy_api_token")
+            assert hasattr(first_item.wsproxy, "use_host_network")
+            assert hasattr(first_item.driver, "name")
+            assert hasattr(first_item.driver, "options")
+            assert hasattr(first_item.scheduler, "name")
+            assert hasattr(first_item.scheduler, "options")
+            # Verify scheduler opts structure
+            assert hasattr(first_item.scheduler.options, "allowed_session_types")
+            assert hasattr(first_item.scheduler.options, "pending_timeout")
+            assert hasattr(first_item.scheduler.options, "config")
+            assert hasattr(first_item.scheduler.options, "agent_selection_strategy")
+            assert hasattr(first_item.scheduler.options, "agent_selector_config")

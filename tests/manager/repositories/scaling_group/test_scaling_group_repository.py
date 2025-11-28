@@ -321,11 +321,25 @@ class TestScalingGroupRepositoryDB:
         # Check first item structure
         if result.items:
             first_item = result.items[0]
+            # Top-level attributes
             assert hasattr(first_item, "name")
-            assert hasattr(first_item, "description")
-            assert hasattr(first_item, "is_active")
-            assert hasattr(first_item, "is_public")
-            assert hasattr(first_item, "created_at")
+            assert hasattr(first_item, "status")
+            assert hasattr(first_item, "metadata")
+            assert hasattr(first_item, "wsproxy")
             assert hasattr(first_item, "driver")
             assert hasattr(first_item, "scheduler")
-            assert hasattr(first_item, "use_host_network")
+
+            # Nested status attributes
+            assert hasattr(first_item.status, "is_active")
+            assert hasattr(first_item.status, "is_public")
+
+            # Nested metadata attributes
+            assert hasattr(first_item.metadata, "description")
+            assert hasattr(first_item.metadata, "created_at")
+
+            # Nested wsproxy attributes
+            assert hasattr(first_item.wsproxy, "use_host_network")
+
+            # Nested driver and scheduler attributes
+            assert hasattr(first_item.driver, "name")
+            assert hasattr(first_item.scheduler, "name")
