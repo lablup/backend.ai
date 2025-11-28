@@ -2,16 +2,29 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, TypeAlias
 
 import graphene
 import sqlalchemy as sa
-from graphql import GraphQLError, Undefined
+from graphql import Undefined
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.container_registry.types import (
+    ContainerRegistryCreator,
+    ContainerRegistryModifier,
+)
+from ai.backend.manager.services.container_registry.actions.create_container_registry import (
+    CreateContainerRegistryAction,
+)
+from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
+    DeleteContainerRegistryAction,
+)
+from ai.backend.manager.services.container_registry.actions.modify_container_registry import (
+    ModifyContainerRegistryAction,
+)
+from ai.backend.manager.types import OptionalState, TriState
 
 from ..container_registry import (
-    ContainerRegistryRow,
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
@@ -21,7 +34,6 @@ from .container_registry import (
     AllowedGroups,
     ContainerRegistryNode,
     ContainerRegistryTypeField,
-    handle_allowed_groups_update,
 )
 
 if TYPE_CHECKING:
@@ -51,6 +63,25 @@ class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):
     extra = graphene.JSONString(description="Added in 25.3.0.")
     allowed_groups = AllowedGroups(description="Added in 25.3.0.")
 
+    def to_action(self) -> CreateContainerRegistryAction:
+        def value_or_none(value):
+            return value if value is not Undefined else None
+
+        return CreateContainerRegistryAction(
+            creator=ContainerRegistryCreator(
+                url=self.url,
+                type=self.type,
+                registry_name=self.registry_name,
+                is_global=value_or_none(self.is_global),
+                project=value_or_none(self.project),
+                username=value_or_none(self.username),
+                password=value_or_none(self.password),
+                ssl_verify=value_or_none(self.ssl_verify),
+                extra=value_or_none(self.extra),
+                allowed_groups=value_or_none(self.allowed_groups),
+            )
+        )
+
 
 class CreateContainerRegistryNodeV2(graphene.Mutation):
     class Meta:
@@ -75,44 +106,18 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):
             ContainerRegistryValidatorArgs(
                 url=props.url,
                 type=props.type,
-                project=props.project,
+                project=props.project if props.project is not Undefined else None,
             )
         )
 
         validator.validate()
-
-        input_config: dict[str, Any] = {
-            "registry_name": props.registry_name,
-            "url": props.url,
-            "type": props.type,
-        }
-
-        def _set_if_set(name: str, val: Any) -> None:
-            if val is not Undefined:
-                input_config[name] = val
-
-        _set_if_set("project", props.project)
-        _set_if_set("username", props.username)
-        _set_if_set("password", props.password)
-        _set_if_set("ssl_verify", props.ssl_verify)
-        _set_if_set("is_global", props.is_global)
-        _set_if_set("extra", props.extra)
-
-        try:
-            async with ctx.db.begin_session() as db_session:
-                reg_row = ContainerRegistryRow(**input_config)
-                db_session.add(reg_row)
-                await db_session.flush()
-                await db_session.refresh(reg_row)
-
-            if props.allowed_groups:
-                await handle_allowed_groups_update(ctx.db, reg_row.id, props.allowed_groups)
-
-            return cls(
-                container_registry=ContainerRegistryNode.from_row(ctx, reg_row),
+        action = props.to_action()
+        result = (
+            await ctx.processors.container_registry.create_container_registry.wait_for_complete(
+                action
             )
-        except Exception as e:
-            raise GraphQLError(str(e))
+        )
+        return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
 
 
 class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):
@@ -130,6 +135,20 @@ class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):
     ssl_verify = graphene.Boolean(description="Added in 25.3.0.")
     extra = graphene.JSONString(description="Added in 25.3.0.")
     allowed_groups = AllowedGroups(description="Added in 25.3.0.")
+
+    def to_modifier(self) -> ContainerRegistryModifier:
+        return ContainerRegistryModifier(
+            url=OptionalState.from_graphql(self.url),
+            type=OptionalState.from_graphql(self.type),
+            registry_name=OptionalState.from_graphql(self.registry_name),
+            is_global=TriState.from_graphql(self.is_global),
+            project=TriState.from_graphql(self.project),
+            username=TriState.from_graphql(self.username),
+            password=TriState.from_graphql(self.password),
+            ssl_verify=TriState.from_graphql(self.ssl_verify),
+            extra=TriState.from_graphql(self.extra),
+            allowed_groups=TriState.from_graphql(self.allowed_groups),
+        )
 
 
 class ModifyContainerRegistryNodeV2(graphene.Mutation):
@@ -157,52 +176,19 @@ class ModifyContainerRegistryNodeV2(graphene.Mutation):
     ) -> ModifyContainerRegistryNodeV2:
         ctx: GraphQueryContext = info.context
 
-        input_config: dict[str, Any] = {}
-
-        def _set_if_set(name: str, val: Any) -> None:
-            if val is not Undefined:
-                input_config[name] = val
-
-        _set_if_set("url", props.url)
-        _set_if_set("type", props.type)
-        _set_if_set("registry_name", props.registry_name)
-        _set_if_set("username", props.username)
-        _set_if_set("password", props.password)
-        _set_if_set("project", props.project)
-        _set_if_set("ssl_verify", props.ssl_verify)
-        _set_if_set("is_global", props.is_global)
-        _set_if_set("extra", props.extra)
-
         _, _id = AsyncNode.resolve_global_id(info, id)
         reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
 
-        try:
-            async with ctx.db.begin_session() as session:
-                stmt = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
-                reg_row = await session.scalar(stmt)
-
-                if reg_row is None:
-                    raise ValueError(f"ContainerRegistry not found (id: {reg_id})")
-                for field, val in input_config.items():
-                    setattr(reg_row, field, val)
-
-                validator = ContainerRegistryValidator(
-                    ContainerRegistryValidatorArgs(
-                        type=reg_row.type,
-                        project=reg_row.project,
-                        url=reg_row.url,
-                    )
+        result = (
+            await ctx.processors.container_registry.modify_container_registry.wait_for_complete(
+                ModifyContainerRegistryAction(
+                    id=reg_id,
+                    modifier=props.to_modifier(),
                 )
+            )
+        )
 
-                validator.validate()
-
-            if props.allowed_groups:
-                await handle_allowed_groups_update(ctx.db, reg_row.id, props.allowed_groups)
-
-            return cls(container_registry=ContainerRegistryNode.from_row(ctx, reg_row))
-
-        except Exception as e:
-            raise GraphQLError(str(e))
+        return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
 
 
 class DeleteContainerRegistryNodeV2(graphene.Mutation):
@@ -231,20 +217,10 @@ class DeleteContainerRegistryNodeV2(graphene.Mutation):
         _, _id = AsyncNode.resolve_global_id(info, id)
         reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
 
-        try:
-            async with ctx.db.begin_session() as db_session:
-                reg_row = await ContainerRegistryRow.get(db_session, reg_id)
-                reg_row = await db_session.scalar(
-                    sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
-                )
-                if reg_row is None:
-                    raise ValueError(f"Container registry not found (id:{reg_id})")
-                container_registry = ContainerRegistryNode.from_row(ctx, reg_row)
-                await db_session.execute(
-                    sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
-                )
+        result = (
+            await ctx.processors.container_registry.delete_container_registry.wait_for_complete(
+                DeleteContainerRegistryAction(id=reg_id)
+            )
+        )
 
-            return cls(container_registry=container_registry)
-
-        except Exception as e:
-            raise GraphQLError(str(e))
+        return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
