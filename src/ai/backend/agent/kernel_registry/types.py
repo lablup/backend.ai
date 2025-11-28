@@ -6,12 +6,10 @@ from pydantic import BaseModel, Field
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AgentId, ContainerId, KernelId, ServicePort, SessionTypes
 
-from ..kernel import AbstractKernel, KernelLifecycleStatus, KernelOwnershipData
+from ..kernel import KernelLifecycleStatus, KernelOwnershipData
 from ..proxy import DomainSocketPathPair
 from ..resources import KernelResourceSpec
 from ..types import AgentBackend
-
-KernelRegistryType = Mapping[KernelId, AbstractKernel]
 
 
 class KernelRecoveryData(BaseModel):

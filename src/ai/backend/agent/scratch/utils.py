@@ -7,7 +7,6 @@ from collections.abc import Mapping
 from functools import partial
 from pathlib import Path
 from typing import Optional
-from uuid import UUID
 
 from ai.backend.common.types import KernelId
 
@@ -61,18 +60,6 @@ class ScratchUtils:
     @staticmethod
     def get_scratch_kernel_config_dir(scratch_root: Path, kernel_id: KernelId) -> Path:
         return scratch_root / str(kernel_id) / "config"
-
-    @staticmethod
-    def list_kernel_id_and_config_path(scratch_root: Path) -> list[tuple[KernelId, Path]]:
-        result: list[tuple[KernelId, Path]] = []
-        for config_path in scratch_root.glob("*/config"):
-            try:
-                raw_kernel_id = config_path.parent.name
-                kernel_id = KernelId(UUID(raw_kernel_id))
-            except (ValueError, TypeError):
-                continue
-            result.append((kernel_id, config_path))
-        return result
 
 
 class ScratchConfigManager:

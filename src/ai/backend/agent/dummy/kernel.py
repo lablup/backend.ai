@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 from collections import OrderedDict
-from typing import Any, Dict, FrozenSet, Mapping, Sequence, override
+from typing import TYPE_CHECKING, Any, Dict, FrozenSet, Mapping, Self, Sequence, override
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp, CodeCompletionResult
@@ -12,7 +12,10 @@ from ai.backend.common.types import CommitStatus
 
 from ..kernel import AbstractCodeRunner, AbstractKernel, NextResult, ResultRecord
 from ..resources import KernelResourceSpec
-from ..types import AgentEventData, KernelOwnershipData
+from ..types import AgentBackend, AgentEventData, KernelOwnershipData
+
+if TYPE_CHECKING:
+    from ..kernel_registry.types import KernelRecoveryData
 
 
 class DummyKernel(AbstractKernel):
@@ -50,6 +53,53 @@ class DummyKernel(AbstractKernel):
     @override
     async def close(self) -> None:
         pass
+
+    @override
+    def to_recovery_data(self) -> KernelRecoveryData:
+        from ..kernel_registry.types import KernelRecoveryData
+
+        return KernelRecoveryData(
+            kernel_backend=AgentBackend.DUMMY,
+            id=self.kernel_id,
+            agent_id=self.ownership_data.agent_id,
+            image_ref=self.image,
+            version=self.version,
+            ownership_data=self.ownership_data,
+            network_id=self.network_id,
+            network_driver="",  # Not used in Dummy backend
+            container_id=None,  # Not applicable for Dummy backend
+            session_type=self.session_type,
+            state=self.state,
+            block_service_ports=self.data.get("block_service_ports", False),
+            domain_socket_proxies=self.data.get("domain_socket_proxies", []),
+            service_ports=self.service_ports,
+            repl_in_port=self.data["repl_in_port"],
+            repl_out_port=self.data["repl_out_port"],
+            resource_spec=self.resource_spec,
+            environ=self.environ,
+        )
+
+    @classmethod
+    @override
+    def from_recovery_data(cls, data: KernelRecoveryData) -> Self:
+        return cls(
+            ownership_data=data.ownership_data,
+            network_id=data.network_id,
+            image=data.image_ref,
+            version=data.version,
+            agent_config={},
+            resource_spec=data.resource_spec,
+            service_ports=data.service_ports,
+            environ=data.environ,
+            data={
+                "kernel_host": "",  # Not used in Dummy backend
+                "repl_in_port": data.repl_in_port,
+                "repl_out_port": data.repl_out_port,
+                "block_service_ports": data.block_service_ports,
+                "domain_socket_proxies": data.domain_socket_proxies,
+            },
+            dummy_config={},  # Will be set by agent when needed
+        )
 
     @override
     async def create_code_runner(
