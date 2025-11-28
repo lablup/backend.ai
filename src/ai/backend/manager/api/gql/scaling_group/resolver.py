@@ -14,15 +14,15 @@ from ai.backend.manager.services.scaling_group.actions.list_scaling_groups impor
 )
 
 from ..types import StrawberryGQLContext
-from .types import ScalingGroup, ScalingGroupFilter, ScalingGroupOrderBy
+from .types import ScalingGroupFilter, ScalingGroupOrderBy, ScalingGroupV2
 
 # Connection types
 
-ScalingGroupEdge = Edge[ScalingGroup]
+ScalingGroupEdge = Edge[ScalingGroupV2]
 
 
 @strawberry.type(description="Added in 25.18.0. Scaling group connection")
-class ScalingGroupConnection(Connection[ScalingGroup]):
+class ScalingGroupV2Connection(Connection[ScalingGroupV2]):
     count: int
 
     def __init__(self, *args, count: int, **kwargs):
@@ -44,7 +44,7 @@ async def scaling_groups(
     last: Optional[int] = None,
     limit: Optional[int] = None,
     offset: Optional[int] = None,
-) -> ScalingGroupConnection:
+) -> ScalingGroupV2Connection:
     processors = info.context.processors
 
     # Build querier from filter, order_by, and pagination using adapter
@@ -63,13 +63,13 @@ async def scaling_groups(
         SearchScalingGroupsAction(querier=querier)
     )
 
-    nodes = [ScalingGroup.from_dataclass(data) for data in action_result.scaling_groups]
+    nodes = [ScalingGroupV2.from_dataclass(data) for data in action_result.scaling_groups]
 
     edges = [
-        ScalingGroupEdge(node=node, cursor=to_global_id(ScalingGroup, node.id)) for node in nodes
+        ScalingGroupEdge(node=node, cursor=to_global_id(ScalingGroupV2, node.id)) for node in nodes
     ]
 
-    return ScalingGroupConnection(
+    return ScalingGroupV2Connection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
             has_next_page=False,

@@ -3,17 +3,17 @@
 from .adapter import ScalingGroupGQLAdapter
 from .resolver import scaling_groups
 from .types import (
-    ScalingGroup,
     ScalingGroupFilter,
     ScalingGroupOrderBy,
     ScalingGroupOrderField,
+    ScalingGroupV2,
 )
 
 __all__ = (
     # Adapters
     "ScalingGroupGQLAdapter",
     # Types
-    "ScalingGroup",
+    "ScalingGroupV2",
     "ScalingGroupFilter",
     "ScalingGroupOrderBy",
     "ScalingGroupOrderField",

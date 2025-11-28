@@ -23,7 +23,7 @@ from ai.backend.manager.repositories.scaling_group.options import (
 )
 
 __all__ = (
-    "ScalingGroup",
+    "ScalingGroupV2",
     "ScalingGroupFilter",
     "ScalingGroupOrderBy",
     "ScalingGroupOrderField",
@@ -31,7 +31,7 @@ __all__ = (
 
 
 @strawberry.type
-class ScalingGroup(Node):
+class ScalingGroupV2(Node):
     id: NodeID[str]
     name: str
     description: str
