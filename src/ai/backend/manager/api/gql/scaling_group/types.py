@@ -23,6 +23,12 @@ from ai.backend.manager.repositories.scaling_group.options import (
 )
 
 __all__ = (
+    "ScalingGroupStatus",
+    "ScalingGroupMetadata",
+    "ScalingGroupNetworkConfig",
+    "ScalingGroupDriverConfig",
+    "ScalingGroupSchedulerOptions",
+    "ScalingGroupSchedulerConfig",
     "ScalingGroupV2",
     "ScalingGroupFilter",
     "ScalingGroupOrderBy",
@@ -31,37 +37,109 @@ __all__ = (
 
 
 @strawberry.type
+class ScalingGroupStatus:
+    """Status information for a scaling group."""
+
+    is_active: bool
+    is_public: bool
+
+
+@strawberry.type
+class ScalingGroupMetadata:
+    """Metadata for a scaling group."""
+
+    description: str
+    created_at: datetime
+
+
+@strawberry.type
+class ScalingGroupNetworkConfig:
+    """Network configuration for a scaling group."""
+
+    wsproxy_addr: str
+    wsproxy_api_token: str
+    use_host_network: bool
+
+
+@strawberry.type
+class ScalingGroupDriverConfig:
+    """Driver configuration for a scaling group."""
+
+    name: str
+    options: JSONString
+
+
+@strawberry.type
+class ScalingGroupSchedulerOptions:
+    """Scheduler options for a scaling group."""
+
+    allowed_session_types: list[str]
+    pending_timeout: float
+    config: JSONString
+    agent_selection_strategy: str
+    agent_selector_config: JSONString
+    enforce_spreading_endpoint_replica: bool
+    allow_fractional_resource_fragmentation: bool
+    route_cleanup_target_statuses: list[str]
+
+
+@strawberry.type
+class ScalingGroupSchedulerConfig:
+    """Scheduler configuration for a scaling group."""
+
+    name: str
+    options: ScalingGroupSchedulerOptions
+
+
+@strawberry.type
 class ScalingGroupV2(Node):
     id: NodeID[str]
     name: str
-    description: str
-    is_active: bool
-    is_public: bool
-    created_at: datetime
-    wsproxy_addr: str
-    wsproxy_api_token: str
-    driver: str
-    driver_opts: JSONString
-    scheduler: str
-    scheduler_opts: JSONString
-    use_host_network: bool
+    status: ScalingGroupStatus
+    metadata: ScalingGroupMetadata
+    wsproxy: ScalingGroupNetworkConfig
+    driver: ScalingGroupDriverConfig
+    scheduler: ScalingGroupSchedulerConfig
 
     @classmethod
     def from_dataclass(cls, data: ScalingGroupData) -> Self:
         return cls(
             id=data.name,
             name=data.name,
-            description=data.description,
-            is_active=data.is_active,
-            is_public=data.is_public,
-            created_at=data.created_at,
-            wsproxy_addr=data.wsproxy_addr,
-            wsproxy_api_token=data.wsproxy_api_token,
-            driver=data.driver,
-            driver_opts=JSONString.serialize(data.driver_opts),
-            scheduler=data.scheduler,
-            scheduler_opts=JSONString.serialize(data.scheduler_opts),
-            use_host_network=data.use_host_network,
+            status=ScalingGroupStatus(
+                is_active=data.status.is_active,
+                is_public=data.status.is_public,
+            ),
+            metadata=ScalingGroupMetadata(
+                description=data.metadata.description,
+                created_at=data.metadata.created_at,
+            ),
+            wsproxy=ScalingGroupNetworkConfig(
+                wsproxy_addr=data.wsproxy.wsproxy_addr,
+                wsproxy_api_token=data.wsproxy.wsproxy_api_token,
+                use_host_network=data.wsproxy.use_host_network,
+            ),
+            driver=ScalingGroupDriverConfig(
+                name=data.driver.name,
+                options=JSONString.serialize(data.driver.options),
+            ),
+            scheduler=ScalingGroupSchedulerConfig(
+                name=data.scheduler.name,
+                options=ScalingGroupSchedulerOptions(
+                    allowed_session_types=[
+                        st.value for st in data.scheduler.options.allowed_session_types
+                    ],
+                    pending_timeout=data.scheduler.options.pending_timeout.total_seconds(),
+                    config=JSONString.serialize(data.scheduler.options.config),
+                    agent_selection_strategy=data.scheduler.options.agent_selection_strategy.value,
+                    agent_selector_config=JSONString.serialize(
+                        data.scheduler.options.agent_selector_config
+                    ),
+                    enforce_spreading_endpoint_replica=data.scheduler.options.enforce_spreading_endpoint_replica,
+                    allow_fractional_resource_fragmentation=data.scheduler.options.allow_fractional_resource_fragmentation,
+                    route_cleanup_target_statuses=data.scheduler.options.route_cleanup_target_statuses,
+                ),
+            ),
         )
 
 

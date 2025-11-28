@@ -2268,6 +2268,11 @@ type RestoreArtifactsPayload {
   artifacts: [Artifact!]!
 }
 
+type ScalingGroupDriverConfig {
+  name: String!
+  options: JSONString!
+}
+
 """Added in 25.18.0. Filter for scaling groups"""
 input ScalingGroupFilter {
   name: StringFilter = null
@@ -2280,6 +2285,17 @@ input ScalingGroupFilter {
   AND: [ScalingGroupFilter!] = null
   OR: [ScalingGroupFilter!] = null
   NOT: [ScalingGroupFilter!] = null
+}
+
+type ScalingGroupMetadata {
+  description: String!
+  createdAt: DateTime!
+}
+
+type ScalingGroupNetworkConfig {
+  wsproxyAddr: String!
+  wsproxyApiToken: String!
+  useHostNetwork: Boolean!
 }
 
 extend type ScalingGroupNode @key(fields: "id") {
@@ -2300,21 +2316,36 @@ enum ScalingGroupOrderField {
   IS_PUBLIC
 }
 
+type ScalingGroupSchedulerConfig {
+  name: String!
+  options: ScalingGroupSchedulerOptions!
+}
+
+type ScalingGroupSchedulerOptions {
+  allowedSessionTypes: [String!]!
+  pendingTimeout: Float!
+  config: JSONString!
+  agentSelectionStrategy: String!
+  agentSelectorConfig: JSONString!
+  enforceSpreadingEndpointReplica: Boolean!
+  allowFractionalResourceFragmentation: Boolean!
+  routeCleanupTargetStatuses: [String!]!
+}
+
+type ScalingGroupStatus {
+  isActive: Boolean!
+  isPublic: Boolean!
+}
+
 type ScalingGroupV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   name: String!
-  description: String!
-  isActive: Boolean!
-  isPublic: Boolean!
-  createdAt: DateTime!
-  wsproxyAddr: String!
-  wsproxyApiToken: String!
-  driver: String!
-  driverOpts: JSONString!
-  scheduler: String!
-  schedulerOpts: JSONString!
-  useHostNetwork: Boolean!
+  status: ScalingGroupStatus!
+  metadata: ScalingGroupMetadata!
+  wsproxy: ScalingGroupNetworkConfig!
+  driver: ScalingGroupDriverConfig!
+  scheduler: ScalingGroupSchedulerConfig!
 }
 
 """Added in 25.18.0. Scaling group connection"""
