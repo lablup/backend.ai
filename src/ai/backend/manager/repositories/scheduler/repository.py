@@ -497,6 +497,11 @@ class SchedulerRepository:
         return await self._db_source.update_kernel_status_terminated(kernel_id, reason, exit_code)
 
     @scheduler_repository_resilience.apply()
+    async def update_kernels_to_terminated(self, kernel_ids: list[str], reason: str) -> int:
+        """Update multiple kernels to TERMINATED status."""
+        return await self._db_source.update_kernels_to_terminated(kernel_ids, reason)
+
+    @scheduler_repository_resilience.apply()
     async def update_kernel_heartbeat(self, kernel_id: UUID) -> bool:
         """Update kernel heartbeat timestamp."""
         return await self._db_source.update_kernel_heartbeat(kernel_id)

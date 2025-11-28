@@ -33,6 +33,7 @@ from .handlers import (
     CheckCreatingProgressHandler,
     CheckPreconditionHandler,
     CheckPullingProgressHandler,
+    CheckRunningSessionTerminationHandler,
     CheckTerminatingProgressHandler,
     RetryCreatingHandler,
     RetryPreparingHandler,
@@ -154,6 +155,11 @@ class ScheduleCoordinator:
                 self._scheduler,
                 self._scheduling_controller,
                 self._event_producer,
+                self._scheduler._repository,
+            ),
+            ScheduleType.CHECK_RUNNING_SESSION_TERMINATION: CheckRunningSessionTerminationHandler(
+                self._valkey_schedule,
+                self._scheduler,
                 self._scheduler._repository,
             ),
             ScheduleType.RETRY_PREPARING: RetryPreparingHandler(
@@ -287,10 +293,15 @@ class ScheduleCoordinator:
 
     async def handle_kernel_terminated(self, event: KernelTerminatedAnycastEvent) -> bool:
         """Handle kernel terminated event through the kernel state engine."""
+        log.info("Handling termination of kernel {}", event.kernel_id)
         result = await self._kernel_state_engine.mark_kernel_terminated(
             event.kernel_id, event.reason, event.exit_code
         )
         if result:
+            # Request CHECK_RUNNING_SESSION_TERMINATION to check if RUNNING session should become TERMINATING
+            await self._scheduling_controller.mark_scheduling_needed(
+                ScheduleType.CHECK_RUNNING_SESSION_TERMINATION
+            )
             # Request CHECK_TERMINATING_PROGRESS to check if session should transition to TERMINATED
             await self._scheduling_controller.mark_scheduling_needed(
                 ScheduleType.CHECK_TERMINATING_PROGRESS
@@ -414,6 +425,13 @@ class ScheduleCoordinator:
             ),
             SchedulerTaskSpec(
                 ScheduleType.CHECK_TERMINATING_PROGRESS,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            # Check RUNNING sessions where all kernels are TERMINATED
+            SchedulerTaskSpec(
+                ScheduleType.CHECK_RUNNING_SESSION_TERMINATION,
                 short_interval=2.0,
                 long_interval=60.0,
                 initial_delay=30.0,

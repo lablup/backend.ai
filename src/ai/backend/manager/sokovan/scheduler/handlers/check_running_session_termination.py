@@ -1,4 +1,4 @@
-"""Handler for sweeping kernels with stale presence status."""
+"""Handler for checking RUNNING sessions with all kernels TERMINATED."""
 
 from __future__ import annotations
 
@@ -19,13 +19,12 @@ from .base import SchedulerHandler
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
-class SweepStaleKernelsHandler(SchedulerHandler):
-    """Handler for sweeping kernels with stale presence status.
+class CheckRunningSessionTerminationHandler(SchedulerHandler):
+    """Handler for checking RUNNING sessions where all kernels are TERMINATED.
 
-    This handler checks kernel presence status in Redis and terminates
-    kernels that are STALE (no heartbeat from agent for too long).
-    Before termination, it confirms with the agent that the kernel
-    is truly gone.
+    This handler finds RUNNING sessions where all kernels have been terminated
+    (e.g., due to agent events or stale kernel sweeping) and marks them as
+    TERMINATING so they can proceed to the termination flow.
     """
 
     def __init__(
@@ -41,7 +40,7 @@ class SweepStaleKernelsHandler(SchedulerHandler):
     @classmethod
     def name(cls) -> str:
         """Get the name of the handler."""
-        return "sweep-stale-kernels"
+        return "check-running-session-termination"
 
     @property
     def lock_id(self) -> Optional[LockID]:
@@ -49,16 +48,19 @@ class SweepStaleKernelsHandler(SchedulerHandler):
         return LockID.LOCKID_SOKOVAN_TARGET_TERMINATING
 
     async def execute(self) -> ScheduleResult:
-        """Sweep kernels with stale presence status."""
-        return await self._scheduler.sweep_stale_kernels()
+        """Check RUNNING sessions with all kernels TERMINATED and mark as TERMINATING."""
+        return await self._scheduler.check_running_session_termination()
 
     async def post_process(self, result: ScheduleResult) -> None:
-        """Trigger CHECK_RUNNING_SESSION_TERMINATION and invalidate cache if kernels were terminated."""
-        log.info("Swept {} stale kernels", len(result.scheduled_sessions))
+        """Trigger CHECK_TERMINATING_PROGRESS and invalidate cache."""
+        log.info(
+            "{} RUNNING sessions marked as TERMINATING",
+            len(result.scheduled_sessions),
+        )
 
-        # Trigger CHECK_RUNNING_SESSION_TERMINATION to check if sessions need termination
+        # Trigger CHECK_TERMINATING_PROGRESS to finalize session termination
         await self._valkey_schedule_client.mark_schedule_needed(
-            ScheduleType.CHECK_RUNNING_SESSION_TERMINATION
+            ScheduleType.CHECK_TERMINATING_PROGRESS
         )
 
         # Invalidate cache for affected access keys
@@ -67,4 +69,7 @@ class SweepStaleKernelsHandler(SchedulerHandler):
         }
         if affected_keys:
             await self._repository.invalidate_kernel_related_cache(list(affected_keys))
-            log.debug("Invalidated kernel-related cache for {} access keys", len(affected_keys))
+            log.debug(
+                "Invalidated kernel-related cache for {} access keys",
+                len(affected_keys),
+            )

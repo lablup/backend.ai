@@ -6,6 +6,7 @@ from .base import SchedulerHandler
 from .check_creating_progress import CheckCreatingProgressHandler
 from .check_precondition import CheckPreconditionHandler
 from .check_pulling_progress import CheckPullingProgressHandler
+from .check_running_session_termination import CheckRunningSessionTerminationHandler
 from .check_terminating_progress import CheckTerminatingProgressHandler
 from .retry_creating import RetryCreatingHandler
 from .retry_preparing import RetryPreparingHandler
@@ -27,6 +28,7 @@ __all__ = [
     "SweepStaleKernelsHandler",
     "CheckPullingProgressHandler",
     "CheckCreatingProgressHandler",
+    "CheckRunningSessionTerminationHandler",
     "CheckTerminatingProgressHandler",
     "RetryPreparingHandler",
     "RetryCreatingHandler",
