@@ -229,7 +229,7 @@ async def execute_querier(
     Returns:
         QuerierResult containing rows and total_count
     """
-    fallback_query = query
+    initial_query = query
     if querier:
         query = _apply_querier(query, querier)
 
@@ -240,8 +240,9 @@ async def execute_querier(
         return QuerierResult(rows=rows, total_count=rows[0].total_count)
 
     # Fallback: Get total_count from window function without pagination
-    # Re-execute query with conditions and orders but without pagination
+    # Re-execute query with conditions but without pagination
 
+    fallback_query = initial_query
     if querier:
         for condition in querier.conditions:
             fallback_query = fallback_query.where(condition())
