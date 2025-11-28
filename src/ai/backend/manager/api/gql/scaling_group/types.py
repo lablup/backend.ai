@@ -60,10 +60,10 @@ class ScalingGroupMetadata:
 @strawberry.type(description="Added in 25.18.0. Network configuration for a scaling group")
 class ScalingGroupNetworkConfig:
     wsproxy_addr: str = strawberry.field(
-        description="WebSocket proxy server address for terminal/web service access in interactive sessions. Used when clients connect to running session services."
+        description="App-proxy coordinator API server address, Manager uses this address to communicate with the app-proxy coordinator for managing service routes, endpoint registration, and proxying client connections to session services."
     )
     wsproxy_api_token: str = strawberry.field(
-        description="Authentication token for the WebSocket proxy API. Required for proxy server to validate and route client connections."
+        description="Authentication token for the App-proxy coordinator API server."
     )
     use_host_network: bool = strawberry.field(
         description="Whether session containers use the host's network namespace instead of isolated container networking. Enables direct host port binding but reduces isolation."
@@ -73,17 +73,17 @@ class ScalingGroupNetworkConfig:
 @strawberry.type(description="Added in 25.18.0. Driver configuration for resource allocation")
 class ScalingGroupDriverConfig:
     name: str = strawberry.field(
-        description="Agent resource driver implementation name. 'static' uses a predefined set of agents registered to this scaling group. 'kubernetes' dynamically provisions agents as Kubernetes pods."
+        description="Agent resource driver implementation name. 'static' uses a predefined set of agents registered to this scaling group."
     )
     options: JSON = strawberry.field(
-        description="Driver-specific configuration options. Contents vary by driver type - static driver may specify agent registration constraints, while kubernetes driver configures pod specifications."
+        description="Driver-specific configuration options. Contents vary by driver type."
     )
 
 
 @strawberry.type(description="Added in 25.18.0. Scheduler configuration options")
 class ScalingGroupSchedulerOptions:
     allowed_session_types: list[str] = strawberry.field(
-        description="Session types that can be scheduled in this scaling group. Valid values: 'interactive' (user terminals/notebooks), 'batch' (background jobs), 'inference' (model serving endpoints). Requests for unlisted types are rejected."
+        description="Session types that can be scheduled in this scaling group. Valid values: 'interactive' , 'batch', 'inference'. Requests for unlisted types are rejected."
     )
     pending_timeout: float = strawberry.field(
         description="Maximum time in seconds a session can wait in PENDING state before automatic cancellation. Zero means no timeout. Used to prevent indefinite resource waiting when no agents are available."
