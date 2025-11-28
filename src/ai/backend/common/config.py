@@ -168,6 +168,7 @@ model_definition_iv = t.Dict({
                     t.Key("max_retries", default=10): t.Null | t.ToInt[1:],
                     t.Key("max_wait_time", default=15): t.Null | t.ToFloat[0:],
                     t.Key("expected_status_code", default=200): t.Null | t.ToInt[100:],
+                    t.Key("initial_delay", default=60): t.Null | t.ToFloat[0:],
                 }),
             }),
             t.Key("metadata", default=None): t.Null
