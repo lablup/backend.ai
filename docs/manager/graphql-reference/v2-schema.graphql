@@ -2404,7 +2404,7 @@ type ScalingGroupStatus {
   isActive: Boolean!
 
   """
-  Whether the scaling group is visible without explicit domain/project/user association. When false, only users with explicit associations can use this scaling group.
+  Whether this scaling group is available for regular user sessions (interactive/batch/inference). When false, the scaling group is reserved for internal SYSTEM-type sessions only, such as management or infrastructure sessions.
   """
   isPublic: Boolean!
 }
