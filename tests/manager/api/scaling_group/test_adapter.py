@@ -293,10 +293,12 @@ class TestScalingGroupGQLAdapter:
 
     def test_order_by_name_ascending(self) -> None:
         """Test ordering by name ascending"""
-        order_by = ScalingGroupOrderBy(
-            field=ScalingGroupOrderField.NAME,
-            direction=OrderDirection.ASC,
-        )
+        order_by = [
+            ScalingGroupOrderBy(
+                field=ScalingGroupOrderField.NAME,
+                direction=OrderDirection.ASC,
+            )
+        ]
         adapter = ScalingGroupGQLAdapter()
         querier = adapter.build_querier(order_by=order_by)
 
@@ -305,10 +307,12 @@ class TestScalingGroupGQLAdapter:
 
     def test_order_by_name_descending(self) -> None:
         """Test ordering by name descending"""
-        order_by = ScalingGroupOrderBy(
-            field=ScalingGroupOrderField.NAME,
-            direction=OrderDirection.DESC,
-        )
+        order_by = [
+            ScalingGroupOrderBy(
+                field=ScalingGroupOrderField.NAME,
+                direction=OrderDirection.DESC,
+            )
+        ]
         adapter = ScalingGroupGQLAdapter()
         querier = adapter.build_querier(order_by=order_by)
 
@@ -317,10 +321,12 @@ class TestScalingGroupGQLAdapter:
 
     def test_order_by_description_ascending(self) -> None:
         """Test ordering by description ascending"""
-        order_by = ScalingGroupOrderBy(
-            field=ScalingGroupOrderField.DESCRIPTION,
-            direction=OrderDirection.ASC,
-        )
+        order_by = [
+            ScalingGroupOrderBy(
+                field=ScalingGroupOrderField.DESCRIPTION,
+                direction=OrderDirection.ASC,
+            )
+        ]
         adapter = ScalingGroupGQLAdapter()
         querier = adapter.build_querier(order_by=order_by)
 
@@ -329,10 +335,12 @@ class TestScalingGroupGQLAdapter:
 
     def test_order_by_description_descending(self) -> None:
         """Test ordering by description descending"""
-        order_by = ScalingGroupOrderBy(
-            field=ScalingGroupOrderField.DESCRIPTION,
-            direction=OrderDirection.DESC,
-        )
+        order_by = [
+            ScalingGroupOrderBy(
+                field=ScalingGroupOrderField.DESCRIPTION,
+                direction=OrderDirection.DESC,
+            )
+        ]
         adapter = ScalingGroupGQLAdapter()
         querier = adapter.build_querier(order_by=order_by)
 
@@ -341,10 +349,12 @@ class TestScalingGroupGQLAdapter:
 
     def test_order_by_created_at_ascending(self) -> None:
         """Test ordering by created_at ascending"""
-        order_by = ScalingGroupOrderBy(
-            field=ScalingGroupOrderField.CREATED_AT,
-            direction=OrderDirection.ASC,
-        )
+        order_by = [
+            ScalingGroupOrderBy(
+                field=ScalingGroupOrderField.CREATED_AT,
+                direction=OrderDirection.ASC,
+            )
+        ]
         adapter = ScalingGroupGQLAdapter()
         querier = adapter.build_querier(order_by=order_by)
 
@@ -353,10 +363,12 @@ class TestScalingGroupGQLAdapter:
 
     def test_order_by_created_at_descending(self) -> None:
         """Test ordering by created_at descending"""
-        order_by = ScalingGroupOrderBy(
-            field=ScalingGroupOrderField.CREATED_AT,
-            direction=OrderDirection.DESC,
-        )
+        order_by = [
+            ScalingGroupOrderBy(
+                field=ScalingGroupOrderField.CREATED_AT,
+                direction=OrderDirection.DESC,
+            )
+        ]
         adapter = ScalingGroupGQLAdapter()
         querier = adapter.build_querier(order_by=order_by)
 
@@ -365,10 +377,12 @@ class TestScalingGroupGQLAdapter:
 
     def test_order_by_is_active_ascending(self) -> None:
         """Test ordering by is_active ascending"""
-        order_by = ScalingGroupOrderBy(
-            field=ScalingGroupOrderField.IS_ACTIVE,
-            direction=OrderDirection.ASC,
-        )
+        order_by = [
+            ScalingGroupOrderBy(
+                field=ScalingGroupOrderField.IS_ACTIVE,
+                direction=OrderDirection.ASC,
+            )
+        ]
         adapter = ScalingGroupGQLAdapter()
         querier = adapter.build_querier(order_by=order_by)
 
@@ -377,10 +391,12 @@ class TestScalingGroupGQLAdapter:
 
     def test_order_by_is_active_descending(self) -> None:
         """Test ordering by is_active descending"""
-        order_by = ScalingGroupOrderBy(
-            field=ScalingGroupOrderField.IS_ACTIVE,
-            direction=OrderDirection.DESC,
-        )
+        order_by = [
+            ScalingGroupOrderBy(
+                field=ScalingGroupOrderField.IS_ACTIVE,
+                direction=OrderDirection.DESC,
+            )
+        ]
         adapter = ScalingGroupGQLAdapter()
         querier = adapter.build_querier(order_by=order_by)
 
@@ -389,10 +405,12 @@ class TestScalingGroupGQLAdapter:
 
     def test_order_by_is_public_ascending(self) -> None:
         """Test ordering by is_public ascending"""
-        order_by = ScalingGroupOrderBy(
-            field=ScalingGroupOrderField.IS_PUBLIC,
-            direction=OrderDirection.ASC,
-        )
+        order_by = [
+            ScalingGroupOrderBy(
+                field=ScalingGroupOrderField.IS_PUBLIC,
+                direction=OrderDirection.ASC,
+            )
+        ]
         adapter = ScalingGroupGQLAdapter()
         querier = adapter.build_querier(order_by=order_by)
 
@@ -401,15 +419,36 @@ class TestScalingGroupGQLAdapter:
 
     def test_order_by_is_public_descending(self) -> None:
         """Test ordering by is_public descending"""
-        order_by = ScalingGroupOrderBy(
-            field=ScalingGroupOrderField.IS_PUBLIC,
-            direction=OrderDirection.DESC,
-        )
+        order_by = [
+            ScalingGroupOrderBy(
+                field=ScalingGroupOrderField.IS_PUBLIC,
+                direction=OrderDirection.DESC,
+            )
+        ]
         adapter = ScalingGroupGQLAdapter()
         querier = adapter.build_querier(order_by=order_by)
 
         assert len(querier.orders) == 1
         assert querier.orders[0] is not None
+
+    def test_multiple_order_by(self) -> None:
+        """Test multiple order by fields"""
+        order_by = [
+            ScalingGroupOrderBy(
+                field=ScalingGroupOrderField.IS_ACTIVE,
+                direction=OrderDirection.DESC,
+            ),
+            ScalingGroupOrderBy(
+                field=ScalingGroupOrderField.NAME,
+                direction=OrderDirection.ASC,
+            ),
+        ]
+        adapter = ScalingGroupGQLAdapter()
+        querier = adapter.build_querier(order_by=order_by)
+
+        assert len(querier.orders) == 2
+        assert querier.orders[0] is not None
+        assert querier.orders[1] is not None
 
     def test_pagination_limit_offset(self) -> None:
         """Test pagination with limit and offset"""
@@ -427,10 +466,12 @@ class TestScalingGroupGQLAdapter:
             name=StringFilter(contains="default"),
             is_active=True,
         )
-        order_by = ScalingGroupOrderBy(
-            field=ScalingGroupOrderField.NAME,
-            direction=OrderDirection.ASC,
-        )
+        order_by = [
+            ScalingGroupOrderBy(
+                field=ScalingGroupOrderField.NAME,
+                direction=OrderDirection.ASC,
+            )
+        ]
         adapter = ScalingGroupGQLAdapter()
         querier = adapter.build_querier(
             filter=filter_obj,

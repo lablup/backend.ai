@@ -21,7 +21,7 @@ from .types import ScalingGroup, ScalingGroupFilter, ScalingGroupOrderBy
 ScalingGroupEdge = Edge[ScalingGroup]
 
 
-@strawberry.type(description="Scaling group connection")
+@strawberry.type(description="Added in 25.18.0. Scaling group connection")
 class ScalingGroupConnection(Connection[ScalingGroup]):
     count: int
 
@@ -33,11 +33,11 @@ class ScalingGroupConnection(Connection[ScalingGroup]):
 # Query fields
 
 
-@strawberry.field(description="List scaling groups")
+@strawberry.field(description="Added in 25.18.0. List scaling groups")
 async def scaling_groups(
     info: Info[StrawberryGQLContext],
     filter: Optional[ScalingGroupFilter] = None,
-    order_by: Optional[ScalingGroupOrderBy] = None,
+    order_by: Optional[list[ScalingGroupOrderBy]] = None,
     before: Optional[str] = None,
     after: Optional[str] = None,
     first: Optional[int] = None,
