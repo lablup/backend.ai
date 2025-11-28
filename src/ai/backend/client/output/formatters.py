@@ -348,3 +348,15 @@ class DependencyListFormatter(NestedObjectFormatter):
                     if f.field_name not in ("id", "name")
                 )
         return textwrap.indent(text, indent)
+
+
+class ImageObjectFormatter(OutputFormatter):
+    """Formatter for nested image_object field, extracting the name."""
+
+    def format_console(self, value: Any, field: FieldSpec) -> str:
+        if value is None:
+            return "(none)"
+        return value.get("name") or "(unknown)"
+
+    def format_json(self, value: Any, field: FieldSpec) -> Any:
+        return value
