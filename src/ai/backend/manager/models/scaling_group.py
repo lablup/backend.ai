@@ -33,6 +33,7 @@ from ai.backend.common.types import (
     JSONSerializableMixin,
     SessionTypes,
 )
+from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 
 from .base import (
     Base,
@@ -278,6 +279,23 @@ class ScalingGroupRow(Base):
         back_populates="scaling_group_row",
         primaryjoin="ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)",
     )
+
+    def to_dataclass(self) -> ScalingGroupData:
+        """Convert Row to domain model data."""
+        return ScalingGroupData(
+            name=self.name,
+            description=self.description,
+            is_active=self.is_active,
+            is_public=self.is_public,
+            created_at=self.created_at,
+            wsproxy_addr=self.wsproxy_addr,
+            wsproxy_api_token=self.wsproxy_api_token,
+            driver=self.driver,
+            driver_opts=self.driver_opts,
+            scheduler=self.scheduler,
+            scheduler_opts=self.scheduler_opts,
+            use_host_network=self.use_host_network,
+        )
 
     @classmethod
     async def list_by_condition(
