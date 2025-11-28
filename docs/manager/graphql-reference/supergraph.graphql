@@ -6307,13 +6307,11 @@ type ScalingGroupDriverConfig
   @join__type(graph: STRAWBERRY)
 {
   """
-  Agent resource driver implementation name. 'static' uses a predefined set of agents registered to this scaling group. 'kubernetes' dynamically provisions agents as Kubernetes pods.
+  Agent resource driver implementation name. 'static' uses a predefined set of agents registered to this scaling group.
   """
   name: String!
 
-  """
-  Driver-specific configuration options. Contents vary by driver type - static driver may specify agent registration constraints, while kubernetes driver configures pod specifications.
-  """
+  """Driver-specific configuration options. Contents vary by driver type."""
   options: JSON!
 }
 
@@ -6362,13 +6360,11 @@ type ScalingGroupNetworkConfig
   @join__type(graph: STRAWBERRY)
 {
   """
-  WebSocket proxy server address for terminal/web service access in interactive sessions. Used when clients connect to running session services.
+  App-proxy coordinator API server address, Manager uses this address to communicate with the app-proxy coordinator for managing service routes, endpoint registration, and proxying client connections to session services.
   """
   wsproxyAddr: String!
 
-  """
-  Authentication token for the WebSocket proxy API. Required for proxy server to validate and route client connections.
-  """
+  """Authentication token for the App-proxy coordinator API server."""
   wsproxyApiToken: String!
 
   """
@@ -6437,7 +6433,7 @@ type ScalingGroupSchedulerOptions
   @join__type(graph: STRAWBERRY)
 {
   """
-  Session types that can be scheduled in this scaling group. Valid values: 'interactive' (user terminals/notebooks), 'batch' (background jobs), 'inference' (model serving endpoints). Requests for unlisted types are rejected.
+  Session types that can be scheduled in this scaling group. Valid values: 'interactive' , 'batch', 'inference'. Requests for unlisted types are rejected.
   """
   allowedSessionTypes: [String!]!
 
