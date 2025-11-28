@@ -215,7 +215,6 @@ async def execute_querier(
     db_sess: SASession,
     query: sa.sql.Select,
     querier: Optional[Querier],
-    fallback_count_table: type[Row],
 ) -> QuerierResult[Row]:
     """Execute query with querier and return rows with total_count.
 
@@ -226,12 +225,11 @@ async def execute_querier(
         db_sess: Database session
         query: SELECT query with count().over().label("total_count") included
         querier: Optional querier for filtering, ordering, and pagination
-        fallback_count_table: SQLAlchemy ORM model class used to count total records
-            when window function result is inaccessible (rows is empty because offset exceeds total)
 
     Returns:
         QuerierResult containing rows and total_count
     """
+    initial_query = query
     if querier:
         query = _apply_querier(query, querier)
 
@@ -241,11 +239,16 @@ async def execute_querier(
     if rows:
         return QuerierResult(rows=rows, total_count=rows[0].total_count)
 
-    # Fallback: count with conditions only when rows is empty
-    count_query = sa.select(sa.func.count()).select_from(fallback_count_table)
+    # Fallback: Get total_count from window function without pagination
+    # Re-execute query with conditions but without pagination
+
+    fallback_query = initial_query
     if querier:
         for condition in querier.conditions:
-            count_query = count_query.where(condition())
-    total_count = await db_sess.scalar(count_query) or 0
+            fallback_query = fallback_query.where(condition())
+
+    result = await db_sess.execute(fallback_query)
+    first_row = result.first()
+    total_count = first_row.total_count if first_row else 0
 
     return QuerierResult(rows=rows, total_count=total_count)
