@@ -6,7 +6,7 @@ from typing import Optional
 from ai.backend.common.clients.valkey_client.valkey_artifact_registries.client import (
     ValkeyArtifactRegistryClient,
 )
-from ai.backend.common.data.artifact_registry.types import HuggingFaceRegistryData
+from ai.backend.common.data.artifact_registry.types import HuggingFaceRegistryStatefulData
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -28,7 +28,7 @@ class HuggingFaceStatefulSource:
         """
         self._valkey_artifact_registry = valkey_artifact_registry
 
-    async def get_registry(self, registry_name: str) -> Optional[HuggingFaceRegistryData]:
+    async def get_registry(self, registry_name: str) -> Optional[HuggingFaceRegistryStatefulData]:
         """
         Get cached HuggingFace registry data by registry name.
 
@@ -40,8 +40,7 @@ class HuggingFaceStatefulSource:
     async def set_registry(
         self,
         registry_name: str,
-        registry_data: HuggingFaceRegistryData,
-        expiration: int = 3600,
+        registry_data: HuggingFaceRegistryStatefulData,
     ) -> None:
         """
         Cache HuggingFace registry data.
@@ -50,9 +49,7 @@ class HuggingFaceStatefulSource:
         :param registry_data: The registry data to cache.
         :param expiration: The cache expiration time in seconds (default: 1 hour).
         """
-        await self._valkey_artifact_registry.set_huggingface_registry(
-            registry_name, registry_data, expiration
-        )
+        await self._valkey_artifact_registry.set_huggingface_registry(registry_name, registry_data)
 
     async def delete_registry(self, registry_name: str) -> bool:
         """
