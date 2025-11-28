@@ -6,7 +6,9 @@ from typing import Final
 REDIS_STATISTICS_DB: Final = 0
 REDIS_RATE_LIMIT_DB: Final = 1
 REDIS_LIVE_DB: Final = 2
+REDIS_STATEFUL_SOURCE_DB: Final = 2  # Same as LIVE DB
 REDIS_IMAGE_DB: Final = 3
+REDIS_CACHE_SOURCE_DB: Final = 3  # Same as IMAGE DB
 REDIS_STREAM_DB: Final = 4
 REDIS_STREAM_LOCK: Final = 5
 REDIS_CONTAINER_LOG: Final = 6
@@ -15,6 +17,7 @@ REDIS_BGTASK_DB: Final = 7
 
 class RedisRole(StrEnum):
     STATISTICS = "statistics"
+    STATEFUL_SOURCE = "stateful_source"
     RATE_LIMIT = "rate_limit"
     LIVE = "live"
     IMAGE = "image"

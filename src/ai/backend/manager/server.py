@@ -67,6 +67,7 @@ from ai.backend.common.defs import (
     REDIS_CONTAINER_LOG,
     REDIS_IMAGE_DB,
     REDIS_LIVE_DB,
+    REDIS_STATEFUL_SOURCE_DB,
     REDIS_STATISTICS_DB,
     REDIS_STREAM_DB,
     REDIS_STREAM_LOCK,
@@ -605,8 +606,8 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         db_id=REDIS_BGTASK_DB,
     )
     root_ctx.valkey_artifact_registry = await ValkeyArtifactRegistryClient.create(
-        valkey_profile_target.profile_target(RedisRole.STATISTICS),
-        db_id=REDIS_STATISTICS_DB,
+        valkey_profile_target.profile_target(RedisRole.STATEFUL_SOURCE),
+        db_id=REDIS_STATEFUL_SOURCE_DB,
         human_readable_name="artifact_registry",  # caching artifact registry configurations
     )
     # Ping ValkeyLiveClient directly
