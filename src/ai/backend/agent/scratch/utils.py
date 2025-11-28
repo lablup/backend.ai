@@ -88,6 +88,9 @@ class ScratchConfigManager:
     def _resource_file_path(self) -> Path:
         return self._config_path / "resource.txt"
 
+    def recovery_file_exists(self) -> bool:
+        return self._json_recovery_file_path().is_file()
+
     async def get_json_recovery_data(self) -> Optional[KernelRecoveryDataSchema]:
         filepath = self._json_recovery_file_path()
         if not filepath.is_file():

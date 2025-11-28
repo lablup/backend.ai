@@ -13,7 +13,7 @@ import subprocess
 import textwrap
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, Final, FrozenSet, Optional, Tuple, cast, override
+from typing import TYPE_CHECKING, Any, Dict, Final, FrozenSet, Optional, Self, Tuple, cast, override
 
 import aiohttp
 import janus
@@ -28,15 +28,19 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.lock import FileLock
-from ai.backend.common.types import CommitStatus, KernelId, Sentinel
+from ai.backend.common.types import CommitStatus, ContainerId, KernelId, Sentinel
 from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
+from ..proxy import DomainSocketPathPair
 from ..resources import KernelResourceSpec
-from ..types import AgentEventData, KernelOwnershipData
+from ..types import AgentBackend, AgentEventData, KernelOwnershipData
 from ..utils import closing_async, get_arch_name
+
+if TYPE_CHECKING:
+    from ..kernel_registry.types import KernelRecoveryData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -87,6 +91,64 @@ class DockerKernel(AbstractKernel):
         if "network_driver" not in props:
             props["network_driver"] = "bridge"
         super().__setstate__(props)
+
+    @override
+    def to_recovery_data(self) -> KernelRecoveryData:
+        from ..kernel_registry.types import KernelRecoveryData
+
+        domain_socket_proxies: list[DomainSocketPathPair] = []
+        for proxy in self.data.get("domain_socket_proxies", []):
+            domain_socket_proxies.append(
+                DomainSocketPathPair(
+                    host_sock_path=proxy.host_sock_path,
+                    host_proxy_path=proxy.host_proxy_path,
+                )
+            )
+
+        return KernelRecoveryData(
+            kernel_backend=AgentBackend.DOCKER,
+            id=self.kernel_id,
+            agent_id=self.ownership_data.agent_id,
+            image_ref=self.image,
+            version=self.version,
+            ownership_data=self.ownership_data,
+            network_id=self.network_id,
+            network_driver=self.network_driver,
+            container_id=ContainerId(self.container_id) if self.container_id is not None else None,
+            session_type=self.session_type,
+            state=self.state,
+            block_service_ports=self.data.get("block_service_ports", False),
+            domain_socket_proxies=domain_socket_proxies,
+            service_ports=self.service_ports,
+            repl_in_port=self.data["repl_in_port"],
+            repl_out_port=self.data["repl_out_port"],
+            resource_spec=self.resource_spec,
+            environ=self.environ,
+        )
+
+    @classmethod
+    @override
+    def from_recovery_data(cls, data: KernelRecoveryData) -> Self:
+        result = cls(
+            ownership_data=data.ownership_data,
+            network_id=data.network_id,
+            image=data.image_ref,
+            version=data.version,
+            network_driver=data.network_driver,
+            agent_config={},
+            resource_spec=data.resource_spec,
+            service_ports=data.service_ports,
+            environ=data.environ,
+            data={
+                "container_id": data.container_id,
+                "repl_in_port": data.repl_in_port,
+                "repl_out_port": data.repl_out_port,
+                "block_service_ports": data.block_service_ports,
+            },
+        )
+        result.session_type = data.session_type
+        result.state = data.state
+        return result
 
     @override
     async def create_code_runner(
