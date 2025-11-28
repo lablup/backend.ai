@@ -65,6 +65,7 @@ from ..agent import (
     ACTIVE_STATUS_SET,
     AbstractAgent,
     AbstractKernelCreationContext,
+    AgentClass,
     ScanImagesResult,
 )
 from ..config.unified import AgentUnifiedConfig, ScratchType
@@ -846,6 +847,7 @@ class KubernetesAgent(
         kernel_registry: KernelRegistry,
         computers: Mapping[DeviceName, ComputerContext],
         slots: Mapping[SlotName, Decimal],
+        agent_class: AgentClass,
     ) -> None:
         super().__init__(
             etcd,
@@ -857,6 +859,7 @@ class KubernetesAgent(
             kernel_registry=kernel_registry,
             computers=computers,
             slots=slots,
+            agent_class=agent_class,
         )
 
     async def __ainit__(self) -> None:
