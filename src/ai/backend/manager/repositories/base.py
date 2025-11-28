@@ -229,7 +229,7 @@ async def execute_querier(
     Returns:
         QuerierResult containing rows and total_count
     """
-    init_query = query
+    fallback_query = query
     if querier:
         query = _apply_querier(query, querier)
 
@@ -244,9 +244,9 @@ async def execute_querier(
 
     if querier:
         for condition in querier.conditions:
-            init_query = init_query.where(condition())
+            fallback_query = fallback_query.where(condition())
 
-    result = await db_sess.execute(init_query)
+    result = await db_sess.execute(fallback_query)
     first_row = result.first()
     total_count = first_row.total_count if first_row else 0
 
