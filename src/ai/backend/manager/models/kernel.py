@@ -77,7 +77,6 @@ from .base import (
     StructuredJSONObjectListColumn,
     URLColumn,
 )
-from .types import QueryCondition
 from .user import users
 from .utils import (
     ExtendedAsyncSAEngine,
@@ -88,6 +87,8 @@ from .utils import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.repositories.types import QueryCondition
+
     from .gql import GraphQueryContext
 
 __all__ = (

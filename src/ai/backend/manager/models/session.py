@@ -133,10 +133,6 @@ from .rbac import (
 from .rbac.context import ClientContext
 from .rbac.permission_defs import ComputeSessionPermission
 from .routing import RouteStatus, RoutingRow
-from .types import (
-    QueryCondition,
-    QueryOption,
-)
 from .utils import (
     ExtendedAsyncSAEngine,
     JSONCoalesceExpr,
@@ -146,6 +142,8 @@ from .utils import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.repositories.types import QueryCondition, QueryOption
+
     from ..registry import AgentRegistry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

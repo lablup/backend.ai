@@ -41,6 +41,7 @@ from ai.backend.manager.idle import ReportInfo
 from ai.backend.manager.models.gql_models.user import UserNode
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.utils import agg_to_array
+from ai.backend.manager.repositories.types import QueryCondition, QueryOption
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
 )
@@ -87,8 +88,6 @@ from ..session import (
     get_permission_ctx,
 )
 from ..types import (
-    QueryCondition,
-    QueryOption,
     join_by_related_field,
     load_related_field,
 )
@@ -796,7 +795,7 @@ class TotalResourceSlot(graphene.ObjectType):
             requested_slots += row.requested_slots
         occupied, requested = occupied_slots.to_json(), requested_slots.to_json()
 
-        return TotalResourceSlot(
+        return cls(
             occupied_slots=occupied,
             requested_slots=requested,
         )

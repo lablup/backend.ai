@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Collection
 
 import sqlalchemy as sa
@@ -8,7 +10,7 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 
-class QueryConditions:
+class AgentConditions:
     @staticmethod
     def by_ids(agent_ids: Collection[AgentId]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -31,7 +33,7 @@ class QueryConditions:
         return inner
 
 
-class QueryOrders:
+class AgentOrders:
     @staticmethod
     def id(ascending: bool = True) -> QueryOrder:
         if ascending:
