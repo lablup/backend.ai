@@ -77,7 +77,7 @@ class ScalingGroupOrderField(StrEnum):
     IS_PUBLIC = "is_public"
 
 
-@strawberry.input(description="Filter for scaling groups")
+@strawberry.input(description="Added in 25.18.0. Filter for scaling groups")
 class ScalingGroupFilter:
     name: Optional[StringFilter] = None
     description: Optional[StringFilter] = None
@@ -164,7 +164,7 @@ class ScalingGroupFilter:
         return field_conditions
 
 
-@strawberry.input(description="Order by specification for scaling groups")
+@strawberry.input(description="Added in 25.18.0. Order by specification for scaling groups")
 class ScalingGroupOrderBy:
     field: ScalingGroupOrderField
     direction: OrderDirection = OrderDirection.ASC

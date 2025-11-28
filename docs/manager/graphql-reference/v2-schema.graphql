@@ -2074,6 +2074,9 @@ type Query {
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection!
 
+  """Added in 25.18.0. List scaling groups"""
+  scalingGroups(filter: ScalingGroupFilter = null, orderBy: [ScalingGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ScalingGroupConnection!
+
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry
 
@@ -2265,8 +2268,72 @@ type RestoreArtifactsPayload {
   artifacts: [Artifact!]!
 }
 
+type ScalingGroup implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  description: String!
+  isActive: Boolean!
+  isPublic: Boolean!
+  createdAt: DateTime!
+  wsproxyAddr: String!
+  wsproxyApiToken: String!
+  driver: String!
+  driverOpts: JSONString!
+  scheduler: String!
+  schedulerOpts: JSONString!
+  useHostNetwork: Boolean!
+}
+
+"""Added in 25.18.0. Scaling group connection"""
+type ScalingGroupConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ScalingGroupEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ScalingGroupEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ScalingGroup!
+}
+
+"""Added in 25.18.0. Filter for scaling groups"""
+input ScalingGroupFilter {
+  name: StringFilter = null
+  description: StringFilter = null
+  isActive: Boolean = null
+  isPublic: Boolean = null
+  driver: String = null
+  scheduler: String = null
+  useHostNetwork: Boolean = null
+  AND: [ScalingGroupFilter!] = null
+  OR: [ScalingGroupFilter!] = null
+  NOT: [ScalingGroupFilter!] = null
+}
+
 extend type ScalingGroupNode @key(fields: "id") {
   id: ID! @external
+}
+
+"""Added in 25.18.0. Order by specification for scaling groups"""
+input ScalingGroupOrderBy {
+  field: ScalingGroupOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum ScalingGroupOrderField {
+  NAME
+  DESCRIPTION
+  CREATED_AT
+  IS_ACTIVE
+  IS_PUBLIC
 }
 
 """Added in 25.16.0"""

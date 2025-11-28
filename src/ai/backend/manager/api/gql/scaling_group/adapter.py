@@ -24,7 +24,7 @@ class ScalingGroupGQLAdapter(BaseGQLAdapter):
     def build_querier(
         self,
         filter: Optional[ScalingGroupFilter] = None,
-        order_by: Optional[ScalingGroupOrderBy] = None,
+        order_by: Optional[list[ScalingGroupOrderBy]] = None,
         first: Optional[int] = None,
         after: Optional[str] = None,
         last: Optional[int] = None,
@@ -41,7 +41,8 @@ class ScalingGroupGQLAdapter(BaseGQLAdapter):
             conditions.extend(filter.build_conditions())
 
         if order_by:
-            orders.append(order_by.to_query_order())
+            for order in order_by:
+                orders.append(order.to_query_order())
 
         pagination = self.build_pagination(first, after, last, before, limit, offset)
 
