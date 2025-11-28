@@ -250,9 +250,9 @@ class TestScalingGroupService:
             assert hasattr(first_item.wsproxy, "wsproxy_api_token")
             assert hasattr(first_item.wsproxy, "use_host_network")
             assert hasattr(first_item.driver, "name")
-            assert hasattr(first_item.driver, "opts")
+            assert hasattr(first_item.driver, "options")
             assert hasattr(first_item.scheduler, "name")
-            assert hasattr(first_item.scheduler, "opts")
+            assert hasattr(first_item.scheduler, "options")
             # Verify scheduler opts structure
             assert hasattr(first_item.scheduler.options, "allowed_session_types")
             assert hasattr(first_item.scheduler.options, "pending_timeout")
