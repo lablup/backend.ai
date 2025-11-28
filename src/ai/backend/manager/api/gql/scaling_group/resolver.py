@@ -77,6 +77,7 @@ async def scaling_groups(
         ScalingGroupEdge(node=node, cursor=to_global_id(ScalingGroupV2, node.id)) for node in nodes
     ]
 
+    # TODO: Get correct has_next_page and has_previous_page values
     return ScalingGroupV2Connection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
@@ -127,6 +128,7 @@ async def all_scaling_groups(
         ScalingGroupEdge(node=node, cursor=to_global_id(ScalingGroupV2, node.id)) for node in nodes
     ]
 
+    # TODO: Get correct has_next_page and has_previous_page values
     return ScalingGroupV2Connection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
