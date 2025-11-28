@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 import sqlalchemy as sa
 
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
@@ -81,6 +83,26 @@ class ScalingGroupConditions:
     def by_use_host_network(use_host_network: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ScalingGroupRow.use_host_network == use_host_network
+
+        return inner
+
+    @staticmethod
+    def by_project(project_id: uuid.UUID) -> QueryCondition:
+        """Filter scaling groups that are associated with a specific project."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow
+
+            return sa.exists(
+                sa.select(1)
+                .select_from(ScalingGroupForProjectRow)
+                .where(
+                    sa.and_(
+                        ScalingGroupForProjectRow.scaling_group == ScalingGroupRow.name,
+                        ScalingGroupForProjectRow.group == project_id,
+                    )
+                )
+            )
 
         return inner
 
