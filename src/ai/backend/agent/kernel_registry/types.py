@@ -7,7 +7,7 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AgentId, ContainerId, KernelId, ServicePort, SessionTypes
 
 from ..kernel import AbstractKernel, KernelLifecycleStatus, KernelOwnershipData
-from ..proxy import DomainSocketProxy
+from ..proxy import DomainSocketPathPair
 from ..resources import KernelResourceSpec
 from ..types import AgentBackend
 
@@ -46,8 +46,8 @@ class KernelRecoveryData(BaseModel):
     block_service_ports: bool = Field(
         description="Whether to block service ports. If true, cannot start any service of the kernel"
     )
-    domain_socket_proxies: list[DomainSocketProxy] = Field(
-        description="List of domain socket proxies associated with the kernel"
+    domain_socket_proxies: list[DomainSocketPathPair] = Field(
+        description="List of domain socket path pairs associated with the kernel"
     )
     service_ports: list[ServicePort] = Field(
         description="List of service port mappings exposed by the kernel"
