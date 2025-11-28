@@ -9,6 +9,7 @@ from typing import Optional, Self
 import strawberry
 from strawberry.relay import Node, NodeID
 
+from ai.backend.common.json import dump_json_str
 from ai.backend.manager.api.gql.base import JSONString, OrderDirection, StringFilter
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 from ai.backend.manager.repositories.base import (
@@ -121,7 +122,7 @@ class ScalingGroupV2(Node):
             ),
             driver=ScalingGroupDriverConfig(
                 name=data.driver.name,
-                options=JSONString.serialize(data.driver.options),
+                options=dump_json_str(data.driver.options),
             ),
             scheduler=ScalingGroupSchedulerConfig(
                 name=data.scheduler.name,
@@ -130,9 +131,9 @@ class ScalingGroupV2(Node):
                         st.value for st in data.scheduler.options.allowed_session_types
                     ],
                     pending_timeout=data.scheduler.options.pending_timeout.total_seconds(),
-                    config=JSONString.serialize(data.scheduler.options.config),
+                    config=dump_json_str(data.scheduler.options.config),
                     agent_selection_strategy=data.scheduler.options.agent_selection_strategy.value,
-                    agent_selector_config=JSONString.serialize(
+                    agent_selector_config=dump_json_str(
                         data.scheduler.options.agent_selector_config
                     ),
                     enforce_spreading_endpoint_replica=data.scheduler.options.enforce_spreading_endpoint_replica,
