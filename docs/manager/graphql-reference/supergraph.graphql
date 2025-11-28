@@ -5906,6 +5906,9 @@ type Query
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection! @join__field(graph: STRAWBERRY)
 
+  """Added in 25.18.0. List scaling groups"""
+  scalingGroups(filter: ScalingGroupFilter = null, orderBy: [ScalingGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ScalingGroupV2Connection! @join__field(graph: STRAWBERRY)
+
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry @join__field(graph: STRAWBERRY)
 
@@ -6312,6 +6315,22 @@ type ScalingGroupEdge
   cursor: String!
 }
 
+"""Added in 25.18.0. Filter for scaling groups"""
+input ScalingGroupFilter
+  @join__type(graph: STRAWBERRY)
+{
+  name: StringFilter = null
+  description: StringFilter = null
+  isActive: Boolean = null
+  isPublic: Boolean = null
+  driver: String = null
+  scheduler: String = null
+  useHostNetwork: Boolean = null
+  AND: [ScalingGroupFilter!] = null
+  OR: [ScalingGroupFilter!] = null
+  NOT: [ScalingGroupFilter!] = null
+}
+
 """Added in 24.12.0."""
 type ScalingGroupNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
@@ -6332,6 +6351,67 @@ type ScalingGroupNode implements Node
   scheduler: String @join__field(graph: GRAPHENE)
   scheduler_opts: JSONString @join__field(graph: GRAPHENE)
   use_host_network: Boolean @join__field(graph: GRAPHENE)
+}
+
+"""Added in 25.18.0. Order by specification for scaling groups"""
+input ScalingGroupOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: ScalingGroupOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum ScalingGroupOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  DESCRIPTION @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  IS_ACTIVE @join__enumValue(graph: STRAWBERRY)
+  IS_PUBLIC @join__enumValue(graph: STRAWBERRY)
+}
+
+type ScalingGroupV2 implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  description: String!
+  isActive: Boolean!
+  isPublic: Boolean!
+  createdAt: DateTime!
+  wsproxyAddr: String!
+  wsproxyApiToken: String!
+  driver: String!
+  driverOpts: JSONString!
+  scheduler: String!
+  schedulerOpts: JSONString!
+  useHostNetwork: Boolean!
+}
+
+"""Added in 25.18.0. Scaling group connection"""
+type ScalingGroupV2Connection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ScalingGroupV2Edge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ScalingGroupV2Edge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ScalingGroupV2!
 }
 
 """Added in 25.16.0"""
