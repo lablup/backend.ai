@@ -8,9 +8,9 @@ from typing import Optional, Self
 
 import strawberry
 from strawberry.relay import Node, NodeID
+from strawberry.scalars import JSON
 
-from ai.backend.common.json import dump_json_str
-from ai.backend.manager.api.gql.base import JSONString, OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 from ai.backend.manager.repositories.base import (
     QueryCondition,
@@ -67,7 +67,7 @@ class ScalingGroupDriverConfig:
     """Driver configuration for a scaling group."""
 
     name: str
-    options: JSONString
+    options: JSON
 
 
 @strawberry.type
@@ -76,9 +76,9 @@ class ScalingGroupSchedulerOptions:
 
     allowed_session_types: list[str]
     pending_timeout: float
-    config: JSONString
+    config: JSON
     agent_selection_strategy: str
-    agent_selector_config: JSONString
+    agent_selector_config: JSON
     enforce_spreading_endpoint_replica: bool
     allow_fractional_resource_fragmentation: bool
     route_cleanup_target_statuses: list[str]
@@ -122,7 +122,7 @@ class ScalingGroupV2(Node):
             ),
             driver=ScalingGroupDriverConfig(
                 name=data.driver.name,
-                options=dump_json_str(data.driver.options),
+                options=data.driver.options,
             ),
             scheduler=ScalingGroupSchedulerConfig(
                 name=data.scheduler.name,
@@ -131,11 +131,9 @@ class ScalingGroupV2(Node):
                         st.value for st in data.scheduler.options.allowed_session_types
                     ],
                     pending_timeout=data.scheduler.options.pending_timeout.total_seconds(),
-                    config=dump_json_str(data.scheduler.options.config),
+                    config=data.scheduler.options.config,
                     agent_selection_strategy=data.scheduler.options.agent_selection_strategy.value,
-                    agent_selector_config=dump_json_str(
-                        data.scheduler.options.agent_selector_config
-                    ),
+                    agent_selector_config=data.scheduler.options.agent_selector_config,
                     enforce_spreading_endpoint_replica=data.scheduler.options.enforce_spreading_endpoint_replica,
                     allow_fractional_resource_fragmentation=data.scheduler.options.allow_fractional_resource_fragmentation,
                     route_cleanup_target_statuses=data.scheduler.options.route_cleanup_target_statuses,
