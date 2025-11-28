@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from aiodocker.exceptions import DockerError
 
+from ai.backend.agent.agent import AgentClass
 from ai.backend.agent.docker.agent import DockerAgent
 from ai.backend.agent.kernel import KernelRegistry
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
@@ -40,6 +41,7 @@ async def agent(local_config, test_id, mocker, socket_relay_image):
         kernel_registry=kernel_registry,
         computers={},
         slots={},
+        agent_class=AgentClass.PRIMARY,
     )  # for faster test iteration
     agent.local_instance_id = test_case_id  # use per-test private registry file
     try:
