@@ -2250,8 +2250,8 @@ class AbstractAgent(
         """
         ipc_base_path = self.local_config.agent.ipc_base_path
         var_base_path = self.local_config.agent.var_base_path
-        ipc_last_registry_file = self.resolve_conflicting_registry_file(ipc_base_path)
-        last_registry_file = self.resolve_conflicting_registry_file(var_base_path)
+        ipc_last_registry_file = self._resolve_conflicting_registry_file(ipc_base_path)
+        last_registry_file = self._resolve_conflicting_registry_file(var_base_path)
         if (ipc_base_path / ipc_last_registry_file).is_file():
             shutil.move(ipc_base_path / ipc_last_registry_file, var_base_path / last_registry_file)
         try:
@@ -3722,7 +3722,7 @@ class AbstractAgent(
         if (not force) and (now <= self.last_registry_written_time + 60):
             return  # don't save too frequently
         var_base_path = self.local_config.agent.var_base_path
-        last_registry_file = self.last_registry_file
+        last_registry_file = self._last_registry_file
         try:
             with open(var_base_path / last_registry_file, "wb") as f:
                 pickle.dump(dict(self.kernel_registry), f)
@@ -3736,29 +3736,34 @@ class AbstractAgent(
                 pass
 
     @property
-    def last_registry_file(self) -> str:
+    def _last_registry_file(self) -> str:
         match self.agent_class:
             case AgentClass.PRIMARY:
-                return f"last_registry.{self.local_instance_id}.dat"
+                return self._primary_last_registry_file
             case AgentClass.AUXILIARY:
-                return f"last_registry.{self.id}.dat"
+                return self._auxiliary_last_registry_file
 
-    def resolve_conflicting_registry_file(self, base_dir: Path) -> str:
-        primary_agent_filename = f"last_registry.{self.local_instance_id}.dat"
-        auxiliary_agent_filename = f"last_registry.{self.id}.dat"
+    @property
+    def _primary_last_registry_file(self) -> str:
+        return f"last_registry.{self.local_instance_id}.dat"
 
-        primary_agent_file = base_dir / primary_agent_filename
-        auxiliary_agent_file = base_dir / auxiliary_agent_filename
+    @property
+    def _auxiliary_last_registry_file(self) -> str:
+        return f"last_registry.{self.id}.dat"
+
+    def _resolve_conflicting_registry_file(self, base_dir: Path) -> str:
+        primary_agent_file = base_dir / self._primary_last_registry_file
+        auxiliary_agent_file = base_dir / self._auxiliary_last_registry_file
         if primary_agent_file.is_file() and auxiliary_agent_file.is_file():
             primary_modification_time = primary_agent_file.stat().st_mtime
             auxiliary_modification_time = auxiliary_agent_file.stat().st_mtime
 
             if primary_modification_time > auxiliary_modification_time:
-                return primary_agent_filename
+                return self._primary_last_registry_file
             else:
-                return auxiliary_agent_filename
+                return self._auxiliary_last_registry_file
         else:
-            return self.last_registry_file
+            return self._last_registry_file
 
 
 async def handle_volume_mount(
