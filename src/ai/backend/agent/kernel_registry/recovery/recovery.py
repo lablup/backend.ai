@@ -9,6 +9,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ...kernel import AbstractKernel
 from ..loader.abc import AbstractKernelRegistryLoader
 from ..loader.pickle import PickleBasedKernelRegistryLoader
+from ..loader.scratch import ScratchBasedKernelRegistryLoader
 from ..types import KernelRegistryType
 from ..writer.abc import AbstractKernelRegistryWriter
 from ..writer.pickle import PickleBasedKernelRegistryWriter
@@ -19,6 +20,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 @dataclass
 class KernelRegistryRecoveryArgs:
+    scratch_root: Path
     ipc_base_path: Path
     var_base_path: Path
     agent_id: AgentId
@@ -48,7 +50,10 @@ class KernelRegistryRecovery:
                     last_registry_file_path,
                     fallback_registry_file_path,
                     legacy_registry_file_path,
-                )
+                ),
+                ScratchBasedKernelRegistryLoader(
+                    scratch_root=args.scratch_root,
+                ),
             ],
             writer=PickleBasedKernelRegistryWriter(last_registry_file_path),
         )

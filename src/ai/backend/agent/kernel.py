@@ -18,6 +18,7 @@ from collections.abc import (
 )
 from dataclasses import dataclass
 from typing import (
+    TYPE_CHECKING,
     Any,
     Dict,
     FrozenSet,
@@ -27,6 +28,7 @@ from typing import (
     MutableMapping,
     NotRequired,
     Optional,
+    Self,
     Set,
     Tuple,
     TypedDict,
@@ -68,6 +70,9 @@ from ai.backend.logging import BraceStyleAdapter
 from .exception import InvalidSocket, UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
 from .types import AgentEventData, KernelLifecycleStatus, KernelOwnershipData
+
+if TYPE_CHECKING:
+    from .kernel_registry.types import KernelRecoveryData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -270,6 +275,15 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.__dict__.update(props)
         # agent_config is set by the pickle.loads() caller.
         self.clean_event = None
+
+    @abstractmethod
+    def to_recovery_data(self) -> KernelRecoveryData:
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def from_recovery_data(cls, data: KernelRecoveryData) -> Self:
+        raise NotImplementedError
 
     @abstractmethod
     async def close(self) -> None:
