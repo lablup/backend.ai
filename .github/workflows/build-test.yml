@@ -21,7 +21,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - name: Check out the revision
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Git LFS Pull
