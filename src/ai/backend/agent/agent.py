@@ -238,6 +238,7 @@ from .kernel import (
     KernelRegistry,
     match_distro_data,
 )
+from .kernel_registry.adapter import KernelRecoveryDataAdapter
 from .observer.heartbeat import HeartbeatObserver
 from .observer.host_port import HostPortObserver
 from .observer.kernel_presence import KernelPresenceObserver
@@ -2257,6 +2258,9 @@ class AbstractAgent(
                 kernel_registry: MutableMapping[KernelId, AbstractKernel] = pickle.load(f)
                 for kernel_id, kernel in kernel_registry.items():
                     self.kernel_registry[kernel_id] = kernel
+            # Rewrite the recovery data to the new location.
+            adapter = KernelRecoveryDataAdapter(self.local_config.container.scratch_root)
+            await adapter.write_recovery_data(self.kernel_registry)
         except EOFError:
             log.warning(
                 "Failed to load the last kernel registry: {}", (var_base_path / last_registry_file)
