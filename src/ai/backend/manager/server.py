@@ -48,6 +48,9 @@ from ai.backend.common.cli import LazyGroup
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
+from ai.backend.common.clients.valkey_client.valkey_artifact_registries.client import (
+    ValkeyArtifactRegistryClient,
+)
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
@@ -64,6 +67,7 @@ from ai.backend.common.defs import (
     REDIS_CONTAINER_LOG,
     REDIS_IMAGE_DB,
     REDIS_LIVE_DB,
+    REDIS_STATEFUL_SOURCE_DB,
     REDIS_STATISTICS_DB,
     REDIS_STREAM_DB,
     REDIS_STREAM_LOCK,
@@ -601,6 +605,11 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         human_readable_name="bgtask",
         db_id=REDIS_BGTASK_DB,
     )
+    root_ctx.valkey_artifact_registry = await ValkeyArtifactRegistryClient.create(
+        valkey_profile_target.profile_target(RedisRole.STATEFUL_SOURCE),
+        db_id=REDIS_STATEFUL_SOURCE_DB,
+        human_readable_name="artifact_registry",  # caching artifact registry configurations
+    )
     # Ping ValkeyLiveClient directly
     await root_ctx.valkey_live.get_server_time()
     # ValkeyImageClient has its own connection handling
@@ -609,6 +618,7 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         yield
     finally:
         await root_ctx.valkey_artifact.close()
+        await root_ctx.valkey_artifact_registry.close()
         await root_ctx.valkey_container_log.close()
         await root_ctx.valkey_image.close()
         await root_ctx.valkey_stat.close()
@@ -962,6 +972,7 @@ async def repositories_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             valkey_live_client=root_ctx.valkey_live,
             valkey_schedule_client=root_ctx.valkey_schedule,
             valkey_image_client=root_ctx.valkey_image,
+            valkey_artifact_registry_client=root_ctx.valkey_artifact_registry,
         )
     )
     root_ctx.repositories = repositories
