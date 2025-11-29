@@ -138,6 +138,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".proxy",
     ".slot_v1",
     ".slot_v2",
+    ".static_address",
     ".worker_v1",
     ".worker_v2",
 ]

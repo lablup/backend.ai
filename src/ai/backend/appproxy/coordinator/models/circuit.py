@@ -81,10 +81,18 @@ class Circuit(Base, BaseMixin):
     )
     route_info = sa.Column(StructuredJSONObjectListColumn(RouteInfo), nullable=False, default=[])
 
+    # Static address reference - when set, port/subdomain are derived from static address
+    static_address_id = ForeignKeyIDColumn(
+        "static_address_id", "static_addresses.id", nullable=True
+    )
+
     created_at = sa.Column(sa.DateTime(timezone=True), server_default=sa.func.now())
     updated_at = sa.Column(sa.DateTime(timezone=True), server_default=sa.func.now())
 
     worker_row = relationship("Worker", back_populates="circuits")
+    static_address = relationship(
+        "StaticAddress", back_populates="circuit", foreign_keys=[static_address_id]
+    )
     endpoint_row = relationship(
         "Endpoint",
         back_populates="circuit_row",
@@ -201,6 +209,7 @@ class Circuit(Base, BaseMixin):
         *,
         port: int | None = None,
         subdomain: str | None = None,
+        static_address_id: UUID | None = None,
         envs: dict[str, Any] | None = None,
         args: str | None = None,
         open_to_public: bool = False,
@@ -218,6 +227,7 @@ class Circuit(Base, BaseMixin):
         c.frontend_mode = frontend_mode
         c.port = port
         c.subdomain = subdomain
+        c.static_address_id = static_address_id
         c.envs = envs
         c.arguments = args
         c.open_to_public = open_to_public
@@ -236,9 +246,15 @@ class Circuit(Base, BaseMixin):
     async def get_endpoint_url(self, session: Optional[AsyncSession] = None) -> URL:
         from .worker import Worker
 
-        worker: Worker = (
-            await Worker.get(session, self.worker) if session is not None else self.worker_row
-        )
+        worker: Worker = self.worker_row
+
+        # If using static address, delegate to static address
+        if self.static_address_id and self.static_address:
+            return await self.static_address.get_endpoint_url(worker, self.protocol)
+
+        # Legacy behavior - use direct port/subdomain
+        if session is not None:
+            worker = await Worker.get(session, self.worker)
 
         match (worker.use_tls, self.protocol):
             case (True, ProxyProtocol.TCP):
@@ -273,6 +289,11 @@ class Circuit(Base, BaseMixin):
         from .worker import Worker
 
         worker: Worker = self.worker_row
+        # If using static address, get address from there
+        if self.static_address_id and self.static_address:
+            address_part = self.static_address.port or self.static_address.subdomain
+            return f"{worker.authority}:{address_part}"
+        # Legacy behavior
         return f"{worker.authority}:{self.port or self.subdomain}"
 
     @property
@@ -285,8 +306,16 @@ class Circuit(Base, BaseMixin):
                     case FrontendMode.PORT:
                         return f"Host(`{self.worker_row.hostname}`)"
                     case FrontendMode.WILDCARD_DOMAIN:
-                        assert self.subdomain
-                        return f"Host(`{self.subdomain}{self.worker_row.wildcard_domain}`)"
+                        # Use static address subdomain if available, otherwise use circuit's subdomain
+                        if self.static_address and self.static_address.subdomain:
+                            subdomain = self.static_address.subdomain
+                        elif self.subdomain:
+                            subdomain = self.subdomain
+                        else:
+                            raise ValueError(
+                                "No subdomain available from static address or circuit"
+                            )
+                        return f"Host(`{subdomain}{self.worker_row.wildcard_domain}`)"
                     case _:
                         raise ValueError(
                             f"Invalid frontend mode for traefik setup: {self.frontend_mode}"
@@ -298,8 +327,14 @@ class Circuit(Base, BaseMixin):
             case FrontendMode.WILDCARD_DOMAIN:
                 return "domainproxy"
             case FrontendMode.PORT:
-                assert self.port
-                return f"portproxy_{self.port}"
+                # Use static address port if available, otherwise use circuit's port
+                if self.static_address and self.static_address.port:
+                    port = self.static_address.port
+                elif self.port:
+                    port = self.port
+                else:
+                    raise ValueError("No port available from static address or circuit")
+                return f"portproxy_{port}"
             case _:
                 raise ValueError(f"Invalid frontend mode for traefik setup: {self.frontend_mode}")
 

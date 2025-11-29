@@ -70,6 +70,13 @@ class EndpointCreationRequestModel(BaseModel):
     subdomain: Annotated[
         str | None, Field(default=None, description="Preferred subdomain name.")
     ] = None
+    static_address_id: Annotated[
+        UUID | None,
+        Field(
+            default=None,
+            description="ID of a static address to use for this endpoint. If specified, port/subdomain are ignored.",
+        ),
+    ] = None
 
     health_check: Annotated[
         ModelHealthCheck | None,
@@ -135,6 +142,42 @@ async def create_or_update_endpoint(
         except ObjectNotFound:
             pass  # Continue with creating new circuit
 
+        # Auto-create static address if port/subdomain provided but no static_address_id
+        auto_created_static_address_id: UUID | None = None
+        if not params.static_address_id:
+            from ..models import StaticAddress
+
+            # Determine frontend mode based on provided parameters
+            if params.port:
+                frontend_mode = FrontendMode.PORT
+                static_address = StaticAddress.create(
+                    frontend_mode=frontend_mode,
+                    port=params.port,
+                    name=f"auto-{params.service_name}-port-{params.port}",
+                    description=f"Auto-created for endpoint {endpoint_id}",
+                    auto_created=True,
+                )
+            elif params.subdomain:
+                frontend_mode = FrontendMode.WILDCARD_DOMAIN
+                static_address = StaticAddress.create(
+                    frontend_mode=frontend_mode,
+                    subdomain=params.subdomain,
+                    name=f"auto-{params.service_name}-{params.subdomain}",
+                    description=f"Auto-created for endpoint {endpoint_id}",
+                    auto_created=True,
+                )
+            else:
+                raise ValueError(
+                    "Either port or subdomain must be provided to automatically assign a static address"
+                )
+
+            sess.add(static_address)
+            await sess.flush()
+            auto_created_static_address_id = static_address.id
+
+        # Use auto-created static address or provided one
+        effective_static_address_id = params.static_address_id or auto_created_static_address_id
+
         # supported for subdomain based workers only
         matched_worker_id: UUID | None = None
         if _url := params.tags.endpoint.existing_url:
@@ -184,8 +227,11 @@ async def create_or_update_endpoint(
             AppMode.INFERENCE,
             [],
             open_to_public=params.open_to_public,
-            preferred_port=params.port,
-            preferred_subdomain=params.subdomain or params.service_name,
+            preferred_port=params.port if not effective_static_address_id else None,
+            preferred_subdomain=params.subdomain or params.service_name
+            if not effective_static_address_id
+            else None,
+            static_address_id=effective_static_address_id,
             worker_id=matched_worker_id,
         )
         circuit.endpoint_id = endpoint.id
@@ -226,6 +272,17 @@ async def remove_endpoint(request: web.Request) -> PydanticResponse[StubResponse
     async def _update(sess: SASession) -> None:
         endpoint = await Endpoint.get(sess, endpoint_id, load_circuit=True)
         circuit = await Circuit.get(sess, endpoint.circuit_row.id, load_worker=True)
+
+        # Deallocate static address if used
+        if circuit.static_address_id:
+            from ..models import StaticAddress
+
+            static_address = await StaticAddress.get(sess, circuit.static_address_id)
+            await static_address.deallocate()
+
+            # If this was an auto-created static address, delete it
+            if static_address.auto_created:
+                await sess.delete(static_address)
         circuit.worker_row.occupied_slots -= 1
         await sess.delete(circuit)
         await sess.delete(endpoint)
