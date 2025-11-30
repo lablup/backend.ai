@@ -104,6 +104,7 @@ from ..agent import (
     ACTIVE_STATUS_SET,
     AbstractAgent,
     AbstractKernelCreationContext,
+    AgentClass,
     ScanImagesResult,
 )
 from ..config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchType
@@ -1356,6 +1357,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         kernel_registry: KernelRegistry,
         computers: Mapping[DeviceName, ComputerContext],
         slots: Mapping[SlotName, Decimal],
+        agent_class: AgentClass,
     ) -> None:
         super().__init__(
             etcd,
@@ -1367,6 +1369,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             kernel_registry=kernel_registry,
             computers=computers,
             slots=slots,
+            agent_class=agent_class,
         )
         self.checked_invalid_images = set()
 
