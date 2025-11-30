@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Mapping, Optional, Sequence
 
 import aiotools
 
-from ai.backend.agent.agent import AbstractAgent
+from ai.backend.agent.agent import AbstractAgent, AgentClass
 from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.errors.runtime import AgentIdNotFoundError
 from ai.backend.agent.etcd import AgentEtcdClientView
@@ -28,7 +28,7 @@ class AgentRuntime:
     _local_config: AgentUnifiedConfig
     _etcd_views: Mapping[AgentId, AgentEtcdClientView]
     _agents: Mapping[AgentId, AbstractAgent]
-    _default_agent: AbstractAgent
+    _primary_agent: AbstractAgent
     _kernel_registry: KernelRegistry
     _resource_allocator: ResourceAllocator
     _metadata_server: Optional[MetadataServer]
@@ -57,7 +57,7 @@ class AgentRuntime:
         etcd_views: dict[AgentId, AgentEtcdClientView] = {}
         create_agent_tasks: list[asyncio.Task] = []
         async with asyncio.TaskGroup() as tg:
-            for agent_config in agent_configs:
+            for i, agent_config in enumerate(agent_configs):
                 agent_id = AgentId(agent_config.agent.defaulted_id)
 
                 etcd_view = AgentEtcdClientView(etcd, agent_config)
@@ -65,6 +65,7 @@ class AgentRuntime:
 
                 computers = resource_allocator.get_computers(agent_id)
                 slots = await resource_allocator.get_updated_slots(agent_id)
+                agent_class = AgentClass.PRIMARY if i == 0 else AgentClass.AUXILIARY
 
                 create_agent_task = tg.create_task(
                     cls._create_agent(
@@ -77,18 +78,19 @@ class AgentRuntime:
                         agent_public_key,
                         computers,
                         slots,
+                        agent_class,
                     )
                 )
                 create_agent_tasks.append(create_agent_task)
         agents_list = [task.result() for task in create_agent_tasks]
-        default_agent = agents_list[0]
+        primary_agent = agents_list[0]
         agents = {agent.id: agent for agent in agents_list}
 
         return AgentRuntime(
             local_config=local_config,
             etcd_views=etcd_views,
             agents=agents,
-            default_agent=default_agent,
+            primary_agent=primary_agent,
             kernel_registry=kernel_registry,
             resource_allocator=resource_allocator,
             metadata_server=metadata_server,
@@ -123,6 +125,7 @@ class AgentRuntime:
         agent_public_key: Optional[PublicKey],
         computers: Mapping[DeviceName, ComputerContext],
         slots: Mapping[SlotName, Decimal],
+        agent_class: AgentClass,
     ) -> AbstractAgent:
         agent_kwargs = {
             "kernel_registry": kernel_registry,
@@ -131,6 +134,7 @@ class AgentRuntime:
             "agent_public_key": agent_public_key,
             "computers": computers,
             "slots": slots,
+            "agent_class": agent_class,
         }
 
         backend = local_config.agent_common.backend
@@ -142,7 +146,7 @@ class AgentRuntime:
         local_config: AgentUnifiedConfig,
         etcd_views: Mapping[AgentId, AgentEtcdClientView],
         agents: dict[AgentId, AbstractAgent],
-        default_agent: AbstractAgent,
+        primary_agent: AbstractAgent,
         kernel_registry: KernelRegistry,
         resource_allocator: ResourceAllocator,
         metadata_server: Optional[MetadataServer] = None,
@@ -150,7 +154,7 @@ class AgentRuntime:
         self._local_config = local_config
         self._etcd_views = etcd_views
         self._agents = agents
-        self._default_agent = default_agent
+        self._primary_agent = primary_agent
         self._kernel_registry = kernel_registry
         self._resource_allocator = resource_allocator
         self._metadata_server = metadata_server
@@ -174,7 +178,7 @@ class AgentRuntime:
 
     def get_agent(self, agent_id: Optional[AgentId]) -> AbstractAgent:
         if agent_id is None:
-            return self._default_agent
+            return self._primary_agent
         if agent_id not in self._agents:
             raise AgentIdNotFoundError(
                 f"Agent '{agent_id}' not found in this runtime. "

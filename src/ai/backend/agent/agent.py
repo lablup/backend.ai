@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import enum
 import logging
 import os
 import pickle
@@ -319,6 +320,11 @@ class CreateTaskInfo:
 
     kernel_id: KernelId
     session_id: SessionId
+
+
+class AgentClass(enum.Enum):
+    PRIMARY = enum.auto()
+    AUXILIARY = enum.auto()
 
 
 class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
@@ -775,6 +781,7 @@ class AbstractAgent(
     aobject, Generic[KernelObjectType, KernelCreationContextType], metaclass=ABCMeta
 ):
     id: AgentId
+    agent_class: AgentClass
     loop: asyncio.AbstractEventLoop
     local_config: AgentUnifiedConfig
     etcd: AgentEtcdClientView
@@ -855,6 +862,7 @@ class AbstractAgent(
         kernel_registry: KernelRegistry,
         computers: Mapping[DeviceName, ComputerContext],
         slots: Mapping[SlotName, Decimal],
+        agent_class: AgentClass,
     ) -> None:
         self._skip_initial_scan = skip_initial_scan
         self.loop = current_loop()
@@ -862,6 +870,7 @@ class AbstractAgent(
         self.local_config = local_config
         self.id = AgentId(local_config.agent.defaulted_id)
         self.local_instance_id = generate_local_instance_id(__file__)
+        self.agent_class = agent_class
         self.agent_public_key = agent_public_key
         self.kernel_registry = kernel_registry.agent_mapping(self.id)
         self.computers = computers
@@ -2241,17 +2250,10 @@ class AbstractAgent(
         """
         ipc_base_path = self.local_config.agent.ipc_base_path
         var_base_path = self.local_config.agent.var_base_path
-        last_registry_file = f"last_registry.{self.id}.dat"
-        if not (var_base_path / last_registry_file).is_file():
-            log.warning(
-                "Registry file with name {} not found. "
-                "Falling back to name based on local instance ID {}...",
-                last_registry_file,
-                self.local_instance_id,
-            )
-            last_registry_file = f"last_registry.{self.local_instance_id}.dat"
-        if os.path.isfile(ipc_base_path / last_registry_file):
-            shutil.move(ipc_base_path / last_registry_file, var_base_path / last_registry_file)
+        ipc_last_registry_file = self._resolve_conflicting_registry_file(ipc_base_path)
+        last_registry_file = self._resolve_conflicting_registry_file(var_base_path)
+        if (ipc_base_path / ipc_last_registry_file).is_file():
+            shutil.move(ipc_base_path / ipc_last_registry_file, var_base_path / last_registry_file)
         try:
             with open(var_base_path / last_registry_file, "rb") as f:
                 kernel_registry: MutableMapping[KernelId, AbstractKernel] = pickle.load(f)
@@ -3720,7 +3722,7 @@ class AbstractAgent(
         if (not force) and (now <= self.last_registry_written_time + 60):
             return  # don't save too frequently
         var_base_path = self.local_config.agent.var_base_path
-        last_registry_file = f"last_registry.{self.id}.dat"
+        last_registry_file = self._last_registry_file
         try:
             with open(var_base_path / last_registry_file, "wb") as f:
                 pickle.dump(dict(self.kernel_registry), f)
@@ -3732,6 +3734,36 @@ class AbstractAgent(
                 os.remove(var_base_path / last_registry_file)
             except FileNotFoundError:
                 pass
+
+    @property
+    def _last_registry_file(self) -> str:
+        match self.agent_class:
+            case AgentClass.PRIMARY:
+                return self._primary_last_registry_file
+            case AgentClass.AUXILIARY:
+                return self._auxiliary_last_registry_file
+
+    @property
+    def _primary_last_registry_file(self) -> str:
+        return f"last_registry.{self.local_instance_id}.dat"
+
+    @property
+    def _auxiliary_last_registry_file(self) -> str:
+        return f"last_registry.{self.id}.dat"
+
+    def _resolve_conflicting_registry_file(self, base_dir: Path) -> str:
+        primary_agent_file = base_dir / self._primary_last_registry_file
+        auxiliary_agent_file = base_dir / self._auxiliary_last_registry_file
+        if primary_agent_file.is_file() and auxiliary_agent_file.is_file():
+            primary_modification_time = primary_agent_file.stat().st_mtime
+            auxiliary_modification_time = auxiliary_agent_file.stat().st_mtime
+
+            if primary_modification_time > auxiliary_modification_time:
+                return self._primary_last_registry_file
+            else:
+                return self._auxiliary_last_registry_file
+        else:
+            return self._last_registry_file
 
 
 async def handle_volume_mount(
