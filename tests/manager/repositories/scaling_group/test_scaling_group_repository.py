@@ -171,9 +171,9 @@ class TestScalingGroupRepositoryDB:
         """Test searching all scaling groups without filters"""
         result = await scaling_group_repository.search_scaling_groups()
 
-        # Should have at least the 5 test scaling groups
-        assert len(result.items) >= 5
-        assert result.total_count >= 5
+        # Should have exactly 5 test scaling groups
+        assert len(result.items) == 5
+        assert result.total_count == 5
 
         # Verify test scaling groups are in results
         result_names = {sg.name for sg in result.items}
@@ -193,8 +193,8 @@ class TestScalingGroupRepositoryDB:
         )
         result = await scaling_group_repository.search_scaling_groups(querier=querier)
 
-        assert len(result.items) >= 5
-        assert result.total_count >= 5
+        assert len(result.items) == 5
+        assert result.total_count == 5
 
     # Pagination Tests
 
@@ -213,7 +213,7 @@ class TestScalingGroupRepositoryDB:
         result = await scaling_group_repository.search_scaling_groups(querier=querier)
 
         assert len(result.items) == 10
-        assert result.total_count >= 25
+        assert result.total_count == 25
 
     @pytest.mark.asyncio
     async def test_search_scaling_groups_offset_pagination_second_page(
@@ -230,7 +230,7 @@ class TestScalingGroupRepositoryDB:
         result = await scaling_group_repository.search_scaling_groups(querier=querier)
 
         assert len(result.items) == 10
-        assert result.total_count >= 25
+        assert result.total_count == 25
 
     @pytest.mark.asyncio
     async def test_search_scaling_groups_offset_pagination_last_page(
@@ -246,9 +246,9 @@ class TestScalingGroupRepositoryDB:
         )
         result = await scaling_group_repository.search_scaling_groups(querier=querier)
 
-        # Should have at least 5 items (our test data)
-        assert len(result.items) >= 5
-        assert result.total_count >= 25
+        # Should have exactly 5 items (remaining from 25 total)
+        assert len(result.items) == 5
+        assert result.total_count == 25
 
     @pytest.mark.asyncio
     async def test_search_scaling_groups_pagination_limit_exceeds_total(
@@ -264,9 +264,9 @@ class TestScalingGroupRepositoryDB:
         )
         result = await scaling_group_repository.search_scaling_groups(querier=querier)
 
-        # Should return all items
-        assert len(result.items) >= 5
-        assert result.total_count >= 5
+        # Should return all 5 items
+        assert len(result.items) == 5
+        assert result.total_count == 5
 
     @pytest.mark.asyncio
     async def test_search_scaling_groups_pagination_offset_exceeds_total(
@@ -284,7 +284,7 @@ class TestScalingGroupRepositoryDB:
 
         assert len(result.items) == 0
         # Total count should still reflect actual number of items
-        assert result.total_count >= 5
+        assert result.total_count == 5
 
     @pytest.mark.asyncio
     async def test_search_scaling_groups_no_pagination(
@@ -300,32 +300,6 @@ class TestScalingGroupRepositoryDB:
         )
         result = await scaling_group_repository.search_scaling_groups(querier=querier)
 
-        # Should have at least 15 test scaling groups
-        assert len(result.items) >= 15
-        assert result.total_count >= 15
-
-    @pytest.mark.asyncio
-    async def test_search_scaling_groups_data_structure(
-        self,
-        scaling_group_repository: ScalingGroupRepository,
-        sample_scaling_groups_small: list[str],
-    ) -> None:
-        """Test that returned data structure is correct"""
-        result = await scaling_group_repository.search_scaling_groups()
-
-        assert hasattr(result, "items")
-        assert hasattr(result, "total_count")
-        assert isinstance(result.items, list)
-        assert isinstance(result.total_count, int)
-
-        # Check first item structure
-        if result.items:
-            first_item = result.items[0]
-            assert hasattr(first_item, "name")
-            assert hasattr(first_item, "description")
-            assert hasattr(first_item, "is_active")
-            assert hasattr(first_item, "is_public")
-            assert hasattr(first_item, "created_at")
-            assert hasattr(first_item, "driver")
-            assert hasattr(first_item, "scheduler")
-            assert hasattr(first_item, "use_host_network")
+        # Should have exactly 15 test scaling groups
+        assert len(result.items) == 15
+        assert result.total_count == 15

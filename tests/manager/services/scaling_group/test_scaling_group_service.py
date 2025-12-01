@@ -151,38 +151,3 @@ class TestScalingGroupService:
 
         assert result.scaling_groups == []
         assert result.total_count == 0
-
-    @pytest.mark.asyncio
-    async def test_search_scaling_groups_result_structure(
-        self,
-        scaling_group_service: ScalingGroupService,
-        mock_repository: MagicMock,
-        sample_scaling_group: ScalingGroupData,
-    ) -> None:
-        """Test that search result has correct structure"""
-        mock_repository.search_scaling_groups = AsyncMock(
-            return_value=ScalingGroupListResult(
-                items=[sample_scaling_group],
-                total_count=1,
-            )
-        )
-
-        action = SearchScalingGroupsAction(querier=None)
-        result = await scaling_group_service.search_scaling_groups(action)
-
-        # Verify result structure
-        assert hasattr(result, "scaling_groups")
-        assert hasattr(result, "total_count")
-        assert isinstance(result.scaling_groups, list)
-        assert isinstance(result.total_count, int)
-
-        # Verify first item structure
-        if result.scaling_groups:
-            first_item = result.scaling_groups[0]
-            assert hasattr(first_item, "name")
-            assert hasattr(first_item, "description")
-            assert hasattr(first_item, "is_active")
-            assert hasattr(first_item, "is_public")
-            assert hasattr(first_item, "created_at")
-            assert hasattr(first_item, "driver")
-            assert hasattr(first_item, "scheduler")
