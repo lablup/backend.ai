@@ -6413,7 +6413,6 @@ enum ScalingGroupOrderField
   @join__type(graph: STRAWBERRY)
 {
   NAME @join__enumValue(graph: STRAWBERRY)
-  DESCRIPTION @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   IS_ACTIVE @join__enumValue(graph: STRAWBERRY)
   IS_PUBLIC @join__enumValue(graph: STRAWBERRY)
