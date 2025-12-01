@@ -329,7 +329,7 @@ class CreateContainerRegistryNode(graphene.Mutation):
         url: str,
         type: ContainerRegistryType,
         registry_name: str,
-        project: str,
+        project: str | UndefinedType = Undefined,
         is_global: bool | UndefinedType = Undefined,
         username: str | UndefinedType = Undefined,
         password: str | UndefinedType = Undefined,
@@ -337,11 +337,12 @@ class CreateContainerRegistryNode(graphene.Mutation):
         extra: dict | UndefinedType = Undefined,
     ) -> CreateContainerRegistryNode:
         ctx: GraphQueryContext = info.context
+        sanitized_project = cast(Optional[str], project if project is not Undefined else None)
         validator = ContainerRegistryValidator(
             ContainerRegistryValidatorArgs(
                 url=url,
                 type=type,
-                project=project,
+                project=sanitized_project,
             )
         )
 
@@ -353,7 +354,7 @@ class CreateContainerRegistryNode(graphene.Mutation):
                 type=type,
                 registry_name=registry_name,
                 is_global=cast(Optional[bool], is_global if is_global is not Undefined else None),
-                project=project,
+                project=sanitized_project,
                 username=cast(Optional[str], username if username is not Undefined else None),
                 password=cast(Optional[str], password if password is not Undefined else None),
                 ssl_verify=cast(
