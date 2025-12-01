@@ -38,7 +38,6 @@ class TestValkeyArtifactRegistryClient:
         try:
             yield client
         finally:
-            await client.flush_database()
             await client.close()
 
     @pytest.fixture
@@ -86,10 +85,7 @@ class TestValkeyArtifactRegistryClient:
 
         assert result_dict is not None
         result = HuggingFaceRegistryStatefulData.from_dict(result_dict)
-        assert result.id == sample_huggingface_registry_data.id
-        assert result.name == sample_huggingface_registry_data.name
-        assert result.url == sample_huggingface_registry_data.url
-        assert result.token == sample_huggingface_registry_data.token
+        assert result == sample_huggingface_registry_data
 
     @pytest.mark.asyncio
     async def test_get_nonexistent_huggingface_registry(
@@ -157,12 +153,7 @@ class TestValkeyArtifactRegistryClient:
 
         assert result_dict is not None
         result = ReservoirRegistryStatefulData.from_dict(result_dict)
-        assert result.id == sample_reservoir_registry_data.id
-        assert result.name == sample_reservoir_registry_data.name
-        assert result.endpoint == sample_reservoir_registry_data.endpoint
-        assert result.access_key == sample_reservoir_registry_data.access_key
-        assert result.secret_key == sample_reservoir_registry_data.secret_key
-        assert result.api_version == sample_reservoir_registry_data.api_version
+        assert result == sample_reservoir_registry_data
 
     @pytest.mark.asyncio
     async def test_multiple_registries_isolation(
@@ -190,8 +181,8 @@ class TestValkeyArtifactRegistryClient:
 
         assert hf_result_dict is not None
         hf_result = HuggingFaceRegistryStatefulData.from_dict(hf_result_dict)
-        assert hf_result.name == sample_huggingface_registry_data.name
+        assert hf_result == sample_huggingface_registry_data
 
         assert reservoir_result_dict is not None
         reservoir_result = ReservoirRegistryStatefulData.from_dict(reservoir_result_dict)
-        assert reservoir_result.name == sample_reservoir_registry_data.name
+        assert reservoir_result == sample_reservoir_registry_data
