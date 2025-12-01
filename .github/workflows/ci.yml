@@ -347,8 +347,38 @@ jobs:
       if: always()  # We want the log even on failures.
 
 
-  build-scies:
+  create-release:
     needs: [lint, typecheck, test, check-alembic-migrations, optimize-ci]
+    if: needs.optimize-ci.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v5
+    - name: Fetch remote tags
+      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Extract the release changelog
+      run: |
+        python ./scripts/extract-release-changelog.py
+        python ./scripts/determine-release-type.py
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        body_path: "CHANGELOG_RELEASE.md"
+        prerelease: ${{ env.IS_PRERELEASE }}
+        draft: false
+
+
+  build-scies:
+    needs: [create-release, optimize-ci]
     if: needs.optimize-ci.outputs.release == 'true'
     strategy:
       fail-fast: false
@@ -359,6 +389,8 @@ jobs:
         # self-hosted-macos-14: apple silicon
         os: [ubuntu-22.04, ubuntu-22.04-arm64, macos-14-large, self-hosted-macos-14]
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
     env:
       SCIENCE_AUTH_API_GITHUB_COM_BEARER: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -405,6 +437,10 @@ jobs:
       with:
         name: scies-${{ matrix.os }}
         path: dist/*
+    - name: Upload scies to GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/*
     - name: Upload pants log
       uses: actions/upload-artifact@v5
       with:
@@ -414,9 +450,11 @@ jobs:
 
 
   build-wheels:
-    needs: [lint, typecheck, test, check-alembic-migrations, optimize-ci]
+    needs: [create-release, optimize-ci]
     if: needs.optimize-ci.outputs.release == 'true'
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
     steps:
     - name: Check out the revision
       uses: actions/checkout@v5
@@ -450,6 +488,10 @@ jobs:
       with:
         name: wheels
         path: dist/*
+    - name: Upload wheels to GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/*
     - name: Upload pants log
       uses: actions/upload-artifact@v5
       with:
@@ -459,13 +501,18 @@ jobs:
 
 
   build-sbom:
-    needs: [lint, typecheck, test, check-alembic-migrations, optimize-ci]
+    needs: [create-release, optimize-ci]
     if: needs.optimize-ci.outputs.release == 'true'
     uses: ./.github/workflows/sbom.yml
+    permissions:
+      contents: write
 
   build-isla-sorna-image:
-    needs: [build-scies, build-wheels, build-sbom, optimize-ci]
-    if: needs.optimize-ci.outputs.release == 'true'
+    needs: [create-release, optimize-ci]
+    if: |
+      always()
+      && needs.optimize-ci.outputs.release == 'true'
+      && needs.create-release.result == 'success'
     runs-on: ubuntu-latest
 
     steps:
@@ -478,8 +525,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT }}
 
-  make-final-release:
-    needs: [build-scies, build-wheels, build-sbom, optimize-ci]
+  publish-to-pypi:
+    needs: [build-wheels, optimize-ci]
     if: needs.optimize-ci.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -500,37 +547,11 @@ jobs:
     - name: Install local dependencies for packaging
       run: |
         pip install -U 'twine~=6.0'
-    - name: Extract the release changelog
-      run: |
-        python ./scripts/extract-release-changelog.py
-        python ./scripts/determine-release-type.py
     - name: Download wheels
       uses: actions/download-artifact@v6
       with:
         name: wheels
         path: dist
-    - name: Download scies
-      uses: actions/download-artifact@v6
-      with:
-        pattern: scies-*
-        path: dist
-        merge-multiple: true
-    - name: Merge checksum files into one
-      run: |
-        cat dist/checksum-*.txt > dist/checksum.txt
-        sort -u -k2 dist/checksum.txt -o dist/checksum.txt
-    - name: Download SBOM report
-      uses: actions/download-artifact@v6
-      with:
-        name: SBOM report
-        path: dist
-    - name: Release to GitHub
-      uses: softprops/action-gh-release@v2
-      with:
-        body_path: "CHANGELOG_RELEASE.md"
-        prerelease: ${{ env.IS_PRERELEASE }}
-        files: |
-          dist/*
     - name: Publish to PyPI
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
@@ -539,6 +560,29 @@ jobs:
       # wheels after buildling them to add arch-specific tags.
       run: |
         twine upload dist/*.whl dist/*.tar.gz
+
+  update-installer-urls:
+    needs: [create-release, build-scies, optimize-ci]
+    if: |
+      always()
+      && needs.optimize-ci.outputs.release == 'true'
+      && needs.create-release.result == 'success'
+      && needs.build-scies.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+    - name: Fetch remote tags
+      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Determine release type
+      run: python ./scripts/determine-release-type.py
     - name: Extract stable release version
       id: extract_stable_release_version
       run: |
@@ -622,7 +666,7 @@ jobs:
 
 
   build-conda-pack-for-windows:
-    needs: [make-final-release, optimize-ci]
+    needs: [create-release, build-wheels, optimize-ci]
     if: needs.optimize-ci.outputs.release == 'true'
     runs-on: windows-latest
     permissions:
