@@ -3,8 +3,8 @@ Tests for ScalingGroupRepository functionality.
 Tests the repository layer with real database operations.
 """
 
+from collections.abc import AsyncGenerator, Callable
 from datetime import datetime
-from typing import AsyncGenerator
 
 import pytest
 import sqlalchemy as sa
@@ -33,20 +33,22 @@ class TestScalingGroupRepositoryDB:
                 execution_options={"synchronize_session": False},
             )
 
-    @pytest.fixture
-    async def sample_scaling_groups_small(
+    async def _create_scaling_groups(
         self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[list[str], None]:
-        """Create 5 sample scaling groups for basic testing"""
+        db_engine: ExtendedAsyncSAEngine,
+        count: int,
+        prefix: str,
+        is_active_func: Callable[[int], bool] = lambda i: True,
+    ) -> list[str]:
+        """Helper to create scaling groups with given parameters"""
         scaling_group_names = []
-        async with db_with_cleanup.begin_session() as db_sess:
-            for i in range(5):
-                sgroup_name = f"test-sgroup-small-{i}"
+        async with db_engine.begin_session() as db_sess:
+            for i in range(count):
+                sgroup_name = f"test-sgroup-{prefix}-{i:02d}"
                 sgroup = ScalingGroupRow(
                     name=sgroup_name,
-                    description=f"Test scaling group {i}",
-                    is_active=True,
+                    description=f"Test scaling group {i:02d}",
+                    is_active=is_active_func(i),
                     is_public=True,
                     created_at=datetime.now(),
                     wsproxy_addr=None,
@@ -60,8 +62,15 @@ class TestScalingGroupRepositoryDB:
                 db_sess.add(sgroup)
                 scaling_group_names.append(sgroup_name)
             await db_sess.flush()
+        return scaling_group_names
 
-        yield scaling_group_names
+    @pytest.fixture
+    async def sample_scaling_groups_small(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[list[str], None]:
+        """Create 5 sample scaling groups for basic testing"""
+        yield await self._create_scaling_groups(db_with_cleanup, 5, "small")
 
     @pytest.fixture
     async def sample_scaling_groups_for_pagination(
@@ -69,29 +78,7 @@ class TestScalingGroupRepositoryDB:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[list[str], None]:
         """Create 25 sample scaling groups for pagination testing"""
-        scaling_group_names = []
-        async with db_with_cleanup.begin_session() as db_sess:
-            for i in range(25):
-                sgroup_name = f"test-sgroup-pagination-{i:02d}"
-                sgroup = ScalingGroupRow(
-                    name=sgroup_name,
-                    description=f"Test scaling group {i:02d}",
-                    is_active=True,
-                    is_public=True,
-                    created_at=datetime.now(),
-                    wsproxy_addr=None,
-                    wsproxy_api_token=None,
-                    driver="static",
-                    driver_opts={},
-                    scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
-                    use_host_network=False,
-                )
-                db_sess.add(sgroup)
-                scaling_group_names.append(sgroup_name)
-            await db_sess.flush()
-
-        yield scaling_group_names
+        yield await self._create_scaling_groups(db_with_cleanup, 25, "pagination")
 
     @pytest.fixture
     async def sample_scaling_groups_mixed_active(
@@ -99,29 +86,9 @@ class TestScalingGroupRepositoryDB:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[list[str], None]:
         """Create 20 sample scaling groups (10 active, 10 inactive) for filter testing"""
-        scaling_group_names = []
-        async with db_with_cleanup.begin_session() as db_sess:
-            for i in range(20):
-                sgroup_name = f"test-sgroup-mixed-{i:02d}"
-                sgroup = ScalingGroupRow(
-                    name=sgroup_name,
-                    description=f"Test scaling group {i:02d}",
-                    is_active=(i % 2 == 0),  # Even indexes active
-                    is_public=True,
-                    created_at=datetime.now(),
-                    wsproxy_addr=None,
-                    wsproxy_api_token=None,
-                    driver="static",
-                    driver_opts={},
-                    scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
-                    use_host_network=False,
-                )
-                db_sess.add(sgroup)
-                scaling_group_names.append(sgroup_name)
-            await db_sess.flush()
-
-        yield scaling_group_names
+        yield await self._create_scaling_groups(
+            db_with_cleanup, 20, "mixed", is_active_func=lambda i: i % 2 == 0
+        )
 
     @pytest.fixture
     async def sample_scaling_groups_medium(
@@ -129,29 +96,7 @@ class TestScalingGroupRepositoryDB:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[list[str], None]:
         """Create 15 sample scaling groups for no-pagination testing"""
-        scaling_group_names = []
-        async with db_with_cleanup.begin_session() as db_sess:
-            for i in range(15):
-                sgroup_name = f"test-sgroup-medium-{i}"
-                sgroup = ScalingGroupRow(
-                    name=sgroup_name,
-                    description=f"Test scaling group {i}",
-                    is_active=True,
-                    is_public=True,
-                    created_at=datetime.now(),
-                    wsproxy_addr=None,
-                    wsproxy_api_token=None,
-                    driver="static",
-                    driver_opts={},
-                    scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
-                    use_host_network=False,
-                )
-                db_sess.add(sgroup)
-                scaling_group_names.append(sgroup_name)
-            await db_sess.flush()
-
-        yield scaling_group_names
+        yield await self._create_scaling_groups(db_with_cleanup, 15, "medium")
 
     @pytest.fixture
     async def scaling_group_repository(
@@ -199,92 +144,65 @@ class TestScalingGroupRepositoryDB:
     # Pagination Tests
 
     @pytest.mark.asyncio
-    async def test_search_scaling_groups_offset_pagination_first_page(
+    @pytest.mark.parametrize(
+        "limit,offset,expected_items,total_count,description",
+        [
+            (10, 0, 10, 25, "first page"),
+            (10, 10, 10, 25, "second page"),
+            (10, 20, 5, 25, "last page with partial results"),
+        ],
+        ids=["first_page", "second_page", "last_page"],
+    )
+    async def test_search_scaling_groups_offset_pagination(
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_groups_for_pagination: list[str],
+        limit: int,
+        offset: int,
+        expected_items: int,
+        total_count: int,
+        description: str,
     ) -> None:
-        """Test first page of offset-based pagination"""
+        """Test offset-based pagination scenarios"""
         querier = Querier(
             conditions=[],
             orders=[],
-            pagination=OffsetPagination(limit=10, offset=0),
+            pagination=OffsetPagination(limit=limit, offset=offset),
         )
         result = await scaling_group_repository.search_scaling_groups(querier=querier)
 
-        assert len(result.items) == 10
-        assert result.total_count == 25
+        assert len(result.items) == expected_items
+        assert result.total_count == total_count
 
     @pytest.mark.asyncio
-    async def test_search_scaling_groups_offset_pagination_second_page(
-        self,
-        scaling_group_repository: ScalingGroupRepository,
-        sample_scaling_groups_for_pagination: list[str],
-    ) -> None:
-        """Test second page of offset-based pagination"""
-        querier = Querier(
-            conditions=[],
-            orders=[],
-            pagination=OffsetPagination(limit=10, offset=10),
-        )
-        result = await scaling_group_repository.search_scaling_groups(querier=querier)
-
-        assert len(result.items) == 10
-        assert result.total_count == 25
-
-    @pytest.mark.asyncio
-    async def test_search_scaling_groups_offset_pagination_last_page(
-        self,
-        scaling_group_repository: ScalingGroupRepository,
-        sample_scaling_groups_for_pagination: list[str],
-    ) -> None:
-        """Test last page of offset-based pagination with partial results"""
-        querier = Querier(
-            conditions=[],
-            orders=[],
-            pagination=OffsetPagination(limit=10, offset=20),
-        )
-        result = await scaling_group_repository.search_scaling_groups(querier=querier)
-
-        # Should have exactly 5 items (remaining from 25 total)
-        assert len(result.items) == 5
-        assert result.total_count == 25
-
-    @pytest.mark.asyncio
-    async def test_search_scaling_groups_pagination_limit_exceeds_total(
+    @pytest.mark.parametrize(
+        "limit,offset,expected_items,total_count,description",
+        [
+            (100, 0, 5, 5, "limit exceeds total count"),
+            (10, 10000, 0, 5, "offset exceeds total count"),
+        ],
+        ids=["limit_exceeds", "offset_exceeds"],
+    )
+    async def test_search_scaling_groups_pagination_edge_cases(
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_groups_small: list[str],
+        limit: int,
+        offset: int,
+        expected_items: int,
+        total_count: int,
+        description: str,
     ) -> None:
-        """Test pagination when limit exceeds total count"""
+        """Test pagination edge cases"""
         querier = Querier(
             conditions=[],
             orders=[],
-            pagination=OffsetPagination(limit=100, offset=0),
+            pagination=OffsetPagination(limit=limit, offset=offset),
         )
         result = await scaling_group_repository.search_scaling_groups(querier=querier)
 
-        # Should return all 5 items
-        assert len(result.items) == 5
-        assert result.total_count == 5
-
-    @pytest.mark.asyncio
-    async def test_search_scaling_groups_pagination_offset_exceeds_total(
-        self,
-        scaling_group_repository: ScalingGroupRepository,
-        sample_scaling_groups_small: list[str],
-    ) -> None:
-        """Test pagination when offset exceeds total count returns empty"""
-        querier = Querier(
-            conditions=[],
-            orders=[],
-            pagination=OffsetPagination(limit=10, offset=10000),
-        )
-        result = await scaling_group_repository.search_scaling_groups(querier=querier)
-
-        assert len(result.items) == 0
-        # Total count should still reflect actual number of items
-        assert result.total_count == 5
+        assert len(result.items) == expected_items
+        assert result.total_count == total_count
 
     @pytest.mark.asyncio
     async def test_search_scaling_groups_no_pagination(
