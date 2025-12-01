@@ -98,7 +98,7 @@ class ScalingGroupSchedulerOptions:
         description="Configuration for the agent selection strategy. Structure varies by strategy - for example, concentrated strategy may specify endpoint spreading rules."
     )
     enforce_spreading_endpoint_replica: bool = strawberry.field(
-        description="When true with concentrated strategy, forces inference service replicas to be distributed across different agents instead of co-locating on same agent. Improves fault tolerance for model serving."
+        description="Whether inference service replicas should be distributed across different agents instead of co-locating on same agent. When true, forces replica spreading. Applied only when using concentrated agent selection strategy. Improves fault tolerance for model serving."
     )
     allow_fractional_resource_fragmentation: bool = strawberry.field(
         description="Whether agents accept session requests that allocate fractional resources (e.g., 0.5 GPU) causing resource fragmentation. When false, agents reject sessions that would prevent future efficient resource allocation."
