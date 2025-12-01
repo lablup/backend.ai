@@ -1,5 +1,7 @@
 import click
 
+from ai.backend.common.cli import get_completion_command
+
 from .extensions import ExtendedCommandGroup
 from .types import CliContextInfo
 
@@ -25,3 +27,7 @@ from .types import CliContextInfo
 def main(ctx: click.Context, **kwargs) -> None:
     """Unified Command Line Interface for Backend.ai"""
     ctx.obj = CliContextInfo(info=kwargs)
+
+
+# Add completion command
+main.add_command(get_completion_command("backend.ai"), name="completion")
