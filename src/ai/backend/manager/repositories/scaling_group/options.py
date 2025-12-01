@@ -96,13 +96,6 @@ class ScalingGroupOrders:
             return ScalingGroupRow.name.desc()
 
     @staticmethod
-    def description(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return ScalingGroupRow.description.asc()
-        else:
-            return ScalingGroupRow.description.desc()
-
-    @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ScalingGroupRow.created_at.asc()
