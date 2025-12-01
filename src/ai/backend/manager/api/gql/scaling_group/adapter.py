@@ -13,7 +13,7 @@ from ai.backend.manager.repositories.base import (
 )
 
 if TYPE_CHECKING:
-    from .types import ScalingGroupFilter, ScalingGroupOrderBy
+    from .types import GQLScalingGroupFilter, GQLScalingGroupOrderBy
 
 __all__ = ("ScalingGroupGQLAdapter",)
 
@@ -23,8 +23,8 @@ class ScalingGroupGQLAdapter(BaseGQLAdapter):
 
     def build_querier(
         self,
-        filter: Optional[ScalingGroupFilter] = None,
-        order_by: Optional[list[ScalingGroupOrderBy]] = None,
+        filter: Optional[GQLScalingGroupFilter] = None,
+        order_by: Optional[list[GQLScalingGroupOrderBy]] = None,
         first: Optional[int] = None,
         after: Optional[str] = None,
         last: Optional[int] = None,

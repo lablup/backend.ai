@@ -14,15 +14,19 @@ from ai.backend.manager.services.scaling_group.actions.list_scaling_groups impor
 )
 
 from ..types import StrawberryGQLContext
-from .types import ScalingGroupFilter, ScalingGroupOrderBy, ScalingGroupV2
+from .types import (
+    GQLScalingGroupFilter,
+    GQLScalingGroupOrderBy,
+    GQLScalingGroupV2,
+)
 
 # Connection types
 
-ScalingGroupEdge = Edge[ScalingGroupV2]
+ScalingGroupEdge = Edge[GQLScalingGroupV2]
 
 
 @strawberry.type(description="Added in 25.18.0. Scaling group connection")
-class ScalingGroupV2Connection(Connection[ScalingGroupV2]):
+class ScalingGroupV2Connection(Connection[GQLScalingGroupV2]):
     count: int
 
     def __init__(self, *args, count: int, **kwargs):
@@ -34,10 +38,10 @@ class ScalingGroupV2Connection(Connection[ScalingGroupV2]):
 
 
 @strawberry.field(description="Added in 25.18.0. List scaling groups")
-async def scaling_groups(
+async def scaling_groups_v2(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ScalingGroupFilter] = None,
-    order_by: Optional[list[ScalingGroupOrderBy]] = None,
+    filter: Optional[GQLScalingGroupFilter] = None,
+    order_by: Optional[list[GQLScalingGroupOrderBy]] = None,
     before: Optional[str] = None,
     after: Optional[str] = None,
     first: Optional[int] = None,
@@ -63,10 +67,11 @@ async def scaling_groups(
         SearchScalingGroupsAction(querier=querier)
     )
 
-    nodes = [ScalingGroupV2.from_dataclass(data) for data in action_result.scaling_groups]
+    nodes = [GQLScalingGroupV2.from_dataclass(data) for data in action_result.scaling_groups]
 
     edges = [
-        ScalingGroupEdge(node=node, cursor=to_global_id(ScalingGroupV2, node.id)) for node in nodes
+        ScalingGroupEdge(node=node, cursor=to_global_id(GQLScalingGroupV2, node.id))
+        for node in nodes
     ]
 
     # TODO: Get correct has_next_page and has_previous_page values

@@ -1,22 +1,22 @@
 """GraphQL scaling group module."""
 
 from .adapter import ScalingGroupGQLAdapter
-from .resolver import scaling_groups
+from .resolver import scaling_groups_v2
 from .types import (
-    ScalingGroupFilter,
-    ScalingGroupOrderBy,
-    ScalingGroupOrderField,
-    ScalingGroupV2,
+    GQLScalingGroupFilter,
+    GQLScalingGroupOrderBy,
+    GQLScalingGroupOrderField,
+    GQLScalingGroupV2,
 )
 
 __all__ = (
     # Adapters
     "ScalingGroupGQLAdapter",
     # Types
-    "ScalingGroupV2",
-    "ScalingGroupFilter",
-    "ScalingGroupOrderBy",
-    "ScalingGroupOrderField",
+    "GQLScalingGroupV2",
+    "GQLScalingGroupFilter",
+    "GQLScalingGroupOrderBy",
+    "GQLScalingGroupOrderField",
     # Resolvers
-    "scaling_groups",
+    "scaling_groups_v2",
 )
