@@ -24,7 +24,7 @@ import trafaret as t
 from aiodocker import Docker
 
 from .. import __version__
-from .atom_api import ATOMAPI, ATOMDeviceStat
+from .atom_api import ATOMAPI, ATOMDeviceStat, LibraryError
 from .types import AbstractATOMDevice
 
 try:
@@ -115,8 +115,16 @@ class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=
             log.warning("could not find {} devices with VID 1eff.", self.key)
             self.enabled = False
 
-    @abstractmethod
     async def list_devices(self) -> List[TATOMDevice]:
+        if self._all_devices is None:
+            devices = await self._list_devices()
+            self._all_devices = devices
+            return devices
+        else:
+            return self._all_devices
+
+    @abstractmethod
+    async def _list_devices(self) -> List[TATOMDevice]:
         raise NotImplementedError
 
     async def available_slots(self) -> Mapping[SlotName, Decimal]:
@@ -279,24 +287,35 @@ class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=
         docker: aiodocker.docker.Docker,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Mapping[str, Any]:
-        assigned_devices: List[str] = []
-        additional_device_files = [Path("/dev/rmda"), Path("/dev/rsd0")]
+        assigned_devices: List[TATOMDevice] = []
+        device_files: List[Path] = []
+        additional_device_files = [Path("/dev/rmda")]
 
         numa_node_indexes: set[int] = set()
-        for dev in await self.list_devices():
+        for dev in await self._list_devices():
             if dev.device_id in device_alloc.get(self.slot_types[0][0], {}).keys():
-                assigned_devices.extend(await self.list_device_files(dev))
-                numa_node_indexes.add(dev.numa_node or 0)
+                assert dev.numa_node, "NUMA node index of accelerator cannot be null!"
+                assigned_devices.append(dev)
+                device_files.extend([Path(x) for x in await self.list_device_files(dev)])
+                numa_node_indexes.add(dev.numa_node)
         if (
             len(numa_node_indexes) > 1
             and self.atom_config["general"]["enforce_singular_numa_affinity"]
         ):
             raise RuntimeError(f"NUMA affinity dispersed ({numa_node_indexes})!")
 
+        try:
+            group_idx = await self.group_npus(assigned_devices)
+            log.debug("Created NPU Group {} with members {}", group_idx, assigned_devices)
+            additional_device_files.append(Path(f"/dev/rsd{group_idx}"))
+        except LibraryError as e:
+            log.warning(f"Failed to create NPU Group: {str(e)}, starting kernel without NPU group")
+            additional_device_files.append(Path("/dev/rsd0"))
+
         for filename in additional_device_files:
             try:
                 filename.stat()  # check if target file exists
-                assigned_devices.append(filename.as_posix())
+                device_files.append(filename)
             except FileNotFoundError:
                 pass  # just skip mounting without raising error
 
@@ -320,7 +339,7 @@ class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=
                         "PathInContainer": dev,
                         "CgroupPermissions": "rwm",
                     }
-                    for dev in assigned_devices
+                    for dev in device_files
                 ],
             },
         }
@@ -342,7 +361,7 @@ class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=
                     "device_id": device.device_id,
                     "model_name": device.model_name,
                     "data": {
-                        "smp": proc,
+                        "proc": proc,
                         "mem": mem,
                     },
                 })
@@ -402,6 +421,10 @@ class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=
             f"{local_idx}:{global_id}" for local_idx, global_id in enumerate(active_device_ids)
         )
         return data
+
+    @abstractmethod
+    async def group_npus(self, devices: List[TATOMDevice]) -> int:
+        raise NotImplementedError
 
     async def cleanup(self) -> None:
         pass

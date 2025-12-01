@@ -2,6 +2,7 @@ import logging
 from typing import (
     Iterable,
     List,
+    Set,
 )
 
 from ai.backend.common.logging import BraceStyleAdapter
@@ -21,9 +22,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
 class ATOMPlugin(AbstractATOMPlugin[ATOMDevice]):
-    async def list_devices(self) -> List[ATOMDevice]:
-        if self._all_devices is not None:
-            return self._all_devices
+    async def _list_devices(self) -> List[ATOMDevice]:
         stats = await ATOMAPI.get_stats(self._rbln_stat_path)
         devices: List[ATOMDevice] = []
         for device_info in stats.devices:
@@ -44,8 +43,18 @@ class ATOMPlugin(AbstractATOMPlugin[ATOMDevice]):
             )
             devices.append(device)
 
-        self._all_devices = devices
-        return self._all_devices
+        return devices
+
+    async def group_npus(self, devices: List[ATOMDevice]) -> int:
+        non_zero_groups: Set[int] = set([int(d.rbln_stat_info.group_id) for d in devices]) - set([
+            0
+        ])
+        if len(non_zero_groups) > 0:
+            await ATOMAPI.destroy_groups(self._rbln_stat_path, list(non_zero_groups))
+
+        device_indexes = [d.rbln_stat_info.npu for d in devices]
+        group_idx = await ATOMAPI.create_group(self._rbln_stat_path, device_indexes)
+        return group_idx
 
     async def list_device_files(
         self,

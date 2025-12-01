@@ -37,9 +37,7 @@ class ATOMMaxPlugin(AbstractATOMPlugin[ATOMMaxDevice]):
 
     _all_devices: Optional[List[ATOMMaxDevice]]
 
-    async def list_devices(self) -> List[ATOMMaxDevice]:
-        if self._all_devices is not None:
-            return self._all_devices
+    async def _list_devices(self) -> List[ATOMMaxDevice]:
         stats = await ATOMAPI.get_stats(self._rbln_stat_path)
         devices: List[ATOMMaxDevice] = []
         devices_by_sid: DefaultDict[DeviceId, List[ATOMMaxChildDevice]] = defaultdict(list)
@@ -72,8 +70,7 @@ class ATOMMaxPlugin(AbstractATOMPlugin[ATOMMaxDevice]):
             )
             devices.append(mother_device)
 
-        self._all_devices = devices
-        return self._all_devices
+        return devices
 
     async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
         dev_count = 0
@@ -130,6 +127,22 @@ class ATOMMaxPlugin(AbstractATOMPlugin[ATOMMaxDevice]):
                 per_device=util_stats,
             ),
         ]
+
+    async def group_npus(
+        self,
+        devices: Iterable[ATOMMaxDevice],
+    ) -> int:
+        groups: Set[int] = set()
+        device_indexes = []
+        for d in devices:
+            groups |= set([int(dd.rbln_stat_info.group_id) for dd in d.children])
+            device_indexes.extend([dd.rbln_stat_info.npu for dd in d.children])
+        non_zero_groups: Set[int] = groups - set([0])
+        if len(non_zero_groups) > 0:
+            await ATOMAPI.destroy_groups(self._rbln_stat_path, list(non_zero_groups))
+
+        group_idx = await ATOMAPI.create_group(self._rbln_stat_path, device_indexes)
+        return group_idx
 
     async def list_device_files(self, device: ATOMMaxDevice) -> Iterable[str]:
         return [f"/dev/{c.rbln_stat_info.device}" for c in device.children]

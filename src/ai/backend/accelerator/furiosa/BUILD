@@ -4,6 +4,7 @@ python_sources(
     dependencies=[
         ":resources",
     ],
+    tags=["accelerator"],
 )
 
 python_distribution(
