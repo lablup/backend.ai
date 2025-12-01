@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForProjectRow,
+    ScalingGroupRow,
+)
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 
@@ -81,6 +84,17 @@ class ScalingGroupConditions:
     def by_use_host_network(use_host_network: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ScalingGroupRow.use_host_network == use_host_network
+
+        return inner
+
+    @staticmethod
+    def by_project(project_id: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupRow.name.in_(
+                sa.select(ScalingGroupForProjectRow.scaling_group).where(
+                    ScalingGroupForProjectRow.group == project_id
+                )
+            )
 
         return inner
 
