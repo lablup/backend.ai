@@ -131,7 +131,6 @@ class ValkeyArtifactRegistryClient:
             value=value,
             expiry=ExpirySet(ExpiryType.SEC, _EXPIRATION),
         )
-        log.debug("Cached registry data for registry_id={}", registry_id)
 
     @valkey_artifact_registries_resilience.apply()
     async def get_registry(
@@ -147,7 +146,6 @@ class ValkeyArtifactRegistryClient:
         key = self._make_registry_key(registry_id)
         value = await self._client.client.get(key)
         if value is None:
-            log.debug("Cache miss for registry_id={}", registry_id)
             return None
 
         json_value = value.decode()
@@ -168,8 +166,6 @@ class ValkeyArtifactRegistryClient:
         key = self._make_registry_key(registry_id)
         result = await self._client.client.delete([key])
         deleted = result > 0
-        if deleted:
-            log.debug("Deleted cached registry data for registry_id={}", registry_id)
         return deleted
 
     @valkey_artifact_registries_resilience.apply()
