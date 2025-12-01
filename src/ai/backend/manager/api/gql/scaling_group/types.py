@@ -11,6 +11,7 @@ from strawberry.relay import Node, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 from ai.backend.manager.repositories.base import (
     QueryCondition,
@@ -40,10 +41,18 @@ __all__ = (
 @strawberry.type(description="Added in 25.18.0. Status information for a scaling group")
 class ScalingGroupStatus:
     is_active: bool = strawberry.field(
-        description="Whether the scaling group can accept new session creation requests. Inactive scaling groups are excluded from scheduling and cannot start new sessions."
+        description=dedent_strip("""
+            Whether the scaling group can accept new session creation requests.
+            Inactive scaling groups are excluded from scheduling and cannot start new sessions.
+        """)
     )
     is_public: bool = strawberry.field(
-        description="Whether this scaling group is available for regular user sessions (interactive/batch/inference). When false, the scaling group is reserved for internal SYSTEM-type sessions only, such as management or infrastructure sessions."
+        description=dedent_strip("""
+            Whether this scaling group is available for regular user sessions
+            (interactive/batch/inference).
+            When false, the scaling group is reserved for internal SYSTEM-type sessions only,
+            such as management or infrastructure sessions.
+        """)
     )
 
 
@@ -60,20 +69,32 @@ class ScalingGroupMetadata:
 @strawberry.type(description="Added in 25.18.0. Network configuration for a scaling group")
 class ScalingGroupNetworkConfig:
     wsproxy_addr: str = strawberry.field(
-        description="App-proxy coordinator API server address, Manager uses this address to communicate with the app-proxy coordinator for managing service routes, endpoint registration, and proxying client connections to session services."
+        description=dedent_strip("""
+            App-proxy coordinator API server address.
+            Manager uses this address to communicate with the app-proxy coordinator
+            for managing service routes, endpoint registration, and proxying client connections
+            to session services.
+        """)
     )
     wsproxy_api_token: str = strawberry.field(
         description="Authentication token for the App-proxy coordinator API server."
     )
     use_host_network: bool = strawberry.field(
-        description="Whether session containers use the host's network namespace instead of isolated container networking. Enables direct host port binding but reduces isolation."
+        description=dedent_strip("""
+            Whether session containers use the host's network namespace
+            instead of isolated container networking.
+            Enables direct host port binding but reduces isolation.
+        """)
     )
 
 
 @strawberry.type(description="Added in 25.18.0. Driver configuration for resource allocation")
 class ScalingGroupDriverConfig:
     name: str = strawberry.field(
-        description="Agent resource driver implementation name. 'static' uses a predefined set of agents registered to this scaling group."
+        description=dedent_strip("""
+            Agent resource driver implementation name.
+            'static' uses a predefined set of agents registered to this scaling group.
+        """)
     )
     options: JSON = strawberry.field(
         description="Driver-specific configuration options. Contents vary by driver type."
@@ -83,38 +104,82 @@ class ScalingGroupDriverConfig:
 @strawberry.type(description="Added in 25.18.0. Scheduler configuration options")
 class ScalingGroupSchedulerOptions:
     allowed_session_types: list[str] = strawberry.field(
-        description="Session types that can be scheduled in this scaling group. Valid values: 'interactive' , 'batch', 'inference'. Requests for unlisted types are rejected."
+        description=dedent_strip("""
+            Session types that can be scheduled in this scaling group.
+            Valid values: 'interactive' , 'batch', 'inference'.
+            Requests for unlisted types are rejected.
+        """)
     )
     pending_timeout: float = strawberry.field(
-        description="Maximum time in seconds a session can wait in PENDING state before automatic cancellation. Zero means no timeout. Used to prevent indefinite resource waiting when no agents are available."
+        description=dedent_strip("""
+            Maximum time in seconds a session can wait in PENDING state
+            before automatic cancellation.
+            Zero means no timeout.
+            Used to prevent indefinite resource waiting when no agents are available.
+        """)
     )
     config: JSON = strawberry.field(
-        description="Scheduler-specific configuration options. Contents depend on the scheduler implementation (fifo/lifo/drf). Used for advanced scheduling behavior customization."
+        description=dedent_strip("""
+            Scheduler-specific configuration options.
+            Contents depend on the scheduler implementation (fifo/lifo/drf).
+            Used for advanced scheduling behavior customization.
+        """)
     )
     agent_selection_strategy: str = strawberry.field(
-        description="Algorithm for selecting target agents when scheduling sessions. 'dispersed' spreads sessions across available agents, 'concentrated' packs sessions onto fewer agents, 'roundrobin' cycles through agents sequentially."
+        description=dedent_strip("""
+            Algorithm for selecting target agents when scheduling sessions.
+            'dispersed' spreads sessions across available agents,
+            'concentrated' packs sessions onto fewer agents,
+            'roundrobin' cycles through agents sequentially.
+        """)
     )
     agent_selector_config: JSON = strawberry.field(
-        description="Configuration for the agent selection strategy. Structure varies by strategy - for example, concentrated strategy may specify endpoint spreading rules."
+        description=dedent_strip("""
+            Configuration for the agent selection strategy.
+            Structure varies by strategy - for example,
+            concentrated strategy may specify endpoint spreading rules.
+        """)
     )
     enforce_spreading_endpoint_replica: bool = strawberry.field(
-        description="Whether inference service replicas should be distributed across different agents instead of co-locating on same agent. When true, forces replica spreading. Applied only when using concentrated agent selection strategy. Improves fault tolerance for model serving."
+        description=dedent_strip("""
+            Whether inference service replicas should be distributed across different agents
+            instead of co-locating on same agent.
+            When true, forces replica spreading.
+            Applied only when using concentrated agent selection strategy.
+            Improves fault tolerance for model serving.
+        """)
     )
     allow_fractional_resource_fragmentation: bool = strawberry.field(
-        description="Whether agents accept session requests that allocate fractional resources (e.g., 0.5 GPU) causing resource fragmentation. When false, agents reject sessions that would prevent future efficient resource allocation."
+        description=dedent_strip("""
+            Whether agents accept session requests that allocate fractional resources
+            (e.g., 0.5 GPU) causing resource fragmentation.
+            When false, agents reject sessions that would prevent future efficient resource allocation.
+        """)
     )
     route_cleanup_target_statuses: list[str] = strawberry.field(
-        description="List of route health statuses that trigger automatic cleanup of service routes. Valid values: 'healthy', 'unhealthy', 'degraded'. Default: ['unhealthy']."
+        description=dedent_strip("""
+            List of route health statuses that trigger automatic cleanup of service routes.
+            Valid values: 'healthy', 'unhealthy', 'degraded'.
+            Default: ['unhealthy'].
+        """)
     )
 
 
 @strawberry.type(description="Added in 25.18.0. Scheduler configuration for session scheduling")
 class ScalingGroupSchedulerConfig:
     name: str = strawberry.field(
-        description="Scheduling algorithm implementation. 'fifo' schedules oldest pending sessions first, 'lifo' schedules newest first, 'drf' (Dominant Resource Fairness) balances resource usage across users."
+        description=dedent_strip("""
+            Scheduling algorithm implementation.
+            'fifo' schedules oldest pending sessions first,
+            'lifo' schedules newest first,
+            'drf' (Dominant Resource Fairness) balances resource usage across users.
+        """)
     )
     options: ScalingGroupSchedulerOptions = strawberry.field(
-        description="Detailed scheduler behavior configuration including session type restrictions, timeouts, agent selection strategy, and resource allocation policies."
+        description=dedent_strip("""
+            Detailed scheduler behavior configuration including session type restrictions,
+            timeouts, agent selection strategy, and resource allocation policies.
+        """)
     )
 
 
@@ -124,22 +189,41 @@ class ScalingGroupV2(Node):
         description="Relay-style global node identifier for the scaling group"
     )
     name: str = strawberry.field(
-        description="Unique name identifying the scaling group. Used as primary key and referenced by agents, sessions, and resource presets."
+        description=dedent_strip("""
+            Unique name identifying the scaling group.
+            Used as primary key and referenced by agents, sessions, and resource presets.
+        """)
     )
     status: ScalingGroupStatus = strawberry.field(
-        description="Operational status controlling whether this scaling group accepts new sessions and its visibility to users without explicit access grants."
+        description=dedent_strip("""
+            Operational status controlling whether this scaling group accepts new sessions
+            and its visibility to users without explicit access grants.
+        """)
     )
     metadata: ScalingGroupMetadata = strawberry.field(
-        description="Administrative metadata including human-readable description and creation timestamp for audit and documentation purposes."
+        description=dedent_strip("""
+            Administrative metadata including human-readable description
+            and creation timestamp for audit and documentation purposes.
+        """)
     )
     wsproxy: ScalingGroupNetworkConfig = strawberry.field(
-        description="Network configuration for connecting clients to interactive session services (terminals, notebooks, web apps) through WebSocket proxy infrastructure."
+        description=dedent_strip("""
+            Network configuration for connecting clients to interactive session services
+            (terminals, notebooks, web apps) through WebSocket proxy infrastructure.
+        """)
     )
     driver: ScalingGroupDriverConfig = strawberry.field(
-        description="Agent resource management driver determining how compute agents are provisioned and registered to this scaling group (static registration vs dynamic provisioning)."
+        description=dedent_strip("""
+            Agent resource management driver determining how compute agents are provisioned
+            and registered to this scaling group (static registration vs dynamic provisioning).
+        """)
     )
     scheduler: ScalingGroupSchedulerConfig = strawberry.field(
-        description="Session scheduling configuration controlling queue management, agent selection strategy, resource allocation policies, and session lifecycle timeouts."
+        description=dedent_strip("""
+            Session scheduling configuration controlling queue management,
+            agent selection strategy, resource allocation policies,
+            and session lifecycle timeouts.
+        """)
     )
 
     @classmethod

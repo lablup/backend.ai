@@ -6307,7 +6307,8 @@ type ScalingGroupDriverConfig
   @join__type(graph: STRAWBERRY)
 {
   """
-  Agent resource driver implementation name. 'static' uses a predefined set of agents registered to this scaling group.
+  Agent resource driver implementation name.
+  'static' uses a predefined set of agents registered to this scaling group.
   """
   name: String!
 
@@ -6360,7 +6361,10 @@ type ScalingGroupNetworkConfig
   @join__type(graph: STRAWBERRY)
 {
   """
-  App-proxy coordinator API server address, Manager uses this address to communicate with the app-proxy coordinator for managing service routes, endpoint registration, and proxying client connections to session services.
+  App-proxy coordinator API server address.
+  Manager uses this address to communicate with the app-proxy coordinator
+  for managing service routes, endpoint registration, and proxying client connections
+  to session services.
   """
   wsproxyAddr: String!
 
@@ -6368,7 +6372,9 @@ type ScalingGroupNetworkConfig
   wsproxyApiToken: String!
 
   """
-  Whether session containers use the host's network namespace instead of isolated container networking. Enables direct host port binding but reduces isolation.
+  Whether session containers use the host's network namespace
+  instead of isolated container networking.
+  Enables direct host port binding but reduces isolation.
   """
   useHostNetwork: Boolean!
 }
@@ -6418,12 +6424,16 @@ type ScalingGroupSchedulerConfig
   @join__type(graph: STRAWBERRY)
 {
   """
-  Scheduling algorithm implementation. 'fifo' schedules oldest pending sessions first, 'lifo' schedules newest first, 'drf' (Dominant Resource Fairness) balances resource usage across users.
+  Scheduling algorithm implementation.
+  'fifo' schedules oldest pending sessions first,
+  'lifo' schedules newest first,
+  'drf' (Dominant Resource Fairness) balances resource usage across users.
   """
   name: String!
 
   """
-  Detailed scheduler behavior configuration including session type restrictions, timeouts, agent selection strategy, and resource allocation policies.
+  Detailed scheduler behavior configuration including session type restrictions,
+  timeouts, agent selection strategy, and resource allocation policies.
   """
   options: ScalingGroupSchedulerOptions!
 }
@@ -6433,42 +6443,62 @@ type ScalingGroupSchedulerOptions
   @join__type(graph: STRAWBERRY)
 {
   """
-  Session types that can be scheduled in this scaling group. Valid values: 'interactive' , 'batch', 'inference'. Requests for unlisted types are rejected.
+  Session types that can be scheduled in this scaling group.
+  Valid values: 'interactive' , 'batch', 'inference'.
+  Requests for unlisted types are rejected.
   """
   allowedSessionTypes: [String!]!
 
   """
-  Maximum time in seconds a session can wait in PENDING state before automatic cancellation. Zero means no timeout. Used to prevent indefinite resource waiting when no agents are available.
+  Maximum time in seconds a session can wait in PENDING state
+  before automatic cancellation.
+  Zero means no timeout.
+  Used to prevent indefinite resource waiting when no agents are available.
   """
   pendingTimeout: Float!
 
   """
-  Scheduler-specific configuration options. Contents depend on the scheduler implementation (fifo/lifo/drf). Used for advanced scheduling behavior customization.
+  Scheduler-specific configuration options.
+  Contents depend on the scheduler implementation (fifo/lifo/drf).
+  Used for advanced scheduling behavior customization.
   """
   config: JSON!
 
   """
-  Algorithm for selecting target agents when scheduling sessions. 'dispersed' spreads sessions across available agents, 'concentrated' packs sessions onto fewer agents, 'roundrobin' cycles through agents sequentially.
+  Algorithm for selecting target agents when scheduling sessions.
+  'dispersed' spreads sessions across available agents,
+  'concentrated' packs sessions onto fewer agents,
+  'roundrobin' cycles through agents sequentially.
   """
   agentSelectionStrategy: String!
 
   """
-  Configuration for the agent selection strategy. Structure varies by strategy - for example, concentrated strategy may specify endpoint spreading rules.
+  Configuration for the agent selection strategy.
+  Structure varies by strategy - for example,
+  concentrated strategy may specify endpoint spreading rules.
   """
   agentSelectorConfig: JSON!
 
   """
-  When true with concentrated strategy, forces inference service replicas to be distributed across different agents instead of co-locating on same agent. Improves fault tolerance for model serving.
+  Whether inference service replicas should be distributed across different agents
+  instead of co-locating on same agent.
+  When true, forces replica spreading.
+  Applied only when using concentrated agent selection strategy.
+  Improves fault tolerance for model serving.
   """
   enforceSpreadingEndpointReplica: Boolean!
 
   """
-  Whether agents accept session requests that allocate fractional resources (e.g., 0.5 GPU) causing resource fragmentation. When false, agents reject sessions that would prevent future efficient resource allocation.
+  Whether agents accept session requests that allocate fractional resources
+  (e.g., 0.5 GPU) causing resource fragmentation.
+  When false, agents reject sessions that would prevent future efficient resource allocation.
   """
   allowFractionalResourceFragmentation: Boolean!
 
   """
-  List of route health statuses that trigger automatic cleanup of service routes. Valid values: 'healthy', 'unhealthy', 'degraded'. Default: ['unhealthy'].
+  List of route health statuses that trigger automatic cleanup of service routes.
+  Valid values: 'healthy', 'unhealthy', 'degraded'.
+  Default: ['unhealthy'].
   """
   routeCleanupTargetStatuses: [String!]!
 }
@@ -6478,12 +6508,16 @@ type ScalingGroupStatus
   @join__type(graph: STRAWBERRY)
 {
   """
-  Whether the scaling group can accept new session creation requests. Inactive scaling groups are excluded from scheduling and cannot start new sessions.
+  Whether the scaling group can accept new session creation requests.
+  Inactive scaling groups are excluded from scheduling and cannot start new sessions.
   """
   isActive: Boolean!
 
   """
-  Whether this scaling group is available for regular user sessions (interactive/batch/inference). When false, the scaling group is reserved for internal SYSTEM-type sessions only, such as management or infrastructure sessions.
+  Whether this scaling group is available for regular user sessions
+  (interactive/batch/inference).
+  When false, the scaling group is reserved for internal SYSTEM-type sessions only,
+  such as management or infrastructure sessions.
   """
   isPublic: Boolean!
 }
@@ -6497,32 +6531,39 @@ type ScalingGroupV2 implements Node
   id: ID!
 
   """
-  Unique name identifying the scaling group. Used as primary key and referenced by agents, sessions, and resource presets.
+  Unique name identifying the scaling group.
+  Used as primary key and referenced by agents, sessions, and resource presets.
   """
   name: String!
 
   """
-  Operational status controlling whether this scaling group accepts new sessions and its visibility to users without explicit access grants.
+  Operational status controlling whether this scaling group accepts new sessions
+  and its visibility to users without explicit access grants.
   """
   status: ScalingGroupStatus!
 
   """
-  Administrative metadata including human-readable description and creation timestamp for audit and documentation purposes.
+  Administrative metadata including human-readable description
+  and creation timestamp for audit and documentation purposes.
   """
   metadata: ScalingGroupMetadata!
 
   """
-  Network configuration for connecting clients to interactive session services (terminals, notebooks, web apps) through WebSocket proxy infrastructure.
+  Network configuration for connecting clients to interactive session services
+  (terminals, notebooks, web apps) through WebSocket proxy infrastructure.
   """
   wsproxy: ScalingGroupNetworkConfig!
 
   """
-  Agent resource management driver determining how compute agents are provisioned and registered to this scaling group (static registration vs dynamic provisioning).
+  Agent resource management driver determining how compute agents are provisioned
+  and registered to this scaling group (static registration vs dynamic provisioning).
   """
   driver: ScalingGroupDriverConfig!
 
   """
-  Session scheduling configuration controlling queue management, agent selection strategy, resource allocation policies, and session lifecycle timeouts.
+  Session scheduling configuration controlling queue management,
+  agent selection strategy, resource allocation policies,
+  and session lifecycle timeouts.
   """
   scheduler: ScalingGroupSchedulerConfig!
 }
