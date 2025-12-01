@@ -46,7 +46,6 @@ class ScalingGroupDBSource:
                 db_sess,
                 query,
                 querier,
-                fallback_count_table=ScalingGroupRow,
             )
 
             items = [row.ScalingGroupRow.to_dataclass() for row in result.rows]
