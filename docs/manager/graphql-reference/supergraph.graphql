@@ -1129,7 +1129,7 @@ input ClearImageCustomResourceLimitKey
   @join__type(graph: GRAPHENE)
 {
   image_canonical: String!
-  architecture: String! = "aarch64"
+  architecture: String! = "x86_64"
 }
 
 """Added in 25.6.0."""
@@ -2602,7 +2602,7 @@ type DomainNode implements Node
   allowed_docker_registries: [String] @join__field(graph: GRAPHENE)
   dotfiles: Bytes @join__field(graph: GRAPHENE)
   integration_id: String @join__field(graph: GRAPHENE)
-  scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalinGroupConnection @join__field(graph: GRAPHENE)
+  scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalingGroupConnection @join__field(graph: GRAPHENE)
 }
 
 """
@@ -4461,7 +4461,7 @@ type Mutation
   ): RescanImages @join__field(graph: GRAPHENE)
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage @join__field(graph: GRAPHENE)
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage @join__field(graph: GRAPHENE)
-  modify_image(architecture: String = "aarch64", props: ModifyImageInput!, target: String!): ModifyImage @join__field(graph: GRAPHENE)
+  modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage @join__field(graph: GRAPHENE)
 
   """Added in 25.6.0"""
   clear_image_custom_resource_limit(key: ClearImageCustomResourceLimitKey!): ClearImageCustomResourceLimitPayload @join__field(graph: GRAPHENE)
@@ -4470,7 +4470,7 @@ type Mutation
   forget_image_by_id(image_id: String!): ForgetImageById @join__field(graph: GRAPHENE)
 
   """Deprecated since 25.4.0. Use `forget_image_by_id` instead."""
-  forget_image(architecture: String = "aarch64", reference: String!): ForgetImage @join__field(graph: GRAPHENE) @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
+  forget_image(architecture: String = "x86_64", reference: String!): ForgetImage @join__field(graph: GRAPHENE) @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
 
   """Added in 25.4.0"""
   purge_image_by_id(
@@ -4482,7 +4482,7 @@ type Mutation
 
   """Added in 24.03.1"""
   untag_image_from_registry(image_id: String!): UntagImageFromRegistry @join__field(graph: GRAPHENE)
-  alias_image(alias: String!, architecture: String = "aarch64", target: String!): AliasImage @join__field(graph: GRAPHENE)
+  alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage @join__field(graph: GRAPHENE)
   dealias_image(alias: String!): DealiasImage @join__field(graph: GRAPHENE)
   clear_images(registry: String): ClearImages @join__field(graph: GRAPHENE)
 
@@ -4571,7 +4571,7 @@ type Mutation
     ssl_verify: Boolean
 
     """
-    Added in 24.09.0. Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local').
+    Added in 24.09.0. Container Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local', 'ocp').
     """
     type: ContainerRegistryTypeField!
 
@@ -4606,7 +4606,7 @@ type Mutation
     ssl_verify: Boolean
 
     """
-    Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local'). Added in 24.09.0.
+    Container Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local', 'ocp'). Added in 24.09.0.
     """
     type: ContainerRegistryTypeField
 
@@ -5512,7 +5512,7 @@ type Query
     """Added in 24.03.1"""
     id: String
     reference: String
-    architecture: String = "aarch64"
+    architecture: String = "x86_64"
   ): Image @join__field(graph: GRAPHENE)
   images(
     """
@@ -6286,6 +6286,33 @@ type ScalingGroup
 }
 
 """Added in 24.12.0."""
+type ScalingGroupConnection
+  @join__type(graph: GRAPHENE)
+{
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ScalingGroupEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Added in 24.12.0. A Relay edge containing a `ScalingGroup` and its cursor.
+"""
+type ScalingGroupEdge
+  @join__type(graph: GRAPHENE)
+{
+  """The item at the end of the edge"""
+  node: ScalingGroupNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""Added in 24.12.0."""
 type ScalingGroupNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
   @join__type(graph: GRAPHENE, key: "id")
@@ -6305,33 +6332,6 @@ type ScalingGroupNode implements Node
   scheduler: String @join__field(graph: GRAPHENE)
   scheduler_opts: JSONString @join__field(graph: GRAPHENE)
   use_host_network: Boolean @join__field(graph: GRAPHENE)
-}
-
-"""Added in 24.12.0."""
-type ScalinGroupConnection
-  @join__type(graph: GRAPHENE)
-{
-  """Pagination data for this connection."""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection."""
-  edges: [ScalinGroupEdge]!
-
-  """Total count of the GQL nodes of the query."""
-  count: Int
-}
-
-"""
-Added in 24.12.0. A Relay edge containing a `ScalinGroup` and its cursor.
-"""
-type ScalinGroupEdge
-  @join__type(graph: GRAPHENE)
-{
-  """The item at the end of the edge"""
-  node: ScalingGroupNode
-
-  """A cursor for use in pagination"""
-  cursor: String!
 }
 
 """Added in 25.16.0"""

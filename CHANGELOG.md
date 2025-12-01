@@ -16,6 +16,42 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.18.0rc1 (2025-11-30)
+
+### Features
+* Support OCP (OpenShift Container Platform) Registry ([#6464](https://github.com/lablup/backend.ai/issues/6464))
+* Add a schema oneshot for the appproxy database. ([#6899](https://github.com/lablup/backend.ai/issues/6899))
+* Add recorder package and result types for scheduler refactoring ([#6902](https://github.com/lablup/backend.ai/issues/6902))
+* Integrate RecorderContext into ScheduleCoordinator ([#6905](https://github.com/lablup/backend.ai/issues/6905))
+* Cleanup artifact files from temporary storages when the storage-proxy bootstraps ([#6914](https://github.com/lablup/backend.ai/issues/6914))
+* Add route-level initial delay to app proxy health check ([#6924](https://github.com/lablup/backend.ai/issues/6924))
+* Replace GlobalTimer with LeaderCron in App Proxy ([#6927](https://github.com/lablup/backend.ai/issues/6927))
+* Add kernel presence status storage to valkey_client ([#6978](https://github.com/lablup/backend.ai/issues/6978))
+* Add KernelPresenceObserver to Agent ([#6986](https://github.com/lablup/backend.ai/issues/6986))
+* Add SweepStaleKernelsHandler for stale kernel cleanup ([#6988](https://github.com/lablup/backend.ai/issues/6988))
+* Add scheduler handler for session & kernel cleanup ([#6994](https://github.com/lablup/backend.ai/issues/6994))
+* Enhance MonitoringValkeyClient reconnection logic for consecutive exception handling ([#6995](https://github.com/lablup/backend.ai/issues/6995))
+
+### Improvements
+* Refactor Agent's kernel registry recovery by separating loader and writer ([#6958](https://github.com/lablup/backend.ai/issues/6958))
+* Add `KernelRegistryType` alias and `KernelRecoveryData` type ([#6971](https://github.com/lablup/backend.ai/issues/6971))
+
+### Fixes
+* Print a warning log when `ConnectionError` occurs to make it easy to identify the types of errors ([#6910](https://github.com/lablup/backend.ai/issues/6910))
+* fix Pure Storage client to properly handle authentication tokens. Previously, tokens were incorrectly stored in context variables, which could cause the client to lose access to authentication credentials ([#6913](https://github.com/lablup/backend.ai/issues/6913))
+* Remove synchronous artifact metadata sync logic ([#6915](https://github.com/lablup/backend.ai/issues/6915))
+* Add fallback for SlotName type conversion to avoid unexpected pydantic validation error caused due to version mismatch between Manager and Agent ([#6923](https://github.com/lablup/backend.ai/issues/6923))
+* Ensure agent-level kernel registry is synced with runtime-level global registry after pickle ([#6931](https://github.com/lablup/backend.ai/issues/6931))
+* Remove model definition YAML requirement for non-CUSTOM runtimes ([#6936](https://github.com/lablup/backend.ai/issues/6936))
+* Fix typo in Scaling Group GQL Objects (`ScalingGroupConnection`, `ScalingGroupEdge`) where 'g' was missing ([#6972](https://github.com/lablup/backend.ai/issues/6972))
+* Remove useless `fallback_count_table` from the `execute_querier` ([#6976](https://github.com/lablup/backend.ai/issues/6976))
+* Add initial_delay field to model_definition_iv trafaret validator ([#7001](https://github.com/lablup/backend.ai/issues/7001))
+* Fix service list CLI showing null image and missing URL ([#7006](https://github.com/lablup/backend.ai/issues/7006))
+
+### Miscellaneous
+* Bundle bssh as intrinsic binary in Backend.AI runner package ([#6452](https://github.com/lablup/backend.ai/issues/6452))
+
+
 ## 25.17.0 (2025-11-23)
 
 ### Features

@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from itertools import groupby
 from typing import Any, Awaitable, Optional
+from uuid import UUID
 
 import aiotools
 import async_timeout
@@ -13,6 +14,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
+from ai.backend.common.clients.valkey_client.valkey_schedule import HealthCheckStatus
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events.dispatcher import EventProducer
@@ -81,6 +83,7 @@ from .types import (
     SessionDataForPull,
     SessionDataForStart,
     SessionRunningData,
+    SessionTransitionData,
     SessionWorkload,
     SystemSnapshot,
 )
@@ -780,6 +783,83 @@ class Scheduler:
         )
 
         return ScheduleResult()
+
+    async def sweep_stale_kernels(self) -> ScheduleResult:
+        """
+        Sweep kernels with stale presence status.
+        Only updates kernel status to TERMINATED, does NOT change session status.
+
+        :return: ScheduleResult with affected sessions for post-processing
+        """
+        # 1. Get RUNNING sessions with RUNNING kernels
+        running_sessions = await self._repository.get_sessions_for_transition(
+            session_statuses=[SessionStatus.RUNNING],
+            kernel_statuses=[KernelStatus.RUNNING],
+        )
+        if not running_sessions:
+            return ScheduleResult()
+
+        # 2. Extract kernel IDs and check presence status in Redis
+        running_kernel_ids = [
+            KernelId(UUID(k.kernel_id)) for session in running_sessions for k in session.kernels
+        ]
+        statuses = await self._valkey_schedule.check_kernel_presence_status_batch(
+            running_kernel_ids
+        )
+
+        # 3. Filter STALE kernels (None status or STALE presence)
+        stale_kernel_id_set: set[str] = {
+            str(kernel_id)
+            for kernel_id in running_kernel_ids
+            if (status := statuses.get(kernel_id)) is None
+            or status.presence == HealthCheckStatus.STALE
+        }
+        if not stale_kernel_id_set:
+            return ScheduleResult()
+
+        # 4. Check with agent RPC - only explicit False terminates
+        dead_kernel_ids: list[str] = []
+        affected_sessions: list[SessionTransitionData] = []
+
+        for session in running_sessions:
+            for kernel in session.kernels:
+                if kernel.kernel_id not in stale_kernel_id_set:
+                    continue
+                try:
+                    agent_client = self._agent_pool.get_agent_client(kernel.agent_id)
+                    is_running = await agent_client.check_running(kernel.kernel_id)
+                    if is_running is False:
+                        dead_kernel_ids.append(kernel.kernel_id)
+                        if session not in affected_sessions:
+                            affected_sessions.append(session)
+                except Exception as e:
+                    log.warning(
+                        "Failed to check kernel {} status: {}. Skipping.",
+                        kernel.kernel_id,
+                        e,
+                    )
+
+        if not dead_kernel_ids:
+            return ScheduleResult()
+
+        # 5. Update kernel status to TERMINATED (NOT session status)
+        updated_count = await self._repository.update_kernels_to_terminated(
+            dead_kernel_ids, reason="STALE_KERNEL"
+        )
+        log.info("Marked {} stale kernels as TERMINATED", updated_count)
+
+        # 6. Return result for post_process to trigger CHECK_RUNNING_SESSION_TERMINATION
+        return ScheduleResult(
+            scheduled_sessions=[
+                ScheduledSessionData(
+                    session_id=s.session_id,
+                    creation_id=s.creation_id,
+                    access_key=s.access_key,
+                    reason="STALE_KERNEL",
+                )
+                for s in affected_sessions
+            ]
+        )
 
     async def check_pulling_progress(self) -> ScheduleResult:
         """
@@ -1741,3 +1821,39 @@ class Scheduler:
             for session in sessions_to_retry
         ]
         return ScheduleResult(scheduled_sessions=scheduled_data)
+
+    async def check_running_session_termination(self) -> ScheduleResult:
+        """
+        Check RUNNING sessions where all kernels are TERMINATED and mark them as TERMINATING.
+
+        :return: ScheduleResult with sessions marked as TERMINATING
+        """
+        # Get RUNNING sessions where ALL kernels are TERMINATED
+        sessions = await self._repository.get_sessions_for_transition(
+            session_statuses=[SessionStatus.RUNNING],
+            kernel_statuses=[KernelStatus.TERMINATED],
+        )
+
+        if not sessions:
+            return ScheduleResult()
+
+        # Mark sessions as TERMINATING
+        session_ids = [s.session_id for s in sessions]
+        await self._repository.mark_sessions_terminating(session_ids, reason="ABNORMAL_TERMINATION")
+
+        log.info(
+            "Marked {} RUNNING sessions as TERMINATING (all kernels terminated unexpectedly)",
+            len(session_ids),
+        )
+
+        return ScheduleResult(
+            scheduled_sessions=[
+                ScheduledSessionData(
+                    session_id=s.session_id,
+                    creation_id=s.creation_id,
+                    access_key=s.access_key,
+                    reason="ABNORMAL_TERMINATION",
+                )
+                for s in sessions
+            ]
+        )

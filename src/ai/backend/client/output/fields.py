@@ -6,6 +6,7 @@ from .formatters import (
     CustomizedImageOutputFormatter,
     DependencyListFormatter,
     GroupListFormatter,
+    ImageObjectFormatter,
     InlineRoutingFormatter,
     KernelStatFormatter,
     SubFieldOutputFormatter,
@@ -374,6 +375,12 @@ permission_fields = FieldSet([
 service_fields = FieldSet([
     FieldSpec("endpoint_id"),
     FieldSpec("image"),
+    FieldSpec(
+        "image_object { name }",
+        "Image",
+        alt_name="image_object",
+        formatter=ImageObjectFormatter(),
+    ),
     FieldSpec("domain"),
     FieldSpec("project"),
     FieldSpec("resource_group"),

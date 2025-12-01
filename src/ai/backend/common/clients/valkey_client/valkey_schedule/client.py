@@ -21,11 +21,13 @@ from ai.backend.common.resilience import (
     RetryArgs,
     RetryPolicy,
 )
-from ai.backend.common.types import SessionId, ValkeyTarget
+from ai.backend.common.types import KernelId, SessionId, ValkeyTarget
 
 PENDING_QUEUE_EXPIRY_SEC = 600  # 10 minutes
 ROUTE_HEALTH_TTL_SEC = 120  # 2 minutes
 MAX_HEALTH_STALENESS_SEC = 300  # 5 minutes - threshold for health status staleness
+KERNEL_HEALTH_TTL_SEC = 300  # 5 minutes - TTL for kernel health status
+MAX_KERNEL_HEALTH_STALENESS_SEC = 120  # 2 minutes - threshold for kernel health staleness
 
 
 class HealthCheckStatus(enum.StrEnum):
@@ -59,6 +61,7 @@ class HealthStatus:
     readiness: HealthCheckStatus
     liveness: HealthCheckStatus
     last_check: int  # Unix timestamp of last check by manager
+    created_at: int  # Unix timestamp when route was initialized (Redis time)
 
     def get_status(self) -> HealthCheckStatus:
         """
@@ -72,6 +75,16 @@ class HealthStatus:
         """
         # TODO: Use liveness too after applying liveness checks in agent
         return self.readiness
+
+
+@dataclass
+class KernelStatus:
+    """Presence status for a kernel."""
+
+    presence: HealthCheckStatus  # HEALTHY, UNHEALTHY, STALE
+    last_presence: int  # Unix timestamp when Agent last reported presence
+    last_check: int  # Unix timestamp when Manager last checked
+    created_at: int  # Unix timestamp when first created
 
 
 class ValkeyScheduleClient:
@@ -147,6 +160,15 @@ class ValkeyScheduleClient:
         """
         return f"route:health:{route_id}"
 
+    def _get_kernel_presence_key(self, kernel_id: KernelId) -> str:
+        """
+        Generate the Redis key for kernel presence status.
+
+        :param kernel_id: The kernel ID
+        :return: The formatted key string
+        """
+        return f"kernel:presence:{kernel_id}"
+
     async def _get_redis_time(self) -> int:
         """
         Get current Unix timestamp from Redis server using TIME command.
@@ -158,12 +180,29 @@ class ValkeyScheduleClient:
         seconds_bytes, _ = result
         return int(seconds_bytes)
 
-    async def _validate_health_status(self, status: str, timestamp_str: str) -> HealthCheckStatus:
+    async def get_redis_time(self) -> int:
+        """
+        Get current Unix timestamp from Redis server using TIME command.
+        This ensures consistent timestamps across distributed systems.
+
+        :return: Current Unix timestamp in seconds
+        """
+        return await self._get_redis_time()
+
+    async def _validate_health_status(
+        self,
+        status: str,
+        timestamp_str: str,
+        current_time: int | None = None,
+        staleness_sec: int = MAX_HEALTH_STALENESS_SEC,
+    ) -> HealthCheckStatus:
         """
         Validate health status by checking if it's healthy and timestamp is not stale.
 
         :param status: The status string ("1" for healthy, "0" for unhealthy)
         :param timestamp_str: The timestamp string value from Redis
+        :param current_time: Optional pre-fetched Redis time (fetches if None)
+        :param staleness_sec: Staleness threshold in seconds
         :return: HealthCheckStatus indicating the status:
                  - HEALTHY: status is "1" and timestamp is fresh
                  - UNHEALTHY: status is "0" and timestamp is fresh
@@ -171,8 +210,9 @@ class ValkeyScheduleClient:
         """
         try:
             timestamp = int(timestamp_str)
-            current_time = await self._get_redis_time()
-            is_stale = (current_time - timestamp) > MAX_HEALTH_STALENESS_SEC
+            if current_time is None:
+                current_time = await self._get_redis_time()
+            is_stale = (current_time - timestamp) > staleness_sec
             if is_stale:
                 return HealthCheckStatus.STALE
             return HealthCheckStatus.HEALTHY if status == "1" else HealthCheckStatus.UNHEALTHY
@@ -363,8 +403,14 @@ class ValkeyScheduleClient:
             data.get("liveness", "0"), data.get("last_liveness", "0")
         )
         last_check = int(data["last_check"]) if "last_check" in data else 0
+        created_at = int(data["created_at"]) if "created_at" in data else 0
 
-        return HealthStatus(readiness=readiness, liveness=liveness, last_check=last_check)
+        return HealthStatus(
+            readiness=readiness,
+            liveness=liveness,
+            last_check=last_check,
+            created_at=created_at,
+        )
 
     @valkey_schedule_resilience.apply()
     async def initialize_routes_health_status_batch(self, route_ids: list[str]) -> None:
@@ -387,6 +433,7 @@ class ValkeyScheduleClient:
                 "readiness": "0",
                 "liveness": "0",
                 "last_check": current_time,
+                "created_at": current_time,
                 # last_readiness and last_liveness are not set until first health check
             }
             batch.hset(key, data)
@@ -490,6 +537,7 @@ class ValkeyScheduleClient:
                 readiness=readiness_status,
                 liveness=liveness_status,
                 last_check=int(data["last_check"]) if "last_check" in data else 0,
+                created_at=int(data["created_at"]) if "created_at" in data else 0,
             )
 
         return health_statuses
@@ -531,3 +579,140 @@ class ValkeyScheduleClient:
     async def ping(self) -> None:
         """Ping the Valkey server to check connection health."""
         await self._client.ping()
+
+    # ==================== Kernel Presence Methods ====================
+
+    @valkey_schedule_resilience.apply()
+    async def initialize_kernel_presence_batch(self, kernel_ids: Sequence[KernelId]) -> None:
+        """
+        Batch initialize presence status for multiple kernels in Redis.
+
+        :param kernel_ids: Sequence of kernel IDs to initialize
+        """
+        if not kernel_ids:
+            return
+
+        current_time = await self._get_redis_time()
+        current_time_str = str(current_time)
+        batch = Batch(is_atomic=False)
+        for kernel_id in kernel_ids:
+            key = self._get_kernel_presence_key(kernel_id)
+            data: Mapping[str | bytes, str | bytes] = {
+                "presence": "0",
+                "last_presence": current_time_str,
+                "last_check": current_time_str,
+                "created_at": current_time_str,
+            }
+            batch.hset(key, data)
+            batch.expire(key, KERNEL_HEALTH_TTL_SEC)
+
+        await self._client.client.exec(batch, raise_on_error=True)
+
+    @valkey_schedule_resilience.apply()
+    async def update_kernel_presence_batch(
+        self,
+        kernel_presences: Mapping[KernelId, bool],
+    ) -> None:
+        """
+        Batch update presence status for multiple kernels in Redis.
+        This is the preferred method for Agent to report all kernel presences.
+
+        :param kernel_presences: Mapping of kernel_id to presence status
+        """
+        if not kernel_presences:
+            return
+
+        current_time = await self._get_redis_time()
+        current_time_str = str(current_time)
+        batch = Batch(is_atomic=False)
+        for kernel_id, presence in kernel_presences.items():
+            key = self._get_kernel_presence_key(kernel_id)
+            data: Mapping[str | bytes, str | bytes] = {
+                "presence": "1" if presence else "0",
+                "last_presence": current_time_str,
+            }
+            batch.hset(key, data)
+            batch.expire(key, KERNEL_HEALTH_TTL_SEC)
+
+        await self._client.client.exec(batch, raise_on_error=True)
+
+    @valkey_schedule_resilience.apply()
+    async def delete_kernel_presence_batch(self, kernel_ids: Sequence[KernelId]) -> None:
+        """
+        Batch delete presence status for multiple kernels from Redis.
+
+        :param kernel_ids: Sequence of kernel IDs to delete
+        """
+        if not kernel_ids:
+            return
+
+        keys: list[str | bytes] = [self._get_kernel_presence_key(kid) for kid in kernel_ids]
+        await self._client.client.delete(keys)
+
+    @valkey_schedule_resilience.apply()
+    async def check_kernel_presence_status_batch(
+        self, kernel_ids: Sequence[KernelId]
+    ) -> dict[KernelId, KernelStatus | None]:
+        """
+        Batch check kernel presence status and update last_check timestamp.
+        This should be called by Manager during periodic checks.
+
+        All operations (hset, expire, hgetall) for all kernels are batched
+        into a single request.
+
+        :param kernel_ids: Sequence of kernel IDs to check
+        :return: Mapping of kernel_id to status (None if not found)
+        """
+        if not kernel_ids:
+            return {}
+
+        current_time = await self._get_redis_time()
+        current_time_str = str(current_time)
+        batch = Batch(is_atomic=False)
+
+        # Single batch: update last_check, refresh TTL, and get all data
+        for kernel_id in kernel_ids:
+            key = self._get_kernel_presence_key(kernel_id)
+            batch.hset(key, {"last_check": current_time_str})
+            batch.expire(key, KERNEL_HEALTH_TTL_SEC)
+            batch.hgetall(key)
+
+        results = await self._client.client.exec(batch, raise_on_error=False)
+        if results is None:
+            return {kernel_id: None for kernel_id in kernel_ids}
+
+        # Process results - every 3rd result is the hgetall response
+        result: dict[KernelId, KernelStatus | None] = {}
+        for i, kernel_id in enumerate(kernel_ids):
+            # Results are in groups of 3: hset result, expire result, hgetall result
+            hgetall_result = results[i * 3 + 2] if len(results) > i * 3 + 2 else None
+
+            if not hgetall_result:
+                result[kernel_id] = None
+                continue
+
+            hash_data = cast(dict[bytes, bytes], hgetall_result)
+            # Check for presence field - if missing, key was accidentally created by hset
+            # and should be treated as not found
+            if not hash_data or b"presence" not in hash_data:
+                result[kernel_id] = None
+                continue
+
+            # Parse existing data
+            data = {k.decode(): v.decode() for k, v in hash_data.items()}
+
+            # Validate presence status with staleness check
+            presence = await self._validate_health_status(
+                data.get("presence", "0"),
+                data.get("last_presence", "0"),
+                current_time,
+                MAX_KERNEL_HEALTH_STALENESS_SEC,
+            )
+            result[kernel_id] = KernelStatus(
+                presence=presence,
+                last_presence=int(data["last_presence"]) if "last_presence" in data else 0,
+                last_check=current_time,
+                created_at=int(data["created_at"]) if "created_at" in data else 0,
+            )
+
+        return result

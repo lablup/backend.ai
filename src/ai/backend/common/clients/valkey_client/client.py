@@ -29,6 +29,10 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _DEFAULT_REQUEST_TIMEOUT: Final[int] = 1_000  # Default request timeout in milliseconds
 _MONITOR_REQUEST_TIMEOUT: Final[int] = 3_000  # Fixed timeout for monitor client in milliseconds
+_DEFAULT_CONSECUTIVE_FAILURE_THRESHOLD: Final[int] = (
+    3  # Number of consecutive failures before reconnection
+)
+_DEFAULT_MONITOR_INTERVAL: Final[float] = 10.0  # Interval between ping attempts in seconds
 
 Logger.init(LogLevel.OFF)  # Disable Glide logging by default
 
@@ -395,6 +399,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
     _monitor_client: AbstractValkeyClient
     _monitor_task: Optional[asyncio.Task[None]]
     _reconnectable_exceptions: tuple[type[Exception], ...]
+    _consecutive_failure_threshold: int
 
     def __init__(
         self,
@@ -404,11 +409,13 @@ class MonitoringValkeyClient(AbstractValkeyClient):
             ClosingError,
             ClientNotConnectedError,
         ),
+        consecutive_failure_threshold: int = _DEFAULT_CONSECUTIVE_FAILURE_THRESHOLD,
     ) -> None:
         self._operation_client = operation_client
         self._monitor_client = monitor_client
         self._monitor_task = None
         self._reconnectable_exceptions = reconnectable_exceptions
+        self._consecutive_failure_threshold = consecutive_failure_threshold
 
     @property
     def client(self) -> GlideClient:
@@ -440,15 +447,33 @@ class MonitoringValkeyClient(AbstractValkeyClient):
 
     async def _monitor_connection(self) -> None:
         reconnectable_exceptions = self._reconnectable_exceptions
+        consecutive_failure_count = 0
         while True:
             try:
-                await asyncio.sleep(10.0)
+                await asyncio.sleep(_DEFAULT_MONITOR_INTERVAL)
                 await self._monitor_client.ping()
+                consecutive_failure_count = 0  # Reset on successful ping
             except reconnectable_exceptions as e:
-                log.warning("Connection error: {}, reconnecting...", e)
+                # Immediate reconnection for known connection errors (backward compatible)
+                log.warning("Connection error: {}, reconnecting immediately...", e)
+                consecutive_failure_count = 0
                 await self._reconnect()
             except Exception as e:
-                log.exception("Error in connection monitoring: {}", e)
+                # Track consecutive failures for other exceptions
+                consecutive_failure_count += 1
+                log.warning(
+                    "Error in connection monitoring (consecutive failures: {}/{}): {}",
+                    consecutive_failure_count,
+                    self._consecutive_failure_threshold,
+                    e,
+                )
+                if consecutive_failure_count >= self._consecutive_failure_threshold:
+                    log.warning(
+                        "Consecutive failure threshold reached ({}), reconnecting...",
+                        self._consecutive_failure_threshold,
+                    )
+                    consecutive_failure_count = 0
+                    await self._reconnect()
 
     async def _reconnect(self) -> None:
         # Disconnect both clients

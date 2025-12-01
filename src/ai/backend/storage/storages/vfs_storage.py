@@ -130,6 +130,7 @@ class VFSStorage(AbstractStorage):
     _base_path: Path
     _upload_chunk_size: int
     _download_chunk_size: int
+    _temporary: bool
     _max_file_size: Optional[int]
 
     def __init__(self, name: str, cfg: VFSStorageConfig) -> None:
@@ -138,11 +139,36 @@ class VFSStorage(AbstractStorage):
         if cfg.subpath:
             base_path = base_path / cfg.subpath
         self._base_path = base_path
+        self._temporary = cfg.temporary
+
         # Ensure base path exists
         self._base_path.mkdir(parents=True, exist_ok=True)
         self._upload_chunk_size = cfg.upload_chunk_size
         self._download_chunk_size = cfg.download_chunk_size
         self._max_file_size = cfg.max_file_size
+
+    def cleanup_temporary_storage(self) -> None:
+        """
+        Clean up all files in temporary storage.
+        This should be called only by the first process (pidx=0) on server startup.
+        """
+        if not self._temporary:
+            return
+
+        if not self._base_path.exists():
+            return
+
+        log.info(f"Cleaning up temporary storage: {self._base_path}")
+        try:
+            # Remove all contents but keep the directory itself
+            for item in self._base_path.iterdir():
+                if item.is_dir():
+                    shutil.rmtree(item)
+                else:
+                    item.unlink()
+            log.info(f"Temporary storage cleaned: {self._base_path}")
+        except Exception as e:
+            log.warning(f"Failed to clean temporary storage {self._base_path}: {e}")
 
     @property
     def name(self) -> str:

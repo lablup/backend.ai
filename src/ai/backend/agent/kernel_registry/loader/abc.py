@@ -3,37 +3,20 @@ from abc import ABC, abstractmethod
 
 from ai.backend.logging import BraceStyleAdapter
 
-from ..kernel_registry import KernelRegistry
-from .types import KernelRegistrySaveMetadata
+from ..types import KernelRegistryType
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class AbstractKernelRegistryRecovery(ABC):
+class AbstractKernelRegistryLoader(ABC):
     """
-    Recovery interface for loading and saving KernelRegistry
+    Loader interface for loading kernel registry.
     """
 
     @abstractmethod
-    async def load_kernel_registry(self) -> KernelRegistry:
+    async def load_kernel_registry(self) -> KernelRegistryType:
         """
-        Load the KernelRegistry from persistent storage.
-        Raises:
-            KernelRegistryNotFound
-            KernelRegistryLoadError
-        Returns: The loaded KernelRegistry.
-        """
-        pass
-
-    @abstractmethod
-    async def save_kernel_registry(
-        self, registry: KernelRegistry, metadata: KernelRegistrySaveMetadata
-    ) -> None:
-        """
-        Save the KernelRegistry to persistent storage.
-        args:
-            registry: The KernelRegistry to save.
-            metadata: Additional metadata for saving.
-        Returns: None
+        Load the kernel registry from persistent storage.
+        Returns: The kernel registry (mapping of KernelId to AbstractKernel).
         """
         pass

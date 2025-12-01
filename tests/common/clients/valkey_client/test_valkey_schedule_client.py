@@ -5,20 +5,23 @@ Tests the client with real Redis operations for route health monitoring.
 
 from __future__ import annotations
 
-import asyncio
+from dataclasses import dataclass
 from time import time
 from typing import AsyncGenerator
+from uuid import uuid4
 
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
+    KERNEL_HEALTH_TTL_SEC,
     MAX_HEALTH_STALENESS_SEC,
+    MAX_KERNEL_HEALTH_STALENESS_SEC,
     HealthCheckStatus,
     ValkeyScheduleClient,
 )
 from ai.backend.common.defs import REDIS_LIVE_DB
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.common.types import ValkeyTarget
+from ai.backend.common.types import KernelId, ValkeyTarget
 
 
 class TestValkeyScheduleClient:
@@ -60,43 +63,6 @@ class TestValkeyScheduleClient:
                 "last_liveness": stale_timestamp,
             },
         )
-
-    @pytest.mark.asyncio
-    async def test_validate_health_status_with_valid_timestamp(
-        self, valkey_schedule_client: ValkeyScheduleClient
-    ) -> None:
-        """Test validation with healthy status and fresh timestamp"""
-        fresh_timestamp = str(int(time()))
-        result = await valkey_schedule_client._validate_health_status("1", fresh_timestamp)
-        assert result == HealthCheckStatus.HEALTHY
-
-    @pytest.mark.asyncio
-    async def test_validate_health_status_with_stale_timestamp(
-        self, valkey_schedule_client: ValkeyScheduleClient
-    ) -> None:
-        """Test validation with healthy status but stale timestamp"""
-        stale_timestamp = str(int(time()) - MAX_HEALTH_STALENESS_SEC - 10)
-        result = await valkey_schedule_client._validate_health_status("1", stale_timestamp)
-        assert result == HealthCheckStatus.STALE
-
-    @pytest.mark.asyncio
-    async def test_validate_health_status_with_unhealthy_status(
-        self, valkey_schedule_client: ValkeyScheduleClient
-    ) -> None:
-        """Test validation with unhealthy status regardless of timestamp"""
-        fresh_timestamp = str(int(time()))
-        result = await valkey_schedule_client._validate_health_status("0", fresh_timestamp)
-        assert result == HealthCheckStatus.UNHEALTHY
-
-    @pytest.mark.asyncio
-    async def test_validate_health_status_with_invalid_timestamp(
-        self, valkey_schedule_client: ValkeyScheduleClient
-    ) -> None:
-        """Test validation with invalid timestamp formats"""
-        result1 = await valkey_schedule_client._validate_health_status("1", "invalid")
-        assert result1 == HealthCheckStatus.STALE
-        result2 = await valkey_schedule_client._validate_health_status("1", "")
-        assert result2 == HealthCheckStatus.STALE
 
     @pytest.mark.asyncio
     async def test_initialize_routes_health_status_batch(
@@ -301,9 +267,6 @@ class TestValkeyScheduleClient:
             stale_route,
         ])
 
-        # Verify results with proper type narrowing
-        assert len(statuses) == 3
-
         healthy_status = statuses[healthy_route]
         assert healthy_status is not None
         assert healthy_status.readiness == HealthCheckStatus.HEALTHY, (
@@ -329,21 +292,347 @@ class TestValkeyScheduleClient:
         """Test that check_route_health_status updates last_check timestamp"""
         route_id = "check-last-check"
 
-        # Initialize route
-        await valkey_schedule_client.initialize_routes_health_status_batch([route_id])
-        initial_status = await valkey_schedule_client.get_route_health_status(route_id)
-        assert initial_status is not None
-        initial_last_check = initial_status.last_check
-
-        # Wait to ensure timestamp difference
-        await asyncio.sleep(1.1)
+        # Set route with old last_check timestamp
+        key = valkey_schedule_client._get_route_health_key(route_id)
+        old_timestamp = str(int(time()) - 60)  # 60 seconds ago
+        await valkey_schedule_client._client.client.hset(
+            key,
+            {"readiness": "1", "last_readiness": old_timestamp, "last_check": old_timestamp},
+        )
 
         # Check health status should update last_check
         await valkey_schedule_client.check_route_health_status([route_id])
 
-        # Verify last_check was updated
+        # Verify last_check was updated to current time
         updated_status = await valkey_schedule_client.get_route_health_status(route_id)
         assert updated_status is not None
-        assert updated_status.last_check > initial_last_check, (
+        assert updated_status.last_check > int(old_timestamp), (
             "last_check should be updated after check"
         )
+
+
+@dataclass
+class KernelPresenceFixture:
+    """Container for kernel presence test fixtures."""
+
+    client: ValkeyScheduleClient
+    kernel_id: KernelId
+    kernel_ids: list[KernelId]
+    healthy_kernel_id: KernelId
+    unhealthy_kernel_id: KernelId
+    stale_kernel_id: KernelId
+    missing_kernel_id: KernelId
+
+
+class TestKernelPresenceStatus:
+    """Test cases for kernel presence status functionality"""
+
+    @pytest.fixture
+    async def valkey_schedule_client(
+        self,
+        redis_container: tuple[str, HostPortPairModel],
+    ) -> AsyncGenerator[ValkeyScheduleClient, None]:
+        """Create ValkeyScheduleClient with real Redis container."""
+        _, hostport_pair = redis_container
+
+        valkey_target = ValkeyTarget(
+            addr=hostport_pair.address,
+        )
+
+        client = await ValkeyScheduleClient.create(
+            valkey_target=valkey_target,
+            db_id=REDIS_LIVE_DB,
+            human_readable_name="test-valkey-schedule-kernel",
+        )
+
+        try:
+            yield client
+        finally:
+            await client.close()
+
+    @pytest.fixture
+    def kernel_id(self) -> KernelId:
+        """Generate a single kernel ID."""
+        return KernelId(uuid4())
+
+    @pytest.fixture
+    def kernel_ids(self) -> list[KernelId]:
+        """Generate multiple kernel IDs."""
+        return [KernelId(uuid4()) for _ in range(3)]
+
+    @pytest.fixture
+    async def initialized_kernel(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        kernel_id: KernelId,
+    ) -> KernelId:
+        """Initialize a kernel and return its ID."""
+        await valkey_schedule_client.initialize_kernel_presence_batch([kernel_id])
+        return kernel_id
+
+    @pytest.fixture
+    async def initialized_kernels(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        kernel_ids: list[KernelId],
+    ) -> list[KernelId]:
+        """Initialize multiple kernels and return their IDs."""
+        await valkey_schedule_client.initialize_kernel_presence_batch(kernel_ids)
+        return kernel_ids
+
+    @pytest.fixture
+    async def healthy_kernel(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+    ) -> KernelId:
+        """Create a kernel with healthy presence status."""
+        kernel_id = KernelId(uuid4())
+        await valkey_schedule_client.initialize_kernel_presence_batch([kernel_id])
+        await valkey_schedule_client.update_kernel_presence_batch({kernel_id: True})
+        return kernel_id
+
+    @pytest.fixture
+    async def unhealthy_kernel(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+    ) -> KernelId:
+        """Create a kernel with unhealthy presence status."""
+        kernel_id = KernelId(uuid4())
+        await valkey_schedule_client.initialize_kernel_presence_batch([kernel_id])
+        await valkey_schedule_client.update_kernel_presence_batch({kernel_id: False})
+        return kernel_id
+
+    @pytest.fixture
+    async def stale_kernel(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+    ) -> KernelId:
+        """Create a kernel with stale presence status."""
+        kernel_id = KernelId(uuid4())
+        key = valkey_schedule_client._get_kernel_presence_key(kernel_id)
+        stale_timestamp = str(int(time()) - MAX_KERNEL_HEALTH_STALENESS_SEC - 10)
+        await valkey_schedule_client._client.client.hset(
+            key,
+            {
+                "presence": "1",
+                "last_presence": stale_timestamp,
+                "last_check": stale_timestamp,
+                "created_at": stale_timestamp,
+            },
+        )
+        await valkey_schedule_client._client.client.expire(key, KERNEL_HEALTH_TTL_SEC)
+        return kernel_id
+
+    @pytest.fixture
+    async def mixed_state_kernels(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        healthy_kernel: KernelId,
+        unhealthy_kernel: KernelId,
+        stale_kernel: KernelId,
+    ) -> KernelPresenceFixture:
+        """Create kernels with various states for mixed state testing."""
+        missing_kernel_id = KernelId(uuid4())  # Not initialized
+        return KernelPresenceFixture(
+            client=valkey_schedule_client,
+            kernel_id=healthy_kernel,
+            kernel_ids=[healthy_kernel, unhealthy_kernel, stale_kernel, missing_kernel_id],
+            healthy_kernel_id=healthy_kernel,
+            unhealthy_kernel_id=unhealthy_kernel,
+            stale_kernel_id=stale_kernel,
+            missing_kernel_id=missing_kernel_id,
+        )
+
+    # ===== Tests =====
+
+    @pytest.mark.asyncio
+    async def test_initialize_kernel_presence_batch(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        initialized_kernels: list[KernelId],
+    ) -> None:
+        """Test batch initialization of kernel presence status."""
+        statuses = await valkey_schedule_client.check_kernel_presence_status_batch(
+            initialized_kernels
+        )
+
+        assert len(statuses) == len(initialized_kernels)
+        for kernel_id in initialized_kernels:
+            status = statuses[kernel_id]
+            assert status is not None
+            assert status.presence == HealthCheckStatus.UNHEALTHY
+            assert status.last_presence > 0
+            assert status.last_check > 0
+            assert status.created_at > 0
+
+    @pytest.mark.asyncio
+    async def test_initialize_kernel_presence_batch_empty(
+        self, valkey_schedule_client: ValkeyScheduleClient
+    ) -> None:
+        """Test that empty batch initialization does nothing."""
+        await valkey_schedule_client.initialize_kernel_presence_batch([])
+
+    @pytest.mark.asyncio
+    async def test_update_kernel_presence_batch_healthy(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        healthy_kernel: KernelId,
+    ) -> None:
+        """Test batch update of kernel presence to healthy."""
+        statuses = await valkey_schedule_client.check_kernel_presence_status_batch([healthy_kernel])
+
+        status = statuses[healthy_kernel]
+        assert status is not None
+        assert status.presence == HealthCheckStatus.HEALTHY
+
+    @pytest.mark.asyncio
+    async def test_update_kernel_presence_batch_unhealthy(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        unhealthy_kernel: KernelId,
+    ) -> None:
+        """Test batch update of kernel presence to unhealthy."""
+        statuses = await valkey_schedule_client.check_kernel_presence_status_batch([
+            unhealthy_kernel
+        ])
+
+        status = statuses[unhealthy_kernel]
+        assert status is not None
+        assert status.presence == HealthCheckStatus.UNHEALTHY
+
+    @pytest.mark.asyncio
+    async def test_update_kernel_presence_batch_mixed(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        healthy_kernel: KernelId,
+        unhealthy_kernel: KernelId,
+    ) -> None:
+        """Test batch update with mixed healthy/unhealthy states."""
+        statuses = await valkey_schedule_client.check_kernel_presence_status_batch([
+            healthy_kernel,
+            unhealthy_kernel,
+        ])
+
+        healthy_status = statuses[healthy_kernel]
+        assert healthy_status is not None
+        assert healthy_status.presence == HealthCheckStatus.HEALTHY
+
+        unhealthy_status = statuses[unhealthy_kernel]
+        assert unhealthy_status is not None
+        assert unhealthy_status.presence == HealthCheckStatus.UNHEALTHY
+
+    @pytest.mark.asyncio
+    async def test_delete_kernel_presence_batch(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        initialized_kernels: list[KernelId],
+    ) -> None:
+        """Test batch deletion of kernel presence status."""
+        # Verify exists before delete
+        statuses_before = await valkey_schedule_client.check_kernel_presence_status_batch(
+            initialized_kernels
+        )
+        for kernel_id in initialized_kernels:
+            assert statuses_before[kernel_id] is not None
+
+        # Delete
+        await valkey_schedule_client.delete_kernel_presence_batch(initialized_kernels)
+
+        # Verify deleted
+        statuses_after = await valkey_schedule_client.check_kernel_presence_status_batch(
+            initialized_kernels
+        )
+        for kernel_id in initialized_kernels:
+            assert statuses_after[kernel_id] is None
+
+    @pytest.mark.asyncio
+    async def test_delete_kernel_presence_batch_empty(
+        self, valkey_schedule_client: ValkeyScheduleClient
+    ) -> None:
+        """Test that empty batch deletion does nothing."""
+        await valkey_schedule_client.delete_kernel_presence_batch([])
+
+    @pytest.mark.asyncio
+    async def test_check_kernel_presence_status_batch_not_found(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        kernel_ids: list[KernelId],
+    ) -> None:
+        """Test checking status for non-existent kernels."""
+        statuses = await valkey_schedule_client.check_kernel_presence_status_batch(kernel_ids)
+
+        assert len(statuses) == len(kernel_ids)
+        for kernel_id in kernel_ids:
+            assert statuses[kernel_id] is None
+
+    @pytest.mark.asyncio
+    async def test_check_kernel_presence_status_batch_empty(
+        self, valkey_schedule_client: ValkeyScheduleClient
+    ) -> None:
+        """Test checking status with empty list."""
+        statuses = await valkey_schedule_client.check_kernel_presence_status_batch([])
+        assert statuses == {}
+
+    @pytest.mark.asyncio
+    async def test_check_kernel_presence_status_batch_updates_last_check(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+    ) -> None:
+        """Test that check updates last_check timestamp."""
+        # Set kernel with old last_check timestamp
+        kernel_id = KernelId(uuid4())
+        key = valkey_schedule_client._get_kernel_presence_key(kernel_id)
+        old_timestamp = str(int(time()) - 60)  # 60 seconds ago
+        await valkey_schedule_client._client.client.hset(
+            key,
+            {
+                "presence": "1",
+                "last_presence": old_timestamp,
+                "last_check": old_timestamp,
+                "created_at": old_timestamp,
+            },
+        )
+
+        # Check should update last_check
+        statuses = await valkey_schedule_client.check_kernel_presence_status_batch([kernel_id])
+        status = statuses[kernel_id]
+        assert status is not None
+        assert status.last_check > int(old_timestamp)
+
+    @pytest.mark.asyncio
+    async def test_check_kernel_presence_status_batch_stale_detection(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        stale_kernel: KernelId,
+    ) -> None:
+        """Test that stale kernel presence is detected correctly."""
+        statuses = await valkey_schedule_client.check_kernel_presence_status_batch([stale_kernel])
+
+        status = statuses[stale_kernel]
+        assert status is not None
+        assert status.presence == HealthCheckStatus.STALE
+
+    @pytest.mark.asyncio
+    async def test_check_kernel_presence_status_batch_mixed_states(
+        self,
+        mixed_state_kernels: KernelPresenceFixture,
+    ) -> None:
+        """Test checking multiple kernels with different states."""
+        fixture = mixed_state_kernels
+        statuses = await fixture.client.check_kernel_presence_status_batch(fixture.kernel_ids)
+
+        assert len(statuses) == len(fixture.kernel_ids)
+
+        healthy_status = statuses[fixture.healthy_kernel_id]
+        assert healthy_status is not None
+        assert healthy_status.presence == HealthCheckStatus.HEALTHY
+
+        unhealthy_status = statuses[fixture.unhealthy_kernel_id]
+        assert unhealthy_status is not None
+        assert unhealthy_status.presence == HealthCheckStatus.UNHEALTHY
+
+        stale_status = statuses[fixture.stale_kernel_id]
+        assert stale_status is not None
+        assert stale_status.presence == HealthCheckStatus.STALE
+
+        assert statuses[fixture.missing_kernel_id] is None

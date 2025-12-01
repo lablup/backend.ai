@@ -35,6 +35,7 @@ from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiv
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.health_checker.probe import HealthProbe
+from ai.backend.common.leader import ValkeyLeaderElection
 from ai.backend.common.lock import AbstractDistributedLock
 from ai.backend.common.metrics.metric import (
     APIMetricObserver,
@@ -291,6 +292,7 @@ class RootContext:
 
     metrics: CoordinatorMetricRegistry
     health_probe: HealthProbe
+    leader_election: ValkeyLeaderElection
 
 
 CleanupContext: TypeAlias = Callable[["RootContext"], AsyncContextManager[None]]

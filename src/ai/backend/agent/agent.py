@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import enum
 import logging
 import os
 import pickle
@@ -80,6 +81,7 @@ from ai.backend.common.clients.valkey_client.valkey_container_log.client import 
     ValkeyContainerLogClient,
 )
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
+from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import model_definition_iv
@@ -89,6 +91,7 @@ from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
     REDIS_CONTAINER_LOG,
     REDIS_IMAGE_DB,
+    REDIS_LIVE_DB,
     REDIS_STATISTICS_DB,
     REDIS_STREAM_DB,
     UNKNOWN_CONTAINER_ID,
@@ -238,6 +241,7 @@ from .kernel import (
 )
 from .observer.heartbeat import HeartbeatObserver
 from .observer.host_port import HostPortObserver
+from .observer.kernel_presence import KernelPresenceObserver
 from .resources import (
     AbstractComputePlugin,
     ComputerContext,
@@ -316,6 +320,11 @@ class CreateTaskInfo:
 
     kernel_id: KernelId
     session_id: SessionId
+
+
+class AgentClass(enum.Enum):
+    PRIMARY = enum.auto()
+    AUXILIARY = enum.auto()
 
 
 class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
@@ -610,6 +619,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         mount_static_binary("yank.sh", "/opt/kernel/yank.sh")
         mount_static_binary(f"all-smi.{arch}.bin", "/usr/local/bin/all-smi")
         mount_static_binary("all-smi.1", "/usr/local/share/man/man1/all-smi.1", skip_missing=True)
+        mount_static_binary(f"bssh.{arch}.bin", "/usr/local/bin/bssh")
+        mount_static_binary("bssh.1", "/usr/local/share/man/man1/bssh.1", skip_missing=True)
 
         jail_path: Optional[Path]
         if self.local_config.container.sandbox_type == ContainerSandboxType.JAIL:
@@ -770,6 +781,7 @@ class AbstractAgent(
     aobject, Generic[KernelObjectType, KernelCreationContextType], metaclass=ABCMeta
 ):
     id: AgentId
+    agent_class: AgentClass
     loop: asyncio.AbstractEventLoop
     local_config: AgentUnifiedConfig
     etcd: AgentEtcdClientView
@@ -850,6 +862,7 @@ class AbstractAgent(
         kernel_registry: KernelRegistry,
         computers: Mapping[DeviceName, ComputerContext],
         slots: Mapping[SlotName, Decimal],
+        agent_class: AgentClass,
     ) -> None:
         self._skip_initial_scan = skip_initial_scan
         self.loop = current_loop()
@@ -857,6 +870,7 @@ class AbstractAgent(
         self.local_config = local_config
         self.id = AgentId(local_config.agent.defaulted_id)
         self.local_instance_id = generate_local_instance_id(__file__)
+        self.agent_class = agent_class
         self.agent_public_key = agent_public_key
         self.kernel_registry = kernel_registry.agent_mapping(self.id)
         self.computers = computers
@@ -941,6 +955,11 @@ class AbstractAgent(
             human_readable_name="agent.image",
             db_id=REDIS_IMAGE_DB,
         )
+        self.valkey_schedule_client = await ValkeyScheduleClient.create(
+            redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target(),
+            human_readable_name="agent.kernel_presence",
+            db_id=REDIS_LIVE_DB,
+        )
         self.background_task_manager = BackgroundTaskManager(
             self.event_producer,
             valkey_client=self.valkey_bgtask_client,
@@ -995,8 +1014,10 @@ class AbstractAgent(
         self._agent_runner = Runner(resources=[])
         container_observer = HeartbeatObserver(self, self.event_producer)
         host_port_observer = HostPortObserver(self)
+        kernel_presence_observer = KernelPresenceObserver(self, self.valkey_schedule_client)
         await self._agent_runner.register_observer(container_observer)
         await self._agent_runner.register_observer(host_port_observer)
+        await self._agent_runner.register_observer(kernel_presence_observer)
         await self._agent_runner.start()
 
         if abuse_report_path := self.local_config.agent.abuse_report_path:
@@ -2229,12 +2250,15 @@ class AbstractAgent(
         """
         ipc_base_path = self.local_config.agent.ipc_base_path
         var_base_path = self.local_config.agent.var_base_path
-        last_registry_file = f"last_registry.{self.id}.dat"
-        if os.path.isfile(ipc_base_path / last_registry_file):
-            shutil.move(ipc_base_path / last_registry_file, var_base_path / last_registry_file)
+        ipc_last_registry_file = self._resolve_conflicting_registry_file(ipc_base_path)
+        last_registry_file = self._resolve_conflicting_registry_file(var_base_path)
+        if (ipc_base_path / ipc_last_registry_file).is_file():
+            shutil.move(ipc_base_path / ipc_last_registry_file, var_base_path / last_registry_file)
         try:
             with open(var_base_path / last_registry_file, "rb") as f:
-                self.kernel_registry = pickle.load(f)
+                kernel_registry: MutableMapping[KernelId, AbstractKernel] = pickle.load(f)
+                for kernel_id, kernel in kernel_registry.items():
+                    self.kernel_registry[kernel_id] = kernel
         except EOFError:
             log.warning(
                 "Failed to load the last kernel registry: {}", (var_base_path / last_registry_file)
@@ -3698,10 +3722,10 @@ class AbstractAgent(
         if (not force) and (now <= self.last_registry_written_time + 60):
             return  # don't save too frequently
         var_base_path = self.local_config.agent.var_base_path
-        last_registry_file = f"last_registry.{self.id}.dat"
+        last_registry_file = self._last_registry_file
         try:
             with open(var_base_path / last_registry_file, "wb") as f:
-                pickle.dump(self.kernel_registry, f)
+                pickle.dump(dict(self.kernel_registry), f)
             self.last_registry_written_time = now
             log.debug("saved {}", last_registry_file)
         except Exception as e:
@@ -3710,6 +3734,36 @@ class AbstractAgent(
                 os.remove(var_base_path / last_registry_file)
             except FileNotFoundError:
                 pass
+
+    @property
+    def _last_registry_file(self) -> str:
+        match self.agent_class:
+            case AgentClass.PRIMARY:
+                return self._primary_last_registry_file
+            case AgentClass.AUXILIARY:
+                return self._auxiliary_last_registry_file
+
+    @property
+    def _primary_last_registry_file(self) -> str:
+        return f"last_registry.{self.local_instance_id}.dat"
+
+    @property
+    def _auxiliary_last_registry_file(self) -> str:
+        return f"last_registry.{self.id}.dat"
+
+    def _resolve_conflicting_registry_file(self, base_dir: Path) -> str:
+        primary_agent_file = base_dir / self._primary_last_registry_file
+        auxiliary_agent_file = base_dir / self._auxiliary_last_registry_file
+        if primary_agent_file.is_file() and auxiliary_agent_file.is_file():
+            primary_modification_time = primary_agent_file.stat().st_mtime
+            auxiliary_modification_time = auxiliary_agent_file.stat().st_mtime
+
+            if primary_modification_time > auxiliary_modification_time:
+                return self._primary_last_registry_file
+            else:
+                return self._auxiliary_last_registry_file
+        else:
+            return self._last_registry_file
 
 
 async def handle_volume_mount(

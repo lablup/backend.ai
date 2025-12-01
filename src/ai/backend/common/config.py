@@ -168,6 +168,7 @@ model_definition_iv = t.Dict({
                     t.Key("max_retries", default=10): t.Null | t.ToInt[1:],
                     t.Key("max_wait_time", default=15): t.Null | t.ToFloat[0:],
                     t.Key("expected_status_code", default=200): t.Null | t.ToInt[100:],
+                    t.Key("initial_delay", default=60): t.Null | t.ToFloat[0:],
                 }),
             }),
             t.Key("metadata", default=None): t.Null
@@ -206,7 +207,7 @@ class PreStartAction(BaseConfigModel):
 
 
 class ModelHealthCheck(BaseConfigModel):
-    interval: Optional[float] = Field(
+    interval: float = Field(
         default=10.0,
         description="Interval in seconds between health checks.",
         examples=[10.0],
@@ -215,21 +216,27 @@ class ModelHealthCheck(BaseConfigModel):
         description="Path to check for health status.",
         examples=["/health"],
     )
-    max_retries: Optional[int] = Field(
+    max_retries: int = Field(
         default=10,
         description="Maximum number of retries for health check.",
         examples=[10],
     )
-    max_wait_time: Optional[float] = Field(
+    max_wait_time: float = Field(
         default=15.0,
         description="Maximum time in seconds to wait for a health check response.",
         examples=[15.0],
     )
-    expected_status_code: Optional[int] = Field(
+    expected_status_code: int = Field(
         default=200,
         description="Expected HTTP status code for a healthy response.",
         examples=[200],
         gt=100,
+    )
+    initial_delay: float = Field(
+        default=60.0,
+        description="Initial delay in seconds before the first health check.",
+        examples=[60.0],
+        ge=0,
     )
 
 

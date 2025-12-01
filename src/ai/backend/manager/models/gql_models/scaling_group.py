@@ -59,7 +59,7 @@ if TYPE_CHECKING:
 __all__ = (
     "ScalingGroup",
     "ScalingGroupNode",
-    "ScalinGroupConnection",
+    "ScalingGroupConnection",
     "CreateScalingGroup",
     "ModifyScalingGroup",
     "DeleteScalingGroup",
@@ -214,7 +214,7 @@ class ScalingGroupNode(graphene.ObjectType):
             )
 
 
-class ScalinGroupConnection(Connection):
+class ScalingGroupConnection(Connection):
     class Meta:
         node = ScalingGroupNode
         description = "Added in 24.12.0."
