@@ -9,7 +9,11 @@ import pytest
 from ai.backend.common.clients.valkey_client.valkey_artifact_storages.client import (
     ValkeyArtifactStorageClient,
 )
-from ai.backend.common.data.storage.types import ObjectStorageStatefulData, VFSStorageStatefulData
+from ai.backend.common.data.storage.types import (
+    ArtifactStorageType,
+    ObjectStorageStatefulData,
+    VFSStorageStatefulData,
+)
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import ValkeyTarget
 
@@ -71,12 +75,14 @@ class TestValkeyArtifactStorageClient:
         storage_id = sample_object_storage_data.id
 
         # Set storage data
-        await valkey_artifact_storage_client.set_object_storage(
-            storage_id, sample_object_storage_data
+        await valkey_artifact_storage_client.set_storage(
+            ArtifactStorageType.OBJECT_STORAGE, storage_id, sample_object_storage_data
         )
 
         # Get storage data
-        result = await valkey_artifact_storage_client.get_object_storage(storage_id)
+        result = await valkey_artifact_storage_client.get_storage(
+            ArtifactStorageType.OBJECT_STORAGE, storage_id, ObjectStorageStatefulData
+        )
 
         assert result is not None
         assert result.id == sample_object_storage_data.id
@@ -95,7 +101,9 @@ class TestValkeyArtifactStorageClient:
         """Test retrieving nonexistent object storage data."""
         storage_id = uuid.uuid4()
 
-        result = await valkey_artifact_storage_client.get_object_storage(storage_id)
+        result = await valkey_artifact_storage_client.get_storage(
+            ArtifactStorageType.OBJECT_STORAGE, storage_id, ObjectStorageStatefulData
+        )
 
         assert result is None
 
@@ -109,16 +117,20 @@ class TestValkeyArtifactStorageClient:
         storage_id = sample_object_storage_data.id
 
         # Set storage data
-        await valkey_artifact_storage_client.set_object_storage(
-            storage_id, sample_object_storage_data
+        await valkey_artifact_storage_client.set_storage(
+            ArtifactStorageType.OBJECT_STORAGE, storage_id, sample_object_storage_data
         )
 
         # Delete storage data
-        deleted = await valkey_artifact_storage_client.delete_object_storage(storage_id)
+        deleted = await valkey_artifact_storage_client.delete_storage(
+            ArtifactStorageType.OBJECT_STORAGE, storage_id
+        )
         assert deleted is True
 
         # Verify deletion
-        result = await valkey_artifact_storage_client.get_object_storage(storage_id)
+        result = await valkey_artifact_storage_client.get_storage(
+            ArtifactStorageType.OBJECT_STORAGE, storage_id, ObjectStorageStatefulData
+        )
         assert result is None
 
     @pytest.mark.asyncio
@@ -129,7 +141,9 @@ class TestValkeyArtifactStorageClient:
         """Test deleting nonexistent object storage cache."""
         storage_id = uuid.uuid4()
 
-        deleted = await valkey_artifact_storage_client.delete_object_storage(storage_id)
+        deleted = await valkey_artifact_storage_client.delete_storage(
+            ArtifactStorageType.OBJECT_STORAGE, storage_id
+        )
         assert deleted is False
 
     @pytest.mark.asyncio
@@ -142,10 +156,14 @@ class TestValkeyArtifactStorageClient:
         storage_id = sample_vfs_storage_data.id
 
         # Set storage data
-        await valkey_artifact_storage_client.set_vfs_storage(storage_id, sample_vfs_storage_data)
+        await valkey_artifact_storage_client.set_storage(
+            ArtifactStorageType.VFS_STORAGE, storage_id, sample_vfs_storage_data
+        )
 
         # Get storage data
-        result = await valkey_artifact_storage_client.get_vfs_storage(storage_id)
+        result = await valkey_artifact_storage_client.get_storage(
+            ArtifactStorageType.VFS_STORAGE, storage_id, VFSStorageStatefulData
+        )
 
         assert result is not None
         assert result.id == sample_vfs_storage_data.id
@@ -161,7 +179,9 @@ class TestValkeyArtifactStorageClient:
         """Test retrieving nonexistent VFS storage data."""
         storage_id = uuid.uuid4()
 
-        result = await valkey_artifact_storage_client.get_vfs_storage(storage_id)
+        result = await valkey_artifact_storage_client.get_storage(
+            ArtifactStorageType.VFS_STORAGE, storage_id, VFSStorageStatefulData
+        )
 
         assert result is None
 
@@ -175,14 +195,20 @@ class TestValkeyArtifactStorageClient:
         storage_id = sample_vfs_storage_data.id
 
         # Set storage data
-        await valkey_artifact_storage_client.set_vfs_storage(storage_id, sample_vfs_storage_data)
+        await valkey_artifact_storage_client.set_storage(
+            ArtifactStorageType.VFS_STORAGE, storage_id, sample_vfs_storage_data
+        )
 
         # Delete storage data
-        deleted = await valkey_artifact_storage_client.delete_vfs_storage(storage_id)
+        deleted = await valkey_artifact_storage_client.delete_storage(
+            ArtifactStorageType.VFS_STORAGE, storage_id
+        )
         assert deleted is True
 
         # Verify deletion
-        result = await valkey_artifact_storage_client.get_vfs_storage(storage_id)
+        result = await valkey_artifact_storage_client.get_storage(
+            ArtifactStorageType.VFS_STORAGE, storage_id, VFSStorageStatefulData
+        )
         assert result is None
 
     @pytest.mark.asyncio
@@ -193,7 +219,9 @@ class TestValkeyArtifactStorageClient:
         """Test deleting nonexistent VFS storage cache."""
         storage_id = uuid.uuid4()
 
-        deleted = await valkey_artifact_storage_client.delete_vfs_storage(storage_id)
+        deleted = await valkey_artifact_storage_client.delete_storage(
+            ArtifactStorageType.VFS_STORAGE, storage_id
+        )
         assert deleted is False
 
     @pytest.mark.asyncio
@@ -224,12 +252,20 @@ class TestValkeyArtifactStorageClient:
         )
 
         # Set both types with different IDs
-        await valkey_artifact_storage_client.set_object_storage(object_uuid, object_data)
-        await valkey_artifact_storage_client.set_vfs_storage(vfs_uuid, vfs_data)
+        await valkey_artifact_storage_client.set_storage(
+            ArtifactStorageType.OBJECT_STORAGE, object_uuid, object_data
+        )
+        await valkey_artifact_storage_client.set_storage(
+            ArtifactStorageType.VFS_STORAGE, vfs_uuid, vfs_data
+        )
 
         # Verify both are stored separately
-        object_result = await valkey_artifact_storage_client.get_object_storage(object_uuid)
-        vfs_result = await valkey_artifact_storage_client.get_vfs_storage(vfs_uuid)
+        object_result = await valkey_artifact_storage_client.get_storage(
+            ArtifactStorageType.OBJECT_STORAGE, object_uuid, ObjectStorageStatefulData
+        )
+        vfs_result = await valkey_artifact_storage_client.get_storage(
+            ArtifactStorageType.VFS_STORAGE, vfs_uuid, VFSStorageStatefulData
+        )
 
         assert object_result is not None
         assert object_result.name == object_name
@@ -264,12 +300,20 @@ class TestValkeyArtifactStorageClient:
         )
 
         # Set both types with the same name but different IDs
-        await valkey_artifact_storage_client.set_object_storage(object_uuid, object_data)
-        await valkey_artifact_storage_client.set_vfs_storage(vfs_uuid, vfs_data)
+        await valkey_artifact_storage_client.set_storage(
+            ArtifactStorageType.OBJECT_STORAGE, object_uuid, object_data
+        )
+        await valkey_artifact_storage_client.set_storage(
+            ArtifactStorageType.VFS_STORAGE, vfs_uuid, vfs_data
+        )
 
         # Verify both are stored separately despite same name
-        object_result = await valkey_artifact_storage_client.get_object_storage(object_uuid)
-        vfs_result = await valkey_artifact_storage_client.get_vfs_storage(vfs_uuid)
+        object_result = await valkey_artifact_storage_client.get_storage(
+            ArtifactStorageType.OBJECT_STORAGE, object_uuid, ObjectStorageStatefulData
+        )
+        vfs_result = await valkey_artifact_storage_client.get_storage(
+            ArtifactStorageType.VFS_STORAGE, vfs_uuid, VFSStorageStatefulData
+        )
 
         assert object_result is not None
         assert object_result.id == object_uuid
@@ -280,11 +324,15 @@ class TestValkeyArtifactStorageClient:
         assert vfs_result.host == "vfs.example.com"
 
         # Delete object storage should not affect VFS storage
-        deleted = await valkey_artifact_storage_client.delete_object_storage(object_uuid)
+        deleted = await valkey_artifact_storage_client.delete_storage(
+            ArtifactStorageType.OBJECT_STORAGE, object_uuid
+        )
         assert deleted is True
 
         # VFS storage should still exist
-        vfs_result_after_delete = await valkey_artifact_storage_client.get_vfs_storage(vfs_uuid)
+        vfs_result_after_delete = await valkey_artifact_storage_client.get_storage(
+            ArtifactStorageType.VFS_STORAGE, vfs_uuid, VFSStorageStatefulData
+        )
         assert vfs_result_after_delete is not None
         assert vfs_result_after_delete.id == vfs_uuid
 
@@ -306,10 +354,14 @@ class TestValkeyArtifactStorageClient:
         )
 
         # Set storage data
-        await valkey_artifact_storage_client.set_vfs_storage(storage_uuid, storage_data)
+        await valkey_artifact_storage_client.set_storage(
+            ArtifactStorageType.VFS_STORAGE, storage_uuid, storage_data
+        )
 
         # Get storage data
-        result = await valkey_artifact_storage_client.get_vfs_storage(storage_uuid)
+        result = await valkey_artifact_storage_client.get_storage(
+            ArtifactStorageType.VFS_STORAGE, storage_uuid, VFSStorageStatefulData
+        )
 
         assert result is not None
         assert result.base_path == complex_path
