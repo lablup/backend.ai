@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import strawberry
 from strawberry import Info
-from strawberry.scalars import JSON
 
+from ai.backend.manager.api.gql.agent.types import AgentResource, AgentStats
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.services.agent.actions.get_total_resources import GetTotalResourcesAction
 
@@ -21,15 +21,3 @@ async def agent_stats(info: Info[StrawberryGQLContext]) -> AgentStats:
             capacity=result.total_resources.total_capacity_slots.to_json(),
         )
     )
-
-
-@strawberry.type(description="Added in 25.15.0")
-class AgentResource:
-    free: JSON
-    used: JSON
-    capacity: JSON
-
-
-@strawberry.type(description="Added in 25.15.0")
-class AgentStats:
-    total_resource: AgentResource = strawberry.field(description="Added in 25.15.0")
