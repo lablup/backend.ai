@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional, Self
 
 
 @dataclass
@@ -13,6 +13,13 @@ class HuggingFaceRegistryStatefulData:
     name: str
     url: str
     token: Optional[str]
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        """Create instance from dictionary, converting string UUID to UUID object."""
+        if "id" in data and isinstance(data["id"], str):
+            data = {**data, "id": uuid.UUID(data["id"])}
+        return cls(**data)
 
 
 @dataclass
@@ -25,3 +32,10 @@ class ReservoirRegistryStatefulData:
     access_key: str
     secret_key: str
     api_version: str
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        """Create instance from dictionary, converting string UUID to UUID object."""
+        if "id" in data and isinstance(data["id"], str):
+            data = {**data, "id": uuid.UUID(data["id"])}
+        return cls(**data)

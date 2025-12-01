@@ -158,10 +158,7 @@ class ValkeyArtifactRegistryClient:
 
         json_value = value.decode()
         data = load_json(json_value)
-        # Convert UUID string back to UUID object
-        if "id" in data and isinstance(data["id"], str):
-            data["id"] = uuid.UUID(data["id"])
-        return HuggingFaceRegistryStatefulData(**data)
+        return HuggingFaceRegistryStatefulData.from_dict(data)
 
     @valkey_artifact_registries_resilience.apply()
     async def delete_huggingface_registry(
@@ -221,10 +218,7 @@ class ValkeyArtifactRegistryClient:
 
         json_value = value.decode()
         data = load_json(json_value)
-        # Convert UUID string back to UUID object
-        if "id" in data and isinstance(data["id"], str):
-            data["id"] = uuid.UUID(data["id"])
-        return ReservoirRegistryStatefulData(**data)
+        return ReservoirRegistryStatefulData.from_dict(data)
 
     @valkey_artifact_registries_resilience.apply()
     async def delete_reservoir_registry(
