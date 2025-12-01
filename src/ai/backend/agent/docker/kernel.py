@@ -12,12 +12,12 @@ import shutil
 import subprocess
 import textwrap
 from collections.abc import Mapping
+from importlib.resources import files
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Final, FrozenSet, Optional, Tuple, cast, override
 
 import aiohttp
 import janus
-import pkg_resources
 from aiodocker.docker import Docker, DockerVolume
 from aiodocker.exceptions import DockerError
 from aiotools import TaskGroup
@@ -482,8 +482,10 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> Tuple[s
     arch = get_arch_name()
     current_version = int(
         Path(
-            pkg_resources.resource_filename(
-                f"ai.backend.krunner.{entrypoint_name}", f"./krunner-version.{distro}.txt"
+            str(
+                files(f"ai.backend.krunner.{entrypoint_name}").joinpath(
+                    f"./krunner-version.{distro}.txt"
+                )
             )
         )
         .read_text()
@@ -500,8 +502,8 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> Tuple[s
                 break
         else:
             log.info("preparing the Docker image for krunner extractor...")
-            extractor_archive = pkg_resources.resource_filename(
-                "ai.backend.runner", f"krunner-extractor.img.{arch}.tar.xz"
+            extractor_archive = str(
+                files("ai.backend.runner").joinpath(f"krunner-extractor.img.{arch}.tar.xz")
             )
             with lzma.open(extractor_archive, "rb") as reader:
                 image_tar = reader.read()
@@ -527,8 +529,10 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> Tuple[s
                 do_create = True
         if do_create:
             archive_path = Path(
-                pkg_resources.resource_filename(
-                    f"ai.backend.krunner.{entrypoint_name}", f"krunner-env.{distro}.{arch}.tar.xz"
+                str(
+                    files(f"ai.backend.krunner.{entrypoint_name}").joinpath(
+                        f"krunner-env.{distro}.{arch}.tar.xz"
+                    )
                 )
             ).resolve()
             if not archive_path.exists():
@@ -540,7 +544,7 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> Tuple[s
                     "Driver": "local",
                 })
                 extractor_path = Path(
-                    pkg_resources.resource_filename("ai.backend.runner", "krunner-extractor.sh")
+                    str(files("ai.backend.runner").joinpath("krunner-extractor.sh"))
                 ).resolve()
                 proc = await asyncio.create_subprocess_exec(*[
                     "docker",
@@ -582,12 +586,7 @@ async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, s
         plugin = entrypoint.load()
         await plugin.init({})  # currently does nothing
         provided_versions = (
-            Path(
-                pkg_resources.resource_filename(
-                    f"ai.backend.krunner.{entrypoint.name}",
-                    "versions.txt",
-                )
-            )
+            Path(str(files(f"ai.backend.krunner.{entrypoint.name}").joinpath("versions.txt")))
             .read_text()
             .splitlines()
         )
@@ -624,8 +623,8 @@ async def prepare_kernel_metadata_uri_handling(local_config: AgentUnifiedConfig)
     if local_config.agent.docker_mode == "linuxkit":
         # Docker Desktop mode
         arch = get_arch_name()
-        proxy_worker_binary = pkg_resources.resource_filename(
-            "ai.backend.agent.docker", f"linuxkit-metadata-proxy-worker.{arch}.bin"
+        proxy_worker_binary = str(
+            files("ai.backend.agent.docker").joinpath(f"linuxkit-metadata-proxy-worker.{arch}.bin")
         )
         shutil.copyfile(proxy_worker_binary, "/tmp/backend.ai/linuxkit-metadata-proxy")
         os.chmod("/tmp/backend.ai/linuxkit-metadata-proxy", 0o755)
