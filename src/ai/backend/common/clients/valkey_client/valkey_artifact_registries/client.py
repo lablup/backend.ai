@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Optional, Self, TypeVar
+from collections.abc import Mapping
+from typing import Any, Optional, Self
 
 from glide import ExpirySet, ExpiryType
 
@@ -10,7 +11,6 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
-from ai.backend.common.data.artifact_registry.types import ArtifactRegistryStatefulData
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -45,8 +45,6 @@ valkey_artifact_registries_resilience = Resilience(
 )
 
 _EXPIRATION = 60 * 60 * 24  # 24 hours
-
-T = TypeVar("T", bound=ArtifactRegistryStatefulData)
 
 
 class ValkeyArtifactRegistryClient:
@@ -118,16 +116,16 @@ class ValkeyArtifactRegistryClient:
     async def set_registry(
         self,
         registry_id: uuid.UUID,
-        registry_data: T,
+        registry_data: Mapping[str, Any],
     ) -> None:
         """
         Cache registry data with independent expiry.
 
         :param registry_id: The UUID of the registry.
-        :param registry_data: The registry data to cache.
+        :param registry_data: The registry data to cache (as dict).
         """
         key = self._make_registry_key(registry_id)
-        value = dump_json_str(registry_data.to_dict())
+        value = dump_json_str(registry_data)
         await self._client.client.set(
             key=key,
             value=value,
@@ -139,14 +137,12 @@ class ValkeyArtifactRegistryClient:
     async def get_registry(
         self,
         registry_id: uuid.UUID,
-        data_class: type[T],
-    ) -> Optional[T]:
+    ) -> Optional[Mapping[str, Any]]:
         """
         Get cached registry data.
 
         :param registry_id: The UUID of the registry.
-        :param data_class: The data class to deserialize into.
-        :return: The cached registry data or None if not found.
+        :return: The cached registry data as dict or None if not found.
         """
         key = self._make_registry_key(registry_id)
         value = await self._client.client.get(key)
@@ -156,7 +152,7 @@ class ValkeyArtifactRegistryClient:
 
         json_value = value.decode()
         data = load_json(json_value)
-        return data_class.from_dict(data)
+        return data
 
     @valkey_artifact_registries_resilience.apply()
     async def delete_registry(
