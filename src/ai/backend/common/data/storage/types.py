@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import enum
 import uuid
-from abc import ABC
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Self
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 
 
 class ArtifactStorageType(enum.StrEnum):
@@ -22,10 +21,8 @@ class ArtifactStorageImportStep(enum.StrEnum):
     ARCHIVE = "archive"
 
 
-class ArtifactStorageStatefulData(ABC, BaseModel):
-    """Abstract base class for artifact storage stateful data."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+class ArtifactStorageStatefulData(BaseModel):
+    """Base class for artifact storage stateful data."""
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> Self:
