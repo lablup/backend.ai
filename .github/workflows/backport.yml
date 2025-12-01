@@ -51,9 +51,9 @@ jobs:
       - name: Extract pr_number from commit message
         id: commit
         run: |
-          latest_commit=$(git rev-parse HEAD)  # Get the recent commit hash of the current repository
-          echo "latest_commit=$latest_commit" >> $GITHUB_OUTPUT
-          commit_message=$(git show -s --format=%B $latest_commit)  # Get messages from recent commit
+          target_commit="${{ matrix.commits }}"
+          echo "target_commit=$target_commit" >> $GITHUB_OUTPUT
+          commit_message=$(git show -s --format=%B $target_commit)  # Get messages from commit
           echo "commit_message<<EOF" >> $GITHUB_OUTPUT
           echo "$commit_message" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -61,9 +61,9 @@ jobs:
           echo "pr_number=$pr_number" >> $GITHUB_OUTPUT
           latest_release=$(cat VERSION | grep -oP "\d+\.\d+")
           echo "latest_release=$latest_release" >> $GITHUB_OUTPUT
-          author=$(git show -s --format=%an $latest_commit)
+          author=$(git show -s --format=%an $target_commit)
           echo "author=$author" >> $GITHUB_OUTPUT
-          author_email=$(git show -s --format=%ae $latest_commit)
+          author_email=$(git show -s --format=%ae $target_commit)
           echo "author_email=$author_email" >> $GITHUB_OUTPUT
           labels=$(gh pr view $pr_number --json labels | jq -r '.labels[].name' | tr '\n' ',' | sed 's/,$//')
           echo "labels=$labels" >> $GITHUB_OUTPUT
@@ -106,7 +106,7 @@ jobs:
           result="[]"
           for branch in "${target_branches[@]}"; do
             if [ -n "$branch" ]; then
-              result=$(echo "$result" | jq --arg commit "${{ steps.commit.outputs.latest_commit }}" \
+              result=$(echo "$result" | jq --arg commit "${{ steps.commit.outputs.target_commit }}" \
                 --arg branch "$branch" \
                 --arg message "${{ steps.commit.outputs.commit_message }}" \
                 --arg pr "${{ steps.commit.outputs.pr_number }}" \
@@ -187,9 +187,9 @@ jobs:
         run: |
           git config user.name "${{ matrix.author }}"
           git config user.email "${{ matrix.author_email }}"
-          latest_commit="${{ matrix.commit }}"
-          git fetch origin main "$latest_commit"
-          git cherry-pick --strategy=recursive --strategy-option=theirs "$latest_commit"
+          target_commit="${{ matrix.commit }}"
+          git fetch origin main "$target_commit"
+          git cherry-pick --strategy=recursive --strategy-option=theirs "$target_commit"
           git commit \
             --amend -m "${COMMIT_MESSAGE}" \
             --trailer "Backported-from=main (${{ matrix.latest_release }})" \
