@@ -167,10 +167,3 @@ class ValkeyArtifactRegistryClient:
         result = await self._client.client.delete([key])
         deleted = result > 0
         return deleted
-
-    @valkey_artifact_registries_resilience.apply()
-    async def flush_database(self) -> None:
-        """
-        Flush all keys in the current database.
-        """
-        await self._client.client.flushdb()
