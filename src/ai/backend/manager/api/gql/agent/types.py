@@ -100,11 +100,16 @@ class AgentOrderBy:
                 return AgentOrders.schedulable(ascending)
 
 
-@strawberry.type(description="Resource-related information for an agent")
-class AgentResourceInfo:
-    available_slots: JSON
-    occupied_slots: JSON
-    compute_plugins: JSON
+@strawberry.type(description="Added in 25.15.0")
+class AgentResource:
+    free: JSON
+    used: JSON
+    capacity: JSON
+
+
+@strawberry.type(description="Added in 25.15.0")
+class AgentStats:
+    total_resource: AgentResource = strawberry.field(description="Added in 25.15.0")
 
 
 @strawberry.type(description="Status and lifecycle information for an agent")
@@ -123,6 +128,7 @@ class AgentSystemInfo:
     auto_terminate_abusing_kernel: bool = strawberry.field(
         description="Not used anymore, present for schema consistency."
     )
+    compute_plugins: JSON
 
 
 @strawberry.type(description="Network-related information for an agent")
@@ -136,7 +142,7 @@ class AgentNetworkInfo:
 @strawberry.type(description="Strawberry-based Agent type replacing AgentNode. Added in 25.18.0.")
 class AgentV2(Node):
     id: NodeID[str]
-    resource_info: AgentResourceInfo
+    resource_info: AgentResource
     status_info: AgentStatusInfo
     system_info: AgentSystemInfo
     network_info: AgentNetworkInfo
