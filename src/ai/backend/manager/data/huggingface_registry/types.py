@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.artifact_registry.types import HuggingFaceRegistryStatefulData
 
 
@@ -26,11 +27,16 @@ class HuggingFaceRegistryData:
             token=stateful_data.token,
         )
 
-    def to_stateful_data(self) -> HuggingFaceRegistryStatefulData:
-        """Convert HuggingFaceRegistryData to HuggingFaceRegistryStatefulData for caching."""
+    def to_stateful_data(self, artifact_registry_id: uuid.UUID) -> HuggingFaceRegistryStatefulData:
+        """Convert HuggingFaceRegistryData to HuggingFaceRegistryStatefulData for caching.
+
+        :param artifact_registry_id: The UUID from artifact_registries table.
+        """
         return HuggingFaceRegistryStatefulData(
-            id=self.id,
+            id=artifact_registry_id,
+            registry_id=self.id,
             name=self.name,
+            type=ArtifactRegistryType.HUGGINGFACE,
             url=self.url,
             token=self.token,
         )
