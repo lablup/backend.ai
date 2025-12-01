@@ -323,7 +323,6 @@ class ScalingGroupV2GQL(Node):
 @strawberry.enum(name="ScalingGroupOrderField")
 class ScalingGroupOrderFieldGQL(StrEnum):
     NAME = "name"
-    DESCRIPTION = "description"
     CREATED_AT = "created_at"
     IS_ACTIVE = "is_active"
     IS_PUBLIC = "is_public"
@@ -433,8 +432,6 @@ class ScalingGroupOrderByGQL:
         match self.field:
             case ScalingGroupOrderFieldGQL.NAME:
                 return ScalingGroupOrders.name(ascending)
-            case ScalingGroupOrderFieldGQL.DESCRIPTION:
-                return ScalingGroupOrders.description(ascending)
             case ScalingGroupOrderFieldGQL.CREATED_AT:
                 return ScalingGroupOrders.created_at(ascending)
             case ScalingGroupOrderFieldGQL.IS_ACTIVE:

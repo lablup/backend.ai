@@ -319,34 +319,6 @@ class TestScalingGroupGQLAdapter:
         assert len(querier.orders) == 1
         assert querier.orders[0] is not None
 
-    def test_order_by_description_ascending(self) -> None:
-        """Test ordering by description ascending"""
-        order_by = [
-            ScalingGroupOrderByGQL(
-                field=ScalingGroupOrderFieldGQL.DESCRIPTION,
-                direction=OrderDirection.ASC,
-            )
-        ]
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(order_by=order_by)
-
-        assert len(querier.orders) == 1
-        assert querier.orders[0] is not None
-
-    def test_order_by_description_descending(self) -> None:
-        """Test ordering by description descending"""
-        order_by = [
-            ScalingGroupOrderByGQL(
-                field=ScalingGroupOrderFieldGQL.DESCRIPTION,
-                direction=OrderDirection.DESC,
-            )
-        ]
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(order_by=order_by)
-
-        assert len(querier.orders) == 1
-        assert querier.orders[0] is not None
-
     def test_order_by_created_at_ascending(self) -> None:
         """Test ordering by created_at ascending"""
         order_by = [
