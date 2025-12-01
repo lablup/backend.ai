@@ -33,16 +33,16 @@ from ai.backend.manager.repositories.scaling_group.options import (
 )
 
 __all__ = (
-    "GQLScalingGroupStatus",
-    "GQLScalingGroupMetadata",
-    "GQLScalingGroupNetworkConfig",
-    "GQLScalingGroupDriverConfig",
-    "GQLScalingGroupSchedulerOptions",
-    "GQLScalingGroupSchedulerConfig",
-    "GQLScalingGroupV2",
-    "GQLScalingGroupFilter",
-    "GQLScalingGroupOrderBy",
-    "GQLScalingGroupOrderField",
+    "ScalingGroupStatusGQL",
+    "ScalingGroupMetadataGQL",
+    "ScalingGroupNetworkConfigGQL",
+    "ScalingGroupDriverConfigGQL",
+    "ScalingGroupSchedulerOptionsGQL",
+    "ScalingGroupSchedulerConfigGQL",
+    "ScalingGroupV2GQL",
+    "ScalingGroupFilterGQL",
+    "ScalingGroupOrderByGQL",
+    "ScalingGroupOrderFieldGQL",
 )
 
 
@@ -50,7 +50,7 @@ __all__ = (
     name="ScalingGroupStatus",
     description="Added in 25.18.0. Status information for a scaling group",
 )
-class GQLScalingGroupStatus:
+class ScalingGroupStatusGQL:
     is_active: bool = strawberry.field(
         description=dedent_strip("""
             Whether the scaling group can accept new session creation requests.
@@ -78,7 +78,7 @@ class GQLScalingGroupStatus:
     name="ScalingGroupMetadata",
     description="Added in 25.18.0. Metadata information for a scaling group",
 )
-class GQLScalingGroupMetadata:
+class ScalingGroupMetadataGQL:
     description: str = strawberry.field(
         description="Human-readable description of the scaling group's purpose"
     )
@@ -98,7 +98,7 @@ class GQLScalingGroupMetadata:
     name="ScalingGroupNetworkConfig",
     description="Added in 25.18.0. Network configuration for a scaling group",
 )
-class GQLScalingGroupNetworkConfig:
+class ScalingGroupNetworkConfigGQL:
     wsproxy_addr: str = strawberry.field(
         description=dedent_strip("""
             App-proxy coordinator API server address.
@@ -131,7 +131,7 @@ class GQLScalingGroupNetworkConfig:
     name="ScalingGroupDriverConfig",
     description="Added in 25.18.0. Driver configuration for resource allocation",
 )
-class GQLScalingGroupDriverConfig:
+class ScalingGroupDriverConfigGQL:
     name: str = strawberry.field(
         description=dedent_strip("""
             Agent resource driver implementation name.
@@ -154,7 +154,7 @@ class GQLScalingGroupDriverConfig:
     name="ScalingGroupSchedulerOptions",
     description="Added in 25.18.0. Scheduler configuration options",
 )
-class GQLScalingGroupSchedulerOptions:
+class ScalingGroupSchedulerOptionsGQL:
     allowed_session_types: list[str] = strawberry.field(
         description=dedent_strip("""
             Session types that can be scheduled in this scaling group.
@@ -234,7 +234,7 @@ class GQLScalingGroupSchedulerOptions:
     name="ScalingGroupSchedulerConfig",
     description="Added in 25.18.0. Scheduler configuration for session scheduling",
 )
-class GQLScalingGroupSchedulerConfig:
+class ScalingGroupSchedulerConfigGQL:
     name: str = strawberry.field(
         description=dedent_strip("""
             Scheduling algorithm implementation.
@@ -243,7 +243,7 @@ class GQLScalingGroupSchedulerConfig:
             'drf' (Dominant Resource Fairness) balances resource usage across users.
         """)
     )
-    options: GQLScalingGroupSchedulerOptions = strawberry.field(
+    options: ScalingGroupSchedulerOptionsGQL = strawberry.field(
         description=dedent_strip("""
             Detailed scheduler behavior configuration including session type restrictions,
             timeouts, agent selection strategy, and resource allocation policies.
@@ -254,7 +254,7 @@ class GQLScalingGroupSchedulerConfig:
     def from_dataclass(cls, data: ScalingGroupSchedulerConfig) -> Self:
         return cls(
             name=data.name,
-            options=GQLScalingGroupSchedulerOptions.from_dataclass(data.options),
+            options=ScalingGroupSchedulerOptionsGQL.from_dataclass(data.options),
         )
 
 
@@ -262,7 +262,7 @@ class GQLScalingGroupSchedulerConfig:
     name="ScalingGroupV2",
     description="Added in 25.18.0. Scaling group with structured configuration",
 )
-class GQLScalingGroupV2(Node):
+class ScalingGroupV2GQL(Node):
     id: NodeID[str] = strawberry.field(
         description="Relay-style global node identifier for the scaling group"
     )
@@ -272,31 +272,31 @@ class GQLScalingGroupV2(Node):
             Used as primary key and referenced by agents, sessions, and resource presets.
         """)
     )
-    status: GQLScalingGroupStatus = strawberry.field(
+    status: ScalingGroupStatusGQL = strawberry.field(
         description=dedent_strip("""
             Operational status controlling whether this scaling group accepts new sessions
             and its visibility to users without explicit access grants.
         """)
     )
-    metadata: GQLScalingGroupMetadata = strawberry.field(
+    metadata: ScalingGroupMetadataGQL = strawberry.field(
         description=dedent_strip("""
             Administrative metadata including human-readable description
             and creation timestamp for audit and documentation purposes.
         """)
     )
-    wsproxy: GQLScalingGroupNetworkConfig = strawberry.field(
+    wsproxy: ScalingGroupNetworkConfigGQL = strawberry.field(
         description=dedent_strip("""
             Network configuration for connecting clients to interactive session services
             (terminals, notebooks, web apps) through WebSocket proxy infrastructure.
         """)
     )
-    driver: GQLScalingGroupDriverConfig = strawberry.field(
+    driver: ScalingGroupDriverConfigGQL = strawberry.field(
         description=dedent_strip("""
             Agent resource management driver determining how compute agents are provisioned
             and registered to this scaling group (static registration vs dynamic provisioning).
         """)
     )
-    scheduler: GQLScalingGroupSchedulerConfig = strawberry.field(
+    scheduler: ScalingGroupSchedulerConfigGQL = strawberry.field(
         description=dedent_strip("""
             Session scheduling configuration controlling queue management,
             agent selection strategy, resource allocation policies,
@@ -309,11 +309,11 @@ class GQLScalingGroupV2(Node):
         return cls(
             id=data.name,
             name=data.name,
-            status=GQLScalingGroupStatus.from_dataclass(data.status),
-            metadata=GQLScalingGroupMetadata.from_dataclass(data.metadata),
-            wsproxy=GQLScalingGroupNetworkConfig.from_dataclass(data.wsproxy),
-            driver=GQLScalingGroupDriverConfig.from_dataclass(data.driver),
-            scheduler=GQLScalingGroupSchedulerConfig.from_dataclass(data.scheduler),
+            status=ScalingGroupStatusGQL.from_dataclass(data.status),
+            metadata=ScalingGroupMetadataGQL.from_dataclass(data.metadata),
+            wsproxy=ScalingGroupNetworkConfigGQL.from_dataclass(data.wsproxy),
+            driver=ScalingGroupDriverConfigGQL.from_dataclass(data.driver),
+            scheduler=ScalingGroupSchedulerConfigGQL.from_dataclass(data.scheduler),
         )
 
 
@@ -321,7 +321,7 @@ class GQLScalingGroupV2(Node):
 
 
 @strawberry.enum(name="ScalingGroupOrderField")
-class GQLScalingGroupOrderField(StrEnum):
+class ScalingGroupOrderFieldGQL(StrEnum):
     NAME = "name"
     DESCRIPTION = "description"
     CREATED_AT = "created_at"
@@ -333,7 +333,7 @@ class GQLScalingGroupOrderField(StrEnum):
     name="ScalingGroupFilter",
     description="Added in 25.18.0. Filter for scaling groups",
 )
-class GQLScalingGroupFilter:
+class ScalingGroupFilterGQL:
     name: Optional[StringFilter] = None
     description: Optional[StringFilter] = None
     is_active: Optional[bool] = None
@@ -342,9 +342,9 @@ class GQLScalingGroupFilter:
     scheduler: Optional[str] = None
     use_host_network: Optional[bool] = None
 
-    AND: Optional[list["GQLScalingGroupFilter"]] = None
-    OR: Optional[list["GQLScalingGroupFilter"]] = None
-    NOT: Optional[list["GQLScalingGroupFilter"]] = None
+    AND: Optional[list["ScalingGroupFilterGQL"]] = None
+    OR: Optional[list["ScalingGroupFilterGQL"]] = None
+    NOT: Optional[list["ScalingGroupFilterGQL"]] = None
 
     def build_conditions(self) -> list[QueryCondition]:
         """Build query conditions from this filter.
@@ -423,21 +423,21 @@ class GQLScalingGroupFilter:
     name="ScalingGroupOrderBy",
     description="Added in 25.18.0. Order by specification for scaling groups",
 )
-class GQLScalingGroupOrderBy:
-    field: GQLScalingGroupOrderField
+class ScalingGroupOrderByGQL:
+    field: ScalingGroupOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
 
     def to_query_order(self) -> QueryOrder:
         """Convert to repository QueryOrder."""
         ascending = self.direction == OrderDirection.ASC
         match self.field:
-            case GQLScalingGroupOrderField.NAME:
+            case ScalingGroupOrderFieldGQL.NAME:
                 return ScalingGroupOrders.name(ascending)
-            case GQLScalingGroupOrderField.DESCRIPTION:
+            case ScalingGroupOrderFieldGQL.DESCRIPTION:
                 return ScalingGroupOrders.description(ascending)
-            case GQLScalingGroupOrderField.CREATED_AT:
+            case ScalingGroupOrderFieldGQL.CREATED_AT:
                 return ScalingGroupOrders.created_at(ascending)
-            case GQLScalingGroupOrderField.IS_ACTIVE:
+            case ScalingGroupOrderFieldGQL.IS_ACTIVE:
                 return ScalingGroupOrders.is_active(ascending)
-            case GQLScalingGroupOrderField.IS_PUBLIC:
+            case ScalingGroupOrderFieldGQL.IS_PUBLIC:
                 return ScalingGroupOrders.is_public(ascending)

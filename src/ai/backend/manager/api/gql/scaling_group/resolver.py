@@ -15,18 +15,18 @@ from ai.backend.manager.services.scaling_group.actions.list_scaling_groups impor
 
 from ..types import StrawberryGQLContext
 from .types import (
-    GQLScalingGroupFilter,
-    GQLScalingGroupOrderBy,
-    GQLScalingGroupV2,
+    ScalingGroupFilterGQL,
+    ScalingGroupOrderByGQL,
+    ScalingGroupV2GQL,
 )
 
 # Connection types
 
-ScalingGroupEdge = Edge[GQLScalingGroupV2]
+ScalingGroupV2Edge = Edge[ScalingGroupV2GQL]
 
 
 @strawberry.type(description="Added in 25.18.0. Scaling group connection")
-class ScalingGroupV2Connection(Connection[GQLScalingGroupV2]):
+class ScalingGroupV2Connection(Connection[ScalingGroupV2GQL]):
     count: int
 
     def __init__(self, *args, count: int, **kwargs):
@@ -40,8 +40,8 @@ class ScalingGroupV2Connection(Connection[GQLScalingGroupV2]):
 @strawberry.field(description="Added in 25.18.0. List scaling groups")
 async def scaling_groups_v2(
     info: Info[StrawberryGQLContext],
-    filter: Optional[GQLScalingGroupFilter] = None,
-    order_by: Optional[list[GQLScalingGroupOrderBy]] = None,
+    filter: Optional[ScalingGroupFilterGQL] = None,
+    order_by: Optional[list[ScalingGroupOrderByGQL]] = None,
     before: Optional[str] = None,
     after: Optional[str] = None,
     first: Optional[int] = None,
@@ -67,10 +67,10 @@ async def scaling_groups_v2(
         SearchScalingGroupsAction(querier=querier)
     )
 
-    nodes = [GQLScalingGroupV2.from_dataclass(data) for data in action_result.scaling_groups]
+    nodes = [ScalingGroupV2GQL.from_dataclass(data) for data in action_result.scaling_groups]
 
     edges = [
-        ScalingGroupEdge(node=node, cursor=to_global_id(GQLScalingGroupV2, node.id))
+        ScalingGroupV2Edge(node=node, cursor=to_global_id(ScalingGroupV2GQL, node.id))
         for node in nodes
     ]
 
