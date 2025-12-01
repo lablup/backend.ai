@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import enum
 import uuid
-from abc import ABC, abstractmethod
+from abc import ABC
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Self
 
@@ -27,15 +28,13 @@ class ArtifactStorageStatefulData(ABC, BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @classmethod
-    @abstractmethod
-    def from_dict(cls, data: dict[str, Any]) -> Self:
-        """Create instance from dictionary with appropriate type conversions."""
-        raise NotImplementedError
+    def from_dict(cls, data: Mapping[str, Any]) -> Self:
+        """Create instance from dictionary with Pydantic validation."""
+        return cls.model_validate(data)
 
-    @abstractmethod
-    def to_dict(self) -> dict[str, Any]:
-        """Convert instance to dictionary with appropriate type conversions."""
-        raise NotImplementedError
+    def to_dict(self) -> Mapping[str, Any]:
+        """Convert instance to dictionary with JSON-compatible types."""
+        return self.model_dump(mode="json")
 
 
 class ObjectStorageStatefulData(ArtifactStorageStatefulData):
@@ -52,15 +51,6 @@ class ObjectStorageStatefulData(ArtifactStorageStatefulData):
     endpoint: str
     region: str
 
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> Self:
-        """Create instance from dictionary with Pydantic validation."""
-        return cls.model_validate(data)
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert instance to dictionary with JSON-compatible types."""
-        return self.model_dump(mode="json")
-
 
 class VFSStorageStatefulData(ArtifactStorageStatefulData):
     """
@@ -72,12 +62,3 @@ class VFSStorageStatefulData(ArtifactStorageStatefulData):
     name: str
     host: str
     base_path: Path
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> Self:
-        """Create instance from dictionary with Pydantic validation."""
-        return cls.model_validate(data)
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert instance to dictionary with JSON-compatible types."""
-        return self.model_dump(mode="json")
