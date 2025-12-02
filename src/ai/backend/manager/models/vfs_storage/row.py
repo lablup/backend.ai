@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
+from ai.backend.common.exception import RelationNotLoadedError
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.base import (
@@ -51,7 +52,6 @@ class VFSStorageRow(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    name: Mapped[str] = mapped_column("name", sa.String, index=True, unique=True, nullable=False)
     host: Mapped[str] = mapped_column("host", sa.String, nullable=False)
     base_path: Mapped[str] = mapped_column("base_path", sa.String, nullable=False)
 
@@ -72,21 +72,18 @@ class VFSStorageRow(Base):
     )
 
     def __str__(self) -> str:
-        return (
-            f"VFSStorageRow("
-            f"id={self.id}, "
-            f"name={self.name}, "
-            f"host={self.host}, "
-            f"base_path={self.base_path})"
-        )
+        return f"VFSStorageRow(id={self.id}, host={self.host}, base_path={self.base_path})"
 
     def __repr__(self) -> str:
         return self.__str__()
 
     def to_dataclass(self) -> VFSStorageData:
-        return VFSStorageData(
-            id=self.id,
-            name=self.name,
-            host=self.host,
-            base_path=Path(self.base_path),
-        )
+        try:
+            return VFSStorageData(
+                id=self.id,
+                name=self.meta.name,
+                host=self.host,
+                base_path=Path(self.base_path),
+            )
+        except Exception:
+            raise RelationNotLoadedError()

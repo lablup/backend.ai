@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
+from ai.backend.common.exception import RelationNotLoadedError
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.base import (
@@ -57,7 +58,6 @@ class ObjectStorageRow(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    name: Mapped[str] = mapped_column("name", sa.String, index=True, unique=True, nullable=False)
     host: Mapped[str] = mapped_column("host", sa.String, index=True, nullable=False)
     access_key: Mapped[str] = mapped_column(
         "access_key",
@@ -105,7 +105,6 @@ class ObjectStorageRow(Base):
         return (
             f"ObjectStorageRow("
             f"id={self.id}, "
-            f"name={self.name}, "
             f"host={self.host}, "
             f"access_key={self.access_key}, "
             f"secret_key={self.secret_key}, "
@@ -117,12 +116,15 @@ class ObjectStorageRow(Base):
         return self.__str__()
 
     def to_dataclass(self) -> ObjectStorageData:
-        return ObjectStorageData(
-            id=self.id,
-            name=self.name,
-            host=self.host,
-            access_key=self.access_key,
-            secret_key=self.secret_key,
-            endpoint=self.endpoint,
-            region=self.region,
-        )
+        try:
+            return ObjectStorageData(
+                id=self.id,
+                name=self.meta.name,
+                host=self.host,
+                access_key=self.access_key,
+                secret_key=self.secret_key,
+                endpoint=self.endpoint,
+                region=self.region,
+            )
+        except Exception:
+            raise RelationNotLoadedError()
