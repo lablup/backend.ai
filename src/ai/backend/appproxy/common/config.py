@@ -16,6 +16,13 @@ from pydantic import (
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
+from .errors import (
+    GroupNotFoundError,
+    InvalidGIDTypeError,
+    InvalidUIDTypeError,
+    MissingAnnotationError,
+    UserNotFoundError,
+)
 from .types import DigestModType
 
 # FIXME: merge majority of common definitions to ai.backend.common when ready
@@ -122,7 +129,8 @@ class UserIDValidator:
         cls,
         value: int | str,
     ) -> int:
-        assert isinstance(value, (int, str)), "value must be an integer or string"
+        if not isinstance(value, (int, str)):
+            raise InvalidUIDTypeError("UID must be an integer or string")
         match value:
             case int():
                 return value
@@ -133,7 +141,7 @@ class UserIDValidator:
                     try:
                         return pwd.getpwnam(value).pw_uid
                     except KeyError:
-                        assert False, f"no such user {value} in system"
+                        raise UserNotFoundError(f"No such user {value} in system")
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -181,7 +189,8 @@ class GroupIDValidator:
         cls,
         value: int | str,
     ) -> int:
-        assert isinstance(value, (int, str)), "value must be an integer or string"
+        if not isinstance(value, (int, str)):
+            raise InvalidGIDTypeError("GID must be an integer or string")
         match value:
             case int():
                 return value
@@ -192,7 +201,7 @@ class GroupIDValidator:
                     try:
                         return pwd.getpwnam(value).pw_gid
                     except KeyError:
-                        assert False, f"no such user {value} in system"
+                        raise GroupNotFoundError(f"No such group {value} in system")
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -436,7 +445,8 @@ def generate_example_json(
         res = {}
         for name, info in schema.model_fields.items():
             config_key = [*parent, name]
-            assert info.annotation
+            if not info.annotation:
+                raise MissingAnnotationError(f"Field '{name}' is missing type annotation")
             alternative_example = Undefined
             if info.examples:
                 res[name] = info.examples[0]

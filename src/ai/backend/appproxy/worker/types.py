@@ -49,6 +49,8 @@ from ai.backend.common.types import (
     RuntimeVariant,
 )
 
+from .errors import InvalidCircuitDataError, InvalidFrontendTypeError
+
 if TYPE_CHECKING:
     from .config import ServerConfig
     from .proxy.frontend.base import BaseFrontend
@@ -380,10 +382,12 @@ class Circuit(SerializableCircuit):
 
         match circuit.app_mode:
             case AppMode.INTERACTIVE:
-                assert circuit.user_id
+                if not circuit.user_id:
+                    raise InvalidCircuitDataError("User ID is required for interactive app mode")
                 app_info = InteractiveAppInfo(circuit.user_id)
             case AppMode.INFERENCE:
-                assert circuit.endpoint_id
+                if not circuit.endpoint_id:
+                    raise InvalidCircuitDataError("Endpoint ID is required for inference app mode")
                 app_info = InferenceAppInfo(
                     circuit.endpoint_id,
                     RuntimeVariant(circuit.runtime_variant)
@@ -393,10 +397,14 @@ class Circuit(SerializableCircuit):
 
         match circuit.frontend_mode:
             case FrontendMode.PORT:
-                assert circuit.port is not None
+                if circuit.port is None:
+                    raise InvalidFrontendTypeError("Port is required for PORT frontend mode")
                 frontend = PortFrontendInfo(circuit.port)
             case FrontendMode.WILDCARD_DOMAIN:
-                assert circuit.subdomain is not None
+                if circuit.subdomain is None:
+                    raise InvalidFrontendTypeError(
+                        "Subdomain is required for WILDCARD_DOMAIN frontend mode"
+                    )
                 frontend = SubdomainFrontendInfo(circuit.subdomain)
 
         return cls(frontend=frontend, app_info=app_info, **circuit.model_dump())

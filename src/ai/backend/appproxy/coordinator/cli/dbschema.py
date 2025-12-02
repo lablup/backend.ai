@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import click
 
+from ai.backend.appproxy.coordinator.errors import MissingDatabaseURLError
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
@@ -55,7 +56,8 @@ def show(cli_ctx: CLIContext, alembic_config) -> None:
 
     alembic_cfg = Config(alembic_config)
     sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
-    assert sa_url is not None
+    if sa_url is None:
+        raise MissingDatabaseURLError("Database URL is not configured in alembic config")
     sa_url = sa_url.replace("postgresql://", "postgresql+asyncpg://")
     asyncio.run(_show(sa_url))
 
@@ -133,6 +135,7 @@ def oneshot(cli_ctx: CLIContext, alembic_config: str) -> None:
 
     alembic_cfg = Config(alembic_config)
     sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
-    assert sa_url is not None
+    if sa_url is None:
+        raise MissingDatabaseURLError("Database URL is not configured in alembic config")
     sa_url = sa_url.replace("postgresql://", "postgresql+asyncpg://")
     asyncio.run(_oneshot(sa_url))

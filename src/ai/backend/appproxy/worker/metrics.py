@@ -12,6 +12,7 @@ from ai.backend.common.clients.http_client.client_pool import ClientKey, ClientP
 from ai.backend.common.types import MetricKey, ModelServiceStatus, RuntimeVariant
 from ai.backend.logging import BraceStyleAdapter
 
+from .errors import InvalidAppInfoTypeError, InvalidMatrixSizeError
 from .types import (
     Circuit,
     HistogramMeasurement,
@@ -35,7 +36,8 @@ def add_matrices(*ms: tuple[float | int | Decimal, ...]) -> tuple[Decimal, ...]:
         return tuple()
     matrix_size = len(ms[0])
     for m in ms:
-        assert len(m) == matrix_size, "Inconsistent matrix size"
+        if len(m) != matrix_size:
+            raise InvalidMatrixSizeError("Inconsistent matrix size")
     base = [Decimal()] * matrix_size
     for m in ms:
         for i in range(matrix_size):
@@ -200,7 +202,10 @@ async def gather_prometheus_inference_measures(
 async def gather_inference_measures(
     client_pool: ClientPool, circuit: Circuit
 ) -> list[InferenceMeasurement] | None:
-    assert isinstance(circuit.app_info, InferenceAppInfo)
+    if not isinstance(circuit.app_info, InferenceAppInfo):
+        raise InvalidAppInfoTypeError(
+            f"Expected InferenceAppInfo, got {type(circuit.app_info).__name__}"
+        )
     measures: list[InferenceMeasurement] = []
 
     match circuit.app_info.runtime_variant:
