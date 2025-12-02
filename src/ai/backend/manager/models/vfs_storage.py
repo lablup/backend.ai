@@ -24,6 +24,12 @@ def _get_vfs_storage_association_artifact_join_cond():
     return VFSStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_namespace_id)
 
 
+def _get_vfs_storage_meta_join_cond():
+    from .artifact_storages import ArtifactStorageRow
+
+    return VFSStorageRow.id == foreign(ArtifactStorageRow.storage_id)
+
+
 class VFSStorageRow(Base):
     """
     Represents a VFS storage configuration.
@@ -43,6 +49,13 @@ class VFSStorageRow(Base):
         back_populates="vfs_storage_row",
         primaryjoin=_get_vfs_storage_association_artifact_join_cond,
         overlaps="association_artifacts_storages_rows,object_storage_row",
+    )
+    meta = relationship(
+        "ArtifactStorageRow",
+        back_populates="vfs_storages",
+        primaryjoin=_get_vfs_storage_meta_join_cond,
+        uselist=False,
+        viewonly=True,
     )
 
     def __str__(self) -> str:

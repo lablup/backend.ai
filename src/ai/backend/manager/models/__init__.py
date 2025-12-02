@@ -4,6 +4,7 @@ from . import app_config as _app_config
 from . import artifact as _artifact
 from . import artifact_registries as _artifact_registries
 from . import artifact_revision as _artifact_revision
+from . import artifact_storages as _artifact_storages
 from . import association_artifacts_storages as _association_artifacts_storages
 from . import association_container_registries_groups as _association_container_registries_groups
 from . import audit_log as _auditlog
@@ -47,6 +48,7 @@ __all__ = (
     *_acl.__all__,
     *_app_config.__all__,
     *_artifact_registries.__all__,
+    *_artifact_storages.__all__,
     *_auditlog.__all__,
     *_agent.__all__,
     *_artifact.__all__,
@@ -91,6 +93,7 @@ __all__ = (
 from .acl import *  # noqa
 from .app_config import *  # noqa
 from .artifact_registries import *  # noqa
+from .artifact_storages import *  # noqa
 from .audit_log import *  # noqa
 from .artifact import *  # noqa
 from .artifact_revision import *  # noqa
