@@ -48,6 +48,7 @@ from setproctitle import setproctitle
 from zmq.auth.certs import load_certificate
 
 from ai.backend.agent.agent import AbstractAgent
+from ai.backend.agent.errors import AgentInitializationError, InvalidAgentConfigError
 from ai.backend.agent.health.docker import DockerHealthChecker
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
@@ -319,7 +320,10 @@ class AgentRPCServer(aobject):
             agent_pkey, agent_skey = load_certificate(
                 str(self.local_config.agent_common.rpc_auth_agent_keypair)
             )
-            assert agent_skey is not None
+            if agent_skey is None:
+                raise AgentInitializationError(
+                    "Agent secret key is not available from the keypair file."
+                )
             self.rpc_auth_agent_public_key = PublicKey(agent_pkey)
             self.rpc_auth_agent_secret_key = SecretKey(agent_skey)
             log.info(
@@ -623,7 +627,8 @@ class AgentRPCServer(aobject):
         scaling_group: str,
         agent: AbstractAgent,
     ) -> None:
-        assert "agents" in config_data
+        if "agents" not in config_data:
+            raise InvalidAgentConfigError("Missing 'agents' section in configuration data.")
 
         for agent_config in config_data["agents"]:  # type: ignore[union-attr]
             if agent_config["agent"]["id"] == str(agent.id):  # type: ignore[index]

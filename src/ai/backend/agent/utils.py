@@ -100,10 +100,18 @@ def update_nested_dict(dest: MutableMapping, additions: Mapping) -> None:
             dest[k] = v
         else:
             if isinstance(dest[k], MutableMapping):
-                assert isinstance(v, MutableMapping)
+                if not isinstance(v, MutableMapping):
+                    raise TypeError(
+                        f"Cannot merge non-mapping value into mapping for key '{k}': "
+                        f"expected MutableMapping, got {type(v).__name__}."
+                    )
                 update_nested_dict(dest[k], v)
             elif isinstance(dest[k], List):
-                assert isinstance(v, List)
+                if not isinstance(v, List):
+                    raise TypeError(
+                        f"Cannot extend non-list value into list for key '{k}': "
+                        f"expected List, got {type(v).__name__}."
+                    )
                 dest[k].extend(v)
             else:
                 dest[k] = v

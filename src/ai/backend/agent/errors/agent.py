@@ -53,7 +53,7 @@ class ContainerCreationFailedError(BackendAIError, web.HTTPInternalServerError):
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
+            error_detail=ErrorDetail.UNAVAILABLE,
         )
 
 
@@ -95,7 +95,7 @@ class ContainerStartupFailedError(BackendAIError, web.HTTPInternalServerError):
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.START,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
+            error_detail=ErrorDetail.NOT_READY,
         )
 
 
@@ -208,4 +208,102 @@ class ImageCommandRequiredError(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.IMAGE,
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class AgentInitializationError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when agent initialization fails."""
+
+    error_type = "https://api.backend.ai/probs/agent/initialization-failed"
+    error_title = "Agent initialization failed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.NOT_READY,
+        )
+
+
+class InvalidAgentConfigError(BackendAIError, web.HTTPBadRequest):
+    """Raised when agent configuration is invalid."""
+
+    error_type = "https://api.backend.ai/probs/agent/invalid-config"
+    error_title = "Invalid agent configuration."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class InvalidMountPathError(BackendAIError, web.HTTPBadRequest):
+    """Raised when mount path configuration is invalid."""
+
+    error_type = "https://api.backend.ai/probs/agent/invalid-mount-path"
+    error_title = "Invalid mount path."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class InvalidLoggingConfigError(BackendAIError, web.HTTPBadRequest):
+    """Raised when logging configuration is invalid."""
+
+    error_type = "https://api.backend.ai/probs/agent/invalid-logging-config"
+    error_title = "Invalid logging configuration."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class InvalidChunkSizeError(BackendAIError, web.HTTPBadRequest):
+    """Raised when chunk size is invalid."""
+
+    error_type = "https://api.backend.ai/probs/agent/invalid-chunk-size"
+    error_title = "Invalid chunk size."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class AsyncioTaskNotAvailableError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when the current asyncio task context is not available."""
+
+    error_type = "https://api.backend.ai/probs/agent/asyncio-task-not-available"
+    error_title = "Asyncio task context not available."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.NOT_READY,
+        )
+
+
+class KernelNotFoundError(BackendAIError, web.HTTPNotFound):
+    """Raised when a kernel is not found."""
+
+    error_type = "https://api.backend.ai/probs/agent/kernel-not-found"
+    error_title = "Kernel not found."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.NOT_FOUND,
         )

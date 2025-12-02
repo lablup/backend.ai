@@ -12,6 +12,7 @@ from aiodocker.exceptions import DockerError
 
 from ai.backend.logging import BraceStyleAdapter
 
+from ..errors import SubprocessStreamError
 from ..exception import InitializationError
 from ..utils import closing_async, get_arch_name, update_nested_dict
 
@@ -112,7 +113,8 @@ class PersistentServiceContainer:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
             )
-            assert proc.stdin is not None
+            if proc.stdin is None:
+                raise SubprocessStreamError("Subprocess stdin is not available.")
             with closing(proc.stdin):
                 while True:
                     chunk = reader.read(IMAGE_CHUNK_SIZE)

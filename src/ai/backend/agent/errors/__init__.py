@@ -3,6 +3,8 @@ Agent-side error classes.
 """
 
 from .agent import (
+    AgentInitializationError,
+    AsyncioTaskNotAvailableError,
     ContainerCreationFailedError,
     ContainerStartupCancelledError,
     ContainerStartupFailedError,
@@ -10,6 +12,11 @@ from .agent import (
     ImageArchitectureMismatchError,
     ImageCommandRequiredError,
     ImagePullTimeoutError,
+    InvalidAgentConfigError,
+    InvalidChunkSizeError,
+    InvalidLoggingConfigError,
+    InvalidMountPathError,
+    KernelNotFoundError,
     ModelDefinitionEmptyError,
     ModelDefinitionInvalidYAMLError,
     ModelDefinitionNotFoundError,
@@ -28,12 +35,20 @@ from .kernel import (
 )
 from .resources import (
     AgentIdNotFoundError,
+    InvalidAllocMapTypeError,
+    InvalidConfigFormatError,
+    InvalidContainerMeasurementError,
+    InvalidMeasurementError,
+    InvalidOvercommitFactorError,
     InvalidResourceConfigError,
+    ResourceAllocationError,
     ResourceOverAllocatedError,
 )
 
 __all__ = [
     # agent
+    "AgentInitializationError",
+    "AsyncioTaskNotAvailableError",
     "ContainerCreationFailedError",
     "ContainerStartupCancelledError",
     "ContainerStartupFailedError",
@@ -41,6 +56,11 @@ __all__ = [
     "ImageArchitectureMismatchError",
     "ImageCommandRequiredError",
     "ImagePullTimeoutError",
+    "InvalidAgentConfigError",
+    "InvalidChunkSizeError",
+    "InvalidLoggingConfigError",
+    "InvalidMountPathError",
+    "KernelNotFoundError",
     "ModelDefinitionEmptyError",
     "ModelDefinitionInvalidYAMLError",
     "ModelDefinitionNotFoundError",
@@ -57,6 +77,12 @@ __all__ = [
     "SubprocessStreamError",
     # resources
     "AgentIdNotFoundError",
+    "InvalidAllocMapTypeError",
+    "InvalidConfigFormatError",
+    "InvalidContainerMeasurementError",
+    "InvalidMeasurementError",
+    "InvalidOvercommitFactorError",
     "InvalidResourceConfigError",
+    "ResourceAllocationError",
     "ResourceOverAllocatedError",
 ]
