@@ -1114,7 +1114,7 @@ class ComputeSession(BaseFunction):
                         pbar.update(len(chunk))
                     fp.close()
                     with tarfile.open(fp.name) as tarf:
-                        tarf.extractall(path=dest)
+                        tarf.extractall(path=dest, filter=tarfile.data_filter)
                         file_names.extend(tarf.getnames())
                     os.unlink(fp.name)
         return {"file_names": file_names}
