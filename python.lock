@@ -6936,19 +6936,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "e9ccfaa63a1342810dab06c2e40696c843e6f422137868d335ad282b93e468e3",
-              "url": "https://files.pythonhosted.org/packages/81/9d/353588c1fe06fa267a088a920eaebb0ac5b67f863dba0bff7c7deb4113a2/types_psutil-7.1.3.20251130-py3-none-any.whl"
+              "hash": "39bfc44780de7ab686c65169e36a7969db09e7f39d92de643b55789292953400",
+              "url": "https://files.pythonhosted.org/packages/1b/c3/7452fb13e3322885aa1f3c4b754fbb325eb666185656cb5982d720cc8fec/types_psutil-7.1.3.20251202-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7f42e7a7845a93397e430b48a8074a35410d7a436695fd3375ec9b687d8d95f8",
-              "url": "https://files.pythonhosted.org/packages/3d/0e/4c0c52099a8b4901d3e8eb5ac12ece32331b96bf87690377fb6c90f85475/types_psutil-7.1.3.20251130.tar.gz"
+              "hash": "5cfecaced7c486fb3995bb290eab45043d697a261718aca01b9b340d1ab7968a",
+              "url": "https://files.pythonhosted.org/packages/56/38/fe935d9e9e70f9f0aaa04b743673a72acafcb6410d7a565c7c333348faa3/types_psutil-7.1.3.20251202.tar.gz"
             }
           ],
           "project_name": "types-psutil",
           "requires_dists": [],
           "requires_python": ">=3.9",
-          "version": "7.1.3.20251130"
+          "version": "7.1.3.20251202"
         },
         {
           "artifacts": [
