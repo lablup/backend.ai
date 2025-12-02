@@ -28,6 +28,7 @@ from ai.backend.manager.data.agent.types import (
     AgentHeartbeatUpsert,
     UpsertResult,
 )
+from ai.backend.manager.models.agent import ADMIN_PERMISSIONS as ADMIN_AGENT_PERMISSIONS
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
@@ -235,7 +236,7 @@ class AgentService:
         return GetTotalResourcesActionResult(total_resources=total_resources)
 
     async def search_agents(self, action: SearchAgentsAction) -> SearchAgentsActionResult:
-        """Searches agents."""
+        """Searches agents. It is used by superadmin only."""
         result = await self._agent_repository.search_agents(
             querier=action.querier,
         )
@@ -243,6 +244,7 @@ class AgentService:
         return SearchAgentsActionResult(
             agents=result.items,
             total_count=result.total_count,
+            permissions=list(ADMIN_AGENT_PERMISSIONS),
         )
 
     async def handle_heartbeat(self, action: HandleHeartbeatAction) -> HandleHeartbeatActionResult:

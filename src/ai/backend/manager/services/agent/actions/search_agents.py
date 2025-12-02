@@ -5,6 +5,7 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.agent.types import AgentData
+from ai.backend.manager.models.rbac.permission_defs import AgentPermission
 from ai.backend.manager.repositories.base import Querier
 
 from .base import AgentAction
@@ -31,6 +32,7 @@ class SearchAgentsActionResult(BaseActionResult):
     """Result of searching agents."""
 
     agents: list[AgentData]
+    permissions: list[AgentPermission]
     total_count: int
 
     @override
