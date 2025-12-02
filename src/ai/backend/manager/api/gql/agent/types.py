@@ -244,13 +244,7 @@ class AgentNetworkInfoGQL:
     name="AgentV2", description="Added in 25.18.0. Strawberry-based Agent type replacing AgentNode."
 )
 class AgentV2GQL(Node):
-    id: NodeID[str] = strawberry.field(
-        description=dedent_strip("""
-            Relay-style global node identifier for the agent.
-            Unique identifier following the Relay specification for GraphQL pagination and node queries.
-            Can be used with the node(id:) root query to directly fetch this agent.
-        """)
-    )
+    id: NodeID[str]
     resource_info: AgentResourceGQL = strawberry.field(
         description=dedent_strip("""
             Hardware resource capacity, usage, and availability information.
