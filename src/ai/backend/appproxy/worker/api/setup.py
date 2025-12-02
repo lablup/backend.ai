@@ -172,6 +172,10 @@ async def setup(
                 PERMIT_COOKIE_NAME,
                 calculate_permit_hash(root_ctx.local_config.permit_hash, circuit.app_info.user_id),
                 domain=cookie_domain,
+                httponly=True,
+                secure=use_tls,
+                samesite="Lax",
+                max_age=604800,  # 7 days
             )
             return response
         case ProxyProtocol.TCP:
