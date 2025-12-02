@@ -5,6 +5,8 @@ from jinja2 import nodes
 from jinja2.ext import Extension
 from jinja2.parser import Parser
 
+from .errors import InvalidTemplateValueError
+
 
 class TOMLField(Extension):
     tags = {"toml_field"}
@@ -69,5 +71,6 @@ def toml_scalar(s: Any) -> str:
     """
     # If our custom tags are used, null values must be handled as commenting out the
     # entire field line and should not be passed to this filter.
-    assert s is not None, "null is not allowed as a TOML scalar value"
+    if s is None:
+        raise InvalidTemplateValueError("null is not allowed as a TOML scalar value")
     return json.dumps(s, ensure_ascii=False)

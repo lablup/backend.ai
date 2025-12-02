@@ -59,6 +59,7 @@ from ai.backend.web.security import SecurityPolicy, security_policy_middleware
 
 from . import __version__, user_agent
 from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
+from .errors import InvalidAPIConfigurationError
 from .proxy import (
     decrypt_payload,
     web_handler,
@@ -228,7 +229,10 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
             user_agent=user_agent,
             skip_sslcert_validation=not config.api.ssl_verify,
         )
-        assert anon_api_config.is_anonymous
+        if not anon_api_config.is_anonymous:
+            raise InvalidAPIConfigurationError(
+                "Anonymous API configuration is not properly initialized."
+            )
         async with APISession(config=anon_api_config) as api_session:
             fill_forwarding_hdrs_to_api_session(request, api_session)
             result = await api_session.Auth.update_password_no_auth(
@@ -397,7 +401,10 @@ async def login_handler(request: web.Request) -> web.Response:
             user_agent=user_agent,
             skip_sslcert_validation=not config.api.ssl_verify,
         )
-        assert anon_api_config.is_anonymous
+        if not anon_api_config.is_anonymous:
+            raise InvalidAPIConfigurationError(
+                "Anonymous API configuration is not properly initialized."
+            )
         async with APISession(config=anon_api_config) as api_session:
             fill_forwarding_hdrs_to_api_session(request, api_session)
             extra_args = {}
@@ -574,7 +581,10 @@ async def token_login_handler(request: web.Request) -> web.Response:
             user_agent=user_agent,
             skip_sslcert_validation=not config.api.ssl_verify,
         )
-        assert anon_api_config.is_anonymous
+        if not anon_api_config.is_anonymous:
+            raise InvalidAPIConfigurationError(
+                "Anonymous API configuration is not properly initialized."
+            )
         async with APISession(config=anon_api_config) as api_session:
             fill_forwarding_hdrs_to_api_session(request, api_session)
             # Instead of email and password, token will be used for user auth.
