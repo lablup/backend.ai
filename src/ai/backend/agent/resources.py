@@ -613,16 +613,18 @@ class ResourceAllocator(aobject):
             )
             devices_allocated_slots.append(device_allocated_slots)
 
-            agent_alloc_map = await ctx.instance.create_alloc_map()
-            agent_alloc_map.update_device_slot_amounts(device_allocated_slots)
-            agent_computers[device_name] = ComputerContext(
-                ctx.instance, ctx.devices, agent_alloc_map
-            )
-
             device_reserved_slots = self._calculate_reserved_slots(
                 device_allocated_slots, total_slots
             )
             devices_reserved_slots.append(device_reserved_slots)
+
+            agent_alloc_map = await ctx.instance.create_alloc_map()
+            agent_alloc_map.update_device_slot_amounts(
+                device_allocated_slots, device_reserved_slots, len(ctx.devices)
+            )
+            agent_computers[device_name] = ComputerContext(
+                ctx.instance, ctx.devices, agent_alloc_map
+            )
 
         reserved_slots = _combine_mappings(devices_reserved_slots)
         resource_scaling_factor = self._calculate_resource_scaling_factor(
