@@ -95,7 +95,7 @@ class AgentFilterGQL:
         return field_conditions
 
 
-@strawberry.input(description="Added in 25.18.0. Options for ordering agents")
+@strawberry.input(name="AgentOrderBy", description="Added in 25.18.0. Options for ordering agents")
 class AgentOrderByGQL:
     field: AgentOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
@@ -141,7 +141,7 @@ class AgentResourceGQL:
     )
 
 
-@strawberry.type(name="AgentResource", description="Added in 25.15.0")
+@strawberry.type(name="AgentStats", description="Added in 25.15.0")
 class AgentStatsGQL:
     total_resource: AgentResourceGQL = strawberry.field(description="Added in 25.15.0")
 
