@@ -55,7 +55,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from ..errors.common import GenericForbidden
 from ..errors.kernel import SessionNotFound
-from ..errors.resource import GroupNotFound
+from ..errors.resource import GroupNotFound, NoCurrentTaskContext
 from ..events.hub.propagators.session import SessionEventPropagator
 from ..exceptions import InvalidArgument
 from ..models import UserRole, groups
@@ -119,7 +119,8 @@ async def push_session_events(
     )
     priv_ctx: PrivateContext = request.app["events.context"]
     current_task = asyncio.current_task()
-    assert current_task is not None
+    if current_task is None:
+        raise NoCurrentTaskContext("Cannot get current asyncio task for event streaming")
     priv_ctx.active_tasks.add(current_task)
 
     # Resolve session name to session ID
@@ -195,7 +196,8 @@ async def push_background_task_events(
     access_key = request["keypair"]["access_key"]
     log.info("PUSH_BACKGROUND_TASK_EVENTS (ak:{}, t:{})", access_key, task_id)
     current_task = asyncio.current_task()
-    assert current_task is not None
+    if current_task is None:
+        raise NoCurrentTaskContext("Cannot get current asyncio task for background task streaming")
     priv_ctx.active_tasks.add(current_task)
     async with sse_response(request) as resp:
         propagator = WithCachePropagator(root_ctx.event_fetcher)

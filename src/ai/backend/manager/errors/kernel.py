@@ -324,3 +324,15 @@ class IdlePolicyNotFound(ObjectNotFound):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class InvalidKernelStatus(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/invalid-kernel-status"
+    error_title = "Invalid kernel status for this operation."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )

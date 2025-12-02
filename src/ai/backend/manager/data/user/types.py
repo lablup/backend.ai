@@ -16,6 +16,7 @@ from ai.backend.manager.data.permission.types import (
     OperationType,
     ScopeType,
 )
+from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.types import Creator
 
 from ..keypair.types import KeyPairData
@@ -37,7 +38,10 @@ class UserStatus(enum.StrEnum):
     @override
     @classmethod
     def _missing_(cls, value: Any) -> Optional[UserStatus]:
-        assert isinstance(value, str)
+        if not isinstance(value, str):
+            raise DataTransformationFailed(
+                f"UserStatus value must be a string, got {type(value).__name__}"
+            )
         match value.upper():
             case "ACTIVE":
                 return cls.ACTIVE

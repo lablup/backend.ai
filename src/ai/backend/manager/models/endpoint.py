@@ -75,6 +75,7 @@ from ..data.model_serving.types import (
 )
 from ..errors.api import InvalidAPIParameters
 from ..errors.common import ObjectNotFound, ServiceUnavailable
+from ..errors.resource import DataTransformationFailed
 from ..models.storage import StorageSessionManager
 from ..types import MountOptionModel, UserScope
 from .base import (
@@ -1185,7 +1186,8 @@ class ModelServiceHelper:
 
         try:
             model_definition = model_definition_iv.check(raw_model_definition)
-            assert model_definition is not None
+            if model_definition is None:
+                raise DataTransformationFailed("Model definition validation returned None")
             return model_definition
         except t.DataError as e:
             raise InvalidAPIParameters(
