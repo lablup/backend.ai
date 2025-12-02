@@ -6,6 +6,7 @@ from pathlib import Path
 import sqlalchemy as sa
 from sqlalchemy.orm import foreign, relationship
 
+from ai.backend.common.exception import RelationNotLoadedError
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
@@ -40,7 +41,6 @@ class VFSStorageRow(Base):
     __tablename__ = "vfs_storages"
 
     id = IDColumn("id")
-    name = sa.Column("name", sa.String, index=True, unique=True, nullable=False)
     host = sa.Column("host", sa.String, nullable=False)
     base_path = sa.Column("base_path", sa.String, nullable=False)
 
@@ -59,21 +59,18 @@ class VFSStorageRow(Base):
     )
 
     def __str__(self) -> str:
-        return (
-            f"VFSStorageRow("
-            f"id={self.id}, "
-            f"name={self.name}, "
-            f"host={self.host}, "
-            f"base_path={self.base_path})"
-        )
+        return f"VFSStorageRow(id={self.id}, host={self.host}, base_path={self.base_path})"
 
     def __repr__(self) -> str:
         return self.__str__()
 
     def to_dataclass(self) -> VFSStorageData:
-        return VFSStorageData(
-            id=self.id,
-            name=self.name,
-            host=self.host,
-            base_path=Path(self.base_path),
-        )
+        try:
+            return VFSStorageData(
+                id=self.id,
+                name=self.meta.name,
+                host=self.host,
+                base_path=Path(self.base_path),
+            )
+        except Exception:
+            raise RelationNotLoadedError()
