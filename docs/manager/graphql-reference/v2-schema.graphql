@@ -118,7 +118,7 @@ type AgentNetworkInfo {
 }
 
 """Added in 25.18.0. Options for ordering agents"""
-input AgentOrderByGQL {
+input AgentOrderBy {
   field: AgentOrderField!
   direction: OrderDirection! = ASC
 }
@@ -136,12 +136,6 @@ enum AgentPermission {
   UPDATE_ATTRIBUTE
   CREATE_COMPUTE_SESSION
   CREATE_SERVICE
-}
-
-"""Added in 25.15.0"""
-type AgentResource {
-  """Added in 25.15.0"""
-  totalResource: AgentResourceGQL!
 }
 
 """Added in 25.15.0"""
@@ -169,6 +163,12 @@ type AgentResourceGQL {
   the same structure as capacity.
   """
   free: JSON!
+}
+
+"""Added in 25.15.0"""
+type AgentStats {
+  """Added in 25.15.0"""
+  totalResource: AgentResourceGQL!
 }
 
 enum AgentStatus {
@@ -2317,10 +2317,10 @@ type Query {
   _service: _Service!
 
   """Added in 25.15.0"""
-  agentStats: AgentResource!
+  agentStats: AgentStats!
 
   """Added in 25.18.0"""
-  agentsV2(filter: AgentFilter = null, orderBy: [AgentOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AgentV2Connection!
+  agentsV2(filter: AgentFilter = null, orderBy: [AgentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AgentV2Connection!
 
   """
   Added in 25.14.0.

@@ -275,7 +275,7 @@ type AgentNode implements Node
 }
 
 """Added in 25.18.0. Options for ordering agents"""
-input AgentOrderByGQL
+input AgentOrderBy
   @join__type(graph: STRAWBERRY)
 {
   field: AgentOrderField!
@@ -308,14 +308,6 @@ scalar AgentPermissionField
   @join__type(graph: GRAPHENE)
 
 """Added in 25.15.0"""
-type AgentResource
-  @join__type(graph: STRAWBERRY)
-{
-  """Added in 25.15.0"""
-  totalResource: AgentResourceGQL!
-}
-
-"""Added in 25.15.0"""
 type AgentResourceGQL
   @join__type(graph: STRAWBERRY)
 {
@@ -342,6 +334,14 @@ type AgentResourceGQL
   the same structure as capacity.
   """
   free: JSON!
+}
+
+"""Added in 25.15.0"""
+type AgentStats
+  @join__type(graph: STRAWBERRY)
+{
+  """Added in 25.15.0"""
+  totalResource: AgentResourceGQL!
 }
 
 enum AgentStatus
@@ -6208,10 +6208,10 @@ type Query
   service_configs(services: [String]!, filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ServiceConfigConnection @join__field(graph: GRAPHENE)
 
   """Added in 25.15.0"""
-  agentStats: AgentResource! @join__field(graph: STRAWBERRY)
+  agentStats: AgentStats! @join__field(graph: STRAWBERRY)
 
   """Added in 25.18.0"""
-  agentsV2(filter: AgentFilter = null, orderBy: [AgentOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AgentV2Connection! @join__field(graph: STRAWBERRY)
+  agentsV2(filter: AgentFilter = null, orderBy: [AgentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AgentV2Connection! @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.14.0.
