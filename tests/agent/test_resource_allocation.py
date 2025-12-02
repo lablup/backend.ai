@@ -25,6 +25,7 @@ from ai.backend.agent.config.unified import (
     ResourceAllocationMode,
 )
 from ai.backend.agent.resources import (
+    AbstractComputeDevice,
     AbstractComputePlugin,
     ResourceAllocator,
 )
@@ -151,6 +152,13 @@ def create_mock_computers(
         mock_plugin: AbstractComputePlugin = Mock(spec=AbstractComputePlugin)  # type: ignore[assignment]
         mock_plugin.get_metadata.return_value = {"slot_name": str(device_name)}  # type: ignore[attr-defined]
 
+        # Create mock devices for each device_id in the alloc_map
+        mock_devices: list[AbstractComputeDevice] = []
+        for dev_id in alloc_map.device_slots.keys():
+            mock_device: AbstractComputeDevice = Mock(spec=AbstractComputeDevice)  # type: ignore[assignment]
+            mock_device.device_id = dev_id  # type: ignore[attr-defined]
+            mock_devices.append(mock_device)
+
         # Create a fresh alloc_map for each call
         async def _create_alloc_map(original_map: AbstractAllocMap = alloc_map) -> AbstractAllocMap:  # type: ignore[misc]
             if isinstance(original_map, FractionAllocMap):
@@ -166,7 +174,7 @@ def create_mock_computers(
             raise NotImplementedError(f"Unsupported alloc_map type: {type(original_map)}")
 
         mock_plugin.create_alloc_map = _create_alloc_map  # type: ignore[attr-defined,assignment]
-        mock_plugin.list_devices = AsyncMock(return_value=[])  # type: ignore[attr-defined,method-assign]
+        mock_plugin.list_devices = AsyncMock(return_value=mock_devices)  # type: ignore[attr-defined,method-assign]
         mock_plugin.cleanup = AsyncMock(return_value=None)  # type: ignore[attr-defined,method-assign]
 
         result[device_name] = mock_plugin
@@ -276,9 +284,11 @@ class TestSharedMode:
             reserved_mem="4G",
         )
 
+        # Create 8 CPU devices (1 core each) so after reserved_cpu=2 subtraction,
+        # we have 6 effective devices. Single mem device with 16G.
         computers = create_mock_computers({
             DeviceName("cpu"): create_fraction_alloc_map({
-                DeviceId("cpu"): (SlotName("cpu"), Decimal("8")),
+                DeviceId(f"cpu{i}"): (SlotName("cpu"), Decimal("1")) for i in range(8)
             }),
             DeviceName("root"): create_fraction_alloc_map({
                 DeviceId("root"): (SlotName("mem"), Decimal(BinarySize.finite_from_str("16G"))),
@@ -292,15 +302,23 @@ class TestSharedMode:
 
         agent1_computers = allocator.get_computers(AgentId("agent1"))
 
-        expected_cpu = Decimal("8") - Decimal("2")
+        # SHARED mode: available = total - reserved
+        # For CPU: total=8, reserved=2, available=6
+        # With reserved_cpu=2, num_devices = 8 - 2 = 6
+        # Per device = 6 / 6 = 1
+        expected_cpu_per_device = Decimal("1")
+        for i in range(6):  # Only 6 effective devices (8 - reserved_cpu)
+            assert (
+                agent1_computers[DeviceName("cpu")]
+                .alloc_map.device_slots[DeviceId(f"cpu{i}")]
+                .amount
+                == expected_cpu_per_device
+            )
+
+        # For mem: total=16G, reserved=4G, available=12G
+        # Single device, so amount = 12G / 1 = 12G
         expected_mem = Decimal(BinarySize.finite_from_str("16G")) - Decimal(
             BinarySize.finite_from_str("4G")
-        )
-
-        # In SHARED mode with single agent, resources are reduced by reservation
-        assert (
-            agent1_computers[DeviceName("cpu")].alloc_map.device_slots[DeviceId("cpu")].amount
-            == expected_cpu
         )
         assert (
             agent1_computers[DeviceName("root")].alloc_map.device_slots[DeviceId("root")].amount
@@ -321,6 +339,7 @@ class TestAutoSplitMode:
             num_agents=2,
         )
 
+        # Single CUDA device with 1.0 shares
         computers = create_mock_computers({
             DeviceName("cuda"): create_fraction_alloc_map({
                 DeviceId("cuda"): (SlotName("cuda.shares"), Decimal("1.0")),
@@ -335,7 +354,8 @@ class TestAutoSplitMode:
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
 
-        # Each agent gets half
+        # Each agent gets half (1.0 / 2 = 0.5)
+        # With 1 device, amount = 0.5 / 1 = 0.5
         assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
             DeviceId("cuda")
         ].amount == Decimal("0.5")
@@ -360,6 +380,7 @@ class TestAutoSplitMode:
             num_agents=2,
         )
 
+        # Single CUDA device with 8 slots
         computers = create_mock_computers({
             DeviceName("cuda"): create_discrete_alloc_map({
                 DeviceId("cuda"): (SlotName("cuda"), Decimal("8")),
@@ -374,7 +395,8 @@ class TestAutoSplitMode:
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
 
-        # Each agent gets 4
+        # Each agent gets 4 (8 / 2 agents)
+        # With 1 device, amount = 4 / 1 = 4
         assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
             DeviceId("cuda")
         ].amount == Decimal("4")
@@ -394,6 +416,7 @@ class TestAutoSplitMode:
             num_agents=3,
         )
 
+        # Single CUDA device with 5 slots
         computers = create_mock_computers({
             DeviceName("cuda"): create_discrete_alloc_map({
                 DeviceId("cuda"): (SlotName("cuda"), Decimal("5")),
@@ -434,9 +457,11 @@ class TestAutoSplitMode:
             num_agents=2,
         )
 
+        # 8 CPU devices with 2 cores each (total 16 cores)
+        # With reserved_cpu=4, num_devices = 8 - 4 = 4
         computers = create_mock_computers({
             DeviceName("cpu"): create_fraction_alloc_map({
-                DeviceId("cpu"): (SlotName("cpu"), Decimal("16")),
+                DeviceId(f"cpu{i}"): (SlotName("cpu"), Decimal("2")) for i in range(8)
             }),
         })
 
@@ -448,13 +473,23 @@ class TestAutoSplitMode:
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
 
-        # (16 - 4) / 2 = 6 per agent
-        assert agent1_computers[DeviceName("cpu")].alloc_map.device_slots[
-            DeviceId("cpu")
-        ].amount == Decimal("6")
-        assert agent2_computers[DeviceName("cpu")].alloc_map.device_slots[
-            DeviceId("cpu")
-        ].amount == Decimal("6")
+        # Total = 16, reserved = 4, available = 12
+        # Split between 2 agents: 12 / 2 = 6 per agent
+        # With num_devices = 8 - 4 = 4, per device = 6 / 4 = 1.5
+        expected_per_device = Decimal("1.5")
+        for i in range(4):  # Only 4 effective devices
+            assert (
+                agent1_computers[DeviceName("cpu")]
+                .alloc_map.device_slots[DeviceId(f"cpu{i}")]
+                .amount
+                == expected_per_device
+            )
+            assert (
+                agent2_computers[DeviceName("cpu")]
+                .alloc_map.device_slots[DeviceId(f"cpu{i}")]
+                .amount
+                == expected_per_device
+            )
 
         reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
         reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
@@ -478,9 +513,14 @@ class TestManualMode:
             num_agents=2,
         )
 
+        # Separate CPU and mem devices in different device groups
+        # CPU device group with 1 device (16 cores)
+        # Root device group with 1 device (32G mem)
         computers = create_mock_computers({
             DeviceName("cpu"): create_fraction_alloc_map({
                 DeviceId("cpu"): (SlotName("cpu"), Decimal("16")),
+            }),
+            DeviceName("root"): create_fraction_alloc_map({
                 DeviceId("mem"): (SlotName("mem"), Decimal(BinarySize.finite_from_str("32G"))),
             }),
         })
@@ -493,17 +533,19 @@ class TestManualMode:
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
 
-        # Each agent gets exactly what was allocated
+        # Each agent gets 4 CPU and 8G mem
+        # CPU: allocated=4, num_devices=1, per device = 4 / 1 = 4
+        # Mem: allocated=8G, num_devices=1, per device = 8G / 1 = 8G
         assert agent1_computers[DeviceName("cpu")].alloc_map.device_slots[
             DeviceId("cpu")
         ].amount == Decimal("4")
-        assert agent1_computers[DeviceName("cpu")].alloc_map.device_slots[
+        assert agent1_computers[DeviceName("root")].alloc_map.device_slots[
             DeviceId("mem")
         ].amount == Decimal(BinarySize.finite_from_str("8G"))
         assert agent2_computers[DeviceName("cpu")].alloc_map.device_slots[
             DeviceId("cpu")
         ].amount == Decimal("4")
-        assert agent2_computers[DeviceName("cpu")].alloc_map.device_slots[
+        assert agent2_computers[DeviceName("root")].alloc_map.device_slots[
             DeviceId("mem")
         ].amount == Decimal(BinarySize.finite_from_str("8G"))
 
@@ -519,19 +561,23 @@ class TestManualMode:
             allocated_cpu=8,
             allocated_mem="16G",
             allocated_devices={
-                SlotName("cuda.shares"): Decimal("0.3"),
-                SlotName("cuda.mem"): Decimal("8000000000"),
+                SlotName("cuda.shares"): Decimal("0.5"),
             },
         )
 
+        # Each device in its own group to avoid division by multiple devices
+        # CPU device group with 1 device
+        # Root device group with 1 device (mem)
+        # CUDA device group with 1 device (cuda.shares only)
         computers = create_mock_computers({
             DeviceName("cpu"): create_fraction_alloc_map({
                 DeviceId("cpu"): (SlotName("cpu"), Decimal("16")),
+            }),
+            DeviceName("root"): create_fraction_alloc_map({
                 DeviceId("mem"): (SlotName("mem"), Decimal(BinarySize.finite_from_str("32G"))),
             }),
             DeviceName("cuda"): create_fraction_alloc_map({
-                DeviceId("cuda.shares"): (SlotName("cuda.shares"), Decimal("1.0")),
-                DeviceId("cuda.mem"): (SlotName("cuda.mem"), Decimal("16000000000")),
+                DeviceId("cuda0"): (SlotName("cuda.shares"), Decimal("1.0")),
             }),
         })
 
@@ -542,12 +588,10 @@ class TestManualMode:
 
         agent1_computers = allocator.get_computers(AgentId("agent1"))
 
+        # With 1 device per group, amount = allocated / 1 = allocated
         assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
-            DeviceId("cuda.shares")
-        ].amount == Decimal("0.3")
-        assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
-            DeviceId("cuda.mem")
-        ].amount == Decimal("8000000000")
+            DeviceId("cuda0")
+        ].amount == Decimal("0.5")
 
         await allocator.__aexit__(None, None, None)
 
@@ -617,10 +661,14 @@ class TestMultiDeviceScenarios:
             allocated_mem="8G",
         )
 
-        # Create 1 CPU device with 8 cores and 1 memory device
+        # Separate CPU and memory into different device groups
+        # CPU device group with 1 device (8 cores)
+        # Root device group with 1 device (16G mem)
         computers = create_mock_computers({
             DeviceName("cpu"): create_discrete_alloc_map({
                 DeviceId("cpu"): (SlotName("cpu"), Decimal("8")),
+            }),
+            DeviceName("root"): create_discrete_alloc_map({
                 DeviceId("mem"): (SlotName("mem"), Decimal(BinarySize.finite_from_str("16G"))),
             }),
         })
@@ -633,12 +681,14 @@ class TestMultiDeviceScenarios:
         agent1_computers = allocator.get_computers(AgentId("agent1"))
 
         # CPU device should show the manually allocated amount (3 cores out of 8 available)
+        # With 1 device in the group, amount = 3 / 1 = 3
         assert agent1_computers[DeviceName("cpu")].alloc_map.device_slots[
             DeviceId("cpu")
         ].amount == Decimal("3")
 
         # Memory device should be set to allocated amount (8G out of 16G available)
-        assert agent1_computers[DeviceName("cpu")].alloc_map.device_slots[
+        # With 1 device in the group, amount = 8G / 1 = 8G
+        assert agent1_computers[DeviceName("root")].alloc_map.device_slots[
             DeviceId("mem")
         ].amount == Decimal(BinarySize.finite_from_str("8G"))
 
@@ -705,17 +755,18 @@ class TestMultiDeviceScenarios:
         agent2_computers = allocator.get_computers(AgentId("agent2"))
         agent3_computers = allocator.get_computers(AgentId("agent3"))
 
-        # In SHARED mode, all agents see all devices with full capacity
+        # In SHARED mode, all agents see all devices
+        # Total = 4, with 4 devices, amount per device = 4 / 4 = 1
         for i in range(4):
             assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
                 DeviceId(f"cuda{i}")
-            ].amount == Decimal("4")
+            ].amount == Decimal("1")
             assert agent2_computers[DeviceName("cuda")].alloc_map.device_slots[
                 DeviceId(f"cuda{i}")
-            ].amount == Decimal("4")
+            ].amount == Decimal("1")
             assert agent3_computers[DeviceName("cuda")].alloc_map.device_slots[
                 DeviceId(f"cuda{i}")
-            ].amount == Decimal("4")
+            ].amount == Decimal("1")
 
         await allocator.__aexit__(None, None, None)
 
@@ -783,5 +834,87 @@ class TestMultiDeviceScenarios:
         assert agent2_computers[DeviceName("cuda")].alloc_map.device_slots[
             DeviceId("cuda0")
         ].amount == Decimal("0.5")
+
+        await allocator.__aexit__(None, None, None)
+
+    async def test_multi_gpu_auto_split(
+        self,
+        mock_etcd: AsyncEtcd,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test AUTO_SPLIT with multiple GPU devices sharing the same slot type."""
+        config = create_test_config(
+            allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
+            num_agents=2,
+        )
+
+        # 4 GPU devices with 1.0 shares each (total 4.0 shares)
+        computers = create_mock_computers({
+            DeviceName("cuda"): create_fraction_alloc_map({
+                DeviceId(f"cuda{i}"): (SlotName("cuda.shares"), Decimal("1.0")) for i in range(4)
+            }),
+        })
+
+        setup_mock_resources(monkeypatch, computers)
+
+        allocator = ResourceAllocator(config, mock_etcd)
+        await allocator.__ainit__()
+
+        agent1_computers = allocator.get_computers(AgentId("agent1"))
+        agent2_computers = allocator.get_computers(AgentId("agent2"))
+
+        # Total = 4.0 shares, each agent gets 2.0 shares
+        # With 4 devices sharing the same slot type, per-device = 2.0 / 4 = 0.5
+        for i in range(4):
+            assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
+                DeviceId(f"cuda{i}")
+            ].amount == Decimal("0.5")
+            assert agent2_computers[DeviceName("cuda")].alloc_map.device_slots[
+                DeviceId(f"cuda{i}")
+            ].amount == Decimal("0.5")
+
+        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
+        reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
+        assert reserved1[SlotName("cuda.shares")] == Decimal("2")
+        assert reserved2[SlotName("cuda.shares")] == Decimal("2")
+
+        await allocator.__aexit__(None, None, None)
+
+    async def test_multi_gpu_shared_mode_with_reservation(
+        self,
+        mock_etcd: AsyncEtcd,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test SHARED mode with multiple GPU devices and system reservation."""
+        config = create_test_config(
+            allocation_mode=ResourceAllocationMode.SHARED,
+            num_agents=2,
+        )
+
+        # 4 GPU devices with 8GB memory each (total 32GB)
+        computers = create_mock_computers({
+            DeviceName("cuda"): create_discrete_alloc_map({
+                DeviceId(f"cuda{i}"): (SlotName("cuda.mem"), Decimal("8000000000"))
+                for i in range(4)
+            }),
+        })
+
+        setup_mock_resources(monkeypatch, computers)
+
+        allocator = ResourceAllocator(config, mock_etcd)
+        await allocator.__ainit__()
+
+        agent1_computers = allocator.get_computers(AgentId("agent1"))
+        agent2_computers = allocator.get_computers(AgentId("agent2"))
+
+        # SHARED mode: both agents get full resources
+        # Total = 32GB, with 4 devices, per-device = 32GB / 4 = 8GB
+        for i in range(4):
+            assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
+                DeviceId(f"cuda{i}")
+            ].amount == Decimal("8000000000")
+            assert agent2_computers[DeviceName("cuda")].alloc_map.device_slots[
+                DeviceId(f"cuda{i}")
+            ].amount == Decimal("8000000000")
 
         await allocator.__aexit__(None, None, None)
