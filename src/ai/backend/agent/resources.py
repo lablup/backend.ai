@@ -470,6 +470,22 @@ ComputersMap: TypeAlias = Mapping[DeviceName, ComputerContext]
 SlotsMap: TypeAlias = Mapping[SlotName, Decimal]
 
 
+@attrs.define(auto_attribs=True, slots=True)
+class DevicePartition:
+    """
+    Represents a partition of devices assigned to a single agent via fill-from-front.
+
+    Each agent gets a portion of the available devices, where the same device may
+    appear in multiple agents' partitions with different allocated amounts.
+    """
+
+    device_shares: Sequence[tuple[AbstractComputeDevice, Decimal]]
+    """List of (device, allocated_amount) tuples for this partition."""
+
+    device_slots: Mapping[DeviceId, DeviceSlotInfo]
+    """Device slots with their allocated amounts for this partition."""
+
+
 class ResourceAllocator(aobject):
     local_config: AgentUnifiedConfig
     etcd: AsyncEtcd
@@ -493,34 +509,27 @@ class ResourceAllocator(aobject):
 
     async def __ainit__(self) -> None:
         alloc_map_mod.log_alloc_map = self.local_config.debug.log_alloc_map
-        computers = await self._load_resources()
+        self.computers = await self._create_global_computers()
 
-        computer_contexts: dict[DeviceName, ComputerContext] = {}
-        for name, computer in computers.items():
-            devices = await computer.list_devices()
-            alloc_map = await computer.create_alloc_map()
-            computer_contexts[name] = ComputerContext(computer, devices, alloc_map)
-        self.computers = computer_contexts
         total_slots = self._calculate_total_slots()
         self.available_total_slots = self._calculate_available_total_slots(total_slots)
 
-        agent_computers = {}
+        agent_allocated_slots = {}
         agent_reserved_slots = {}
         agent_resource_scaling_factor = {}
         for agent_idx, agent_config in enumerate(self.agent_configs):
             res = await self._calculate_agent_partition(agent_idx, agent_config, total_slots)
-            agent_computer, reserved_slots, resource_scaling_factor = res
+            allocated_slots, reserved_slots, resource_scaling_factor = res
 
             agent_id = AgentId(agent_config.agent.defaulted_id)
-            agent_computers[agent_id] = agent_computer
+            agent_allocated_slots[agent_id] = allocated_slots
             agent_reserved_slots[agent_id] = reserved_slots
             agent_resource_scaling_factor[agent_id] = resource_scaling_factor
-
-        self.agent_computers = agent_computers
         self.agent_reserved_slots = agent_reserved_slots
         self.agent_resource_scaling_factor = agent_resource_scaling_factor
-
         self._ensure_slots_are_not_overallocated()
+
+        self.agent_computers = await self._build_agent_computers(agent_allocated_slots)
 
     async def __aexit__(self, *exc_info) -> None:
         for _, computer in self.computers.items():
@@ -573,6 +582,16 @@ class ResourceAllocator(aobject):
             raise AgentIdNotFoundError(f"Agent ID {agent_id} not in computers")
         return self.agent_resource_scaling_factor[agent_id]
 
+    async def _create_global_computers(self) -> ComputersMap:
+        computer_plugins = await self._load_resources()
+
+        computers: dict[DeviceName, ComputerContext] = {}
+        for name, computer in computer_plugins.items():
+            devices = await computer.list_devices()
+            alloc_map = await computer.create_alloc_map()
+            computers[name] = ComputerContext(computer, devices, alloc_map)
+        return computers
+
     def _calculate_total_slots(self) -> SlotsMap:
         total_slots: dict[SlotName, Decimal] = defaultdict(lambda: Decimal("0"))
         for device in self.computers.values():
@@ -603,32 +622,25 @@ class ResourceAllocator(aobject):
         agent_idx: int,
         agent_config: AgentUnifiedConfig,
         total_slots: SlotsMap,
-    ) -> tuple[ComputersMap, SlotsMap, SlotsMap]:
-        agent_computers: dict[DeviceName, ComputerContext] = {}
+    ) -> tuple[SlotsMap, SlotsMap, SlotsMap]:
         devices_allocated_slots: list[Mapping[SlotName, Decimal]] = []
         devices_reserved_slots: list[Mapping[SlotName, Decimal]] = []
-        for device_name, ctx in self.computers.items():
+        for ctx in self.computers.values():
             device_allocated_slots = self._calculate_device_slots(
                 ctx.alloc_map, agent_idx, agent_config
             )
             devices_allocated_slots.append(device_allocated_slots)
-
-            agent_alloc_map = await ctx.instance.create_alloc_map()
-            agent_computers[device_name] = ComputerContext(
-                ctx.instance, ctx.devices, agent_alloc_map
-            )
 
             device_reserved_slots = self._calculate_reserved_slots(
                 device_allocated_slots, total_slots
             )
             devices_reserved_slots.append(device_reserved_slots)
 
+        allocated_slots = _combine_mappings(devices_allocated_slots)
         reserved_slots = _combine_mappings(devices_reserved_slots)
-        resource_scaling_factor = self._calculate_resource_scaling_factor(
-            allocated_slots=_combine_mappings(devices_allocated_slots)
-        )
+        resource_scaling_factor = self._calculate_resource_scaling_factor(allocated_slots)
 
-        return agent_computers, reserved_slots, resource_scaling_factor
+        return allocated_slots, reserved_slots, resource_scaling_factor
 
     def _calculate_device_slots(
         self,
@@ -747,6 +759,144 @@ class ResourceAllocator(aobject):
                     f"Resource slot {slot_name} was manually allocated {allocated_slot} across "
                     f"all agents when total capacity is {available_total_slot}."
                 )
+
+    async def _build_agent_computers(
+        self, agent_allocated_slots: Mapping[AgentId, SlotsMap]
+    ) -> Mapping[AgentId, ComputersMap]:
+        agent_computers = {}
+        for agent_config in self.agent_configs:
+            agent_id = AgentId(agent_config.agent.defaulted_id)
+            agent_computers[agent_id] = {
+                device_name: ComputerContext(
+                    instance=ctx.instance,
+                    devices=ctx.devices,
+                    alloc_map=await ctx.instance.create_alloc_map(),
+                )
+                for device_name, ctx in self.computers.items()
+            }
+
+        if len(self.agent_configs) == 1:
+            return agent_computers
+
+        match self.local_config.resource.allocation_mode:
+            case ResourceAllocationMode.SHARED:
+                return agent_computers
+            case ResourceAllocationMode.AUTO_SPLIT | ResourceAllocationMode.MANUAL:
+                return await self._partition_devices(agent_computers, agent_allocated_slots)
+
+    async def _partition_devices(
+        self,
+        agent_computers: Mapping[AgentId, ComputersMap],
+        agent_allocated_slots: Mapping[AgentId, SlotsMap],
+    ) -> Mapping[AgentId, ComputersMap]:
+        partitioned_devices: dict[AgentId, dict[DeviceName, ComputerContext]] = defaultdict(dict)
+        for device_name, global_context in self.computers.items():
+            agent_devices = {
+                agent_id: computers[device_name] for agent_id, computers in agent_computers.items()
+            }
+            partitioned_agent_devices = await self._partition_device(
+                global_context, agent_devices, agent_allocated_slots
+            )
+
+            for agent_id in agent_computers:
+                partitioned_device = partitioned_agent_devices[agent_id]
+                partitioned_devices[agent_id][device_name] = partitioned_device
+
+        return partitioned_devices
+
+    async def _partition_device(
+        self,
+        global_context: ComputerContext,
+        agent_devices: Mapping[AgentId, ComputerContext],
+        agent_allocated_slots: Mapping[AgentId, SlotsMap],
+    ) -> Mapping[AgentId, ComputerContext]:
+        agent_ids = list(agent_devices.keys())
+        slot_names = {info.slot_name for info in global_context.alloc_map.device_slots.values()}
+
+        partitioned_agent_devices: dict[AgentId, list[AbstractComputeDevice]] = defaultdict(list)
+        partitioned_agent_slots: dict[AgentId, dict[DeviceId, Decimal]] = defaultdict(dict)
+        for slot_name in slot_names:
+            agent_slot_amounts = [
+                (agent_id, agent_allocated_slots[agent_id].get(slot_name, Decimal(0)))
+                for agent_id in agent_ids
+            ]
+            partitions = self._compute_device_partitions(
+                devices=list(global_context.devices),
+                device_slots=global_context.alloc_map.device_slots,
+                agent_slot_amounts=agent_slot_amounts,
+            )
+
+            for agent_id, partition in partitions:
+                partitioned_agent_devices[agent_id].extend(
+                    (device for device, amount in partition.device_shares if amount > Decimal(0))
+                )
+                partitioned_agent_slots[agent_id].update({
+                    device_id: device_slot_info.amount
+                    for device_id, device_slot_info in partition.device_slots.items()
+                })
+
+        partitioned_agent_context: dict[AgentId, ComputerContext] = {}
+        for agent_id, agent_context in agent_devices.items():
+            agent_context.alloc_map.set_device_slot_amounts(partitioned_agent_slots[agent_id])
+            partitioned_agent_context[agent_id] = ComputerContext(
+                agent_context.instance,
+                partitioned_agent_devices[agent_id],
+                agent_context.alloc_map,
+            )
+        return partitioned_agent_context
+
+    def _compute_device_partitions(
+        self,
+        devices: Sequence[AbstractComputeDevice],
+        device_slots: Mapping[DeviceId, DeviceSlotInfo],
+        agent_slot_amounts: Sequence[tuple[AgentId, Decimal]],
+    ) -> Sequence[tuple[AgentId, DevicePartition]]:
+        sorted_devices = sorted(devices, key=lambda d: d.device_id)
+
+        agent_partitions: list[tuple[AgentId, DevicePartition]] = []
+        remaining_capacity = {
+            dev.device_id: device_slots[dev.device_id].amount for dev in sorted_devices
+        }
+        for agent_id, agent_amount in agent_slot_amounts:
+            device_partition = self._compute_device_partition(
+                sorted_devices, device_slots, remaining_capacity, agent_amount
+            )
+            agent_partitions.append((agent_id, device_partition))
+        return agent_partitions
+
+    def _compute_device_partition(
+        self,
+        sorted_devices: Sequence[AbstractComputeDevice],
+        device_slots: Mapping[DeviceId, DeviceSlotInfo],
+        remaining_capacity: MutableMapping[DeviceId, Decimal],
+        agent_amount: Decimal,
+    ) -> DevicePartition:
+        agent_device_shares: list[tuple[AbstractComputeDevice, Decimal]] = []
+        agent_device_slots: dict[DeviceId, DeviceSlotInfo] = {}
+
+        agent_remaining = agent_amount
+        for device in sorted_devices:
+            if agent_remaining <= Decimal(0):
+                break
+            capacity = remaining_capacity[device.device_id]
+            if capacity > Decimal(0):
+                take = min(capacity, agent_remaining)
+                agent_device_shares.append((device, take))
+
+                slot_info = device_slots[device.device_id]
+                agent_device_slots[device.device_id] = DeviceSlotInfo(
+                    slot_type=slot_info.slot_type,
+                    slot_name=slot_info.slot_name,
+                    amount=take,
+                )
+
+                remaining_capacity[device.device_id] -= take
+                agent_remaining -= take
+
+        return DevicePartition(
+            device_shares=agent_device_shares,
+            device_slots=agent_device_slots,
+        )
 
     @cached_property
     def _agent_discovery(self) -> AbstractAgentDiscovery:
