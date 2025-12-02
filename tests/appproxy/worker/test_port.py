@@ -8,7 +8,7 @@ import pytest_mock
 from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
 
-from ai.backend.appproxy.common.exceptions import GenericBadRequest
+from ai.backend.appproxy.common.errors import GenericBadRequest
 from ai.backend.appproxy.common.types import (
     AppMode,
     FrontendMode,
