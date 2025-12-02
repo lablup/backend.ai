@@ -39,6 +39,12 @@ def _get_object_storage_namespace_join_cond():
     return foreign(StorageNamespaceRow.storage_id) == ObjectStorageRow.id
 
 
+def _get_object_storage_meta_join_cond():
+    from .artifact_storages import ArtifactStorageRow
+
+    return ObjectStorageRow.id == foreign(ArtifactStorageRow.storage_id)
+
+
 class ObjectStorageRow(Base):
     """
     Represents an object storage configuration.
@@ -86,6 +92,13 @@ class ObjectStorageRow(Base):
         "StorageNamespaceRow",
         back_populates="object_storage_row",
         primaryjoin=_get_object_storage_namespace_join_cond,
+    )
+    meta = relationship(
+        "ArtifactStorageRow",
+        back_populates="object_storages",
+        primaryjoin=_get_object_storage_meta_join_cond,
+        uselist=False,
+        viewonly=True,
     )
 
     def __str__(self) -> str:
