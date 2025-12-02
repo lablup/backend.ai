@@ -37,7 +37,7 @@ from ai.backend.storage.client.huggingface import (
 )
 from ai.backend.storage.config.unified import HuggingfaceConfig
 from ai.backend.storage.context_types import ArtifactVerifierContext
-from ai.backend.storage.exception import (
+from ai.backend.storage.errors import (
     HuggingFaceAPIError,
     HuggingFaceModelNotFoundError,
     ObjectStorageConfigInvalidError,

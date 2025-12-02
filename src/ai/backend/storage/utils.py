@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 import logging
 from contextlib import asynccontextmanager as actxmgr
@@ -11,6 +13,11 @@ from aiohttp import web
 
 from ai.backend.common.json import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
+
+from .errors import (
+    InvalidConfigurationSourceError,
+    InvalidPathError,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -49,7 +56,7 @@ async def check_params(
         elif read_from == CheckParamSource.QUERY:
             raw_params = request.query
         else:
-            raise ValueError("Invalid source for check_params() helper")
+            raise InvalidConfigurationSourceError("Invalid source for check_params() helper")
     try:
         if checker is None:
             yield None
@@ -193,10 +200,10 @@ def normalize_filepath(filepath: str) -> str:
         Normalized filepath string
 
     Raises:
-        ValueError: If the filepath contains invalid characters or path traversal
+        InvalidPathError: If the filepath is empty, contains invalid characters, or attempts path traversal
     """
     if not filepath:
-        raise ValueError("Filepath cannot be empty")
+        raise InvalidPathError("Filepath cannot be empty")
 
     # Convert to PurePath to handle cross-platform path normalization
     path = PurePath(filepath)
@@ -204,9 +211,9 @@ def normalize_filepath(filepath: str) -> str:
     # Check for path traversal attempts
     for part in path.parts:
         if part in (".", ".."):
-            raise ValueError(f"Path traversal not allowed: {filepath}")
+            raise InvalidPathError(f"Path traversal not allowed: {filepath}")
         if "\x00" in part:  # Null byte
-            raise ValueError(f"Invalid character in filepath: {filepath}")
+            raise InvalidPathError(f"Invalid character in filepath: {filepath}")
 
     # Convert back to string with forward slashes (POSIX style)
     normalized = str(path).replace("\\", "/")

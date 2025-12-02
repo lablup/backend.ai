@@ -11,7 +11,7 @@ from ai.backend.common.types import VolumeID
 from ai.backend.logging import BraceStyleAdapter
 
 from ..config.unified import StorageProxyUnifiedConfig, VolumeInfoConfig
-from ..exception import InvalidVolumeError
+from ..errors import InvalidVolumeError
 from ..plugin import StoragePluginContext
 from ..types import VolumeInfo
 from .abc import AbstractVolume

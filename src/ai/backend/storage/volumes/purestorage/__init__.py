@@ -9,6 +9,7 @@ from typing import FrozenSet
 from ai.backend.common.types import HardwareMetadata
 from ai.backend.logging import BraceStyleAdapter
 
+from ...errors import MetricNotFoundError, PureStorageCommandFailedError, VolumeNotInitializedError
 from ...types import CapacityUsage, FSPerfMetric
 from ..abc import (
     CAP_FAST_FS_SIZE,
@@ -79,15 +80,16 @@ class FlashBladeVolume(BaseVolume):
                     self._toolkit_version = -1
         finally:
             await proc.wait()
-            assert self._toolkit_version
+            if not self._toolkit_version:
+                raise VolumeNotInitializedError("Failed to detect FlashBlade Toolkit version")
             return self._toolkit_version
 
     async def init(self) -> None:
         toolkit_version = await self.get_toolkit_version()
         if toolkit_version == -1:
-            raise RuntimeError(
+            raise PureStorageCommandFailedError(
                 "PureStorage RapidFile Toolkit is not installed. "
-                "You cannot use the PureStorage backend for the stroage proxy.",
+                "You cannot use the PureStorage backend for the storage proxy."
             )
         self.purity_client = PurityClient(
             self.config["purity_endpoint"],
@@ -143,6 +145,6 @@ class FlashBladeVolume(BaseVolume):
                         io_usec_write=item["usec_per_write_op"],
                     )
                 else:
-                    raise RuntimeError(
+                    raise MetricNotFoundError(
                         "no metric found for the configured flashblade filesystem",
                     )

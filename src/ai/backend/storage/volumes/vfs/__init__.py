@@ -20,9 +20,10 @@ from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
-from ...exception import (
+from ...errors import (
     InvalidAPIParameters,
     InvalidQuotaScopeError,
+    MetadataTooLargeError,
     ProcessExecutionError,
     QuotaDirectoryNotEmptyError,
     QuotaScopeNotFoundError,
@@ -479,7 +480,7 @@ class BaseVolume(AbstractVolume):
         try:
             stat = await loop.run_in_executor(None, metadata_path.stat)
             if stat.st_size > 10 * (2**20):
-                raise RuntimeError("Too large metadata (more than 10 MiB)")
+                raise MetadataTooLargeError("Too large metadata (more than 10 MiB)")
             data = await loop.run_in_executor(None, metadata_path.read_bytes)
             return data
         except FileNotFoundError:

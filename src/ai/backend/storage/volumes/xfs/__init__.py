@@ -22,7 +22,12 @@ from ai.backend.common.lock import FileLock
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
-from ...exception import InvalidQuotaScopeError, QuotaDirectoryNotEmptyError
+from ...errors import (
+    InvalidQuotaFormatError,
+    InvalidQuotaScopeError,
+    QuotaDirectoryNotEmptyError,
+    QuotaTreeNotFoundError,
+)
 from ...subproc import run
 from ...types import (
     QuotaConfig,
@@ -209,9 +214,9 @@ class XFSProjectQuotaModel(BaseQuotaModel):
                 report = line
                 break
         else:
-            raise RuntimeError(f"unknown xfs project ID: {quota_scope_id.pathname}")
+            raise QuotaTreeNotFoundError(f"unknown xfs project ID: {quota_scope_id.pathname}")
         if len(report.split()) != 6:
-            raise ValueError("unexpected format for xfs_quota report")
+            raise InvalidQuotaFormatError("unexpected format for xfs_quota report")
         _, used_kbs, _, hard_limit_kbs, _, _ = report.split()
         # By default, report command displays the sizes in the 1 KiB unit.
         used_bytes = int(used_kbs) * 1024
