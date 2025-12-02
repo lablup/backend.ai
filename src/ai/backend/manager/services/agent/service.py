@@ -64,6 +64,10 @@ from ai.backend.manager.services.agent.actions.remove_agent_from_images_by_canon
     RemoveAgentFromImagesByCanonicalsAction,
     RemoveAgentFromImagesByCanonicalsActionResult,
 )
+from ai.backend.manager.services.agent.actions.search_agents import (
+    SearchAgentsAction,
+    SearchAgentsActionResult,
+)
 from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
     SyncAgentRegistryActionResult,
@@ -229,6 +233,17 @@ class AgentService:
     ) -> GetTotalResourcesActionResult:
         total_resources = await self._scheduler_repository.get_total_resource_slots()
         return GetTotalResourcesActionResult(total_resources=total_resources)
+
+    async def search_agents(self, action: SearchAgentsAction) -> SearchAgentsActionResult:
+        """Searches agents."""
+        result = await self._agent_repository.search_agents(
+            querier=action.querier,
+        )
+
+        return SearchAgentsActionResult(
+            agents=result.items,
+            total_count=result.total_count,
+        )
 
     async def handle_heartbeat(self, action: HandleHeartbeatAction) -> HandleHeartbeatActionResult:
         reported_agent_info = action.agent_info

@@ -11,13 +11,16 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import (
     AgentData,
     AgentHeartbeatUpsert,
+    AgentListResult,
     AgentStatus,
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentRow, agents
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
@@ -135,3 +138,32 @@ class AgentDBSource:
     async def update_agent_status(self, updater: Updater[AgentRow]) -> None:
         async with self._db.begin_session() as session:
             await execute_updater(session, updater)
+
+    async def search_agents(
+        self,
+        querier: Optional[Querier] = None,
+    ) -> AgentListResult:
+        """Searches agents with total count."""
+
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(
+                AgentRow,
+                sa.func.count().over().label("total_count"),
+            ).options(
+                selectinload(AgentRow.kernels).where(
+                    KernelRow.status.in_(KernelStatus.resource_occupied_statuses())
+                )
+            )
+
+            result = await execute_querier(
+                db_sess,
+                query,
+                querier,
+            )
+            agent_rows: list[AgentRow] = [row.AgentRow for row in result.rows]
+            items = [agent_row.to_data() for agent_row in agent_rows]
+
+            return AgentListResult(
+                items=items,
+                total_count=result.total_count,
+            )

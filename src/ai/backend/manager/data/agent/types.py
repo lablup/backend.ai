@@ -214,3 +214,11 @@ class UpsertResult:
             was_revived=was_revived,
             need_resource_slot_update=need_resource_slot_update,
         )
+
+
+@dataclass
+class AgentListResult:
+    """Search result with total count for agents."""
+
+    items: list[AgentData]
+    total_count: int
