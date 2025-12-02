@@ -18,6 +18,7 @@ from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupSchedulerConfig,
     ScalingGroupSchedulerOptions,
     ScalingGroupStatus,
+    SchedulerType,
 )
 from ai.backend.manager.repositories.base import Querier
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
@@ -63,7 +64,7 @@ class TestScalingGroupService:
                 options={},
             ),
             scheduler=ScalingGroupSchedulerConfig(
-                name="fifo",
+                name=SchedulerType.FIFO,
                 options=ScalingGroupSchedulerOptions(
                     allowed_session_types=[
                         SessionTypes.INTERACTIVE,
@@ -154,7 +155,7 @@ class TestScalingGroupService:
                     options={},
                 ),
                 scheduler=ScalingGroupSchedulerConfig(
-                    name="fifo",
+                    name=SchedulerType.FIFO,
                     options=ScalingGroupSchedulerOptions(
                         allowed_session_types=[
                             SessionTypes.INTERACTIVE,
