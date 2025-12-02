@@ -35,13 +35,13 @@ from .base import (
 from .exceptions import ObjectNotFound
 from .hasher import PasswordHasherFactory
 from .types import (
-    QueryCondition,
-    QueryOption,
     load_related_field,
 )
 from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
+    from ai.backend.manager.repositories.types import QueryCondition, QueryOption
+
     from .keypair import KeyPairRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

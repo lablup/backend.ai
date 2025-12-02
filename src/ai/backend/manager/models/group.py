@@ -60,13 +60,13 @@ from .rbac import (
 from .rbac.context import ClientContext
 from .rbac.permission_defs import ProjectPermission
 from .types import (
-    QueryCondition,
-    QueryOption,
     load_related_field,
 )
 from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
+    from ai.backend.manager.repositories.types import QueryCondition, QueryOption
+
     from .rbac import ContainerRegistryScope
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
