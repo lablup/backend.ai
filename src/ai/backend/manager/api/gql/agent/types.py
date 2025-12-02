@@ -1,10 +1,10 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import Optional
+from typing import Optional, Self
 
 import strawberry
 from strawberry import ID
-from strawberry.relay import Connection, Edge, Node, NodeID, to_base64
+from strawberry.relay import Connection, Edge, Node, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
@@ -294,9 +294,9 @@ class AgentV2GQL(Node):
     )
 
     @classmethod
-    def from_dataclass(cls, data: AgentData) -> "AgentV2GQL":
+    def from_action_result(cls, data: AgentData, permissions: list[AgentPermission]) -> Self:
         return cls(
-            id=ID(to_base64("AgentV2GQL", data.id)),
+            id=ID(data.id),
             resource_info=AgentResourceGQL(
                 capacity=data.available_slots.to_json(),
                 used=data.actual_occupied_slots.to_json(),
@@ -319,7 +319,7 @@ class AgentV2GQL(Node):
                 region=data.region,
                 addr=data.addr,
             ),
-            permissions=[],  # TODO: Calculate permissions based on user context
+            permissions=permissions,
             scaling_group=data.scaling_group,
         )
 
