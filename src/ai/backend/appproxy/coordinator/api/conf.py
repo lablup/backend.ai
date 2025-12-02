@@ -6,10 +6,11 @@ import aiohttp_cors
 from aiohttp import web
 from pydantic import BaseModel
 
-from ai.backend.appproxy.common.exceptions import AuthorizationFailed
+from ai.backend.appproxy.common.errors import AuthorizationFailed
 from ai.backend.appproxy.common.types import CORSOptions, PydanticResponse, WebMiddleware
 from ai.backend.appproxy.common.utils import pydantic_api_handler
 from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
+from ai.backend.appproxy.coordinator.errors import InvalidSessionParameterError
 from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.logging import BraceStyleAdapter
 
@@ -37,7 +38,8 @@ async def conf_v2(
         if token_to_evaluate != root_ctx.local_config.secrets.api_secret:
             raise AuthorizationFailed("Unauthorized access")
 
-    assert params.session.id and params.session.access_key, "Not meant for inference apps"
+    if not params.session.id or not params.session.access_key:
+        raise InvalidSessionParameterError("Not meant for inference apps")
 
     async with root_ctx.db.begin_session() as sess:
         token_id = uuid.uuid4()

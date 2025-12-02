@@ -5,7 +5,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 
-from ai.backend.appproxy.common.exceptions import ObjectNotFound
+from ai.backend.appproxy.common.errors import ObjectNotFound
 from ai.backend.common.config import ModelHealthCheck
 
 from .base import (

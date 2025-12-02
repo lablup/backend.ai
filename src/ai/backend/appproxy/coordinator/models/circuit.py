@@ -9,7 +9,7 @@ from sqlalchemy.orm import relationship, selectinload
 from yarl import URL
 
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
-from ai.backend.appproxy.common.exceptions import ObjectNotFound, UnsupportedProtocol
+from ai.backend.appproxy.common.errors import ObjectNotFound, UnsupportedProtocol
 from ai.backend.appproxy.common.types import (
     AppMode,
     FrontendMode,
@@ -18,6 +18,11 @@ from ai.backend.appproxy.common.types import (
     SerializableCircuit,
 )
 from ai.backend.appproxy.coordinator.config import ServerConfig
+from ai.backend.appproxy.coordinator.errors import (
+    InvalidCircuitConfigError,
+    InvalidCircuitStateError,
+    MissingTraefikConfigError,
+)
 from ai.backend.common.types import ModelServiceStatus, RuntimeVariant
 
 from .base import (
@@ -256,14 +261,18 @@ class Circuit(Base, BaseMixin):
 
         match self.frontend_mode:
             case FrontendMode.WILDCARD_DOMAIN:
-                assert self.subdomain and worker.wildcard_domain
+                if not self.subdomain or not worker.wildcard_domain:
+                    raise InvalidCircuitConfigError(
+                        "Subdomain and wildcard domain are required for wildcard domain frontend mode"
+                    )
                 hostname = self.subdomain + worker.wildcard_domain
                 if (scheme == "https" and worker.wildcard_traffic_port != 443) or (
                     scheme == "http" and worker.wildcard_traffic_port != 80
                 ):
                     hostname += f":{worker.wildcard_traffic_port}"
             case FrontendMode.PORT:
-                assert self.port
+                if not self.port:
+                    raise InvalidCircuitConfigError("Port is required for port frontend mode")
                 hostname = f"{worker.hostname}:{self.port}"
 
         url = f"{scheme}://{hostname}"
@@ -285,7 +294,10 @@ class Circuit(Base, BaseMixin):
                     case FrontendMode.PORT:
                         return f"Host(`{self.worker_row.hostname}`)"
                     case FrontendMode.WILDCARD_DOMAIN:
-                        assert self.subdomain
+                        if not self.subdomain:
+                            raise InvalidCircuitConfigError(
+                                "Subdomain is required for wildcard domain frontend mode"
+                            )
                         return f"Host(`{self.subdomain}{self.worker_row.wildcard_domain}`)"
                     case _:
                         raise ValueError(
@@ -298,7 +310,8 @@ class Circuit(Base, BaseMixin):
             case FrontendMode.WILDCARD_DOMAIN:
                 return "domainproxy"
             case FrontendMode.PORT:
-                assert self.port
+                if not self.port:
+                    raise InvalidCircuitConfigError("Port is required for port frontend mode")
                 return f"portproxy_{self.port}"
             case _:
                 raise ValueError(f"Invalid frontend mode for traefik setup: {self.frontend_mode}")
@@ -346,7 +359,8 @@ class Circuit(Base, BaseMixin):
             # No health filtering, return all routes
             return self.route_info
 
-        assert self.endpoint_row
+        if not self.endpoint_row:
+            raise InvalidCircuitStateError("Endpoint row is not loaded for health filtering")
         # Filter routes based on health status stored in JSON
         healthy_routes = []
         for route in self.route_info:
@@ -450,7 +464,8 @@ class Circuit(Base, BaseMixin):
         match self.protocol:
             case ProxyProtocol.HTTP:
                 traefik_config = local_config.proxy_coordinator.traefik
-                assert traefik_config
+                if not traefik_config:
+                    raise MissingTraefikConfigError("Traefik configuration is required")
 
                 return {
                     "CORSHeaders": {

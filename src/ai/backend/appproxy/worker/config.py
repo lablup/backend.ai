@@ -23,7 +23,7 @@ from ai.backend.appproxy.common.config import (
     SecretConfig,
     UserIDValidator,
 )
-from ai.backend.appproxy.common.exceptions import ConfigValidationError
+from ai.backend.appproxy.common.errors import ConfigValidationError
 from ai.backend.appproxy.common.types import (
     AppMode,
     EventLoopType,

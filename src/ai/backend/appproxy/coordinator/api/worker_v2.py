@@ -15,8 +15,8 @@ from dateutil.tz import tzutc
 from pydantic import BaseModel, Field
 
 from ai.backend.appproxy.common.config import get_default_redis_key_ttl
+from ai.backend.appproxy.common.errors import ObjectNotFound
 from ai.backend.appproxy.common.events import DoCheckWorkerLostEvent, WorkerLostEvent
-from ai.backend.appproxy.common.exceptions import ObjectNotFound
 from ai.backend.appproxy.common.types import (
     AppMode,
     CORSOptions,

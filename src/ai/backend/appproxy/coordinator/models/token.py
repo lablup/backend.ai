@@ -3,7 +3,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ai.backend.appproxy.common.exceptions import ObjectNotFound
+from ai.backend.appproxy.common.errors import ObjectNotFound
 
 from .base import GUID, Base, BaseMixin, IDColumn
 
