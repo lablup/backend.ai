@@ -6428,7 +6428,7 @@ type ScalingGroupSchedulerConfig
   'lifo' schedules newest first,
   'drf' (Dominant Resource Fairness) balances resource usage across users.
   """
-  name: String!
+  name: ScalingGroupSchedulerType!
 
   """
   Detailed scheduler behavior configuration including session type restrictions,
@@ -6500,6 +6500,21 @@ type ScalingGroupSchedulerOptions
   Default: ['unhealthy'].
   """
   routeCleanupTargetStatuses: [String!]!
+}
+
+"""
+Added in 25.18.0. Scheduler type for session scheduling.
+
+- FIFO: First-In-First-Out - Schedules oldest pending sessions first
+- LIFO: Last-In-First-Out - Schedules newest pending sessions first
+- DRF: Dominant Resource Fairness - Balances resource usage across users
+"""
+enum ScalingGroupSchedulerType
+  @join__type(graph: STRAWBERRY)
+{
+  FIFO @join__enumValue(graph: STRAWBERRY)
+  LIFO @join__enumValue(graph: STRAWBERRY)
+  DRF @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.18.0. Status information for a scaling group"""

@@ -289,6 +289,7 @@ class ScalingGroupRow(Base):
             ScalingGroupSchedulerConfig,
             ScalingGroupSchedulerOptions,
             ScalingGroupStatus,
+            SchedulerType,
         )
 
         return ScalingGroupData(
@@ -311,7 +312,7 @@ class ScalingGroupRow(Base):
                 options=self.driver_opts,
             ),
             scheduler=ScalingGroupSchedulerConfig(
-                name=self.scheduler,
+                name=SchedulerType(self.scheduler),
                 options=ScalingGroupSchedulerOptions(
                     allowed_session_types=self.scheduler_opts.allowed_session_types,
                     pending_timeout=self.scheduler_opts.pending_timeout,

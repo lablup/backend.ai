@@ -38,6 +38,7 @@ __all__ = (
     "ScalingGroupNetworkConfigGQL",
     "ScalingGroupDriverConfigGQL",
     "ScalingGroupSchedulerOptionsGQL",
+    "ScalingGroupSchedulerTypeGQL",
     "ScalingGroupSchedulerConfigGQL",
     "ScalingGroupV2GQL",
     "ScalingGroupFilterGQL",
@@ -230,12 +231,28 @@ class ScalingGroupSchedulerOptionsGQL:
         )
 
 
+@strawberry.enum(
+    name="ScalingGroupSchedulerType",
+    description=dedent_strip("""
+        Added in 25.18.0. Scheduler type for session scheduling.
+
+        - FIFO: First-In-First-Out - Schedules oldest pending sessions first
+        - LIFO: Last-In-First-Out - Schedules newest pending sessions first
+        - DRF: Dominant Resource Fairness - Balances resource usage across users
+    """),
+)
+class ScalingGroupSchedulerTypeGQL(StrEnum):
+    FIFO = "fifo"
+    LIFO = "lifo"
+    DRF = "drf"
+
+
 @strawberry.type(
     name="ScalingGroupSchedulerConfig",
     description="Added in 25.18.0. Scheduler configuration for session scheduling",
 )
 class ScalingGroupSchedulerConfigGQL:
-    name: str = strawberry.field(
+    name: ScalingGroupSchedulerTypeGQL = strawberry.field(
         description=dedent_strip("""
             Scheduling algorithm implementation.
             'fifo' schedules oldest pending sessions first,
@@ -253,7 +270,7 @@ class ScalingGroupSchedulerConfigGQL:
     @classmethod
     def from_dataclass(cls, data: ScalingGroupSchedulerConfig) -> Self:
         return cls(
-            name=data.name,
+            name=ScalingGroupSchedulerTypeGQL(data.name),
             options=ScalingGroupSchedulerOptionsGQL.from_dataclass(data.options),
         )
 

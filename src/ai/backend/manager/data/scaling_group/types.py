@@ -1,9 +1,18 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from enum import StrEnum
 from typing import Any
 
 from ai.backend.common.types import AgentSelectionStrategy, SessionTypes
+
+
+class SchedulerType(StrEnum):
+    """Scheduler type for session scheduling."""
+
+    FIFO = "fifo"
+    LIFO = "lifo"
+    DRF = "drf"
 
 
 @dataclass
@@ -57,7 +66,7 @@ class ScalingGroupSchedulerOptions:
 class ScalingGroupSchedulerConfig:
     """Scheduler configuration for a scaling group."""
 
-    name: str
+    name: SchedulerType
     options: ScalingGroupSchedulerOptions
 
 
