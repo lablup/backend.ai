@@ -284,8 +284,7 @@ class TestSharedMode:
             reserved_mem="4G",
         )
 
-        # Create 8 CPU devices (1 core each) so after reserved_cpu=2 subtraction,
-        # we have 6 effective devices. Single mem device with 16G.
+        # Create 8 CPU devices (1 core each). Single mem device with 16G.
         computers = create_mock_computers({
             DeviceName("cpu"): create_fraction_alloc_map({
                 DeviceId(f"cpu{i}"): (SlotName("cpu"), Decimal("1")) for i in range(8)
@@ -302,28 +301,21 @@ class TestSharedMode:
 
         agent1_computers = allocator.get_computers(AgentId("agent1"))
 
-        # SHARED mode: available = total - reserved
-        # For CPU: total=8, reserved=2, available=6
-        # With reserved_cpu=2, num_devices = 8 - 2 = 6
-        # Per device = 6 / 6 = 1
-        expected_cpu_per_device = Decimal("1")
-        for i in range(6):  # Only 6 effective devices (8 - reserved_cpu)
-            assert (
-                agent1_computers[DeviceName("cpu")]
-                .alloc_map.device_slots[DeviceId(f"cpu{i}")]
-                .amount
-                == expected_cpu_per_device
-            )
+        # alloc_map shows original hardware amounts (unchanged)
+        for i in range(8):
+            assert agent1_computers[DeviceName("cpu")].alloc_map.device_slots[
+                DeviceId(f"cpu{i}")
+            ].amount == Decimal("1")
+        assert agent1_computers[DeviceName("root")].alloc_map.device_slots[
+            DeviceId("root")
+        ].amount == Decimal(BinarySize.finite_from_str("16G"))
 
-        # For mem: total=16G, reserved=4G, available=12G
-        # Single device, so amount = 12G / 1 = 12G
-        expected_mem = Decimal(BinarySize.finite_from_str("16G")) - Decimal(
-            BinarySize.finite_from_str("4G")
-        )
-        assert (
-            agent1_computers[DeviceName("root")].alloc_map.device_slots[DeviceId("root")].amount
-            == expected_mem
-        )
+        # SHARED mode: reserved_slots = system reserved only (not from other agents)
+        # For CPU: total=8, available=6, reserved_slots = 8 - 6 = 2
+        # For mem: total=16G, available=12G, reserved_slots = 16G - 12G = 4G
+        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
+        assert reserved1[SlotName("cpu")] == Decimal("2")
+        assert reserved1[SlotName("mem")] == Decimal(BinarySize.finite_from_str("4G"))
 
         await allocator.__aexit__(None, None, None)
 
@@ -354,15 +346,16 @@ class TestAutoSplitMode:
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
 
-        # Each agent gets half (1.0 / 2 = 0.5)
-        # With 1 device, amount = 0.5 / 1 = 0.5
+        # alloc_map shows original hardware amounts (unchanged)
         assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
             DeviceId("cuda")
-        ].amount == Decimal("0.5")
+        ].amount == Decimal("1.0")
         assert agent2_computers[DeviceName("cuda")].alloc_map.device_slots[
             DeviceId("cuda")
-        ].amount == Decimal("0.5")
+        ].amount == Decimal("1.0")
 
+        # AUTO_SPLIT: Each agent gets half (1.0 / 2 = 0.5)
+        # reserved_slots = total - allocated = 1.0 - 0.5 = 0.5
         reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
         reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
         assert reserved1[SlotName("cuda.shares")] == Decimal("0.5")
@@ -395,14 +388,20 @@ class TestAutoSplitMode:
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
 
-        # Each agent gets 4 (8 / 2 agents)
-        # With 1 device, amount = 4 / 1 = 4
+        # alloc_map shows original hardware amounts (unchanged)
         assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
             DeviceId("cuda")
-        ].amount == Decimal("4")
+        ].amount == Decimal("8")
         assert agent2_computers[DeviceName("cuda")].alloc_map.device_slots[
             DeviceId("cuda")
-        ].amount == Decimal("4")
+        ].amount == Decimal("8")
+
+        # AUTO_SPLIT: Each agent gets 4 (8 / 2 agents)
+        # reserved_slots = total - allocated = 8 - 4 = 4
+        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
+        reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
+        assert reserved1[SlotName("cuda")] == Decimal("4")
+        assert reserved2[SlotName("cuda")] == Decimal("4")
 
         await allocator.__aexit__(None, None, None)
 
@@ -428,21 +427,30 @@ class TestAutoSplitMode:
         allocator = ResourceAllocator(config, mock_etcd)
         await allocator.__ainit__()
 
-        # 5 divided by 3 = 1 with remainder 2
-        # First two agents get 2, last agent gets 1
+        # alloc_map shows original hardware amounts (unchanged)
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
         agent3_computers = allocator.get_computers(AgentId("agent3"))
 
         assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
             DeviceId("cuda")
-        ].amount == Decimal("2")
+        ].amount == Decimal("5")
         assert agent2_computers[DeviceName("cuda")].alloc_map.device_slots[
             DeviceId("cuda")
-        ].amount == Decimal("2")
+        ].amount == Decimal("5")
         assert agent3_computers[DeviceName("cuda")].alloc_map.device_slots[
             DeviceId("cuda")
-        ].amount == Decimal("1")
+        ].amount == Decimal("5")
+
+        # 5 divided by 3 = 1 with remainder 2
+        # First two agents get 2, last agent gets 1
+        # reserved_slots = total - allocated
+        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
+        reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
+        reserved3 = allocator.agent_reserved_slots[AgentId("agent3")]
+        assert reserved1[SlotName("cuda")] == Decimal("3")  # 5 - 2 = 3
+        assert reserved2[SlotName("cuda")] == Decimal("3")  # 5 - 2 = 3
+        assert reserved3[SlotName("cuda")] == Decimal("4")  # 5 - 1 = 4
 
         await allocator.__aexit__(None, None, None)
 
@@ -458,7 +466,6 @@ class TestAutoSplitMode:
         )
 
         # 8 CPU devices with 2 cores each (total 16 cores)
-        # With reserved_cpu=4, num_devices = 8 - 4 = 4
         computers = create_mock_computers({
             DeviceName("cpu"): create_fraction_alloc_map({
                 DeviceId(f"cpu{i}"): (SlotName("cpu"), Decimal("2")) for i in range(8)
@@ -473,27 +480,20 @@ class TestAutoSplitMode:
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
 
-        # Total = 16, reserved = 4, available = 12
-        # Split between 2 agents: 12 / 2 = 6 per agent
-        # With num_devices = 8 - 4 = 4, per device = 6 / 4 = 1.5
-        expected_per_device = Decimal("1.5")
-        for i in range(4):  # Only 4 effective devices
-            assert (
-                agent1_computers[DeviceName("cpu")]
-                .alloc_map.device_slots[DeviceId(f"cpu{i}")]
-                .amount
-                == expected_per_device
-            )
-            assert (
-                agent2_computers[DeviceName("cpu")]
-                .alloc_map.device_slots[DeviceId(f"cpu{i}")]
-                .amount
-                == expected_per_device
-            )
+        # alloc_map shows original hardware amounts (unchanged)
+        for i in range(8):
+            assert agent1_computers[DeviceName("cpu")].alloc_map.device_slots[
+                DeviceId(f"cpu{i}")
+            ].amount == Decimal("2")
+            assert agent2_computers[DeviceName("cpu")].alloc_map.device_slots[
+                DeviceId(f"cpu{i}")
+            ].amount == Decimal("2")
 
+        # Total = 16, reserved_cpu = 4, available = 12
+        # Split between 2 agents: 12 / 2 = 6 per agent
+        # reserved_slots = total - allocated = 16 - 6 = 10
         reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
         reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
-        # Each agent has 10 reserved away (6 for other agent + 4 for system)
         assert reserved1[SlotName("cpu")] == Decimal("10")
         assert reserved2[SlotName("cpu")] == Decimal("10")
 
@@ -533,21 +533,28 @@ class TestManualMode:
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
 
-        # Each agent gets 4 CPU and 8G mem
-        # CPU: allocated=4, num_devices=1, per device = 4 / 1 = 4
-        # Mem: allocated=8G, num_devices=1, per device = 8G / 1 = 8G
+        # alloc_map shows original hardware amounts (unchanged)
         assert agent1_computers[DeviceName("cpu")].alloc_map.device_slots[
             DeviceId("cpu")
-        ].amount == Decimal("4")
+        ].amount == Decimal("16")
         assert agent1_computers[DeviceName("root")].alloc_map.device_slots[
             DeviceId("mem")
-        ].amount == Decimal(BinarySize.finite_from_str("8G"))
+        ].amount == Decimal(BinarySize.finite_from_str("32G"))
         assert agent2_computers[DeviceName("cpu")].alloc_map.device_slots[
             DeviceId("cpu")
-        ].amount == Decimal("4")
+        ].amount == Decimal("16")
         assert agent2_computers[DeviceName("root")].alloc_map.device_slots[
             DeviceId("mem")
-        ].amount == Decimal(BinarySize.finite_from_str("8G"))
+        ].amount == Decimal(BinarySize.finite_from_str("32G"))
+
+        # MANUAL mode: Each agent gets 4 CPU and 8G mem
+        # reserved_slots = total - allocated
+        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
+        reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
+        assert reserved1[SlotName("cpu")] == Decimal("12")  # 16 - 4 = 12
+        assert reserved1[SlotName("mem")] == Decimal(BinarySize.finite_from_str("24G"))  # 32G - 8G
+        assert reserved2[SlotName("cpu")] == Decimal("12")
+        assert reserved2[SlotName("mem")] == Decimal(BinarySize.finite_from_str("24G"))
 
         await allocator.__aexit__(None, None, None)
 
@@ -565,7 +572,7 @@ class TestManualMode:
             },
         )
 
-        # Each device in its own group to avoid division by multiple devices
+        # Each device in its own group
         # CPU device group with 1 device
         # Root device group with 1 device (mem)
         # CUDA device group with 1 device (cuda.shares only)
@@ -588,10 +595,15 @@ class TestManualMode:
 
         agent1_computers = allocator.get_computers(AgentId("agent1"))
 
-        # With 1 device per group, amount = allocated / 1 = allocated
+        # alloc_map shows original hardware amounts (unchanged)
         assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
             DeviceId("cuda0")
-        ].amount == Decimal("0.5")
+        ].amount == Decimal("1.0")
+
+        # MANUAL mode: agent gets 0.5 cuda.shares
+        # reserved_slots = total - allocated = 1.0 - 0.5 = 0.5
+        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
+        assert reserved1[SlotName("cuda.shares")] == Decimal("0.5")
 
         await allocator.__aexit__(None, None, None)
 
@@ -639,13 +651,20 @@ class TestMultiDeviceScenarios:
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
 
-        # Each agent gets 4 cores (8 / 2 agents)
+        # alloc_map shows original hardware amounts (unchanged)
         assert agent1_computers[DeviceName("cpu")].alloc_map.device_slots[
             DeviceId("cpu")
-        ].amount == Decimal("4")
+        ].amount == Decimal("8")
         assert agent2_computers[DeviceName("cpu")].alloc_map.device_slots[
             DeviceId("cpu")
-        ].amount == Decimal("4")
+        ].amount == Decimal("8")
+
+        # AUTO_SPLIT: Each agent gets 4 cores (8 / 2 agents)
+        # reserved_slots = total - allocated = 8 - 4 = 4
+        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
+        reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
+        assert reserved1[SlotName("cpu")] == Decimal("4")
+        assert reserved2[SlotName("cpu")] == Decimal("4")
 
         await allocator.__aexit__(None, None, None)
 
@@ -680,17 +699,19 @@ class TestMultiDeviceScenarios:
 
         agent1_computers = allocator.get_computers(AgentId("agent1"))
 
-        # CPU device should show the manually allocated amount (3 cores out of 8 available)
-        # With 1 device in the group, amount = 3 / 1 = 3
+        # alloc_map shows original hardware amounts (unchanged)
         assert agent1_computers[DeviceName("cpu")].alloc_map.device_slots[
             DeviceId("cpu")
-        ].amount == Decimal("3")
-
-        # Memory device should be set to allocated amount (8G out of 16G available)
-        # With 1 device in the group, amount = 8G / 1 = 8G
+        ].amount == Decimal("8")
         assert agent1_computers[DeviceName("root")].alloc_map.device_slots[
             DeviceId("mem")
-        ].amount == Decimal(BinarySize.finite_from_str("8G"))
+        ].amount == Decimal(BinarySize.finite_from_str("16G"))
+
+        # MANUAL mode: agent gets 3 CPU cores and 8G mem
+        # reserved_slots = total - allocated
+        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
+        assert reserved1[SlotName("cpu")] == Decimal("5")  # 8 - 3 = 5
+        assert reserved1[SlotName("mem")] == Decimal(BinarySize.finite_from_str("8G"))  # 16G - 8G
 
         await allocator.__aexit__(None, None, None)
 
@@ -819,21 +840,29 @@ class TestMultiDeviceScenarios:
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
 
-        # CPU split: each agent gets 2 cores (4 / 2 agents)
+        # alloc_map shows original hardware amounts (unchanged)
         assert agent1_computers[DeviceName("cpu")].alloc_map.device_slots[
             DeviceId("cpu")
-        ].amount == Decimal("2")
+        ].amount == Decimal("4")
         assert agent2_computers[DeviceName("cpu")].alloc_map.device_slots[
             DeviceId("cpu")
-        ].amount == Decimal("2")
-
-        # GPU shares split fractionally: each agent gets 0.5 shares
+        ].amount == Decimal("4")
         assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
             DeviceId("cuda0")
-        ].amount == Decimal("0.5")
+        ].amount == Decimal("1.0")
         assert agent2_computers[DeviceName("cuda")].alloc_map.device_slots[
             DeviceId("cuda0")
-        ].amount == Decimal("0.5")
+        ].amount == Decimal("1.0")
+
+        # AUTO_SPLIT:
+        # CPU: each agent gets 2 cores, reserved = 4 - 2 = 2
+        # GPU shares: each agent gets 0.5 shares, reserved = 1.0 - 0.5 = 0.5
+        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
+        reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
+        assert reserved1[SlotName("cpu")] == Decimal("2")
+        assert reserved2[SlotName("cpu")] == Decimal("2")
+        assert reserved1[SlotName("cuda.shares")] == Decimal("0.5")
+        assert reserved2[SlotName("cuda.shares")] == Decimal("0.5")
 
         await allocator.__aexit__(None, None, None)
 
@@ -863,16 +892,17 @@ class TestMultiDeviceScenarios:
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
 
-        # Total = 4.0 shares, each agent gets 2.0 shares
-        # With 4 devices sharing the same slot type, per-device = 2.0 / 4 = 0.5
+        # alloc_map shows original hardware amounts (unchanged)
         for i in range(4):
             assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
                 DeviceId(f"cuda{i}")
-            ].amount == Decimal("0.5")
+            ].amount == Decimal("1.0")
             assert agent2_computers[DeviceName("cuda")].alloc_map.device_slots[
                 DeviceId(f"cuda{i}")
-            ].amount == Decimal("0.5")
+            ].amount == Decimal("1.0")
 
+        # AUTO_SPLIT: Total = 4.0 shares, each agent gets 2.0 shares
+        # reserved_slots = total - allocated = 4.0 - 2.0 = 2.0
         reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
         reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
         assert reserved1[SlotName("cuda.shares")] == Decimal("2")
