@@ -243,8 +243,7 @@ class TestSharedMode:
 
         setup_mock_resources(monkeypatch, computers)
 
-        allocator = ResourceAllocator(config, mock_etcd)
-        await allocator.__ainit__()
+        allocator = await ResourceAllocator.new(config, mock_etcd)
 
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
@@ -296,8 +295,7 @@ class TestSharedMode:
 
         setup_mock_resources(monkeypatch, computers)
 
-        allocator = ResourceAllocator(config, mock_etcd)
-        await allocator.__ainit__()
+        allocator = await ResourceAllocator.new(config, mock_etcd)
 
         agent1_computers = allocator.get_computers(AgentId("agent1"))
 
@@ -340,8 +338,7 @@ class TestAutoSplitMode:
 
         setup_mock_resources(monkeypatch, computers)
 
-        allocator = ResourceAllocator(config, mock_etcd)
-        await allocator.__ainit__()
+        allocator = await ResourceAllocator.new(config, mock_etcd)
 
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
@@ -382,8 +379,7 @@ class TestAutoSplitMode:
 
         setup_mock_resources(monkeypatch, computers)
 
-        allocator = ResourceAllocator(config, mock_etcd)
-        await allocator.__ainit__()
+        allocator = await ResourceAllocator.new(config, mock_etcd)
 
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
@@ -424,8 +420,7 @@ class TestAutoSplitMode:
 
         setup_mock_resources(monkeypatch, computers)
 
-        allocator = ResourceAllocator(config, mock_etcd)
-        await allocator.__ainit__()
+        allocator = await ResourceAllocator.new(config, mock_etcd)
 
         # alloc_map shows original hardware amounts (unchanged)
         agent1_computers = allocator.get_computers(AgentId("agent1"))
@@ -474,8 +469,7 @@ class TestAutoSplitMode:
 
         setup_mock_resources(monkeypatch, computers)
 
-        allocator = ResourceAllocator(config, mock_etcd)
-        await allocator.__ainit__()
+        allocator = await ResourceAllocator.new(config, mock_etcd)
 
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
@@ -527,8 +521,7 @@ class TestManualMode:
 
         setup_mock_resources(monkeypatch, computers)
 
-        allocator = ResourceAllocator(config, mock_etcd)
-        await allocator.__ainit__()
+        allocator = await ResourceAllocator.new(config, mock_etcd)
 
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
@@ -590,8 +583,7 @@ class TestManualMode:
 
         setup_mock_resources(monkeypatch, computers)
 
-        allocator = ResourceAllocator(config, mock_etcd)
-        await allocator.__ainit__()
+        allocator = await ResourceAllocator.new(config, mock_etcd)
 
         agent1_computers = allocator.get_computers(AgentId("agent1"))
 
@@ -636,8 +628,7 @@ class TestMultiDeviceScenarios:
 
         setup_mock_resources(monkeypatch, computers)
 
-        allocator = ResourceAllocator(config, mock_etcd)
-        await allocator.__ainit__()
+        allocator = await ResourceAllocator.new(config, mock_etcd)
 
         # Verify total slots by summing from computers
         total_cpu = sum(
@@ -694,8 +685,7 @@ class TestMultiDeviceScenarios:
 
         setup_mock_resources(monkeypatch, computers)
 
-        allocator = ResourceAllocator(config, mock_etcd)
-        await allocator.__ainit__()
+        allocator = await ResourceAllocator.new(config, mock_etcd)
 
         agent1_computers = allocator.get_computers(AgentId("agent1"))
 
@@ -735,8 +725,7 @@ class TestMultiDeviceScenarios:
 
         setup_mock_resources(monkeypatch, computers)
 
-        allocator = ResourceAllocator(config, mock_etcd)
-        await allocator.__ainit__()
+        allocator = await ResourceAllocator.new(config, mock_etcd)
 
         # 4 GPUs × 8GB each = 32GB total VRAM
         total_cuda_mem = sum(
@@ -769,8 +758,7 @@ class TestMultiDeviceScenarios:
 
         setup_mock_resources(monkeypatch, computers)
 
-        allocator = ResourceAllocator(config, mock_etcd)
-        await allocator.__ainit__()
+        allocator = await ResourceAllocator.new(config, mock_etcd)
 
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
@@ -818,8 +806,7 @@ class TestMultiDeviceScenarios:
 
         setup_mock_resources(monkeypatch, computers)
 
-        allocator = ResourceAllocator(config, mock_etcd)
-        await allocator.__ainit__()
+        allocator = await ResourceAllocator.new(config, mock_etcd)
 
         # Verify total slots by summing from computers
         total_cpu = sum(
@@ -886,8 +873,7 @@ class TestMultiDeviceScenarios:
 
         setup_mock_resources(monkeypatch, computers)
 
-        allocator = ResourceAllocator(config, mock_etcd)
-        await allocator.__ainit__()
+        allocator = await ResourceAllocator.new(config, mock_etcd)
 
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
@@ -931,8 +917,7 @@ class TestMultiDeviceScenarios:
 
         setup_mock_resources(monkeypatch, computers)
 
-        allocator = ResourceAllocator(config, mock_etcd)
-        await allocator.__ainit__()
+        allocator = await ResourceAllocator.new(config, mock_etcd)
 
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
