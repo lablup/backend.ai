@@ -251,7 +251,9 @@ class AbstractAllocMap(metaclass=ABCMeta):
             device_slots[device_id] = DeviceSlotInfo(
                 slot_type=slot_info.slot_type,
                 slot_name=slot_info.slot_name,
-                amount=slot_amounts[slot_info.slot_name] / num_devices_no_reserved,
+                amount=(slot_amounts[slot_info.slot_name] / num_devices_no_reserved)
+                if num_devices_no_reserved > Decimal(0)
+                else Decimal(0),
             )
 
         self.device_slots = device_slots
