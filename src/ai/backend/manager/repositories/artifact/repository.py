@@ -177,7 +177,7 @@ class ArtifactRepository:
         self, artifact_revision_id: uuid.UUID, verification_result: VerificationStepResult
     ) -> uuid.UUID:
         return await self._db_source.update_artifact_revision_verification_result(
-            artifact_revision_id, verification_result.model_dump()
+            artifact_revision_id, verification_result
         )
 
     @artifact_repository_resilience.apply()

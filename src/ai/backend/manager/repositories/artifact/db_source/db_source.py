@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload, sessionmaker
 from sqlalchemy.sql import Select
 
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
@@ -796,13 +796,15 @@ class ArtifactDBSource:
             return artifact_revision_id
 
     async def update_artifact_revision_verification_result(
-        self, artifact_revision_id: uuid.UUID, verification_result: dict[str, Any]
+        self,
+        artifact_revision_id: uuid.UUID,
+        verification_result: VerificationStepResult,
     ) -> uuid.UUID:
         async with self._begin_session_read_committed() as db_sess:
             stmt = (
                 sa.update(ArtifactRevisionRow)
                 .where(ArtifactRevisionRow.id == artifact_revision_id)
-                .values(verification_result=verification_result)
+                .values(verification_result=verification_result.model_dump())
             )
             await db_sess.execute(stmt)
             return artifact_revision_id
