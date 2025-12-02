@@ -409,5 +409,41 @@ class ReservoirService:
 
             return DispatchResult.success(None)
 
-        bgtask_id = await self._background_task_manager.start(_import_models_batch)
-        return bgtask_id
+        try:
+            # Create temporary file for tar
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".tar") as tf:
+                temp_file = Path(tf.name)
+                log.debug(f"Downloading artifact tar to temp directory: {temp_file}")
+
+                # Download to temp file
+                async with aiofiles.open(temp_file, "wb") as f:
+                    async for chunk in self._stream_reader.read():
+                        await f.write(chunk)
+                        bytes_downloaded += len(chunk)
+
+                log.debug(f"Downloaded {bytes_downloaded} bytes to {temp_file}")
+
+            # Ensure target directory exists
+            target_dir.mkdir(parents=True, exist_ok=True)
+
+            # Extract tar file in executor to avoid blocking
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, self._extract_tar, temp_file, target_dir)
+
+            log.info(f"Successfully extracted artifact tar to: {target_dir}")
+            return bytes_downloaded
+
+        finally:
+            # Clean up temp file
+            if temp_file and temp_file.exists():
+                try:
+                    temp_file.unlink()
+                    log.debug(f"Cleaned up temp file: {temp_file}")
+                except Exception as e:
+                    log.warning(f"Failed to remove temp file {temp_file}: {e}")
+
+    def _extract_tar(self, tar_path: Path, target_dir: Path) -> None:
+        """Extract tar archive to target directory safely."""
+        with tarfile.open(tar_path, "r") as tar:
+            tar.extractall(path=target_dir, filter=tarfile.data_filter)
+        log.debug(f"Tar extraction completed: {tar_path} -> {target_dir}")
