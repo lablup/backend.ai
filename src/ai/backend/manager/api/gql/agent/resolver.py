@@ -62,7 +62,8 @@ async def agent_v2(
     action_result = await processors.agent.search_agents.wait_for_complete(
         SearchAgentsAction(querier=querier)
     )
-    nodes = [AgentV2GQL.from_dataclass(data) for data in action_result.agents]
+    permissions = action_result.permissions
+    nodes = [AgentV2GQL.from_action_result(data, permissions) for data in action_result.agents]
 
     edges = [AgentV2Edge(node=node, cursor=to_global_id(AgentV2GQL, node.id)) for node in nodes]
 
