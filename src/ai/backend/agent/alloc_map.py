@@ -240,19 +240,15 @@ class AbstractAllocMap(metaclass=ABCMeta):
     def update_device_slot_amounts(
         self,
         slot_amounts: Mapping[SlotName, Decimal],
-        reserved_slot_amounts: Mapping[SlotName, Decimal],
         num_devices: int,
     ) -> None:
         device_slots = {}
         for device_id, slot_info in self.device_slots.items():
-            reserved_slot = reserved_slot_amounts.get(slot_info.slot_name, Decimal(0))
-            num_devices_no_reserved = Decimal(num_devices) - reserved_slot
-
             device_slots[device_id] = DeviceSlotInfo(
                 slot_type=slot_info.slot_type,
                 slot_name=slot_info.slot_name,
-                amount=(slot_amounts[slot_info.slot_name] / num_devices_no_reserved)
-                if num_devices_no_reserved > Decimal(0)
+                amount=(slot_amounts[slot_info.slot_name] / Decimal(num_devices))
+                if num_devices > 0
                 else Decimal(0),
             )
 

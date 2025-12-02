@@ -619,9 +619,10 @@ class ResourceAllocator(aobject):
             devices_reserved_slots.append(device_reserved_slots)
 
             agent_alloc_map = await ctx.instance.create_alloc_map()
-            agent_alloc_map.update_device_slot_amounts(
-                device_allocated_slots, device_reserved_slots, len(ctx.devices)
-            )
+            num_devices = len(ctx.devices)
+            if device_name == DeviceName("cpu"):
+                num_devices -= self.local_config.resource.reserved_cpu
+            agent_alloc_map.update_device_slot_amounts(device_allocated_slots, num_devices)
             agent_computers[device_name] = ComputerContext(
                 ctx.instance, ctx.devices, agent_alloc_map
             )
