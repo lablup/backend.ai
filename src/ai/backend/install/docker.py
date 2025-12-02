@@ -48,7 +48,7 @@ def get_build_root() -> Path:
 
 
 def simple_hash(data: bytes) -> str:
-    h = hashlib.sha1()
+    h = hashlib.sha1(usedforsecurity=False)
     h.update(data)
     # generate a filesystem-safe base64 string
     return base64.b64encode(h.digest()[:12], altchars=b"._").decode()
