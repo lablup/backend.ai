@@ -9,10 +9,12 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.container_registry.types import (
     ContainerRegistryCreator,
     ContainerRegistryData,
+    ContainerRegistryLocationInfo,
     ContainerRegistryModifier,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import Querier
 from ai.backend.manager.repositories.container_registry.db_source.db_source import (
     ContainerRegistryDBSource,
 )
@@ -91,8 +93,10 @@ class ContainerRegistryRepository:
         return await self._db_source.fetch_by_registry_and_project(registry_name, project)
 
     @container_registry_repository_resilience.apply()
-    async def get_known_registries(self) -> dict[str, str]:
-        return await self._db_source.fetch_known_registries()
+    async def get_known_registries(
+        self, querier: Optional[Querier]
+    ) -> list[ContainerRegistryLocationInfo]:
+        return await self._db_source.fetch_known_registries(querier)
 
     @container_registry_repository_resilience.apply()
     async def get_registry_row_for_scanner(
