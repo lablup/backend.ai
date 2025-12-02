@@ -1130,7 +1130,7 @@ class TarExtractor:
                     log.warning(f"Failed to remove temp file {temp_file}: {e}")
 
     def _extract_tar(self, tar_path: Path, target_dir: Path) -> None:
-        """Extract tar archive to target directory."""
+        """Extract tar archive to target directory safely."""
         with tarfile.open(tar_path, "r") as tar:
-            tar.extractall(path=target_dir)
+            tar.extractall(path=target_dir, filter=tarfile.data_filter)
         log.debug(f"Tar extraction completed: {tar_path} -> {target_dir}")
