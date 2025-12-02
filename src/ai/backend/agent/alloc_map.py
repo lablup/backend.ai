@@ -236,17 +236,6 @@ class AbstractAllocMap(metaclass=ABCMeta):
                     hint_for_next_allocation.append(dev)
         affinity_hint.devices = hint_for_next_allocation
 
-    @final
-    def update_device_slot_amounts(self, slot_amounts: Mapping[SlotName, Decimal]) -> None:
-        self.device_slots = {
-            device_id: DeviceSlotInfo(
-                slot_type=slot_info.slot_type,
-                slot_name=slot_info.slot_name,
-                amount=slot_amounts[slot_info.slot_name],
-            )
-            for device_id, slot_info in self.device_slots.items()
-        }
-
     @abstractmethod
     def allocate(
         self,
