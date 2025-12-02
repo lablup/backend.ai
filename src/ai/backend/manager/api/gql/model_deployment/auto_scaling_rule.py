@@ -13,6 +13,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.scale import ModelDeploymentAutoScalingRuleCreator
 from ai.backend.manager.data.deployment.scale_modifier import ModelDeploymentAutoScalingRuleModifier
 from ai.backend.manager.data.deployment.types import ModelDeploymentAutoScalingRuleData
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_auto_scaling_rule import (
     CreateAutoScalingRuleAction,
 )
@@ -167,7 +168,8 @@ async def create_auto_scaling_rule(
     input: CreateAutoScalingRuleInput, info: Info[StrawberryGQLContext]
 ) -> CreateAutoScalingRulePayload:
     deployment_processor = info.context.processors.deployment
-    assert deployment_processor is not None
+    if deployment_processor is None:
+        raise ServerMisconfiguredError("Deployment processor is not available")
     result = await deployment_processor.create_auto_scaling_rule.wait_for_complete(
         action=CreateAutoScalingRuleAction(input.to_creator())
     )
@@ -181,7 +183,8 @@ async def update_auto_scaling_rule(
     input: UpdateAutoScalingRuleInput, info: Info[StrawberryGQLContext]
 ) -> UpdateAutoScalingRulePayload:
     deployment_processor = info.context.processors.deployment
-    assert deployment_processor is not None
+    if deployment_processor is None:
+        raise ServerMisconfiguredError("Deployment processor is not available")
     action_result = await deployment_processor.update_auto_scaling_rule.wait_for_complete(
         input.to_action()
     )
@@ -195,7 +198,8 @@ async def delete_auto_scaling_rule(
     input: DeleteAutoScalingRuleInput, info: Info[StrawberryGQLContext]
 ) -> DeleteAutoScalingRulePayload:
     deployment_processor = info.context.processors.deployment
-    assert deployment_processor is not None
+    if deployment_processor is None:
+        raise ServerMisconfiguredError("Deployment processor is not available")
     _ = await deployment_processor.delete_auto_scaling_rule.wait_for_complete(
         DeleteAutoScalingRuleAction(auto_scaling_rule_id=UUID(input.id))
     )

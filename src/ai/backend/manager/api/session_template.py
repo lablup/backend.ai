@@ -15,7 +15,7 @@ from ai.backend.common.json import dump_json, load_json
 from ai.backend.logging import BraceStyleAdapter
 
 from ..errors.api import InvalidAPIParameters
-from ..errors.resource import TaskTemplateNotFound
+from ..errors.resource import DBOperationFailed, TaskTemplateNotFound
 from ..models import TemplateType, groups, session_templates, users
 from ..models.session_template import check_task_template
 from .auth import auth_required
@@ -86,7 +86,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 "id": template_id,
                 "user": user_uuid if isinstance(user_uuid, str) else user_uuid.hex,
             })
-            assert result.rowcount == 1
+            if result.rowcount != 1:
+                raise DBOperationFailed(f"Failed to create session template: {template_id}")
     return web.json_response(resp)
 
 
@@ -269,7 +270,8 @@ async def put(request: web.Request, params: Any) -> web.Response:
                 .where((session_templates.c.id == template_id))
             )
             result = await conn.execute(query)
-            assert result.rowcount == 1
+            if result.rowcount != 1:
+                raise DBOperationFailed(f"Failed to update session template: {template_id}")
         return web.json_response({"success": True})
 
 
@@ -308,7 +310,8 @@ async def delete(request: web.Request, params: Any) -> web.Response:
             .where((session_templates.c.id == template_id))
         )
         result = await conn.execute(query)
-        assert result.rowcount == 1
+        if result.rowcount != 1:
+            raise DBOperationFailed(f"Failed to delete session template: {template_id}")
 
         return web.json_response({"success": True})
 

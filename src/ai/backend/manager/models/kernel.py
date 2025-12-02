@@ -65,6 +65,7 @@ from ..errors.kernel import (
     KernelRestartFailed,
     SessionNotFound,
 )
+from ..errors.resource import DataTransformationFailed
 from ..exceptions import AgentError
 from .base import (
     GUID,
@@ -731,9 +732,12 @@ class KernelRow(Base):
         reason: Optional[str] = None,
         status_changed_at: Optional[datetime] = None,
     ) -> None:
-        assert status != KernelStatus.TERMINATED, (
-            "TERMINATED status update must be handled in mark_kernel_terminated()"
-        )
+        from ai.backend.manager.errors.kernel import InvalidKernelStatus
+
+        if status == KernelStatus.TERMINATED:
+            raise InvalidKernelStatus(
+                "TERMINATED status update must be handled in mark_kernel_terminated()"
+            )
         if status_changed_at is None:
             now = datetime.now(tzutc())
         else:
@@ -1053,8 +1057,14 @@ async def recalc_concurrency_used(
             ),
         )
         sftp_concurrency_used = result.scalar()
-        assert isinstance(concurrency_used, int)
-        assert isinstance(sftp_concurrency_used, int)
+        if not isinstance(concurrency_used, int):
+            raise DataTransformationFailed(
+                f"Expected int for concurrency_used, got {type(concurrency_used).__name__}"
+            )
+        if not isinstance(sftp_concurrency_used, int):
+            raise DataTransformationFailed(
+                f"Expected int for sftp_concurrency_used, got {type(sftp_concurrency_used).__name__}"
+            )
 
     await valkey_stat_client.set_keypair_concurrency(
         access_key=str(access_key),

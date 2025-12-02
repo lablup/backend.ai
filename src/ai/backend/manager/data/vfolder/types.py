@@ -12,6 +12,7 @@ from ai.backend.common.dto.manager.field import (
     VFolderPermissionField,
 )
 from ai.backend.common.types import CIStrEnum, QuotaScopeID, VFolderID, VFolderUsageMode
+from ai.backend.manager.errors.resource import DataTransformationFailed
 
 from ..permission.types import OperationType
 
@@ -47,7 +48,10 @@ class VFolderMountPermission(enum.StrEnum):
     @override
     @classmethod
     def _missing_(cls, value: Any) -> Optional[VFolderMountPermission]:
-        assert isinstance(value, str)
+        if not isinstance(value, str):
+            raise DataTransformationFailed(
+                f"VFolderMountPermission value must be a string, got {type(value).__name__}"
+            )
         match value.upper():
             case "RO" | "READ_ONLY":
                 return cls.READ_ONLY
@@ -100,7 +104,10 @@ class VFolderOperationStatus(enum.StrEnum):
     @override
     @classmethod
     def _missing_(cls, value: Any) -> Optional[VFolderOperationStatus]:
-        assert isinstance(value, str)
+        if not isinstance(value, str):
+            raise DataTransformationFailed(
+                f"VFolderOperationStatus value must be a string, got {type(value).__name__}"
+            )
         match value.upper():
             case "READY":
                 return cls.READY
