@@ -348,7 +348,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         core_api = kube_client.CoreV1Api()
 
         # Get hash of public key
-        enc = hashlib.md5()
+        enc = hashlib.md5(usedforsecurity=False)
         enc.update(sshkey["public_key"].encode("ascii"))
         hash = enc.digest().decode("utf-8")
 

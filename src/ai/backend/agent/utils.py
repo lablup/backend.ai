@@ -79,7 +79,7 @@ class closing_async(AsyncContextManager[_SupportsAsyncCloseT]):
 
 
 def generate_local_instance_id(hint: str) -> str:
-    return hashlib.md5(hint.encode("utf-8")).hexdigest()[:12]
+    return hashlib.md5(hint.encode("utf-8"), usedforsecurity=False).hexdigest()[:12]
 
 
 def get_arch_name() -> str:
