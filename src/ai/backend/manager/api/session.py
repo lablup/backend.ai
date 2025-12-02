@@ -12,7 +12,7 @@ from collections.abc import Iterable, Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Annotated, Any, Optional, cast, get_args
+from typing import TYPE_CHECKING, Annotated, Any, Optional, cast
 from uuid import UUID
 
 import aiohttp_cors
@@ -104,7 +104,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
 from ..errors.api import InvalidAPIParameters
-from ..errors.auth import AuthorizationFailed, InsufficientPrivilege
+from ..errors.auth import InsufficientPrivilege
 from ..errors.kernel import InvalidSessionData, SessionNotFound
 from ..errors.resource import NoCurrentTaskContext
 from ..models import (
@@ -763,7 +763,7 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
 
     myself = asyncio.current_task()
     if myself is None:
-        raise AuthorizationFailed("No current task context")
+        raise NoCurrentTaskContext("No current task context")
 
     log.info(
         "GET_COMMIT_STATUS (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
@@ -1345,8 +1345,6 @@ async def _find_dependency_sessions(
     session_id = str(sessions[0].id)
     session_name = sessions[0].name
 
-    if not isinstance(session_id, get_args(UUID | str)):
-        raise InvalidSessionData("Invalid session_id type")
     if not isinstance(session_name, str):
         raise InvalidSessionData("Invalid session_name type")
 
