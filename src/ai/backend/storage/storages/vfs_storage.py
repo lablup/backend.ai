@@ -23,9 +23,10 @@ from ai.backend.common.dto.storage.response import (
 from ai.backend.common.types import StreamReader
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.config.unified import VFSStorageConfig
-from ai.backend.storage.exception import (
+from ai.backend.storage.errors import (
     FileStreamDownloadError,
     FileStreamUploadError,
+    InvalidPathError,
     NotImplementedAPI,
     ObjectInfoFetchError,
     StorageBucketFileNotFoundError,
@@ -193,8 +194,7 @@ class VFSStorage(AbstractStorage):
         try:
             full_path.relative_to(self._base_path)
         except ValueError:
-            # TODO: Make exception class
-            raise ValueError(f"Path traversal not allowed: {filepath}")
+            raise InvalidPathError(f"Path traversal not allowed: {filepath}")
 
         return full_path
 

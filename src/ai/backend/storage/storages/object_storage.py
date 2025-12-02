@@ -14,7 +14,7 @@ from ai.backend.storage.config.unified import (
     PresignedDownloadConfig,
     PresignedUploadConfig,
 )
-from ai.backend.storage.exception import (
+from ai.backend.storage.errors import (
     FileStreamDownloadError,
     FileStreamUploadError,
     ObjectInfoFetchError,

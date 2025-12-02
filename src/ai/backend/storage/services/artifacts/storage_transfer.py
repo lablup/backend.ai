@@ -6,7 +6,7 @@ import shutil
 
 from ai.backend.common.artifact_storage import AbstractStorage
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.storage.exception import StorageTransferError
+from ai.backend.storage.errors import StorageTransferError
 from ai.backend.storage.storages.object_storage import ObjectStorage
 from ai.backend.storage.storages.storage_pool import StoragePool
 from ai.backend.storage.storages.vfs_storage import VFSStorage

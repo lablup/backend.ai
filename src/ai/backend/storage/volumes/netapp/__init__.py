@@ -30,11 +30,14 @@ from tenacity import (
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
-from ...exception import (
+from ...errors import (
+    InvalidAPIParameters,
+    InvalidPathError,
     InvalidQuotaScopeError,
     ProcessExecutionError,
     QuotaDirectoryNotEmptyError,
     QuotaScopeNotFoundError,
+    SubprocessStdoutNotAvailableError,
 )
 from ...subproc import spawn_and_watch
 from ...types import (
@@ -219,9 +222,9 @@ class XCPFSOpModel(BaseFSOpModel):
         dst_path: Path,
     ) -> None:
         if not src_path.is_relative_to(self.mount_path):
-            raise ValueError(f"Invalid path inside the volume: {src_path}")
+            raise InvalidPathError(f"Invalid path inside the volume: {src_path}")
         if not dst_path.is_relative_to(self.mount_path):
-            raise ValueError(f"Invalid path inside the volume: {dst_path}")
+            raise InvalidPathError(f"Invalid path inside the volume: {dst_path}")
 
         # Rearrange the paths into the NFS absolute path.
         # These relative paths contains the qtree (quota-scope) name as the first part.
@@ -283,7 +286,10 @@ class XCPFSOpModel(BaseFSOpModel):
             entry_queue: asyncio.Queue[DirEntry | Sentinel] = asyncio.Queue(maxsize=1024)
 
             async def read_stdout() -> None:
-                assert proc.stdout is not None
+                if proc.stdout is None:
+                    raise SubprocessStdoutNotAvailableError(
+                        "xcp scan process stdout is not available"
+                    )
                 while True:
                     line = await proc.stdout.readline()
                     if not line:
@@ -332,7 +338,10 @@ class XCPFSOpModel(BaseFSOpModel):
                     )
 
             async def read_stderr() -> None:
-                assert proc.stderr is not None
+                if proc.stderr is None:
+                    raise SubprocessStdoutNotAvailableError(
+                        "xcp scan process stderr is not available"
+                    )
                 while True:
                     line = await proc.stderr.readline()
                     if not line:
@@ -472,12 +481,14 @@ class NetAppVolume(BaseVolume):
         self.netapp_xcp_cmd = self.config["netapp_xcp_cmd"]
         self.volume_name = self.config["netapp_volume_name"]
         volume_info = await self.netapp_client.get_volume_by_name(self.volume_name, ["svm"])
-        assert "svm" in volume_info
+        if "svm" not in volume_info:
+            raise InvalidAPIParameters("Volume info does not contain svm data")
         self.volume_id = volume_info["uuid"]
         self.svm_name = volume_info["svm"]["name"]
         self.svm_id = StorageID(volume_info["svm"]["uuid"])
         self.nas_path = volume_info["path"]
-        assert self.nas_path.is_absolute()
+        if not self.nas_path.is_absolute():
+            raise InvalidAPIParameters("NAS path must be an absolute path")
         # Example volume ID: 8a5c9938-a872-11ed-8519-d039ea42b802
         # Example volume name: "cj1nipacjssd1_02R10c1v2"
         # Example volume path: /cj1nipacjssd1_02R10c1v2/
@@ -516,7 +527,8 @@ class NetAppVolume(BaseVolume):
         volume_info = await self.netapp_client.get_volume_by_id(
             self.volume_id, ["space.size,space.used"]
         )
-        assert "space" in volume_info
+        if "space" not in volume_info:
+            raise InvalidAPIParameters("Volume info does not contain space data")
         return CapacityUsage(
             capacity_bytes=BinarySize(volume_info["space"]["size"]),
             used_bytes=BinarySize(volume_info["space"]["used"]),
@@ -524,7 +536,8 @@ class NetAppVolume(BaseVolume):
 
     async def get_performance_metric(self) -> FSPerfMetric:
         volume_info = await self.netapp_client.get_volume_by_id(self.volume_id, ["statistics"])
-        assert "statistics" in volume_info
+        if "statistics" not in volume_info:
+            raise InvalidAPIParameters("Volume info does not contain statistics data")
         stats = volume_info["statistics"]
         # Example of volume info's statistics field:
         # 'statistics': {'iops_raw': {'other': 10860,

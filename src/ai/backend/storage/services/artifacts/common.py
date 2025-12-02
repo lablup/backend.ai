@@ -18,7 +18,7 @@ from ai.backend.common.events.event_types.artifact.anycast import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.context_types import ArtifactVerifierContext
-from ai.backend.storage.exception import (
+from ai.backend.storage.errors import (
     ArtifactVerificationFailedError,
     ArtifactVerifyStorageTypeInvalid,
     NotImplementedAPI,

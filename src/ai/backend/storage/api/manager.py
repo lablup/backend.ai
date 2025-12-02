@@ -72,8 +72,9 @@ from ..bgtask.tasks.clone import VFolderCloneManifest
 from ..bgtask.tasks.delete import VFolderDeleteManifest
 from ..bgtask.tasks.delete_files import FileDeleteManifest
 from ..dto.context import StorageRootCtx
-from ..exception import (
+from ..errors import (
     ExternalStorageServiceError,
+    InvalidAPIParameters,
     InvalidQuotaConfig,
     InvalidSubpathError,
     ProcessExecutionError,
@@ -418,7 +419,8 @@ async def create_vfolder(request: web.Request) -> web.Response:
         ),
     ) as params:
         await log_manager_api_entry(log, "create_vfolder", params)
-        assert params["vfid"].quota_scope_id is not None
+        if params["vfid"].quota_scope_id is None:
+            raise InvalidAPIParameters("quota_scope_id is required for vfid")
         ctx: RootContext = request.app["ctx"]
         perm_mode = cast(
             int, params["mode"] if params["mode"] is not None else DEFAULT_VFOLDER_PERMISSION_MODE
@@ -429,7 +431,10 @@ async def create_vfolder(request: web.Request) -> web.Response:
             except QuotaScopeNotFoundError:
                 if not ctx.local_config.storage_proxy.auto_quota_scope_creation:
                     raise
-                assert params["vfid"].quota_scope_id
+                if not params["vfid"].quota_scope_id:
+                    raise InvalidAPIParameters(
+                        "quota_scope_id is required for auto quota scope creation"
+                    )
                 if initial_max_size_for_quota_scope := (params["options"] or {}).get(
                     "initial_max_size_for_quota_scope"
                 ):

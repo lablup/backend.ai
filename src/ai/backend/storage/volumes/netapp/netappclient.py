@@ -78,7 +78,7 @@ import aiohttp
 
 from ai.backend.logging import BraceStyleAdapter
 
-from ...exception import NetAppClientError
+from ...errors import NetAppClientError, NetAppQTreeNotFoundError
 from ...types import QuotaConfig, QuotaUsage
 
 StorageID: TypeAlias = uuid.UUID
@@ -414,7 +414,7 @@ class NetAppClient:
                 qtree_info.update(record)
                 return qtree_info
             else:
-                raise RuntimeError(f"No qtree {name} found in the volume {volume_id}")
+                raise NetAppQTreeNotFoundError(f"No qtree {name} found in the volume {volume_id}")
 
     async def create_qtree(
         self,

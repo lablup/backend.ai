@@ -33,7 +33,7 @@ from ai.backend.storage.config.unified import (
     ReservoirConfig,
 )
 from ai.backend.storage.context_types import ArtifactVerifierContext
-from ai.backend.storage.exception import (
+from ai.backend.storage.errors import (
     ArtifactRevisionEmptyError,
     ArtifactStorageEmptyError,
     ObjectStorageBucketNotFoundError,

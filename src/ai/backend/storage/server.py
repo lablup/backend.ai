@@ -82,6 +82,7 @@ from ai.backend.storage.context_types import ArtifactVerifierContext
 from . import __version__ as VERSION
 from .config.loaders import load_local_config, make_etcd
 from .config.unified import EventLoopType, StorageProxyUnifiedConfig
+from .errors import InvalidConfigurationSourceError, InvalidSocketPathError
 from .watcher import WatcherClient
 
 if TYPE_CHECKING:
@@ -288,14 +289,14 @@ async def watcher_ctx(
 ) -> AsyncGenerator[WatcherClient | None]:
     if local_config.storage_proxy.use_watcher:
         if not _is_root():
-            raise ValueError(
+            raise InvalidConfigurationSourceError(
                 "Storage proxy must be run as root if watcher is enabled. Else, set"
                 " `use-watcher` to false in your local config file."
             )
         insock_path: str | None = local_config.storage_proxy.watcher_insock_path_prefix
         outsock_path: str | None = local_config.storage_proxy.watcher_outsock_path_prefix
         if insock_path is None or outsock_path is None:
-            raise ValueError(
+            raise InvalidSocketPathError(
                 "Socket path must be not null. Please set valid socket path to"
                 " `watcher-insock-path-prefix` and `watcher-outsock-path-prefix` in your local"
                 " config file."
@@ -787,7 +788,7 @@ def main(
 
                 if local_config.storage_proxy.use_watcher:
                     if not _is_root():
-                        raise ValueError(
+                        raise InvalidConfigurationSourceError(
                             "Storage proxy must be run as root if watcher is enabled. Else, set"
                             " `use-watcher` to false in your local config file."
                         )
@@ -796,7 +797,7 @@ def main(
                         local_config.storage_proxy.watcher_outsock_path_prefix
                     )
                     if insock_path is None or outsock_path is None:
-                        raise ValueError(
+                        raise InvalidSocketPathError(
                             "Socket path must be not null. Please set valid socket path to"
                             " `watcher-insock-path-prefix` and `watcher-outsock-path-prefix` in"
                             " your local config file."
