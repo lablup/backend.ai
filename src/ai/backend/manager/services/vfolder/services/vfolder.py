@@ -223,7 +223,8 @@ class VFolderService:
             if ownership_type == "user":
                 current_count = await self._vfolder_repository.count_vfolders_by_user(user_uuid)
             else:
-                assert group_uuid is not None
+                if group_uuid is None:
+                    raise VFolderInvalidParameter("Group UUID is required for group-owned vfolders")
                 current_count = await self._vfolder_repository.count_vfolders_by_group(group_uuid)
 
             if current_count >= max_vfolder_count:

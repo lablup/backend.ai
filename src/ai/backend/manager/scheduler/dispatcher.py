@@ -116,6 +116,7 @@ from .types import (
     AbstractScheduler,
     AgentAllocationContext,
     DefaultResourceGroupStateStore,
+    InvalidSchedulerState,
     KernelAgentBinding,
     PredicateResult,
     SchedulingContext,
@@ -920,7 +921,6 @@ class SchedulerDispatcher(aobject):
                                 f" resource group: {sess_ctx.scaling_group_name})"
                             ),
                         )
-                assert agent_id is not None
 
                 agent_alloc_ctx = await self.schedule_repository.reserve_agent(
                     sgroup_name,
@@ -955,10 +955,17 @@ class SchedulerDispatcher(aobject):
                 await execute_with_retry(_update_generic_failure)
                 raise
             else:
-                assert agent_alloc_ctx is not None
+                if agent_alloc_ctx is None:
+                    raise InvalidSchedulerState(
+                        "Agent allocation context is not available after successful reservation"
+                    )
                 kernel_agent_bindings.append(KernelAgentBinding(kernel, agent_alloc_ctx, set()))
 
-        assert len(kernel_agent_bindings) == len(sess_ctx.kernels)
+        if len(kernel_agent_bindings) != len(sess_ctx.kernels):
+            raise InvalidSchedulerState(
+                f"Kernel-agent binding count mismatch: {len(kernel_agent_bindings)} bindings"
+                f" for {len(sess_ctx.kernels)} kernels"
+            )
         # Proceed to PREPARING only when all kernels are successfully scheduled.
 
         async def _finalize_scheduled() -> None:
@@ -1230,7 +1237,8 @@ class SchedulerDispatcher(aobject):
         log_args = (session,)
         log.debug(log_fmt + "try-starting", *log_args)
         try:
-            assert len(session.kernels) > 0
+            if len(session.kernels) == 0:
+                raise InvalidSchedulerState(f"Session {session.id} has no kernels to start")
             await self.registry.start_session(sched_ctx, session)
         except (asyncio.CancelledError, Exception) as e:
             status_data = convert_to_status_data(e, self.config_provider.config.debug.enabled)

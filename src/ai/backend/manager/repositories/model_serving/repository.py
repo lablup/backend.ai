@@ -34,6 +34,7 @@ from ai.backend.manager.data.model_serving.types import (
     UserData,
 )
 from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
@@ -725,7 +726,8 @@ class ModelServingRepository:
         """
         async with self._db.begin_readonly_session() as session:
             conn = await session.connection()
-            assert conn is not None
+            if conn is None:
+                raise DatabaseConnectionUnavailable("Database connection is not available")
             return await resolve_group_name_or_id(conn, domain_name, group_name_or_id)
 
     @model_serving_repository_resilience.apply()
@@ -822,7 +824,8 @@ class ModelServingRepository:
                 session_owner: UserRow = endpoint_row.session_owner_row
 
                 conn = await db_session.connection()
-                assert conn
+                if conn is None:
+                    raise DatabaseConnectionUnavailable("Database connection is not available")
 
                 await ModelServiceHelper.check_scaling_group(
                     conn,

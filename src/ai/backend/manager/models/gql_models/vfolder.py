@@ -33,6 +33,7 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.user.types import UserRole
 
+from ...errors.resource import DataTransformationFailed
 from ...errors.storage import (
     ModelCardParseError,
     VFolderBadRequest,
@@ -638,7 +639,10 @@ class ModelCard(graphene.ObjectType):
                 raise ModelCardParseError(
                     extra_msg=f"Failed to validate model definition file (data:{model_definition_dict}, detail:{str(e)})"
                 )
-            assert model_definition is not None
+            if model_definition is None:
+                raise DataTransformationFailed(
+                    "Model definition validation returned None unexpectedly"
+                )
             model_definition["id"] = vfolder_row_id
         else:
             model_definition = None

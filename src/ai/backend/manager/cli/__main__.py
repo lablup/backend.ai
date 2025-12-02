@@ -21,6 +21,7 @@ from ai.backend.common.cli import LazyGroup
 from ai.backend.common.validators import TimeDuration
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 
+from ..errors.resource import ConfigurationLoadFailed
 from .context import CLIContext, redis_ctx
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
@@ -207,7 +208,8 @@ def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) 
     log.info("Generating a RPC keypair...")
     public_key_path, secret_key_path = create_certificates(dst_dir, name)
     public_key, secret_key = load_certificate(secret_key_path)
-    assert secret_key is not None
+    if secret_key is None:
+        raise ConfigurationLoadFailed("Failed to load secret key from certificate")
     print(f"Public Key: {public_key.decode('ascii')} (stored at {public_key_path})")
     print(f"Secret Key: {secret_key.decode('ascii')} (stored at {secret_key_path})")
 

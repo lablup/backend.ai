@@ -14,7 +14,7 @@ from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
 
 from ..errors.api import InvalidAPIParameters
-from ..errors.resource import TaskTemplateNotFound
+from ..errors.resource import DBOperationFailed, TaskTemplateNotFound
 from ..models import (
     TemplateType,
     UserRole,
@@ -167,7 +167,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "type": TemplateType.CLUSTER,
         })
         result = await conn.execute(query)
-        assert result.rowcount == 1
+        if result.rowcount != 1:
+            raise DBOperationFailed(f"Failed to create cluster template: {template_id}")
     return web.json_response(resp)
 
 
@@ -340,7 +341,8 @@ async def put(request: web.Request, params: Any) -> web.Response:
             .where((session_templates.c.id == template_id))
         )
         result = await conn.execute(query)
-        assert result.rowcount == 1
+        if result.rowcount != 1:
+            raise DBOperationFailed(f"Failed to update cluster template: {template_id}")
 
         return web.json_response({"success": True})
 
@@ -383,7 +385,8 @@ async def delete(request: web.Request, params: Any) -> web.Response:
             .where((session_templates.c.id == template_id))
         )
         result = await conn.execute(query)
-        assert result.rowcount == 1
+        if result.rowcount != 1:
+            raise DBOperationFailed(f"Failed to delete cluster template: {template_id}")
 
         return web.json_response({"success": True})
 

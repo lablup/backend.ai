@@ -23,7 +23,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderPermissionData,
 )
 from ai.backend.manager.errors.common import ObjectNotFound
-from ai.backend.manager.errors.resource import GroupNotFound
+from ai.backend.manager.errors.resource import DBOperationFailed, GroupNotFound
 from ai.backend.manager.errors.storage import (
     VFolderDeletionNotAllowed,
     VFolderInvalidParameter,
@@ -254,7 +254,10 @@ class VfolderRepository:
 
             query = sa.insert(VFolderRow, insert_values)
             result = await session.execute(query)
-            assert result.rowcount == 1
+            if result.rowcount != 1:
+                raise DBOperationFailed(
+                    f"Failed to insert vfolder: expected 1 row, got {result.rowcount}"
+                )
             match params.ownership_type:
                 case VFolderOwnershipType.USER:
                     scope_id = ScopeId(ScopeType.USER, str(params.user))

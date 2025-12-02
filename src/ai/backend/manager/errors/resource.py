@@ -400,3 +400,51 @@ class DatabaseConnectionUnavailable(BackendAIError, web.HTTPInternalServerError)
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class InvalidSchedulerState(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/invalid-scheduler-state"
+    error_title = "Scheduler is in an invalid state."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SCALING_GROUP,
+            operation=ErrorOperation.SCHEDULE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class ConfigurationLoadFailed(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/configuration-load-failed"
+    error_title = "Failed to load configuration."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class DataTransformationFailed(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/data-transformation-failed"
+    error_title = "Failed to transform data."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DATABASE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class DBOperationFailed(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/db-operation-failed"
+    error_title = "Database operation failed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DATABASE,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

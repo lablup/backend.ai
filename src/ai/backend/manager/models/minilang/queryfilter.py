@@ -4,6 +4,8 @@ import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
 from lark.lexer import Token
 
+from ai.backend.manager.errors.resource import DataTransformationFailed
+
 from . import (
     ArrayFieldItem,
     EnumFieldItem,
@@ -247,5 +249,6 @@ class QueryFilterParser:
             raise ValueError("Unsupported SQLAlchemy query object type")
         where_clause = self.parse_filter(table, filter_expr)
         final_query = sa_query.where(where_clause)
-        assert final_query is not None
+        if final_query is None:
+            raise DataTransformationFailed("Failed to apply filter to query")
         return final_query

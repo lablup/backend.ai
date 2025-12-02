@@ -90,8 +90,7 @@ class Bytes(Scalar):
     @staticmethod
     def parse_literal(node: Any, _variables=None) -> Optional[bytes]:
         if isinstance(node, graphql.language.ast.StringValueNode):
-            assert isinstance(node, str)
-            return bytes.fromhex(node)
+            return bytes.fromhex(node.value)
         return None
 
     @staticmethod
