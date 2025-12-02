@@ -1,5 +1,5 @@
 from .adapter import AgentGQLAdapter
-from .resolver import agent_stats, agent_v2
+from .resolver import agent_stats, agents_v2
 from .types import (
     AgentFilterGQL,
     AgentOrderByGQL,
@@ -23,5 +23,5 @@ __all__ = (
     "AgentV2Edge",
     # Resolvers
     "agent_stats",
-    "agent_v2",
+    "agents_v2",
 )
