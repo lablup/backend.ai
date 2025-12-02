@@ -232,7 +232,23 @@ from ai.backend.logging.formatter import pretty
 from . import __version__ as VERSION
 from .affinity_map import AffinityMap
 from .config.unified import AgentUnifiedConfig, ContainerSandboxType
-from .exception import AgentError, ContainerCreationError, ResourceError
+from .errors import (
+    ContainerCreationFailedError,
+    ContainerStartupCancelledError,
+    ContainerStartupFailedError,
+    ContainerStartupTimeoutError,
+    ImageArchitectureMismatchError,
+    ImageCommandRequiredError,
+    ImagePullTimeoutError,
+    ModelDefinitionEmptyError,
+    ModelDefinitionInvalidYAMLError,
+    ModelDefinitionNotFoundError,
+    ModelDefinitionValidationError,
+    ModelFolderNotSpecifiedError,
+    PortConflictError,
+    ReservedPortError,
+)
+from .exception import ContainerCreationError, ResourceError
 from .kernel import (
     RUN_ID_FOR_BATCH_JOB,
     AbstractKernel,
@@ -2598,7 +2614,7 @@ class AbstractAgent(
                 agent_architecture = get_arch_name()
                 if agent_architecture != ctx.image_ref.architecture:
                     # disable running different architecture's image
-                    raise AgentError(
+                    raise ImageArchitectureMismatchError(
                         f"cannot run {ctx.image_ref.architecture} image on"
                         f" {agent_architecture} machine",
                     )
@@ -2633,7 +2649,7 @@ class AbstractAgent(
                         log.exception(
                             f"Image pull timeout after {image_pull_timeout} seconds. Destroying kernel (k:{kernel_id}, img:{ctx.image_ref.canonical})"
                         )
-                        raise AgentError(
+                        raise ImagePullTimeoutError(
                             f"Image pull timeout after {image_pull_timeout} seconds. (img:{ctx.image_ref.canonical})"
                         )
                 else:
@@ -2850,12 +2866,14 @@ class AbstractAgent(
                             port_map[sport["name"]] = sport
                         for port_no in preopen_ports:
                             if port_no in (2000, 2001):
-                                raise AgentError("Port 2000 and 2001 are reserved for internal use")
+                                raise ReservedPortError(
+                                    "Port 2000 and 2001 are reserved for internal use"
+                                )
                             overlapping_services = [
                                 s for s in service_ports if port_no in s["container_ports"]
                             ]
                             if len(overlapping_services) > 0:
-                                raise AgentError(
+                                raise PortConflictError(
                                     f"Port {port_no} overlaps with built-in service"
                                     f" {overlapping_services[0]['name']}"
                                 )
@@ -3018,7 +3036,7 @@ class AbstractAgent(
                             KernelLifecycleEventReason.FAILED_TO_CREATE,
                             container_id=ContainerId(cid),
                         )
-                        raise AgentError(
+                        raise ContainerCreationFailedError(
                             f"Kernel failed to create container (k:{str(ctx.kernel_id)}, detail:{msg})"
                         )
                     except Exception as e:
@@ -3032,7 +3050,7 @@ class AbstractAgent(
                             LifecycleEvent.DESTROY,
                             KernelLifecycleEventReason.FAILED_TO_CREATE,
                         )
-                        raise AgentError(
+                        raise ContainerCreationFailedError(
                             f"Kernel failed to create container (k:{str(kernel_id)}, detail: {str(e)})"
                         )
                     try:
@@ -3120,7 +3138,7 @@ class AbstractAgent(
                             KernelLifecycleEventReason.FAILED_TO_START,
                             container_id=ContainerId(container_data["container_id"]),
                         )
-                        raise AgentError(
+                        raise ContainerStartupTimeoutError(
                             f"Timeout during container startup (k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
                         )
                     except asyncio.CancelledError:
@@ -3131,7 +3149,7 @@ class AbstractAgent(
                             KernelLifecycleEventReason.FAILED_TO_START,
                             container_id=ContainerId(container_data["container_id"]),
                         )
-                        raise AgentError(
+                        raise ContainerStartupCancelledError(
                             f"Cancelled waiting of container startup (k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
                         )
                     except RetryError:
@@ -3147,7 +3165,7 @@ class AbstractAgent(
                             f"(k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
                         )
                         log.exception(err_msg)
-                        raise AgentError(err_msg)
+                        raise ContainerStartupFailedError(err_msg)
                     except BaseException as e:
                         log.exception(
                             "unexpected error while waiting container startup (k: {}, e: {})",
@@ -3274,12 +3292,14 @@ class AbstractAgent(
     ) -> Any:
         image_command = await self.extract_image_command(kernel_config["image"]["canonical"])
         if runtime_variant != RuntimeVariant.CUSTOM and not image_command:
-            raise AgentError(
-                "image should have its own command when runtime variant is set to values other than CUSTOM!"
+            raise ImageCommandRequiredError(
+                "Image should have its own command when runtime variant is set to values other than CUSTOM"
             )
 
         if len(model_folders) == 0:
-            raise AgentError("At least one model virtual folder must be specified.")
+            raise ModelFolderNotSpecifiedError(
+                "At least one model virtual folder must be specified"
+            )
 
         model_folder: VFolderMount = model_folders[0]
 
@@ -3393,7 +3413,7 @@ class AbstractAgent(
                         break
 
                 if not model_definition_path:
-                    raise AgentError(
+                    raise ModelDefinitionNotFoundError(
                         f"Model definition file ({' or '.join(model_definition_candidates)}) does not exist under vFolder"
                         f" {model_folder.name} (ID {model_folder.vfid})",
                     )
@@ -3402,7 +3422,7 @@ class AbstractAgent(
                         None, model_definition_path.read_text
                     )
                 except FileNotFoundError as e:
-                    raise AgentError(
+                    raise ModelDefinitionNotFoundError(
                         "Model definition file (model-definition.yml) does not exist under"
                         f" vFolder {model_folder.name} (ID {model_folder.vfid})",
                     ) from e
@@ -3410,25 +3430,23 @@ class AbstractAgent(
                     yaml = YAML()
                     raw_definition = yaml.load(model_definition_yaml)
                 except YAMLError as e:
-                    raise AgentError(f"Invalid YAML syntax: {e}") from e
+                    raise ModelDefinitionInvalidYAMLError(f"Invalid YAML syntax: {e}") from e
         try:
             model_definition = model_definition_iv.check(raw_definition)
             if model_definition is None:
-                raise AgentError(
-                    "Model definition is empty. Please check your model definition file"
-                )
+                raise ModelDefinitionEmptyError
             for model in model_definition["models"]:
                 if "BACKEND_MODEL_NAME" not in environ:
                     environ["BACKEND_MODEL_NAME"] = model["name"]
                 environ["BACKEND_MODEL_PATH"] = model["model_path"]
                 if service := model.get("service"):
                     if service["port"] in (2000, 2001):
-                        raise AgentError("Port 2000 and 2001 are reserved for internal use")
+                        raise ReservedPortError("Port 2000 and 2001 are reserved for internal use")
                     overlapping_services = [
                         s for s in service_ports if service["port"] in s["container_ports"]
                     ]
                     if len(overlapping_services) > 0:
-                        raise AgentError(
+                        raise PortConflictError(
                             f"Port {service['port']} overlaps with built-in service"
                             f" {overlapping_services[0]['name']}"
                         )
@@ -3441,7 +3459,7 @@ class AbstractAgent(
                     })
             return model_definition
         except DataError as e:
-            raise AgentError(
+            raise ModelDefinitionValidationError(
                 "Failed to validate model definition from vFolder"
                 f" {model_folder.name} (ID {model_folder.vfid})",
             ) from e

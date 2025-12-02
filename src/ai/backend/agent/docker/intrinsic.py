@@ -40,6 +40,8 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__  # pants: no-infer-dep
 from ..alloc_map import AllocationStrategy
+from ..errors import InvalidResourceConfigError
+from ..exception import InvalidArgumentError
 from ..resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
@@ -180,7 +182,10 @@ class CPUPlugin(AbstractComputePlugin):
     async def list_devices(self) -> Collection[CPUDevice]:
         cores = await libnuma.get_available_cores()
         overcommit_factor = int(os.environ.get("BACKEND_CPU_OVERCOMMIT_FACTOR", "1"))
-        assert 1 <= overcommit_factor <= 10
+        if not (1 <= overcommit_factor <= 10):
+            raise InvalidResourceConfigError(
+                f"BACKEND_CPU_OVERCOMMIT_FACTOR must be between 1 and 10, got {overcommit_factor}"
+            )
         return [
             CPUDevice(
                 device_id=DeviceId(str(core_idx)),
@@ -417,7 +422,10 @@ class CPUPlugin(AbstractComputePlugin):
         container: Container,
         alloc_map: AbstractAllocMap,
     ) -> None:
-        assert isinstance(alloc_map, DiscretePropertyAllocMap)
+        if not isinstance(alloc_map, DiscretePropertyAllocMap):
+            raise InvalidArgumentError(
+                f"Expected DiscretePropertyAllocMap, got {type(alloc_map).__name__}"
+            )
         # Docker does not return the original cpuset.... :(
         # We need to read our own records.
         resource_spec = await get_resource_spec_from_container(container.backend_obj)
@@ -940,7 +948,10 @@ class MemoryPlugin(AbstractComputePlugin):
         container: Container,
         alloc_map: AbstractAllocMap,
     ) -> None:
-        assert isinstance(alloc_map, DiscretePropertyAllocMap)
+        if not isinstance(alloc_map, DiscretePropertyAllocMap):
+            raise InvalidArgumentError(
+                f"Expected DiscretePropertyAllocMap, got {type(alloc_map).__name__}"
+            )
         memory_limit = container.backend_obj["HostConfig"]["Memory"]
         alloc_map.apply_allocation({
             SlotName("mem"): {DeviceId("root"): memory_limit},

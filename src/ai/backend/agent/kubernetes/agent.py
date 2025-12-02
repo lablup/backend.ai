@@ -184,8 +184,10 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         else:
             slots = ResourceSlot.from_json(self.kernel_config["resource_slots"])
             # Ensure that we have intrinsic slots.
-            assert SlotName("cpu") in slots
-            assert SlotName("mem") in slots
+            if SlotName("cpu") not in slots:
+                raise UnsupportedResource("cpu slot is required")
+            if SlotName("mem") not in slots:
+                raise UnsupportedResource("mem slot is required")
             # accept unknown slot type with zero values
             # but reject if they have non-zero values.
             for st, sv in slots.items():
@@ -758,7 +760,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             log.exception("Error while rollup: {}", e)
             raise
 
-        assert expose_service_api_response.spec is not None
+        if expose_service_api_response.spec is None:
+            raise K8sError("expose_service_api_response.spec is None")
         node_ports: List[V1ServicePort] = expose_service_api_response.spec.ports
         arguments.append((
             None,
