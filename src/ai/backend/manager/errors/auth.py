@@ -122,3 +122,15 @@ class GroupMembershipNotFoundError(BackendAIError, web.HTTPNotFound):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class InvalidClientIPConfig(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/invalid-client-ip-config"
+    error_title = "Invalid client IP configuration."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )

@@ -352,3 +352,51 @@ class NoAvailableScalingGroup(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class AgentNotAllocated(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/agent-not-allocated"
+    error_title = "Agent ID has not been allocated for the session."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class SessionNotAllocated(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/session-not-allocated"
+    error_title = "Session ID is not available during allocation."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class NoCurrentTaskContext(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/no-current-task-context"
+    error_title = "No current asyncio task context available."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class DatabaseConnectionUnavailable(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/database-connection-unavailable"
+    error_title = "Database connection is not available."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DATABASE,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
