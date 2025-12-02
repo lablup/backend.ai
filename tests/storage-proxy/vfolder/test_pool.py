@@ -6,7 +6,7 @@ import pytest
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import VolumeID
-from ai.backend.storage.exception import InvalidVolumeError
+from ai.backend.storage.errors import InvalidVolumeError
 from ai.backend.storage.plugin import StoragePluginContext
 from ai.backend.storage.types import VolumeInfo
 from ai.backend.storage.volumes.abc import AbstractVolume
