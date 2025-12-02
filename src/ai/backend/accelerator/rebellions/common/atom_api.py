@@ -64,6 +64,7 @@ class ATOMAPI:
     async def get_stats(cls, exec_path: str) -> ATOMStat:
         result = await asyncio.create_subprocess_exec(
             exec_path,
+            "-g",
             "-j",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

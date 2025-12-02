@@ -136,11 +136,16 @@ class ATOMMaxPlugin(AbstractATOMPlugin[ATOMMaxDevice]):
         device_indexes = []
         for d in devices:
             groups |= set([int(dd.rbln_stat_info.group_id) for dd in d.children])
-            device_indexes.extend([dd.rbln_stat_info.npu for dd in d.children])
         non_zero_groups: Set[int] = groups - set([0])
         if len(non_zero_groups) > 0:
             await ATOMAPI.destroy_groups(self._rbln_stat_path, list(non_zero_groups))
 
+        # device index alters based on its group membership - so we need to query up to date device stat here
+        unique_ids = {d.device_id for d in devices}
+        live_devices = await self._list_devices()
+        for d in live_devices:
+            if d.device_id in unique_ids:
+                device_indexes.extend([dd.rbln_stat_info.npu for dd in d.children])
         group_idx = await ATOMAPI.create_group(self._rbln_stat_path, device_indexes)
         return group_idx
 

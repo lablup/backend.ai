@@ -52,7 +52,8 @@ class ATOMPlugin(AbstractATOMPlugin[ATOMDevice]):
         if len(non_zero_groups) > 0:
             await ATOMAPI.destroy_groups(self._rbln_stat_path, list(non_zero_groups))
 
-        device_indexes = [d.rbln_stat_info.npu for d in devices]
+        live_devices = await self._list_devices()
+        device_indexes = [d.rbln_stat_info.npu for d in live_devices]
         group_idx = await ATOMAPI.create_group(self._rbln_stat_path, device_indexes)
         return group_idx
 

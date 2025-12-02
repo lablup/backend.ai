@@ -29,8 +29,7 @@ class ATOMMaxDevice(AbstractATOMDevice):
         *args,
         **kwargs,
     ) -> None:
-        super().__init__(*args, **kwargs)
-        self.model_name = model_name
+        super().__init__(model_name, *args, **kwargs)
         self.children = children
 
     def __str__(self) -> str:

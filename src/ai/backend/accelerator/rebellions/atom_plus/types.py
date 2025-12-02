@@ -22,8 +22,7 @@ class ATOMPlusDevice(AbstractATOMDevice):
         *args,
         **kwargs,
     ) -> None:
-        super().__init__(*args, **kwargs)
-        self.model_name = model_name
+        super().__init__(model_name, *args, **kwargs)
         self.serial = serial
         self.device_number = device_number
         self.rbln_stat_info = rbln_stat_info
