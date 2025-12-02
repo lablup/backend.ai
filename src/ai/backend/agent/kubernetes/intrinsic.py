@@ -24,6 +24,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__  # pants: no-infer-dep
 from ..alloc_map import AllocationStrategy
+from ..errors import InvalidAllocMapTypeError, InvalidOvercommitFactorError
 from ..resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
@@ -110,7 +111,10 @@ class CPUPlugin(AbstractComputePlugin):
 
         nodes = (await core_api.list_node()).to_dict()["items"]
         overcommit_factor = int(os.environ.get("BACKEND_CPU_OVERCOMMIT_FACTOR", "1"))
-        assert 1 <= overcommit_factor <= 10
+        if not (1 <= overcommit_factor <= 10):
+            raise InvalidOvercommitFactorError(
+                f"CPU overcommit factor must be between 1 and 10, got {overcommit_factor}."
+            )
 
         return [
             CPUDevice(
@@ -189,7 +193,10 @@ class CPUPlugin(AbstractComputePlugin):
         container: Container,
         alloc_map: AbstractAllocMap,
     ) -> None:
-        assert isinstance(alloc_map, DiscretePropertyAllocMap)
+        if not isinstance(alloc_map, DiscretePropertyAllocMap):
+            raise InvalidAllocMapTypeError(
+                f"Expected DiscretePropertyAllocMap, got {type(alloc_map).__name__}."
+            )
         # Docker does not return the original cpuset.... :(
         # We need to read our own records.
         resource_spec = await get_resource_spec_from_container(container.backend_obj)
@@ -270,7 +277,10 @@ class MemoryPlugin(AbstractComputePlugin):
 
         nodes = (await core_api.list_node()).to_dict()["items"]
         overcommit_factor = int(os.environ.get("BACKEND_MEM_OVERCOMMIT_FACTOR", "1"))
-        assert 1 <= overcommit_factor <= 10
+        if not (1 <= overcommit_factor <= 10):
+            raise InvalidOvercommitFactorError(
+                f"Memory overcommit factor must be between 1 and 10, got {overcommit_factor}."
+            )
         mem = 0
         for node in nodes:
             # if 'node-role.kubernetes.io/master' in node['metadata']['labels'].keys():
@@ -342,7 +352,10 @@ class MemoryPlugin(AbstractComputePlugin):
         container: Container,
         alloc_map: AbstractAllocMap,
     ) -> None:
-        assert isinstance(alloc_map, DiscretePropertyAllocMap)
+        if not isinstance(alloc_map, DiscretePropertyAllocMap):
+            raise InvalidAllocMapTypeError(
+                f"Expected DiscretePropertyAllocMap, got {type(alloc_map).__name__}."
+            )
         memory_limit = container.backend_obj["HostConfig"]["Memory"]
         alloc_map.apply_allocation({
             SlotName("mem"): {DeviceId("root"): memory_limit},

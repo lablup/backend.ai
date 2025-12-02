@@ -687,7 +687,8 @@ class ResourceAllocator(aobject):
         agent_config: AgentUnifiedConfig,
     ) -> Decimal:
         resource_config = agent_config.resource
-        assert resource_config.allocations is not None
+        if resource_config.allocations is None:
+            raise InvalidResourceConfigError("Resource allocations are not configured.")
 
         if slot_name == SlotName("cpu"):
             return Decimal(resource_config.allocations.cpu)

@@ -39,7 +39,7 @@ class AsyncioContextError(BackendAIError, web.HTTPInternalServerError):
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.EXECUTE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
+            error_detail=ErrorDetail.NOT_READY,
         )
 
 

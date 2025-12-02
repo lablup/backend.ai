@@ -68,6 +68,11 @@ from tenacity import (
 )
 from trafaret import DataError
 
+from ai.backend.agent.errors import (
+    AsyncioTaskNotAvailableError,
+    InvalidChunkSizeError,
+    KernelNotFoundError,
+)
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.metrics.metric import (
     StatScope,
@@ -1288,7 +1293,10 @@ class AbstractAgent(
                         chunk_buffer.close()
                         chunk_buffer = next_chunk_buffer
 
-            assert chunk_length < chunk_size
+            if chunk_length >= chunk_size:
+                raise InvalidChunkSizeError(
+                    f"Chunk length ({chunk_length}) must be less than chunk size ({chunk_size})."
+                )
             if chunk_length > 0:
                 chunk_log_item = ContainerLogData.from_log(
                     ContainerLogType.ZLIB, chunk_buffer.getvalue()
@@ -1380,7 +1388,8 @@ class AbstractAgent(
         )
         try:
             current_task = asyncio.current_task()
-            assert current_task is not None
+            if current_task is None:
+                raise AsyncioTaskNotAvailableError("No current asyncio task is available.")
             if ev.kernel_id not in self._ongoing_destruction_tasks:
                 self._ongoing_destruction_tasks[ev.kernel_id] = current_task
             async with self.registry_lock:
@@ -1747,7 +1756,8 @@ class AbstractAgent(
                     kernel_id,
                 )
         else:
-            assert kernel_obj is not None
+            if kernel_obj is None:
+                raise KernelNotFoundError(f"Kernel object for {kernel_id} is not found.")
             if kernel_obj.termination_reason:
                 reason = kernel_obj.termination_reason
             if container_id is not None:
@@ -3074,7 +3084,8 @@ class AbstractAgent(
                     )
 
                     current_task = asyncio.current_task()
-                    assert current_task is not None
+                    if current_task is None:
+                        raise AsyncioTaskNotAvailableError("No current asyncio task is available.")
                     self._pending_creation_tasks[kernel_id].add(current_task)
                     kernel_init_polling_attempt = (
                         self.local_config.kernel_lifecycles.init_polling_attempt

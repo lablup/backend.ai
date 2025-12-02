@@ -44,6 +44,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
+from .errors import InvalidContainerMeasurementError
 from .metrics.metric import UtilizationMetricObserver
 from .metrics.types import (
     CAPACITY_METRIC_KEY,
@@ -688,7 +689,10 @@ class StatContext:
                     )
                     continue
                 for ctnr_measure in result:
-                    assert isinstance(ctnr_measure, ContainerMeasurement)
+                    if not isinstance(ctnr_measure, ContainerMeasurement):
+                        raise InvalidContainerMeasurementError(
+                            f"Expected ContainerMeasurement, got {type(ctnr_measure).__name__}."
+                        )
                     metric_key = ctnr_measure.key
                     # update per-container metric
                     for cid, measure in ctnr_measure.per_container.items():
