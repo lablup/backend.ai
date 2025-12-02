@@ -7,6 +7,7 @@ from strawberry.relay import Node, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
 from ai.backend.manager.repositories.agent.options import AgentConditions, AgentOrders
@@ -18,29 +19,40 @@ from ai.backend.manager.repositories.base import (
 )
 
 
-@strawberry.enum(description="Added in 25.18.0. Fields by which agents can be ordered")
-class AgentOrderField(StrEnum):
+@strawberry.enum(
+    name="AgentOrderField",
+    description="Added in 25.18.0. Order by specification for agents",
+)
+class AgentOrderFieldGQL(StrEnum):
     ID = "id"
     FIRST_CONTACT = "first_contact"
     SCALING_GROUP = "scaling_group"
     SCHEDULABLE = "schedulable"
 
 
-@strawberry.input(description="Added in 25.18.0. Filter options for agent statuses")
-class AgentStatusFilter:
+@strawberry.input(
+    name="AgentStatusFilter",
+    description=dedent_strip("""
+        Added in 25.18.0. Filter options for agent status within AgentFilter.
+        It includes options to filter whether agent status is in a specific list or equals a specific value.
+    """),
+)
+class AgentStatusFilterGQL:
     in_: Optional[list[AgentStatus]] = strawberry.field(name="in", default=None)
     equals: Optional[AgentStatus] = None
 
 
-@strawberry.input(description="Added in 25.18.0. Filter options for querying agents")
-class AgentFilter:
+@strawberry.input(
+    name="AgentFilter", description="Added in 25.18.0. Filter options for querying agents"
+)
+class AgentFilterGQL:
     id: Optional[StringFilter] = None
-    status: Optional[AgentStatusFilter] = None
+    status: Optional[AgentStatusFilterGQL] = None
     schedulable: Optional[bool] = None
 
-    AND: Optional[list["AgentFilter"]] = None
-    OR: Optional[list["AgentFilter"]] = None
-    NOT: Optional[list["AgentFilter"]] = None
+    AND: Optional[list["AgentFilterGQL"]] = None
+    OR: Optional[list["AgentFilterGQL"]] = None
+    NOT: Optional[list["AgentFilterGQL"]] = None
 
     def build_conditions(self) -> list[QueryCondition]:
         field_conditions: list[QueryCondition] = []
@@ -83,84 +95,198 @@ class AgentFilter:
 
 
 @strawberry.input(description="Added in 25.18.0. Options for ordering agents")
-class AgentOrderBy:
-    field: AgentOrderField
+class AgentOrderByGQL:
+    field: AgentOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
 
     def to_query_order(self) -> QueryOrder:
         ascending = self.direction == OrderDirection.ASC
         match self.field:
-            case AgentOrderField.ID:
+            case AgentOrderFieldGQL.ID:
                 return AgentOrders.id(ascending)
-            case AgentOrderField.FIRST_CONTACT:
+            case AgentOrderFieldGQL.FIRST_CONTACT:
                 return AgentOrders.first_contact(ascending)
-            case AgentOrderField.SCALING_GROUP:
+            case AgentOrderFieldGQL.SCALING_GROUP:
                 return AgentOrders.scaling_group(ascending)
-            case AgentOrderField.SCHEDULABLE:
+            case AgentOrderFieldGQL.SCHEDULABLE:
                 return AgentOrders.schedulable(ascending)
 
 
 @strawberry.type(description="Added in 25.15.0")
-class AgentResource:
+class AgentResourceGQL:
     capacity: JSON = strawberry.field(
-        description="Total amount of resources available in the Agent"
+        description=dedent_strip("""
+            Total hardware resource capacity available on the agent.
+            Expressed as a JSON object containing resource slots (e.g., cpu, mem, accelerators).
+            Each slot represents the maximum amount of that resource type the agent can provide.
+        """)
     )
     used: JSON = strawberry.field(
-        description="Total amount of resources used in the Agent. It is sum of requested resources for running compute session and already allocated resources for compute sessions."
+        description=dedent_strip("""
+            Total amount of resources currently consumed by running and scheduled compute sessions.
+            Includes both the requested resources for sessions being prepared and already allocated
+            resources for active sessions. The sum of occupied resources across all session states
+            that occupy agent resources (PREPARING, PULLING, RUNNING, RESTARTING, etc.).
+            Expressed as a JSON object with the same structure as capacity.
+        """)
     )
     free: JSON = strawberry.field(
-        description="Total amount of free resources(capacity - used) in the Agent."
+        description=dedent_strip("""
+            Available resources for scheduling new compute sessions (capacity - used).
+            This represents the maximum resources that can be allocated to new sessions
+            without exceeding the agent's capacity. Expressed as a JSON object with
+            the same structure as capacity.
+        """)
     )
 
 
-@strawberry.type(description="Added in 25.15.0")
-class AgentStats:
-    total_resource: AgentResource = strawberry.field(description="Added in 25.15.0")
+@strawberry.type(name="AgentResource", description="Added in 25.15.0")
+class AgentStatsGQL:
+    total_resource: AgentResourceGQL = strawberry.field(description="Added in 25.15.0")
 
 
-@strawberry.type(description="Added in 25.18.0. Status and lifecycle information for an agent")
-class AgentStatusInfo:
-    status: AgentStatus = strawberry.field(description="Current status of the agent")
+@strawberry.type(
+    name="AgentStatusInfo",
+    description="Added in 25.18.0. Status and lifecycle information for an agent",
+)
+class AgentStatusInfoGQL:
+    status: AgentStatus = strawberry.field(
+        description=dedent_strip("""
+            Current operational status of the agent.
+            Indicates whether the agent is ALIVE (active and reachable), LOST (unreachable),
+            TERMINATED (intentionally stopped), or RESTARTING (in recovery process).
+        """)
+    )
     status_changed: datetime = strawberry.field(
-        description="Timestamp when the status last changed"
+        description=dedent_strip("""
+            Timestamp when the agent last changed its status.
+            Updated whenever the agent transitions between different status states
+            (e.g., from ALIVE to LOST, or RESTARTING to ALIVE).
+        """)
     )
     first_contact: datetime = strawberry.field(
-        description="Timestamp when the agent first made contact"
+        description=dedent_strip("""
+            Timestamp when the agent first registered with the manager.
+            This value remains constant throughout the agent's lifecycle and can be used
+            to track the agent's age or identify when it was initially deployed.
+        """)
     )
     lost_at: Optional[datetime] = strawberry.field(
-        description="Timestamp when the agent was lost, if applicable"
+        description=dedent_strip("""
+            Timestamp when the agent was marked as lost or unreachable.
+            Set when the manager detects the agent has stopped sending heartbeats.
+            Will be null if the agent has never been lost or is currently alive.
+        """)
     )
-    schedulable: bool = strawberry.field(description="Indicates if the agent is schedulable")
+    schedulable: bool = strawberry.field(
+        description=dedent_strip("""
+            Indicates whether the agent is available for scheduling new compute sessions.
+            An agent may be non-schedulable if it's being drained, under maintenance,
+            or manually disabled by administrators while remaining in ALIVE status.
+        """)
+    )
 
 
-@strawberry.type(description="Added in 25.18.0. System and configuration information for an agent")
-class AgentSystemInfo:
-    architecture: str = strawberry.field(description="System architecture of the agent")
-    version: str = strawberry.field(description="Version of the agent software")
+@strawberry.type(
+    name="AgentSystemInfo",
+    description="Added in 25.18.0. System and configuration information for an agent",
+)
+class AgentSystemInfoGQL:
+    architecture: str = strawberry.field(
+        description=dedent_strip("""
+            Hardware architecture of the agent's host system (e.g., "x86_64", "aarch64").
+            Used to match compute sessions with compatible container images and ensure
+            proper binary execution on the agent.
+        """)
+    )
+    version: str = strawberry.field(
+        description=dedent_strip("""
+            Version string of the Backend.AI agent software running on this node.
+            Follows semantic versioning (e.g., "25.18.0") and helps identify
+            compatibility and available features.
+        """)
+    )
     auto_terminate_abusing_kernel: bool = strawberry.field(
-        description="Not used anymore, present for schema consistency."
+        description=dedent_strip("""
+            Legacy configuration flag, no longer actively used in the system.
+            Retained for backward compatibility and schema consistency.
+            Originally intended to control automatic termination of misbehaving sessions.
+        """)
     )
     compute_plugins: JSON = strawberry.field(
-        description="List of compute plugins supported by the agent"
+        description=dedent_strip("""
+            List of compute plugin metadata supported by this agent.
+            Each plugin represents a specific accelerator or resource type (e.g., CUDA).
+            Expressed as a JSON object where keys are plugin names and values contain
+            plugin-specific configuration and capabilities.
+        """)
     )
 
 
-@strawberry.type(description="Added in 25.18.0. Network-related information for an agent")
-class AgentNetworkInfo:
-    region: str = strawberry.field(description="Region where the agent is located")
+@strawberry.type(
+    name="AgentNetworkInfo",
+    description="Added in 25.18.0. Network-related information for an agent",
+)
+class AgentNetworkInfoGQL:
+    region: str = strawberry.field(description="Logical region where the agent is deployed.")
     addr: str = strawberry.field(
-        description="Agent's address with port. (bind/advertised host:port)"
+        description=dedent_strip("""
+            Network address and port where the agent can be reached (format: "host:port").
+            This is the bind or advertised address used by the manager to communicate
+            with the agent for session lifecycle management and health monitoring.
+        """)
     )
 
 
-@strawberry.type(description="Added in 25.18.0. Strawberry-based Agent type replacing AgentNode.")
-class AgentV2(Node):
-    id: NodeID[str]
-    resource_info: AgentResource
-    status_info: AgentStatusInfo
-    system_info: AgentSystemInfo
-    network_info: AgentNetworkInfo
+@strawberry.type(
+    name="AgentV2", description="Added in 25.18.0. Strawberry-based Agent type replacing AgentNode."
+)
+class AgentV2GQL(Node):
+    id: NodeID[str] = strawberry.field(
+        description=dedent_strip("""
+            Relay-style global node identifier for the agent.
+            Unique identifier following the Relay specification for GraphQL pagination and node queries.
+            Can be used with the node(id:) root query to directly fetch this agent.
+        """)
+    )
+    resource_info: AgentResourceGQL = strawberry.field(
+        description=dedent_strip("""
+            Hardware resource capacity, usage, and availability information.
+            Contains capacity (total), used (occupied by sessions), and free (available) resource slots
+            including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources.
+        """)
+    )
+    status_info: AgentStatusInfoGQL = strawberry.field(
+        description=dedent_strip("""
+            Current operational status and lifecycle timestamps.
+            Includes the agent's status (ALIVE, LOST, etc.), status change history,
+            initial registration time, and schedulability state.
+        """)
+    )
+    system_info: AgentSystemInfoGQL = strawberry.field(
+        description=dedent_strip("""
+            System configuration and software version information.
+            Contains the host architecture, agent software version, and available compute plugins
+            for accelerators and specialized hardware.
+        """)
+    )
+    network_info: AgentNetworkInfoGQL = strawberry.field(
+        description=dedent_strip("""
+            Network location and connectivity information.
+            Provides the agent's region and network address for manager-to-agent communication.
+        """)
+    )
     permissions: list[AgentPermission] = strawberry.field(
-        description="Permissions the current user has on this agent"
+        description=dedent_strip("""
+            List of permissions the current authenticated user has on this agent.
+            Determines which operations (read attributes, create sessions, etc.)
+            the user can perform on this specific agent based on RBAC policies.
+        """)
     )
-    scaling_group: str = strawberry.field(description="Scaling group of the agent")
+    scaling_group: str = strawberry.field(
+        description=dedent_strip("""
+            Name of the scaling group this agent belongs to.
+            Scaling groups are logical collections of agents used for resource scheduling,
+            quota management, and workload isolation across different user groups or projects.
+        """)
+    )
