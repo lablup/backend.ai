@@ -50,6 +50,7 @@ from ai.backend.manager.services.session.actions.modify_session import (
 )
 from ai.backend.manager.types import OptionalState
 
+from ...errors.resource import DataTransformationFailed
 from ..base import (
     BigInt,
     FilterExprArg,
@@ -995,7 +996,8 @@ class ComputeSession(graphene.ObjectType):
 
     @classmethod
     def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
-        assert row is not None
+        if row is None:
+            raise DataTransformationFailed("Session row cannot be None")
         email = getattr(row, "email")
         full_name = getattr(row, "full_name")
         group_name = getattr(row, "group_name")

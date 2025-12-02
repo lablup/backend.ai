@@ -46,6 +46,7 @@ from ai.backend.common.exception import DatabaseError
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.bootstrap import DatabaseConfig
+from ai.backend.manager.errors.resource import DBOperationFailed
 
 from ..defs import LockID
 from ..types import Sentinel
@@ -394,7 +395,8 @@ async def execute_with_txn_retry(
         raise asyncio.TimeoutError(
             f"DB serialization failed after {max_attempts} retry transactions"
         )
-    assert result is not Sentinel.TOKEN
+    if result is Sentinel.TOKEN:
+        raise DBOperationFailed("Transaction completed but no result was returned")
     return result
 
 
@@ -511,7 +513,8 @@ async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) ->
                     raise
     except RetryError:
         raise RuntimeError(f"DB serialization failed after {max_attempts} retries")
-    assert result is not Sentinel.TOKEN
+    if result is Sentinel.TOKEN:
+        raise DBOperationFailed("Transaction completed but no result was returned")
     return result
 
 
@@ -526,7 +529,8 @@ async def retry_txn(max_attempts: int = 20) -> AsyncIterator[AttemptManager]:
             # when yielded because stack frames are switched, we should pass AttemptManager to
             # provide a shared exception handling mechanism like the original execute_with_retry().
             yield attempt
-            assert attempt.retry_state.outcome is not None
+            if attempt.retry_state.outcome is None:
+                raise DBOperationFailed("Retry attempt completed but no outcome was recorded")
             exc = attempt.retry_state.outcome.exception()
             if isinstance(exc, DBAPIError) and not is_db_retry_error(exc):
                 raise exc

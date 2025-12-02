@@ -139,6 +139,8 @@ from .config.loader.types import AbstractConfigLoader
 from .config.provider import ManagerConfigProvider
 from .config.unified import EventLoopType
 from .config.watchers.etcd import EtcdConfigWatcher
+from .errors.common import ServerMisconfiguredError
+from .errors.resource import ConfigurationLoadFailed
 from .health.database import DatabaseHealthChecker
 from .server_bgtask_ctx import manager_bgtask_registry_ctx
 from .sokovan.deployment.deployment_controller import (
@@ -1075,7 +1077,8 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     manager_pkey, manager_skey = load_certificate(
         root_ctx.config_provider.config.manager.rpc_auth_manager_keypair
     )
-    assert manager_skey is not None
+    if manager_skey is None:
+        raise ConfigurationLoadFailed("Failed to load manager secret key from certificate")
     manager_public_key = PublicKey(manager_pkey)
     manager_secret_key = SecretKey(manager_skey)
     root_ctx.agent_cache = AgentRPCCache(root_ctx.db, manager_public_key, manager_secret_key)
@@ -1541,7 +1544,8 @@ def build_root_app(
 
     async def _cleanup_context_wrapper(app: web.Application) -> AsyncIterator[None]:
         # aiohttp's cleanup contexts are just async generators, not async context managers.
-        assert cleanup_contexts is not None
+        if cleanup_contexts is None:
+            raise ServerMisconfiguredError("cleanup_contexts is not initialized")
         async with AsyncExitStack() as stack:
             for cctx in cleanup_contexts:
                 cctx_instance = cctx(root_ctx)
@@ -1573,7 +1577,8 @@ def build_root_app(
         init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
 
     vendor_path = importlib.resources.files("ai.backend.manager.vendor")
-    assert isinstance(vendor_path, Path)
+    if not isinstance(vendor_path, Path):
+        raise ServerMisconfiguredError("vendor_path must be a Path instance")
     app.router.add_static("/static/vendor", path=vendor_path, name="static")
     return app
 

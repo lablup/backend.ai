@@ -31,6 +31,7 @@ from ai.backend.manager.data.notification import (
     NotificationRuleData,
     NotificationRuleModifier,
 )
+from ai.backend.manager.errors.notification import InvalidNotificationConfig
 from ai.backend.manager.repositories.base import (
     OffsetPagination,
     Querier,
@@ -81,7 +82,10 @@ class NotificationChannelAdapter(BaseFilterAdapter):
             modifier.description = OptionalState.update(request.description)
         if request.config is not None:
             # config validator ensures this is WebhookConfig
-            assert isinstance(request.config, WebhookConfig)
+            if not isinstance(request.config, WebhookConfig):
+                raise InvalidNotificationConfig(
+                    f"Expected WebhookConfig, got {type(request.config).__name__}"
+                )
             modifier.config = OptionalState.update(request.config)
         if request.enabled is not None:
             modifier.enabled = OptionalState.update(request.enabled)

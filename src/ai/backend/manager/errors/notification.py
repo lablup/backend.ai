@@ -18,6 +18,7 @@ __all__ = (
     "NotificationProcessingFailure",
     "NotificationTemplateRenderingFailure",
     "InvalidNotificationChannelType",
+    "InvalidNotificationConfig",
 )
 
 
@@ -101,5 +102,17 @@ class InvalidNotificationChannelType(BackendAIError, web.HTTPBadRequest):
         return ErrorCode(
             domain=ErrorDomain.NOTIFICATION,
             operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class InvalidNotificationConfig(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-notification-config"
+    error_title = "Invalid notification configuration."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.NOTIFICATION,
+            operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
