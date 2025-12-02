@@ -614,7 +614,6 @@ class ResourceAllocator(aobject):
             devices_allocated_slots.append(device_allocated_slots)
 
             agent_alloc_map = await ctx.instance.create_alloc_map()
-            agent_alloc_map.update_device_slot_amounts(device_allocated_slots)
             agent_computers[device_name] = ComputerContext(
                 ctx.instance, ctx.devices, agent_alloc_map
             )
