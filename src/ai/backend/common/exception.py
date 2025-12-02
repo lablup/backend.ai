@@ -172,6 +172,7 @@ class ErrorDomain(enum.StrEnum):
     MESSAGE_QUEUE = "message-queue"
     NOTIFICATION = "notification"
     HEALTH_CHECK = "health-check"
+    DATABASE = "database"
 
 
 class ErrorOperation(enum.StrEnum):

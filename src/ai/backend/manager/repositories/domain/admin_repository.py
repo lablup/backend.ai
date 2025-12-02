@@ -15,7 +15,9 @@ from ai.backend.manager.data.domain.types import (
     UserInfo,
 )
 from ai.backend.manager.errors.resource import (
+    DataTransformationFailed,
     DomainCreationFailed,
+    DomainDataProcessingError,
     DomainDeletionFailed,
     DomainHasActiveKernels,
     DomainHasGroups,
@@ -79,9 +81,11 @@ class AdminDomainRepository:
                     f"No domain created. rowcount: {result.rowcount}, data: {data}"
                 )
 
-        assert row is not None
+        if row is None:
+            raise DomainDataProcessingError("Domain row is unexpectedly None after creation")
         result = row_to_data(row)
-        assert result is not None
+        if result is None:
+            raise DataTransformationFailed("Failed to transform domain row to data")
         return result
 
     @domain_repository_resilience.apply()
@@ -206,9 +210,9 @@ class AdminDomainRepository:
             await session.commit()
             if domain_row is None:
                 raise DomainNodeCreationFailed(f"Failed to create domain node: {creator.name}")
-            assert domain_row is not None
             result = row_to_data(domain_row)
-            assert result is not None
+            if result is None:
+                raise DataTransformationFailed("Failed to transform domain row to data")
             return result
 
     @domain_repository_resilience.apply()

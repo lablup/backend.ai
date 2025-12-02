@@ -11,6 +11,7 @@ from strawberry.relay import Connection, Edge
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.api.gql.base import to_global_id
+from ai.backend.manager.errors.auth import InvalidAuthParameters
 from ai.backend.manager.services.notification.actions import (
     CreateChannelAction,
     CreateRuleAction,
@@ -230,7 +231,8 @@ async def create_notification_channel(
 ) -> CreateNotificationChannelPayload:
     processors = info.context.processors
     me = current_user()
-    assert me is not None
+    if me is None:
+        raise InvalidAuthParameters("User authentication is required")
 
     action_result = await processors.notification.create_channel.wait_for_complete(
         CreateChannelAction(creator=input.to_creator(me.user_id))
@@ -278,7 +280,8 @@ async def create_notification_rule(
 ) -> CreateNotificationRulePayload:
     processors = info.context.processors
     me = current_user()
-    assert me is not None
+    if me is None:
+        raise InvalidAuthParameters("User authentication is required")
 
     action_result = await processors.notification.create_rule.wait_for_complete(
         CreateRuleAction(creator=input.to_creator(me.user_id))

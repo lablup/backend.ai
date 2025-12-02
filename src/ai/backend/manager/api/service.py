@@ -93,6 +93,7 @@ from ai.backend.manager.services.model_serving.actions.scale_service_replicas im
 from ai.backend.manager.services.model_serving.actions.update_route import UpdateRouteAction
 
 from ..errors.api import InvalidAPIParameters
+from ..errors.auth import InvalidAuthParameters
 from ..errors.storage import VFolderNotFound
 from ..models import (
     ModelServiceHelper,
@@ -630,7 +631,8 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         )
         query = sa.select([UserRow.role]).where(UserRow.uuid == owner_uuid)
         owner_role = (await conn.execute(query)).scalar()
-        assert owner_role
+        if not owner_role:
+            raise InvalidAuthParameters("Owner role is required to create a model service")
 
         allowed_vfolder_types = (
             await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()

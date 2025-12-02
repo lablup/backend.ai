@@ -51,9 +51,9 @@ from ai.backend.manager.idle import AppStreamingStatus
 
 from ..defs import DEFAULT_ROLE
 from ..errors.api import InvalidAPIParameters
-from ..errors.common import InternalServerError
-from ..errors.kernel import SessionNotFound, TooManySessionsMatched
-from ..errors.resource import AppNotFound
+from ..errors.kernel import InvalidStreamMode, SessionNotFound, TooManySessionsMatched
+from ..errors.resource import AppNotFound, NoCurrentTaskContext
+from ..errors.service import AppServiceStartFailed
 from ..models import KernelLoadingStrategy, KernelRow, SessionRow
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
@@ -104,7 +104,8 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
     await ws.prepare(request)
 
     myself = asyncio.current_task()
-    assert myself is not None
+    if myself is None:
+        raise NoCurrentTaskContext("No current task context")
     app_ctx.stream_pty_handlers[stream_key].add(myself)
     defer(lambda: app_ctx.stream_pty_handlers[stream_key].discard(myself))
 
@@ -315,7 +316,8 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
     await ws.prepare(request)
 
     myself = asyncio.current_task()
-    assert myself is not None
+    if myself is None:
+        raise NoCurrentTaskContext("No current task context")
     app_ctx.stream_execute_handlers[stream_key].add(myself)
     defer(lambda: app_ctx.stream_execute_handlers[stream_key].discard(myself))
 
@@ -327,9 +329,11 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
             log.debug("STREAM_EXECUTE: client disconnected (cancelled)")
             return ws
         params = await ws.receive_json()
-        assert params.get("mode"), "mode is missing or empty!"
+        if not params.get("mode"):
+            raise InvalidStreamMode("mode is missing or empty!")
         mode = params["mode"]
-        assert mode in {"query", "batch"}, "mode has an invalid value."
+        if mode not in {"query", "batch"}:
+            raise InvalidStreamMode("mode has an invalid value.")
         code = params.get("code", "")
         opts = params.get("options", None) or {}
 
@@ -429,7 +433,8 @@ async def stream_proxy(
     access_key: AccessKey = request["keypair"]["access_key"]
     service: str = params["app"]
     myself = asyncio.current_task()
-    assert myself is not None
+    if myself is None:
+        raise NoCurrentTaskContext("No current task context")
     try:
         async with root_ctx.db.begin_readonly_session() as db_sess:
             session = await asyncio.shield(
@@ -563,7 +568,7 @@ async def stream_proxy(
             ),
         )
         if result["status"] == "failed":
-            raise InternalServerError(
+            raise AppServiceStartFailed(
                 "Failed to launch the app service", extra_data=result["error"]
             )
 

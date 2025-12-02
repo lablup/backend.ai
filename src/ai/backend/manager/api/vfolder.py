@@ -70,6 +70,7 @@ from ..errors.service import ModelServiceDependencyNotCleared
 from ..errors.storage import (
     TooManyVFoldersFound,
     VFolderAlreadyExists,
+    VFolderBadRequest,
     VFolderFilterStatusFailed,
     VFolderFilterStatusNotAvailable,
     VFolderInvalidParameter,
@@ -909,7 +910,10 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
             .where(vfolders.c.id == params["id"])
         )
         result = await conn.execute(query)
-        assert result.rowcount == 1
+        if result.rowcount != 1:
+            raise VFolderOperationFailed(
+                f"Failed to update vfolder quota: expected 1 row, got {result.rowcount}"
+            )
 
     return web.json_response({"size_bytes": quota}, status=HTTPStatus.OK)
 
@@ -2574,7 +2578,8 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
     if mount_prefix is None:
         mount_prefix = "/mnt"
     mountpoint = Path(mount_prefix) / params["name"]
-    assert Path(mount_prefix) != mountpoint
+    if Path(mount_prefix) == mountpoint:
+        raise VFolderBadRequest("Mount prefix and mountpoint cannot be the same")
 
     async with root_ctx.db.begin() as conn, conn.begin():
         # Prevent unmount if target host is mounted to running kernels.
