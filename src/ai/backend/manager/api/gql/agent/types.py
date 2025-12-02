@@ -3,12 +3,13 @@ from enum import StrEnum
 from typing import Optional
 
 import strawberry
-from strawberry.relay import Node, NodeID
+from strawberry import ID
+from strawberry.relay import Connection, Edge, Node, NodeID, to_base64
 from strawberry.scalars import JSON
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.agent.types import AgentData, AgentStatus
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
 from ai.backend.manager.repositories.agent.options import AgentConditions, AgentOrders
 from ai.backend.manager.repositories.base import (
@@ -157,11 +158,12 @@ class AgentStatusInfoGQL:
             TERMINATED (intentionally stopped), or RESTARTING (in recovery process).
         """)
     )
-    status_changed: datetime = strawberry.field(
+    status_changed: Optional[datetime] = strawberry.field(
         description=dedent_strip("""
             Timestamp when the agent last changed its status.
             Updated whenever the agent transitions between different status states
             (e.g., from ALIVE to LOST, or RESTARTING to ALIVE).
+            Will be null if the agent status has never changed since initial registration.
         """)
     )
     first_contact: datetime = strawberry.field(
@@ -290,3 +292,47 @@ class AgentV2GQL(Node):
             quota management, and workload isolation across different user groups or projects.
         """)
     )
+
+    @classmethod
+    def from_dataclass(cls, data: AgentData) -> "AgentV2GQL":
+        return cls(
+            id=ID(to_base64("AgentV2GQL", data.id)),
+            resource_info=AgentResourceGQL(
+                capacity=data.available_slots.to_json(),
+                used=data.actual_occupied_slots.to_json(),
+                free=(data.available_slots - data.actual_occupied_slots).to_json(),
+            ),
+            status_info=AgentStatusInfoGQL(
+                status=data.status,
+                status_changed=data.status_changed,
+                first_contact=data.first_contact,
+                lost_at=data.lost_at,
+                schedulable=data.schedulable,
+            ),
+            system_info=AgentSystemInfoGQL(
+                architecture=data.architecture,
+                version=data.version,
+                auto_terminate_abusing_kernel=data.auto_terminate_abusing_kernel,
+                compute_plugins=data.compute_plugins,
+            ),
+            network_info=AgentNetworkInfoGQL(
+                region=data.region,
+                addr=data.addr,
+            ),
+            permissions=[],  # TODO: Calculate permissions based on user context
+            scaling_group=data.scaling_group,
+        )
+
+
+AgentV2Edge = Edge[AgentV2GQL]
+
+
+@strawberry.type(
+    description="Added in 25.18.0. Relay-style connection type for paginated lists of agents"
+)
+class AgentV2Connection(Connection[AgentV2GQL]):
+    count: int
+
+    def __init__(self, *args, count: int, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.count = count
