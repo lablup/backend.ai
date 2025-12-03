@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 
 import sqlalchemy as sa
+from sqlalchemy.orm import selectinload
 
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData, VFSStorageListResult
 from ai.backend.manager.errors.vfs_storage import (
@@ -28,7 +29,11 @@ class VFSStorageDBSource:
         Get an existing VFS storage configuration from the database.
         """
         async with self._db.begin_session() as db_session:
-            query = sa.select(VFSStorageRow).where(VFSStorageRow.name == storage_name)
+            query = (
+                sa.select(VFSStorageRow)
+                .where(VFSStorageRow.name == storage_name)
+                .options(selectinload(VFSStorageRow.meta))
+            )
             result = await db_session.execute(query)
             row = result.scalar_one_or_none()
             if row is None:
@@ -40,7 +45,11 @@ class VFSStorageDBSource:
         Get an existing VFS storage configuration from the database by ID.
         """
         async with self._db.begin_session() as db_session:
-            query = sa.select(VFSStorageRow).where(VFSStorageRow.id == storage_id)
+            query = (
+                sa.select(VFSStorageRow)
+                .where(VFSStorageRow.id == storage_id)
+                .options(selectinload(VFSStorageRow.meta))
+            )
             result = await db_session.execute(query)
             row = result.scalar_one_or_none()
             if row is None:
@@ -86,7 +95,7 @@ class VFSStorageDBSource:
         List all VFS storage configurations from the database.
         """
         async with self._db.begin_session() as db_session:
-            query = sa.select(VFSStorageRow)
+            query = sa.select(VFSStorageRow).options(selectinload(VFSStorageRow.meta))
             result = await db_session.execute(query)
             rows = result.scalars().all()
             return [row.to_dataclass() for row in rows]
