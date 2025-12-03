@@ -3583,6 +3583,7 @@ class AgentRegistry:
                         max_retries=health_check_info["max_retries"],
                         max_wait_time=health_check_info["max_wait_time"],
                         expected_status_code=health_check_info["expected_status_code"],
+                        initial_delay=health_check_info.get("initial_delay"),
                     )
                     break
         return _info
