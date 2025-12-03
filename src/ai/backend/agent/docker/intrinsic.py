@@ -1022,6 +1022,7 @@ class OverlayNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
                 "EndpointsConfig": {
                     network_name: {
                         "Aliases": [kernel_config["cluster_hostname"]],
+                        "DriverOpts": {"com.docker.network.endpoint.ifname": "baimulti0"},
                     },
                 },
             },
