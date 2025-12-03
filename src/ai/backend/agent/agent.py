@@ -6,7 +6,6 @@ import logging
 import os
 import pickle
 import re
-import shutil
 import signal
 import sys
 import time
@@ -2316,23 +2315,7 @@ class AbstractAgent(
         Scan currently running kernels and recreate the kernel objects in
         ``self.kernel_registry`` if any missing.
         """
-        ipc_base_path = self.local_config.agent.ipc_base_path
-        var_base_path = self.local_config.agent.var_base_path
-        ipc_last_registry_file = self._resolve_conflicting_registry_file(ipc_base_path)
-        last_registry_file = self._resolve_conflicting_registry_file(var_base_path)
-        if (ipc_base_path / ipc_last_registry_file).is_file():
-            shutil.move(ipc_base_path / ipc_last_registry_file, var_base_path / last_registry_file)
-        try:
-            with open(var_base_path / last_registry_file, "rb") as f:
-                kernel_registry: MutableMapping[KernelId, AbstractKernel] = pickle.load(f)
-                for kernel_id, kernel in kernel_registry.items():
-                    self.kernel_registry[kernel_id] = kernel
-        except EOFError:
-            log.warning(
-                "Failed to load the last kernel registry: {}", (var_base_path / last_registry_file)
-            )
-        except FileNotFoundError:
-            pass
+        self.kernel_registry = await self._load_kernel_registry_from_recovery()
         for kernel_obj in self.kernel_registry.values():
             kernel_obj.agent_config = self.local_config.model_dump(by_alias=True)
             try:
@@ -3790,22 +3773,10 @@ class AbstractAgent(
         return await self.kernel_registry[kernel_id].ping()
 
     async def save_last_registry(self, force=False) -> None:
-        now = time.monotonic()
-        if (not force) and (now <= self.last_registry_written_time + 60):
-            return  # don't save too frequently
-        var_base_path = self.local_config.agent.var_base_path
-        last_registry_file = self._last_registry_file
-        try:
-            with open(var_base_path / last_registry_file, "wb") as f:
-                pickle.dump(dict(self.kernel_registry), f)
-            self.last_registry_written_time = now
-            log.debug("saved {}", last_registry_file)
-        except Exception as e:
-            log.exception("unable to save {}", last_registry_file, exc_info=e)
-            try:
-                os.remove(var_base_path / last_registry_file)
-            except FileNotFoundError:
-                pass
+        await self._write_kernel_registry_to_recovery(
+            self.kernel_registry,
+            KernelRegistrySaveMetadata(force),
+        )
 
     @property
     def _last_registry_file(self) -> str:

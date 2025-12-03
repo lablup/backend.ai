@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 from collections import OrderedDict
-from typing import Any, Dict, FrozenSet, Mapping, Sequence, override
+from typing import TYPE_CHECKING, Any, Dict, FrozenSet, Mapping, Sequence, override
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp, CodeCompletionResult
@@ -13,6 +13,9 @@ from ai.backend.common.types import CommitStatus
 from ..kernel import AbstractCodeRunner, AbstractKernel, NextResult, ResultRecord
 from ..resources import KernelResourceSpec
 from ..types import AgentEventData, KernelOwnershipData
+
+if TYPE_CHECKING:
+    pass
 
 
 class DummyKernel(AbstractKernel):
