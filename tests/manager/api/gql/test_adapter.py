@@ -171,27 +171,39 @@ class TestBaseGQLAdapterBuildPagination:
             )
         assert "Only one pagination mode allowed" in str(exc_info.value)
 
-    def test_build_pagination_first_without_after_error(
-        self, adapter: BaseGQLAdapter, cursor_factories: CursorPaginationFactories
+    def test_build_pagination_first_without_after(
+        self,
+        adapter: BaseGQLAdapter,
+        mock_order: Any,
+        cursor_factories: CursorPaginationFactories,
     ) -> None:
-        """Test that first without after raises InvalidGraphQLParameters."""
-        with pytest.raises(InvalidGraphQLParameters) as exc_info:
-            adapter.build_querier(
-                PaginationOptions(first=10),
-                cursor_factories,
-            )
-        assert "after cursor is required" in str(exc_info.value)
+        """Test that first without after returns CursorForwardPagination with no cursor condition."""
+        querier = adapter.build_querier(
+            PaginationOptions(first=10),
+            cursor_factories,
+        )
 
-    def test_build_pagination_last_without_before_error(
-        self, adapter: BaseGQLAdapter, cursor_factories: CursorPaginationFactories
+        assert isinstance(querier.pagination, CursorForwardPagination)
+        assert querier.pagination.first == 10
+        assert querier.pagination.cursor_condition is None
+        assert querier.pagination.default_order is mock_order
+
+    def test_build_pagination_last_without_before(
+        self,
+        adapter: BaseGQLAdapter,
+        mock_order: Any,
+        cursor_factories: CursorPaginationFactories,
     ) -> None:
-        """Test that last without before raises InvalidGraphQLParameters."""
-        with pytest.raises(InvalidGraphQLParameters) as exc_info:
-            adapter.build_querier(
-                PaginationOptions(last=10),
-                cursor_factories,
-            )
-        assert "before cursor is required" in str(exc_info.value)
+        """Test that last without before returns CursorBackwardPagination with no cursor condition."""
+        querier = adapter.build_querier(
+            PaginationOptions(last=10),
+            cursor_factories,
+        )
+
+        assert isinstance(querier.pagination, CursorBackwardPagination)
+        assert querier.pagination.last == 10
+        assert querier.pagination.cursor_condition is None
+        assert querier.pagination.default_order is mock_order
 
     def test_build_pagination_first_must_be_positive(
         self,
@@ -199,10 +211,9 @@ class TestBaseGQLAdapterBuildPagination:
         cursor_factories: CursorPaginationFactories,
     ) -> None:
         """Test that first <= 0 raises InvalidGraphQLParameters."""
-        cursor = encode_cursor("test-value")
         with pytest.raises(InvalidGraphQLParameters) as exc_info:
             adapter.build_querier(
-                PaginationOptions(first=0, after=cursor),
+                PaginationOptions(first=0),
                 cursor_factories,
             )
         assert "first must be positive" in str(exc_info.value)
@@ -213,10 +224,9 @@ class TestBaseGQLAdapterBuildPagination:
         cursor_factories: CursorPaginationFactories,
     ) -> None:
         """Test that last <= 0 raises InvalidGraphQLParameters."""
-        cursor = encode_cursor("test-value")
         with pytest.raises(InvalidGraphQLParameters) as exc_info:
             adapter.build_querier(
-                PaginationOptions(last=-1, before=cursor),
+                PaginationOptions(last=-1),
                 cursor_factories,
             )
         assert "last must be positive" in str(exc_info.value)

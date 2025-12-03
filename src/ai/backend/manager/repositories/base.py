@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable, Generic, TypeVar
+from typing import TYPE_CHECKING, Callable, Generic, Optional, TypeVar
 
 import sqlalchemy as sa
 from sqlalchemy.engine import Row
@@ -94,33 +94,36 @@ class CursorForwardPagination(QueryPagination):
     This follows the GraphQL Relay Cursor Connections specification for forward pagination.
     Use this to paginate forward through a result set:
     - first: Number of items to return from the cursor position
-    - cursor_condition: QueryCondition for WHERE clause (e.g., id > cursor_id)
+    - cursor_condition: Optional QueryCondition for WHERE clause (e.g., id > cursor_id).
+      If None, starts from the beginning.
     - default_order: QueryOrder for cursor-based ordering (e.g., id ASC)
     """
 
     first: int
     """Number of items to return (must be positive)."""
 
-    cursor_condition: QueryCondition
-    """QueryCondition for cursor position (e.g., WHERE id > cursor_id)."""
-
     default_order: QueryOrder
     """Default ordering for cursor-based pagination (e.g., ORDER BY id ASC)."""
+
+    cursor_condition: Optional[QueryCondition] = None
+    """Optional QueryCondition for cursor position. If None, starts from the beginning."""
 
     def apply(self, query: sa.sql.Select) -> sa.sql.Select:
         """
         Apply cursor-based forward pagination to query.
 
-        Applies cursor condition, default order, and LIMIT + 1 for has_next_page detection.
+        Applies cursor condition (if present), default order, and LIMIT + 1 for has_next_page detection.
         """
-        query = query.where(self.cursor_condition())
+        if self.cursor_condition is not None:
+            query = query.where(self.cursor_condition())
         query = query.order_by(self.default_order)
         return query.limit(self.first + 1)
 
     def compute_page_info(self, rows: list[Row], total_count: int) -> _PageInfoResult[Row]:
         """Compute pagination info for cursor-based forward pagination."""
 
-        has_previous_page = True  # cursor exists means previous page exists
+        # has_previous_page is True only if cursor was provided (meaning we're past the first page)
+        has_previous_page = self.cursor_condition is not None
         has_next_page = len(rows) > self.first
         if has_next_page:
             rows = rows[: self.first]
@@ -139,33 +142,36 @@ class CursorBackwardPagination(QueryPagination):
     This follows the GraphQL Relay Cursor Connections specification for backward pagination.
     Use this to paginate backward through a result set:
     - last: Number of items to return before the cursor position
-    - cursor_condition: QueryCondition for WHERE clause (e.g., id < cursor_id)
+    - cursor_condition: Optional QueryCondition for WHERE clause (e.g., id < cursor_id).
+      If None, starts from the end.
     - default_order: QueryOrder for cursor-based ordering (e.g., id DESC for reverse fetch)
     """
 
     last: int
     """Number of items to return (must be positive)."""
 
-    cursor_condition: QueryCondition
-    """QueryCondition for cursor position (e.g., WHERE id < cursor_id)."""
-
     default_order: QueryOrder
     """Default ordering for cursor-based pagination (e.g., ORDER BY id DESC)."""
+
+    cursor_condition: Optional[QueryCondition] = None
+    """Optional QueryCondition for cursor position. If None, starts from the end."""
 
     def apply(self, query: sa.sql.Select) -> sa.sql.Select:
         """
         Apply cursor-based backward pagination to query.
 
-        Applies cursor condition, default order, and LIMIT + 1 for has_previous_page detection.
+        Applies cursor condition (if present), default order, and LIMIT + 1 for has_previous_page detection.
         """
-        query = query.where(self.cursor_condition())
+        if self.cursor_condition is not None:
+            query = query.where(self.cursor_condition())
         query = query.order_by(self.default_order)
         return query.limit(self.last + 1)
 
     def compute_page_info(self, rows: list[Row], total_count: int) -> _PageInfoResult[Row]:
         """Compute pagination info for cursor-based backward pagination."""
 
-        has_next_page = True  # cursor exists means next page exists
+        # has_next_page is True only if cursor was provided (meaning there are items after this page)
+        has_next_page = self.cursor_condition is not None
         has_previous_page = len(rows) > self.last
         if has_previous_page:
             rows = rows[: self.last]

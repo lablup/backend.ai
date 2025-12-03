@@ -81,26 +81,26 @@ class BaseGQLAdapter:
         if options.first is not None:
             if options.first <= 0:
                 raise InvalidGraphQLParameters(f"first must be positive, got {options.first}")
-            if options.after is None:
-                raise InvalidGraphQLParameters("after cursor is required when using first")
-            cursor_value = decode_cursor(options.after)
-            cursor_condition = factories.forward_cursor_condition_factory(cursor_value)
+            cursor_condition = None
+            if options.after is not None:
+                cursor_value = decode_cursor(options.after)
+                cursor_condition = factories.forward_cursor_condition_factory(cursor_value)
             return CursorForwardPagination(
                 first=options.first,
-                cursor_condition=cursor_condition,
                 default_order=factories.default_order,
+                cursor_condition=cursor_condition,
             )
         elif options.last is not None:
             if options.last <= 0:
                 raise InvalidGraphQLParameters(f"last must be positive, got {options.last}")
-            if options.before is None:
-                raise InvalidGraphQLParameters("before cursor is required when using last")
-            cursor_value = decode_cursor(options.before)
-            cursor_condition = factories.backward_cursor_condition_factory(cursor_value)
+            cursor_condition = None
+            if options.before is not None:
+                cursor_value = decode_cursor(options.before)
+                cursor_condition = factories.backward_cursor_condition_factory(cursor_value)
             return CursorBackwardPagination(
                 last=options.last,
-                cursor_condition=cursor_condition,
                 default_order=factories.default_order,
+                cursor_condition=cursor_condition,
             )
         elif options.limit is not None:
             if options.limit <= 0:
