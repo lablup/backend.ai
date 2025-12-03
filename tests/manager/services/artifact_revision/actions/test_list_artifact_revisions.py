@@ -1,15 +1,11 @@
 import pytest
 
-from ai.backend.manager.repositories.artifact.types import (
-    ArtifactRevisionOrderingOptions,
-)
-from ai.backend.manager.repositories.types import PaginationOptions
+from ai.backend.manager.repositories.base import OffsetPagination, Querier
 from ai.backend.manager.services.artifact_revision.actions.list import (
     ListArtifactRevisionsAction,
     ListArtifactRevisionsActionResult,
 )
 from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
-from ai.backend.manager.types import OffsetBasedPaginationOptions
 
 from ...fixtures import (
     ARTIFACT_FIXTURE_DICT,
@@ -25,11 +21,10 @@ from ...utils import ScenarioBase
         ScenarioBase.success(
             "Success Case - List all artifact revisions",
             ListArtifactRevisionsAction(
-                pagination=PaginationOptions(
-                    offset=OffsetBasedPaginationOptions(
-                        limit=10,
-                        offset=0,
-                    )
+                querier=Querier(
+                    conditions=[],
+                    orders=[],
+                    pagination=OffsetPagination(limit=10, offset=0),
                 ),
             ),
             ListArtifactRevisionsActionResult(
@@ -40,13 +35,11 @@ from ...utils import ScenarioBase
         ScenarioBase.success(
             "Success Case - List with ordering",
             ListArtifactRevisionsAction(
-                pagination=PaginationOptions(
-                    offset=OffsetBasedPaginationOptions(
-                        limit=10,
-                        offset=0,
-                    )
+                querier=Querier(
+                    conditions=[],
+                    orders=[],
+                    pagination=OffsetPagination(limit=10, offset=0),
                 ),
-                ordering=ArtifactRevisionOrderingOptions(),
             ),
             ListArtifactRevisionsActionResult(
                 data=[ARTIFACT_REVISION_FIXTURE_DATA],
