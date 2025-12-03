@@ -84,6 +84,10 @@ class ModelImportDoneEvent(BaseArtifactEvent):
         return "model_import_done"
 
     def serialize(self) -> tuple:
+        verification_result = None
+        if self.verification_result is not None:
+            verification_result = self.verification_result.model_dump()
+
         return (
             self.model_id,
             self.revision,
@@ -91,12 +95,15 @@ class ModelImportDoneEvent(BaseArtifactEvent):
             self.registry_name,
             self.success,
             self.digest,
-            self.verification_result.model_dump() if self.verification_result else None,
+            verification_result,
         )
 
     @classmethod
     def deserialize(cls, value: tuple):
-        verification_result = VerificationStepResult.model_validate(value[6]) if value[6] else None
+        verification_result = None
+        if value[6] is not None:
+            verification_result = VerificationStepResult.model_validate(value[6])
+
         return cls(
             model_id=value[0],
             revision=value[1],
