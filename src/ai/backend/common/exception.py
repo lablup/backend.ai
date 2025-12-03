@@ -729,6 +729,41 @@ class DomainNotFound(BackendAIError, web.HTTPNotFound):
         )
 
 
+class GroupCreationError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/group-creation-failed"
+    error_title = "Project Creation Failed"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class GroupModificationError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/group-modification-failed"
+    error_title = "Project Modification Failed"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class GroupDeletionError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/group-deletion-failed"
+    error_title = "Project Deletion Failed"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.SOFT_DELETE,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
 class ModelDeploymentNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/model-deployment-not-found"
     error_title = "Model Deployment Not Found"

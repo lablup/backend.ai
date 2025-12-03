@@ -4,7 +4,6 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.group.actions.base import GroupAction
-from ai.backend.manager.services.group.types import GroupData
 
 
 @dataclass
@@ -23,9 +22,8 @@ class DeleteGroupAction(GroupAction):
 
 @dataclass
 class DeleteGroupActionResult(BaseActionResult):
-    data: Optional[GroupData]
-    success: bool
+    group_id: uuid.UUID
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.data.id) if self.data is not None else None
+        return str(self.group_id)

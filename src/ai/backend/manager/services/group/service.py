@@ -6,7 +6,9 @@ from uuid import UUID
 from dateutil.relativedelta import relativedelta
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.exception import (
+    InvalidAPIParameters,
+)
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.resource_usage import (
@@ -70,47 +72,37 @@ class GroupService:
         self._admin_group_repository = group_repositories.admin_repository
 
     async def create_group(self, action: CreateGroupAction) -> CreateGroupActionResult:
-        try:
-            group_data = await self._group_repository.create(action.input)
-            return CreateGroupActionResult(data=group_data, success=True)
-        except Exception as e:
-            log.warning("create_group(): error ({})", repr(e))
-            return CreateGroupActionResult(data=None, success=False)
+        if action.input.name.strip() == "":
+            raise InvalidAPIParameters("Group name cannot be empty or whitespace.")
+
+        if len(action.input.name) > 64 or action.input.name.strip() == "":
+            raise InvalidAPIParameters("Group name cannot exceed 64 characters.")
+
+        group_data = await self._group_repository.create(action.input)
+        return CreateGroupActionResult(data=group_data)
 
     async def modify_group(self, action: ModifyGroupAction) -> ModifyGroupActionResult:
-        import uuid
-
         from ai.backend.manager.models.user import UserRole
 
-        try:
-            # Convert user_uuids from list[str] to list[UUID] if provided
-            user_uuids_converted = None
-            user_uuids_list = action.user_uuids.optional_value()
-            if user_uuids_list:
-                user_uuids_converted = [uuid.UUID(user_uuid) for user_uuid in user_uuids_list]
+        # Convert user_uuids from list[str] to list[UUID] if provided
+        user_uuids_converted = None
+        user_uuids_list = action.user_uuids.optional_value()
+        if user_uuids_list:
+            user_uuids_converted = [UUID(user_uuid) for user_uuid in user_uuids_list]
 
-            group_data = await self._group_repository.modify_validated(
-                action.group_id,
-                action.modifier,
-                UserRole.USER,  # Default role since group operations don't require role-based logic
-                action.user_update_mode.optional_value(),
-                user_uuids_converted,
-            )
-            if group_data is None:
-                # Only user updates were performed, no group data to return
-                return ModifyGroupActionResult(data=None, success=True)
-            return ModifyGroupActionResult(data=group_data, success=True)
-        except Exception as e:
-            log.warning("modify_group(): error ({})", repr(e))
-            return ModifyGroupActionResult(data=None, success=False)
+        group_data = await self._group_repository.modify_validated(
+            action.group_id,
+            action.modifier,
+            UserRole.USER,  # Default role since group operations don't require role-based logic
+            action.user_update_mode.optional_value(),
+            user_uuids_converted,
+        )
+        # If no group data is returned, it means only user updates were performed
+        return ModifyGroupActionResult(data=group_data)
 
     async def delete_group(self, action: DeleteGroupAction) -> DeleteGroupActionResult:
-        try:
-            result = await self._group_repository.mark_inactive(action.group_id)
-            return DeleteGroupActionResult(data=None, success=result)
-        except Exception as e:
-            log.warning("delete_group(): error ({})", repr(e))
-            return DeleteGroupActionResult(data=None, success=False)
+        await self._group_repository.mark_inactive(action.group_id)
+        return DeleteGroupActionResult(group_id=action.group_id)
 
     async def purge_group(self, action: PurgeGroupAction) -> PurgeGroupActionResult:
         from ai.backend.manager.errors.resource import (

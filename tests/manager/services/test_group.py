@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import RedisConnectionInfo, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
@@ -152,12 +153,9 @@ async def create_group(
                     type=ProjectType.GENERAL,
                     container_registry={},
                 ),
-                success=True,
             ),
         ),
-        # TODO: If business logic is implemented to raise exception instead of returning None
-        # we need to update ScenarioBase.failure
-        ScenarioBase.success(
+        ScenarioBase.failure(
             "With duplicated name, group creation should be failed",
             CreateGroupAction(
                 input=GroupCreator(
@@ -169,12 +167,9 @@ async def create_group(
                     domain_name="default",
                 ),
             ),
-            CreateGroupActionResult(
-                data=None,
-                success=False,
-            ),
+            InvalidAPIParameters,
         ),
-        ScenarioBase.success(
+        ScenarioBase.failure(
             "When trigger create group action with invalid resource policy, group creation should be failed",
             CreateGroupAction(
                 input=GroupCreator(
@@ -186,10 +181,7 @@ async def create_group(
                     domain_name="default",
                 )
             ),
-            CreateGroupActionResult(
-                data=None,
-                success=False,
-            ),
+            InvalidAPIParameters,
         ),
     ],
 )
@@ -228,6 +220,8 @@ async def test_modify_group(
 async def test_modify_group_with_invalid_group_id(
     processors: GroupProcessors,
 ) -> None:
+    from ai.backend.manager.errors.resource import GroupNotFound
+
     action = ModifyGroupAction(
         group_id=uuid.UUID("00000000-0000-0000-0000-000000000000"),
         modifier=GroupModifier(
@@ -236,9 +230,8 @@ async def test_modify_group_with_invalid_group_id(
             is_active=OptionalState.update(False),
         ),
     )
-    result: ModifyGroupActionResult = await processors.modify_group.wait_for_complete(action)
-    assert result.data is None
-    assert result.success is False
+    with pytest.raises(GroupNotFound):
+        await processors.modify_group.wait_for_complete(action)
 
 
 @pytest.mark.asyncio
@@ -251,8 +244,7 @@ async def test_delete_group(
     ) as group_id:
         action = DeleteGroupAction(group_id=group_id)
         result: DeleteGroupActionResult = await processors.delete_group.wait_for_complete(action)
-        assert result.data is None
-        assert result.success is True
+        assert result.group_id == group_id
 
 
 @pytest.mark.asyncio
@@ -286,7 +278,6 @@ async def test_purge_group(
         result: PurgeGroupActionResult = await processors.purge_group.wait_for_complete(
             PurgeGroupAction(group_id)
         )
-        assert result.data is None
         assert result.success is True
 
 
