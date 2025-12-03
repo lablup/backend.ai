@@ -5,11 +5,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 
 from ai.backend.manager.api.gql.adapter import BaseGQLAdapter
+from ai.backend.manager.errors.api import InvalidGraphQLParameters
 from ai.backend.manager.repositories.base import (
     Querier,
     QueryCondition,
     QueryOrder,
-    QueryPagination,
+)
+from ai.backend.manager.repositories.scaling_group.options import (
+    ScalingGroupConditions,
+    ScalingGroupOrders,
 )
 
 if TYPE_CHECKING:
@@ -33,17 +37,37 @@ class ScalingGroupGQLAdapter(BaseGQLAdapter):
         offset: Optional[int] = None,
     ) -> Querier:
         """Build Querier from GraphQL filter, order_by, and pagination."""
+        # Cursor pagination and order_by are mutually exclusive
+        is_cursor_pagination = first is not None or last is not None
+        if is_cursor_pagination and order_by is not None:
+            raise InvalidGraphQLParameters(
+                "order_by cannot be used with cursor pagination (first/after, last/before)"
+            )
+
         conditions: list[QueryCondition] = []
         orders: list[QueryOrder] = []
-        pagination: Optional[QueryPagination] = None
 
         if filter:
             conditions.extend(filter.build_conditions())
 
+        # Apply client-specified order (only for offset pagination)
         if order_by:
             for order in order_by:
                 orders.append(order.to_query_order())
 
-        pagination = self.build_pagination(first, after, last, before, limit, offset)
+        # Default order is created_at DESC (newest first) for cursor pagination
+        default_order: QueryOrder = ScalingGroupOrders.created_at(ascending=False)
+
+        pagination = self.build_pagination(
+            first,
+            after,
+            last,
+            before,
+            limit,
+            offset,
+            forward_cursor_condition_factory=ScalingGroupConditions.by_cursor_forward,
+            backward_cursor_condition_factory=ScalingGroupConditions.by_cursor_backward,
+            default_order=default_order,
+        )
 
         return Querier(conditions=conditions, orders=orders, pagination=pagination)

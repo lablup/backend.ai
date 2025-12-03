@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from enum import StrEnum
 from typing import Optional, Self
 
@@ -111,6 +112,7 @@ class NotificationChannel(Node):
     channel_type: NotificationChannelTypeGQL
     config: WebhookConfigGQL
     enabled: bool
+    created_at: datetime
 
     @classmethod
     def from_dataclass(cls, data: NotificationChannelData) -> Self:
@@ -121,6 +123,7 @@ class NotificationChannel(Node):
             channel_type=NotificationChannelTypeGQL.from_internal(data.channel_type),
             config=WebhookConfigGQL.from_dataclass(data.config),
             enabled=data.enabled,
+            created_at=data.created_at,
         )
 
 
@@ -133,6 +136,7 @@ class NotificationRule(Node):
     channel: NotificationChannel
     message_template: str
     enabled: bool
+    created_at: datetime
 
     @classmethod
     def from_dataclass(cls, data: NotificationRuleData) -> Self:
@@ -144,6 +148,7 @@ class NotificationRule(Node):
             channel=NotificationChannel.from_dataclass(data.channel),
             message_template=data.message_template,
             enabled=data.enabled,
+            created_at=data.created_at,
         )
 
 

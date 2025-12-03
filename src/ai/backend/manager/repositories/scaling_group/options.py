@@ -98,6 +98,42 @@ class ScalingGroupConditions:
 
         return inner
 
+    @staticmethod
+    def by_cursor_forward(cursor_name: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        ScalingGroup uses name as primary key.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(ScalingGroupRow.created_at)
+                .where(ScalingGroupRow.name == cursor_name)
+                .scalar_subquery()
+            )
+            return ScalingGroupRow.created_at < subquery
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_name: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        ScalingGroup uses name as primary key.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(ScalingGroupRow.created_at)
+                .where(ScalingGroupRow.name == cursor_name)
+                .scalar_subquery()
+            )
+            return ScalingGroupRow.created_at > subquery
+
+        return inner
+
 
 class ScalingGroupOrders:
     """Query orders for scaling groups."""

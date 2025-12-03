@@ -32,6 +32,8 @@ class SearchScalingGroupsActionResult(BaseActionResult):
 
     scaling_groups: list[ScalingGroupData]
     total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
     @override
     def entity_id(self) -> Optional[str]:

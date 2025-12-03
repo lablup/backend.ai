@@ -17,6 +17,9 @@ type QueryCondition = Callable[[], sa.sql.expression.ColumnElement[bool]]
 
 type QueryOrder = sa.sql.ClauseElement
 
+# Factory function that creates a cursor condition from a decoded cursor value (str or UUID)
+type CursorConditionFactory = Callable[[str], QueryCondition]
+
 
 class QueryPagination(ABC):
     """
@@ -91,35 +94,33 @@ class CursorForwardPagination(QueryPagination):
     This follows the GraphQL Relay Cursor Connections specification for forward pagination.
     Use this to paginate forward through a result set:
     - first: Number of items to return from the cursor position
-    - after: Cursor representing the position to start after
+    - cursor_condition: QueryCondition for WHERE clause (e.g., id > cursor_id)
+    - default_order: QueryOrder for cursor-based ordering (e.g., id ASC)
     """
 
     first: int
     """Number of items to return (must be positive)."""
 
-    after: str
-    """
-    Base64-encoded cursor representing the position to start after.
+    cursor_condition: QueryCondition
+    """QueryCondition for cursor position (e.g., WHERE id > cursor_id)."""
 
-    The cursor encodes the values of the ordering columns for a specific item.
-    Results will start after this cursor position based on the query ordering.
-    """
+    default_order: QueryOrder
+    """Default ordering for cursor-based pagination (e.g., ORDER BY id ASC)."""
 
     def apply(self, query: sa.sql.Select) -> sa.sql.Select:
         """
         Apply cursor-based forward pagination to query.
 
-        Note: Cursor decoding and WHERE clause for cursor position
-        should be handled by the caller before building the query.
-        This applies LIMIT + 1 for has_next_page detection.
+        Applies cursor condition, default order, and LIMIT + 1 for has_next_page detection.
         """
-
+        query = query.where(self.cursor_condition())
+        query = query.order_by(self.default_order)
         return query.limit(self.first + 1)
 
     def compute_page_info(self, rows: list[Row], total_count: int) -> _PageInfoResult[Row]:
         """Compute pagination info for cursor-based forward pagination."""
 
-        has_previous_page = True  # after cursor exists means previous page exists
+        has_previous_page = True  # cursor exists means previous page exists
         has_next_page = len(rows) > self.first
         if has_next_page:
             rows = rows[: self.first]
@@ -138,35 +139,33 @@ class CursorBackwardPagination(QueryPagination):
     This follows the GraphQL Relay Cursor Connections specification for backward pagination.
     Use this to paginate backward through a result set:
     - last: Number of items to return before the cursor position
-    - before: Cursor representing the position to end before
+    - cursor_condition: QueryCondition for WHERE clause (e.g., id < cursor_id)
+    - default_order: QueryOrder for cursor-based ordering (e.g., id DESC for reverse fetch)
     """
 
     last: int
     """Number of items to return (must be positive)."""
 
-    before: str
-    """
-    Base64-encoded cursor representing the position to end before.
+    cursor_condition: QueryCondition
+    """QueryCondition for cursor position (e.g., WHERE id < cursor_id)."""
 
-    The cursor encodes the values of the ordering columns for a specific item.
-    Results will end before this cursor position based on the query ordering.
-    """
+    default_order: QueryOrder
+    """Default ordering for cursor-based pagination (e.g., ORDER BY id DESC)."""
 
     def apply(self, query: sa.sql.Select) -> sa.sql.Select:
         """
         Apply cursor-based backward pagination to query.
 
-        Note: Cursor decoding and WHERE clause for cursor position
-        should be handled by the caller before building the query.
-        This applies LIMIT + 1 for has_previous_page detection and may require result reversal.
+        Applies cursor condition, default order, and LIMIT + 1 for has_previous_page detection.
         """
-
+        query = query.where(self.cursor_condition())
+        query = query.order_by(self.default_order)
         return query.limit(self.last + 1)
 
     def compute_page_info(self, rows: list[Row], total_count: int) -> _PageInfoResult[Row]:
         """Compute pagination info for cursor-based backward pagination."""
 
-        has_next_page = True  # before cursor exists means next page exists
+        has_next_page = True  # cursor exists means next page exists
         has_previous_page = len(rows) > self.last
         if has_previous_page:
             rows = rows[: self.last]
@@ -235,17 +234,22 @@ def _apply_querier(
 
     Returns:
         The modified SELECT statement with conditions, orders, and pagination applied
+
+    Note:
+        For cursor-based pagination, the pagination.apply() method applies
+        default_order first. User-specified orders are applied after,
+        serving as secondary sort criteria.
     """
     # Apply all conditions
     for condition in querier.conditions:
         query = query.where(condition())
 
-    # Apply all orders
+    # Apply pagination (includes cursor condition and default_order for cursor pagination)
+    query = querier.pagination.apply(query)
+
+    # Apply user orders AFTER default order from pagination
     for order in querier.orders:
         query = query.order_by(order)
-
-    # Apply pagination
-    query = querier.pagination.apply(query)
 
     return query
 
