@@ -130,7 +130,7 @@ class SearchNotificationChannelsRequest(BaseRequestModel):
         default=None, description="Order specification"
     )
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
-    offset: Optional[int] = Field(default=None, ge=0, description="Number of items to skip")
+    offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 
 class CreateNotificationRuleRequest(BaseRequestModel):
@@ -189,7 +189,7 @@ class SearchNotificationRulesRequest(BaseRequestModel):
     filter: Optional[NotificationRuleFilter] = Field(default=None, description="Filter conditions")
     order: Optional[NotificationRuleOrder] = Field(default=None, description="Order specification")
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
-    offset: Optional[int] = Field(default=None, ge=0, description="Number of items to skip")
+    offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 
 class ValidateNotificationChannelRequest(BaseRequestModel):

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -216,7 +216,7 @@ class NotificationDBSource:
 
     async def search_channels(
         self,
-        querier: Optional[Querier] = None,
+        querier: Querier,
     ) -> NotificationChannelListResult:
         """Searches notification channels with total count."""
         async with self._db.begin_readonly_session() as db_sess:
@@ -236,11 +236,13 @@ class NotificationDBSource:
             return NotificationChannelListResult(
                 items=items,
                 total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
             )
 
     async def search_rules(
         self,
-        querier: Optional[Querier] = None,
+        querier: Querier,
     ) -> NotificationRuleListResult:
         """Searches notification rules with total count."""
         async with self._db.begin_readonly_session() as db_sess:
@@ -260,4 +262,6 @@ class NotificationDBSource:
             return NotificationRuleListResult(
                 items=items,
                 total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
             )

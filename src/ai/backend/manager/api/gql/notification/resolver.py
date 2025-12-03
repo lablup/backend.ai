@@ -134,8 +134,8 @@ async def notification_channels(
     return NotificationChannelConnection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
             start_cursor=edges[0].cursor if edges else None,
             end_cursor=edges[-1].cursor if edges else None,
         ),
@@ -192,8 +192,8 @@ async def notification_rules(
     return NotificationRuleConnection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
             start_cursor=edges[0].cursor if edges else None,
             end_cursor=edges[-1].cursor if edges else None,
         ),

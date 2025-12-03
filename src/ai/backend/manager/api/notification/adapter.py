@@ -6,8 +6,6 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from ai.backend.common.dto.manager.notification import (
     NotificationChannelDTO,
     NotificationChannelFilter,
@@ -144,13 +142,9 @@ class NotificationChannelAdapter(BaseFilterAdapter):
         else:
             raise ValueError(f"Unknown order field: {order.field}")
 
-    def _build_pagination(
-        self, limit: Optional[int], offset: Optional[int]
-    ) -> Optional[OffsetPagination]:
+    def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""
-        if limit is None:
-            return None
-        return OffsetPagination(limit=limit, offset=offset or 0)
+        return OffsetPagination(limit=limit, offset=offset)
 
 
 class NotificationRuleAdapter(BaseFilterAdapter):
@@ -238,10 +232,6 @@ class NotificationRuleAdapter(BaseFilterAdapter):
         else:
             raise ValueError(f"Unknown order field: {order.field}")
 
-    def _build_pagination(
-        self, limit: Optional[int], offset: Optional[int]
-    ) -> Optional[OffsetPagination]:
+    def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""
-        if limit is None:
-            return None
-        return OffsetPagination(limit=limit, offset=offset or 0)
+        return OffsetPagination(limit=limit, offset=offset)

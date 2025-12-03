@@ -142,6 +142,8 @@ class NotificationChannelListResult:
 
     items: list[NotificationChannelData]
     total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
 
 @dataclass
@@ -150,3 +152,5 @@ class NotificationRuleListResult:
 
     items: list[NotificationRuleData]
     total_count: int
+    has_next_page: bool
+    has_previous_page: bool

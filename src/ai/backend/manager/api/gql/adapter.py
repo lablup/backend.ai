@@ -12,6 +12,8 @@ from ai.backend.manager.repositories.base import (
     QueryPagination,
 )
 
+DEFAULT_PAGINATION_LIMIT = 10
+
 
 class BaseGQLAdapter:
     """Base adapter providing common GraphQL query building utilities."""
@@ -24,8 +26,12 @@ class BaseGQLAdapter:
         before: Optional[str] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
-    ) -> Optional[QueryPagination]:
-        """Build pagination from GraphQL pagination arguments."""
+    ) -> QueryPagination:
+        """Build pagination from GraphQL pagination arguments.
+
+        If no pagination parameters are provided, returns a default OffsetPagination
+        with limit=DEFAULT_PAGINATION_LIMIT.
+        """
         # Validate and build pagination
         # Count how many pagination modes are being used
         pagination_modes = sum([
@@ -59,4 +65,5 @@ class BaseGQLAdapter:
                 raise InvalidGraphQLParameters(f"offset must be non-negative, got {offset}")
             return OffsetPagination(limit=limit, offset=offset or 0)
 
-        return None
+        # Default pagination when no parameters provided
+        return OffsetPagination(limit=DEFAULT_PAGINATION_LIMIT, offset=0)
