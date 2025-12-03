@@ -7,6 +7,7 @@ from pydantic import Field
 
 from ...api_handlers import BaseResponseModel
 from ...bgtask.types import TaskID
+from ...data.artifact.types import VerificationStepResult
 from .field import VFolderItemField
 
 
@@ -108,4 +109,11 @@ class ObjectStorageBucketsResponse(BaseResponseModel):
 class ObjectStorageAllBucketsResponse(BaseResponseModel):
     buckets_by_storage: dict[uuid.UUID, list[str]] = Field(
         description="Mapping of storage IDs to bucket lists"
+    )
+
+
+class GetArtifactRevisionVerificationResultResponse(BaseResponseModel):
+    verification_result: Optional[VerificationStepResult] = Field(
+        default=None,
+        description="Verification result containing results from all verifiers",
     )

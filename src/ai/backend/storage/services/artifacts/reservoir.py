@@ -429,6 +429,48 @@ class ReservoirService:
         self._reservoir_client_config = args.reservoir_client_config
         self._redis_client = args.redis_client
 
+    async def _query_remote_verification_result(
+        self,
+        registry_name: str,
+        model_id: str,
+        revision: str,
+    ) -> Optional[VerificationStepResult]:
+        """
+        Query verification result from remote reservoir manager.
+
+        Args:
+            registry_name: Name of the reservoir registry
+            model_id: Model ID to query
+            revision: Revision to query
+
+        Returns:
+            Verification result if found, None otherwise
+        """
+        registry_config = self._reservoir_registry_configs.get(registry_name)
+        if not registry_config or not registry_config.endpoint:
+            return None
+
+        manager_client = self._manager_http_clients.get(registry_name)
+        if not manager_client:
+            return None
+
+        try:
+            log.debug(
+                f"Querying verification result from remote reservoir for model: {model_id}/{revision}"
+            )
+            response = await manager_client.get_verification_result(
+                model_id=model_id,
+                revision=revision,
+            )
+            if response.verification_result:
+                log.info(
+                    f"Retrieved verification result from remote reservoir for model: {model_id}/{revision}"
+                )
+            return response.verification_result
+        except Exception as e:
+            log.warning(f"Failed to query verification result from remote reservoir: {e}")
+            return None
+
     async def import_model(
         self,
         registry_name: str,
@@ -448,7 +490,6 @@ class ReservoirService:
             pipeline: ImportPipeline to execute
         """
         success = False
-        verification_result: Optional[VerificationStepResult] = None
         try:
             if model.revision is None:
                 raise ArtifactRevisionEmptyError(f"Revision must be specified for model: {model}")
@@ -467,8 +508,12 @@ class ReservoirService:
             log.info(f"Model import completed: {model}")
             success = True
 
-            # Extract verification result from context (None if verification step was not executed)
-            verification_result = context.step_metadata.get("verification_result")
+            # Query verification result from remote reservoir manager
+            verification_result = await self._query_remote_verification_result(
+                registry_name=registry_name,
+                model_id=model.model_id,
+                revision=model.resolve_revision(ArtifactRegistryType.RESERVOIR),
+            )
         finally:
             await self._event_producer.anycast_event(
                 ModelImportDoneEvent(

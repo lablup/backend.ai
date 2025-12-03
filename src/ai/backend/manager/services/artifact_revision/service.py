@@ -98,6 +98,10 @@ from ai.backend.manager.services.artifact_revision.actions.get_readme import (
     GetArtifactRevisionReadmeAction,
     GetArtifactRevisionReadmeActionResult,
 )
+from ai.backend.manager.services.artifact_revision.actions.get_verification_result import (
+    GetArtifactRevisionVerificationResultAction,
+    GetArtifactRevisionVerificationResultActionResult,
+)
 from ai.backend.manager.services.artifact_revision.actions.import_revision import (
     ImportArtifactRevisionAction,
     ImportArtifactRevisionActionResult,
@@ -212,6 +216,16 @@ class ArtifactRevisionService:
         )
         readme_data = ArtifactRevisionReadme(readme=readme)
         return GetArtifactRevisionReadmeActionResult(readme_data=readme_data)
+
+    async def get_verification_result(
+        self, action: GetArtifactRevisionVerificationResultAction
+    ) -> GetArtifactRevisionVerificationResultActionResult:
+        revision = await self._artifact_repository.get_artifact_revision_by_name_and_revision(
+            action.model_id, action.revision
+        )
+        return GetArtifactRevisionVerificationResultActionResult(
+            verification_result=revision.verification_result
+        )
 
     async def get_download_progress(
         self, action: GetDownloadProgressAction

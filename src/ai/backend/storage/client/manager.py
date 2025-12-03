@@ -11,6 +11,7 @@ import yarl
 from dateutil.tz import tzutc
 
 from ai.backend.common.auth.utils import generate_signature
+from ai.backend.common.dto.manager.response import GetArtifactRevisionVerificationResultResponse
 from ai.backend.common.dto.storage.response import VFSListFilesResponse
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.config.unified import ReservoirClientConfig
@@ -127,7 +128,7 @@ class ManagerHTTPClient:
 
         Args:
             storage_name: Name of the VFS storage
-            directory: Directory path to list files from (empty string for root)
+            directory: Directory path to list files from (empty string or root)
 
         Returns:
             Response containing list of files with metadata
@@ -136,3 +137,24 @@ class ManagerHTTPClient:
         request_body = {"directory": directory}
         resp = await self._request("GET", rel_url, json=request_body)
         return VFSListFilesResponse.model_validate(resp)
+
+    async def get_verification_result(
+        self, model_id: str, revision: str
+    ) -> GetArtifactRevisionVerificationResultResponse:
+        """
+        Get verification result for an artifact revision.
+
+        Args:
+            model_id: Model ID (artifact name)
+            revision: Revision string
+
+        Returns:
+            Response containing verification result
+        """
+        rel_url = f"/artifacts/{model_id}/revisions/{revision}/verification_result"
+        try:
+            resp = await self._request("GET", rel_url)
+            return GetArtifactRevisionVerificationResultResponse.model_validate(resp)
+        except Exception as e:
+            log.warning(f"Failed to get verification result: {e}")
+            return GetArtifactRevisionVerificationResultResponse(verification_result=None)
