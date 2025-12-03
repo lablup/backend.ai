@@ -662,7 +662,7 @@ class CreateGroup(graphene.Mutation):
         res = await graph_ctx.processors.group.create_group.wait_for_complete(action)
         return cls(
             ok=True,
-            msg="Project created successfully",
+            msg="success",
             group=Group.from_dto(res.data),
         )
 
@@ -696,7 +696,7 @@ class ModifyGroup(graphene.Mutation):
         res = await graph_ctx.processors.group.modify_group.wait_for_complete(action)
         return cls(
             ok=True,
-            msg="Project modified successfully",
+            msg="success",
             group=Group.from_dto(res.data) if res.data else None,
         )
 
@@ -722,7 +722,7 @@ class DeleteGroup(graphene.Mutation):
     async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> DeleteGroup:
         ctx: GraphQueryContext = info.context
         await ctx.processors.group.delete_group.wait_for_complete(DeleteGroupAction(gid))
-        return cls(ok=True, msg="Project deleted successfully")
+        return cls(ok=True, msg="success")
 
 
 class PurgeGroup(graphene.Mutation):
@@ -751,4 +751,4 @@ class PurgeGroup(graphene.Mutation):
         graph_ctx: GraphQueryContext = info.context
 
         await graph_ctx.processors.group.purge_group.wait_for_complete(PurgeGroupAction(gid))
-        return cls(ok=True, msg="Project purged successfully")
+        return cls(ok=True, msg="success")
