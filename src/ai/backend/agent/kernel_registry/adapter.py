@@ -1,0 +1,43 @@
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+
+from ai.backend.logging import BraceStyleAdapter
+
+from .loader.abc import AbstractKernelRegistryLoader
+from .writer.abc import AbstractKernelRegistryWriter
+from .writer.types import KernelRegistrySaveMetadata
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+@dataclass
+class KernelRecoveryDataAdapterTarget:
+    loader: AbstractKernelRegistryLoader
+    writer: AbstractKernelRegistryWriter
+
+
+class KernelRecoveryDataAdapter:
+    """
+    Adapts Docker kernel recovery data.
+    1. Loads recovery data using the source loader.
+    2. Loads recovery data using the target loader to ensure compatibility.
+    3. Saves the recovery data using the target writer.
+    """
+
+    def __init__(
+        self,
+        source_loader: AbstractKernelRegistryLoader,
+        targets: list[KernelRecoveryDataAdapterTarget],
+    ) -> None:
+        self._source_loader = source_loader
+        self._targets = targets
+
+    async def adapt_recovery_data(self) -> None:
+        source_data = await self._source_loader.load_kernel_registry()
+        for target in self._targets:
+            data = await target.loader.load_kernel_registry()
+            data_to_save = {**data, **source_data}
+            metadata = KernelRegistrySaveMetadata(force=True)
+            await target.writer.save_kernel_registry(data_to_save, metadata)
