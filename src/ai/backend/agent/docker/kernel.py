@@ -13,7 +13,7 @@ import subprocess
 import textwrap
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
-from typing import TYPE_CHECKING, Any, Dict, Final, FrozenSet, Optional, Tuple, cast, override
+from typing import Any, Dict, Final, FrozenSet, Optional, Tuple, cast, override
 
 import aiohttp
 import janus
@@ -38,9 +38,6 @@ from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
 from ..types import AgentEventData, KernelOwnershipData
 from ..utils import closing_async, get_arch_name
-
-if TYPE_CHECKING:
-    pass
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

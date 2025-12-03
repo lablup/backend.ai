@@ -5,7 +5,7 @@ import os
 import shutil
 import textwrap
 from pathlib import Path, PurePosixPath
-from typing import TYPE_CHECKING, Any, Dict, FrozenSet, Mapping, Optional, Tuple, override
+from typing import Any, Dict, FrozenSet, Mapping, Optional, Tuple, override
 
 import pkg_resources
 import zmq
@@ -27,9 +27,6 @@ from ..errors import KernelRunnerNotInitializedError
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
 from ..types import AgentEventData, KernelOwnershipData
-
-if TYPE_CHECKING:
-    pass
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
