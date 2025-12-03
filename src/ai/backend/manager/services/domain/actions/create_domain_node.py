@@ -29,7 +29,6 @@ class CreateDomainNodeAction(DomainAction):
 @dataclass
 class CreateDomainNodeActionResult(BaseActionResult):
     domain_data: Optional[DomainData]
-    success: bool
     description: str
 
     @override

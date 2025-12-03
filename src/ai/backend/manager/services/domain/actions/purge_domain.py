@@ -23,7 +23,6 @@ class PurgeDomainAction(DomainAction):
 
 @dataclass
 class PurgeDomainActionResult(BaseActionResult):
-    success: bool
     description: str
 
     @override

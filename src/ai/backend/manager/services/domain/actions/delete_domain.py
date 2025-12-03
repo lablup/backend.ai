@@ -23,7 +23,6 @@ class DeleteDomainAction(DomainAction):
 
 @dataclass
 class DeleteDomainActionResult(BaseActionResult):
-    success: bool
     description: str
 
     @override

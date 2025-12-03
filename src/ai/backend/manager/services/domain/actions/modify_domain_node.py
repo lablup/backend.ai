@@ -27,7 +27,6 @@ class ModifyDomainNodeAction(DomainAction):
 @dataclass
 class ModifyDomainNodeActionResult(BaseActionResult):
     domain_data: Optional[DomainData]
-    success: bool
     description: Optional[str]
 
     @override

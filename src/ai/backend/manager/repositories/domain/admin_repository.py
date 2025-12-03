@@ -3,7 +3,7 @@ from typing import Optional
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
-from ai.backend.common.exception import BackendAIError
+from ai.backend.common.exception import BackendAIError, DomainNotFound, InvalidAPIParameters
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -68,6 +68,11 @@ class AdminDomainRepository:
         For superadmin use only.
         """
         async with self._db.begin() as conn:
+            check_query = sa.select(DomainRow).where(DomainRow.name == creator.name)
+            existing_domain = await conn.scalar(check_query)
+            if existing_domain is not None:
+                raise InvalidAPIParameters(f"Domain with name '{creator.name}' already exists")
+
             data = creator.fields_to_store()
             insert_query = sa.insert(domains).values(data).returning(domains)
             result = await conn.execute(insert_query)
@@ -89,9 +94,7 @@ class AdminDomainRepository:
         return result
 
     @domain_repository_resilience.apply()
-    async def modify_domain_force(
-        self, domain_name: str, modifier: DomainModifier
-    ) -> Optional[DomainData]:
+    async def modify_domain_force(self, domain_name: str, modifier: DomainModifier) -> DomainData:
         """
         Modifies an existing domain without permission checks.
         For superadmin use only.
@@ -108,12 +111,11 @@ class AdminDomainRepository:
             row = result.first()
 
             if result.rowcount == 0:
-                return None
-
-        return row_to_data(row)
+                raise DomainNotFound(f"Domain not found: {domain_name}")
+            return row_to_data(row)
 
     @domain_repository_resilience.apply()
-    async def soft_delete_domain_force(self, domain_name: str) -> bool:
+    async def soft_delete_domain_force(self, domain_name: str) -> None:
         """
         Soft deletes a domain by setting is_active to False without permission checks.
         For superadmin use only.
@@ -123,7 +125,8 @@ class AdminDomainRepository:
                 sa.update(domains).values({"is_active": False}).where(domains.c.name == domain_name)
             )
             result = await conn.execute(update_query)
-            return result.rowcount > 0
+            if result.rowcount == 0:
+                raise DomainNotFound(f"Domain not found: {domain_name}")
 
     @domain_repository_resilience.apply()
     async def purge_domain_force(self, domain_name: str) -> None:
@@ -193,6 +196,11 @@ class AdminDomainRepository:
         """
         async with self._db.begin_session() as session:
             data = creator.fields_to_store()
+            check_query = sa.select(DomainRow).where(DomainRow.name == creator.name)
+            existing_domain = await session.scalar(check_query)
+            if existing_domain is not None:
+                raise InvalidAPIParameters(f"Domain with name '{creator.name}' already exists")
+
             insert_and_returning = sa.select(DomainRow).from_statement(
                 sa.insert(DomainRow).values(data).returning(DomainRow)
             )

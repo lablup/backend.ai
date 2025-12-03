@@ -21,7 +21,9 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ai.backend.common.exception import DomainNotFound
+from ai.backend.common.exception import (
+    DomainNotFound,
+)
 from ai.backend.common.types import ResourceSlot, Sentinel
 from ai.backend.manager.data.domain.types import (
     DomainCreator,
@@ -728,13 +730,10 @@ class CreateDomain(graphene.Mutation):
 
         action: CreateDomainAction = props.to_action(name, user_info)
         res = await ctx.processors.domain.create_domain.wait_for_complete(action)
-
-        domain_data: Optional[DomainData] = res.domain_data
-
         return cls(
-            ok=res.success,
-            msg=res.description,
-            domain=Domain.from_data(domain_data) if domain_data else None,
+            ok=True,
+            msg="Domain created successfully",
+            domain=Domain.from_data(res.domain_data) if res.domain_data else None,
         )
 
 
@@ -767,13 +766,10 @@ class ModifyDomain(graphene.Mutation):
 
         action = props.to_action(name, user_info)
         res = await ctx.processors.domain.modify_domain.wait_for_complete(action)
-
-        domain_data: Optional[DomainData] = res.domain_data
-
         return cls(
-            ok=res.success,
-            msg=res.description,
-            domain=Domain.from_data(domain_data) if domain_data else None,
+            ok=True,
+            msg="Domain modified successfully",
+            domain=Domain.from_data(res.domain_data) if res.domain_data else None,
         )
 
 
@@ -801,9 +797,8 @@ class DeleteDomain(graphene.Mutation):
         )
 
         action = DeleteDomainAction(name, user_info)
-        res = await ctx.processors.domain.delete_domain.wait_for_complete(action)
-
-        return cls(ok=res.success, msg=res.description)
+        await ctx.processors.domain.delete_domain.wait_for_complete(action)
+        return cls(ok=True, msg="Domain deleted successfully")
 
 
 class PurgeDomain(graphene.Mutation):
@@ -833,6 +828,5 @@ class PurgeDomain(graphene.Mutation):
         )
 
         action = PurgeDomainAction(name, user_info)
-        res = await ctx.processors.domain.purge_domain.wait_for_complete(action)
-
-        return cls(ok=res.success, msg=res.description)
+        await ctx.processors.domain.purge_domain.wait_for_complete(action)
+        return cls(ok=True, msg="Domain purged successfully")

@@ -862,3 +862,39 @@ class KeypairResourcePolicyNotFound(BackendAIError, web.HTTPNotFound):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class DomainCreationError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/domain-creation-failed"
+    error_title = "Domain Creation Failed"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DOMAIN,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class DomainModificationError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/domain-modification-failed"
+    error_title = "Domain Modification Failed"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DOMAIN,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class DomainDeletionError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/domain-deletion-failed"
+    error_title = "Domain Deletion Failed"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DOMAIN,
+            operation=ErrorOperation.SOFT_DELETE,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )

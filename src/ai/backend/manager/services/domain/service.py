@@ -1,7 +1,6 @@
 import logging
 
-from sqlalchemy import exc as sa_exc
-
+from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.domain.admin_repository import AdminDomainRepository
@@ -47,71 +46,41 @@ class DomainService:
         self._admin_repository = admin_repository
 
     async def create_domain(self, action: CreateDomainAction) -> CreateDomainActionResult:
-        try:
-            if action.user_info.role == UserRole.SUPERADMIN:
-                domain_data = await self._admin_repository.create_domain_force(action.creator)
-            else:
-                domain_data = await self._repository.create_domain_validated(action.creator)
-            return CreateDomainActionResult(
-                domain_data=domain_data,
-                success=True,
-                description="domain creation succeed",
-            )
-        except Exception as e:
-            return CreateDomainActionResult(
-                domain_data=None,
-                success=False,
-                description=f"domain creation failed: {str(e)}",
-            )
+        if action.creator.name.strip() == "" or len(action.creator.name) > 64:
+            raise InvalidAPIParameters("Domain name cannot be empty or exceed 64 characters.")
+
+        if action.user_info.role == UserRole.SUPERADMIN:
+            domain_data = await self._admin_repository.create_domain_force(action.creator)
+        else:
+            domain_data = await self._repository.create_domain_validated(action.creator)
+        return CreateDomainActionResult(
+            domain_data=domain_data,
+            description="domain creation succeed",
+        )
 
     async def modify_domain(self, action: ModifyDomainAction) -> ModifyDomainActionResult:
-        try:
-            if action.user_info.role == UserRole.SUPERADMIN:
-                domain_data = await self._admin_repository.modify_domain_force(
-                    action.domain_name, action.modifier
-                )
-            else:
-                domain_data = await self._repository.modify_domain_validated(
-                    action.domain_name, action.modifier
-                )
-            if domain_data:
-                return ModifyDomainActionResult(
-                    domain_data=domain_data,
-                    success=True,
-                    description="domain modification succeed",
-                )
-            else:
-                return ModifyDomainActionResult(
-                    domain_data=None,
-                    success=False,
-                    description=f"no matching {action.domain_name}",
-                )
-        except Exception as e:
-            return ModifyDomainActionResult(
-                domain_data=None,
-                success=False,
-                description=f"domain modification failed: {str(e)}",
+        if action.user_info.role == UserRole.SUPERADMIN:
+            domain_data = await self._admin_repository.modify_domain_force(
+                action.domain_name, action.modifier
             )
+        else:
+            domain_data = await self._repository.modify_domain_validated(
+                action.domain_name, action.modifier
+            )
+        return ModifyDomainActionResult(
+            domain_data=domain_data,
+            description="domain modification succeed",
+        )
 
     async def delete_domain(self, action: DeleteDomainAction) -> DeleteDomainActionResult:
-        try:
-            if action.user_info.role == UserRole.SUPERADMIN:
-                success = await self._admin_repository.soft_delete_domain_force(action.name)
-            else:
-                success = await self._repository.soft_delete_domain_validated(action.name)
-            if success:
-                return DeleteDomainActionResult(
-                    success=True,
-                    description=f"domain {action.name} deleted successfully",
-                )
-            else:
-                return DeleteDomainActionResult(
-                    success=False, description=f"no matching {action.name}"
-                )
-        except Exception as e:
-            return DeleteDomainActionResult(
-                success=False, description=f"domain deletion failed: {str(e)}"
-            )
+        if action.user_info.role == UserRole.SUPERADMIN:
+            await self._admin_repository.soft_delete_domain_force(action.name)
+        else:
+            await self._repository.soft_delete_domain_validated(action.name)
+
+        return DeleteDomainActionResult(
+            description=f"domain {action.name} deleted successfully",
+        )
 
     async def purge_domain(self, action: PurgeDomainAction) -> PurgeDomainActionResult:
         name = action.name
@@ -120,34 +89,27 @@ class DomainService:
             await self._admin_repository.purge_domain_force(name)
         else:
             await self._repository.purge_domain_validated(name)
-        return PurgeDomainActionResult(
-            success=True, description=f"domain {name} purged successfully"
-        )
+        return PurgeDomainActionResult(description=f"domain {name} purged successfully")
 
     async def create_domain_node(
         self, action: CreateDomainNodeAction
     ) -> CreateDomainNodeActionResult:
+        if action.creator.name.strip() == "" or len(action.creator.name) > 64:
+            raise InvalidAPIParameters("Domain name cannot be empty or exceed 64 characters.")
+
         scaling_groups = action.scaling_groups
 
-        try:
-            if action.user_info.role == UserRole.SUPERADMIN:
-                domain_data = (
-                    await self._admin_repository.create_domain_node_with_permissions_force(
-                        action.creator, action.user_info, scaling_groups
-                    )
-                )
-            else:
-                domain_data = await self._repository.create_domain_node_with_permissions(
-                    action.creator, action.user_info, scaling_groups
-                )
-        except sa_exc.IntegrityError as e:
-            raise ValueError(
-                f"Cannot create the domain with given arguments. (arg:{action}, e:{str(e)})"
+        if action.user_info.role == UserRole.SUPERADMIN:
+            domain_data = await self._admin_repository.create_domain_node_with_permissions_force(
+                action.creator, action.user_info, scaling_groups
+            )
+        else:
+            domain_data = await self._repository.create_domain_node_with_permissions(
+                action.creator, action.user_info, scaling_groups
             )
 
         return CreateDomainNodeActionResult(
             domain_data=domain_data,
-            success=True,
             description=f"domain {action.creator.name} created",
         )
 
@@ -158,39 +120,31 @@ class DomainService:
 
         if action.sgroups_to_add is not None and action.sgroups_to_remove is not None:
             if union := action.sgroups_to_add | action.sgroups_to_remove:
-                raise ValueError(
+                raise InvalidAPIParameters(
                     "Should be no scaling group names included in both `sgroups_to_add` and `sgroups_to_remove` "
                     f"(sg:{union})."
                 )
 
-        try:
-            if action.user_info.role == UserRole.SUPERADMIN:
-                domain_data = (
-                    await self._admin_repository.modify_domain_node_with_permissions_force(
-                        domain_name,
-                        action.modifier.fields_to_update(),
-                        action.user_info,
-                        action.sgroups_to_add,
-                        action.sgroups_to_remove,
-                    )
-                )
-            else:
-                domain_data = await self._repository.modify_domain_node_with_permissions(
-                    domain_name,
-                    action.modifier.fields_to_update(),
-                    action.user_info,
-                    action.sgroups_to_add,
-                    action.sgroups_to_remove,
-                )
-        except sa_exc.IntegrityError as e:
-            raise ValueError(
-                f"Cannot modify the domain with given arguments. (arg:{action}, e:{str(e)})"
+        if action.user_info.role == UserRole.SUPERADMIN:
+            domain_data = await self._admin_repository.modify_domain_node_with_permissions_force(
+                domain_name,
+                action.modifier.fields_to_update(),
+                action.user_info,
+                action.sgroups_to_add,
+                action.sgroups_to_remove,
+            )
+        else:
+            domain_data = await self._repository.modify_domain_node_with_permissions(
+                domain_name,
+                action.modifier.fields_to_update(),
+                action.user_info,
+                action.sgroups_to_add,
+                action.sgroups_to_remove,
             )
         if domain_data is None:
-            raise ValueError(f"Domain not found (id:{domain_name})")
+            raise DomainNotFound(f"Domain not found (id:{domain_name})")
 
         return ModifyDomainNodeActionResult(
             domain_data=domain_data,
-            success=True,
             description=f"domain {domain_name} modified",
         )

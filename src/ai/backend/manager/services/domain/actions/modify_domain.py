@@ -28,7 +28,6 @@ class ModifyDomainAction(DomainAction):
 @dataclass
 class ModifyDomainActionResult(BaseActionResult):
     domain_data: Optional[DomainData]
-    success: bool = field(compare=False)
     description: Optional[str] = field(compare=False)
 
     @override
