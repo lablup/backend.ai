@@ -17,6 +17,9 @@ type QueryCondition = Callable[[], sa.sql.expression.ColumnElement[bool]]
 
 type QueryOrder = sa.sql.ClauseElement
 
+# Factory function that creates a cursor condition from a decoded cursor value (str or UUID)
+type CursorConditionFactory = Callable[[str], QueryCondition]
+
 
 class QueryPagination(ABC):
     """

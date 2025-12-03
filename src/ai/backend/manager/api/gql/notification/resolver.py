@@ -10,7 +10,7 @@ from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.manager.api.gql.base import to_global_id
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.errors.auth import InvalidAuthParameters
 from ai.backend.manager.services.notification.actions import (
     CreateChannelAction,
@@ -127,8 +127,7 @@ async def notification_channels(
     nodes = [NotificationChannel.from_dataclass(data) for data in action_result.channels]
 
     edges = [
-        NotificationChannelEdge(node=node, cursor=to_global_id(NotificationChannel, node.id))
-        for node in nodes
+        NotificationChannelEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
     ]
 
     return NotificationChannelConnection(
@@ -184,10 +183,7 @@ async def notification_rules(
 
     nodes = [NotificationRule.from_dataclass(data) for data in action_result.rules]
 
-    edges = [
-        NotificationRuleEdge(node=node, cursor=to_global_id(NotificationRule, node.id))
-        for node in nodes
-    ]
+    edges = [NotificationRuleEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
 
     return NotificationRuleConnection(
         edges=edges,

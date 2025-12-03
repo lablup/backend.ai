@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from typing import Optional
 
+from ai.backend.manager.api.gql.base import decode_cursor
 from ai.backend.manager.errors.api import InvalidGraphQLParameters
 from ai.backend.manager.repositories.base import (
     CursorBackwardPagination,
+    CursorConditionFactory,
     CursorForwardPagination,
     OffsetPagination,
-    QueryCondition,
     QueryOrder,
     QueryPagination,
 )
@@ -28,14 +29,15 @@ class BaseGQLAdapter:
         before: Optional[str] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
-        cursor_condition: Optional[QueryCondition] = None,
+        forward_cursor_condition_factory: Optional[CursorConditionFactory] = None,
+        backward_cursor_condition_factory: Optional[CursorConditionFactory] = None,
         default_order: Optional[QueryOrder] = None,
     ) -> QueryPagination:
         """Build pagination from GraphQL pagination arguments.
 
-        For cursor-based pagination (first/after or last/before), cursor_condition
-        and default_order are required. These should be provided by the domain adapter
-        after decoding the cursor.
+        For cursor-based pagination (first/after or last/before), cursor condition factories
+        and default_order are required. The factories create cursor conditions from decoded
+        cursor values.
 
         If no pagination parameters are provided, returns a default OffsetPagination
         with limit=DEFAULT_PAGINATION_LIMIT.
@@ -59,10 +61,12 @@ class BaseGQLAdapter:
                 raise InvalidGraphQLParameters(f"first must be positive, got {first}")
             if after is None:
                 raise InvalidGraphQLParameters("after cursor is required when using first")
-            if cursor_condition is None or default_order is None:
+            if forward_cursor_condition_factory is None or default_order is None:
                 raise InvalidGraphQLParameters(
-                    "cursor_condition and default_order are required for cursor pagination"
+                    "forward_cursor_condition_factory and default_order are required for cursor pagination"
                 )
+            cursor_value = decode_cursor(after)
+            cursor_condition = forward_cursor_condition_factory(cursor_value)
             return CursorForwardPagination(
                 first=first,
                 cursor_condition=cursor_condition,
@@ -73,10 +77,12 @@ class BaseGQLAdapter:
                 raise InvalidGraphQLParameters(f"last must be positive, got {last}")
             if before is None:
                 raise InvalidGraphQLParameters("before cursor is required when using last")
-            if cursor_condition is None or default_order is None:
+            if backward_cursor_condition_factory is None or default_order is None:
                 raise InvalidGraphQLParameters(
-                    "cursor_condition and default_order are required for cursor pagination"
+                    "backward_cursor_condition_factory and default_order are required for cursor pagination"
                 )
+            cursor_value = decode_cursor(before)
+            cursor_condition = backward_cursor_condition_factory(cursor_value)
             return CursorBackwardPagination(
                 last=last,
                 cursor_condition=cursor_condition,

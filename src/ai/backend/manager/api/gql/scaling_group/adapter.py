@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 
 from ai.backend.manager.api.gql.adapter import BaseGQLAdapter
-from ai.backend.manager.api.gql.base import decode_cursor
+from ai.backend.manager.errors.api import InvalidGraphQLParameters
 from ai.backend.manager.repositories.base import (
     Querier,
     QueryCondition,
@@ -37,28 +37,26 @@ class ScalingGroupGQLAdapter(BaseGQLAdapter):
         offset: Optional[int] = None,
     ) -> Querier:
         """Build Querier from GraphQL filter, order_by, and pagination."""
+        # Cursor pagination and order_by are mutually exclusive
+        is_cursor_pagination = first is not None or last is not None
+        if is_cursor_pagination and order_by is not None:
+            raise InvalidGraphQLParameters(
+                "order_by cannot be used with cursor pagination (first/after, last/before)"
+            )
+
         conditions: list[QueryCondition] = []
         orders: list[QueryOrder] = []
 
         if filter:
             conditions.extend(filter.build_conditions())
 
+        # Apply client-specified order (only for offset pagination)
         if order_by:
             for order in order_by:
                 orders.append(order.to_query_order())
 
-        # Build cursor condition and default order for cursor-based pagination
-        cursor_condition: Optional[QueryCondition] = None
-        default_order: Optional[QueryOrder] = None
-
-        if after:
-            cursor_value = decode_cursor(after)
-            cursor_condition = ScalingGroupConditions.by_name_greater_than(cursor_value)
-            default_order = ScalingGroupOrders.name(ascending=True)
-        elif before:
-            cursor_value = decode_cursor(before)
-            cursor_condition = ScalingGroupConditions.by_name_less_than(cursor_value)
-            default_order = ScalingGroupOrders.name(ascending=False)
+        # Default order is created_at DESC (newest first) for cursor pagination
+        default_order: QueryOrder = ScalingGroupOrders.created_at(ascending=False)
 
         pagination = self.build_pagination(
             first,
@@ -67,7 +65,8 @@ class ScalingGroupGQLAdapter(BaseGQLAdapter):
             before,
             limit,
             offset,
-            cursor_condition=cursor_condition,
+            forward_cursor_condition_factory=ScalingGroupConditions.by_cursor_forward,
+            backward_cursor_condition_factory=ScalingGroupConditions.by_cursor_backward,
             default_order=default_order,
         )
 

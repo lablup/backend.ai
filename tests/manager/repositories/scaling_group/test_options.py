@@ -13,37 +13,37 @@ from ai.backend.manager.repositories.scaling_group.options import (
 class TestScalingGroupConditionsCursor:
     """Tests for cursor-related conditions in ScalingGroupConditions."""
 
-    def test_by_name_greater_than_returns_callable(self) -> None:
-        """Test that by_name_greater_than returns a callable QueryCondition."""
-        condition = ScalingGroupConditions.by_name_greater_than("test-name")
+    def test_by_cursor_forward_returns_callable(self) -> None:
+        """Test that by_cursor_forward returns a callable QueryCondition."""
+        condition = ScalingGroupConditions.by_cursor_forward("test-name")
         assert callable(condition)
 
-    def test_by_name_greater_than_returns_column_element(self) -> None:
-        """Test that by_name_greater_than() returns a SQLAlchemy ColumnElement."""
-        condition = ScalingGroupConditions.by_name_greater_than("cursor-value")
+    def test_by_cursor_forward_returns_column_element(self) -> None:
+        """Test that by_cursor_forward() returns a SQLAlchemy ColumnElement."""
+        condition = ScalingGroupConditions.by_cursor_forward("cursor-value")
         result = condition()
         # Result should be a SQLAlchemy expression
         assert isinstance(result, sa.sql.expression.ColumnElement)
 
-    def test_by_name_less_than_returns_callable(self) -> None:
-        """Test that by_name_less_than returns a callable QueryCondition."""
-        condition = ScalingGroupConditions.by_name_less_than("test-name")
+    def test_by_cursor_backward_returns_callable(self) -> None:
+        """Test that by_cursor_backward returns a callable QueryCondition."""
+        condition = ScalingGroupConditions.by_cursor_backward("test-name")
         assert callable(condition)
 
-    def test_by_name_less_than_returns_column_element(self) -> None:
-        """Test that by_name_less_than() returns a SQLAlchemy ColumnElement."""
-        condition = ScalingGroupConditions.by_name_less_than("cursor-value")
+    def test_by_cursor_backward_returns_column_element(self) -> None:
+        """Test that by_cursor_backward() returns a SQLAlchemy ColumnElement."""
+        condition = ScalingGroupConditions.by_cursor_backward("cursor-value")
         result = condition()
         # Result should be a SQLAlchemy expression
         assert isinstance(result, sa.sql.expression.ColumnElement)
 
-    def test_by_name_greater_than_uses_closure(self) -> None:
-        """Test that by_name_greater_than captures the value in closure."""
+    def test_by_cursor_forward_uses_closure(self) -> None:
+        """Test that by_cursor_forward captures the value in closure."""
         value1 = "value-a"
         value2 = "value-b"
 
-        condition1 = ScalingGroupConditions.by_name_greater_than(value1)
-        condition2 = ScalingGroupConditions.by_name_greater_than(value2)
+        condition1 = ScalingGroupConditions.by_cursor_forward(value1)
+        condition2 = ScalingGroupConditions.by_cursor_forward(value2)
 
         # Each condition should be independent (different closures)
         result1 = condition1()
@@ -54,13 +54,13 @@ class TestScalingGroupConditionsCursor:
             result2.compile(compile_kwargs={"literal_binds": True})
         )
 
-    def test_by_name_less_than_uses_closure(self) -> None:
-        """Test that by_name_less_than captures the value in closure."""
+    def test_by_cursor_backward_uses_closure(self) -> None:
+        """Test that by_cursor_backward captures the value in closure."""
         value1 = "value-a"
         value2 = "value-b"
 
-        condition1 = ScalingGroupConditions.by_name_less_than(value1)
-        condition2 = ScalingGroupConditions.by_name_less_than(value2)
+        condition1 = ScalingGroupConditions.by_cursor_backward(value1)
+        condition2 = ScalingGroupConditions.by_cursor_backward(value2)
 
         # Each condition should be independent (different closures)
         result1 = condition1()
