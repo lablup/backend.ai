@@ -1,18 +1,23 @@
+from __future__ import annotations
+
 import logging
 import os
 import pickle
 import time
+from collections.abc import MutableMapping
 from pathlib import Path
-from typing import override
+from typing import TYPE_CHECKING, override
 
+from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
 
-from ..types import KernelRegistryType
 from .abc import AbstractKernelRegistryWriter
 from .types import KernelRegistrySaveMetadata
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
+if TYPE_CHECKING:
+    from ai.backend.agent.kernel import AbstractKernel
 
 SAVE_COOL_DOWN_SECONDS = 60
 
@@ -24,7 +29,7 @@ class PickleBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
 
     @override
     async def save_kernel_registry(
-        self, data: KernelRegistryType, metadata: KernelRegistrySaveMetadata
+        self, data: MutableMapping[KernelId, AbstractKernel], metadata: KernelRegistrySaveMetadata
     ) -> None:
         now = time.monotonic()
         if (not metadata.force) and (now <= self._last_saved_time + SAVE_COOL_DOWN_SECONDS):

@@ -260,6 +260,7 @@ from .kernel import (
     KernelRegistry,
     match_distro_data,
 )
+from .kernel_registry.writer.types import KernelRegistrySaveMetadata
 from .observer.heartbeat import HeartbeatObserver
 from .observer.host_port import HostPortObserver
 from .observer.kernel_presence import KernelPresenceObserver
@@ -1162,6 +1163,18 @@ class AbstractAgent(
         if self.local_config.agent.advertised_rpc_addr:
             return self.local_config.agent.advertised_rpc_addr
         return self.local_config.agent.rpc_listen_addr
+
+    @abstractmethod
+    async def _load_kernel_registry_from_recovery(self) -> MutableMapping[KernelId, AbstractKernel]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def _write_kernel_registry_to_recovery(
+        self,
+        kernel_registry: MutableMapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+    ) -> None:
+        raise NotImplementedError
 
     async def _pre_anycast_event(self, event: AbstractEvent) -> None:
         if self.local_config.debug.log_heartbeats:
