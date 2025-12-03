@@ -111,6 +111,10 @@ from ..config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchTy
 from ..exception import ContainerCreationError, InvalidArgumentError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel, KernelRegistry
+from ..kernel_registry.container.creator import (
+    ContainerBasedKernelRegistryCreatorArgs,
+    ContainerBasedLoaderWriterCreator,
+)
 from ..kernel_registry.pickle.creator import (
     PickleBasedKernelRegistryCreatorArgs,
     PickleBasedLoaderWriterCreator,
@@ -1408,11 +1412,18 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 local_instance_id=self.local_instance_id,
             ),
         )
-        pickle_loader = pickle_loader_writer_creator.create_loader()
         pickle_writer = pickle_loader_writer_creator.create_writer()
+        container_loader_writer_creator = ContainerBasedLoaderWriterCreator(
+            ContainerBasedKernelRegistryCreatorArgs(
+                scratch_root=local_config.container.scratch_root,
+                agent=self,
+            )
+        )
+        container_loader = container_loader_writer_creator.create_loader()
+        container_writer = container_loader_writer_creator.create_writer()
         self._kernel_recovery = DockerKernelRegistryRecovery(
-            loader=pickle_loader,
-            writers=[pickle_writer],
+            loader=container_loader,
+            writers=[pickle_writer, container_writer],
         )
 
     async def __ainit__(self) -> None:
