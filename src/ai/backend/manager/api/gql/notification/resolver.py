@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from functools import lru_cache
 from typing import Optional
 
 import strawberry
@@ -10,8 +11,15 @@ from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.manager.api.gql.adapter import CursorPaginationFactories, PaginationOptions
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.errors.auth import InvalidAuthParameters
+from ai.backend.manager.repositories.notification.options import (
+    NotificationChannelConditions,
+    NotificationChannelOrders,
+    NotificationRuleConditions,
+    NotificationRuleOrders,
+)
 from ai.backend.manager.services.notification.actions import (
     CreateChannelAction,
     CreateRuleAction,
@@ -53,6 +61,29 @@ from .types import (
     ValidateNotificationRuleInput,
     ValidateNotificationRulePayload,
 )
+
+# Cursor pagination factories
+
+
+@lru_cache(maxsize=1)
+def _get_channel_cursor_factories() -> CursorPaginationFactories:
+    return CursorPaginationFactories(
+        forward_cursor_order=NotificationChannelOrders.created_at(ascending=False),
+        backward_cursor_order=NotificationChannelOrders.created_at(ascending=True),
+        forward_cursor_condition_factory=NotificationChannelConditions.by_cursor_forward,
+        backward_cursor_condition_factory=NotificationChannelConditions.by_cursor_backward,
+    )
+
+
+@lru_cache(maxsize=1)
+def _get_rule_cursor_factories() -> CursorPaginationFactories:
+    return CursorPaginationFactories(
+        forward_cursor_order=NotificationRuleOrders.created_at(ascending=False),
+        backward_cursor_order=NotificationRuleOrders.created_at(ascending=True),
+        forward_cursor_condition_factory=NotificationRuleConditions.by_cursor_forward,
+        backward_cursor_condition_factory=NotificationRuleConditions.by_cursor_backward,
+    )
+
 
 # Connection types
 
@@ -98,7 +129,7 @@ async def notification_channel(
 async def notification_channels(
     info: Info[StrawberryGQLContext],
     filter: Optional[NotificationChannelFilter] = None,
-    order_by: Optional[NotificationChannelOrderBy] = None,
+    order_by: Optional[list[NotificationChannelOrderBy]] = None,
     before: Optional[str] = None,
     after: Optional[str] = None,
     first: Optional[int] = None,
@@ -109,15 +140,18 @@ async def notification_channels(
     processors = info.context.processors
 
     # Build querier from filter, order_by, and pagination using adapter
-    querier = info.context.gql_adapters.notification_channel.build_querier(
+    querier = info.context.gql_adapter.build_querier(
+        PaginationOptions(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        _get_channel_cursor_factories(),
         filter=filter,
         order_by=order_by,
-        first=first,
-        after=after,
-        last=last,
-        before=before,
-        limit=limit,
-        offset=offset,
     )
 
     action_result = await processors.notification.search_channels.wait_for_complete(
@@ -155,7 +189,7 @@ async def notification_rule(id: ID, info: Info[StrawberryGQLContext]) -> Optiona
 async def notification_rules(
     info: Info[StrawberryGQLContext],
     filter: Optional[NotificationRuleFilter] = None,
-    order_by: Optional[NotificationRuleOrderBy] = None,
+    order_by: Optional[list[NotificationRuleOrderBy]] = None,
     before: Optional[str] = None,
     after: Optional[str] = None,
     first: Optional[int] = None,
@@ -166,15 +200,18 @@ async def notification_rules(
     processors = info.context.processors
 
     # Build querier from filter, order_by, and pagination using adapter
-    querier = info.context.gql_adapters.notification_rule.build_querier(
+    querier = info.context.gql_adapter.build_querier(
+        PaginationOptions(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        _get_rule_cursor_factories(),
         filter=filter,
         order_by=order_by,
-        first=first,
-        after=after,
-        last=last,
-        before=before,
-        limit=limit,
-        offset=offset,
     )
 
     action_result = await processors.notification.search_rules.wait_for_complete(

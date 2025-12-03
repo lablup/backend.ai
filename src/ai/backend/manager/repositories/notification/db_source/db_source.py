@@ -220,10 +220,7 @@ class NotificationDBSource:
     ) -> NotificationChannelListResult:
         """Searches notification channels with total count."""
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(
-                NotificationChannelRow,
-                sa.func.count().over().label("total_count"),
-            )
+            query = sa.select(NotificationChannelRow)
 
             result = await execute_querier(
                 db_sess,
@@ -246,10 +243,9 @@ class NotificationDBSource:
     ) -> NotificationRuleListResult:
         """Searches notification rules with total count."""
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(
-                NotificationRuleRow,
-                sa.func.count().over().label("total_count"),
-            ).options(selectinload(NotificationRuleRow.channel))
+            query = sa.select(NotificationRuleRow).options(
+                selectinload(NotificationRuleRow.channel)
+            )
 
             result = await execute_querier(
                 db_sess,

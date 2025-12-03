@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Optional, Self
+from typing import Optional, Self, override
 
 import strawberry
 from strawberry.relay import Node, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupData,
@@ -349,7 +350,7 @@ class ScalingGroupOrderFieldGQL(StrEnum):
     name="ScalingGroupFilter",
     description="Added in 25.18.0. Filter for scaling groups",
 )
-class ScalingGroupFilterGQL:
+class ScalingGroupFilterGQL(GQLFilter):
     name: Optional[StringFilter] = None
     description: Optional[StringFilter] = None
     is_active: Optional[bool] = None
@@ -362,6 +363,7 @@ class ScalingGroupFilterGQL:
     OR: Optional[list["ScalingGroupFilterGQL"]] = None
     NOT: Optional[list["ScalingGroupFilterGQL"]] = None
 
+    @override
     def build_conditions(self) -> list[QueryCondition]:
         """Build query conditions from this filter.
 
@@ -439,10 +441,11 @@ class ScalingGroupFilterGQL:
     name="ScalingGroupOrderBy",
     description="Added in 25.18.0. Order by specification for scaling groups",
 )
-class ScalingGroupOrderByGQL:
+class ScalingGroupOrderByGQL(GQLOrderBy):
     field: ScalingGroupOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
 
+    @override
     def to_query_order(self) -> QueryOrder:
         """Convert to repository QueryOrder."""
         ascending = self.direction == OrderDirection.ASC

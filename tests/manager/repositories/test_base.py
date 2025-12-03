@@ -89,20 +89,20 @@ class TestCursorForwardPagination:
         return mock
 
     @pytest.fixture
-    def mock_default_order(self) -> Any:
-        """Create a mock default order."""
+    def mock_cursor_order(self) -> Any:
+        """Create a mock cursor order."""
         return MagicMock(spec=sa.sql.ClauseElement)
 
     def test_apply(
         self,
         mock_cursor_condition: MagicMock,
-        mock_default_order: Any,
+        mock_cursor_order: Any,
     ) -> None:
-        """Test that apply() applies cursor_condition, default_order, and limit+1."""
+        """Test that apply() applies cursor_condition, cursor_order, and limit+1."""
         pagination = CursorForwardPagination(
             first=10,
             cursor_condition=mock_cursor_condition,
-            default_order=mock_default_order,
+            cursor_order=mock_cursor_order,
         )
 
         mock_query = MagicMock()
@@ -116,8 +116,8 @@ class TestCursorForwardPagination:
         mock_cursor_condition.assert_called_once()
         # where should be called with the result of cursor_condition
         mock_query.where.assert_called_once()
-        # order_by should be called with default_order
-        mock_query.order_by.assert_called_once_with(mock_default_order)
+        # order_by should be called with cursor_order
+        mock_query.order_by.assert_called_once_with(mock_cursor_order)
         # limit should be first + 1 (for has_next_page detection)
         mock_query.limit.assert_called_once_with(11)
         assert result is mock_query
@@ -125,13 +125,13 @@ class TestCursorForwardPagination:
     def test_compute_page_info_has_next(
         self,
         mock_cursor_condition: MagicMock,
-        mock_default_order: Any,
+        mock_cursor_order: Any,
     ) -> None:
         """Test page info when there are more pages (rows > first)."""
         pagination = CursorForwardPagination(
             first=10,
             cursor_condition=mock_cursor_condition,
-            default_order=mock_default_order,
+            cursor_order=mock_cursor_order,
         )
         # 11 rows returned means there's a next page
         rows = [MagicMock() for _ in range(11)]
@@ -146,13 +146,13 @@ class TestCursorForwardPagination:
     def test_compute_page_info_no_next(
         self,
         mock_cursor_condition: MagicMock,
-        mock_default_order: Any,
+        mock_cursor_order: Any,
     ) -> None:
         """Test page info when there are no more pages (rows <= first)."""
         pagination = CursorForwardPagination(
             first=10,
             cursor_condition=mock_cursor_condition,
-            default_order=mock_default_order,
+            cursor_order=mock_cursor_order,
         )
         # Exactly 10 rows means no next page
         rows = [MagicMock() for _ in range(10)]
@@ -166,13 +166,13 @@ class TestCursorForwardPagination:
     def test_compute_page_info_always_has_previous(
         self,
         mock_cursor_condition: MagicMock,
-        mock_default_order: Any,
+        mock_cursor_order: Any,
     ) -> None:
         """Test that cursor-based pagination always indicates has_previous_page=True."""
         pagination = CursorForwardPagination(
             first=10,
             cursor_condition=mock_cursor_condition,
-            default_order=mock_default_order,
+            cursor_order=mock_cursor_order,
         )
         rows = [MagicMock() for _ in range(5)]
 
@@ -193,20 +193,20 @@ class TestCursorBackwardPagination:
         return mock
 
     @pytest.fixture
-    def mock_default_order(self) -> Any:
-        """Create a mock default order."""
+    def mock_cursor_order(self) -> Any:
+        """Create a mock cursor order."""
         return MagicMock(spec=sa.sql.ClauseElement)
 
     def test_apply(
         self,
         mock_cursor_condition: MagicMock,
-        mock_default_order: Any,
+        mock_cursor_order: Any,
     ) -> None:
-        """Test that apply() applies cursor_condition, default_order, and limit+1."""
+        """Test that apply() applies cursor_condition, cursor_order, and limit+1."""
         pagination = CursorBackwardPagination(
             last=10,
             cursor_condition=mock_cursor_condition,
-            default_order=mock_default_order,
+            cursor_order=mock_cursor_order,
         )
 
         mock_query = MagicMock()
@@ -220,8 +220,8 @@ class TestCursorBackwardPagination:
         mock_cursor_condition.assert_called_once()
         # where should be called with the result of cursor_condition
         mock_query.where.assert_called_once()
-        # order_by should be called with default_order
-        mock_query.order_by.assert_called_once_with(mock_default_order)
+        # order_by should be called with cursor_order
+        mock_query.order_by.assert_called_once_with(mock_cursor_order)
         # limit should be last + 1 (for has_previous_page detection)
         mock_query.limit.assert_called_once_with(11)
         assert result is mock_query
@@ -229,13 +229,13 @@ class TestCursorBackwardPagination:
     def test_compute_page_info_has_previous(
         self,
         mock_cursor_condition: MagicMock,
-        mock_default_order: Any,
+        mock_cursor_order: Any,
     ) -> None:
         """Test page info when there are more pages before (rows > last)."""
         pagination = CursorBackwardPagination(
             last=10,
             cursor_condition=mock_cursor_condition,
-            default_order=mock_default_order,
+            cursor_order=mock_cursor_order,
         )
         # 11 rows returned means there's a previous page
         rows = [MagicMock() for _ in range(11)]
@@ -250,13 +250,13 @@ class TestCursorBackwardPagination:
     def test_compute_page_info_no_previous(
         self,
         mock_cursor_condition: MagicMock,
-        mock_default_order: Any,
+        mock_cursor_order: Any,
     ) -> None:
         """Test page info when there are no more pages before (rows <= last)."""
         pagination = CursorBackwardPagination(
             last=10,
             cursor_condition=mock_cursor_condition,
-            default_order=mock_default_order,
+            cursor_order=mock_cursor_order,
         )
         # Exactly 10 rows means no previous page
         rows = [MagicMock() for _ in range(10)]
@@ -270,13 +270,13 @@ class TestCursorBackwardPagination:
     def test_compute_page_info_always_has_next(
         self,
         mock_cursor_condition: MagicMock,
-        mock_default_order: Any,
+        mock_cursor_order: Any,
     ) -> None:
         """Test that backward cursor pagination always indicates has_next_page=True."""
         pagination = CursorBackwardPagination(
             last=10,
             cursor_condition=mock_cursor_condition,
-            default_order=mock_default_order,
+            cursor_order=mock_cursor_order,
         )
         rows = [MagicMock() for _ in range(5)]
 

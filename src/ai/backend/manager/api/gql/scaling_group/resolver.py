@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Optional
 
 import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge
 
+from ai.backend.manager.api.gql.adapter import CursorPaginationFactories, PaginationOptions
 from ai.backend.manager.api.gql.base import encode_cursor
-from ai.backend.manager.repositories.scaling_group.options import ScalingGroupConditions
+from ai.backend.manager.repositories.scaling_group.options import (
+    ScalingGroupConditions,
+    ScalingGroupOrders,
+)
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
 )
@@ -20,6 +25,19 @@ from .types import (
     ScalingGroupOrderByGQL,
     ScalingGroupV2GQL,
 )
+
+# Cursor pagination factories
+
+
+@lru_cache(maxsize=1)
+def _get_scaling_group_cursor_factories() -> CursorPaginationFactories:
+    return CursorPaginationFactories(
+        forward_cursor_order=ScalingGroupOrders.created_at(ascending=False),
+        backward_cursor_order=ScalingGroupOrders.created_at(ascending=True),
+        forward_cursor_condition_factory=ScalingGroupConditions.by_cursor_forward,
+        backward_cursor_condition_factory=ScalingGroupConditions.by_cursor_backward,
+    )
+
 
 # Connection types
 
@@ -54,15 +72,18 @@ async def scaling_groups_v2(
     processors = info.context.processors
 
     # Build querier from filter, order_by, and pagination using adapter
-    querier = info.context.gql_adapters.scaling_group.build_querier(
+    querier = info.context.gql_adapter.build_querier(
+        PaginationOptions(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        _get_scaling_group_cursor_factories(),
         filter=filter,
         order_by=order_by,
-        first=first,
-        after=after,
-        last=last,
-        before=before,
-        limit=limit,
-        offset=offset,
     )
 
     # Apply project filtering as a required condition
@@ -104,15 +125,18 @@ async def all_scaling_groups_v2(
     processors = info.context.processors
 
     # Build querier from filter, order_by, and pagination using adapter
-    querier = info.context.gql_adapters.scaling_group.build_querier(
+    querier = info.context.gql_adapter.build_querier(
+        PaginationOptions(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        _get_scaling_group_cursor_factories(),
         filter=filter,
         order_by=order_by,
-        first=first,
-        after=after,
-        last=last,
-        before=before,
-        limit=limit,
-        offset=offset,
     )
 
     action_result = await processors.scaling_group.search_scaling_groups.wait_for_complete(

@@ -5,23 +5,49 @@ Tests conversion from GraphQL filter objects to repository Querier objects.
 
 from __future__ import annotations
 
+from ai.backend.manager.api.gql.adapter import (
+    BaseGQLAdapter,
+    CursorPaginationFactories,
+    PaginationOptions,
+)
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
-from ai.backend.manager.api.gql.scaling_group.adapter import ScalingGroupGQLAdapter
 from ai.backend.manager.api.gql.scaling_group.types import (
     ScalingGroupFilterGQL,
     ScalingGroupOrderByGQL,
     ScalingGroupOrderFieldGQL,
 )
 from ai.backend.manager.repositories.base import OffsetPagination
+from ai.backend.manager.repositories.scaling_group.options import (
+    ScalingGroupConditions,
+    ScalingGroupOrders,
+)
 
 
-class TestScalingGroupGQLAdapter:
-    """Test cases for ScalingGroupGQLAdapter"""
+def _get_cursor_factories() -> CursorPaginationFactories:
+    """Create cursor pagination factories for scaling groups.
+
+    For typical "newest first" lists:
+    - Forward (first/after): DESC order, shows newer items first, next page shows older items
+    - Backward (last/before): ASC order, fetches older items first (reversed for display)
+    """
+    return CursorPaginationFactories(
+        forward_cursor_order=ScalingGroupOrders.created_at(ascending=False),
+        backward_cursor_order=ScalingGroupOrders.created_at(ascending=True),
+        forward_cursor_condition_factory=ScalingGroupConditions.by_cursor_forward,
+        backward_cursor_condition_factory=ScalingGroupConditions.by_cursor_backward,
+    )
+
+
+class TestBaseGQLAdapter:
+    """Test cases for BaseGQLAdapter with scaling group types"""
 
     def test_empty_querier(self) -> None:
         """Test building querier with no filters, orders, or pagination returns default pagination"""
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier()
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+        )
 
         assert len(querier.conditions) == 0
         assert len(querier.orders) == 0
@@ -34,8 +60,12 @@ class TestScalingGroupGQLAdapter:
         filter_obj = ScalingGroupFilterGQL(
             name=StringFilter(equals="default"),
         )
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         assert len(querier.conditions) == 1
         # Verify condition is callable and returns ColumnElement
@@ -47,8 +77,12 @@ class TestScalingGroupGQLAdapter:
         filter_obj = ScalingGroupFilterGQL(
             name=StringFilter(i_equals="default"),
         )
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         assert len(querier.conditions) == 1
         condition_result = querier.conditions[0]()
@@ -59,8 +93,12 @@ class TestScalingGroupGQLAdapter:
         filter_obj = ScalingGroupFilterGQL(
             name=StringFilter(contains="def"),
         )
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         assert len(querier.conditions) == 1
         condition_result = querier.conditions[0]()
@@ -71,8 +109,12 @@ class TestScalingGroupGQLAdapter:
         filter_obj = ScalingGroupFilterGQL(
             name=StringFilter(i_contains="def"),
         )
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         assert len(querier.conditions) == 1
         condition_result = querier.conditions[0]()
@@ -83,8 +125,12 @@ class TestScalingGroupGQLAdapter:
         filter_obj = ScalingGroupFilterGQL(
             description=StringFilter(equals="Test Description"),
         )
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         assert len(querier.conditions) == 1
         condition_result = querier.conditions[0]()
@@ -95,8 +141,12 @@ class TestScalingGroupGQLAdapter:
         filter_obj = ScalingGroupFilterGQL(
             description=StringFilter(i_equals="test description"),
         )
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         assert len(querier.conditions) == 1
         condition_result = querier.conditions[0]()
@@ -107,8 +157,12 @@ class TestScalingGroupGQLAdapter:
         filter_obj = ScalingGroupFilterGQL(
             description=StringFilter(contains="Test"),
         )
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         assert len(querier.conditions) == 1
         condition_result = querier.conditions[0]()
@@ -119,8 +173,12 @@ class TestScalingGroupGQLAdapter:
         filter_obj = ScalingGroupFilterGQL(
             description=StringFilter(i_contains="test"),
         )
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         assert len(querier.conditions) == 1
         condition_result = querier.conditions[0]()
@@ -129,8 +187,12 @@ class TestScalingGroupGQLAdapter:
     def test_is_active_filter_true(self) -> None:
         """Test is_active filter (True)"""
         filter_obj = ScalingGroupFilterGQL(is_active=True)
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         assert len(querier.conditions) == 1
         condition_result = querier.conditions[0]()
@@ -139,8 +201,12 @@ class TestScalingGroupGQLAdapter:
     def test_is_active_filter_false(self) -> None:
         """Test is_active filter (False)"""
         filter_obj = ScalingGroupFilterGQL(is_active=False)
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         assert len(querier.conditions) == 1
         condition_result = querier.conditions[0]()
@@ -149,8 +215,12 @@ class TestScalingGroupGQLAdapter:
     def test_is_public_filter_true(self) -> None:
         """Test is_public filter (True)"""
         filter_obj = ScalingGroupFilterGQL(is_public=True)
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         assert len(querier.conditions) == 1
         condition_result = querier.conditions[0]()
@@ -159,8 +229,12 @@ class TestScalingGroupGQLAdapter:
     def test_is_public_filter_false(self) -> None:
         """Test is_public filter (False)"""
         filter_obj = ScalingGroupFilterGQL(is_public=False)
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         assert len(querier.conditions) == 1
         condition_result = querier.conditions[0]()
@@ -169,8 +243,12 @@ class TestScalingGroupGQLAdapter:
     def test_driver_filter(self) -> None:
         """Test driver filter"""
         filter_obj = ScalingGroupFilterGQL(driver="static")
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         assert len(querier.conditions) == 1
         condition_result = querier.conditions[0]()
@@ -179,8 +257,12 @@ class TestScalingGroupGQLAdapter:
     def test_scheduler_filter(self) -> None:
         """Test scheduler filter"""
         filter_obj = ScalingGroupFilterGQL(scheduler="fifo")
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         assert len(querier.conditions) == 1
         condition_result = querier.conditions[0]()
@@ -189,8 +271,12 @@ class TestScalingGroupGQLAdapter:
     def test_use_host_network_filter_true(self) -> None:
         """Test use_host_network filter (True)"""
         filter_obj = ScalingGroupFilterGQL(use_host_network=True)
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         assert len(querier.conditions) == 1
         condition_result = querier.conditions[0]()
@@ -199,8 +285,12 @@ class TestScalingGroupGQLAdapter:
     def test_use_host_network_filter_false(self) -> None:
         """Test use_host_network filter (False)"""
         filter_obj = ScalingGroupFilterGQL(use_host_network=False)
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         assert len(querier.conditions) == 1
         condition_result = querier.conditions[0]()
@@ -214,8 +304,12 @@ class TestScalingGroupGQLAdapter:
             is_public=True,
             driver="static",
         )
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         # Should have 4 conditions
         assert len(querier.conditions) == 4
@@ -231,8 +325,12 @@ class TestScalingGroupGQLAdapter:
                 ScalingGroupFilterGQL(driver="static"),
             ],
         )
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         # Should have 3 conditions (name + 2 AND conditions)
         assert len(querier.conditions) == 3
@@ -247,8 +345,12 @@ class TestScalingGroupGQLAdapter:
                 ScalingGroupFilterGQL(name=StringFilter(equals="custom")),
             ],
         )
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         # Should have 1 combined OR condition
         assert len(querier.conditions) == 1
@@ -262,8 +364,12 @@ class TestScalingGroupGQLAdapter:
                 ScalingGroupFilterGQL(is_active=False),
             ],
         )
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         # Should have 1 negated condition
         assert len(querier.conditions) == 1
@@ -285,8 +391,12 @@ class TestScalingGroupGQLAdapter:
                 ScalingGroupFilterGQL(is_public=False),
             ],
         )
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(filter=filter_obj)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            _get_cursor_factories(),
+            filter=filter_obj,
+        )
 
         # Should have 4 conditions: name + AND + OR (combined) + NOT (negated)
         assert len(querier.conditions) == 4
@@ -301,8 +411,12 @@ class TestScalingGroupGQLAdapter:
                 direction=OrderDirection.ASC,
             )
         ]
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(order_by=order_by)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(limit=10),
+            _get_cursor_factories(),
+            order_by=order_by,
+        )
 
         assert len(querier.orders) == 1
         assert querier.orders[0] is not None
@@ -315,8 +429,12 @@ class TestScalingGroupGQLAdapter:
                 direction=OrderDirection.DESC,
             )
         ]
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(order_by=order_by)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(limit=10),
+            _get_cursor_factories(),
+            order_by=order_by,
+        )
 
         assert len(querier.orders) == 1
         assert querier.orders[0] is not None
@@ -329,8 +447,12 @@ class TestScalingGroupGQLAdapter:
                 direction=OrderDirection.ASC,
             )
         ]
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(order_by=order_by)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(limit=10),
+            _get_cursor_factories(),
+            order_by=order_by,
+        )
 
         assert len(querier.orders) == 1
         assert querier.orders[0] is not None
@@ -343,8 +465,12 @@ class TestScalingGroupGQLAdapter:
                 direction=OrderDirection.DESC,
             )
         ]
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(order_by=order_by)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(limit=10),
+            _get_cursor_factories(),
+            order_by=order_by,
+        )
 
         assert len(querier.orders) == 1
         assert querier.orders[0] is not None
@@ -357,8 +483,12 @@ class TestScalingGroupGQLAdapter:
                 direction=OrderDirection.ASC,
             )
         ]
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(order_by=order_by)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(limit=10),
+            _get_cursor_factories(),
+            order_by=order_by,
+        )
 
         assert len(querier.orders) == 1
         assert querier.orders[0] is not None
@@ -371,8 +501,12 @@ class TestScalingGroupGQLAdapter:
                 direction=OrderDirection.DESC,
             )
         ]
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(order_by=order_by)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(limit=10),
+            _get_cursor_factories(),
+            order_by=order_by,
+        )
 
         assert len(querier.orders) == 1
         assert querier.orders[0] is not None
@@ -385,8 +519,12 @@ class TestScalingGroupGQLAdapter:
                 direction=OrderDirection.ASC,
             )
         ]
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(order_by=order_by)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(limit=10),
+            _get_cursor_factories(),
+            order_by=order_by,
+        )
 
         assert len(querier.orders) == 1
         assert querier.orders[0] is not None
@@ -399,8 +537,12 @@ class TestScalingGroupGQLAdapter:
                 direction=OrderDirection.DESC,
             )
         ]
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(order_by=order_by)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(limit=10),
+            _get_cursor_factories(),
+            order_by=order_by,
+        )
 
         assert len(querier.orders) == 1
         assert querier.orders[0] is not None
@@ -417,8 +559,12 @@ class TestScalingGroupGQLAdapter:
                 direction=OrderDirection.ASC,
             ),
         ]
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(order_by=order_by)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(limit=10),
+            _get_cursor_factories(),
+            order_by=order_by,
+        )
 
         assert len(querier.orders) == 2
         assert querier.orders[0] is not None
@@ -426,8 +572,11 @@ class TestScalingGroupGQLAdapter:
 
     def test_pagination_limit_offset(self) -> None:
         """Test pagination with limit and offset"""
-        adapter = ScalingGroupGQLAdapter()
-        querier = adapter.build_querier(limit=10, offset=5)
+        adapter = BaseGQLAdapter()
+        querier = adapter.build_querier(
+            PaginationOptions(limit=10, offset=5),
+            _get_cursor_factories(),
+        )
 
         assert querier.pagination is not None
         assert isinstance(querier.pagination, OffsetPagination)
@@ -446,12 +595,12 @@ class TestScalingGroupGQLAdapter:
                 direction=OrderDirection.ASC,
             )
         ]
-        adapter = ScalingGroupGQLAdapter()
+        adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
+            PaginationOptions(limit=20, offset=10),
+            _get_cursor_factories(),
             filter=filter_obj,
             order_by=order_by,
-            limit=20,
-            offset=10,
         )
 
         assert len(querier.conditions) == 2

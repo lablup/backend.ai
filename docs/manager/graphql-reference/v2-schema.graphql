@@ -2041,13 +2041,13 @@ type Query {
   notificationChannel(id: ID!): NotificationChannel
 
   """List notification channels"""
-  notificationChannels(filter: NotificationChannelFilter = null, orderBy: NotificationChannelOrderBy = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationChannelConnection!
+  notificationChannels(filter: NotificationChannelFilter = null, orderBy: [NotificationChannelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationChannelConnection!
 
   """Get a notification rule by ID"""
   notificationRule(id: ID!): NotificationRule
 
   """List notification rules"""
-  notificationRules(filter: NotificationRuleFilter = null, orderBy: NotificationRuleOrderBy = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection!
+  notificationRules(filter: NotificationRuleFilter = null, orderBy: [NotificationRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection!
 
   """List available notification rule types"""
   notificationRuleTypes: [NotificationRuleType!]!
