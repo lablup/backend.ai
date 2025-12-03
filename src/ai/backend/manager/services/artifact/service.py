@@ -343,24 +343,33 @@ class ArtifactService:
         return GetArtifactActionResult(result=artifact)
 
     async def list(self, action: ListArtifactsAction) -> ListArtifactsActionResult:
-        artifacts_data, total_count = await self._artifact_repository.list_artifacts_paginated(
-            pagination=action.pagination,
-            ordering=action.ordering,
-            filters=action.filters,
+        artifacts_data, total_count = await self._artifact_repository.search_artifacts(
+            querier=action.querier,
         )
         return ListArtifactsActionResult(data=artifacts_data, total_count=total_count)
 
     async def list_with_revisions(
         self, action: ListArtifactsWithRevisionsAction
     ) -> ListArtifactsWithRevisionsActionResult:
-        (
-            artifacts_data,
-            total_count,
-        ) = await self._artifact_repository.list_artifacts_with_revisions_paginated(
-            pagination=action.pagination,
-            ordering=action.ordering,
-            filters=action.filters,
-        )
+        # Support both new Querier pattern (for GraphQL) and old style (for REST API)
+        if action.querier is not None:
+            # New Querier pattern (GraphQL)
+            (
+                artifacts_data,
+                total_count,
+            ) = await self._artifact_repository.search_artifacts_with_revisions(
+                querier=action.querier,
+            )
+        else:
+            # Old-style (REST API compatibility)
+            (
+                artifacts_data,
+                total_count,
+            ) = await self._artifact_repository.list_artifacts_with_revisions_paginated(
+                pagination=action.pagination,
+                ordering=action.ordering,
+                filters=action.filters,
+            )
         return ListArtifactsWithRevisionsActionResult(data=artifacts_data, total_count=total_count)
 
     async def get_revisions(
