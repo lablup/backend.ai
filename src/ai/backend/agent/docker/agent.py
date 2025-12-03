@@ -115,6 +115,7 @@ from ..kernel_registry.container.creator import (
     ContainerBasedKernelRegistryCreatorArgs,
     ContainerBasedLoaderWriterCreator,
 )
+from ..kernel_registry.adapter import KernelRecoveryDataAdapter, KernelRecoveryDataAdapterTarget
 from ..kernel_registry.pickle.creator import (
     PickleBasedKernelRegistryCreatorArgs,
     PickleBasedLoaderWriterCreator,
@@ -1426,6 +1427,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             loader=pickle_loader,
             writers=[pickle_writer, container_writer],
         )
+        self._kernel_recovery_adapter = KernelRecoveryDataAdapter(
+            pickle_loader,
+            [KernelRecoveryDataAdapterTarget(pickle_loader, pickle_writer)],
+        )
 
     async def __ainit__(self) -> None:
         async with closing_async(Docker()) as docker:
@@ -1512,6 +1517,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             allowlist=self.local_config.agent.allow_network_plugins,
             blocklist=self.local_config.agent.block_network_plugins,
         )
+        await self._kernel_recovery_adapter.adapt_recovery_data()
 
     async def shutdown(self, stop_signal: signal.Signals):
         # Stop handling agent sock.
