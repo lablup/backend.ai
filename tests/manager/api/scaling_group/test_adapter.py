@@ -24,10 +24,15 @@ from ai.backend.manager.repositories.scaling_group.options import (
 
 
 def _get_cursor_factories() -> CursorPaginationFactories:
-    """Create cursor pagination factories for scaling groups."""
+    """Create cursor pagination factories for scaling groups.
+
+    For typical "newest first" lists:
+    - Forward (first/after): DESC order, shows newer items first, next page shows older items
+    - Backward (last/before): ASC order, fetches older items first (reversed for display)
+    """
     return CursorPaginationFactories(
-        forward_cursor_order=ScalingGroupOrders.created_at(ascending=True),
-        backward_cursor_order=ScalingGroupOrders.created_at(ascending=False),
+        forward_cursor_order=ScalingGroupOrders.created_at(ascending=False),
+        backward_cursor_order=ScalingGroupOrders.created_at(ascending=True),
         forward_cursor_condition_factory=ScalingGroupConditions.by_cursor_forward,
         backward_cursor_condition_factory=ScalingGroupConditions.by_cursor_backward,
     )

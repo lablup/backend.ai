@@ -68,8 +68,8 @@ from .types import (
 @lru_cache(maxsize=1)
 def _get_channel_cursor_factories() -> CursorPaginationFactories:
     return CursorPaginationFactories(
-        forward_cursor_order=NotificationChannelOrders.created_at(ascending=True),
-        backward_cursor_order=NotificationChannelOrders.created_at(ascending=False),
+        forward_cursor_order=NotificationChannelOrders.created_at(ascending=False),
+        backward_cursor_order=NotificationChannelOrders.created_at(ascending=True),
         forward_cursor_condition_factory=NotificationChannelConditions.by_cursor_forward,
         backward_cursor_condition_factory=NotificationChannelConditions.by_cursor_backward,
     )
@@ -78,8 +78,8 @@ def _get_channel_cursor_factories() -> CursorPaginationFactories:
 @lru_cache(maxsize=1)
 def _get_rule_cursor_factories() -> CursorPaginationFactories:
     return CursorPaginationFactories(
-        forward_cursor_order=NotificationRuleOrders.created_at(ascending=True),
-        backward_cursor_order=NotificationRuleOrders.created_at(ascending=False),
+        forward_cursor_order=NotificationRuleOrders.created_at(ascending=False),
+        backward_cursor_order=NotificationRuleOrders.created_at(ascending=True),
         forward_cursor_condition_factory=NotificationRuleConditions.by_cursor_forward,
         backward_cursor_condition_factory=NotificationRuleConditions.by_cursor_backward,
     )

@@ -40,20 +40,22 @@ class CursorPaginationFactories:
     """Factories for cursor-based pagination.
 
     Contains domain-specific factories needed for cursor-based pagination.
-    Forward uses ASC order, backward uses DESC order.
+    For typical "newest first" lists:
+    - Forward (first/after): DESC order, shows newer items first, next page shows older items
+    - Backward (last/before): ASC order, fetches older items first (reversed for display)
     """
 
     forward_cursor_order: QueryOrder
-    """Order for forward pagination (e.g., created_at ASC)."""
+    """Order for forward pagination (e.g., created_at DESC for newest first)."""
 
     backward_cursor_order: QueryOrder
-    """Order for backward pagination (e.g., created_at DESC)."""
+    """Order for backward pagination (e.g., created_at ASC, results reversed for display)."""
 
     forward_cursor_condition_factory: CursorConditionFactory
-    """Factory that creates cursor condition for forward pagination (e.g., created_at > cursor)."""
+    """Factory that creates cursor condition for forward pagination (e.g., created_at < cursor)."""
 
     backward_cursor_condition_factory: CursorConditionFactory
-    """Factory that creates cursor condition for backward pagination (e.g., created_at < cursor)."""
+    """Factory that creates cursor condition for backward pagination (e.g., created_at > cursor)."""
 
 
 class BaseGQLAdapter:
