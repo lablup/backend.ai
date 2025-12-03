@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
@@ -33,7 +33,7 @@ class ScalingGroupDBSource:
 
     async def search_scaling_groups(
         self,
-        querier: Optional[Querier] = None,
+        querier: Querier,
     ) -> ScalingGroupListResult:
         """Searches scaling groups with total count."""
         async with self._db.begin_readonly_session() as db_sess:
@@ -53,4 +53,6 @@ class ScalingGroupDBSource:
             return ScalingGroupListResult(
                 items=items,
                 total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
             )

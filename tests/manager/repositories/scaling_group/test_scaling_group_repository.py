@@ -114,7 +114,12 @@ class TestScalingGroupRepositoryDB:
         sample_scaling_groups_small: list[str],
     ) -> None:
         """Test searching all scaling groups without filters"""
-        result = await scaling_group_repository.search_scaling_groups()
+        querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        result = await scaling_group_repository.search_scaling_groups(querier=querier)
 
         # Should have exactly 5 test scaling groups
         assert len(result.items) == 5
@@ -133,6 +138,7 @@ class TestScalingGroupRepositoryDB:
     ) -> None:
         """Test searching scaling groups with querier"""
         querier = Querier(
+            pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
             orders=[],
         )
@@ -205,16 +211,16 @@ class TestScalingGroupRepositoryDB:
         assert result.total_count == total_count
 
     @pytest.mark.asyncio
-    async def test_search_scaling_groups_no_pagination(
+    async def test_search_scaling_groups_large_limit(
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_groups_medium: list[str],
     ) -> None:
-        """Test searching scaling groups without pagination returns all items"""
+        """Test searching scaling groups with large limit returns all items"""
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[],
-            pagination=None,
         )
         result = await scaling_group_repository.search_scaling_groups(querier=querier)
 

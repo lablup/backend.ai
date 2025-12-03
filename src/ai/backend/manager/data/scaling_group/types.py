@@ -86,3 +86,5 @@ class ScalingGroupListResult:
 
     items: list[ScalingGroupData]
     total_count: int
+    has_next_page: bool
+    has_previous_page: bool

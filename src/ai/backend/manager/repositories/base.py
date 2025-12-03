@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable, Generic, Optional, TypeVar
+from typing import TYPE_CHECKING, Callable, Generic, TypeVar
 
 import sqlalchemy as sa
 from sqlalchemy.engine import Row
@@ -32,6 +32,20 @@ class QueryPagination(ABC):
 
         raise NotImplementedError
 
+    @abstractmethod
+    def compute_page_info(self, rows: list[Row], total_count: int) -> _PageInfoResult[Row]:
+        """Compute pagination info and slice rows if needed.
+
+        Args:
+            rows: The rows returned from query (may include extra row for page detection)
+            total_count: Total count of items matching the query
+
+        Returns:
+            _PageInfoResult containing sliced rows and pagination flags
+        """
+
+        raise NotImplementedError
+
 
 @dataclass
 class OffsetPagination(QueryPagination):
@@ -56,6 +70,17 @@ class OffsetPagination(QueryPagination):
         if self.offset > 0:
             query = query.offset(self.offset)
         return query
+
+    def compute_page_info(self, rows: list[Row], total_count: int) -> _PageInfoResult[Row]:
+        """Compute pagination info for offset-based pagination."""
+
+        has_previous_page = self.offset > 0
+        has_next_page = (self.offset + len(rows)) < total_count
+        return _PageInfoResult(
+            rows=rows,
+            has_next_page=has_next_page,
+            has_previous_page=has_previous_page,
+        )
 
 
 @dataclass
@@ -86,10 +111,23 @@ class CursorForwardPagination(QueryPagination):
 
         Note: Cursor decoding and WHERE clause for cursor position
         should be handled by the caller before building the query.
-        This only applies the LIMIT.
+        This applies LIMIT + 1 for has_next_page detection.
         """
 
-        return query.limit(self.first)
+        return query.limit(self.first + 1)
+
+    def compute_page_info(self, rows: list[Row], total_count: int) -> _PageInfoResult[Row]:
+        """Compute pagination info for cursor-based forward pagination."""
+
+        has_previous_page = True  # after cursor exists means previous page exists
+        has_next_page = len(rows) > self.first
+        if has_next_page:
+            rows = rows[: self.first]
+        return _PageInfoResult(
+            rows=rows,
+            has_next_page=has_next_page,
+            has_previous_page=has_previous_page,
+        )
 
 
 @dataclass
@@ -120,19 +158,32 @@ class CursorBackwardPagination(QueryPagination):
 
         Note: Cursor decoding and WHERE clause for cursor position
         should be handled by the caller before building the query.
-        This only applies the LIMIT and may require result reversal.
+        This applies LIMIT + 1 for has_previous_page detection and may require result reversal.
         """
 
-        return query.limit(self.last)
+        return query.limit(self.last + 1)
+
+    def compute_page_info(self, rows: list[Row], total_count: int) -> _PageInfoResult[Row]:
+        """Compute pagination info for cursor-based backward pagination."""
+
+        has_next_page = True  # before cursor exists means next page exists
+        has_previous_page = len(rows) > self.last
+        if has_previous_page:
+            rows = rows[: self.last]
+        return _PageInfoResult(
+            rows=rows,
+            has_next_page=has_next_page,
+            has_previous_page=has_previous_page,
+        )
 
 
 @dataclass
 class Querier:
     """Bundles query conditions, orders, and pagination for repository queries."""
 
+    pagination: QueryPagination
     conditions: list[QueryCondition] = field(default_factory=list)
     orders: list[QueryOrder] = field(default_factory=list)
-    pagination: Optional[QueryPagination] = None
 
 
 def combine_conditions_or(conditions: list[QueryCondition]) -> QueryCondition:
@@ -194,8 +245,7 @@ def _apply_querier(
         query = query.order_by(order)
 
     # Apply pagination
-    if querier.pagination is not None:
-        query = querier.pagination.apply(query)
+    query = querier.pagination.apply(query)
 
     return query
 
@@ -204,51 +254,71 @@ TRow = TypeVar("TRow", bound=Row)
 
 
 @dataclass
+class _PageInfoResult(Generic[TRow]):
+    """Result of compute_page_info containing sliced rows and pagination flags."""
+
+    rows: list[TRow]
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
 class QuerierResult(Generic[TRow]):
     """Result of executing a query with querier."""
 
     rows: list[TRow]
     total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
 
 async def execute_querier(
     db_sess: SASession,
     query: sa.sql.Select,
-    querier: Optional[Querier],
+    querier: Querier,
 ) -> QuerierResult[Row]:
-    """Execute query with querier and return rows with total_count.
+    """Execute query with querier and return rows with total_count and pagination info.
 
     Uses count().over() window function for efficient counting in most cases.
     Falls back to separate count query only when rows is empty (offset exceeds total).
 
+    For cursor-based pagination, fetches N+1 rows to detect has_next_page/has_previous_page,
+    then slices to return only the requested count.
+
     Args:
         db_sess: Database session
         query: SELECT query with count().over().label("total_count") included
-        querier: Optional querier for filtering, ordering, and pagination
+        querier: Querier for filtering, ordering, and pagination
 
     Returns:
-        QuerierResult containing rows and total_count
+        QuerierResult containing rows, total_count, and pagination info
     """
     initial_query = query
-    if querier:
-        query = _apply_querier(query, querier)
+    query = _apply_querier(query, querier)
 
     result = await db_sess.execute(query)
-    rows = result.all()
+    rows = list(result.all())
 
+    total_count: int
     if rows:
-        return QuerierResult(rows=rows, total_count=rows[0].total_count)
-
-    # Fallback: Get total_count from window function without pagination
-    # Re-execute query with conditions but without pagination
-
-    fallback_query = initial_query
-    if querier:
+        total_count = rows[0].total_count
+    else:
+        # Fallback: Get total_count from window function without pagination
+        # Re-execute query with conditions but without pagination
+        fallback_query = initial_query
         for condition in querier.conditions:
             fallback_query = fallback_query.where(condition())
 
-    result = await db_sess.execute(fallback_query)
-    first_row = result.first()
-    total_count = first_row.total_count if first_row else 0
+        result = await db_sess.execute(fallback_query)
+        first_row = result.first()
+        total_count = first_row.total_count if first_row else 0
 
-    return QuerierResult(rows=rows, total_count=total_count)
+    # Calculate pagination info
+    page_info = querier.pagination.compute_page_info(rows, total_count)
+
+    return QuerierResult(
+        rows=page_info.rows,
+        total_count=total_count,
+        has_next_page=page_info.has_next_page,
+        has_previous_page=page_info.has_previous_page,
+    )

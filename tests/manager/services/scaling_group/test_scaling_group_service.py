@@ -20,7 +20,7 @@ from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupStatus,
     SchedulerType,
 )
-from ai.backend.manager.repositories.base import Querier
+from ai.backend.manager.repositories.base import OffsetPagination, Querier
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
@@ -83,26 +83,33 @@ class TestScalingGroupService:
         )
 
     @pytest.mark.asyncio
-    async def test_search_scaling_groups_without_querier(
+    async def test_search_scaling_groups_with_default_querier(
         self,
         scaling_group_service: ScalingGroupService,
         mock_repository: MagicMock,
         sample_scaling_group: ScalingGroupData,
     ) -> None:
-        """Test searching scaling groups without querier"""
+        """Test searching scaling groups with default querier"""
         mock_repository.search_scaling_groups = AsyncMock(
             return_value=ScalingGroupListResult(
                 items=[sample_scaling_group],
                 total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
             )
         )
 
-        action = SearchScalingGroupsAction(querier=None)
+        querier = Querier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchScalingGroupsAction(querier=querier)
         result = await scaling_group_service.search_scaling_groups(action)
 
         assert result.scaling_groups == [sample_scaling_group]
         assert result.total_count == 1
-        mock_repository.search_scaling_groups.assert_called_once_with(querier=None)
+        mock_repository.search_scaling_groups.assert_called_once_with(querier=querier)
 
     @pytest.mark.asyncio
     async def test_search_scaling_groups_with_querier(
@@ -112,11 +119,19 @@ class TestScalingGroupService:
         sample_scaling_group: ScalingGroupData,
     ) -> None:
         """Test searching scaling groups with querier"""
-        querier = Querier(conditions=[], orders=[], pagination=None)
+        from ai.backend.manager.repositories.base import OffsetPagination
+
+        querier = Querier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
         mock_repository.search_scaling_groups = AsyncMock(
             return_value=ScalingGroupListResult(
                 items=[sample_scaling_group],
                 total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
             )
         )
 
@@ -179,10 +194,17 @@ class TestScalingGroupService:
             return_value=ScalingGroupListResult(
                 items=scaling_groups,
                 total_count=3,
+                has_next_page=False,
+                has_previous_page=False,
             )
         )
 
-        action = SearchScalingGroupsAction(querier=None)
+        querier = Querier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchScalingGroupsAction(querier=querier)
         result = await scaling_group_service.search_scaling_groups(action)
 
         assert len(result.scaling_groups) == 3
@@ -200,10 +222,17 @@ class TestScalingGroupService:
             return_value=ScalingGroupListResult(
                 items=[],
                 total_count=0,
+                has_next_page=False,
+                has_previous_page=False,
             )
         )
 
-        action = SearchScalingGroupsAction(querier=None)
+        querier = Querier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchScalingGroupsAction(querier=querier)
         result = await scaling_group_service.search_scaling_groups(action)
 
         assert result.scaling_groups == []
