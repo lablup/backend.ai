@@ -1,6 +1,5 @@
 """GraphQL notification module."""
 
-from .adapter import NotificationChannelGQLAdapter, NotificationRuleGQLAdapter
 from .resolver import (
     create_notification_channel,
     create_notification_rule,
@@ -42,9 +41,6 @@ from .types import (
 )
 
 __all__ = (
-    # Adapters
-    "NotificationChannelGQLAdapter",
-    "NotificationRuleGQLAdapter",
     # Types
     "NotificationChannel",
     "NotificationRule",

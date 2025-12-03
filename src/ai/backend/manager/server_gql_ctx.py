@@ -14,17 +14,8 @@ async def gql_adapters_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     These adapters are created once at server startup and reused across all GraphQL requests.
     """
-    from .api.gql.adapters import GQLAdapters
-    from .api.gql.notification.adapter import (
-        NotificationChannelGQLAdapter,
-        NotificationRuleGQLAdapter,
-    )
-    from .api.gql.scaling_group.adapter import ScalingGroupGQLAdapter
+    from .api.gql.adapter import BaseGQLAdapter
 
-    root_ctx.gql_adapters = GQLAdapters(
-        notification_channel=NotificationChannelGQLAdapter(),
-        notification_rule=NotificationRuleGQLAdapter(),
-        scaling_group=ScalingGroupGQLAdapter(),
-    )
+    root_ctx.gql_adapter = BaseGQLAdapter()
 
     yield

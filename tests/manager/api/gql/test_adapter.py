@@ -7,7 +7,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ai.backend.manager.api.gql.adapter import DEFAULT_PAGINATION_LIMIT, BaseGQLAdapter
+from ai.backend.manager.api.gql.adapter import (
+    DEFAULT_PAGINATION_LIMIT,
+    BaseGQLAdapter,
+    CursorPaginationFactories,
+    PaginationOptions,
+)
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.errors.api import InvalidGraphQLParameters
 from ai.backend.manager.repositories.base import (
@@ -18,7 +23,7 @@ from ai.backend.manager.repositories.base import (
 
 
 class TestBaseGQLAdapterBuildPagination:
-    """Tests for BaseGQLAdapter.build_pagination method."""
+    """Tests for BaseGQLAdapter._build_pagination method via build_querier."""
 
     @pytest.fixture
     def adapter(self) -> BaseGQLAdapter:
@@ -37,180 +42,203 @@ class TestBaseGQLAdapterBuildPagination:
         """Create a mock default order."""
         return MagicMock()
 
+    @pytest.fixture
+    def cursor_factories(
+        self, mock_cursor_factory: MagicMock, mock_order: Any
+    ) -> CursorPaginationFactories:
+        """Create CursorPaginationFactories with mocks."""
+        return CursorPaginationFactories(
+            default_order=mock_order,
+            forward_cursor_condition_factory=mock_cursor_factory,
+            backward_cursor_condition_factory=mock_cursor_factory,
+        )
+
     def test_build_pagination_forward_cursor(
         self,
         adapter: BaseGQLAdapter,
         mock_cursor_factory: MagicMock,
         mock_order: Any,
+        cursor_factories: CursorPaginationFactories,
     ) -> None:
         """Test that first + after returns CursorForwardPagination."""
         cursor = encode_cursor("test-cursor-value")
-        result = adapter.build_pagination(
-            first=10,
-            after=cursor,
-            forward_cursor_condition_factory=mock_cursor_factory,
-            default_order=mock_order,
+        querier = adapter.build_querier(
+            PaginationOptions(first=10, after=cursor),
+            cursor_factories,
         )
 
-        assert isinstance(result, CursorForwardPagination)
-        assert result.first == 10
+        assert isinstance(querier.pagination, CursorForwardPagination)
+        assert querier.pagination.first == 10
         mock_cursor_factory.assert_called_once_with("test-cursor-value")
-        assert result.default_order is mock_order
+        assert querier.pagination.default_order is mock_order
 
     def test_build_pagination_backward_cursor(
         self,
         adapter: BaseGQLAdapter,
         mock_cursor_factory: MagicMock,
         mock_order: Any,
+        cursor_factories: CursorPaginationFactories,
     ) -> None:
         """Test that last + before returns CursorBackwardPagination."""
         cursor = encode_cursor("test-cursor-value")
-        result = adapter.build_pagination(
-            last=5,
-            before=cursor,
-            backward_cursor_condition_factory=mock_cursor_factory,
+        # Need a fresh factory for backward since we check call count
+        backward_factory = MagicMock()
+        backward_factory.return_value = MagicMock()
+        factories = CursorPaginationFactories(
             default_order=mock_order,
+            forward_cursor_condition_factory=mock_cursor_factory,
+            backward_cursor_condition_factory=backward_factory,
+        )
+        querier = adapter.build_querier(
+            PaginationOptions(last=5, before=cursor),
+            factories,
         )
 
-        assert isinstance(result, CursorBackwardPagination)
-        assert result.last == 5
-        mock_cursor_factory.assert_called_once_with("test-cursor-value")
-        assert result.default_order is mock_order
+        assert isinstance(querier.pagination, CursorBackwardPagination)
+        assert querier.pagination.last == 5
+        backward_factory.assert_called_once_with("test-cursor-value")
+        assert querier.pagination.default_order is mock_order
 
-    def test_build_pagination_offset(self, adapter: BaseGQLAdapter) -> None:
+    def test_build_pagination_offset(
+        self, adapter: BaseGQLAdapter, cursor_factories: CursorPaginationFactories
+    ) -> None:
         """Test that limit + offset returns OffsetPagination."""
-        result = adapter.build_pagination(limit=20, offset=10)
+        querier = adapter.build_querier(
+            PaginationOptions(limit=20, offset=10),
+            cursor_factories,
+        )
 
-        assert isinstance(result, OffsetPagination)
-        assert result.limit == 20
-        assert result.offset == 10
+        assert isinstance(querier.pagination, OffsetPagination)
+        assert querier.pagination.limit == 20
+        assert querier.pagination.offset == 10
 
-    def test_build_pagination_offset_without_offset(self, adapter: BaseGQLAdapter) -> None:
+    def test_build_pagination_offset_without_offset(
+        self, adapter: BaseGQLAdapter, cursor_factories: CursorPaginationFactories
+    ) -> None:
         """Test that limit without offset defaults offset to 0."""
-        result = adapter.build_pagination(limit=20)
+        querier = adapter.build_querier(
+            PaginationOptions(limit=20),
+            cursor_factories,
+        )
 
-        assert isinstance(result, OffsetPagination)
-        assert result.limit == 20
-        assert result.offset == 0
+        assert isinstance(querier.pagination, OffsetPagination)
+        assert querier.pagination.limit == 20
+        assert querier.pagination.offset == 0
 
-    def test_build_pagination_default(self, adapter: BaseGQLAdapter) -> None:
+    def test_build_pagination_default(
+        self, adapter: BaseGQLAdapter, cursor_factories: CursorPaginationFactories
+    ) -> None:
         """Test that no parameters returns default OffsetPagination."""
-        result = adapter.build_pagination()
+        querier = adapter.build_querier(
+            PaginationOptions(),
+            cursor_factories,
+        )
 
-        assert isinstance(result, OffsetPagination)
-        assert result.limit == DEFAULT_PAGINATION_LIMIT
-        assert result.offset == 0
+        assert isinstance(querier.pagination, OffsetPagination)
+        assert querier.pagination.limit == DEFAULT_PAGINATION_LIMIT
+        assert querier.pagination.offset == 0
 
     def test_build_pagination_mixed_modes_first_and_limit_error(
-        self, adapter: BaseGQLAdapter
+        self, adapter: BaseGQLAdapter, cursor_factories: CursorPaginationFactories
     ) -> None:
         """Test that first + limit raises InvalidGraphQLParameters."""
         with pytest.raises(InvalidGraphQLParameters) as exc_info:
-            adapter.build_pagination(first=10, limit=20)
+            adapter.build_querier(
+                PaginationOptions(first=10, limit=20),
+                cursor_factories,
+            )
         assert "Only one pagination mode allowed" in str(exc_info.value)
 
     def test_build_pagination_mixed_modes_last_and_limit_error(
-        self, adapter: BaseGQLAdapter
+        self, adapter: BaseGQLAdapter, cursor_factories: CursorPaginationFactories
     ) -> None:
         """Test that last + limit raises InvalidGraphQLParameters."""
         with pytest.raises(InvalidGraphQLParameters) as exc_info:
-            adapter.build_pagination(last=10, limit=20)
+            adapter.build_querier(
+                PaginationOptions(last=10, limit=20),
+                cursor_factories,
+            )
         assert "Only one pagination mode allowed" in str(exc_info.value)
 
     def test_build_pagination_mixed_modes_first_and_last_error(
-        self, adapter: BaseGQLAdapter
+        self, adapter: BaseGQLAdapter, cursor_factories: CursorPaginationFactories
     ) -> None:
         """Test that first + last raises InvalidGraphQLParameters."""
         with pytest.raises(InvalidGraphQLParameters) as exc_info:
-            adapter.build_pagination(first=10, last=10)
+            adapter.build_querier(
+                PaginationOptions(first=10, last=10),
+                cursor_factories,
+            )
         assert "Only one pagination mode allowed" in str(exc_info.value)
 
-    def test_build_pagination_first_without_after_error(self, adapter: BaseGQLAdapter) -> None:
+    def test_build_pagination_first_without_after_error(
+        self, adapter: BaseGQLAdapter, cursor_factories: CursorPaginationFactories
+    ) -> None:
         """Test that first without after raises InvalidGraphQLParameters."""
         with pytest.raises(InvalidGraphQLParameters) as exc_info:
-            adapter.build_pagination(first=10)
+            adapter.build_querier(
+                PaginationOptions(first=10),
+                cursor_factories,
+            )
         assert "after cursor is required" in str(exc_info.value)
 
-    def test_build_pagination_last_without_before_error(self, adapter: BaseGQLAdapter) -> None:
+    def test_build_pagination_last_without_before_error(
+        self, adapter: BaseGQLAdapter, cursor_factories: CursorPaginationFactories
+    ) -> None:
         """Test that last without before raises InvalidGraphQLParameters."""
         with pytest.raises(InvalidGraphQLParameters) as exc_info:
-            adapter.build_pagination(last=10)
+            adapter.build_querier(
+                PaginationOptions(last=10),
+                cursor_factories,
+            )
         assert "before cursor is required" in str(exc_info.value)
-
-    def test_build_pagination_cursor_without_factory_error(
-        self, adapter: BaseGQLAdapter, mock_order: Any
-    ) -> None:
-        """Test that cursor pagination without cursor_condition_factory raises error."""
-        cursor = encode_cursor("test-value")
-        with pytest.raises(InvalidGraphQLParameters) as exc_info:
-            adapter.build_pagination(
-                first=10,
-                after=cursor,
-                default_order=mock_order,
-                # forward_cursor_condition_factory is missing
-            )
-        assert "forward_cursor_condition_factory and default_order are required" in str(
-            exc_info.value
-        )
-
-    def test_build_pagination_cursor_without_order_error(
-        self, adapter: BaseGQLAdapter, mock_cursor_factory: MagicMock
-    ) -> None:
-        """Test that cursor pagination without default_order raises error."""
-        cursor = encode_cursor("test-value")
-        with pytest.raises(InvalidGraphQLParameters) as exc_info:
-            adapter.build_pagination(
-                first=10,
-                after=cursor,
-                forward_cursor_condition_factory=mock_cursor_factory,
-                # default_order is missing
-            )
-        assert "forward_cursor_condition_factory and default_order are required" in str(
-            exc_info.value
-        )
 
     def test_build_pagination_first_must_be_positive(
         self,
         adapter: BaseGQLAdapter,
-        mock_cursor_factory: MagicMock,
-        mock_order: Any,
+        cursor_factories: CursorPaginationFactories,
     ) -> None:
         """Test that first <= 0 raises InvalidGraphQLParameters."""
         cursor = encode_cursor("test-value")
         with pytest.raises(InvalidGraphQLParameters) as exc_info:
-            adapter.build_pagination(
-                first=0,
-                after=cursor,
-                forward_cursor_condition_factory=mock_cursor_factory,
-                default_order=mock_order,
+            adapter.build_querier(
+                PaginationOptions(first=0, after=cursor),
+                cursor_factories,
             )
         assert "first must be positive" in str(exc_info.value)
 
     def test_build_pagination_last_must_be_positive(
         self,
         adapter: BaseGQLAdapter,
-        mock_cursor_factory: MagicMock,
-        mock_order: Any,
+        cursor_factories: CursorPaginationFactories,
     ) -> None:
         """Test that last <= 0 raises InvalidGraphQLParameters."""
         cursor = encode_cursor("test-value")
         with pytest.raises(InvalidGraphQLParameters) as exc_info:
-            adapter.build_pagination(
-                last=-1,
-                before=cursor,
-                backward_cursor_condition_factory=mock_cursor_factory,
-                default_order=mock_order,
+            adapter.build_querier(
+                PaginationOptions(last=-1, before=cursor),
+                cursor_factories,
             )
         assert "last must be positive" in str(exc_info.value)
 
-    def test_build_pagination_limit_must_be_positive(self, adapter: BaseGQLAdapter) -> None:
+    def test_build_pagination_limit_must_be_positive(
+        self, adapter: BaseGQLAdapter, cursor_factories: CursorPaginationFactories
+    ) -> None:
         """Test that limit <= 0 raises InvalidGraphQLParameters."""
         with pytest.raises(InvalidGraphQLParameters) as exc_info:
-            adapter.build_pagination(limit=0)
+            adapter.build_querier(
+                PaginationOptions(limit=0),
+                cursor_factories,
+            )
         assert "limit must be positive" in str(exc_info.value)
 
-    def test_build_pagination_offset_must_be_non_negative(self, adapter: BaseGQLAdapter) -> None:
+    def test_build_pagination_offset_must_be_non_negative(
+        self, adapter: BaseGQLAdapter, cursor_factories: CursorPaginationFactories
+    ) -> None:
         """Test that negative offset raises InvalidGraphQLParameters."""
         with pytest.raises(InvalidGraphQLParameters) as exc_info:
-            adapter.build_pagination(limit=10, offset=-1)
+            adapter.build_querier(
+                PaginationOptions(limit=10, offset=-1),
+                cursor_factories,
+            )
         assert "offset must be non-negative" in str(exc_info.value)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from enum import StrEnum
-from typing import Optional, Self
+from typing import Optional, Self, override
 
 import strawberry
 from strawberry import ID, UNSET
@@ -17,6 +17,7 @@ from ai.backend.common.data.notification import (
     WebhookConfig,
 )
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.data.notification import (
     NotificationChannelCreator,
     NotificationChannelData,
@@ -163,7 +164,7 @@ class NotificationChannelOrderField(StrEnum):
 
 
 @strawberry.input(description="Filter for notification channels")
-class NotificationChannelFilter:
+class NotificationChannelFilter(GQLFilter):
     name: Optional[StringFilter] = None
     channel_type: Optional[list[NotificationChannelTypeGQL]] = None
     enabled: Optional[bool] = None
@@ -172,6 +173,7 @@ class NotificationChannelFilter:
     OR: Optional[list[NotificationChannelFilter]] = None
     NOT: Optional[list[NotificationChannelFilter]] = None
 
+    @override
     def build_conditions(self) -> list[QueryCondition]:
         """Build query conditions from this filter.
 
@@ -224,10 +226,11 @@ class NotificationChannelFilter:
 
 
 @strawberry.input(description="Order by specification for notification channels")
-class NotificationChannelOrderBy:
+class NotificationChannelOrderBy(GQLOrderBy):
     field: NotificationChannelOrderField
     direction: OrderDirection = OrderDirection.ASC
 
+    @override
     def to_query_order(self) -> QueryOrder:
         """Convert to repository QueryOrder."""
         ascending = self.direction == OrderDirection.ASC
@@ -248,7 +251,7 @@ class NotificationRuleOrderField(StrEnum):
 
 
 @strawberry.input(description="Filter for notification rules")
-class NotificationRuleFilter:
+class NotificationRuleFilter(GQLFilter):
     name: Optional[StringFilter] = None
     rule_type: Optional[list[NotificationRuleTypeGQL]] = None
     enabled: Optional[bool] = None
@@ -257,6 +260,7 @@ class NotificationRuleFilter:
     OR: Optional[list[NotificationRuleFilter]] = None
     NOT: Optional[list[NotificationRuleFilter]] = None
 
+    @override
     def build_conditions(self) -> list[QueryCondition]:
         """Build query conditions from this filter.
 
@@ -309,10 +313,11 @@ class NotificationRuleFilter:
 
 
 @strawberry.input(description="Order by specification for notification rules")
-class NotificationRuleOrderBy:
+class NotificationRuleOrderBy(GQLOrderBy):
     field: NotificationRuleOrderField
     direction: OrderDirection = OrderDirection.ASC
 
+    @override
     def to_query_order(self) -> QueryOrder:
         """Convert to repository QueryOrder."""
         ascending = self.direction == OrderDirection.ASC
