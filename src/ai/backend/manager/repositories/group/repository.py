@@ -12,7 +12,6 @@ import sqlalchemy as sa
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import (
     BackendAIError,
-    GroupDeletionError,
     InvalidAPIParameters,
 )
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -193,7 +192,7 @@ class GroupRepository:
             )
             if result.rowcount > 0:
                 return
-            raise GroupDeletionError("Failed to mark group as inactive")
+            raise GroupNotFound(f"Group not found: {group_id}")
 
     @group_repository_resilience.apply()
     async def get_container_stats_for_period(

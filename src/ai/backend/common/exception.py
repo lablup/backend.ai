@@ -764,6 +764,7 @@ class GroupDeletionError(BackendAIError, web.HTTPBadRequest):
             error_detail=ErrorDetail.BAD_REQUEST,
         )
 
+
 class ModelDeploymentNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/model-deployment-not-found"
     error_title = "Model Deployment Not Found"
