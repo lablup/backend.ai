@@ -5049,6 +5049,7 @@ type NotificationChannel implements Node
   channelType: NotificationChannelType!
   config: WebhookConfigGQL!
   enabled: Boolean!
+  createdAt: DateTime!
 }
 
 """Notification channel connection"""
@@ -5122,6 +5123,7 @@ type NotificationRule implements Node
   channel: NotificationChannel!
   messageTemplate: String!
   enabled: Boolean!
+  createdAt: DateTime!
 }
 
 """Notification rule connection"""
