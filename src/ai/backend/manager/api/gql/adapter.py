@@ -40,11 +40,20 @@ class CursorPaginationFactories:
     """Factories for cursor-based pagination.
 
     Contains domain-specific factories needed for cursor-based pagination.
+    Forward uses ASC order, backward uses DESC order.
     """
 
-    cursor_order: QueryOrder
+    forward_cursor_order: QueryOrder
+    """Order for forward pagination (e.g., created_at ASC)."""
+
+    backward_cursor_order: QueryOrder
+    """Order for backward pagination (e.g., created_at DESC)."""
+
     forward_cursor_condition_factory: CursorConditionFactory
+    """Factory that creates cursor condition for forward pagination (e.g., created_at > cursor)."""
+
     backward_cursor_condition_factory: CursorConditionFactory
+    """Factory that creates cursor condition for backward pagination (e.g., created_at < cursor)."""
 
 
 class BaseGQLAdapter:
@@ -87,7 +96,7 @@ class BaseGQLAdapter:
                 cursor_condition = factories.forward_cursor_condition_factory(cursor_value)
             return CursorForwardPagination(
                 first=options.first,
-                cursor_order=factories.cursor_order,
+                cursor_order=factories.forward_cursor_order,
                 cursor_condition=cursor_condition,
             )
         elif options.last is not None:
@@ -99,7 +108,7 @@ class BaseGQLAdapter:
                 cursor_condition = factories.backward_cursor_condition_factory(cursor_value)
             return CursorBackwardPagination(
                 last=options.last,
-                cursor_order=factories.cursor_order,
+                cursor_order=factories.backward_cursor_order,
                 cursor_condition=cursor_condition,
             )
         elif options.limit is not None:

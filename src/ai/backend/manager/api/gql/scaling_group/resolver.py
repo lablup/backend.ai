@@ -32,7 +32,8 @@ from .types import (
 @lru_cache(maxsize=1)
 def _get_scaling_group_cursor_factories() -> CursorPaginationFactories:
     return CursorPaginationFactories(
-        cursor_order=ScalingGroupOrders.created_at(ascending=False),
+        forward_cursor_order=ScalingGroupOrders.created_at(ascending=True),
+        backward_cursor_order=ScalingGroupOrders.created_at(ascending=False),
         forward_cursor_condition_factory=ScalingGroupConditions.by_cursor_forward,
         backward_cursor_condition_factory=ScalingGroupConditions.by_cursor_backward,
     )

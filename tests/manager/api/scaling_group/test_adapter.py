@@ -26,7 +26,8 @@ from ai.backend.manager.repositories.scaling_group.options import (
 def _get_cursor_factories() -> CursorPaginationFactories:
     """Create cursor pagination factories for scaling groups."""
     return CursorPaginationFactories(
-        cursor_order=ScalingGroupOrders.created_at(ascending=False),
+        forward_cursor_order=ScalingGroupOrders.created_at(ascending=True),
+        backward_cursor_order=ScalingGroupOrders.created_at(ascending=False),
         forward_cursor_condition_factory=ScalingGroupConditions.by_cursor_forward,
         backward_cursor_condition_factory=ScalingGroupConditions.by_cursor_backward,
     )

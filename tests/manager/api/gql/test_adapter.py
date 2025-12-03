@@ -38,17 +38,23 @@ class TestBaseGQLAdapterBuildPagination:
         return factory
 
     @pytest.fixture
-    def mock_order(self) -> Any:
-        """Create a mock default order."""
+    def mock_forward_order(self) -> Any:
+        """Create a mock forward cursor order."""
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_backward_order(self) -> Any:
+        """Create a mock backward cursor order."""
         return MagicMock()
 
     @pytest.fixture
     def cursor_factories(
-        self, mock_cursor_factory: MagicMock, mock_order: Any
+        self, mock_cursor_factory: MagicMock, mock_forward_order: Any, mock_backward_order: Any
     ) -> CursorPaginationFactories:
         """Create CursorPaginationFactories with mocks."""
         return CursorPaginationFactories(
-            cursor_order=mock_order,
+            forward_cursor_order=mock_forward_order,
+            backward_cursor_order=mock_backward_order,
             forward_cursor_condition_factory=mock_cursor_factory,
             backward_cursor_condition_factory=mock_cursor_factory,
         )
@@ -57,7 +63,7 @@ class TestBaseGQLAdapterBuildPagination:
         self,
         adapter: BaseGQLAdapter,
         mock_cursor_factory: MagicMock,
-        mock_order: Any,
+        mock_forward_order: Any,
         cursor_factories: CursorPaginationFactories,
     ) -> None:
         """Test that first + after returns CursorForwardPagination."""
@@ -70,13 +76,14 @@ class TestBaseGQLAdapterBuildPagination:
         assert isinstance(querier.pagination, CursorForwardPagination)
         assert querier.pagination.first == 10
         mock_cursor_factory.assert_called_once_with("test-cursor-value")
-        assert querier.pagination.cursor_order is mock_order
+        assert querier.pagination.cursor_order is mock_forward_order
 
     def test_build_pagination_backward_cursor(
         self,
         adapter: BaseGQLAdapter,
         mock_cursor_factory: MagicMock,
-        mock_order: Any,
+        mock_forward_order: Any,
+        mock_backward_order: Any,
         cursor_factories: CursorPaginationFactories,
     ) -> None:
         """Test that last + before returns CursorBackwardPagination."""
@@ -85,7 +92,8 @@ class TestBaseGQLAdapterBuildPagination:
         backward_factory = MagicMock()
         backward_factory.return_value = MagicMock()
         factories = CursorPaginationFactories(
-            cursor_order=mock_order,
+            forward_cursor_order=mock_forward_order,
+            backward_cursor_order=mock_backward_order,
             forward_cursor_condition_factory=mock_cursor_factory,
             backward_cursor_condition_factory=backward_factory,
         )
@@ -97,7 +105,7 @@ class TestBaseGQLAdapterBuildPagination:
         assert isinstance(querier.pagination, CursorBackwardPagination)
         assert querier.pagination.last == 5
         backward_factory.assert_called_once_with("test-cursor-value")
-        assert querier.pagination.cursor_order is mock_order
+        assert querier.pagination.cursor_order is mock_backward_order
 
     def test_build_pagination_offset(
         self, adapter: BaseGQLAdapter, cursor_factories: CursorPaginationFactories
@@ -174,7 +182,7 @@ class TestBaseGQLAdapterBuildPagination:
     def test_build_pagination_first_without_after(
         self,
         adapter: BaseGQLAdapter,
-        mock_order: Any,
+        mock_forward_order: Any,
         cursor_factories: CursorPaginationFactories,
     ) -> None:
         """Test that first without after returns CursorForwardPagination with no cursor condition."""
@@ -186,12 +194,12 @@ class TestBaseGQLAdapterBuildPagination:
         assert isinstance(querier.pagination, CursorForwardPagination)
         assert querier.pagination.first == 10
         assert querier.pagination.cursor_condition is None
-        assert querier.pagination.cursor_order is mock_order
+        assert querier.pagination.cursor_order is mock_forward_order
 
     def test_build_pagination_last_without_before(
         self,
         adapter: BaseGQLAdapter,
-        mock_order: Any,
+        mock_backward_order: Any,
         cursor_factories: CursorPaginationFactories,
     ) -> None:
         """Test that last without before returns CursorBackwardPagination with no cursor condition."""
@@ -203,7 +211,7 @@ class TestBaseGQLAdapterBuildPagination:
         assert isinstance(querier.pagination, CursorBackwardPagination)
         assert querier.pagination.last == 10
         assert querier.pagination.cursor_condition is None
-        assert querier.pagination.cursor_order is mock_order
+        assert querier.pagination.cursor_order is mock_backward_order
 
     def test_build_pagination_first_must_be_positive(
         self,
