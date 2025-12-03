@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
@@ -49,7 +49,7 @@ class ScalingGroupRepository:
     @scaling_group_repository_resilience.apply()
     async def search_scaling_groups(
         self,
-        querier: Optional[Querier] = None,
+        querier: Querier,
     ) -> ScalingGroupListResult:
         """Searches scaling groups with total count."""
         return await self._db_source.search_scaling_groups(querier=querier)

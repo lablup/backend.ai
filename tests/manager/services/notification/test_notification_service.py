@@ -631,11 +631,19 @@ class TestNotificationService:
     ) -> None:
         """Test searching notification channels with querier"""
         from ai.backend.manager.data.notification import NotificationChannelListResult
+        from ai.backend.manager.repositories.base import OffsetPagination
 
-        querier = Querier(conditions=[], orders=[], pagination=None)
+        querier = Querier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
         mock_repository.search_channels = AsyncMock(
             return_value=NotificationChannelListResult(
-                items=[sample_webhook_channel], total_count=1
+                items=[sample_webhook_channel],
+                total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
             )
         )
 
@@ -655,10 +663,20 @@ class TestNotificationService:
     ) -> None:
         """Test searching notification rules with querier"""
         from ai.backend.manager.data.notification import NotificationRuleListResult
+        from ai.backend.manager.repositories.base import OffsetPagination
 
-        querier = Querier(conditions=[], orders=[], pagination=None)
+        querier = Querier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
         mock_repository.search_rules = AsyncMock(
-            return_value=NotificationRuleListResult(items=[sample_rule], total_count=1)
+            return_value=NotificationRuleListResult(
+                items=[sample_rule],
+                total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
+            )
         )
 
         action = SearchRulesAction(querier=querier)

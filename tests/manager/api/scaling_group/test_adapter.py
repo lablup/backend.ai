@@ -19,13 +19,15 @@ class TestScalingGroupGQLAdapter:
     """Test cases for ScalingGroupGQLAdapter"""
 
     def test_empty_querier(self) -> None:
-        """Test building querier with no filters, orders, or pagination"""
+        """Test building querier with no filters, orders, or pagination returns default pagination"""
         adapter = ScalingGroupGQLAdapter()
         querier = adapter.build_querier()
 
         assert len(querier.conditions) == 0
         assert len(querier.orders) == 0
-        assert querier.pagination is None
+        # Default pagination is applied
+        assert querier.pagination is not None
+        assert isinstance(querier.pagination, OffsetPagination)
 
     def test_name_equals_case_sensitive(self) -> None:
         """Test name equals filter (case-sensitive)"""

@@ -27,7 +27,7 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import Querier
+from ai.backend.manager.repositories.base import OffsetPagination, Querier
 from ai.backend.manager.repositories.notification import NotificationRepository
 from ai.backend.manager.repositories.notification.options import (
     NotificationChannelConditions,
@@ -348,6 +348,7 @@ class TestNotificationOptions:
         """Test case-sensitive name contains filter"""
         # sample_channels_for_filter creates channels with various names
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
                 NotificationChannelConditions.by_name_contains("Test", case_insensitive=False)
             ],
@@ -368,6 +369,7 @@ class TestNotificationOptions:
         """Test case-insensitive name contains filter"""
         # sample_channels_for_filter creates channels with various names
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
                 NotificationChannelConditions.by_name_contains("test", case_insensitive=True)
             ],
@@ -389,6 +391,7 @@ class TestNotificationOptions:
         """Test case-sensitive name equals filter"""
         # sample_channels_for_filter creates channels with various names
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
                 NotificationChannelConditions.by_name_equals("Test Channel", case_insensitive=False)
             ],
@@ -409,6 +412,7 @@ class TestNotificationOptions:
         """Test case-insensitive name equals filter"""
         # sample_channels_for_filter creates channels with various names
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
                 NotificationChannelConditions.by_name_equals("test channel", case_insensitive=True)
             ],
@@ -430,6 +434,7 @@ class TestNotificationOptions:
         """Test filter by channel types"""
         # sample_channels_for_filter creates all WEBHOOK type channels
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
                 NotificationChannelConditions.by_channel_types([NotificationChannelType.WEBHOOK])
             ],
@@ -450,6 +455,7 @@ class TestNotificationOptions:
         """Test filter by enabled=True"""
         # sample_channels_for_filter creates 4 enabled and 1 disabled
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[NotificationChannelConditions.by_enabled(True)],
             orders=[],
         )
@@ -467,6 +473,7 @@ class TestNotificationOptions:
         """Test filter by enabled=False"""
         # sample_channels_for_filter creates 4 enabled and 1 disabled
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[NotificationChannelConditions.by_enabled(False)],
             orders=[],
         )
@@ -487,6 +494,7 @@ class TestNotificationOptions:
         """Test ordering by name ascending (A-Z)"""
         # sample_channels_for_order creates: Zebra, Alpha, Beta
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationChannelOrders.name(ascending=True)],
         )
@@ -506,6 +514,7 @@ class TestNotificationOptions:
         """Test ordering by name descending (Z-A)"""
         # sample_channels_for_order creates: Zebra, Alpha, Beta
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationChannelOrders.name(ascending=False)],
         )
@@ -525,6 +534,7 @@ class TestNotificationOptions:
         """Test ordering by created_at ascending (oldest first)"""
         # sample_channels_for_order creates with different created_at timestamps
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationChannelOrders.created_at(ascending=True)],
         )
@@ -545,6 +555,7 @@ class TestNotificationOptions:
         """Test ordering by created_at descending (newest first)"""
         # sample_channels_for_order creates with different created_at timestamps
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationChannelOrders.created_at(ascending=False)],
         )
@@ -565,6 +576,7 @@ class TestNotificationOptions:
         """Test ordering by updated_at ascending"""
         # sample_channels_for_order creates with different updated_at timestamps
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationChannelOrders.updated_at(ascending=True)],
         )
@@ -585,6 +597,7 @@ class TestNotificationOptions:
         """Test ordering by updated_at descending"""
         # sample_channels_for_order creates with different updated_at timestamps
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationChannelOrders.updated_at(ascending=False)],
         )
@@ -607,6 +620,7 @@ class TestNotificationOptions:
         """Test case-sensitive name contains filter for rules"""
         # sample_rules_for_filter creates rules with various names
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
                 NotificationRuleConditions.by_name_contains("Test", case_insensitive=False)
             ],
@@ -627,6 +641,7 @@ class TestNotificationOptions:
         """Test case-insensitive name contains filter for rules"""
         # sample_rules_for_filter creates rules with various names
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[NotificationRuleConditions.by_name_contains("test", case_insensitive=True)],
             orders=[],
         )
@@ -646,6 +661,7 @@ class TestNotificationOptions:
         """Test case-sensitive name equals filter for rules"""
         # sample_rules_for_filter creates rules with various names
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
                 NotificationRuleConditions.by_name_equals("Test Rule", case_insensitive=False)
             ],
@@ -666,6 +682,7 @@ class TestNotificationOptions:
         """Test case-insensitive name equals filter for rules"""
         # sample_rules_for_filter creates rules with various names
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
                 NotificationRuleConditions.by_name_equals("test rule", case_insensitive=True)
             ],
@@ -687,6 +704,7 @@ class TestNotificationOptions:
         """Test filter by rule types"""
         # sample_rules_for_filter creates 3 SESSION_STARTED and 2 SESSION_TERMINATED
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
                 NotificationRuleConditions.by_rule_types([NotificationRuleType.SESSION_STARTED])
             ],
@@ -707,6 +725,7 @@ class TestNotificationOptions:
         """Test filter by enabled=True"""
         # sample_rules_for_filter creates 4 enabled and 1 disabled
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[NotificationRuleConditions.by_enabled(True)],
             orders=[],
         )
@@ -724,6 +743,7 @@ class TestNotificationOptions:
         """Test filter by enabled=False"""
         # sample_rules_for_filter creates 4 enabled and 1 disabled
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[NotificationRuleConditions.by_enabled(False)],
             orders=[],
         )
@@ -744,6 +764,7 @@ class TestNotificationOptions:
         """Test ordering by name ascending (A-Z)"""
         # sample_rules_for_order creates: Zebra, Alpha, Beta
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationRuleOrders.name(ascending=True)],
         )
@@ -763,6 +784,7 @@ class TestNotificationOptions:
         """Test ordering by name descending (Z-A)"""
         # sample_rules_for_order creates: Zebra, Alpha, Beta
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationRuleOrders.name(ascending=False)],
         )
@@ -782,6 +804,7 @@ class TestNotificationOptions:
         """Test ordering by created_at ascending (oldest first)"""
         # sample_rules_for_order creates with different created_at timestamps
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationRuleOrders.created_at(ascending=True)],
         )
@@ -802,6 +825,7 @@ class TestNotificationOptions:
         """Test ordering by created_at descending (newest first)"""
         # sample_rules_for_order creates with different created_at timestamps
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationRuleOrders.created_at(ascending=False)],
         )
@@ -822,6 +846,7 @@ class TestNotificationOptions:
         """Test ordering by updated_at ascending"""
         # sample_rules_for_order creates with different updated_at timestamps
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationRuleOrders.updated_at(ascending=True)],
         )
@@ -842,6 +867,7 @@ class TestNotificationOptions:
         """Test ordering by updated_at descending"""
         # sample_rules_for_order creates with different updated_at timestamps
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationRuleOrders.updated_at(ascending=False)],
         )
@@ -861,6 +887,7 @@ class TestNotificationOptions:
     ) -> None:
         """Test that searching for non-existent channel returns empty with total_count=0"""
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[NotificationChannelConditions.by_name_equals("NonexistentChannelName")],
             orders=[],
         )
@@ -878,6 +905,7 @@ class TestNotificationOptions:
     ) -> None:
         """Test that searching for non-existent rule returns empty with total_count=0"""
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[NotificationRuleConditions.by_name_equals("NonexistentRuleName")],
             orders=[],
         )

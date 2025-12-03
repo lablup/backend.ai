@@ -94,6 +94,8 @@ class TestScalingGroupService:
             return_value=ScalingGroupListResult(
                 items=[sample_scaling_group],
                 total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
             )
         )
 
@@ -112,11 +114,19 @@ class TestScalingGroupService:
         sample_scaling_group: ScalingGroupData,
     ) -> None:
         """Test searching scaling groups with querier"""
-        querier = Querier(conditions=[], orders=[], pagination=None)
+        from ai.backend.manager.repositories.base import OffsetPagination
+
+        querier = Querier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
         mock_repository.search_scaling_groups = AsyncMock(
             return_value=ScalingGroupListResult(
                 items=[sample_scaling_group],
                 total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
             )
         )
 
@@ -179,6 +189,8 @@ class TestScalingGroupService:
             return_value=ScalingGroupListResult(
                 items=scaling_groups,
                 total_count=3,
+                has_next_page=False,
+                has_previous_page=False,
             )
         )
 
@@ -200,6 +212,8 @@ class TestScalingGroupService:
             return_value=ScalingGroupListResult(
                 items=[],
                 total_count=0,
+                has_next_page=False,
+                has_previous_page=False,
             )
         )
 

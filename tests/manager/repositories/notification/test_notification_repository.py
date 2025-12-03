@@ -474,11 +474,17 @@ class TestNotificationRepository:
             db_sess.add(disabled_channel)
             await db_sess.flush()
 
-        result = await notification_repository.search_channels()
+        querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        result = await notification_repository.search_channels(querier=querier)
         assert len(result.items) >= 2
         assert result.total_count >= 2
 
         enabled_querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[NotificationChannelConditions.by_enabled(True)],
             orders=[],
         )
@@ -683,16 +689,21 @@ class TestNotificationRepository:
             db_sess.add(rule3)
             await db_sess.flush()
 
-        from ai.backend.manager.repositories.base import Querier
         from ai.backend.manager.repositories.notification.options import NotificationRuleConditions
 
         # List all rules
-        all_result = await notification_repository.search_rules()
+        all_querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        all_result = await notification_repository.search_rules(querier=all_querier)
         assert len(all_result.items) >= 3
         assert all_result.total_count >= 3
 
         # List enabled rules only
         enabled_querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[NotificationRuleConditions.by_enabled(True)],
             orders=[],
         )
@@ -701,6 +712,7 @@ class TestNotificationRepository:
 
         # List rules by rule_type
         started_querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
                 NotificationRuleConditions.by_rule_types([NotificationRuleType.SESSION_STARTED])
             ],
@@ -774,9 +786,9 @@ class TestNotificationRepository:
         """Test first page of offset-based pagination"""
         # sample_channels_for_pagination fixture creates 25 channels
         querier = Querier(
+            pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
-            pagination=OffsetPagination(limit=10, offset=0),
         )
         result = await notification_repository.search_channels(querier=querier)
         assert len(result.items) == 10
@@ -791,9 +803,9 @@ class TestNotificationRepository:
         """Test second page of offset-based pagination"""
         # sample_channels_for_pagination fixture creates 25 channels
         querier = Querier(
+            pagination=OffsetPagination(limit=10, offset=10),
             conditions=[],
             orders=[],
-            pagination=OffsetPagination(limit=10, offset=10),
         )
         result = await notification_repository.search_channels(querier=querier)
         assert len(result.items) == 10
@@ -808,9 +820,9 @@ class TestNotificationRepository:
         """Test last page of offset-based pagination with partial results"""
         # sample_channels_for_pagination fixture creates 25 channels
         querier = Querier(
+            pagination=OffsetPagination(limit=10, offset=20),
             conditions=[],
             orders=[],
-            pagination=OffsetPagination(limit=10, offset=20),
         )
         result = await notification_repository.search_channels(querier=querier)
         assert len(result.items) == 5
@@ -825,9 +837,9 @@ class TestNotificationRepository:
         """Test pagination when limit exceeds total count"""
         # sample_channels_small fixture creates 5 channels
         querier = Querier(
+            pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
             orders=[],
-            pagination=OffsetPagination(limit=100, offset=0),
         )
         result = await notification_repository.search_channels(querier=querier)
         assert len(result.items) == 5
@@ -842,9 +854,9 @@ class TestNotificationRepository:
         """Test pagination when offset exceeds total count returns empty"""
         # sample_channels_small fixture creates 5 channels
         querier = Querier(
+            pagination=OffsetPagination(limit=10, offset=100),
             conditions=[],
             orders=[],
-            pagination=OffsetPagination(limit=10, offset=100),
         )
         result = await notification_repository.search_channels(querier=querier)
         assert len(result.items) == 0
@@ -859,9 +871,9 @@ class TestNotificationRepository:
         """Test pagination combined with filtering and ordering"""
         # sample_channels_mixed_enabled fixture creates 20 channels (10 enabled, 10 disabled)
         querier = Querier(
+            pagination=OffsetPagination(limit=5, offset=0),
             conditions=[NotificationChannelConditions.by_enabled(True)],
             orders=[NotificationChannelOrders.name(ascending=True)],
-            pagination=OffsetPagination(limit=5, offset=0),
         )
         result = await notification_repository.search_channels(querier=querier)
         assert len(result.items) == 5
@@ -872,17 +884,17 @@ class TestNotificationRepository:
         assert result.items[1].name == "Channel 02"
 
     @pytest.mark.asyncio
-    async def test_list_channels_no_pagination(
+    async def test_list_channels_large_limit(
         self,
         notification_repository: NotificationRepository,
         sample_channels_medium: list[uuid.UUID],
     ) -> None:
-        """Test listing channels without pagination returns all items"""
+        """Test listing channels with large limit returns all items"""
         # sample_channels_medium fixture creates 15 channels
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[],
-            pagination=None,
         )
         result = await notification_repository.search_channels(querier=querier)
         assert len(result.items) == 15
