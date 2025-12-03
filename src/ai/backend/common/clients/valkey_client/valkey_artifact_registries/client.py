@@ -1,20 +1,15 @@
 from __future__ import annotations
 
-import dataclasses
 import logging
 import uuid
-from typing import Optional, Self
+from collections.abc import Mapping
+from typing import Any, Optional, Self
 
 from glide import ExpirySet, ExpiryType
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
-)
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.common.data.artifact_registry.types import (
-    HuggingFaceRegistrySharedData,
-    ReservoirRegistrySharedData,
 )
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.json import dump_json_str, load_json
@@ -49,15 +44,17 @@ valkey_artifact_registries_resilience = Resilience(
     ]
 )
 
-_DEFAULT_CACHE_EXPIRATION = 60 * 60  # 1 hour
+_EXPIRATION = 60 * 60 * 24  # 24 hours
 
 
 class ValkeyArtifactRegistryClient:
     """
     Client for caching artifact registry information using Valkey.
 
-    This client caches registry data like HuggingFace registry configurations
-    using keys in the format: artifact_registries.{type}.{registry_uuid}
+    This client stores each registry as an individual key with independent expiry:
+    - Key format: artifact_registries.{registry_id}
+    - Value: JSON serialized registry data
+    - Each key has its own TTL for independent expiry management
     """
 
     _client: AbstractValkeyClient
@@ -106,149 +103,67 @@ class ValkeyArtifactRegistryClient:
         """Ping the Valkey server to check connection health."""
         await self._client.ping()
 
-    def _make_registry_key(self, registry_type: ArtifactRegistryType, registry_name: str) -> str:
+    def _make_registry_key(self, registry_id: uuid.UUID) -> str:
         """
-        Generate a cache key for artifact registry.
+        Generate a cache key for individual artifact registry.
 
-        :param registry_type: The type of registry (e.g., ArtifactRegistryType.HUGGINGFACE).
-        :param registry_name: The name of the registry.
+        :param registry_id: The UUID of the registry.
         :return: The formatted cache key.
         """
-        return f"artifact_registries.{registry_type.value}.{registry_name}"
+        return f"artifact_registries.{registry_id}"
 
     @valkey_artifact_registries_resilience.apply()
-    async def set_huggingface_registry(
+    async def set_registry(
         self,
-        registry_name: str,
-        registry_data: HuggingFaceRegistrySharedData,
-        expiration: int = _DEFAULT_CACHE_EXPIRATION,
+        registry_id: uuid.UUID,
+        registry_data: Mapping[str, Any],
     ) -> None:
         """
-        Cache HuggingFace registry data.
+        Cache registry data with independent expiry.
 
-        :param registry_name: The name of the HuggingFace registry.
-        :param registry_data: The registry data to cache.
-        :param expiration: The cache expiration time in seconds.
+        :param registry_id: The UUID of the registry.
+        :param registry_data: The registry data to cache (as dict).
         """
-        key = self._make_registry_key(ArtifactRegistryType.HUGGINGFACE, registry_name)
-        value = dump_json_str(dataclasses.asdict(registry_data))
+        key = self._make_registry_key(registry_id)
+        value = dump_json_str(registry_data)
         await self._client.client.set(
             key=key,
             value=value,
-            expiry=ExpirySet(ExpiryType.SEC, expiration),
+            expiry=ExpirySet(ExpiryType.SEC, _EXPIRATION),
         )
-        log.debug("Cached HuggingFace registry data for {}", registry_name)
 
     @valkey_artifact_registries_resilience.apply()
-    async def get_huggingface_registry(
+    async def get_registry(
         self,
-        registry_name: str,
-    ) -> Optional[HuggingFaceRegistrySharedData]:
+        registry_id: uuid.UUID,
+    ) -> Optional[Mapping[str, Any]]:
         """
-        Get cached HuggingFace registry data.
+        Get cached registry data.
 
-        :param registry_name: The name of the HuggingFace registry.
-        :return: The cached registry data or None if not found.
+        :param registry_id: The UUID of the registry.
+        :return: The cached registry data as dict or None if not found.
         """
-        key = self._make_registry_key(ArtifactRegistryType.HUGGINGFACE, registry_name)
+        key = self._make_registry_key(registry_id)
         value = await self._client.client.get(key)
         if value is None:
-            log.debug("Cache miss for HuggingFace registry {}", registry_name)
             return None
 
         json_value = value.decode()
         data = load_json(json_value)
-        # Convert UUID string back to UUID object
-        if "id" in data and isinstance(data["id"], str):
-            data["id"] = uuid.UUID(data["id"])
-        return HuggingFaceRegistrySharedData(**data)
+        return data
 
     @valkey_artifact_registries_resilience.apply()
-    async def delete_huggingface_registry(
+    async def delete_registry(
         self,
-        registry_name: str,
+        registry_id: uuid.UUID,
     ) -> bool:
         """
-        Delete cached HuggingFace registry data.
+        Delete cached registry data.
 
-        :param registry_name: The name of the HuggingFace registry.
+        :param registry_id: The UUID of the registry.
         :return: True if the key was deleted, False otherwise.
         """
-        key = self._make_registry_key(ArtifactRegistryType.HUGGINGFACE, registry_name)
+        key = self._make_registry_key(registry_id)
         result = await self._client.client.delete([key])
         deleted = result > 0
-        if deleted:
-            log.debug("Deleted cached HuggingFace registry data for {}", registry_name)
         return deleted
-
-    @valkey_artifact_registries_resilience.apply()
-    async def set_reservoir_registry(
-        self,
-        registry_name: str,
-        registry_data: ReservoirRegistrySharedData,
-        expiration: int = _DEFAULT_CACHE_EXPIRATION,
-    ) -> None:
-        """
-        Cache Reservoir registry data.
-
-        :param registry_name: The name of the Reservoir registry.
-        :param registry_data: The registry data to cache.
-        :param expiration: The cache expiration time in seconds.
-        """
-        key = self._make_registry_key(ArtifactRegistryType.RESERVOIR, registry_name)
-        value = dump_json_str(dataclasses.asdict(registry_data))
-        await self._client.client.set(
-            key=key,
-            value=value,
-            expiry=ExpirySet(ExpiryType.SEC, expiration),
-        )
-        log.debug("Cached Reservoir registry data for {}", registry_name)
-
-    @valkey_artifact_registries_resilience.apply()
-    async def get_reservoir_registry(
-        self,
-        registry_name: str,
-    ) -> Optional[ReservoirRegistrySharedData]:
-        """
-        Get cached Reservoir registry data.
-
-        :param registry_name: The name of the Reservoir registry.
-        :return: The cached registry data or None if not found.
-        """
-        key = self._make_registry_key(ArtifactRegistryType.RESERVOIR, registry_name)
-        value = await self._client.client.get(key)
-        if value is None:
-            log.debug("Cache miss for Reservoir registry {}", registry_name)
-            return None
-
-        json_value = value.decode()
-        data = load_json(json_value)
-        # Convert UUID string back to UUID object
-        if "id" in data and isinstance(data["id"], str):
-            data["id"] = uuid.UUID(data["id"])
-        return ReservoirRegistrySharedData(**data)
-
-    @valkey_artifact_registries_resilience.apply()
-    async def delete_reservoir_registry(
-        self,
-        registry_name: str,
-    ) -> bool:
-        """
-        Delete cached Reservoir registry data.
-
-        :param registry_name: The name of the Reservoir registry.
-        :return: True if the key was deleted, False otherwise.
-        """
-        key = self._make_registry_key(ArtifactRegistryType.RESERVOIR, registry_name)
-        result = await self._client.client.delete([key])
-        deleted = result > 0
-        if deleted:
-            log.debug("Deleted cached Reservoir registry data for {}", registry_name)
-        return deleted
-
-    @valkey_artifact_registries_resilience.apply()
-    async def flush_database(self) -> None:
-        """
-        Flush all keys in the current database.
-        """
-        await self._client.client.flushdb()
