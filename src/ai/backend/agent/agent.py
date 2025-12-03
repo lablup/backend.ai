@@ -407,6 +407,11 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     async def prepare_resource_spec(
         self,
     ) -> tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
+        """
+        Generates base resource spec lacking non agent backend agnostic information
+        (e.g. unified device allocation). Do not call this method directly outside
+        `generate_resource_spec` implementation.
+        """
         raise NotImplementedError
 
     @abstractmethod
@@ -691,37 +696,36 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         # Inject ComputeDevice-specific hooks
         already_injected_hooks: set[Path] = set()
 
-        for dev_type, device_alloc in resource_spec.allocations.items():
-            computer_ctx = self.computers[dev_type]
+        for device_view in resource_spec.device_list:
+            computer_ctx = self.computers[device_view.device]
             await self.apply_accelerator_allocation(
                 computer_ctx.instance,
-                device_alloc,
+                {device_view.slot: device_view.device_alloc},
             )
             accelerator_mounts = await self.generate_accelerator_mounts(
                 computer_ctx.instance,
-                device_alloc,
+                {device_view.slot: device_view.device_alloc},
             )
 
             for mount_info in accelerator_mounts:
                 _mount(mount_info.mode, mount_info.src_path, mount_info.dst_path.as_posix())
-            alloc_sum = Decimal(0)
-            for dev_id, per_dev_alloc in device_alloc.items():
-                alloc_sum += sum(per_dev_alloc.values())
-            if alloc_sum > 0:
-                hook_paths = await computer_ctx.instance.get_hooks(distro, arch)
-                if hook_paths:
-                    log.debug(
-                        "accelerator {} provides hooks: {}",
-                        type(computer_ctx.instance).__name__,
-                        ", ".join(map(str, hook_paths)),
-                    )
-                for hook_path in map(lambda p: Path(p).absolute(), hook_paths):
-                    if hook_path in already_injected_hooks:
-                        continue
-                    container_hook_path = f"/opt/kernel/{hook_path.name}"
-                    _mount(MountTypes.BIND, hook_path, container_hook_path)
-                    environ["LD_PRELOAD"] += ":" + container_hook_path
-                    already_injected_hooks.add(hook_path)
+
+            # `.device_list()` guarantees every listed device (slot) would
+            # actually attach device to the container
+            hook_paths = await computer_ctx.instance.get_hooks(distro, arch)
+            if hook_paths:
+                log.debug(
+                    "accelerator {} provides hooks: {}",
+                    type(computer_ctx.instance).__name__,
+                    ", ".join(map(str, hook_paths)),
+                )
+            for hook_path in map(lambda p: Path(p).absolute(), hook_paths):
+                if hook_path in already_injected_hooks:
+                    continue
+                container_hook_path = f"/opt/kernel/{hook_path.name}"
+                _mount(MountTypes.BIND, hook_path, container_hook_path)
+                environ["LD_PRELOAD"] += ":" + container_hook_path
+                already_injected_hooks.add(hook_path)
 
     async def inject_additional_device_env_vars(
         self, resource_spec: KernelResourceSpec, environ: MutableMapping[str, str]
@@ -753,6 +757,27 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     def get_supplementary_gids(self) -> set[int]:
         # TODO(BA-3073): This should be separated out to its own class/module.
         return self.supplementary_gids
+
+    async def generate_resource_spec(self) -> tuple[KernelResourceSpec, Mapping[str, Any] | None]:
+        """
+        Creates complete set of `KernelResourceSpec` based on the results from
+        `prepare_resource_spec()` result.
+        """
+        base_resource_spec, resource_opts = await self.prepare_resource_spec()
+        unified_devices: list[tuple[DeviceName, SlotName]] = []
+
+        # implicitly attach unified accelerators to every created kernels
+        for dev_type, computer_ctx in self.computers.items():
+            for slot_name, slot_type in computer_ctx.instance.slot_types:
+                if slot_type == SlotTypes.UNIFIED:
+                    log.debug(
+                        "mount_krunner(): Attaching Unified device {} to kernel {}",
+                        slot_name,
+                        self.kernel_id,
+                    )
+                    unified_devices.append((dev_type, slot_name))
+        base_resource_spec.unified_devices = unified_devices
+        return base_resource_spec, resource_opts
 
 
 KernelCreationContextType = TypeVar(
@@ -2678,7 +2703,8 @@ class AbstractAgent(
 
                 # Get the resource spec from existing kernel scratches
                 # or create a new resource spec from ctx.kernel_config
-                resource_spec, resource_opts = await ctx.prepare_resource_spec()
+                resource_spec, resource_opts = await ctx.generate_resource_spec()
+
                 # When creating a new kernel,
                 # we need to allocate agent resources, prepare the networks,
                 # adn specify the container mounts.
