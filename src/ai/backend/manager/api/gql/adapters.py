@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .artifact import ArtifactGQLAdapter, ArtifactRevisionGQLAdapter
 from .notification import NotificationChannelGQLAdapter, NotificationRuleGQLAdapter
 from .scaling_group import ScalingGroupGQLAdapter
 
@@ -17,3 +18,5 @@ class GQLAdapters:
     notification_channel: NotificationChannelGQLAdapter
     notification_rule: NotificationRuleGQLAdapter
     scaling_group: ScalingGroupGQLAdapter
+    artifact: ArtifactGQLAdapter
+    artifact_revision: ArtifactRevisionGQLAdapter
