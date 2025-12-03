@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .artifact import ArtifactGQLAdapter, ArtifactRevisionGQLAdapter
 from .notification import NotificationChannelGQLAdapter, NotificationRuleGQLAdapter
 
 __all__ = ("GQLAdapters",)
@@ -15,3 +16,5 @@ class GQLAdapters:
 
     notification_channel: NotificationChannelGQLAdapter
     notification_rule: NotificationRuleGQLAdapter
+    artifact: ArtifactGQLAdapter
+    artifact_revision: ArtifactRevisionGQLAdapter
