@@ -282,19 +282,48 @@ class ScalingGroupRow(Base):
 
     def to_dataclass(self) -> ScalingGroupData:
         """Convert Row to domain model data."""
+        from ai.backend.manager.data.scaling_group.types import (
+            ScalingGroupDriverConfig,
+            ScalingGroupMetadata,
+            ScalingGroupNetworkConfig,
+            ScalingGroupSchedulerConfig,
+            ScalingGroupSchedulerOptions,
+            ScalingGroupStatus,
+            SchedulerType,
+        )
+
         return ScalingGroupData(
             name=self.name,
-            description=self.description,
-            is_active=self.is_active,
-            is_public=self.is_public,
-            created_at=self.created_at,
-            wsproxy_addr=self.wsproxy_addr,
-            wsproxy_api_token=self.wsproxy_api_token,
-            driver=self.driver,
-            driver_opts=self.driver_opts,
-            scheduler=self.scheduler,
-            scheduler_opts=self.scheduler_opts,
-            use_host_network=self.use_host_network,
+            status=ScalingGroupStatus(
+                is_active=self.is_active,
+                is_public=self.is_public,
+            ),
+            metadata=ScalingGroupMetadata(
+                description=self.description,
+                created_at=self.created_at,
+            ),
+            wsproxy=ScalingGroupNetworkConfig(
+                wsproxy_addr=self.wsproxy_addr,
+                wsproxy_api_token=self.wsproxy_api_token,
+                use_host_network=self.use_host_network,
+            ),
+            driver=ScalingGroupDriverConfig(
+                name=self.driver,
+                options=self.driver_opts,
+            ),
+            scheduler=ScalingGroupSchedulerConfig(
+                name=SchedulerType(self.scheduler),
+                options=ScalingGroupSchedulerOptions(
+                    allowed_session_types=self.scheduler_opts.allowed_session_types,
+                    pending_timeout=self.scheduler_opts.pending_timeout,
+                    config=self.scheduler_opts.config,
+                    agent_selection_strategy=self.scheduler_opts.agent_selection_strategy,
+                    agent_selector_config=self.scheduler_opts.agent_selector_config,
+                    enforce_spreading_endpoint_replica=self.scheduler_opts.enforce_spreading_endpoint_replica,
+                    allow_fractional_resource_fragmentation=self.scheduler_opts.allow_fractional_resource_fragmentation,
+                    route_cleanup_target_statuses=self.scheduler_opts.route_cleanup_target_statuses,
+                ),
+            ),
         )
 
     @classmethod
