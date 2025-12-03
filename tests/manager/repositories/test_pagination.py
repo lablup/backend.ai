@@ -165,7 +165,7 @@ class TestCursorForwardPagination:
         )
         pagination = CursorForwardPagination(
             first=first,
-            default_order=test_items.c.id.asc(),
+            cursor_order=test_items.c.id.asc(),
             cursor_condition=cursor_condition,
         )
         querier = Querier(pagination=pagination)
@@ -212,7 +212,7 @@ class TestCursorBackwardPagination:
         )
         pagination = CursorBackwardPagination(
             last=last,
-            default_order=test_items.c.id.desc(),
+            cursor_order=test_items.c.id.desc(),
             cursor_condition=cursor_condition,
         )
         querier = Querier(pagination=pagination)
@@ -272,7 +272,7 @@ class TestPaginationWithFilter:
         query = _make_base_query(test_items)
         pagination = CursorForwardPagination(
             first=10,
-            default_order=test_items.c.id.asc(),
+            cursor_order=test_items.c.id.asc(),
             cursor_condition=None,  # Start from beginning of filtered set
         )
         querier = Querier(
@@ -328,7 +328,7 @@ class TestEdgeCases:
                 querier = Querier(
                     pagination=CursorForwardPagination(
                         first=10,
-                        default_order=empty_table.c.id.asc(),
+                        cursor_order=empty_table.c.id.asc(),
                         cursor_condition=None,
                     )
                 )
@@ -379,7 +379,7 @@ class TestEdgeCases:
                 querier = Querier(
                     pagination=CursorForwardPagination(
                         first=10,
-                        default_order=single_table.c.id.asc(),
+                        cursor_order=single_table.c.id.asc(),
                         cursor_condition=None,
                     )
                 )

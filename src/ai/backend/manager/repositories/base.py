@@ -111,14 +111,14 @@ class CursorForwardPagination(QueryPagination):
     - first: Number of items to return from the cursor position
     - cursor_condition: Optional QueryCondition for WHERE clause (e.g., id > cursor_id).
       If None, starts from the beginning.
-    - default_order: QueryOrder for cursor-based ordering (e.g., id ASC)
+    - cursor_order: QueryOrder for cursor-based ordering (e.g., created_at ASC)
     """
 
     first: int
     """Number of items to return (must be positive)."""
 
-    default_order: QueryOrder
-    """Default ordering for cursor-based pagination (e.g., ORDER BY id ASC)."""
+    cursor_order: QueryOrder
+    """Ordering for cursor-based pagination (e.g., ORDER BY created_at ASC)."""
 
     cursor_condition: Optional[QueryCondition] = None
     """Optional QueryCondition for cursor position. If None, starts from the beginning."""
@@ -131,11 +131,11 @@ class CursorForwardPagination(QueryPagination):
         """
         Apply cursor-based forward pagination to query.
 
-        Applies cursor condition (if present), default order, and LIMIT + 1 for has_next_page detection.
+        Applies cursor condition (if present), cursor order, and LIMIT + 1 for has_next_page detection.
         """
         if self.cursor_condition is not None:
             query = query.where(self.cursor_condition())
-        query = query.order_by(self.default_order)
+        query = query.order_by(self.cursor_order)
         return query.limit(self.first + 1)
 
     def compute_page_info(self, rows: list[Row], total_count: int) -> _PageInfoResult[Row]:
@@ -163,14 +163,14 @@ class CursorBackwardPagination(QueryPagination):
     - last: Number of items to return before the cursor position
     - cursor_condition: Optional QueryCondition for WHERE clause (e.g., id < cursor_id).
       If None, starts from the end.
-    - default_order: QueryOrder for cursor-based ordering (e.g., id DESC for reverse fetch)
+    - cursor_order: QueryOrder for cursor-based ordering (e.g., created_at DESC for reverse fetch)
     """
 
     last: int
     """Number of items to return (must be positive)."""
 
-    default_order: QueryOrder
-    """Default ordering for cursor-based pagination (e.g., ORDER BY id DESC)."""
+    cursor_order: QueryOrder
+    """Ordering for cursor-based pagination (e.g., ORDER BY created_at DESC)."""
 
     cursor_condition: Optional[QueryCondition] = None
     """Optional QueryCondition for cursor position. If None, starts from the end."""
@@ -183,11 +183,11 @@ class CursorBackwardPagination(QueryPagination):
         """
         Apply cursor-based backward pagination to query.
 
-        Applies cursor condition (if present), default order, and LIMIT + 1 for has_previous_page detection.
+        Applies cursor condition (if present), cursor order, and LIMIT + 1 for has_previous_page detection.
         """
         if self.cursor_condition is not None:
             query = query.where(self.cursor_condition())
-        query = query.order_by(self.default_order)
+        query = query.order_by(self.cursor_order)
         return query.limit(self.last + 1)
 
     def compute_page_info(self, rows: list[Row], total_count: int) -> _PageInfoResult[Row]:
@@ -266,14 +266,14 @@ def _apply_querier(
 
     Note:
         For cursor-based pagination, the pagination.apply() method applies
-        default_order first. User-specified orders are applied after,
+        cursor_order first. User-specified orders are applied after,
         serving as secondary sort criteria.
     """
     # Apply all conditions
     for condition in querier.conditions:
         query = query.where(condition())
 
-    # Apply pagination (includes cursor condition and default_order for cursor pagination)
+    # Apply pagination (includes cursor condition and cursor_order for cursor pagination)
     query = querier.pagination.apply(query)
 
     # Apply user orders AFTER default order from pagination

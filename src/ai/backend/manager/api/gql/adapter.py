@@ -42,7 +42,7 @@ class CursorPaginationFactories:
     Contains domain-specific factories needed for cursor-based pagination.
     """
 
-    default_order: QueryOrder
+    cursor_order: QueryOrder
     forward_cursor_condition_factory: CursorConditionFactory
     backward_cursor_condition_factory: CursorConditionFactory
 
@@ -58,7 +58,7 @@ class BaseGQLAdapter:
         """Build pagination from GraphQL pagination arguments.
 
         For cursor-based pagination (first/after or last/before), cursor condition factories
-        and default_order are required. The factories create cursor conditions from decoded
+        and cursor_order are required. The factories create cursor conditions from decoded
         cursor values.
 
         If no pagination parameters are provided, returns a default OffsetPagination
@@ -87,7 +87,7 @@ class BaseGQLAdapter:
                 cursor_condition = factories.forward_cursor_condition_factory(cursor_value)
             return CursorForwardPagination(
                 first=options.first,
-                default_order=factories.default_order,
+                cursor_order=factories.cursor_order,
                 cursor_condition=cursor_condition,
             )
         elif options.last is not None:
@@ -99,7 +99,7 @@ class BaseGQLAdapter:
                 cursor_condition = factories.backward_cursor_condition_factory(cursor_value)
             return CursorBackwardPagination(
                 last=options.last,
-                default_order=factories.default_order,
+                cursor_order=factories.cursor_order,
                 cursor_condition=cursor_condition,
             )
         elif options.limit is not None:
