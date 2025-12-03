@@ -5,10 +5,11 @@ from __future__ import annotations
 from typing import Optional
 
 import strawberry
-from strawberry import Info
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge
 
 from ai.backend.manager.api.gql.base import to_global_id
+from ai.backend.manager.repositories.scaling_group.options import ScalingGroupConditions
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
 )
@@ -37,8 +38,63 @@ class ScalingGroupV2Connection(Connection[ScalingGroupV2GQL]):
 # Query fields
 
 
-@strawberry.field(description="Added in 25.18.0. List scaling groups")
+@strawberry.field(description="Added in 25.18.0. List scaling groups for a specific project")
 async def scaling_groups_v2(
+    info: Info[StrawberryGQLContext],
+    project: ID,
+    filter: Optional[ScalingGroupFilterGQL] = None,
+    order_by: Optional[list[ScalingGroupOrderByGQL]] = None,
+    before: Optional[str] = None,
+    after: Optional[str] = None,
+    first: Optional[int] = None,
+    last: Optional[int] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+) -> ScalingGroupV2Connection:
+    processors = info.context.processors
+
+    # Build querier from filter, order_by, and pagination using adapter
+    querier = info.context.gql_adapters.scaling_group.build_querier(
+        filter=filter,
+        order_by=order_by,
+        first=first,
+        after=after,
+        last=last,
+        before=before,
+        limit=limit,
+        offset=offset,
+    )
+
+    # Apply project filtering as a required condition
+    project_condition = ScalingGroupConditions.by_project(project)
+    querier.conditions.append(project_condition)
+
+    action_result = await processors.scaling_group.search_scaling_groups.wait_for_complete(
+        SearchScalingGroupsAction(querier=querier)
+    )
+
+    nodes = [ScalingGroupV2GQL.from_dataclass(data) for data in action_result.scaling_groups]
+
+    edges = [
+        ScalingGroupV2Edge(node=node, cursor=to_global_id(ScalingGroupV2GQL, node.id))
+        for node in nodes
+    ]
+
+    # TODO: Get correct has_next_page and has_previous_page values
+    return ScalingGroupV2Connection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=action_result.total_count,
+    )
+
+
+@strawberry.field(description="Added in 25.18.0. List all scaling groups")
+async def all_scaling_groups_v2(
     info: Info[StrawberryGQLContext],
     filter: Optional[ScalingGroupFilterGQL] = None,
     order_by: Optional[list[ScalingGroupOrderByGQL]] = None,
