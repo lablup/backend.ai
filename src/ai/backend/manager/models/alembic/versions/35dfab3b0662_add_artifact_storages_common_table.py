@@ -57,7 +57,6 @@ def upgrade() -> None:
                 )
 
             # Drop the name column and constraint
-            op.drop_constraint("uq_object_storages_name", "object_storages", type_="unique")
             op.drop_index("ix_object_storages_name", table_name="object_storages")
             op.drop_column("object_storages", "name")
 
@@ -83,7 +82,6 @@ def upgrade() -> None:
                 )
 
             # Drop the name column and constraint
-            op.drop_constraint("uq_vfs_storages_name", "vfs_storages", type_="unique")
             op.drop_index("ix_vfs_storages_name", table_name="vfs_storages")
             op.drop_column("vfs_storages", "name")
 
@@ -130,7 +128,6 @@ def downgrade() -> None:
 
     # Recreate constraints
     op.create_index("ix_object_storages_name", "object_storages", ["name"], unique=False)
-    op.create_unique_constraint("uq_object_storages_name", "object_storages", ["name"])
 
     # Add name column back to vfs_storages
     op.add_column(
@@ -167,7 +164,6 @@ def downgrade() -> None:
 
     # Recreate constraints
     op.create_index("ix_vfs_storages_name", "vfs_storages", ["name"], unique=False)
-    op.create_unique_constraint("uq_vfs_storages_name", "vfs_storages", ["name"])
 
     op.drop_table("artifact_storages")
     # ### end Alembic commands ###
