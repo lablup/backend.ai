@@ -3781,18 +3781,24 @@ class AbstractAgent(
         return f"last_registry.{self.id}.dat"
 
     def _resolve_conflicting_registry_file(self, base_dir: Path) -> str:
+        if self.agent_class != AgentClass.PRIMARY:
+            # Non-primary agents must never use local_instance_id based file name.
+            return self._last_registry_file
+
         primary_agent_file = base_dir / self._primary_last_registry_file
         auxiliary_agent_file = base_dir / self._auxiliary_last_registry_file
-        if primary_agent_file.is_file() and auxiliary_agent_file.is_file():
-            primary_modification_time = primary_agent_file.stat().st_mtime
-            auxiliary_modification_time = auxiliary_agent_file.stat().st_mtime
 
-            if primary_modification_time > auxiliary_modification_time:
-                return self._primary_last_registry_file
-            else:
+        match primary_agent_file.is_file(), auxiliary_agent_file.is_file():
+            case True, True if (
+                primary_agent_file.stat().st_mtime < auxiliary_agent_file.stat().st_mtime
+            ):
+                # Case 1: If both files exist for primary agent, and ID-based file is more recent.
                 return self._auxiliary_last_registry_file
-        else:
-            return self._last_registry_file
+            case False, True:
+                # Case 2: Only ID-based file exists.
+                return self._auxiliary_last_registry_file
+            case _:
+                return self._primary_last_registry_file
 
 
 async def handle_volume_mount(
