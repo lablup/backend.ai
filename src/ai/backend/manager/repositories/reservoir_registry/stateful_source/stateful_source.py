@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import asdict
-from typing import Optional
 
 from glide import ExpirySet, ExpiryType
 
@@ -13,6 +12,7 @@ from ai.backend.common.clients.valkey_client.valkey_artifact_registries.client i
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
+from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -37,17 +37,23 @@ class ReservoirStatefulSource:
         """Generate cache key for reservoir registry by name."""
         return f"artifact_registries.reservoir.{registry_name}"
 
-    async def get_registry(self, registry_name: str) -> Optional[ReservoirRegistryData]:
+    async def get_registry(self, registry_name: str) -> ReservoirRegistryData:
         """
         Get cached Reservoir registry data by registry name.
 
+        Stateful view assumes the value always exists in cache.
+        If not found, raises an error.
+
         :param registry_name: The name of the Reservoir registry.
-        :return: The cached registry data or None if not found.
+        :return: The cached registry data.
+        :raises ArtifactRegistryNotFoundError: If the registry is not found in cache.
         """
         key = self._make_cache_key(registry_name)
         value = await self._valkey_artifact_registry._client.client.get(key)
         if value is None:
-            return None
+            raise ArtifactRegistryNotFoundError(
+                f"Reservoir registry '{registry_name}' not found in cache"
+            )
 
         data = load_json(value.decode())
         # Convert string UUID back to UUID

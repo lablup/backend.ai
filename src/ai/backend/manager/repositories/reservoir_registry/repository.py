@@ -71,14 +71,8 @@ class ReservoirRegistryRepository:
 
     @reservoir_registry_repository_resilience.apply()
     async def get_registry_data_by_name(self, name: str) -> ReservoirRegistryData:
-        # Try cache first (read-through caching)
-        cached_data = await self._stateful_source.get_registry(name)
-        if cached_data is not None:
-            return cached_data
-        # Cache miss - fetch from DB and populate cache
-        data = await self._db_source.get_registry_data_by_name(name)
-        await self._stateful_source.set_registry(name, data)
-        return data
+        # Read from stateful source only - no fallback to DB
+        return await self._stateful_source.get_registry(name)
 
     @reservoir_registry_repository_resilience.apply()
     async def get_registry_data_by_artifact_id(
