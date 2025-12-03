@@ -27,4 +27,6 @@ class ScalingGroupService:
         return SearchScalingGroupsActionResult(
             scaling_groups=result.items,
             total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )

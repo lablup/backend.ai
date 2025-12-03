@@ -8,7 +8,7 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge
 
-from ai.backend.manager.api.gql.base import to_global_id
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.repositories.scaling_group.options import ScalingGroupConditions
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
@@ -75,17 +75,13 @@ async def scaling_groups_v2(
 
     nodes = [ScalingGroupV2GQL.from_dataclass(data) for data in action_result.scaling_groups]
 
-    edges = [
-        ScalingGroupV2Edge(node=node, cursor=to_global_id(ScalingGroupV2GQL, node.id))
-        for node in nodes
-    ]
+    edges = [ScalingGroupV2Edge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
-    # TODO: Get correct has_next_page and has_previous_page values
     return ScalingGroupV2Connection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
             start_cursor=edges[0].cursor if edges else None,
             end_cursor=edges[-1].cursor if edges else None,
         ),
@@ -125,17 +121,13 @@ async def all_scaling_groups_v2(
 
     nodes = [ScalingGroupV2GQL.from_dataclass(data) for data in action_result.scaling_groups]
 
-    edges = [
-        ScalingGroupV2Edge(node=node, cursor=to_global_id(ScalingGroupV2GQL, node.id))
-        for node in nodes
-    ]
+    edges = [ScalingGroupV2Edge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
-    # TODO: Get correct has_next_page and has_previous_page values
     return ScalingGroupV2Connection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
             start_cursor=edges[0].cursor if edges else None,
             end_cursor=edges[-1].cursor if edges else None,
         ),

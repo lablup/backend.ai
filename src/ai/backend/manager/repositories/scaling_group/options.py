@@ -98,6 +98,24 @@ class ScalingGroupConditions:
 
         return inner
 
+    @staticmethod
+    def by_name_greater_than(name: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor)."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupRow.name > name
+
+        return inner
+
+    @staticmethod
+    def by_name_less_than(name: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor)."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupRow.name < name
+
+        return inner
+
 
 class ScalingGroupOrders:
     """Query orders for scaling groups."""
