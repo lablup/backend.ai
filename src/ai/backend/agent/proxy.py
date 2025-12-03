@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Set, Tuple
 
 import attrs
+from pydantic import BaseModel
 
 from ai.backend.common.utils import current_loop
 
@@ -13,6 +14,11 @@ class DomainSocketProxy:
     host_sock_path: Path
     host_proxy_path: Path
     proxy_server: asyncio.AbstractServer
+
+
+class DomainSocketPathPair(BaseModel):
+    host_sock_path: Path
+    host_proxy_path: Path
 
 
 async def proxy_connection(
