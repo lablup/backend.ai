@@ -5,19 +5,13 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact.types import ArtifactData
-from ai.backend.manager.repositories.artifact.repository import (
-    ArtifactFilterOptions,
-    ArtifactOrderingOptions,
-    PaginationOptions,
-)
+from ai.backend.manager.repositories.base import Querier
 from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 
 @dataclass
 class ListArtifactsAction(ArtifactAction):
-    pagination: PaginationOptions
-    ordering: Optional[ArtifactOrderingOptions] = None
-    filters: Optional[ArtifactFilterOptions] = None
+    querier: Optional[Querier] = None
 
     @override
     def entity_id(self) -> Optional[str]:
