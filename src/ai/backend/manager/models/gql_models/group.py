@@ -21,6 +21,7 @@ from sqlalchemy.engine.row import Row
 
 from ai.backend.common.exception import (
     GroupNotFound,
+    InvalidAPIParameters,
 )
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
@@ -657,6 +658,10 @@ class CreateGroup(graphene.Mutation):
         props: GroupInput,
     ) -> CreateGroup:
         graph_ctx: GraphQueryContext = info.context
+        if name.strip() == "" or len(name) > 64:
+            raise InvalidAPIParameters(
+                "Group name cannot be empty or whitespace and must not exceed 64 characters."
+            )
 
         action = props.to_action(name)
         res = await graph_ctx.processors.group.create_group.wait_for_complete(action)

@@ -72,12 +72,6 @@ class GroupService:
         self._admin_group_repository = group_repositories.admin_repository
 
     async def create_group(self, action: CreateGroupAction) -> CreateGroupActionResult:
-        if action.input.name.strip() == "":
-            raise InvalidAPIParameters("Group name cannot be empty or whitespace.")
-
-        if len(action.input.name) > 64 or action.input.name.strip() == "":
-            raise InvalidAPIParameters("Group name cannot exceed 64 characters.")
-
         group_data = await self._group_repository.create(action.input)
         return CreateGroupActionResult(data=group_data)
 

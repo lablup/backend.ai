@@ -171,9 +171,9 @@ class GroupRepository:
                 )
                 row = await session.scalar(query_stmt)
                 row = cast(Optional[GroupRow], row)
-                if row is not None:
-                    return row.to_data()
-                raise GroupNotFound()
+                if row is None:
+                    raise GroupNotFound(f"Group not found: {group_id}")
+                return row.to_data()
 
             # If only user updates were performed, return None
             return None

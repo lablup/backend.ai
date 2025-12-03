@@ -7,10 +7,11 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.exception import GroupNotFound, InvalidAPIParameters
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import RedisConnectionInfo, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
+from ai.backend.manager.errors.resource import GroupNotFound
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
