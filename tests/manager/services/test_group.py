@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.exception import GroupNotFound, InvalidAPIParameters
 from ai.backend.common.types import RedisConnectionInfo, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
@@ -220,8 +220,6 @@ async def test_modify_group(
 async def test_modify_group_with_invalid_group_id(
     processors: GroupProcessors,
 ) -> None:
-    from ai.backend.manager.errors.resource import GroupNotFound
-
     action = ModifyGroupAction(
         group_id=uuid.UUID("00000000-0000-0000-0000-000000000000"),
         modifier=GroupModifier(
