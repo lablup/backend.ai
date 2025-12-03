@@ -29,6 +29,17 @@ class QueryPagination(ABC):
     select statement with appropriate pagination logic.
     """
 
+    @property
+    @abstractmethod
+    def uses_window_function(self) -> bool:
+        """Whether this pagination uses window function for total_count.
+
+        Returns:
+            True if window function should be added to main query (Offset),
+            False if separate count query should be used (Cursor).
+        """
+        raise NotImplementedError
+
     @abstractmethod
     def apply(self, query: sa.sql.Select) -> sa.sql.Select:
         """Apply pagination to a SQLAlchemy select statement."""
@@ -65,6 +76,10 @@ class OffsetPagination(QueryPagination):
 
     offset: int = 0
     """Number of items to skip from the beginning (must be non-negative)."""
+
+    @property
+    def uses_window_function(self) -> bool:
+        return True
 
     def apply(self, query: sa.sql.Select) -> sa.sql.Select:
         """Apply offset-based pagination to query."""
@@ -107,6 +122,10 @@ class CursorForwardPagination(QueryPagination):
 
     cursor_condition: Optional[QueryCondition] = None
     """Optional QueryCondition for cursor position. If None, starts from the beginning."""
+
+    @property
+    def uses_window_function(self) -> bool:
+        return False
 
     def apply(self, query: sa.sql.Select) -> sa.sql.Select:
         """
@@ -155,6 +174,10 @@ class CursorBackwardPagination(QueryPagination):
 
     cursor_condition: Optional[QueryCondition] = None
     """Optional QueryCondition for cursor position. If None, starts from the end."""
+
+    @property
+    def uses_window_function(self) -> bool:
+        return False
 
     def apply(self, query: sa.sql.Select) -> sa.sql.Select:
         """
@@ -289,39 +312,41 @@ async def execute_querier(
 ) -> QuerierResult[Row]:
     """Execute query with querier and return rows with total_count and pagination info.
 
-    Uses count().over() window function for efficient counting in most cases.
-    Falls back to separate count query only when rows is empty (offset exceeds total).
-
-    For cursor-based pagination, fetches N+1 rows to detect has_next_page/has_previous_page,
-    then slices to return only the requested count.
+    For offset pagination, uses count().over() window function for efficient counting.
+    For cursor pagination, executes a separate count query with filter conditions.
 
     Args:
         db_sess: Database session
-        query: SELECT query with count().over().label("total_count") included
+        query: Base SELECT query (without count window function)
         querier: Querier for filtering, ordering, and pagination
 
     Returns:
         QuerierResult containing rows, total_count, and pagination info
     """
     initial_query = query
-    query = _apply_querier(query, querier)
 
+    # Add window function for offset pagination
+    if querier.pagination.uses_window_function:
+        query = query.add_columns(sa.func.count().over().label("total_count"))
+
+    # Apply conditions and pagination to get data rows
+    query = _apply_querier(query, querier)
     result = await db_sess.execute(query)
     rows = list(result.all())
 
     total_count: int
-    if rows:
+    if querier.pagination.uses_window_function and rows:
+        # Offset pagination with results: use window function from rows
         total_count = rows[0].total_count
     else:
-        # Fallback: Get total_count from window function without pagination
-        # Re-execute query with conditions but without pagination
-        fallback_query = initial_query
+        # Cursor pagination or offset fallback (rows empty):
+        # Execute pure count query with filter conditions only
+        count_query = sa.select(sa.func.count()).select_from(initial_query.froms[0])
         for condition in querier.conditions:
-            fallback_query = fallback_query.where(condition())
+            count_query = count_query.where(condition())
 
-        result = await db_sess.execute(fallback_query)
-        first_row = result.first()
-        total_count = first_row.total_count if first_row else 0
+        count_result = await db_sess.execute(count_query)
+        total_count = count_result.scalar() or 0
 
     # Calculate pagination info
     page_info = querier.pagination.compute_page_info(rows, total_count)

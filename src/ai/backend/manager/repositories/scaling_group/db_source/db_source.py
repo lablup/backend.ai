@@ -37,10 +37,7 @@ class ScalingGroupDBSource:
     ) -> ScalingGroupListResult:
         """Searches scaling groups with total count."""
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(
-                ScalingGroupRow,
-                sa.func.count().over().label("total_count"),
-            )
+            query = sa.select(ScalingGroupRow)
 
             result = await execute_querier(
                 db_sess,
