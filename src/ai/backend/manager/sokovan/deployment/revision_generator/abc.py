@@ -27,6 +27,7 @@ class RevisionGenerator(ABC):
         draft_revision: ModelRevisionSpecDraft,
         vfolder_id: UUID,
         model_definition_path: Optional[str],
+        default_architecture: Optional[str] = None,
     ) -> ModelRevisionSpec:
         """
         Process draft revision by loading service definition and merging.
@@ -35,6 +36,7 @@ class RevisionGenerator(ABC):
             draft_revision: Draft model revision from API
             vfolder_id: VFolder ID containing model and service definition
             model_definition_path: Optional path to model definition directory
+            default_architecture: Default architecture from scaling group agents
 
         Returns:
             Final ModelRevisionSpec ready for deployment
@@ -69,6 +71,7 @@ class RevisionGenerator(ABC):
         self,
         draft_revision: ModelRevisionSpecDraft,
         service_definition: Optional[ModelServiceDefinition],
+        default_architecture: Optional[str] = None,
     ) -> ModelRevisionSpec:
         """
         Merge draft revision with service definition.
@@ -76,6 +79,7 @@ class RevisionGenerator(ABC):
         Args:
             draft_revision: Draft model revision from API
             service_definition: Optional service definition from file
+            default_architecture: Default architecture from scaling group agents
 
         Returns:
             Merged ModelRevisionSpec

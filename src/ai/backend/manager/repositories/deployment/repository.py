@@ -879,3 +879,13 @@ class DeploymentRepository:
             List of RouteServiceDiscoveryInfo containing kernel host/port and endpoint details
         """
         return await self._db_source.fetch_route_service_discovery_info(route_ids)
+
+    @deployment_repository_resilience.apply()
+    async def get_default_architecture_from_scaling_group(
+        self, scaling_group_name: str
+    ) -> Optional[str]:
+        """
+        Get the default (most common) architecture from active agents in a scaling group.
+        Returns None if no active agents exist.
+        """
+        return await self._db_source.get_default_architecture_from_scaling_group(scaling_group_name)
