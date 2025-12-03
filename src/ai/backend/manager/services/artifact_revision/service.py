@@ -323,10 +323,8 @@ class ArtifactRevisionService:
         (
             artifacts_data,
             total_count,
-        ) = await self._artifact_repository.list_artifact_revisions_paginated(
-            pagination=action.pagination,
-            ordering=action.ordering,
-            filters=action.filters,
+        ) = await self._artifact_repository.search_artifact_revisions(
+            querier=action.querier,
         )
         return ListArtifactRevisionsActionResult(data=artifacts_data, total_count=total_count)
 
