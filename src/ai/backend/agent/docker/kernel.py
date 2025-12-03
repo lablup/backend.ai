@@ -44,6 +44,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
 
+KERNEL_HOST = "127.0.0.1"
+
 
 class DockerKernel(AbstractKernel):
     network_driver: str
