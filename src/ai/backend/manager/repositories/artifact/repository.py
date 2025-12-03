@@ -26,6 +26,7 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactRevisionFilterOptions,
     ArtifactRevisionOrderingOptions,
 )
+from ai.backend.manager.repositories.base import Querier
 from ai.backend.manager.repositories.types import PaginationOptions
 
 artifact_repository_resilience = Resilience(
@@ -219,3 +220,30 @@ class ArtifactRepository:
         return await self._db_source.list_artifact_revisions_paginated(
             pagination=pagination, ordering=ordering, filters=filters
         )
+
+    @artifact_repository_resilience.apply()
+    async def search_artifacts(
+        self,
+        querier: Optional[Querier] = None,
+    ) -> tuple[list[ArtifactData], int]:
+        """Search artifacts with querier pattern."""
+
+        return await self._db_source.search_artifacts(querier=querier)
+
+    @artifact_repository_resilience.apply()
+    async def search_artifact_revisions(
+        self,
+        querier: Optional[Querier] = None,
+    ) -> tuple[list[ArtifactRevisionData], int]:
+        """Search artifact revisions with querier pattern."""
+
+        return await self._db_source.search_artifact_revisions(querier=querier)
+
+    @artifact_repository_resilience.apply()
+    async def search_artifacts_with_revisions(
+        self,
+        querier: Optional[Querier] = None,
+    ) -> tuple[list[ArtifactDataWithRevisions], int]:
+        """Search artifacts with their revisions using querier pattern."""
+
+        return await self._db_source.search_artifacts_with_revisions(querier=querier)
