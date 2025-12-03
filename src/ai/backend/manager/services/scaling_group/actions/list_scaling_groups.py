@@ -14,7 +14,7 @@ from .base import ScalingGroupAction
 class SearchScalingGroupsAction(ScalingGroupAction):
     """Action to search scaling groups."""
 
-    querier: Optional[Querier] = None
+    querier: Querier
 
     @override
     @classmethod
