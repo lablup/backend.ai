@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .notification import NotificationChannelGQLAdapter, NotificationRuleGQLAdapter
+from .scaling_group import ScalingGroupGQLAdapter
 
 __all__ = ("GQLAdapters",)
 
@@ -15,3 +16,4 @@ class GQLAdapters:
 
     notification_channel: NotificationChannelGQLAdapter
     notification_rule: NotificationRuleGQLAdapter
+    scaling_group: ScalingGroupGQLAdapter

@@ -33,6 +33,7 @@ from ai.backend.common.types import (
     JSONSerializableMixin,
     SessionTypes,
 )
+from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 
 from .base import (
     Base,
@@ -278,6 +279,52 @@ class ScalingGroupRow(Base):
         back_populates="scaling_group_row",
         primaryjoin="ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)",
     )
+
+    def to_dataclass(self) -> ScalingGroupData:
+        """Convert Row to domain model data."""
+        from ai.backend.manager.data.scaling_group.types import (
+            ScalingGroupDriverConfig,
+            ScalingGroupMetadata,
+            ScalingGroupNetworkConfig,
+            ScalingGroupSchedulerConfig,
+            ScalingGroupSchedulerOptions,
+            ScalingGroupStatus,
+            SchedulerType,
+        )
+
+        return ScalingGroupData(
+            name=self.name,
+            status=ScalingGroupStatus(
+                is_active=self.is_active,
+                is_public=self.is_public,
+            ),
+            metadata=ScalingGroupMetadata(
+                description=self.description,
+                created_at=self.created_at,
+            ),
+            wsproxy=ScalingGroupNetworkConfig(
+                wsproxy_addr=self.wsproxy_addr,
+                wsproxy_api_token=self.wsproxy_api_token,
+                use_host_network=self.use_host_network,
+            ),
+            driver=ScalingGroupDriverConfig(
+                name=self.driver,
+                options=self.driver_opts,
+            ),
+            scheduler=ScalingGroupSchedulerConfig(
+                name=SchedulerType(self.scheduler),
+                options=ScalingGroupSchedulerOptions(
+                    allowed_session_types=self.scheduler_opts.allowed_session_types,
+                    pending_timeout=self.scheduler_opts.pending_timeout,
+                    config=self.scheduler_opts.config,
+                    agent_selection_strategy=self.scheduler_opts.agent_selection_strategy,
+                    agent_selector_config=self.scheduler_opts.agent_selector_config,
+                    enforce_spreading_endpoint_replica=self.scheduler_opts.enforce_spreading_endpoint_replica,
+                    allow_fractional_resource_fragmentation=self.scheduler_opts.allow_fractional_resource_fragmentation,
+                    route_cleanup_target_statuses=self.scheduler_opts.route_cleanup_target_statuses,
+                ),
+            ),
+        )
 
     @classmethod
     async def list_by_condition(

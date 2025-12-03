@@ -19,10 +19,12 @@ async def gql_adapters_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         NotificationChannelGQLAdapter,
         NotificationRuleGQLAdapter,
     )
+    from .api.gql.scaling_group.adapter import ScalingGroupGQLAdapter
 
     root_ctx.gql_adapters = GQLAdapters(
         notification_channel=NotificationChannelGQLAdapter(),
         notification_rule=NotificationRuleGQLAdapter(),
+        scaling_group=ScalingGroupGQLAdapter(),
     )
 
     yield

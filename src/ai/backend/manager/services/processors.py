@@ -74,6 +74,8 @@ from ai.backend.manager.services.project_resource_policy.processors import (
 from ai.backend.manager.services.project_resource_policy.service import ProjectResourcePolicyService
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
+from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
+from ai.backend.manager.services.scaling_group.service import ScalingGroupService
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
@@ -138,6 +140,7 @@ class Services:
     user_resource_policy: UserResourcePolicyService
     project_resource_policy: ProjectResourcePolicyService
     resource_preset: ResourcePresetService
+    scaling_group: ScalingGroupService
     utilization_metric: UtilizationMetricService
     model_serving: ModelServingServiceProtocol
     model_serving_auto_scaling: AutoScalingService
@@ -234,6 +237,9 @@ class Services:
         resource_preset_service = ResourcePresetService(
             repositories.resource_preset.repository,
         )
+        scaling_group_service = ScalingGroupService(
+            repositories.scaling_group.repository,
+        )
         utilization_metric_service = UtilizationMetricService(
             args.config_provider, repositories.metric.repository
         )
@@ -323,6 +329,7 @@ class Services:
             user_resource_policy=user_resource_policy_service,
             project_resource_policy=project_resource_policy_service,
             resource_preset=resource_preset_service,
+            scaling_group=scaling_group_service,
             utilization_metric=utilization_metric_service,
             model_serving=model_serving_service,
             model_serving_auto_scaling=model_serving_auto_scaling,
@@ -360,6 +367,7 @@ class Processors(AbstractProcessorPackage):
     user_resource_policy: UserResourcePolicyProcessors
     project_resource_policy: ProjectResourcePolicyProcessors
     resource_preset: ResourcePresetProcessors
+    scaling_group: ScalingGroupProcessors
     utilization_metric: UtilizationMetricProcessors
     model_serving: ModelServingProcessors
     model_serving_auto_scaling: ModelServingAutoScalingProcessors
@@ -403,6 +411,7 @@ class Processors(AbstractProcessorPackage):
         resource_preset_processors = ResourcePresetProcessors(
             services.resource_preset, action_monitors
         )
+        scaling_group_processors = ScalingGroupProcessors(services.scaling_group, action_monitors)
         model_serving_processors = ModelServingProcessors(services.model_serving, action_monitors)
         model_serving_auto_scaling_processors = ModelServingAutoScalingProcessors(
             services.model_serving_auto_scaling, action_monitors
@@ -449,6 +458,7 @@ class Processors(AbstractProcessorPackage):
             user_resource_policy=user_resource_policy_processors,
             project_resource_policy=project_resource_policy_processors,
             resource_preset=resource_preset_processors,
+            scaling_group=scaling_group_processors,
             utilization_metric=utilization_metric_processors,
             model_serving=model_serving_processors,
             model_serving_auto_scaling=model_serving_auto_scaling_processors,
@@ -481,6 +491,7 @@ class Processors(AbstractProcessorPackage):
             *self.user_resource_policy.supported_actions(),
             *self.project_resource_policy.supported_actions(),
             *self.resource_preset.supported_actions(),
+            *self.scaling_group.supported_actions(),
             *self.utilization_metric.supported_actions(),
             *self.model_serving.supported_actions(),
             *self.model_serving_auto_scaling.supported_actions(),

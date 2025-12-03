@@ -421,6 +421,7 @@ class LayerType(enum.StrEnum):
     PROJECT_RESOURCE_POLICY_REPOSITORY = "project_resource_policy_repository"
     RESERVOIR_REGISTRY_REPOSITORY = "reservoir_registry_repository"
     RESOURCE_PRESET_REPOSITORY = "resource_preset_repository"
+    SCALING_GROUP_REPOSITORY = "scaling_group_repository"
     SCHEDULE_REPOSITORY = "schedule_repository"
     SCHEDULER_REPOSITORY = "scheduler_repository"
     SESSION_REPOSITORY = "session_repository"
