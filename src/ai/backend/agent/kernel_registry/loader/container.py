@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, override
 from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
 
-from ...scratch.utils import ScratchConfigManager, ScratchUtils
+from ...scratch.utils import ScratchConfig, ScratchUtils
 from ..exception import KernelRegistryNotFound
 from ..types import KernelRecoveryData
 from .abc import AbstractKernelRegistryLoader
@@ -30,7 +30,7 @@ class ContainerBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
         self._agent = agent
 
     async def _load_kernel_recovery_from_scratch(self, config_path: Path) -> KernelRecoveryData:
-        config = ScratchConfigManager(config_path)
+        config = ScratchConfig(config_path)
         json_data = await config.get_json_recovery_data()
         if json_data is None:
             raise KernelRegistryNotFound

@@ -64,7 +64,7 @@ class ScratchUtils:
         return scratch_root / str(kernel_id) / "config"
 
 
-class ScratchConfigManager:
+class ScratchConfig:
     def __init__(self, config_path: Path) -> None:
         self._config_path = config_path
 

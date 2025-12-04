@@ -26,15 +26,16 @@ class ContainerBasedLoaderWriterCreator:
         self,
         args: ContainerBasedKernelRegistryCreatorArgs,
     ) -> None:
-        self._args = args
+        self._scratch_root = args.scratch_root
+        self._agent = args.agent
 
     def create_loader(self) -> ContainerBasedKernelRegistryLoader:
         return ContainerBasedKernelRegistryLoader(
-            scratch_root=self._args.scratch_root,
-            agent=self._args.agent,
+            scratch_root=self._scratch_root,
+            agent=self._agent,
         )
 
     def create_writer(self) -> ContainerBasedKernelRegistryWriter:
         return ContainerBasedKernelRegistryWriter(
-            scratch_root=self._args.scratch_root,
+            scratch_root=self._scratch_root,
         )

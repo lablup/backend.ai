@@ -7,7 +7,7 @@ from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
 
 from ...scratch.types import KernelRecoveryScratchData
-from ...scratch.utils import ScratchConfigManager, ScratchUtils
+from ...scratch.utils import ScratchConfig, ScratchUtils
 from ..types import KernelRecoveryData
 from .abc import AbstractKernelRegistryWriter
 from .types import KernelRegistrySaveMetadata
@@ -42,7 +42,7 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
     ) -> None:
         for kernel_id, kernel in data.items():
             config_path = ScratchUtils.get_scratch_kernel_config_dir(self._scratch_root, kernel_id)
-            config_mgr = ScratchConfigManager(config_path)
+            config_mgr = ScratchConfig(config_path)
             original_recovery_data = self._parse_recovery_data_from_kernel(kernel)
             if original_recovery_data is None:
                 continue
