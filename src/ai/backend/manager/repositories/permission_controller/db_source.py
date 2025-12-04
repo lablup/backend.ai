@@ -8,8 +8,10 @@ from sqlalchemy.orm import contains_eager, selectinload
 
 from ...data.permission.id import ObjectId, ScopeId
 from ...data.permission.role import (
+    AssignedUserInfo,
     RoleCreateInput,
     RoleDeleteInput,
+    RoleListResult,
     RoleUpdateInput,
     UserRoleAssignmentInput,
 )
@@ -18,6 +20,7 @@ from ...data.permission.status import (
 )
 from ...data.permission.types import OperationType, ScopeType
 from ...errors.common import ObjectNotFound
+from ...errors.permission import RoleNotFound
 from ...models.rbac_models.association_scopes_entities import AssociationScopesEntitiesRow
 from ...models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ...models.rbac_models.permission.permission import PermissionRow
@@ -25,6 +28,7 @@ from ...models.rbac_models.permission.permission_group import PermissionGroupRow
 from ...models.rbac_models.role import RoleRow
 from ...models.rbac_models.user_role import UserRoleRow
 from ...models.utils import ExtendedAsyncSAEngine
+from ...repositories.base import Querier, execute_querier
 
 
 class PermissionDBSource:
@@ -304,3 +308,70 @@ class PermissionDBSource:
                             object_id = object.object_id()
                             result[object_id] = True
         return result
+
+    async def search_roles(
+        self,
+        querier: Querier,
+    ) -> RoleListResult:
+        """Searches roles with pagination and filtering."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(RoleRow)
+
+            result = await execute_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.RoleRow.to_data() for row in result.rows]
+
+            return RoleListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def get_role_with_permissions(self, role_id: uuid.UUID) -> RoleRow:
+        """Get role with eagerly loaded permissions only (no users)."""
+        async with self._db.begin_readonly_session() as db_sess:
+            stmt = (
+                sa.select(RoleRow)
+                .where(RoleRow.id == role_id)
+                .options(
+                    selectinload(RoleRow.permission_group_rows).selectinload(
+                        PermissionGroupRow.permission_rows
+                    ),
+                    selectinload(RoleRow.object_permission_rows),
+                )
+            )
+            result = await db_sess.execute(stmt)
+            role_row = result.scalar_one_or_none()
+            if role_row is None:
+                raise RoleNotFound(f"Role with ID {role_id} does not exist.")
+            return role_row
+
+    async def get_role_assigned_users(self, role_id: uuid.UUID) -> list[AssignedUserInfo]:
+        """Get users assigned to a specific role."""
+        async with self._db.begin_readonly_session() as db_sess:
+            stmt = (
+                sa.select(UserRoleRow)
+                .where(UserRoleRow.role_id == role_id)
+                .options(selectinload(UserRoleRow.user_row))
+            )
+            result = await db_sess.execute(stmt)
+            user_role_rows = result.scalars().all()
+
+            assigned_users = []
+            for user_role_row in user_role_rows:
+                if user_role_row.user_row:
+                    assigned_users.append(
+                        AssignedUserInfo(
+                            user_id=user_role_row.user_id,
+                            username=user_role_row.user_row.username,
+                            email=user_role_row.user_row.email,
+                            granted_by=user_role_row.granted_by,
+                            granted_at=user_role_row.granted_at,
+                        )
+                    )
+            return assigned_users
