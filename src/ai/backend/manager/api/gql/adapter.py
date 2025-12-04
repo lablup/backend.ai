@@ -36,25 +36,29 @@ class PaginationOptions:
 
 
 @dataclass(frozen=True)
-class CursorPaginationFactories:
-    """Factories for cursor-based pagination.
+class PaginationSpec:
+    """Specification for pagination behavior.
 
-    Contains domain-specific factories needed for cursor-based pagination.
+    Contains domain-specific configuration for pagination:
+    - Forward/backward orders and condition factories for cursor-based pagination
+    - forward_order is also used as default order for offset pagination when order_by is not provided
+
     For typical "newest first" lists:
     - Forward (first/after): DESC order, shows newer items first, next page shows older items
     - Backward (last/before): ASC order, fetches older items first (reversed for display)
     """
 
-    forward_cursor_order: QueryOrder
-    """Order for forward pagination (e.g., created_at DESC for newest first)."""
+    forward_order: QueryOrder
+    """Order for forward pagination (e.g., created_at DESC for newest first).
+    Also used as default order for offset pagination when order_by is not provided."""
 
-    backward_cursor_order: QueryOrder
+    backward_order: QueryOrder
     """Order for backward pagination (e.g., created_at ASC, results reversed for display)."""
 
-    forward_cursor_condition_factory: CursorConditionFactory
+    forward_condition_factory: CursorConditionFactory
     """Factory that creates cursor condition for forward pagination (e.g., created_at < cursor)."""
 
-    backward_cursor_condition_factory: CursorConditionFactory
+    backward_condition_factory: CursorConditionFactory
     """Factory that creates cursor condition for backward pagination (e.g., created_at > cursor)."""
 
 
@@ -64,13 +68,13 @@ class BaseGQLAdapter:
     def _build_pagination(
         self,
         options: PaginationOptions,
-        factories: CursorPaginationFactories,
+        spec: PaginationSpec,
     ) -> QueryPagination:
         """Build pagination from GraphQL pagination arguments.
 
-        For cursor-based pagination (first/after or last/before), cursor condition factories
-        and cursor_order are required. The factories create cursor conditions from decoded
-        cursor values.
+        For cursor-based pagination (first/after or last/before), condition factories
+        and orders are used from the spec. The factories create cursor conditions from
+        decoded cursor values.
 
         If no pagination parameters are provided, returns a default OffsetPagination
         with limit=DEFAULT_PAGINATION_LIMIT.
@@ -95,10 +99,10 @@ class BaseGQLAdapter:
             cursor_condition = None
             if options.after is not None:
                 cursor_value = decode_cursor(options.after)
-                cursor_condition = factories.forward_cursor_condition_factory(cursor_value)
+                cursor_condition = spec.forward_condition_factory(cursor_value)
             return CursorForwardPagination(
                 first=options.first,
-                cursor_order=factories.forward_cursor_order,
+                cursor_order=spec.forward_order,
                 cursor_condition=cursor_condition,
             )
         elif options.last is not None:
@@ -107,10 +111,10 @@ class BaseGQLAdapter:
             cursor_condition = None
             if options.before is not None:
                 cursor_value = decode_cursor(options.before)
-                cursor_condition = factories.backward_cursor_condition_factory(cursor_value)
+                cursor_condition = spec.backward_condition_factory(cursor_value)
             return CursorBackwardPagination(
                 last=options.last,
-                cursor_order=factories.backward_cursor_order,
+                cursor_order=spec.backward_order,
                 cursor_condition=cursor_condition,
             )
         elif options.limit is not None:
@@ -127,7 +131,7 @@ class BaseGQLAdapter:
     def build_querier(
         self,
         pagination_options: PaginationOptions,
-        cursor_pagination_factories: CursorPaginationFactories,
+        pagination_spec: PaginationSpec,
         filter: Optional[GQLFilter] = None,
         order_by: Optional[Sequence[GQLOrderBy]] = None,
     ) -> Querier:
@@ -135,7 +139,7 @@ class BaseGQLAdapter:
 
         Args:
             pagination_options: Pagination parameters (first/after/last/before/limit/offset)
-            cursor_pagination_factories: Domain-specific factories (cursor factories, default order)
+            pagination_spec: Domain-specific pagination specification (orders, condition factories)
             filter: Optional filter with build_conditions() method
             order_by: Optional sequence of order specifications with to_query_order() method
 
@@ -163,10 +167,13 @@ class BaseGQLAdapter:
         if order_by:
             for o in order_by:
                 orders.append(o.to_query_order())
+        elif not is_cursor_pagination:
+            # Apply default order for offset pagination when order_by is not provided
+            orders.append(pagination_spec.forward_order)
 
         pagination = self._build_pagination(
             options=pagination_options,
-            factories=cursor_pagination_factories,
+            spec=pagination_spec,
         )
 
         return Querier(conditions=conditions, orders=orders, pagination=pagination)

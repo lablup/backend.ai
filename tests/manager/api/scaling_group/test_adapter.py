@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from ai.backend.manager.api.gql.adapter import (
     BaseGQLAdapter,
-    CursorPaginationFactories,
     PaginationOptions,
+    PaginationSpec,
 )
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.scaling_group.types import (
@@ -23,18 +23,18 @@ from ai.backend.manager.repositories.scaling_group.options import (
 )
 
 
-def _get_cursor_factories() -> CursorPaginationFactories:
-    """Create cursor pagination factories for scaling groups.
+def _get_pagination_spec() -> PaginationSpec:
+    """Create pagination spec for scaling groups.
 
     For typical "newest first" lists:
     - Forward (first/after): DESC order, shows newer items first, next page shows older items
     - Backward (last/before): ASC order, fetches older items first (reversed for display)
     """
-    return CursorPaginationFactories(
-        forward_cursor_order=ScalingGroupOrders.created_at(ascending=False),
-        backward_cursor_order=ScalingGroupOrders.created_at(ascending=True),
-        forward_cursor_condition_factory=ScalingGroupConditions.by_cursor_forward,
-        backward_cursor_condition_factory=ScalingGroupConditions.by_cursor_backward,
+    return PaginationSpec(
+        forward_order=ScalingGroupOrders.created_at(ascending=False),
+        backward_order=ScalingGroupOrders.created_at(ascending=True),
+        forward_condition_factory=ScalingGroupConditions.by_cursor_forward,
+        backward_condition_factory=ScalingGroupConditions.by_cursor_backward,
     )
 
 
@@ -46,11 +46,12 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
         )
 
         assert len(querier.conditions) == 0
-        assert len(querier.orders) == 0
+        # Default order is applied for offset pagination when order_by is not provided
+        assert len(querier.orders) == 1
         # Default pagination is applied
         assert querier.pagination is not None
         assert isinstance(querier.pagination, OffsetPagination)
@@ -63,7 +64,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -80,7 +81,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -96,7 +97,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -112,7 +113,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -128,7 +129,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -144,7 +145,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -160,7 +161,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -176,7 +177,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -190,7 +191,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -204,7 +205,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -218,7 +219,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -232,7 +233,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -246,7 +247,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -260,7 +261,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -274,7 +275,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -288,7 +289,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -307,7 +308,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -328,7 +329,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -348,7 +349,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -367,7 +368,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -394,7 +395,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
         )
 
@@ -414,7 +415,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(limit=10),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             order_by=order_by,
         )
 
@@ -432,7 +433,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(limit=10),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             order_by=order_by,
         )
 
@@ -450,7 +451,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(limit=10),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             order_by=order_by,
         )
 
@@ -468,7 +469,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(limit=10),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             order_by=order_by,
         )
 
@@ -486,7 +487,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(limit=10),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             order_by=order_by,
         )
 
@@ -504,7 +505,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(limit=10),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             order_by=order_by,
         )
 
@@ -522,7 +523,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(limit=10),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             order_by=order_by,
         )
 
@@ -540,7 +541,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(limit=10),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             order_by=order_by,
         )
 
@@ -562,7 +563,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(limit=10),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             order_by=order_by,
         )
 
@@ -575,7 +576,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(limit=10, offset=5),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
         )
 
         assert querier.pagination is not None
@@ -598,7 +599,7 @@ class TestBaseGQLAdapter:
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(limit=20, offset=10),
-            _get_cursor_factories(),
+            _get_pagination_spec(),
             filter=filter_obj,
             order_by=order_by,
         )
