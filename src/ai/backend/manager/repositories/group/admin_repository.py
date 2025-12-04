@@ -188,20 +188,29 @@ class AdminGroupRepository:
         # Delete endpoint-related data
         endpoint_ids = [ep.id for ep in endpoints]
 
-        # Delete sessions associated with endpoints
-        await session.execute(
-            sa.delete(SessionRow).where(
-                SessionRow.id.in_(
-                    sa.select(RoutingRow.session).where(
-                        (RoutingRow.endpoint.in_(endpoint_ids)) & (RoutingRow.session.is_not(None))
-                    )
+        # Get session IDs before deleting endpoints
+        session_ids_result = await session.scalars(
+            sa.select(RoutingRow.session).where(
+                sa.and_(
+                    RoutingRow.endpoint.in_(endpoint_ids),
+                    RoutingRow.session.is_not(None),
                 )
             )
         )
+        session_ids = list(session_ids_result.unique().all())
 
-        # Delete routing entries and endpoints
-        await session.execute(sa.delete(RoutingRow).where(RoutingRow.endpoint.in_(endpoint_ids)))
-        await session.execute(sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoint_ids)))
+        # Delete endpoints (routings are CASCADE deleted automatically)
+        await session.execute(
+            sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoint_ids)),
+            execution_options={"synchronize_session": False},
+        )
+
+        # Delete sessions that were associated with endpoints
+        if session_ids:
+            await session.execute(
+                sa.delete(SessionRow).where(SessionRow.id.in_(session_ids)),
+                execution_options={"synchronize_session": False},
+            )
 
     @group_repository_resilience.apply()
     async def purge_group_force(self, group_id: uuid.UUID) -> bool:
