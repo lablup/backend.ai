@@ -93,7 +93,10 @@ async def test_valkey_stream(redis_container) -> AsyncIterator[ValkeyStreamClien
         db_id=REDIS_STREAM_DB,
         pubsub_channels={"test-broadcast"},
     )
-    yield client
+    try:
+        yield client
+    finally:
+        await client.close()
 
 
 @pytest.fixture
