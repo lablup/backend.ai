@@ -1152,6 +1152,7 @@ class AbstractAgent(
         await self.valkey_stat_client.close()
         await self.valkey_bgtask_client.close()
         await self.valkey_image_client.close()
+        await self.valkey_schedule_client.close()
 
     @property
     def rpc_addr(self) -> HostPortPair:
