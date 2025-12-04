@@ -18,7 +18,6 @@ from collections.abc import (
 )
 from dataclasses import dataclass
 from typing import (
-    TYPE_CHECKING,
     Any,
     Dict,
     FrozenSet,
@@ -79,9 +78,6 @@ from .exception import (
 )
 from .resources import KernelResourceSpec
 from .types import AgentEventData, KernelLifecycleStatus, KernelOwnershipData
-
-if TYPE_CHECKING:
-    pass
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
