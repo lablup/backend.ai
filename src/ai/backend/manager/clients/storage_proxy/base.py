@@ -31,6 +31,7 @@ from ai.backend.manager.errors.storage import (
 )
 
 AUTH_TOKEN_HDR: Final = "X-BackendAI-Storage-Auth-Token"
+DEFAULT_TIMEOUT: Final = ClientTimeout(total=300, connect=30)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -133,7 +134,7 @@ class StorageProxyHTTPClient:
         *,
         body: Mapping[str, Any] | None = None,
         params: Mapping[str, Any] | None = None,
-        timeout: Optional[ClientTimeout] = None,
+        timeout: ClientTimeout,
     ) -> AsyncIterator[aiohttp.ClientResponse]:
         """
         Make an HTTP request using the session client.
@@ -176,7 +177,7 @@ class StorageProxyHTTPClient:
         *,
         body: Mapping[str, Any] | None = None,
         params: Mapping[str, Any] | None = None,
-        timeout: Optional[ClientTimeout] = None,
+        timeout: ClientTimeout,
     ) -> Optional[Mapping[str, Any]]:
         """
         Make an HTTP request using the session client.
@@ -204,7 +205,7 @@ class StorageProxyHTTPClient:
         *,
         body: Mapping[str, Any] | None = None,
         params: Mapping[str, Any] | None = None,
-        timeout: Optional[ClientTimeout] = None,
+        timeout: ClientTimeout,
     ) -> Mapping[str, Any]:
         """
         Make an HTTP request and return the response as a dictionary.

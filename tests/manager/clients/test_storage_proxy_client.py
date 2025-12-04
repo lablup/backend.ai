@@ -5,6 +5,7 @@ from aiohttp import ClientTimeout, web
 
 from ai.backend.common.exception import ErrorDetail, ErrorDomain, ErrorOperation, PassthroughError
 from ai.backend.manager.clients.storage_proxy.base import (
+    DEFAULT_TIMEOUT,
     StorageProxyClientArgs,
     StorageProxyHTTPClient,
 )
@@ -43,7 +44,9 @@ class TestStorageProxyClient:
 
         # Verify that non-JSON response raises PassthroughError with correct error code
         with pytest.raises(PassthroughError) as exc_info:
-            await storage_proxy_client.request(method="GET", url=test_endpoint)
+            await storage_proxy_client.request(
+                method="GET", url=test_endpoint, timeout=DEFAULT_TIMEOUT
+            )
 
         assert exc_info.value.status_code == test_status_code
 
