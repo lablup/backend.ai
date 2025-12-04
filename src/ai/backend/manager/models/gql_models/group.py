@@ -427,10 +427,13 @@ class Group(graphene.ObjectType):
         group_ids: Sequence[uuid.UUID],
         *,
         domain_name: Optional[str] = None,
+        is_active: Optional[bool] = None,
     ) -> Sequence[Group | None]:
         query = sa.select([groups]).select_from(groups).where(groups.c.id.in_(group_ids))
         if domain_name is not None:
             query = query.where(groups.c.domain_name == domain_name)
+        if is_active is not None:
+            query = query.where(groups.c.is_active == is_active)
         async with graph_ctx.db.begin_readonly() as conn:
             return await batch_result(
                 graph_ctx,
@@ -448,10 +451,13 @@ class Group(graphene.ObjectType):
         group_names: Sequence[str],
         *,
         domain_name: Optional[str] = None,
+        is_active: Optional[bool] = None,
     ) -> Sequence[Sequence[Group | None]]:
         query = sa.select([groups]).select_from(groups).where(groups.c.name.in_(group_names))
         if domain_name is not None:
             query = query.where(groups.c.domain_name == domain_name)
+        if is_active is not None:
+            query = query.where(groups.c.is_active == is_active)
         async with graph_ctx.db.begin_readonly() as conn:
             return await batch_multiresult(
                 graph_ctx,
@@ -469,6 +475,7 @@ class Group(graphene.ObjectType):
         user_ids: Sequence[uuid.UUID],
         *,
         type: list[ProjectType] | None = None,
+        is_active: Optional[bool] = None,
     ) -> Sequence[Sequence[Group | None]]:
         if type is None:
             _type = [ProjectType.GENERAL]
@@ -484,6 +491,8 @@ class Group(graphene.ObjectType):
             .select_from(j)
             .where(association_groups_users.c.user_id.in_(user_ids) & (groups.c.type.in_(_type)))
         )
+        if is_active is not None:
+            query = query.where(groups.c.is_active == is_active)
         async with graph_ctx.db.begin_readonly() as conn:
             return await batch_multiresult(
                 graph_ctx,
