@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -16,6 +17,14 @@ from ai.backend.manager.services.permission_contoller.actions.create_role import
 from ai.backend.manager.services.permission_contoller.actions.delete_role import (
     DeleteRoleAction,
     DeleteRoleActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
+    GetRoleDetailAction,
+    GetRoleDetailActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_roles import (
+    SearchRolesAction,
+    SearchRolesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.update_role import (
     UpdateRoleAction,
@@ -73,3 +82,21 @@ class PermissionControllerService:
         data = await self._repository.assign_role(action.input)
 
         return AssignRoleActionResult(success=True, data=data)
+
+    async def get_role_detail(self, action: GetRoleDetailAction) -> GetRoleDetailActionResult:
+        """Get role with all permission details and assigned users."""
+        # Step 1: Get role with permissions (without users)
+        role_data = await self._repository.get_role_with_permissions(action.role_id)
+
+        # Step 2: Get assigned users separately
+        assigned_users = await self._repository.get_role_assigned_users(action.role_id)
+
+        # Step 3: Combine
+        complete_role_data = dataclasses.replace(role_data, assigned_users=assigned_users)
+
+        return GetRoleDetailActionResult(role=complete_role_data)
+
+    async def search_roles(self, action: SearchRolesAction) -> SearchRolesActionResult:
+        """Search roles with pagination and filtering."""
+        roles = await self._repository.search_roles(action.querier)
+        return SearchRolesActionResult(roles=roles)
