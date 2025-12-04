@@ -3,13 +3,17 @@ from __future__ import annotations
 import abc
 import logging
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from ai.backend.common.artifact_storage import ImportStepContext
-from ai.backend.common.data.artifact.types import VerificationStepResult
+from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
 from ai.backend.common.data.storage.registries.types import FileObjectData
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.logging import BraceStyleAdapter
+
+if TYPE_CHECKING:
+    from ai.backend.common.artifact_storage import AbstractStorage
+    from ai.backend.storage.storages.vfs_storage import VFSStorage
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
@@ -50,10 +54,50 @@ class ImportStep(abc.ABC, Generic[InputType]):
         """Execute step and return data to pass to next step"""
         pass
 
+    @property
     @abc.abstractmethod
-    async def cleanup_stage(self, context: ImportStepContext) -> None:
-        """Perform cleanup after stage completion, or after failure"""
+    def registry_type(self) -> ArtifactRegistryType:
+        """Return the registry type for this step (used for revision resolution)"""
         pass
+
+    @abc.abstractmethod
+    def stage_storage(self, context: ImportStepContext) -> AbstractStorage:
+        """Return the storage for this step"""
+        pass
+
+    async def cleanup_stage(self, context: ImportStepContext) -> None:
+        """Default cleanup implementation that removes files and empty parent directories"""
+        from ai.backend.storage.storages.vfs_storage import VFSStorage
+
+        storage = self.stage_storage(context)
+        revision = context.model.resolve_revision(self.registry_type)
+        model_prefix = f"{context.model.model_id}/{revision}"
+        model_id = context.model.model_id
+
+        try:
+            await storage.delete_file(model_prefix)
+            log.info(f"[cleanup] Removed files: {model_prefix}")
+        except Exception as e:
+            log.warning(f"[cleanup] Failed to cleanup: {model_prefix}: {str(e)}")
+            return
+
+        # For VFS storage, check if parent model directory is now empty and remove it
+        if isinstance(storage, VFSStorage):
+            await self._cleanup_empty_parent_directory(storage, model_id)
+
+    async def _cleanup_empty_parent_directory(
+        self,
+        storage: VFSStorage,
+        model_id: str,
+    ) -> None:
+        """Remove parent model directory if it's empty after cleanup"""
+        try:
+            entries = await storage.list_directory(model_id)
+            if len(entries) == 0:
+                await storage.delete_file(model_id)
+                log.info(f"[cleanup] Removed empty model directory: {model_id}")
+        except Exception as e:
+            log.warning(f"[cleanup] Failed to cleanup empty model directory: {model_id}: {str(e)}")
 
 
 class ImportPipeline:

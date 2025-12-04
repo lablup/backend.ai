@@ -584,6 +584,15 @@ class ReservoirDownloadStep(ImportStep[None]):
     def step_type(self) -> ArtifactStorageImportStep:
         return ArtifactStorageImportStep.DOWNLOAD
 
+    @property
+    @override
+    def registry_type(self) -> ArtifactRegistryType:
+        return ArtifactRegistryType.RESERVOIR
+
+    @override
+    def stage_storage(self, context: ImportStepContext) -> AbstractStorage:
+        return self._download_storage
+
     @override
     async def execute(self, context: ImportStepContext, input_data: None) -> DownloadStepResult:
         # Get storage mapping for download step
@@ -1005,20 +1014,6 @@ class ReservoirDownloadStep(ImportStep[None]):
 
         log.trace("[list] done keys={} total_bytes={}", len(keys), total)
         return keys, size_map, total
-
-    @override
-    async def cleanup_stage(self, context: ImportStepContext) -> None:
-        """Clean up files from download storage after successful transfer"""
-        revision = context.model.resolve_revision(ArtifactRegistryType.RESERVOIR)
-        model_prefix = f"{context.model.model_id}/{revision}"
-
-        try:
-            await self._download_storage.delete_file(model_prefix)
-            log.info(f"[cleanup] Removed download files from reservoir storage: {model_prefix}")
-        except Exception as e:
-            log.warning(
-                f"[cleanup] Failed to cleanup reservoir download storage: {model_prefix}: {str(e)}"
-            )
 
 
 class ReservoirVerifyStep(ModelVerifyStep):

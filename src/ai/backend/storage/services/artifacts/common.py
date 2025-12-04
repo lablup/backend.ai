@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import cast, override
 
+from ai.backend.common.artifact_storage import AbstractStorage
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
     VerificationStepResult,
@@ -61,6 +62,16 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
     def registry_type(self) -> ArtifactRegistryType:
         """Registry type used for revision resolution"""
         raise NotImplementedAPI
+
+    @override
+    def stage_storage(self, context: ImportStepContext) -> AbstractStorage:
+        verify_storage_name = context.storage_step_mappings.get(ArtifactStorageImportStep.VERIFY)
+        if not verify_storage_name:
+            raise StorageStepRequiredStepNotProvided(
+                "No storage mapping provided for VERIFY step cleanup"
+            )
+
+        return context.storage_pool.get_storage(verify_storage_name)
 
     @override
     async def execute(
@@ -171,26 +182,6 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
             verification_result=verification_result,
         )
 
-    @override
-    async def cleanup_stage(self, context: ImportStepContext) -> None:
-        """Clean up files from verify storage on failure"""
-        verify_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.VERIFY)
-        if not verify_storage:
-            return
-
-        # Delete entire model (cleaning up individual files is complex)
-        revision = context.model.resolve_revision(self.registry_type)
-        model_prefix = f"{context.model.model_id}/{revision}"
-
-        try:
-            storage = context.storage_pool.get_storage(verify_storage)
-            await storage.delete_file(model_prefix)
-            log.info(f"[cleanup] Removed verify files: {verify_storage}:{model_prefix}")
-        except Exception as e:
-            log.warning(
-                f"[cleanup] Failed to cleanup verify: {verify_storage}:{model_prefix}: {str(e)}"
-            )
-
 
 class ModelArchiveStep(ImportStep[VerifyStepResult], ABC):
     """Base class for model archiving steps that transfer files to archive storage"""
@@ -207,6 +198,16 @@ class ModelArchiveStep(ImportStep[VerifyStepResult], ABC):
     def registry_type(self) -> ArtifactRegistryType:
         """Registry type used for revision resolution"""
         raise NotImplementedAPI
+
+    @override
+    def stage_storage(self, context: ImportStepContext) -> AbstractStorage:
+        archive_storage_name = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
+        if not archive_storage_name:
+            raise StorageStepRequiredStepNotProvided(
+                "No storage mapping provided for ARCHIVE step cleanup"
+            )
+
+        return context.storage_pool.get_storage(archive_storage_name)
 
     @override
     async def execute(
@@ -248,23 +249,3 @@ class ModelArchiveStep(ImportStep[VerifyStepResult], ABC):
             f"Archive transfer completed: {download_storage} -> {archive_storage}, "
             f"files={archieved_file_cnt}"
         )
-
-    @override
-    async def cleanup_stage(self, context: ImportStepContext) -> None:
-        """Clean up files from archive storage on failure"""
-        archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
-        if not archive_storage:
-            return
-
-        # Delete entire model (cleaning up individual files is complex)
-        revision = context.model.resolve_revision(self.registry_type)
-        model_prefix = f"{context.model.model_id}/{revision}"
-
-        try:
-            storage = context.storage_pool.get_storage(archive_storage)
-            await storage.delete_file(model_prefix)
-            log.info(f"[cleanup] Removed archive files: {archive_storage}:{model_prefix}")
-        except Exception as e:
-            log.warning(
-                f"[cleanup] Failed to cleanup archive: {archive_storage}:{model_prefix}: {str(e)}"
-            )
