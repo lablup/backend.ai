@@ -1593,9 +1593,9 @@ class Queries(graphene.ObjectType):
             loader = ctx.dataloader_manager.get_loader(
                 ctx,
                 "Group.by_user",
+                is_active=is_active,
             )
-            client_groups = await loader.load(client_user_id)
-            return client_groups
+            return await loader.load(client_user_id)
         else:
             raise InvalidAPIParameters("Unknown client role")
         return await Group.load_all(
