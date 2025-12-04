@@ -54,7 +54,7 @@ class TestScalingGroupService:
                 description="Default scaling group",
                 created_at=datetime.now(),
             ),
-            wsproxy=ScalingGroupNetworkConfig(
+            network=ScalingGroupNetworkConfig(
                 wsproxy_addr="",
                 wsproxy_api_token="",
                 use_host_network=False,
@@ -160,7 +160,7 @@ class TestScalingGroupService:
                     description=f"Scaling group {i}",
                     created_at=datetime.now(),
                 ),
-                wsproxy=ScalingGroupNetworkConfig(
+                network=ScalingGroupNetworkConfig(
                     wsproxy_addr="",
                     wsproxy_api_token="",
                     use_host_network=False,

@@ -2483,7 +2483,7 @@ type ScalingGroupV2 implements Node {
   Network configuration for connecting clients to interactive session services
   (terminals, notebooks, web apps) through WebSocket proxy infrastructure.
   """
-  wsproxy: ScalingGroupNetworkConfig!
+  network: ScalingGroupNetworkConfig!
 
   """
   Agent resource management driver determining how compute agents are provisioned
