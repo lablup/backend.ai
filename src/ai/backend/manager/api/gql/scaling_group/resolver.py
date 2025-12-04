@@ -9,7 +9,7 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge
 
-from ai.backend.manager.api.gql.adapter import CursorPaginationFactories, PaginationOptions
+from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.repositories.scaling_group.options import (
     ScalingGroupConditions,
@@ -26,16 +26,16 @@ from .types import (
     ScalingGroupV2GQL,
 )
 
-# Cursor pagination factories
+# Pagination specs
 
 
 @lru_cache(maxsize=1)
-def _get_scaling_group_cursor_factories() -> CursorPaginationFactories:
-    return CursorPaginationFactories(
-        forward_cursor_order=ScalingGroupOrders.created_at(ascending=False),
-        backward_cursor_order=ScalingGroupOrders.created_at(ascending=True),
-        forward_cursor_condition_factory=ScalingGroupConditions.by_cursor_forward,
-        backward_cursor_condition_factory=ScalingGroupConditions.by_cursor_backward,
+def _get_scaling_group_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=ScalingGroupOrders.created_at(ascending=False),
+        backward_order=ScalingGroupOrders.created_at(ascending=True),
+        forward_condition_factory=ScalingGroupConditions.by_cursor_forward,
+        backward_condition_factory=ScalingGroupConditions.by_cursor_backward,
     )
 
 
@@ -81,7 +81,7 @@ async def scaling_groups_v2(
             limit=limit,
             offset=offset,
         ),
-        _get_scaling_group_cursor_factories(),
+        _get_scaling_group_pagination_spec(),
         filter=filter,
         order_by=order_by,
     )
@@ -134,7 +134,7 @@ async def all_scaling_groups_v2(
             limit=limit,
             offset=offset,
         ),
-        _get_scaling_group_cursor_factories(),
+        _get_scaling_group_pagination_spec(),
         filter=filter,
         order_by=order_by,
     )

@@ -11,7 +11,7 @@ from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.manager.api.gql.adapter import CursorPaginationFactories, PaginationOptions
+from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.errors.auth import InvalidAuthParameters
 from ai.backend.manager.repositories.notification.options import (
@@ -62,26 +62,26 @@ from .types import (
     ValidateNotificationRulePayload,
 )
 
-# Cursor pagination factories
+# Pagination specs
 
 
 @lru_cache(maxsize=1)
-def _get_channel_cursor_factories() -> CursorPaginationFactories:
-    return CursorPaginationFactories(
-        forward_cursor_order=NotificationChannelOrders.created_at(ascending=False),
-        backward_cursor_order=NotificationChannelOrders.created_at(ascending=True),
-        forward_cursor_condition_factory=NotificationChannelConditions.by_cursor_forward,
-        backward_cursor_condition_factory=NotificationChannelConditions.by_cursor_backward,
+def _get_channel_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=NotificationChannelOrders.created_at(ascending=False),
+        backward_order=NotificationChannelOrders.created_at(ascending=True),
+        forward_condition_factory=NotificationChannelConditions.by_cursor_forward,
+        backward_condition_factory=NotificationChannelConditions.by_cursor_backward,
     )
 
 
 @lru_cache(maxsize=1)
-def _get_rule_cursor_factories() -> CursorPaginationFactories:
-    return CursorPaginationFactories(
-        forward_cursor_order=NotificationRuleOrders.created_at(ascending=False),
-        backward_cursor_order=NotificationRuleOrders.created_at(ascending=True),
-        forward_cursor_condition_factory=NotificationRuleConditions.by_cursor_forward,
-        backward_cursor_condition_factory=NotificationRuleConditions.by_cursor_backward,
+def _get_rule_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=NotificationRuleOrders.created_at(ascending=False),
+        backward_order=NotificationRuleOrders.created_at(ascending=True),
+        forward_condition_factory=NotificationRuleConditions.by_cursor_forward,
+        backward_condition_factory=NotificationRuleConditions.by_cursor_backward,
     )
 
 
@@ -149,7 +149,7 @@ async def notification_channels(
             limit=limit,
             offset=offset,
         ),
-        _get_channel_cursor_factories(),
+        _get_channel_pagination_spec(),
         filter=filter,
         order_by=order_by,
     )
@@ -209,7 +209,7 @@ async def notification_rules(
             limit=limit,
             offset=offset,
         ),
-        _get_rule_cursor_factories(),
+        _get_rule_pagination_spec(),
         filter=filter,
         order_by=order_by,
     )
