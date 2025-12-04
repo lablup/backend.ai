@@ -1,11 +1,14 @@
+import asyncio
+
 import pytest
-from aiohttp import web
+from aiohttp import ClientTimeout, web
 
 from ai.backend.common.exception import ErrorDetail, ErrorDomain, ErrorOperation, PassthroughError
 from ai.backend.manager.clients.storage_proxy.base import (
     StorageProxyClientArgs,
     StorageProxyHTTPClient,
 )
+from ai.backend.manager.errors.storage import StorageProxyConnectionError
 
 
 class TestStorageProxyClient:
@@ -48,3 +51,38 @@ class TestStorageProxyClient:
         assert error_code.domain == ErrorDomain.STORAGE_PROXY
         assert error_code.operation == ErrorOperation.REQUEST
         assert error_code.error_detail == ErrorDetail.CONTENT_TYPE_MISMATCH
+
+    @pytest.mark.asyncio
+    async def test_request_timeout_expiration(self, aiohttp_client) -> None:
+        """Test that request properly times out when timeout expires."""
+
+        async def slow_endpoint_handler(_request: web.Request) -> web.Response:
+            # Sleep for longer than the timeout
+            await asyncio.sleep(2.0)
+            return web.json_response({"status": "success"})
+
+        # Set up mock storage proxy server
+        app = web.Application()
+        test_endpoint = "slow-endpoint"
+        app.router.add_get(f"/{test_endpoint}", slow_endpoint_handler)
+        client = await aiohttp_client(app)
+
+        # Create storage proxy client
+        storage_proxy_client = StorageProxyHTTPClient(
+            client_session=client.session,
+            args=StorageProxyClientArgs(
+                endpoint=client.make_url("/"),
+                secret="test-secret",
+            ),
+        )
+
+        # Make request with very short timeout
+        timeout = ClientTimeout(total=0.1)
+        with pytest.raises(StorageProxyConnectionError) as exc_info:
+            await storage_proxy_client.request(
+                method="GET",
+                url=test_endpoint,
+                timeout=timeout,
+            )
+
+        assert "Failed to connect to storage proxy" in str(exc_info.value)
