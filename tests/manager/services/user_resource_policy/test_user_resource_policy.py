@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.exception import UserResourcePolicyNotFound
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
@@ -205,16 +205,18 @@ async def test_create_user_resource_policy_service(service, mock_repository):
     # Verify result
     assert result.user_resource_policy == expected_data
 
-    # Verify repository was called with correct data
+    # Verify repository was called with correct creator object
     mock_repository.create.assert_called_once()
     call_args = mock_repository.create.call_args[0][0]
-    assert call_args["name"] == "test-policy"
-    assert call_args["max_vfolder_count"] == 10
-    assert call_args["max_quota_scope_size"] == 1000000
-    assert call_args["max_session_count_per_model_session"] == 5
-    assert call_args["max_customized_image_count"] == 3
-    # Verify deprecated field is not included
-    assert "max_vfolder_size" not in call_args
+    assert isinstance(call_args, UserResourcePolicyCreator)
+    assert call_args.name == "test-policy"
+    assert call_args.max_vfolder_count == 10
+    assert call_args.max_quota_scope_size == 1000000
+    assert call_args.max_session_count_per_model_session == 5
+    assert call_args.max_customized_image_count == 3
+    # Verify deprecated field is not included in fields_to_store
+    fields_to_store = call_args.fields_to_store()
+    assert "max_vfolder_size" not in fields_to_store
 
 
 @pytest.mark.asyncio
@@ -248,15 +250,25 @@ async def test_modify_user_resource_policy_service(service, mock_repository):
     # Verify result
     assert result.user_resource_policy == expected_data
 
-    # Verify repository was called correctly
-    mock_repository.update.assert_called_once_with(
-        "test-policy",
-        {
-            "max_vfolder_count": 20,
-            "max_quota_scope_size": 2000000,
-            "max_customized_image_count": 5,
-        },
-    )
+    # Verify repository was called with correct modifier object
+    mock_repository.update.assert_called_once()
+    call_args = mock_repository.update.call_args[0]
+    assert call_args[0] == "test-policy"
+    assert isinstance(call_args[1], UserResourcePolicyModifier)
+
+    # Verify modifier contains correct fields
+    modifier_arg = call_args[1]
+    assert modifier_arg.max_vfolder_count.value() == 20
+    assert modifier_arg.max_quota_scope_size.value() == 2000000
+    assert modifier_arg.max_customized_image_count.value() == 5
+
+    # Verify fields_to_update only contains updated fields
+    fields_to_update = modifier_arg.fields_to_update()
+    assert fields_to_update == {
+        "max_vfolder_count": 20,
+        "max_quota_scope_size": 2000000,
+        "max_customized_image_count": 5,
+    }
 
 
 @pytest.mark.asyncio
@@ -287,9 +299,9 @@ async def test_delete_user_resource_policy_service(service, mock_repository):
 
 @pytest.mark.asyncio
 async def test_modify_non_existing_policy_raises_exception(service, mock_repository):
-    """Test that modifying non-existing policy raises ObjectNotFound"""
+    """Test that modifying non-existing policy raises UserResourcePolicyNotFound"""
     # Setup mock to raise exception
-    mock_repository.update.side_effect = ObjectNotFound("Policy not found")
+    mock_repository.update.side_effect = UserResourcePolicyNotFound("Policy not found")
 
     # Create action
     modifier = UserResourcePolicyModifier(
@@ -301,21 +313,21 @@ async def test_modify_non_existing_policy_raises_exception(service, mock_reposit
     )
 
     # Execute and verify exception is raised
-    with pytest.raises(ObjectNotFound):
+    with pytest.raises(UserResourcePolicyNotFound):
         await service.modify_user_resource_policy(action)
 
 
 @pytest.mark.asyncio
 async def test_delete_non_existing_policy_raises_exception(service, mock_repository):
-    """Test that deleting non-existing policy raises ObjectNotFound"""
+    """Test that deleting non-existing policy raises UserResourcePolicyNotFound"""
     # Setup mock to raise exception
-    mock_repository.delete.side_effect = ObjectNotFound("Policy not found")
+    mock_repository.delete.side_effect = UserResourcePolicyNotFound("Policy not found")
 
     # Create action
     action = DeleteUserResourcePolicyAction(name="non-existing-policy")
 
     # Execute and verify exception is raised
-    with pytest.raises(ObjectNotFound):
+    with pytest.raises(UserResourcePolicyNotFound):
         await service.delete_user_resource_policy(action)
 
 

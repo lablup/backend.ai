@@ -181,6 +181,16 @@ class UserResourcePolicyRow(Base):
         self.max_customized_image_count = max_customized_image_count
 
     @classmethod
+    def from_creator(cls, creator: UserResourcePolicyCreator) -> Self:
+        return cls(
+            name=creator.name,
+            max_vfolder_count=creator.max_vfolder_count,
+            max_quota_scope_size=creator.max_quota_scope_size,
+            max_session_count_per_model_session=creator.max_session_count_per_model_session,
+            max_customized_image_count=creator.max_customized_image_count,
+        )
+
+    @classmethod
     def from_dataclass(cls, data: UserResourcePolicyData) -> Self:
         return cls(
             name=data.name,
