@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import Mapping
 from contextlib import asynccontextmanager as actxmgr
@@ -162,6 +163,10 @@ class StorageProxyHTTPClient:
         except aiohttp.ClientConnectionError as e:
             raise StorageProxyConnectionError(
                 extra_msg="Failed to connect to storage proxy",
+            ) from e
+        except asyncio.TimeoutError as e:
+            raise StorageProxyConnectionError(
+                extra_msg="Request to storage proxy timed out",
             ) from e
 
     async def request(
