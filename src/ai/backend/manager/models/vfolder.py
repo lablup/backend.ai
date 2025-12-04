@@ -1479,13 +1479,13 @@ async def ensure_quota_scope_accessible_by_user(
 
     # Lookup user table to match if quota is scoped to the user
     query = sa.select(UserRow).where(UserRow.uuid == quota_scope.scope_id)
-    quota_scope_user = await conn.scalar(query)
+    quota_scope_user: Optional[UserRow] = await conn.scalar(query)
     if quota_scope_user:
         match user["role"]:
             case UserRole.SUPERADMIN:
                 return
             case UserRole.ADMIN:
-                if quota_scope_user.domain == user["domain"]:
+                if quota_scope_user.domain_name == user["domain_name"]:
                     return
             case _:
                 if quota_scope_user.uuid == user["uuid"]:
@@ -1494,13 +1494,13 @@ async def ensure_quota_scope_accessible_by_user(
 
     # Lookup group table to match if quota is scoped to the group
     query = sa.select(GroupRow).where(GroupRow.id == quota_scope.scope_id)
-    quota_scope_group = await conn.scalar(query)
+    quota_scope_group: Optional[GroupRow] = await conn.scalar(query)
     if quota_scope_group:
         match user["role"]:
             case UserRole.SUPERADMIN:
                 return
             case UserRole.ADMIN:
-                if quota_scope_group.domain == user["domain"]:
+                if quota_scope_group.domain_name == user["domain_name"]:
                     return
             case _:
                 query = (
