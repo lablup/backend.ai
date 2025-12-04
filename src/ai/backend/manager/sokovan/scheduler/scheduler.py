@@ -799,12 +799,16 @@ class Scheduler:
         if not running_sessions:
             return ScheduleResult()
 
-        # 2. Extract kernel IDs and check presence status in Redis
-        running_kernel_ids = [
-            KernelId(UUID(k.kernel_id)) for session in running_sessions for k in session.kernels
-        ]
+        # 2. Extract kernel IDs and agent IDs, then check presence status in Redis
+        running_kernel_ids: list[KernelId] = []
+        agent_ids: set[AgentId] = set()
+        for session in running_sessions:
+            for kernel in session.kernels:
+                running_kernel_ids.append(KernelId(UUID(kernel.kernel_id)))
+                agent_ids.add(kernel.agent_id)
         statuses = await self._valkey_schedule.check_kernel_presence_status_batch(
-            running_kernel_ids
+            running_kernel_ids,
+            agent_ids=agent_ids,
         )
 
         # 3. Filter STALE kernels (None status or STALE presence)
