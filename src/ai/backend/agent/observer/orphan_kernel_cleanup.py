@@ -7,9 +7,12 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeySchedu
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
     ORPHAN_KERNEL_THRESHOLD_SEC,
 )
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.observer.types import AbstractObserver
-from ai.backend.common.types import ContainerId, ContainerStatus, KernelId
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
+
+from ..types import LifecycleEvent
 
 if TYPE_CHECKING:
     from ..agent import AbstractAgent
@@ -57,18 +60,18 @@ class OrphanKernelCleanupObserver(AbstractObserver):
             )
             return
 
-        # 2. Enumerate running containers
-        containers = await self._agent.enumerate_containers(ContainerStatus.active_set())
-        if not containers:
+        # 2. Get kernels from registry
+        kernel_registry = self._agent.kernel_registry
+        if not kernel_registry:
             return
 
         # 3. Get kernel presence statuses (read-only)
-        kernel_ids = [kernel_id for kernel_id, _ in containers]
+        kernel_ids = list(kernel_registry.keys())
         statuses = await self._valkey_schedule_client.get_kernel_presence_batch(kernel_ids)
 
         # 4. Find orphan kernels
-        orphan_kernels: list[tuple[KernelId, ContainerId]] = []
-        for kernel_id, container in containers:
+        orphan_kernels: list[tuple[KernelId, SessionId]] = []
+        for kernel_id, kernel in kernel_registry.items():
             status = statuses.get(kernel_id)
             if status is None:
                 # No Redis entry - skip (not enough info to decide)
@@ -76,7 +79,7 @@ class OrphanKernelCleanupObserver(AbstractObserver):
 
             # Strict condition: kernel.last_check < agent_last_check - THRESHOLD
             if status.last_check < agent_last_check - ORPHAN_KERNEL_THRESHOLD_SEC:
-                orphan_kernels.append((kernel_id, container.id))
+                orphan_kernels.append((kernel_id, kernel.session_id))
                 log.info(
                     "Detected orphan kernel: {} (last_check={}, agent_last_check={}, threshold={})",
                     kernel_id,
@@ -85,11 +88,17 @@ class OrphanKernelCleanupObserver(AbstractObserver):
                     ORPHAN_KERNEL_THRESHOLD_SEC,
                 )
 
-        # 5. Cleanup orphan kernels
-        for kernel_id, container_id in orphan_kernels:
+        # 5. Cleanup orphan kernels via lifecycle event
+        for kernel_id, session_id in orphan_kernels:
             try:
                 log.warning("Cleaning up orphan kernel: {}", kernel_id)
-                await self._agent.destroy_kernel(kernel_id, container_id)
+                await self._agent.inject_container_lifecycle_event(
+                    kernel_id,
+                    session_id,
+                    LifecycleEvent.DESTROY,
+                    KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
+                    suppress_events=True,
+                )
             except Exception:
                 log.exception("Failed to cleanup orphan kernel {}", kernel_id)
 
