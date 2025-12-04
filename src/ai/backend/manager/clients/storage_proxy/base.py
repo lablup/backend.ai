@@ -23,6 +23,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.storage import (
     QuotaScopeNotFoundError,
     StorageProxyConnectionError,
+    StorageProxyTimeoutError,
     UnexpectedStorageProxyResponseError,
     VFolderBadRequest,
     VFolderGone,
@@ -166,7 +167,7 @@ class StorageProxyHTTPClient:
                 extra_msg="Failed to connect to storage proxy",
             ) from e
         except asyncio.TimeoutError as e:
-            raise StorageProxyConnectionError(
+            raise StorageProxyTimeoutError(
                 extra_msg="Request to storage proxy timed out",
             ) from e
 

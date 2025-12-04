@@ -9,7 +9,7 @@ from ai.backend.manager.clients.storage_proxy.base import (
     StorageProxyClientArgs,
     StorageProxyHTTPClient,
 )
-from ai.backend.manager.errors.storage import StorageProxyConnectionError
+from ai.backend.manager.errors.storage import StorageProxyTimeoutError
 
 
 class TestStorageProxyClient:
@@ -81,11 +81,11 @@ class TestStorageProxyClient:
 
         # Make request with very short timeout
         timeout = ClientTimeout(total=0.1)
-        with pytest.raises(StorageProxyConnectionError) as exc_info:
+        with pytest.raises(StorageProxyTimeoutError) as exc_info:
             await storage_proxy_client.request(
                 method="GET",
                 url=test_endpoint,
                 timeout=timeout,
             )
 
-        assert "Failed to connect to storage proxy" in str(exc_info.value)
+        assert "Request to storage proxy timed out" in str(exc_info.value)
