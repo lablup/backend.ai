@@ -119,6 +119,16 @@ class AbstractValkeyClient(ABC):
         """
         pass
 
+    @abstractmethod
+    async def need_reconnect(self) -> bool:
+        """
+        Check if reconnection is needed.
+
+        For Sentinel clients, this checks if the master address has changed.
+        For standalone clients, this returns True only if the client is not connected.
+        """
+        raise NotImplementedError
+
 
 class ValkeyStandaloneClient(AbstractValkeyClient):
     _target: ValkeyStandaloneTarget
@@ -208,6 +218,9 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
         if self._valkey_client is None:
             raise ClientNotConnectedError("ValkeyStandaloneClient is not connected")
         await self._valkey_client.ping()
+
+    async def need_reconnect(self) -> bool:
+        return self._valkey_client is None
 
 
 class ValkeySentinelClient(AbstractValkeyClient):
@@ -332,6 +345,20 @@ class ValkeySentinelClient(AbstractValkeyClient):
             raise ClientNotConnectedError("ValkeySentinelClient is not connected")
         await self._valkey_client.ping()
 
+    async def need_reconnect(self) -> bool:
+        """Check if reconnection is needed (client disconnected or master changed)."""
+        if self._valkey_client is None:
+            return True
+
+        if self._master_address is None:
+            return True
+
+        current_master = await self._get_master_address()
+        if current_master is None:
+            return False
+
+        return current_master != self._master_address
+
 
 def _create_valkey_client_internal(
     valkey_target: ValkeyTarget,
@@ -400,6 +427,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
     _monitor_task: Optional[asyncio.Task[None]]
     _reconnectable_exceptions: tuple[type[Exception], ...]
     _consecutive_failure_threshold: int
+    _consecutive_failure_count: int
 
     def __init__(
         self,
@@ -416,6 +444,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         self._monitor_task = None
         self._reconnectable_exceptions = reconnectable_exceptions
         self._consecutive_failure_threshold = consecutive_failure_threshold
+        self._consecutive_failure_count = 0
 
     @property
     def client(self) -> GlideClient:
@@ -445,35 +474,63 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         """
         await self._monitor_client.ping()
 
-    async def _monitor_connection(self) -> None:
+    async def need_reconnect(self) -> bool:
+        return await self._monitor_client.need_reconnect()
+
+    async def _check_ping(self) -> bool:
+        """
+        Ping the monitor client and determine if reconnection is needed.
+
+        Returns:
+            True if reconnection is needed, False otherwise.
+        """
         reconnectable_exceptions = self._reconnectable_exceptions
-        consecutive_failure_count = 0
-        while True:
-            try:
-                await asyncio.sleep(_DEFAULT_MONITOR_INTERVAL)
-                await self._monitor_client.ping()
-                consecutive_failure_count = 0  # Reset on successful ping
-            except reconnectable_exceptions as e:
-                # Immediate reconnection for known connection errors (backward compatible)
-                log.warning("Connection error: {}, reconnecting immediately...", e)
-                consecutive_failure_count = 0
-                await self._reconnect()
-            except Exception as e:
-                # Track consecutive failures for other exceptions
-                consecutive_failure_count += 1
+        try:
+            await self._monitor_client.ping()
+            self._consecutive_failure_count = 0
+            return False
+        except reconnectable_exceptions as e:
+            log.warning("Connection error: {}, reconnecting immediately...", e)
+            self._consecutive_failure_count = 0
+            return True
+        except Exception as e:
+            self._consecutive_failure_count += 1
+            log.warning(
+                "Error in connection monitoring (consecutive failures: {}/{}): {}",
+                self._consecutive_failure_count,
+                self._consecutive_failure_threshold,
+                e,
+            )
+            if self._consecutive_failure_count >= self._consecutive_failure_threshold:
                 log.warning(
-                    "Error in connection monitoring (consecutive failures: {}/{}): {}",
-                    consecutive_failure_count,
+                    "Consecutive failure threshold reached ({}), reconnecting...",
                     self._consecutive_failure_threshold,
-                    e,
                 )
-                if consecutive_failure_count >= self._consecutive_failure_threshold:
-                    log.warning(
-                        "Consecutive failure threshold reached ({}), reconnecting...",
-                        self._consecutive_failure_threshold,
-                    )
-                    consecutive_failure_count = 0
-                    await self._reconnect()
+                self._consecutive_failure_count = 0
+                return True
+            return False
+
+    async def _check_connection(self) -> bool:
+        """
+        Check if reconnection is needed by ping and need_reconnect.
+
+        Returns:
+            True if reconnection is needed, False otherwise.
+        """
+        if await self._check_ping():
+            return True
+
+        if await self._monitor_client.need_reconnect():
+            log.info("Reconnection needed (master changed), reconnecting...")
+            return True
+
+        return False
+
+    async def _monitor_connection(self) -> None:
+        while True:
+            await asyncio.sleep(_DEFAULT_MONITOR_INTERVAL)
+            if await self._check_connection():
+                await self._reconnect()
 
     async def _reconnect(self) -> None:
         # Disconnect both clients
