@@ -162,13 +162,13 @@ class StorageProxyHTTPClient:
                     yield client_resp
                     return
                 await self._handle_exceptional_response(client_resp)
-        except aiohttp.ClientConnectionError as e:
-            raise StorageProxyConnectionError(
-                extra_msg="Failed to connect to storage proxy",
-            ) from e
         except asyncio.TimeoutError as e:
             raise StorageProxyTimeoutError(
                 extra_msg="Request to storage proxy timed out",
+            ) from e
+        except aiohttp.ClientConnectionError as e:
+            raise StorageProxyConnectionError(
+                extra_msg="Failed to connect to storage proxy",
             ) from e
 
     async def request(
