@@ -31,7 +31,7 @@ from ai.backend.manager.errors.storage import (
 )
 
 AUTH_TOKEN_HDR: Final = "X-BackendAI-Storage-Auth-Token"
-DEFAULT_TIMEOUT: Final = ClientTimeout(total=300, connect=30)
+DEFAULT_TIMEOUT: Final = ClientTimeout(total=300, sock_connect=30)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
