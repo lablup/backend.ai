@@ -167,7 +167,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
       - name: Create Backport PR
         id: pr
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.OCTODOG }}
           author: "${{ needs.get-backport-target-branch.outputs.author }} <${{ needs.get-backport-target-branch.outputs.author_email }}>"
