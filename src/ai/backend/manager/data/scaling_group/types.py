@@ -75,7 +75,7 @@ class ScalingGroupData:
     name: str
     status: ScalingGroupStatus
     metadata: ScalingGroupMetadata
-    wsproxy: ScalingGroupNetworkConfig
+    network: ScalingGroupNetworkConfig
     driver: ScalingGroupDriverConfig
     scheduler: ScalingGroupSchedulerConfig
 

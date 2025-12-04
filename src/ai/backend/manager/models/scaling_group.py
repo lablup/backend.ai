@@ -302,7 +302,7 @@ class ScalingGroupRow(Base):
                 description=self.description,
                 created_at=self.created_at,
             ),
-            wsproxy=ScalingGroupNetworkConfig(
+            network=ScalingGroupNetworkConfig(
                 wsproxy_addr=self.wsproxy_addr,
                 wsproxy_api_token=self.wsproxy_api_token,
                 use_host_network=self.use_host_network,

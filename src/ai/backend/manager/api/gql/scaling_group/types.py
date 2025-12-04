@@ -302,7 +302,7 @@ class ScalingGroupV2GQL(Node):
             and creation timestamp for audit and documentation purposes.
         """)
     )
-    wsproxy: ScalingGroupNetworkConfigGQL = strawberry.field(
+    network: ScalingGroupNetworkConfigGQL = strawberry.field(
         description=dedent_strip("""
             Network configuration for connecting clients to interactive session services
             (terminals, notebooks, web apps) through WebSocket proxy infrastructure.
@@ -329,7 +329,7 @@ class ScalingGroupV2GQL(Node):
             name=data.name,
             status=ScalingGroupStatusGQL.from_dataclass(data.status),
             metadata=ScalingGroupMetadataGQL.from_dataclass(data.metadata),
-            wsproxy=ScalingGroupNetworkConfigGQL.from_dataclass(data.wsproxy),
+            network=ScalingGroupNetworkConfigGQL.from_dataclass(data.network),
             driver=ScalingGroupDriverConfigGQL.from_dataclass(data.driver),
             scheduler=ScalingGroupSchedulerConfigGQL.from_dataclass(data.scheduler),
         )
