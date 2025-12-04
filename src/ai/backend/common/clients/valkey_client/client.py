@@ -445,6 +445,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         self._reconnectable_exceptions = reconnectable_exceptions
         self._consecutive_failure_threshold = consecutive_failure_threshold
         self._consecutive_failure_count = 0
+        self._closed = False
 
     @property
     def client(self) -> GlideClient:
@@ -456,6 +457,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         self._monitor_task = asyncio.create_task(self._monitor_connection())
 
     async def disconnect(self) -> None:
+        self._closed = True
         if self._monitor_task:
             await cancel_and_wait(self._monitor_task)
             self._monitor_task = None
@@ -527,10 +529,23 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         return False
 
     async def _monitor_connection(self) -> None:
-        while True:
-            await asyncio.sleep(_DEFAULT_MONITOR_INTERVAL)
-            if await self._check_connection():
-                await self._reconnect()
+        log.info("Starting Valkey connection monitor task...")
+        try:
+            while True:
+                try:
+                    await asyncio.sleep(_DEFAULT_MONITOR_INTERVAL)
+                    if await self._check_connection():
+                        log.info("Reconnecting Valkey clients...")
+                        await self._reconnect()
+                except BaseException as e:
+                    if not self._closed:
+                        log.exception("Error in Valkey connection monitor: {}", e)
+                        continue
+                    raise
+        finally:
+            log.info(
+                "Valkey connection monitor task stopped. {}", "Client closed: {}", self._closed
+            )
 
     async def _reconnect(self) -> None:
         # Disconnect both clients
