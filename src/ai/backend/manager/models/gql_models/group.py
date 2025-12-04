@@ -19,7 +19,10 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
-from ai.backend.common.exception import GroupNotFound
+from ai.backend.common.exception import (
+    GroupNotFound,
+    InvalidAPIParameters,
+)
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
 from ai.backend.manager.models.rbac import ProjectScope
@@ -664,14 +667,17 @@ class CreateGroup(graphene.Mutation):
         props: GroupInput,
     ) -> CreateGroup:
         graph_ctx: GraphQueryContext = info.context
+        if name.strip() == "" or len(name) > 64:
+            raise InvalidAPIParameters(
+                "Group name cannot be empty or whitespace and must not exceed 64 characters."
+            )
 
         action = props.to_action(name)
         res = await graph_ctx.processors.group.create_group.wait_for_complete(action)
-
         return cls(
-            ok=res.success,
-            msg="success" if res.success else "failed",
-            group=Group.from_dto(res.data) if res.success else None,
+            ok=True,
+            msg="success",
+            group=Group.from_dto(res.data),
         )
 
 
@@ -702,11 +708,10 @@ class ModifyGroup(graphene.Mutation):
 
         action = props.to_action(gid)
         res = await graph_ctx.processors.group.modify_group.wait_for_complete(action)
-
         return cls(
-            ok=res.success,
-            msg="success" if res.success else "failed",
-            group=Group.from_dto(res.data) if res.success else None,
+            ok=True,
+            msg="success",
+            group=Group.from_dto(res.data) if res.data else None,
         )
 
 
@@ -730,9 +735,8 @@ class DeleteGroup(graphene.Mutation):
     )
     async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> DeleteGroup:
         ctx: GraphQueryContext = info.context
-        res = await ctx.processors.group.delete_group.wait_for_complete(DeleteGroupAction(gid))
-
-        return cls(ok=res.success, msg="success" if res.success else "failed")
+        await ctx.processors.group.delete_group.wait_for_complete(DeleteGroupAction(gid))
+        return cls(ok=True, msg="success")
 
 
 class PurgeGroup(graphene.Mutation):
@@ -760,9 +764,5 @@ class PurgeGroup(graphene.Mutation):
     async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> PurgeGroup:
         graph_ctx: GraphQueryContext = info.context
 
-        res = await graph_ctx.processors.group.purge_group.wait_for_complete(PurgeGroupAction(gid))
-
-        return cls(
-            ok=res.success,
-            msg="success" if res.success else "failed",
-        )
+        await graph_ctx.processors.group.purge_group.wait_for_complete(PurgeGroupAction(gid))
+        return cls(ok=True, msg="success")
