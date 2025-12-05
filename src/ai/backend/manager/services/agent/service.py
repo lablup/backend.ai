@@ -9,6 +9,13 @@ from dateutil.tz import tzutc
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
+from ai.backend.common.exception import (
+    ErrorCode,
+    ErrorDetail,
+    ErrorDomain,
+    ErrorOperation,
+    PassthroughError,
+)
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -147,7 +154,22 @@ class AgentService:
             with _timeout(5.0):
                 headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
                 async with sess.get(watcher_info["addr"], headers=headers) as resp:
-                    return GetWatcherStatusActionResult(resp, agent_id=action.agent_id)
+                    if resp.status // 100 == 2:
+                        data = await resp.json()
+                        return GetWatcherStatusActionResult(
+                            data=data,
+                            agent_id=action.agent_id,
+                        )
+                    error_msg = await resp.text()
+                    raise PassthroughError(
+                        status_code=resp.status,
+                        error_code=ErrorCode(
+                            domain=ErrorDomain.AGENT,
+                            operation=ErrorOperation.READ,
+                            error_detail=ErrorDetail.UNAVAILABLE,
+                        ),
+                        error_message=f"Agent watcher error: {error_msg}",
+                    )
 
     async def watcher_agent_start(
         self, action: WatcherAgentStartAction
@@ -159,7 +181,22 @@ class AgentService:
                 watcher_url = watcher_info["addr"] / "agent/start"
                 headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
                 async with sess.post(watcher_url, headers=headers) as resp:
-                    return WatcherAgentStartActionResult(resp, agent_id=action.agent_id)
+                    if resp.status // 100 == 2:
+                        data = await resp.json()
+                        return WatcherAgentStartActionResult(
+                            data=data,
+                            agent_id=action.agent_id,
+                        )
+                    error_msg = await resp.text()
+                    raise PassthroughError(
+                        status_code=resp.status,
+                        error_code=ErrorCode(
+                            domain=ErrorDomain.AGENT,
+                            operation=ErrorOperation.EXECUTE,
+                            error_detail=ErrorDetail.UNAVAILABLE,
+                        ),
+                        error_message=f"Agent watcher error: {error_msg}",
+                    )
 
     async def watcher_agent_restart(
         self, action: WatcherAgentRestartAction
@@ -171,7 +208,22 @@ class AgentService:
                 watcher_url = watcher_info["addr"] / "agent/restart"
                 headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
                 async with sess.post(watcher_url, headers=headers) as resp:
-                    return WatcherAgentRestartActionResult(resp, agent_id=action.agent_id)
+                    if resp.status // 100 == 2:
+                        data = await resp.json()
+                        return WatcherAgentRestartActionResult(
+                            data=data,
+                            agent_id=action.agent_id,
+                        )
+                    error_msg = await resp.text()
+                    raise PassthroughError(
+                        status_code=resp.status,
+                        error_code=ErrorCode(
+                            domain=ErrorDomain.AGENT,
+                            operation=ErrorOperation.EXECUTE,
+                            error_detail=ErrorDetail.UNAVAILABLE,
+                        ),
+                        error_message=f"Agent watcher error: {error_msg}",
+                    )
 
     async def watcher_agent_stop(
         self, action: WatcherAgentStopAction
@@ -183,7 +235,22 @@ class AgentService:
                 watcher_url = watcher_info["addr"] / "agent/stop"
                 headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
                 async with sess.post(watcher_url, headers=headers) as resp:
-                    return WatcherAgentStopActionResult(resp, agent_id=action.agent_id)
+                    if resp.status // 100 == 2:
+                        data = await resp.json()
+                        return WatcherAgentStopActionResult(
+                            data=data,
+                            agent_id=action.agent_id,
+                        )
+                    error_msg = await resp.text()
+                    raise PassthroughError(
+                        status_code=resp.status,
+                        error_code=ErrorCode(
+                            domain=ErrorDomain.AGENT,
+                            operation=ErrorOperation.EXECUTE,
+                            error_detail=ErrorDetail.UNAVAILABLE,
+                        ),
+                        error_message=f"Agent watcher error: {error_msg}",
+                    )
 
     async def recalculate_usage(
         self, action: RecalculateUsageAction
