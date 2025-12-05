@@ -425,11 +425,7 @@ class CreateDomainNode(graphene.Mutation):
             )
         )
 
-        domain_data: Optional[DomainData] = res.domain_data
-
-        return CreateDomainNode(
-            ok=True, msg="", item=DomainNode.from_dto(domain_data) if domain_data else None
-        )
+        return CreateDomainNode(ok=True, msg="", item=DomainNode.from_dto(res.domain_data))
 
 
 class ModifyDomainNodeInput(graphene.InputObjectType):
@@ -526,10 +522,8 @@ class ModifyDomainNode(graphene.Mutation):
             )
         )
 
-        domain_data: Optional[DomainData] = res.domain_data
-
         return ModifyDomainNode(
-            item=DomainNode.from_dto(domain_data) if domain_data else None,
+            item=DomainNode.from_dto(res.domain_data),
             client_mutation_id=input.get("client_mutation_id"),
         )
 
@@ -733,7 +727,7 @@ class CreateDomain(graphene.Mutation):
         return cls(
             ok=True,
             msg="domain creation succeed",
-            domain=Domain.from_data(res.domain_data) if res.domain_data else None,
+            domain=Domain.from_data(res.domain_data),
         )
 
 
@@ -769,7 +763,7 @@ class ModifyDomain(graphene.Mutation):
         return cls(
             ok=True,
             msg="domain modification succeed",
-            domain=Domain.from_data(res.domain_data) if res.domain_data else None,
+            domain=Domain.from_data(res.domain_data),
         )
 
 
