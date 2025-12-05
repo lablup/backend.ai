@@ -35,6 +35,10 @@ from ai.backend.manager.services.agent.actions.remove_agent_from_images_by_canon
     RemoveAgentFromImagesByCanonicalsAction,
     RemoveAgentFromImagesByCanonicalsActionResult,
 )
+from ai.backend.manager.services.agent.actions.search_agents import (
+    SearchAgentsAction,
+    SearchAgentsActionResult,
+)
 from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
     SyncAgentRegistryActionResult,
@@ -73,6 +77,7 @@ class AgentProcessors(AbstractProcessorPackage):
     remove_agent_from_images: ActionProcessor[
         RemoveAgentFromImagesAction, RemoveAgentFromImagesActionResult
     ]
+    search_agents: ActionProcessor[SearchAgentsAction, SearchAgentsActionResult]
 
     def __init__(self, service: AgentService, action_monitors: list[ActionMonitor]) -> None:
         self.sync_agent_registry = ActionProcessor(service.sync_agent_registry, action_monitors)
@@ -91,6 +96,7 @@ class AgentProcessors(AbstractProcessorPackage):
         self.remove_agent_from_images = ActionProcessor(
             service.remove_agent_from_images, action_monitors
         )
+        self.search_agents = ActionProcessor(service.search_agents, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -105,4 +111,5 @@ class AgentProcessors(AbstractProcessorPackage):
             HandleHeartbeatAction.spec(),
             RemoveAgentFromImagesAction.spec(),
             RemoveAgentFromImagesByCanonicalsAction.spec(),
+            SearchAgentsAction.spec(),
         ]
