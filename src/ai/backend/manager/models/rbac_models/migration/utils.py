@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection
 from sqlalchemy.engine.row import Row
 
-from .enums import EntityType, OperationType, ScopeType
+from .enums import EntityType, OperationType, RoleSource, ScopeType
 from .models import (
     get_permission_groups_table,
     get_permissions_table,
@@ -140,3 +140,91 @@ class PermissionUpdateUtil:
                 )
                 permission_inputs.append(input.to_dict())
         insert_if_data_exists(db_conn, permissions_table, permission_inputs)
+
+
+class EntityAddUtil:
+    @classmethod
+    def _query_roles(
+        cls, db_conn: Connection, offset: int, page_size: int, *, role_source: RoleSource
+    ) -> list[Row]:
+        roles_table = get_roles_table()
+        query = (
+            sa.select(roles_table)
+            .where(roles_table.c.source == role_source)
+            .offset(offset)
+            .limit(page_size)
+        )
+        return db_conn.execute(query).all()
+
+    @classmethod
+    def _permission_inputs_to_permission_group(
+        cls,
+        permission_group_id: uuid.UUID,
+        entity_type: EntityType,
+        operations: Collection[OperationType],
+    ) -> list[dict[str, Any]]:
+        inputs: list[dict[str, Any]] = []
+        for operation in operations:
+            input = {
+                "permission_group_id": permission_group_id,
+                "entity_type": entity_type,
+                "operation": str(operation),
+            }
+            inputs.append(input)
+        return inputs
+
+    @classmethod
+    def add_permissions_to_system_sourced_roles(
+        cls,
+        db_conn: Connection,
+        entity_type: EntityType,
+        operations: Collection[OperationType],
+    ) -> None:
+        permissions_table = get_permissions_table()
+        role_source = RoleSource.SYSTEM
+
+        offset = 0
+        page_size = 1000
+
+        while True:
+            roles = cls._query_roles(db_conn, offset, page_size, role_source=role_source)
+            offset += page_size
+            if not roles:
+                break
+            permission_inputs: list[dict[str, Any]] = []
+            for row in roles:
+                inputs = cls._permission_inputs_to_permission_group(
+                    permission_group_id=row.permission_group_id,
+                    entity_type=entity_type,
+                    operations=operations,
+                )
+                permission_inputs.extend(inputs)
+            insert_if_data_exists(db_conn, permissions_table, permission_inputs)
+
+    @classmethod
+    def add_permissions_to_custom_sourced_roles(
+        cls,
+        db_conn: Connection,
+        entity_type: EntityType,
+        operations: Collection[OperationType],
+    ) -> None:
+        permissions_table = get_permissions_table()
+        role_source = RoleSource.CUSTOM
+
+        offset = 0
+        page_size = 1000
+
+        while True:
+            roles = cls._query_roles(db_conn, offset, page_size, role_source=role_source)
+            offset += page_size
+            if not roles:
+                break
+            permission_inputs: list[dict[str, Any]] = []
+            for row in roles:
+                inputs = cls._permission_inputs_to_permission_group(
+                    permission_group_id=row.permission_group_id,
+                    entity_type=entity_type,
+                    operations=operations,
+                )
+                permission_inputs.extend(inputs)
+            insert_if_data_exists(db_conn, permissions_table, permission_inputs)
