@@ -370,7 +370,7 @@ class ServiceConfigModel(LegacyBaseRequestModel):
         examples=["nvidia-H100"],
         alias="scalingGroup",
     )
-    resources: Optional[dict[str, str | int]] = Field(
+    resources: Optional[dict[str, str | int | float]] = Field(
         examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}]
     )
     resource_opts: dict[str, str | int | bool] = Field(examples=[{"shmem": "2g"}], default={})
