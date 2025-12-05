@@ -4,3 +4,5 @@ python_tests(
         "src/ai/backend/manager:src",
     ],
 )
+
+python_sources()
