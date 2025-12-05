@@ -10,8 +10,8 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.types import ImageCanonical, ImageID
 from ai.backend.manager.container_registry import get_container_registry_cls
-from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -61,23 +61,6 @@ def container_registry_service(
 
 
 @pytest.fixture
-def sample_registry_data():
-    """Create sample container registry data."""
-    return ContainerRegistryData(
-        id=UUID("12345678-1234-5678-1234-567812345678"),
-        url="https://registry.example.com",
-        registry_name="registry.example.com",
-        type=ContainerRegistryType.DOCKER,
-        project="test-project",
-        username=None,
-        password=None,
-        ssl_verify=True,
-        is_global=True,
-        extra=None,
-    )
-
-
-@pytest.fixture
 def sample_registry_row():
     """Create sample container registry row."""
     row = MagicMock(spec=ContainerRegistryRow)
@@ -93,8 +76,8 @@ def sample_registry_row():
 def sample_image_data():
     """Create sample image data."""
     return ImageData(
-        id=UUID("87654321-4321-8765-4321-876543218765"),
-        name="registry.example.com/test-project/python:3.9",
+        id=ImageID(UUID("87654321-4321-8765-4321-876543218765")),
+        name=ImageCanonical("registry.example.com/test-project/python:3.9"),
         project="test-project",
         image="test-project/python",
         created_at=datetime.now(),
@@ -121,15 +104,11 @@ class TestRescanImagesService:
         self,
         container_registry_service,
         mock_container_registry_repository,
-        sample_registry_data,
         sample_registry_row,
         sample_image_data,
     ):
         """Test successful image rescan"""
         # Setup mocks
-        mock_container_registry_repository.get_by_registry_and_project.return_value = (
-            sample_registry_data
-        )
         mock_container_registry_repository.get_registry_row_for_scanner.return_value = (
             sample_registry_row
         )
@@ -152,15 +131,12 @@ class TestRescanImagesService:
             result = await container_registry_service.rescan_images(action)
 
             # Verify
-            assert result.registry == sample_registry_data
+            assert result.registry == sample_registry_row.to_dataclass()
             assert len(result.images) == 1
             assert result.images[0] == sample_image_data
             assert result.errors == []
 
             # Verify calls
-            mock_container_registry_repository.get_by_registry_and_project.assert_called_once_with(
-                "registry.example.com", "test-project"
-            )
             mock_container_registry_repository.get_registry_row_for_scanner.assert_called_once_with(
                 "registry.example.com", "test-project"
             )
@@ -172,7 +148,7 @@ class TestRescanImagesService:
     ):
         """Test rescan when registry not found"""
         # Setup mock to raise exception
-        mock_container_registry_repository.get_by_registry_and_project.side_effect = (
+        mock_container_registry_repository.get_registry_row_for_scanner.side_effect = (
             ContainerRegistryNotFound()
         )
 
@@ -189,15 +165,11 @@ class TestRescanImagesService:
         self,
         container_registry_service,
         mock_container_registry_repository,
-        sample_registry_data,
         sample_registry_row,
         sample_image_data,
     ):
         """Test rescan with some errors from scanner"""
         # Setup mocks
-        mock_container_registry_repository.get_by_registry_and_project.return_value = (
-            sample_registry_data
-        )
         mock_container_registry_repository.get_registry_row_for_scanner.return_value = (
             sample_registry_row
         )
@@ -229,14 +201,10 @@ class TestRescanImagesService:
         self,
         container_registry_service,
         mock_container_registry_repository,
-        sample_registry_data,
         sample_registry_row,
     ):
         """Test rescan without project parameter"""
         # Setup mocks
-        mock_container_registry_repository.get_by_registry_and_project.return_value = (
-            sample_registry_data
-        )
         mock_container_registry_repository.get_registry_row_for_scanner.return_value = (
             sample_registry_row
         )
@@ -255,9 +223,6 @@ class TestRescanImagesService:
             await container_registry_service.rescan_images(action)
 
             # Verify repository was called with None project
-            mock_container_registry_repository.get_by_registry_and_project.assert_called_once_with(
-                "registry.example.com", None
-            )
             mock_container_registry_repository.get_registry_row_for_scanner.assert_called_once_with(
                 "registry.example.com", None
             )
@@ -267,15 +232,11 @@ class TestRescanImagesService:
         self,
         container_registry_service,
         mock_container_registry_repository,
-        sample_registry_data,
         sample_registry_row,
         mock_db_engine,
     ):
         """Test that scanner is properly initialized"""
         # Setup mocks
-        mock_container_registry_repository.get_by_registry_and_project.return_value = (
-            sample_registry_data
-        )
         mock_container_registry_repository.get_registry_row_for_scanner.return_value = (
             sample_registry_row
         )
