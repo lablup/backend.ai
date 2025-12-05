@@ -8,7 +8,6 @@ from itertools import groupby
 from typing import Any, Awaitable, Optional
 from uuid import UUID
 
-import aiotools
 import async_timeout
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
@@ -1139,19 +1138,27 @@ class Scheduler:
         image_configs: dict[str, ImageConfigData],
     ) -> None:
         """
-        Start multiple sessions concurrently with timeout.
+        Start multiple sessions concurrently with individual timeouts.
 
         :param sessions: List of sessions to start
         :param image_configs: Image configurations for the sessions
         """
-        # Start each session concurrently with timeout
-        async with (
-            async_timeout.timeout(delay=START_SESSION_TIMEOUT_SEC),
-            aiotools.PersistentTaskGroup() as tg,
-        ):
-            for session in sessions:
-                # Start session asynchronously with image configs
-                tg.create_task(self._start_single_session(session, image_configs))
+
+        async def start_with_timeout(session: SessionDataForStart) -> None:
+            async with async_timeout.timeout(delay=START_SESSION_TIMEOUT_SEC):
+                await self._start_single_session(session, image_configs)
+
+        results = await asyncio.gather(
+            *[start_with_timeout(session) for session in sessions],
+            return_exceptions=True,
+        )
+        for session, result in zip(sessions, results, strict=True):
+            if isinstance(result, BaseException):
+                log.warning(
+                    "start-session(s:{}): failed with unhandled exception",
+                    session.session_id,
+                    exc_info=result,
+                )
 
     async def _start_single_session(
         self,
