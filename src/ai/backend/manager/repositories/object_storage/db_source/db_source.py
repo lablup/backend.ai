@@ -27,7 +27,11 @@ class ObjectStorageDBSource:
         Get an existing object storage configuration from the database.
         """
         async with self._db.begin_session() as db_session:
-            query = sa.select(ObjectStorageRow).where(ObjectStorageRow.name == storage_name)
+            query = (
+                sa.select(ObjectStorageRow)
+                .where(ObjectStorageRow.name == storage_name)
+                .options(selectinload(ObjectStorageRow.meta))
+            )
             result = await db_session.execute(query)
             row: ObjectStorageRow = result.scalar_one_or_none()
             if row is None:
@@ -41,7 +45,11 @@ class ObjectStorageDBSource:
         Get an existing object storage configuration from the database by ID.
         """
         async with self._db.begin_session() as db_session:
-            query = sa.select(ObjectStorageRow).where(ObjectStorageRow.id == storage_id)
+            query = (
+                sa.select(ObjectStorageRow)
+                .where(ObjectStorageRow.id == storage_id)
+                .options(selectinload(ObjectStorageRow.meta))
+            )
             result = await db_session.execute(query)
             row: ObjectStorageRow = result.scalar_one_or_none()
             if row is None:
@@ -56,7 +64,11 @@ class ObjectStorageDBSource:
             query = (
                 sa.select(StorageNamespaceRow)
                 .where(StorageNamespaceRow.id == storage_namespace_id)
-                .options(selectinload(StorageNamespaceRow.object_storage_row))
+                .options(
+                    selectinload(StorageNamespaceRow.object_storage_row).selectinload(
+                        ObjectStorageRow.meta
+                    )
+                )
             )
             result = await db_session.execute(query)
             row: StorageNamespaceRow = result.scalar_one_or_none()
@@ -76,7 +88,17 @@ class ObjectStorageDBSource:
             db_session.add(object_storage_row)
             await db_session.flush()
             await db_session.refresh(object_storage_row)
-            return object_storage_row.to_dataclass()
+
+            # Query with eager loading to get the created row with relationships
+            query = (
+                sa.select(ObjectStorageRow)
+                .where(ObjectStorageRow.id == object_storage_row.id)
+                .options(selectinload(ObjectStorageRow.meta))
+            )
+            result = await db_session.execute(query)
+            row: ObjectStorageRow = result.scalar_one()
+
+            return row.to_dataclass()
 
     async def update(
         self, storage_id: uuid.UUID, modifier: ObjectStorageModifier
@@ -90,10 +112,18 @@ class ObjectStorageDBSource:
                 sa.update(ObjectStorageRow)
                 .where(ObjectStorageRow.id == storage_id)
                 .values(**data)
-                .returning(*sa.select(ObjectStorageRow).selected_columns)
+                .returning(ObjectStorageRow.id)
             )
-            stmt = sa.select(ObjectStorageRow).from_statement(update_stmt)
-            row: ObjectStorageRow = (await db_session.execute(stmt)).scalars().one()
+            await db_session.execute(update_stmt)
+
+            # Query with eager loading to get the updated row
+            query = (
+                sa.select(ObjectStorageRow)
+                .where(ObjectStorageRow.id == storage_id)
+                .options(selectinload(ObjectStorageRow.meta))
+            )
+            result = await db_session.execute(query)
+            row: ObjectStorageRow = result.scalar_one()
 
             return row.to_dataclass()
 
@@ -116,7 +146,7 @@ class ObjectStorageDBSource:
         List all object storage configurations from the database.
         """
         async with self._db.begin_session() as db_session:
-            query = sa.select(ObjectStorageRow)
+            query = sa.select(ObjectStorageRow).options(selectinload(ObjectStorageRow.meta))
             result = await db_session.execute(query)
             rows: list[ObjectStorageRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]
