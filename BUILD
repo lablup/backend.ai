@@ -9,6 +9,8 @@ python_requirements(
         "boto3": ["botocore", "boto3"],
         "graphql-core": ["graphql"],
         "graphql-relay": ["graphql_relay"],
+        "habana-pyhlml": ["pyhlml"],
+        "tt-smi": ["tt_smi"],
         "pycryptodome": ["Crypto"],
         "python-dateutil": ["dateutil", "dateutil.parser", "dateutil.tz"],
         "python-json-logger": ["pythonjsonlogger"],
