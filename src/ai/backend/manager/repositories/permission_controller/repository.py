@@ -10,7 +10,7 @@ from ai.backend.common.resilience.resilience import Resilience
 
 from ...data.permission.id import ObjectId
 from ...data.permission.role import (
-    AssignedUserInfo,
+    AssignedUserData,
     BatchEntityPermissionCheckInput,
     RoleCreateInput,
     RoleData,
@@ -136,6 +136,6 @@ class PermissionControllerRepository:
         return result.to_detail_data_without_users()
 
     @permission_controller_repository_resilience.apply()
-    async def get_role_assigned_users(self, role_id: uuid.UUID) -> list[AssignedUserInfo]:
+    async def get_role_assigned_users(self, role_id: uuid.UUID) -> list[AssignedUserData]:
         """Get users assigned to a specific role."""
         return await self._db_source.get_role_assigned_users(role_id)

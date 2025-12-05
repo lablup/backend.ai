@@ -59,6 +59,11 @@ class RoleDeleteInput:
 
 @dataclass(frozen=True)
 class RoleData:
+    """
+    Information about a role.
+    If detailed information is needed, use RoleDetailData.
+    """
+
     id: uuid.UUID
     name: str
     source: RoleSource
@@ -70,7 +75,7 @@ class RoleData:
 
 
 @dataclass(frozen=True)
-class AssignedUserInfo:
+class AssignedUserData:
     """Information about a user assigned to a role."""
 
     user_id: uuid.UUID
@@ -82,6 +87,11 @@ class AssignedUserInfo:
 
 @dataclass(frozen=True)
 class RoleDetailData:
+    """
+    Detailed information about a role.
+    It includes permission groups, object permissions, and assigned users.
+    """
+
     id: uuid.UUID
     name: str
     source: RoleSource
@@ -89,7 +99,7 @@ class RoleDetailData:
 
     permission_groups: list[PermissionGroupExtendedData]
     object_permissions: list[ObjectPermissionData]
-    assigned_users: list[AssignedUserInfo]
+    assigned_users: list[AssignedUserData]
 
     created_at: datetime
     updated_at: Optional[datetime]
