@@ -301,12 +301,7 @@ async def get_watcher_status(request: web.Request, params: Any) -> web.Response:
         GetWatcherStatusAction(agent_id=params["agent_id"])
     )
 
-    if result.resp.status == HTTPStatus.OK:
-        data = await result.resp.json()
-        return web.json_response(data, status=result.resp.status)
-    else:
-        data = await result.resp.text()
-        return web.Response(text=data, status=result.resp.status)
+    return web.json_response(result.data, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -324,12 +319,7 @@ async def watcher_agent_start(request: web.Request, params: Any) -> web.Response
         WatcherAgentStartAction(agent_id=params["agent_id"])
     )
 
-    if result.resp.status == HTTPStatus.OK:
-        data = await result.resp.json()
-        return web.json_response(data, status=result.resp.status)
-    else:
-        data = await result.resp.text()
-        return web.Response(text=data, status=result.resp.status)
+    return web.json_response(result.data, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -347,12 +337,7 @@ async def watcher_agent_stop(request: web.Request, params: Any) -> web.Response:
         WatcherAgentStopAction(agent_id=params["agent_id"])
     )
 
-    if result.resp.status == HTTPStatus.OK:
-        data = await result.resp.json()
-        return web.json_response(data, status=result.resp.status)
-    else:
-        data = await result.resp.text()
-        return web.Response(text=data, status=result.resp.status)
+    return web.json_response(result.data, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -372,12 +357,7 @@ async def watcher_agent_restart(request: web.Request, params: Any) -> web.Respon
         )
     )
 
-    if result.resp.status == HTTPStatus.OK:
-        data = await result.resp.json()
-        return web.json_response(data, status=result.resp.status)
-    else:
-        data = await result.resp.text()
-        return web.Response(text=data, status=result.resp.status)
+    return web.json_response(result.data, status=HTTPStatus.OK)
 
 
 @superadmin_required
