@@ -16,7 +16,7 @@ from sqlalchemy.orm import (
 from ai.backend.manager.data.permission.role import (
     RoleCreateInput,
     RoleData,
-    RoleDataWithPermissions,
+    RoleDetailData,
 )
 from ai.backend.manager.data.permission.status import (
     RoleStatus,
@@ -94,8 +94,9 @@ class RoleRow(Base):
             description=self.description,
         )
 
-    def to_data_with_permissions(self) -> RoleDataWithPermissions:
-        return RoleDataWithPermissions(
+    def to_detail_data_without_users(self) -> RoleDetailData:
+        """Convert to detail data without assigned users."""
+        return RoleDetailData(
             id=self.id,
             name=self.name,
             source=self.source,
@@ -106,6 +107,7 @@ class RoleRow(Base):
             description=self.description,
             permission_groups=[pg_row.to_extended_data() for pg_row in self.permission_group_rows],
             object_permissions=[op_row.to_data() for op_row in self.object_permission_rows],
+            assigned_users=[],
         )
 
     @classmethod

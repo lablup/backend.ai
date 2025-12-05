@@ -59,6 +59,11 @@ class RoleDeleteInput:
 
 @dataclass(frozen=True)
 class RoleData:
+    """
+    Information about a role.
+    If detailed information is needed, use RoleDetailData.
+    """
+
     id: uuid.UUID
     name: str
     source: RoleSource
@@ -70,7 +75,23 @@ class RoleData:
 
 
 @dataclass(frozen=True)
-class RoleDataWithPermissions:
+class AssignedUserData:
+    """Information about a user assigned to a role."""
+
+    user_id: uuid.UUID
+    username: str
+    email: str
+    granted_by: Optional[uuid.UUID]
+    granted_at: datetime
+
+
+@dataclass(frozen=True)
+class RoleDetailData:
+    """
+    Detailed information about a role.
+    It includes permission groups, object permissions, and assigned users.
+    """
+
     id: uuid.UUID
     name: str
     source: RoleSource
@@ -78,6 +99,7 @@ class RoleDataWithPermissions:
 
     permission_groups: list[PermissionGroupExtendedData]
     object_permissions: list[ObjectPermissionData]
+    assigned_users: list[AssignedUserData]
 
     created_at: datetime
     updated_at: Optional[datetime]
@@ -123,3 +145,13 @@ class UserRoleAssignmentData:
     user_id: uuid.UUID
     role_id: uuid.UUID
     granted_by: Optional[uuid.UUID] = None
+
+
+@dataclass(frozen=True)
+class RoleListResult:
+    """Result of role search with pagination info."""
+
+    items: list[RoleData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
