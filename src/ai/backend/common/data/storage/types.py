@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Self
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ArtifactStorageType(enum.StrEnum):
@@ -34,28 +34,46 @@ class ArtifactStorageStatefulData(BaseModel):
         return self.model_dump(mode="json")
 
 
-class ObjectStorageStatefulData(ArtifactStorageStatefulData):
+class _CommonArtifactStorageStatefulData(ArtifactStorageStatefulData):
+    """Common fields for all artifact storage stateful data types."""
+
+    id: uuid.UUID = Field(
+        description="Primary key from the artifact_storages table representing the storage configuration",
+    )
+    name: str = Field(
+        description="Human-readable name of the storage used for display and identification purposes",
+    )
+    host: str = Field(
+        description="Hostname or IP address of the server providing the storage backend",
+    )
+
+
+class ObjectStorageStatefulData(_CommonArtifactStorageStatefulData):
     """
     Shared object storage data type for common components.
     This is a copy of manager's ObjectStorageData without the to_dto method.
     """
 
-    id: uuid.UUID
-    name: str
-    host: str
-    access_key: str
-    secret_key: str
-    endpoint: str
-    region: str
+    access_key: str = Field(
+        description="Access key credential used for authenticating API requests to the object storage service",
+    )
+    secret_key: str = Field(
+        description="Secret key credential used for signing and authenticating API requests to the object storage service",
+    )
+    endpoint: str = Field(
+        description="Full endpoint URL of the S3-compatible object storage service (e.g., https://s3.amazonaws.com)",
+    )
+    region: str = Field(
+        description="AWS region or region identifier for the object storage service (e.g., us-east-1, ap-northeast-2)",
+    )
 
 
-class VFSStorageStatefulData(ArtifactStorageStatefulData):
+class VFSStorageStatefulData(_CommonArtifactStorageStatefulData):
     """
     Shared VFS storage data type for common components.
     This is a copy of manager's VFSStorageData.
     """
 
-    id: uuid.UUID
-    name: str
-    host: str
-    base_path: Path
+    base_path: Path = Field(
+        description="Base filesystem path where artifacts are stored in the VFS (e.g., /mnt/vfs/artifacts)",
+    )
