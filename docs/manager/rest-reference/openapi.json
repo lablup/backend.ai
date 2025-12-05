@@ -896,6 +896,9 @@
                     },
                     {
                       "type": "integer"
+                    },
+                    {
+                      "type": "number"
                     }
                   ]
                 },
