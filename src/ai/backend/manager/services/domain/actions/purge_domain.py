@@ -23,8 +23,7 @@ class PurgeDomainAction(DomainAction):
 
 @dataclass
 class PurgeDomainActionResult(BaseActionResult):
-    success: bool
-    description: str
+    name: str
 
     @override
     def entity_id(self) -> Optional[str]:

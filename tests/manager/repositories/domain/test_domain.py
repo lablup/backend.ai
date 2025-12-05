@@ -11,8 +11,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
-from sqlalchemy.exc import IntegrityError
 
+from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.domain.types import (
     DomainCreator,
@@ -202,7 +202,7 @@ class TestDomainRepository:
                 is_active=True,
             )
 
-            with pytest.raises(IntegrityError):
+            with pytest.raises(InvalidAPIParameters):
                 await domain_repository.create_domain_validated(duplicate_creator)
 
         finally:
@@ -282,9 +282,8 @@ class TestDomainRepository:
             description=TriState.update("Updated description"),
         )
 
-        result = await domain_repository.modify_domain_validated("nonexistent-domain", modifier)
-
-        assert result is None
+        with pytest.raises(DomainNotFound):
+            await domain_repository.modify_domain_validated("nonexistent-domain", modifier)
 
     @pytest.mark.asyncio
     async def test_soft_delete_domain_validated_success(
@@ -311,10 +310,8 @@ class TestDomainRepository:
         await domain_repository.create_domain_validated(domain_creator)
 
         try:
-            # Soft delete domain
-            result = await domain_repository.soft_delete_domain_validated(domain_name)
-
-            assert result is True
+            # Soft delete domain (now returns None)
+            await domain_repository.soft_delete_domain_validated(domain_name)
 
             # Verify domain is marked as inactive
             async with database_engine.begin() as conn:
@@ -338,9 +335,8 @@ class TestDomainRepository:
         domain_repository: DomainRepository,
     ) -> None:
         """Test domain soft deletion when domain not found"""
-        result = await domain_repository.soft_delete_domain_validated("nonexistent-domain")
-
-        assert result is False
+        with pytest.raises(DomainNotFound):
+            await domain_repository.soft_delete_domain_validated("nonexistent-domain")
 
     @pytest.mark.asyncio
     async def test_purge_domain_validated_success(
