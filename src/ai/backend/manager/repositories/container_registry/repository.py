@@ -114,13 +114,24 @@ class ContainerRegistryRepository:
         self, session: SASession, registry_id: uuid.UUID, allowed_groups: AllowedGroupsModel
     ) -> None:
         if allowed_groups.add:
-            insert_values = [
-                {"registry_id": registry_id, "group_id": group_id}
-                for group_id in allowed_groups.add
-            ]
+            existing_stmt = sa.select(AssociationContainerRegistriesGroupsRow.group_id).where(
+                AssociationContainerRegistriesGroupsRow.registry_id == registry_id
+            )
+            result = await session.execute(existing_stmt)
+            # Convert UUID objects to strings for comparison with allowed_groups.add
+            existing_group_ids = {str(gid) for gid in result.scalars().all()}
 
-            insert_query = sa.insert(AssociationContainerRegistriesGroupsRow).values(insert_values)
-            await session.execute(insert_query)
+            # Add only new group associations
+            new_group_ids = [gid for gid in allowed_groups.add if gid not in existing_group_ids]
+
+            if new_group_ids:
+                insert_values = [
+                    {"registry_id": registry_id, "group_id": group_id} for group_id in new_group_ids
+                ]
+                insert_query = sa.insert(AssociationContainerRegistriesGroupsRow).values(
+                    insert_values
+                )
+                await session.execute(insert_query)
         if allowed_groups.remove:
             delete_query = (
                 sa.delete(AssociationContainerRegistriesGroupsRow)

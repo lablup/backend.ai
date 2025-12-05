@@ -1009,3 +1009,71 @@ class TestContainerRegistryRepository:
         # Then - Should raise error for non-existent group
         with pytest.raises(ContainerRegistryGroupsAssociationNotFound):
             await repository.modify_registry(sample_registry.id, modifier)
+
+    @pytest.fixture
+    async def modifier_with_two_duplicate_two_new_allowed_groups(
+        self, registry_with_partial_groups: _RegistryWithPartialGroups
+    ) -> ContainerRegistryModifier:
+        """Modifier that attempts to add duplicate allowed_groups."""
+        group_ids = registry_with_partial_groups.all_group_ids
+        return ContainerRegistryModifier(
+            url=OptionalState.nop(),
+            type=OptionalState.nop(),
+            registry_name=OptionalState.nop(),
+            project=TriState.nop(),
+            username=TriState.nop(),
+            password=TriState.nop(),
+            ssl_verify=TriState.update(True),
+            is_global=TriState.nop(),
+            extra=TriState.nop(),
+            allowed_groups=TriState.update(
+                AllowedGroupsModel(
+                    add=[
+                        str(group_ids[0]),  # duplicate
+                        str(group_ids[1]),  # duplicate
+                        str(group_ids[2]),  # new
+                        str(group_ids[3]),  # new
+                    ],
+                    remove=[],
+                )
+            ),
+        )
+
+    @pytest.mark.asyncio
+    async def test_modify_registry_add_duplicate_allowed_groups(
+        self,
+        repository: ContainerRegistryRepository,
+        database_engine: ExtendedAsyncSAEngine,
+        registry_with_partial_groups: _RegistryWithPartialGroups,
+        modifier_with_two_duplicate_two_new_allowed_groups: ContainerRegistryModifier,
+    ) -> None:
+        """Test adding duplicate allowed_groups doesn't raise error and is handled properly"""
+        # Given - Registry has groups 0 and 1 already associated
+        group_ids = registry_with_partial_groups.all_group_ids
+
+        # When - Try to add 2 duplicate, 2 new groups
+        result = await repository.modify_registry(
+            registry_with_partial_groups.registry.id,
+            modifier_with_two_duplicate_two_new_allowed_groups,
+        )
+
+        # Then - No error should be raised
+        assert result is not None
+
+        # Then - Verify all 4 groups are associated (no duplicates created)
+        async with database_engine.begin_readonly_session() as session:
+            associations = (
+                (
+                    await session.execute(
+                        sa.select(AssociationContainerRegistriesGroupsRow).where(
+                            AssociationContainerRegistriesGroupsRow.registry_id
+                            == registry_with_partial_groups.registry.id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            assert len(associations) == 4
+            assert {a.group_id for a in associations} == set(group_ids)
