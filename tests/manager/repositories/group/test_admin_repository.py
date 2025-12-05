@@ -56,65 +56,15 @@ class TestAdminGroupRepositoryDeleteEndpoints:
         # Cleanup test data in correct order (respecting FK constraints)
         async with database_engine.begin_session() as session:
             # Delete in reverse dependency order: routings → sessions → endpoints → groups → users → policies → domains → scaling_groups
-            await session.execute(
-                sa.delete(RoutingRow),
-                execution_options={"synchronize_session": False},
-            )
-            await session.execute(
-                sa.delete(SessionRow),
-                execution_options={"synchronize_session": False},
-            )
-            await session.execute(
-                sa.delete(EndpointRow),
-                execution_options={"synchronize_session": False},
-            )
-            await session.execute(
-                sa.delete(GroupRow),
-                execution_options={"synchronize_session": False},
-            )
-            await session.execute(
-                sa.delete(UserRow),
-                execution_options={"synchronize_session": False},
-            )
-            await session.execute(
-                sa.delete(ProjectResourcePolicyRow),
-                execution_options={"synchronize_session": False},
-            )
-            await session.execute(
-                sa.delete(UserResourcePolicyRow),
-                execution_options={"synchronize_session": False},
-            )
-            await session.execute(
-                sa.delete(DomainRow),
-                execution_options={"synchronize_session": False},
-            )
-            await session.execute(
-                sa.delete(ScalingGroupRow),
-                execution_options={"synchronize_session": False},
-            )
-
-    @pytest.fixture
-    async def test_scaling_group(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
-        """Create test scaling group"""
-        sgroup_name = f"default-{uuid.uuid4().hex[:8]}"
-
-        async with db_with_cleanup.begin_session() as session:
-            sgroup = ScalingGroupRow(
-                name=sgroup_name,
-                description="Test scaling group",
-                is_active=True,
-                driver="static",
-                driver_opts={},
-                scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
-            )
-            session.add(sgroup)
-            await session.flush()
-
-        yield sgroup_name
+            await session.execute(sa.delete(RoutingRow))
+            await session.execute(sa.delete(SessionRow))
+            await session.execute(sa.delete(EndpointRow))
+            await session.execute(sa.delete(GroupRow))
+            await session.execute(sa.delete(UserRow))
+            await session.execute(sa.delete(ProjectResourcePolicyRow))
+            await session.execute(sa.delete(UserResourcePolicyRow))
+            await session.execute(sa.delete(DomainRow))
+            await session.execute(sa.delete(ScalingGroupRow))
 
     @pytest.fixture
     async def test_domain(
@@ -245,15 +195,27 @@ class TestAdminGroupRepositoryDeleteEndpoints:
     async def inactive_endpoints_with_routings(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_scaling_group: str,
         test_domain: str,
         test_user: uuid.UUID,
         test_group: uuid.UUID,
     ) -> AsyncGenerator[list[uuid.UUID], None]:
         """Create two inactive endpoints with routing entries (no sessions)"""
         endpoint_ids = []
+        sgroup_name = f"default-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
+            # Create scaling group
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                description="Test scaling group",
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            session.add(sgroup)
+            await session.flush()
             # Create two inactive endpoints (use DESTROYED to avoid image requirement)
             for i in range(2):
                 endpoint_id = uuid.uuid4()
@@ -267,7 +229,7 @@ class TestAdminGroupRepositoryDeleteEndpoints:
                     image=None,
                     domain=test_domain,
                     project=test_group,
-                    resource_group="default",
+                    resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,  # Use DESTROYED to avoid image requirement
                     resource_slots={},
                     cluster_mode="single-node",
@@ -296,7 +258,6 @@ class TestAdminGroupRepositoryDeleteEndpoints:
     async def inactive_endpoint_with_session_and_routing(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_scaling_group: str,
         test_domain: str,
         test_user: uuid.UUID,
         test_group: uuid.UUID,
@@ -304,8 +265,22 @@ class TestAdminGroupRepositoryDeleteEndpoints:
         """Create one inactive endpoint with a session and routing entry"""
         endpoint_id = uuid.uuid4()
         session_id = uuid.uuid4()
+        sgroup_name = f"default-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
+            # Create scaling group
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                description="Test scaling group",
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            session.add(sgroup)
+            await session.flush()
+
             # Create endpoint (use DESTROYED to avoid image requirement)
             endpoint = EndpointRow(
                 id=endpoint_id,
@@ -317,7 +292,7 @@ class TestAdminGroupRepositoryDeleteEndpoints:
                 image=None,
                 domain=test_domain,
                 project=test_group,
-                resource_group="default",
+                resource_group=sgroup_name,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
                 resource_slots={},
                 cluster_mode="single-node",
@@ -363,7 +338,6 @@ class TestAdminGroupRepositoryDeleteEndpoints:
     async def active_endpoint(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_scaling_group: str,
         test_domain: str,
         test_user: uuid.UUID,
         test_group: uuid.UUID,
@@ -371,8 +345,22 @@ class TestAdminGroupRepositoryDeleteEndpoints:
         """Create one active endpoint (lifecycle_stage=CREATED)"""
         endpoint_id = uuid.uuid4()
         image_id = uuid.uuid4()
+        sgroup_name = f"default-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
+            # Create scaling group
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                description="Test scaling group",
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            session.add(sgroup)
+            await session.flush()
+
             endpoint = EndpointRow(
                 id=endpoint_id,
                 name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
@@ -383,7 +371,7 @@ class TestAdminGroupRepositoryDeleteEndpoints:
                 image=image_id,  # Active endpoints require image
                 domain=test_domain,
                 project=test_group,
-                resource_group="default",
+                resource_group=sgroup_name,
                 lifecycle_stage=EndpointLifecycle.CREATED,  # Active!
                 resource_slots={},
                 cluster_mode="single-node",
@@ -398,7 +386,6 @@ class TestAdminGroupRepositoryDeleteEndpoints:
     async def multiple_endpoints_with_sessions(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_scaling_group: str,
         test_domain: str,
         test_user: uuid.UUID,
         test_group: uuid.UUID,
@@ -406,8 +393,21 @@ class TestAdminGroupRepositoryDeleteEndpoints:
         """Create 3 inactive endpoints, each with a session and routing entry"""
         endpoint_ids = []
         session_ids = []
+        sgroup_name = f"default-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
+            # Create scaling group
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                description="Test scaling group",
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            session.add(sgroup)
+            await session.flush()
             for i in range(3):
                 endpoint_id = uuid.uuid4()
                 session_id = uuid.uuid4()
@@ -423,7 +423,7 @@ class TestAdminGroupRepositoryDeleteEndpoints:
                     image=None,
                     domain=test_domain,
                     project=test_group,
-                    resource_group="default",
+                    resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
                     resource_slots={},
                     cluster_mode="single-node",
