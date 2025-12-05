@@ -684,8 +684,16 @@ class ValkeyScheduleClient:
         current_time_str = str(current_time)
         batch = Batch(is_atomic=False)
 
-        # Update agent last_check timestamps first
-        agent_ops_count = 0
+        # Update kernel status first, then agent last_check
+        # This ordering prevents timing issues where agent appears alive
+        # but kernels haven't been checked yet
+        for kernel_id in kernel_ids:
+            key = self._get_kernel_presence_key(kernel_id)
+            batch.hset(key, {"last_check": current_time_str})
+            batch.expire(key, KERNEL_HEALTH_TTL_SEC)
+            batch.hgetall(key)
+
+        # Update agent last_check timestamps after kernel updates
         if agent_ids:
             for agent_id in agent_ids:
                 agent_key = self._get_agent_last_check_key(agent_id)
@@ -694,26 +702,17 @@ class ValkeyScheduleClient:
                     current_time_str,
                     expiry=ExpirySet(ExpiryType.SEC, AGENT_LAST_CHECK_TTL_SEC),
                 )
-                agent_ops_count += 1
-
-        # Single batch: update last_check, refresh TTL, and get all data
-        for kernel_id in kernel_ids:
-            key = self._get_kernel_presence_key(kernel_id)
-            batch.hset(key, {"last_check": current_time_str})
-            batch.expire(key, KERNEL_HEALTH_TTL_SEC)
-            batch.hgetall(key)
 
         results = await self._client.client.exec(batch, raise_on_error=False)
         if results is None:
             return {kernel_id: None for kernel_id in kernel_ids}
 
         # Process results - every 3rd result is the hgetall response
-        # Skip agent_ops_count results at the beginning
+        # Kernel results come first (3 ops each), then agent results (1 op each)
         result: dict[KernelId, KernelStatus | None] = {}
         for i, kernel_id in enumerate(kernel_ids):
             # Results are in groups of 3: hset result, expire result, hgetall result
-            # Offset by agent_ops_count for agent last_check updates
-            idx = agent_ops_count + i * 3 + 2
+            idx = i * 3 + 2
             hgetall_result = results[idx] if len(results) > idx else None
 
             if not hgetall_result:
