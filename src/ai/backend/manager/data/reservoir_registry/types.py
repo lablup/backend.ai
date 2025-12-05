@@ -10,6 +10,7 @@ from ai.backend.common.data.artifact_registry.types import ReservoirRegistryStat
 @dataclass
 class ReservoirRegistryData:
     id: uuid.UUID
+    meta_id: uuid.UUID
     name: str
     endpoint: str
     access_key: str
@@ -22,7 +23,8 @@ class ReservoirRegistryData:
     ) -> ReservoirRegistryData:
         """Convert ReservoirRegistryStatefulData to ReservoirRegistryData."""
         return cls(
-            id=stateful_data.id,
+            id=stateful_data.registry_id,
+            meta_id=stateful_data.id,
             name=stateful_data.name,
             endpoint=stateful_data.endpoint,
             access_key=stateful_data.access_key,
@@ -30,13 +32,10 @@ class ReservoirRegistryData:
             api_version=stateful_data.api_version,
         )
 
-    def to_stateful_data(self, artifact_registry_id: uuid.UUID) -> ReservoirRegistryStatefulData:
-        """Convert ReservoirRegistryData to ReservoirRegistryStatefulData for caching.
-
-        :param artifact_registry_id: The UUID from artifact_registries table.
-        """
+    def to_stateful_data(self) -> ReservoirRegistryStatefulData:
+        """Convert ReservoirRegistryData to ReservoirRegistryStatefulData for caching."""
         return ReservoirRegistryStatefulData(
-            id=artifact_registry_id,
+            id=self.meta_id,
             registry_id=self.id,
             name=self.name,
             type=ArtifactRegistryType.RESERVOIR,

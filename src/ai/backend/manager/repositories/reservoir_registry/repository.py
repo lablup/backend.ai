@@ -52,72 +52,80 @@ class ReservoirRegistryRepository:
 
     @reservoir_registry_repository_resilience.apply()
     async def get_reservoir_registry_data_by_id(
-        self, reservoir_id: uuid.UUID
+        self, registry_id: uuid.UUID
     ) -> ReservoirRegistryData:
-        data = await self._db_source.get_reservoir_registry_data_by_id(reservoir_id)
-        # Populate cache with registry name
-        await self._stateful_source.set_registry(data.name, data)
+        """Get reservoir registry data by artifact registry ID."""
+        data = await self._db_source.get_reservoir_registry_data_by_id(registry_id)
+        # Populate cache
+        await self._stateful_source.set_registry(data.to_stateful_data())
         return data
 
     @reservoir_registry_repository_resilience.apply()
     async def get_registries_by_ids(
-        self, reservoir_ids: list[uuid.UUID]
+        self, registry_ids: list[uuid.UUID]
     ) -> list[ReservoirRegistryData]:
-        registries = await self._db_source.get_registries_by_ids(reservoir_ids)
+        """Get multiple reservoir registries by artifact registry IDs."""
+        results = await self._db_source.get_registries_by_ids(registry_ids)
         # Populate cache for all retrieved registries
-        for registry in registries:
-            await self._stateful_source.set_registry(registry.name, registry)
-        return registries
+        for data in results:
+            await self._stateful_source.set_registry(data.to_stateful_data())
+        return results
 
     @reservoir_registry_repository_resilience.apply()
     async def get_registry_data_by_name(self, name: str) -> ReservoirRegistryData:
-        # Read from stateful source only - no fallback to DB
-        return await self._stateful_source.get_registry(name)
+        """Get reservoir registry data by name."""
+        data = await self._db_source.get_registry_data_by_name(name)
+        # Populate cache
+        await self._stateful_source.set_registry(data.to_stateful_data())
+        return data
 
     @reservoir_registry_repository_resilience.apply()
     async def get_registry_data_by_artifact_id(
         self, artifact_id: uuid.UUID
     ) -> ReservoirRegistryData:
+        """Get reservoir registry data by artifact ID."""
         data = await self._db_source.get_registry_data_by_artifact_id(artifact_id)
-        # Populate cache with registry name
-        await self._stateful_source.set_registry(data.name, data)
+        # Populate cache
+        await self._stateful_source.set_registry(data.to_stateful_data())
         return data
 
     @reservoir_registry_repository_resilience.apply()
     async def create(
         self, creator: ReservoirRegistryCreator, meta: ArtifactRegistryCreatorMeta
     ) -> ReservoirRegistryData:
+        """Create a new reservoir registry."""
         # Write-through caching: DB insert then cache update
         data = await self._db_source.create(creator, meta)
-        await self._stateful_source.set_registry(data.name, data)
+        await self._stateful_source.set_registry(data.to_stateful_data())
         return data
 
     @reservoir_registry_repository_resilience.apply()
     async def update(
         self,
-        reservoir_id: uuid.UUID,
+        registry_id: uuid.UUID,
         modifier: ReservoirRegistryModifier,
         meta: ArtifactRegistryModifierMeta,
     ) -> ReservoirRegistryData:
+        """Update an existing reservoir registry by artifact registry ID."""
         # Write-through caching: DB update then cache update
-        data = await self._db_source.update(reservoir_id, modifier, meta)
-        await self._stateful_source.set_registry(data.name, data)
+        data = await self._db_source.update(registry_id, modifier, meta)
+        await self._stateful_source.set_registry(data.to_stateful_data())
         return data
 
     @reservoir_registry_repository_resilience.apply()
-    async def delete(self, reservoir_id: uuid.UUID) -> uuid.UUID:
-        # Get registry name for cache invalidation
-        data = await self._db_source.get_reservoir_registry_data_by_id(reservoir_id)
+    async def delete(self, registry_id: uuid.UUID) -> uuid.UUID:
+        """Delete a reservoir registry by artifact registry ID."""
         # Delete from DB
-        result = await self._db_source.delete(reservoir_id)
+        result = await self._db_source.delete(registry_id)
         # Invalidate cache
-        await self._stateful_source.delete_registry(data.name)
+        await self._stateful_source.delete_registry(registry_id)
         return result
 
     @reservoir_registry_repository_resilience.apply()
     async def list_reservoir_registries(self) -> list[ReservoirRegistryData]:
-        registries = await self._db_source.list_reservoir_registries()
+        """List all reservoir registries."""
+        results = await self._db_source.list_reservoir_registries()
         # Populate cache for all retrieved registries
-        for registry in registries:
-            await self._stateful_source.set_registry(registry.name, registry)
-        return registries
+        for data in results:
+            await self._stateful_source.set_registry(data.to_stateful_data())
+        return results
