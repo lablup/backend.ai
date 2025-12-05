@@ -2,17 +2,14 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Optional, Self, TypeVar
+from collections.abc import Mapping
+from typing import Any, Optional, Self
 
 from glide import ExpirySet, ExpiryType
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
-)
-from ai.backend.common.data.storage.types import (
-    ArtifactStorageStatefulData,
-    ArtifactStorageType,
 )
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.json import dump_json_str, load_json
@@ -49,15 +46,13 @@ valkey_artifact_storages_resilience = Resilience(
 
 _EXPIRATION = 60 * 60 * 24  # 24 hours
 
-T = TypeVar("T", bound=ArtifactStorageStatefulData)
-
 
 class ValkeyArtifactStorageClient:
     """
     Client for caching artifact storage information using Valkey.
 
     This client stores each storage as an individual key with independent expiry:
-    - Key format: artifact_storages.{type}.{storage_id}
+    - Key format: artifact_storages.{storage_id}
     - Value: JSON serialized storage data
     - Each key has its own TTL for independent expiry management
     """
@@ -108,87 +103,67 @@ class ValkeyArtifactStorageClient:
         """Ping the Valkey server to check connection health."""
         await self._client.ping()
 
-    def _make_storage_key(self, storage_type: ArtifactStorageType, storage_id: uuid.UUID) -> str:
+    def _make_storage_key(self, storage_id: uuid.UUID) -> str:
         """
         Generate a cache key for individual artifact storage.
 
-        :param storage_type: The type of storage.
         :param storage_id: The UUID of the storage.
         :return: The formatted cache key.
         """
-        return f"artifact_storages.{storage_type.value}.{storage_id}"
+        return f"artifact_storages.{storage_id}"
 
     @valkey_artifact_storages_resilience.apply()
     async def set_storage(
         self,
-        storage_type: ArtifactStorageType,
         storage_id: uuid.UUID,
-        storage_data: ArtifactStorageStatefulData,
+        storage_data: Mapping[str, Any],
     ) -> None:
         """
         Cache storage data with independent expiry.
 
-        :param storage_type: The type of storage.
         :param storage_id: The UUID of the storage.
-        :param storage_data: The storage data to cache.
+        :param storage_data: The storage data to cache (as dict).
         """
-        key = self._make_storage_key(storage_type, storage_id)
-        value = dump_json_str(storage_data.to_dict())
+        key = self._make_storage_key(storage_id)
+        value = dump_json_str(storage_data)
         await self._client.client.set(
             key=key,
             value=value,
             expiry=ExpirySet(ExpiryType.SEC, _EXPIRATION),
         )
-        log.debug("Cached {} data for storage_id={}", storage_type.value, storage_id)
 
     @valkey_artifact_storages_resilience.apply()
     async def get_storage(
         self,
-        storage_type: ArtifactStorageType,
         storage_id: uuid.UUID,
-        data_class: type[T],
-    ) -> Optional[T]:
+    ) -> Optional[Mapping[str, Any]]:
         """
         Get cached storage data.
 
-        :param storage_type: The type of storage.
         :param storage_id: The UUID of the storage.
-        :param data_class: The data class to deserialize into.
-        :return: The cached storage data or None if not found.
+        :return: The cached storage data as dict or None if not found.
         """
-        key = self._make_storage_key(storage_type, storage_id)
+        key = self._make_storage_key(storage_id)
         value = await self._client.client.get(key)
         if value is None:
-            log.debug("Cache miss for {} with storage_id={}", storage_type.value, storage_id)
             return None
 
         json_value = value.decode()
         data = load_json(json_value)
-        return data_class.from_dict(data)
+        return data
 
     @valkey_artifact_storages_resilience.apply()
     async def delete_storage(
         self,
-        storage_type: ArtifactStorageType,
         storage_id: uuid.UUID,
     ) -> bool:
         """
         Delete cached storage data.
 
-        :param storage_type: The type of storage.
         :param storage_id: The UUID of the storage.
         :return: True if the key was deleted, False otherwise.
         """
-        key = self._make_storage_key(storage_type, storage_id)
+        key = self._make_storage_key(storage_id)
         result = await self._client.client.delete([key])
         deleted = result > 0
-        if deleted:
-            log.debug("Deleted cached {} data for storage_id={}", storage_type.value, storage_id)
         return deleted
-
-    @valkey_artifact_storages_resilience.apply()
-    async def flush_database(self) -> None:
-        """
-        Flush all keys in the current database.
-        """
-        await self._client.client.flushdb()
