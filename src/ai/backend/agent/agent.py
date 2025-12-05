@@ -263,6 +263,7 @@ from .kernel import (
 from .observer.heartbeat import HeartbeatObserver
 from .observer.host_port import HostPortObserver
 from .observer.kernel_presence import KernelPresenceObserver
+from .observer.orphan_kernel_cleanup import OrphanKernelCleanupObserver
 from .resources import (
     AbstractComputePlugin,
     ComputerContext,
@@ -1061,9 +1062,11 @@ class AbstractAgent(
         container_observer = HeartbeatObserver(self, self.event_producer)
         host_port_observer = HostPortObserver(self)
         kernel_presence_observer = KernelPresenceObserver(self, self.valkey_schedule_client)
+        orphan_cleanup_observer = OrphanKernelCleanupObserver(self, self.valkey_schedule_client)
         await self._agent_runner.register_observer(container_observer)
         await self._agent_runner.register_observer(host_port_observer)
         await self._agent_runner.register_observer(kernel_presence_observer)
+        await self._agent_runner.register_observer(orphan_cleanup_observer)
         await self._agent_runner.start()
 
         if abuse_report_path := self.local_config.agent.abuse_report_path:
