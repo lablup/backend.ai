@@ -178,10 +178,8 @@ class ReservoirDBSource:
                 sa.update(ReservoirRegistryRow)
                 .where(ReservoirRegistryRow.id == reservoir_id)
                 .values(**data)
-                .returning(ReservoirRegistryRow.id)
             )
-            result = await db_session.execute(update_stmt)
-            updated_reservoir_id = result.scalar()
+            await db_session.execute(update_stmt)
 
             if (name := meta.name.optional_value()) is not None:
                 await db_session.execute(
@@ -222,13 +220,10 @@ class ReservoirDBSource:
 
             reservoir_id = artifact_row.registry_id
 
-            delete_query = (
-                sa.delete(ReservoirRegistryRow)
-                .where(ReservoirRegistryRow.id == reservoir_id)
-                .returning(ReservoirRegistryRow.id)
+            delete_query = sa.delete(ReservoirRegistryRow).where(
+                ReservoirRegistryRow.id == reservoir_id
             )
-            result = await db_session.execute(delete_query)
-            deleted_reservoir_id = result.scalar()
+            await db_session.execute(delete_query)
 
             delete_meta_query = sa.delete(ArtifactRegistryRow).where(
                 ArtifactRegistryRow.id == registry_id
