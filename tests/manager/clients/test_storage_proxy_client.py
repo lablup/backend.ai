@@ -1,11 +1,15 @@
+import asyncio
+
 import pytest
-from aiohttp import web
+from aiohttp import ClientTimeout, web
 
 from ai.backend.common.exception import ErrorDetail, ErrorDomain, ErrorOperation, PassthroughError
 from ai.backend.manager.clients.storage_proxy.base import (
+    DEFAULT_TIMEOUT,
     StorageProxyClientArgs,
     StorageProxyHTTPClient,
 )
+from ai.backend.manager.errors.storage import StorageProxyTimeoutError
 
 
 class TestStorageProxyClient:
@@ -40,7 +44,9 @@ class TestStorageProxyClient:
 
         # Verify that non-JSON response raises PassthroughError with correct error code
         with pytest.raises(PassthroughError) as exc_info:
-            await storage_proxy_client.request(method="GET", url=test_endpoint)
+            await storage_proxy_client.request(
+                method="GET", url=test_endpoint, timeout=DEFAULT_TIMEOUT
+            )
 
         assert exc_info.value.status_code == test_status_code
 
@@ -48,3 +54,38 @@ class TestStorageProxyClient:
         assert error_code.domain == ErrorDomain.STORAGE_PROXY
         assert error_code.operation == ErrorOperation.REQUEST
         assert error_code.error_detail == ErrorDetail.CONTENT_TYPE_MISMATCH
+
+    @pytest.mark.asyncio
+    async def test_request_timeout_expiration(self, aiohttp_client) -> None:
+        """Test that request properly times out when timeout expires."""
+
+        async def slow_endpoint_handler(_request: web.Request) -> web.Response:
+            # Sleep for longer than the timeout
+            await asyncio.sleep(2.0)
+            return web.json_response({"status": "success"})
+
+        # Set up mock storage proxy server
+        app = web.Application()
+        test_endpoint = "slow-endpoint"
+        app.router.add_get(f"/{test_endpoint}", slow_endpoint_handler)
+        client = await aiohttp_client(app)
+
+        # Create storage proxy client
+        storage_proxy_client = StorageProxyHTTPClient(
+            client_session=client.session,
+            args=StorageProxyClientArgs(
+                endpoint=client.make_url("/"),
+                secret="test-secret",
+            ),
+        )
+
+        # Make request with very short timeout
+        timeout = ClientTimeout(total=0.1)
+        with pytest.raises(StorageProxyTimeoutError) as exc_info:
+            await storage_proxy_client.request(
+                method="GET",
+                url=test_endpoint,
+                timeout=timeout,
+            )
+
+        assert "Request to storage proxy timed out" in str(exc_info.value)
