@@ -11,6 +11,7 @@ from ai.backend.manager.data.model_serving.types import (
     ServiceConfig,
     ServiceInfo,
 )
+from ai.backend.manager.errors.storage import UnexpectedStorageProxyResponseError
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
 from ai.backend.manager.services.model_serving.actions.create_model_service import (
@@ -46,7 +47,8 @@ def mock_fetch_file_from_storage_proxy(mocker, model_serving_service):
         "_fetch_file_from_storage_proxy",
         new_callable=AsyncMock,
     )
-    mock.return_value = None
+    # Simulate no service-definition.toml file
+    mock.side_effect = UnexpectedStorageProxyResponseError(extra_msg="File not found")
     return mock
 
 
