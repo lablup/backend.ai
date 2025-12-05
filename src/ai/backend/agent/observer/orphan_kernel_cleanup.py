@@ -25,7 +25,7 @@ class OrphanKernelCleanupObserver(AbstractObserver):
     Observer that periodically detects and cleans up orphan kernels.
 
     Orphan kernels are containers that exist in Agent but have been
-    deleted from Manager's DB. Detection is based on comparing
+    terminated from Manager's DB. Detection is based on comparing
     kernel.last_check with agent_last_check timestamps.
 
     Cleanup condition (strict):
