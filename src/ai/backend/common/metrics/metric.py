@@ -440,6 +440,7 @@ class LayerType(enum.StrEnum):
     SCHEDULE_DB_SOURCE = "schedule_db_source"
     SCHEDULER_DB_SOURCE = "scheduler_db_source"
     USER_RESOURCE_POLICY_DB_SOURCE = "user_resource_policy_db_source"
+    KEYPAIR_RESOURCE_POLICY_DB_SOURCE = "keypair_resource_policy_db_source"
 
     # Cache Source layers
     AGENT_CACHE_SOURCE = "agent_cache_source"
