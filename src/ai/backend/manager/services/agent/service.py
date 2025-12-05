@@ -21,6 +21,7 @@ from ai.backend.manager.data.agent.types import (
     AgentHeartbeatUpsert,
     UpsertResult,
 )
+from ai.backend.manager.models.agent import ADMIN_PERMISSIONS as ADMIN_AGENT_PERMISSIONS
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -55,6 +56,10 @@ from ai.backend.manager.services.agent.actions.remove_agent_from_images import (
 from ai.backend.manager.services.agent.actions.remove_agent_from_images_by_canonicals import (
     RemoveAgentFromImagesByCanonicalsAction,
     RemoveAgentFromImagesByCanonicalsActionResult,
+)
+from ai.backend.manager.services.agent.actions.search_agents import (
+    SearchAgentsAction,
+    SearchAgentsActionResult,
 )
 from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
@@ -196,6 +201,20 @@ class AgentService:
     ) -> GetTotalResourcesActionResult:
         total_resources = await self._scheduler_repository.get_total_resource_slots()
         return GetTotalResourcesActionResult(total_resources=total_resources)
+
+    async def search_agents(self, action: SearchAgentsAction) -> SearchAgentsActionResult:
+        """Searches agents. It is used by superadmin only."""
+        result = await self._agent_repository.search_agents(
+            querier=action.querier,
+        )
+
+        return SearchAgentsActionResult(
+            agents=result.items,
+            total_count=result.total_count,
+            permissions=list(ADMIN_AGENT_PERMISSIONS),
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def handle_heartbeat(self, action: HandleHeartbeatAction) -> HandleHeartbeatActionResult:
         reported_agent_info = action.agent_info
