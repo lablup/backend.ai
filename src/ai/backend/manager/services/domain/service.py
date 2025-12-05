@@ -46,7 +46,8 @@ class DomainService:
         self._admin_repository = admin_repository
 
     async def create_domain(self, action: CreateDomainAction) -> CreateDomainActionResult:
-        if action.creator.name.strip() == "" or len(action.creator.name) > 64:
+        domain_name_candidate = action.creator.name.strip()
+        if domain_name_candidate == "" or len(domain_name_candidate) > 64:
             raise InvalidAPIParameters("Domain name cannot be empty or exceed 64 characters.")
 
         if action.user_info.role == UserRole.SUPERADMIN:
@@ -94,7 +95,8 @@ class DomainService:
     async def create_domain_node(
         self, action: CreateDomainNodeAction
     ) -> CreateDomainNodeActionResult:
-        if action.creator.name.strip() == "" or len(action.creator.name) > 64:
+        domain_name_candidate = action.creator.name.strip()
+        if domain_name_candidate == "" or len(domain_name_candidate) > 64:
             raise InvalidAPIParameters("Domain name cannot be empty or exceed 64 characters.")
 
         scaling_groups = action.scaling_groups
