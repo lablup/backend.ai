@@ -13,7 +13,6 @@ from ai.backend.common.data.artifact.types import (
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.artifact.anycast import (
-    ModelVerifyDoneEvent,
     ModelVerifyingEvent,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -156,17 +155,8 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
             verifiers=verifier_results,
         )
 
-        # Send ModelVerifyDoneEvent with collected results
-        await self._event_producer.anycast_event(
-            ModelVerifyDoneEvent(
-                model_id=context.model.model_id,
-                revision=revision,
-                registry_type=self.registry_type,
-                registry_name=context.registry_name,
-                success=verification_success,
-                verification_result=verification_result.model_dump(),
-            )
-        )
+        # Store verification result in context for later use
+        context.step_metadata["verification_result"] = verification_result
 
         # Raise error if any verification failed
         if not verification_success:
@@ -178,6 +168,7 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
             verified_files=input_data.downloaded_files,
             storage_name=dst_storage_name,
             total_bytes=input_data.total_bytes,
+            verification_result=verification_result,
         )
 
     @override

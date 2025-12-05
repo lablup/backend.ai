@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
 from ai.backend.common.artifact_storage import ImportStepContext
+from ai.backend.common.data.artifact.types import VerificationStepResult
 from ai.backend.common.data.storage.registries.types import FileObjectData
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.logging import BraceStyleAdapter
@@ -29,6 +30,7 @@ class VerifyStepResult:
     verified_files: list[tuple[FileObjectData, str]]  # (file_info, storage_key)
     storage_name: str
     total_bytes: int
+    verification_result: VerificationStepResult
 
 
 InputType = TypeVar("InputType")
