@@ -28,7 +28,6 @@ class ModifyDomainAction(DomainAction):
 @dataclass
 class ModifyDomainActionResult(BaseActionResult):
     domain_data: Optional[DomainData]
-    description: Optional[str] = field(compare=False)
 
     @override
     def entity_id(self) -> Optional[str]:

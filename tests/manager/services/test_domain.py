@@ -173,7 +173,6 @@ async def create_domain(
                     dotfiles=b"\x90",
                     integration_id=None,
                 ),
-                description="domain test-create-domain-node created",
             ),
         ),
         ScenarioBase.failure(
@@ -181,7 +180,6 @@ async def create_domain(
             CreateDomainNodeAction(
                 creator=DomainCreator(
                     name="default",
-                    description="Test domain",
                 ),
                 user_info=UserInfo(
                     id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
@@ -230,7 +228,6 @@ async def test_create_domain_node(
                     dotfiles=b"\x90",
                     integration_id=None,
                 ),
-                description="domain test-modify-domain-node modified",
             ),
         ),
         ScenarioBase.failure(
@@ -304,7 +301,6 @@ async def test_modify_domain_node(
                     dotfiles=b"\x90",
                     integration_id=None,
                 ),
-                description="domain creation succeed",
             ),
         ),
         ScenarioBase.failure(
@@ -376,7 +372,6 @@ async def test_modify_domain_node(
                     dotfiles=b"\x90",
                     integration_id=None,
                 ),
-                description="domain creation succeed",
             ),
         ),
     ],
@@ -437,7 +432,6 @@ async def test_create_model_store_after_domain_created(
                     dotfiles=b"\x90",
                     integration_id=None,
                 ),
-                description="domain modification succeed",
             ),
         ),
         ScenarioBase.failure(
@@ -481,7 +475,6 @@ async def test_create_model_store_after_domain_created(
                     dotfiles=b"\x90",
                     integration_id=None,
                 ),
-                description="domain modification succeed",
             ),
         ),
         ScenarioBase.success(
@@ -511,7 +504,6 @@ async def test_create_model_store_after_domain_created(
                     dotfiles=b"\x90",
                     integration_id=None,
                 ),
-                description="domain modification succeed",
             ),
         ),
     ],
@@ -544,7 +536,7 @@ async def test_modify_domain(
                 ),
             ),
             DeleteDomainActionResult(
-                description="domain test-delete-domain deleted successfully",
+                name="test-delete-domain",
             ),
         ),
         ScenarioBase.failure(
@@ -621,7 +613,7 @@ async def test_delete_domain_in_db(
                 ),
             ),
             PurgeDomainActionResult(
-                description="domain test-purge-domain purged successfully",
+                name="test-purge-domain",
             ),
         ),
         ScenarioBase.failure(
@@ -1230,7 +1222,7 @@ class TestDomainService:
         result = await service.purge_domain(action)
 
         mock_repository.purge_domain_validated.assert_called_once_with("test-domain")
-        assert "test-domain purged successfully" in result.description
+        assert result.name == "test-domain"
 
     @pytest.mark.asyncio
     async def test_purge_domain_success_as_superadmin(
@@ -1242,7 +1234,7 @@ class TestDomainService:
         result = await service.purge_domain(action)
 
         mock_admin_repository.purge_domain_force.assert_called_once_with("test-domain")
-        assert "test-domain purged successfully" in result.description
+        assert result.name == "test-domain"
 
     @pytest.mark.asyncio
     async def test_purge_domain_fails_with_active_kernels_as_admin(

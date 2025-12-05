@@ -55,7 +55,6 @@ class DomainService:
             domain_data = await self._repository.create_domain_validated(action.creator)
         return CreateDomainActionResult(
             domain_data=domain_data,
-            description="domain creation succeed",
         )
 
     async def modify_domain(self, action: ModifyDomainAction) -> ModifyDomainActionResult:
@@ -69,7 +68,6 @@ class DomainService:
             )
         return ModifyDomainActionResult(
             domain_data=domain_data,
-            description="domain modification succeed",
         )
 
     async def delete_domain(self, action: DeleteDomainAction) -> DeleteDomainActionResult:
@@ -79,7 +77,7 @@ class DomainService:
             await self._repository.soft_delete_domain_validated(action.name)
 
         return DeleteDomainActionResult(
-            description=f"domain {action.name} deleted successfully",
+            name=action.name,
         )
 
     async def purge_domain(self, action: PurgeDomainAction) -> PurgeDomainActionResult:
@@ -89,7 +87,9 @@ class DomainService:
             await self._admin_repository.purge_domain_force(name)
         else:
             await self._repository.purge_domain_validated(name)
-        return PurgeDomainActionResult(description=f"domain {name} purged successfully")
+        return PurgeDomainActionResult(
+            name=name,
+        )
 
     async def create_domain_node(
         self, action: CreateDomainNodeAction
@@ -110,7 +110,6 @@ class DomainService:
 
         return CreateDomainNodeActionResult(
             domain_data=domain_data,
-            description=f"domain {action.creator.name} created",
         )
 
     async def modify_domain_node(
@@ -146,5 +145,4 @@ class DomainService:
 
         return ModifyDomainNodeActionResult(
             domain_data=domain_data,
-            description=f"domain {domain_name} modified",
         )

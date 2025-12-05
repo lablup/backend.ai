@@ -29,7 +29,6 @@ class CreateDomainNodeAction(DomainAction):
 @dataclass
 class CreateDomainNodeActionResult(BaseActionResult):
     domain_data: Optional[DomainData]
-    description: str
 
     @override
     def entity_id(self) -> Optional[str]:

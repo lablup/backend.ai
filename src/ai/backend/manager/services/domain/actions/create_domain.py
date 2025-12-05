@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
@@ -24,7 +24,6 @@ class CreateDomainAction(DomainAction):
 @dataclass
 class CreateDomainActionResult(BaseActionResult):
     domain_data: Optional[DomainData]
-    description: Optional[str] = field(compare=False)
 
     @override
     def entity_id(self) -> Optional[str]:
