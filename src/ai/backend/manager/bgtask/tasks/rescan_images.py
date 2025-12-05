@@ -12,6 +12,7 @@ from ai.backend.common.bgtask.task.base import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.services.container_registry.actions.load_all_container_registries import (
     LoadAllContainerRegistriesAction,
 )
@@ -74,7 +75,7 @@ class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest, Rescan
     async def execute(self, manifest: RescanImagesManifest) -> RescanImagesTaskResult:
         # TODO: Import actual result types when available
         # For now using placeholder types
-        loaded_registries = []
+        loaded_registries: list[ContainerRegistryData] = []
 
         if manifest.registry is None:
             all_registries = await self._processors.container_registry.load_all_container_registries.wait_for_complete(

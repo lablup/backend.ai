@@ -18,7 +18,10 @@ from sqlalchemy.orm.exc import NoResultFound
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.exception import UnknownImageRegistry
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.container_registry.types import (
+    ContainerRegistryCreator,
+    ContainerRegistryData,
+)
 from ai.backend.manager.errors.container_registry import (
     InvalidContainerRegistryProject,
     InvalidContainerRegistryURL,
@@ -159,6 +162,20 @@ class ContainerRegistryRow(Base):
         self.ssl_verify = ssl_verify
         self.is_global = is_global
         self.extra = extra
+
+    @classmethod
+    def from_creator(cls, creator: ContainerRegistryCreator) -> Self:
+        return cls(
+            url=creator.url,
+            registry_name=creator.registry_name,
+            type=creator.type,
+            project=creator.project,
+            username=creator.username,
+            password=creator.password,
+            ssl_verify=creator.ssl_verify,
+            is_global=creator.is_global,
+            extra=creator.extra,
+        )
 
     @classmethod
     async def get(
