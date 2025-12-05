@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import pathlib
-from typing import Optional
+import subprocess
+import sys
+import uuid
+from datetime import datetime
+from typing import Optional, cast
 
 import click
 
@@ -108,8 +112,6 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
     because the dbshell command fills out them from the manager configuration.
     """
     import asyncio
-    import subprocess
-    import sys
 
     from ai.backend.cli.types import ExitCode
 
@@ -249,17 +251,10 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     invoke the PostgreSQL's vaccuum operation to clear up the actual disk space.
     """
     import asyncio
-    import uuid
-    from datetime import datetime
-    from functools import partial
-    from typing import cast
 
     import sqlalchemy as sa
     from more_itertools import chunked
-    from redis.asyncio import Redis
-    from redis.asyncio.client import Pipeline
 
-    from ai.backend.common import redis_helper
     from ai.backend.common.validators import TimeDuration
     from ai.backend.manager.models import SessionRow, error_logs, kernels
     from ai.backend.manager.models.utils import connect_database, vacuum_db
@@ -288,25 +283,12 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
 
             delete_count = 0
             async with redis_ctx(cli_ctx) as redis_conn_set:
-
-                async def _build_pipe(
-                    r: Redis,
-                    kernel_ids: list[str],
-                ) -> Pipeline:
-                    pipe = r.pipeline(transaction=False)
-                    await pipe.delete(*kernel_ids)
-                    return pipe
-
                 if len(target_kernels) > 0:
                     # Apply chunking to avoid excessive length of command params
                     # and indefinite blocking of the Redis server.
                     for kernel_ids in chunked(target_kernels, 32):
-                        results = await redis_helper.execute(
-                            redis_conn_set.stat,
-                            partial(_build_pipe, kernel_ids=kernel_ids),
-                        )
-                    # Each DEL command returns the number of keys deleted.
-                    delete_count += sum(results)
+                        deleted = await redis_conn_set.stat.delete(kernel_ids)
+                        delete_count += deleted
                     log.info(
                         "Cleaned up {:,} redis statistics records older than {:}.",
                         delete_count,
@@ -314,21 +296,12 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
                     )
 
                 # Sync and compact the persistent database of Redis
-                redis_config = await redis_helper.execute(
-                    redis_conn_set.stat,
-                    lambda r: r.config_get("appendonly"),
-                )
-                if redis_config["appendonly"] == "yes":
-                    await redis_helper.execute(
-                        redis_conn_set.stat,
-                        lambda r: r.bgrewriteaof(),
-                    )
+                redis_config = await redis_conn_set.stat.client.client.config_get(["appendonly"])
+                if redis_config.get(b"appendonly") == b"yes":
+                    await redis_conn_set.stat.client.client.custom_command(["BGREWRITEAOF"])
                     log.info("Issued BGREWRITEAOF to the Redis database.")
                 else:
-                    await redis_helper.execute(
-                        redis_conn_set.stat,
-                        lambda r: r.execute_command("BGSAVE SCHEDULE"),
-                    )
+                    await redis_conn_set.stat.client.client.custom_command(["BGSAVE", "SCHEDULE"])
                     log.info("Issued BGSAVE to the Redis database.")
         except Exception:
             log.exception("Unexpected error while cleaning up redis history")
