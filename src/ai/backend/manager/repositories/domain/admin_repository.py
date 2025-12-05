@@ -223,51 +223,6 @@ class AdminDomainRepository:
                 raise DataTransformationFailed("Failed to transform domain row to data")
             return result
 
-    @domain_repository_resilience.apply()
-    async def modify_domain_node_force(
-        self,
-        domain_name: str,
-        modifier_fields: dict,
-        sgroups_to_add: Optional[set[str]] = None,
-        sgroups_to_remove: Optional[set[str]] = None,
-    ) -> Optional[DomainData]:
-        """
-        Modifies a domain node with scaling group changes without permission checks.
-        For superadmin use only.
-        """
-        async with self._db.begin_session() as session:
-            if sgroups_to_add is not None:
-                await session.execute(
-                    sa.insert(ScalingGroupForDomainRow),
-                    [
-                        {"scaling_group": sgroup_name, "domain": domain_name}
-                        for sgroup_name in sgroups_to_add
-                    ],
-                )
-
-            if sgroups_to_remove is not None:
-                await session.execute(
-                    sa.delete(ScalingGroupForDomainRow).where(
-                        (ScalingGroupForDomainRow.domain == domain_name)
-                        & (ScalingGroupForDomainRow.scaling_group.in_(sgroups_to_remove))
-                    ),
-                )
-
-            update_stmt = (
-                sa.update(DomainRow)
-                .where(DomainRow.name == domain_name)
-                .values(modifier_fields)
-                .returning(DomainRow)
-            )
-            await session.execute(update_stmt)
-
-            domain_row = await session.scalar(
-                sa.select(DomainRow).where(DomainRow.name == domain_name)
-            )
-
-            await session.commit()
-            return row_to_data(domain_row) if domain_row else None
-
     async def _create_model_store_group(self, conn: SAConnection, domain_name: str) -> None:
         """
         Private method to create model-store group for a domain.
@@ -315,14 +270,42 @@ class AdminDomainRepository:
         user_info: UserInfo,
         sgroups_to_add: Optional[set[str]] = None,
         sgroups_to_remove: Optional[set[str]] = None,
-    ) -> Optional[DomainData]:
+    ) -> DomainData:
         """
         Modifies a domain node with scaling group changes without permission checks.
         For superadmin use only.
         """
-        return await self.modify_domain_node_force(
-            domain_name,
-            modifier_fields,
-            sgroups_to_add,
-            sgroups_to_remove,
-        )
+        async with self._db.begin_session() as session:
+            if sgroups_to_add is not None:
+                await session.execute(
+                    sa.insert(ScalingGroupForDomainRow),
+                    [
+                        {"scaling_group": sgroup_name, "domain": domain_name}
+                        for sgroup_name in sgroups_to_add
+                    ],
+                )
+
+            if sgroups_to_remove is not None:
+                await session.execute(
+                    sa.delete(ScalingGroupForDomainRow).where(
+                        (ScalingGroupForDomainRow.domain == domain_name)
+                        & (ScalingGroupForDomainRow.scaling_group.in_(sgroups_to_remove))
+                    ),
+                )
+
+            update_stmt = (
+                sa.update(DomainRow)
+                .where(DomainRow.name == domain_name)
+                .values(modifier_fields)
+                .returning(DomainRow)
+            )
+            await session.execute(update_stmt)
+
+            domain_row = await session.scalar(
+                sa.select(DomainRow).where(DomainRow.name == domain_name)
+            )
+
+            await session.commit()
+            if domain_row is None:
+                raise DomainNotFound(f"Domain not found (id:{domain_name})")
+            return row_to_data(domain_row)

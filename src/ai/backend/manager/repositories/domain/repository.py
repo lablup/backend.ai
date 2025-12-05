@@ -208,7 +208,7 @@ class DomainRepository:
         modifier_fields: dict,
         sgroups_to_add: Optional[set[str]] = None,
         sgroups_to_remove: Optional[set[str]] = None,
-    ) -> Optional[DomainData]:
+    ) -> DomainData:
         """
         Modifies a domain node with scaling group changes.
         Validates domain node modification permissions.
@@ -243,8 +243,11 @@ class DomainRepository:
                 sa.select(DomainRow).where(DomainRow.name == domain_name)
             )
 
+            if domain_row is None:
+                raise DomainNotFound(f"Domain not found (id:{domain_name})")
+
             await session.commit()
-            return domain_row.to_data() if domain_row is not None else None
+            return domain_row.to_data()
 
     async def _create_model_store_group(self, db_session: SASession, domain_name: str) -> None:
         """
@@ -336,7 +339,7 @@ class DomainRepository:
         user_info: UserInfo,
         sgroups_to_add: Optional[set[str]] = None,
         sgroups_to_remove: Optional[set[str]] = None,
-    ) -> Optional[DomainData]:
+    ) -> DomainData:
         """
         Modifies a domain node with scaling group changes and permission checks.
         Validates domain and scaling group permissions.

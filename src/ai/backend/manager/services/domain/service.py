@@ -1,6 +1,6 @@
 import logging
 
-from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.domain.admin_repository import AdminDomainRepository
@@ -140,9 +140,6 @@ class DomainService:
                 action.sgroups_to_add,
                 action.sgroups_to_remove,
             )
-        if domain_data is None:
-            raise DomainNotFound(f"Domain not found (id:{domain_name})")
-
         return ModifyDomainNodeActionResult(
             domain_data=domain_data,
         )
