@@ -19,7 +19,6 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
 from ai.backend.common.exception import (
-    GroupNotFound,
     InvalidAPIParameters,
 )
 from ai.backend.common.types import ResourceSlot

@@ -10,19 +10,17 @@ import sqlalchemy as sa
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import (
-    BackendAIError,
     InvalidAPIParameters,
 )
-from ai.backend.common.metrics.metric import DomainType, LayerType
-from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
-from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
-from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import SlotName
+from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
-from ai.backend.manager.errors.resource import GroupNotFound, InvalidUserUpdateMode
+from ai.backend.manager.decorators.repository_decorator import (
+    create_layer_aware_repository_decorator,
+)
+from ai.backend.manager.errors.resource import GroupNotFound
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import GroupRow, association_groups_users, groups
 from ai.backend.manager.models.kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, kernels
@@ -165,7 +163,7 @@ class GroupRepository:
             # If only user updates were performed, return None
             return None
 
-    @group_repository_resilience.apply()
+    @repository_decorator()
     async def mark_inactive(self, group_id: uuid.UUID) -> None:
         """Mark a group as inactive (soft delete)."""
         async with self._db.begin_session() as session:
