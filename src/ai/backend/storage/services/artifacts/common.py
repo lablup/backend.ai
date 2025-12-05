@@ -230,22 +230,18 @@ class ModelArchiveStep(ImportStep[VerifyStepResult], ABC):
 
         log.info(f"Starting archive transfer: {download_storage} -> {archive_storage}")
 
-        archieved_file_cnt = 0
-        # Move each file from download storage to archive storage
-        for file_info, storage_key in input_data.verified_files:
-            try:
-                archieved_file_cnt += await self._transfer_manager.transfer_directory(
-                    source_storage_name=download_storage,
-                    dest_storage_name=archive_storage,
-                    source_prefix=storage_key,
-                    dest_prefix=storage_key,
-                )
-                log.debug(f"Transferred file to archive: {storage_key}")
-            except Exception as e:
-                log.error(f"Failed to transfer file to archive: {storage_key}: {str(e)}")
-                raise
+        # Transfer entire model directory at once
+        revision = context.model.resolve_revision(self.registry_type)
+        model_prefix = f"{context.model.model_id}/{revision}"
+
+        archived_file_cnt = await self._transfer_manager.transfer_directory(
+            source_storage_name=download_storage,
+            dest_storage_name=archive_storage,
+            source_prefix=model_prefix,
+            dest_prefix=model_prefix,
+        )
 
         log.info(
             f"Archive transfer completed: {download_storage} -> {archive_storage}, "
-            f"files={archieved_file_cnt}"
+            f"files={archived_file_cnt}"
         )
