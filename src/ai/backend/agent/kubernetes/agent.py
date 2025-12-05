@@ -71,6 +71,11 @@ from ..agent import (
 from ..config.unified import AgentUnifiedConfig, ScratchType
 from ..exception import K8sError, UnsupportedResource
 from ..kernel import AbstractKernel, KernelRegistry
+from ..kernel_registry.recovery.kubernetes_recovery import (
+    KubernetesKernelRegistryRecovery,
+    KubernetesKernelRegistryRecoveryArgs,
+)
+from ..kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ..resources import (
     AbstractComputePlugin,
     ComputerContext,
@@ -864,6 +869,15 @@ class KubernetesAgent(
             slots=slots,
             agent_class=agent_class,
         )
+        self._kernel_recovery = KubernetesKernelRegistryRecovery.create(
+            KubernetesKernelRegistryRecoveryArgs(
+                scratch_root=self.local_config.container.scratch_root,
+                ipc_base_path=self.local_config.agent.ipc_base_path,
+                var_base_path=self.local_config.agent.var_base_path,
+                agent_id=self.id,
+                local_instance_id=self.local_instance_id,
+            )
+        )
 
     async def __ainit__(self) -> None:
         await super().__ainit__()
@@ -980,6 +994,18 @@ class KubernetesAgent(
         finally:
             # Stop k8s event monitoring.
             pass
+
+    @override
+    async def _load_kernel_registry_from_recovery(self) -> MutableMapping[KernelId, AbstractKernel]:
+        return await self._kernel_recovery.load_kernel_registry()
+
+    @override
+    async def _write_kernel_registry_to_recovery(
+        self,
+        kernel_registry: MutableMapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+    ) -> None:
+        await self._kernel_recovery.save_kernel_registry(kernel_registry, metadata)
 
     @override
     def get_cgroup_path(self, controller: str, container_id: str) -> Path:

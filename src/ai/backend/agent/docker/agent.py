@@ -111,6 +111,14 @@ from ..config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchTy
 from ..exception import ContainerCreationError, InvalidArgumentError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel, KernelRegistry
+from ..kernel_registry.pickle.creator import (
+    PickleBasedKernelRegistryCreatorArgs,
+    PickleBasedLoaderWriterCreator,
+)
+from ..kernel_registry.recovery.docker_recovery import (
+    DockerKernelRegistryRecovery,
+)
+from ..kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ..plugin.network import ContainerNetworkCapability, ContainerNetworkInfo, NetworkPluginContext
 from ..proxy import DomainSocketProxy, proxy_connection
 from ..resources import (
@@ -1391,6 +1399,21 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             agent_class=agent_class,
         )
         self.checked_invalid_images = set()
+        pickle_loader_writer_creator = PickleBasedLoaderWriterCreator(
+            PickleBasedKernelRegistryCreatorArgs(
+                scratch_root=local_config.container.scratch_root,
+                ipc_base_path=local_config.agent.ipc_base_path,
+                var_base_path=local_config.agent.var_base_path,
+                agent_id=self.id,
+                local_instance_id=self.local_instance_id,
+            ),
+        )
+        pickle_loader = pickle_loader_writer_creator.create_loader()
+        pickle_writer = pickle_loader_writer_creator.create_writer()
+        self._kernel_recovery = DockerKernelRegistryRecovery(
+            loader=pickle_loader,
+            writers=[pickle_writer],
+        )
 
     async def __ainit__(self) -> None:
         async with closing_async(Docker()) as docker:
@@ -1496,6 +1519,18 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
         if self.docker:
             await self.docker.close()
+
+    @override
+    async def _load_kernel_registry_from_recovery(self) -> MutableMapping[KernelId, AbstractKernel]:
+        return await self._kernel_recovery.load_kernel_registry()
+
+    @override
+    async def _write_kernel_registry_to_recovery(
+        self,
+        kernel_registry: MutableMapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+    ) -> None:
+        await self._kernel_recovery.save_kernel_registry(kernel_registry, metadata)
 
     @override
     def get_cgroup_path(self, controller: str, container_id: str) -> Path:
