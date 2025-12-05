@@ -176,7 +176,7 @@ class StorageTransferManager:
             None, shutil.move, str(source_path), str(dest_path)
         )
 
-        # Cleanup empty parent directories
+        # Cleanup empty artifact directories
         self._cleanup_empty_parents(source_path.parent, source_storage.base_path)
 
     def _cleanup_empty_parents(self, path: Path, base_path: Path) -> None:
