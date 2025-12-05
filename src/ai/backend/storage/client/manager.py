@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -11,8 +12,10 @@ import yarl
 from dateutil.tz import tzutc
 
 from ai.backend.common.auth.utils import generate_signature
-from ai.backend.common.dto.manager.response import GetArtifactRevisionVerificationResultResponse
-from ai.backend.common.dto.storage.response import VFSListFilesResponse
+from ai.backend.common.dto.storage.response import (
+    GetVerificationResultResponse,
+    VFSListFilesResponse,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.config.unified import ReservoirClientConfig
 
@@ -139,22 +142,17 @@ class ManagerHTTPClient:
         return VFSListFilesResponse.model_validate(resp)
 
     async def get_verification_result(
-        self, model_id: str, revision: str
-    ) -> GetArtifactRevisionVerificationResultResponse:
+        self, artifact_revision_id: uuid.UUID
+    ) -> GetVerificationResultResponse:
         """
-        Get verification result for an artifact revision.
+        Get verification result for an artifact revision from the remote manager.
 
         Args:
-            model_id: Model ID (artifact name)
-            revision: Revision string
+            artifact_revision_id: The artifact revision ID to get verification result for
 
         Returns:
-            Response containing verification result
+            GetVerificationResultResponse containing the verification result
         """
-        rel_url = f"/artifacts/{model_id}/revisions/{revision}/verification_result"
-        try:
-            resp = await self._request("GET", rel_url)
-            return GetArtifactRevisionVerificationResultResponse.model_validate(resp)
-        except Exception as e:
-            log.warning(f"Failed to get verification result: {e}")
-            return GetArtifactRevisionVerificationResultResponse(verification_result=None)
+        rel_url = f"/artifacts/revisions/{artifact_revision_id}/verification-result"
+        resp = await self._request("GET", rel_url)
+        return GetVerificationResultResponse.model_validate(resp)

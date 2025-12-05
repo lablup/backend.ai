@@ -1,3 +1,4 @@
+import uuid
 from pathlib import PurePosixPath
 from typing import Optional
 
@@ -335,6 +336,11 @@ class ReservoirImportModelsReq(BaseRequestModel):
         If None, storage_name is used for all steps.
         """,
         examples=[{"download": "fast-storage", "archive": "long-term-storage"}],
+    )
+    # Used by storage proxy to fetch verification results from remote reservoir.
+    # Must have 1:1 correspondence with the models list.
+    artifact_revision_ids: list[uuid.UUID] = Field(
+        description="Artifact revision IDs corresponding to each model in the models list.",
     )
 
 

@@ -539,6 +539,7 @@ class ArtifactRevisionService:
                                 ],
                                 registry_name=registry_data.name,
                                 storage_step_mappings=reservoir_config.resolve_storage_step_selection(),
+                                artifact_revision_ids=[action.artifact_revision_id],
                             )
                         )
 

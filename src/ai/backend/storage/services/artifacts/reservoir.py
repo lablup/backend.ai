@@ -429,22 +429,20 @@ class ReservoirService:
         self._reservoir_client_config = args.reservoir_client_config
         self._redis_client = args.redis_client
 
-    async def _query_remote_verification_result(
+    async def _fetch_remote_verification_result(
         self,
         registry_name: str,
-        model_id: str,
-        revision: str,
+        artifact_revision_id: uuid.UUID,
     ) -> Optional[VerificationStepResult]:
         """
-        Query verification result from remote reservoir manager.
+        Fetch verification result from remote reservoir manager.
 
         Args:
-            registry_name: Name of the reservoir registry
-            model_id: Model ID to query
-            revision: Revision to query
+            registry_name: Name of the Reservoir registry
+            artifact_revision_id: The artifact revision ID to get verification result for
 
         Returns:
-            Verification result if found, None otherwise
+            VerificationStepResult if available, None otherwise
         """
         registry_config = self._reservoir_registry_configs.get(registry_name)
         if not registry_config or not registry_config.endpoint:
@@ -456,19 +454,22 @@ class ReservoirService:
 
         try:
             log.debug(
-                f"Querying verification result from remote reservoir for model: {model_id}/{revision}"
+                f"Querying verification result from remote reservoir for artifact revision {artifact_revision_id}"
             )
-            response = await manager_client.get_verification_result(
-                model_id=model_id,
-                revision=revision,
-            )
-            if response.verification_result:
+            resp = await manager_client.get_verification_result(artifact_revision_id)
+            if resp.verification_result:
                 log.info(
-                    f"Retrieved verification result from remote reservoir for model: {model_id}/{revision}"
+                    "Fetched verification result from remote reservoir: artifact_revision_id={}",
+                    artifact_revision_id,
                 )
-            return response.verification_result
+            return resp.verification_result
         except Exception as e:
-            log.warning(f"Failed to query verification result from remote reservoir: {e}")
+            log.warning(
+                "Failed to fetch verification result from remote reservoir: "
+                "artifact_revision_id={}, error={}",
+                artifact_revision_id,
+                str(e),
+            )
             return None
 
     async def import_model(
@@ -478,6 +479,7 @@ class ReservoirService:
         reporter: ProgressReporter,
         storage_step_mappings: dict[ArtifactStorageImportStep, str],
         pipeline: ImportPipeline,
+        artifact_revision_id: uuid.UUID,
     ) -> None:
         """
         Import a single model from a reservoir registry to a reservoir storage.
@@ -488,8 +490,10 @@ class ReservoirService:
             reporter: ProgressReporter for tracking progress
             storage_step_mappings: Mapping of import steps to storage names
             pipeline: ImportPipeline to execute
+            artifact_revision_id: The artifact revision ID for verification result lookup
         """
         success = False
+        verification_result: Optional[VerificationStepResult] = None
         try:
             if model.revision is None:
                 raise ArtifactRevisionEmptyError(f"Revision must be specified for model: {model}")
@@ -508,11 +512,9 @@ class ReservoirService:
             log.info(f"Model import completed: {model}")
             success = True
 
-            # Query verification result from remote reservoir manager
-            verification_result = await self._query_remote_verification_result(
-                registry_name=registry_name,
-                model_id=model.model_id,
-                revision=model.resolve_revision(ArtifactRegistryType.RESERVOIR),
+            # Fetch verification result from remote reservoir
+            verification_result = await self._fetch_remote_verification_result(
+                registry_name, artifact_revision_id
             )
         finally:
             await self._event_producer.anycast_event(
@@ -534,6 +536,7 @@ class ReservoirService:
         models: list[ModelTarget],
         storage_step_mappings: dict[ArtifactStorageImportStep, str],
         pipeline: ImportPipeline,
+        artifact_revision_ids: list[uuid.UUID],
     ) -> uuid.UUID:
         async def _import_models_batch(reporter: ProgressReporter) -> DispatchResult:
             model_count = len(models)
@@ -555,6 +558,8 @@ class ReservoirService:
                 # and proper job queue management
                 for idx, model in enumerate(models, 1):
                     model_id = model.model_id
+                    # Get corresponding artifact_revision_id (1:1 mapping with models list)
+                    artifact_revision_id = artifact_revision_ids[idx - 1]
                     try:
                         log.info(
                             f"Processing model in batch: model_id={model_id}, progress={idx}/{model_count}"
@@ -567,6 +572,7 @@ class ReservoirService:
                             reporter=reporter,
                             storage_step_mappings=storage_step_mappings,
                             pipeline=pipeline,
+                            artifact_revision_id=artifact_revision_id,
                         )
 
                         successful_models += 1
