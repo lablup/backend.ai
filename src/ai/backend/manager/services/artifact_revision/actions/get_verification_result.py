@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
@@ -10,12 +11,11 @@ from ai.backend.manager.services.artifact_revision.actions.base import ArtifactR
 
 @dataclass
 class GetArtifactRevisionVerificationResultAction(ArtifactRevisionAction):
-    model_id: str
-    revision: str
+    artifact_revision_id: uuid.UUID
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.artifact_revision_id)
 
     @override
     @classmethod

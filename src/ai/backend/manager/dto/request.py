@@ -104,8 +104,9 @@ class GetArtifactRevisionReadmeReq(BaseRequestModel):
 
 
 class GetArtifactRevisionVerificationResultReq(BaseRequestModel):
-    model_id: str = Field(description="The model ID (artifact name) to get verification result.")
-    revision: str = Field(description="The revision to get verification result.")
+    artifact_revision_id: uuid.UUID = Field(
+        description="The artifact revision ID to get verification result."
+    )
 
 
 class RejectArtifactRevisionReq(BaseRequestModel):

@@ -220,8 +220,8 @@ class ArtifactRevisionService:
     async def get_verification_result(
         self, action: GetArtifactRevisionVerificationResultAction
     ) -> GetArtifactRevisionVerificationResultActionResult:
-        revision = await self._artifact_repository.get_artifact_revision_by_name_and_revision(
-            action.model_id, action.revision
+        revision = await self._artifact_repository.get_artifact_revision_by_id(
+            action.artifact_revision_id
         )
         return GetArtifactRevisionVerificationResultActionResult(
             verification_result=revision.verification_result

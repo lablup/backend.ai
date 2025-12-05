@@ -295,8 +295,7 @@ class APIHandler:
         action_result = (
             await processors.artifact_revision.get_verification_result.wait_for_complete(
                 GetArtifactRevisionVerificationResultAction(
-                    model_id=path.parsed.model_id,
-                    revision=path.parsed.revision,
+                    artifact_revision_id=path.parsed.artifact_revision_id,
                 )
             )
         )
@@ -370,7 +369,7 @@ def create_app(
     cors.add(
         app.router.add_route(
             "GET",
-            "/{model_id}/revisions/{revision}/verification_result",
+            "/revisions/{artifact_revision_id}/verification-result",
             api_handler.get_artifact_revision_verification_result,
         )
     )
