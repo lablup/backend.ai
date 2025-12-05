@@ -150,7 +150,7 @@ def downgrade() -> None:
     )
 
     # Recreate constraints
-    op.create_index("ix_object_storages_name", "object_storages", ["name"], unique=False)
+    op.create_index("ix_object_storages_name", "object_storages", ["name"], unique=True)
 
     # Add name column back to vfs_storages
     op.add_column(
@@ -169,6 +169,6 @@ def downgrade() -> None:
     )
 
     # Recreate constraints
-    op.create_index("ix_vfs_storages_name", "vfs_storages", ["name"], unique=False)
+    op.create_index("ix_vfs_storages_name", "vfs_storages", ["name"], unique=True)
 
     op.drop_table("artifact_storages")
