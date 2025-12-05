@@ -135,7 +135,7 @@ class StorageProxyHTTPClient:
         *,
         body: Mapping[str, Any] | None = None,
         params: Mapping[str, Any] | None = None,
-        timeout: ClientTimeout,
+        timeout: ClientTimeout = DEFAULT_TIMEOUT,
     ) -> AsyncIterator[aiohttp.ClientResponse]:
         """
         Make an HTTP request using the session client.
@@ -178,7 +178,7 @@ class StorageProxyHTTPClient:
         *,
         body: Mapping[str, Any] | None = None,
         params: Mapping[str, Any] | None = None,
-        timeout: ClientTimeout,
+        timeout: ClientTimeout = DEFAULT_TIMEOUT,
     ) -> Optional[Mapping[str, Any]]:
         """
         Make an HTTP request using the session client.
@@ -206,7 +206,7 @@ class StorageProxyHTTPClient:
         *,
         body: Mapping[str, Any] | None = None,
         params: Mapping[str, Any] | None = None,
-        timeout: ClientTimeout,
+        timeout: ClientTimeout = DEFAULT_TIMEOUT,
     ) -> Mapping[str, Any]:
         """
         Make an HTTP request and return the response as a dictionary.
