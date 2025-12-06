@@ -64,6 +64,7 @@ class ReservoirRegistryRow(Base):
         try:
             return ReservoirRegistryData(
                 id=self.id,
+                meta_id=self.meta.id,
                 name=self.meta.name,
                 endpoint=self.endpoint,
                 access_key=self.access_key,
