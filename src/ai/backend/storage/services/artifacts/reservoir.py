@@ -429,6 +429,49 @@ class ReservoirService:
         self._reservoir_client_config = args.reservoir_client_config
         self._redis_client = args.redis_client
 
+    async def _fetch_remote_verification_result(
+        self,
+        registry_name: str,
+        artifact_revision_id: uuid.UUID,
+    ) -> Optional[VerificationStepResult]:
+        """
+        Fetch verification result from remote reservoir manager.
+
+        Args:
+            registry_name: Name of the Reservoir registry
+            artifact_revision_id: The artifact revision ID to get verification result for
+
+        Returns:
+            VerificationStepResult if available, None otherwise
+        """
+        registry_config = self._reservoir_registry_configs.get(registry_name)
+        if not registry_config or not registry_config.endpoint:
+            return None
+
+        manager_client = self._manager_http_clients.get(registry_name)
+        if not manager_client:
+            return None
+
+        try:
+            log.debug(
+                f"Querying verification result from remote reservoir for artifact revision {artifact_revision_id}"
+            )
+            resp = await manager_client.get_verification_result(artifact_revision_id)
+            if resp.verification_result:
+                log.info(
+                    "Fetched verification result from remote reservoir: artifact_revision_id={}",
+                    artifact_revision_id,
+                )
+            return resp.verification_result
+        except Exception as e:
+            log.warning(
+                "Failed to fetch verification result from remote reservoir: "
+                "artifact_revision_id={}, error={}",
+                artifact_revision_id,
+                str(e),
+            )
+            return None
+
     async def import_model(
         self,
         registry_name: str,
@@ -436,6 +479,7 @@ class ReservoirService:
         reporter: ProgressReporter,
         storage_step_mappings: dict[ArtifactStorageImportStep, str],
         pipeline: ImportPipeline,
+        artifact_revision_id: uuid.UUID,
     ) -> None:
         """
         Import a single model from a reservoir registry to a reservoir storage.
@@ -446,6 +490,7 @@ class ReservoirService:
             reporter: ProgressReporter for tracking progress
             storage_step_mappings: Mapping of import steps to storage names
             pipeline: ImportPipeline to execute
+            artifact_revision_id: The artifact revision ID for verification result lookup
         """
         success = False
         verification_result: Optional[VerificationStepResult] = None
@@ -467,8 +512,10 @@ class ReservoirService:
             log.info(f"Model import completed: {model}")
             success = True
 
-            # Extract verification result from context (None if verification step was not executed)
-            verification_result = context.step_metadata.get("verification_result")
+            # Fetch verification result from remote reservoir
+            verification_result = await self._fetch_remote_verification_result(
+                registry_name, artifact_revision_id
+            )
         finally:
             await self._event_producer.anycast_event(
                 ModelImportDoneEvent(
@@ -489,6 +536,7 @@ class ReservoirService:
         models: list[ModelTarget],
         storage_step_mappings: dict[ArtifactStorageImportStep, str],
         pipeline: ImportPipeline,
+        artifact_revision_ids: list[uuid.UUID],
     ) -> uuid.UUID:
         async def _import_models_batch(reporter: ProgressReporter) -> DispatchResult:
             model_count = len(models)
@@ -510,6 +558,8 @@ class ReservoirService:
                 # and proper job queue management
                 for idx, model in enumerate(models, 1):
                     model_id = model.model_id
+                    # Get corresponding artifact_revision_id (1:1 mapping with models list)
+                    artifact_revision_id = artifact_revision_ids[idx - 1]
                     try:
                         log.info(
                             f"Processing model in batch: model_id={model_id}, progress={idx}/{model_count}"
@@ -522,6 +572,7 @@ class ReservoirService:
                             reporter=reporter,
                             storage_step_mappings=storage_step_mappings,
                             pipeline=pipeline,
+                            artifact_revision_id=artifact_revision_id,
                         )
 
                         successful_models += 1

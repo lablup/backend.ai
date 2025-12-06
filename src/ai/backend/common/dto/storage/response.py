@@ -4,6 +4,7 @@ from typing import Optional
 from pydantic import Field
 
 from ai.backend.common.bgtask.types import TaskID
+from ai.backend.common.data.artifact.types import VerificationStepResult
 from ai.backend.common.data.storage.registries.types import ModelData
 
 from ...api_handlers import BaseResponseModel
@@ -211,4 +212,13 @@ class VFSListFilesResponse(BaseResponseModel):
 
     files: list[VFSFileInfo] = Field(
         default_factory=list, description="List of all files and directories found recursively."
+    )
+
+
+class GetVerificationResultResponse(BaseResponseModel):
+    """Response for getting verification result of an artifact revision."""
+
+    verification_result: Optional[VerificationStepResult] = Field(
+        default=None,
+        description="The verification result for the artifact revision.",
     )

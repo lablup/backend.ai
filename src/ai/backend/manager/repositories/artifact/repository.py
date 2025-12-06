@@ -70,6 +70,12 @@ class ArtifactRepository:
         return await self._db_source.get_artifact_revision(artifact_id, revision)
 
     @artifact_repository_resilience.apply()
+    async def get_artifact_revision_by_name_and_revision(
+        self, name: str, revision: str
+    ) -> ArtifactRevisionData:
+        return await self._db_source.get_artifact_revision_by_name_and_revision(name, revision)
+
+    @artifact_repository_resilience.apply()
     async def update_artifact(
         self, artifact_id: uuid.UUID, modifier: ArtifactModifier
     ) -> ArtifactData:

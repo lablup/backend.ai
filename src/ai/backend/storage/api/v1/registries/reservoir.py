@@ -74,6 +74,7 @@ class ReservoirRegistryAPIHandler:
             models=body.parsed.models,
             storage_step_mappings=body.parsed.storage_step_mappings,
             pipeline=pipeline,
+            artifact_revision_ids=body.parsed.artifact_revision_ids,
         )
 
         return APIResponse.build(

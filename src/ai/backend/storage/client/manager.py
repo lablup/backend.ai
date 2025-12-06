@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -11,7 +12,10 @@ import yarl
 from dateutil.tz import tzutc
 
 from ai.backend.common.auth.utils import generate_signature
-from ai.backend.common.dto.storage.response import VFSListFilesResponse
+from ai.backend.common.dto.storage.response import (
+    GetVerificationResultResponse,
+    VFSListFilesResponse,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.config.unified import ReservoirClientConfig
 
@@ -127,7 +131,7 @@ class ManagerHTTPClient:
 
         Args:
             storage_name: Name of the VFS storage
-            directory: Directory path to list files from (empty string for root)
+            directory: Directory path to list files from (empty string or root)
 
         Returns:
             Response containing list of files with metadata
@@ -136,3 +140,19 @@ class ManagerHTTPClient:
         request_body = {"directory": directory}
         resp = await self._request("GET", rel_url, json=request_body)
         return VFSListFilesResponse.model_validate(resp)
+
+    async def get_verification_result(
+        self, artifact_revision_id: uuid.UUID
+    ) -> GetVerificationResultResponse:
+        """
+        Get verification result for an artifact revision from the remote manager.
+
+        Args:
+            artifact_revision_id: The artifact revision ID to get verification result for
+
+        Returns:
+            GetVerificationResultResponse containing the verification result
+        """
+        rel_url = f"/artifacts/revisions/{artifact_revision_id}/verification-result"
+        resp = await self._request("GET", rel_url)
+        return GetVerificationResultResponse.model_validate(resp)
