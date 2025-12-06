@@ -5,6 +5,8 @@ on: [workflow_dispatch, workflow_call]
 jobs:
   sbom:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
     - name: Checkout the revision
       uses: actions/checkout@v6
@@ -12,8 +14,13 @@ jobs:
         lfs: false
     - name: Generate the SBOM report
       uses: CycloneDX/gh-python-generate-sbom@v2
-    - name: Upload the SBOM report
+    - name: Upload the SBOM report as artifact
       uses: actions/upload-artifact@v5
       with:
         name: SBOM report
         path: ./bom.xml
+    - name: Upload SBOM to GitHub Release
+      if: github.event_name == 'workflow_call'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: ./bom.xml
