@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentInfo
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentInfo
 from ai.backend.manager.sokovan.scheduler.types import (
     ScalingGroupInfo,
     SchedulingConfig,
