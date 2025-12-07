@@ -253,27 +253,6 @@ class ArtifactDBSource:
                 raise ArtifactRevisionNotFoundError(f"Revision {revision} not found")
             return row.to_dataclass()
 
-    async def get_artifact_revision_by_name_and_revision(
-        self, name: str, revision: str
-    ) -> ArtifactRevisionData:
-        async with self._db.begin_session() as db_sess:
-            result = await db_sess.execute(
-                sa.select(ArtifactRevisionRow)
-                .join(ArtifactRow, ArtifactRevisionRow.artifact_id == ArtifactRow.id)
-                .where(
-                    sa.and_(
-                        ArtifactRow.name == name,
-                        ArtifactRevisionRow.version == revision,
-                    )
-                )
-            )
-            row: ArtifactRevisionRow = result.scalar_one_or_none()
-            if row is None:
-                raise ArtifactRevisionNotFoundError(
-                    f"Artifact revision not found for name={name}, revision={revision}"
-                )
-            return row.to_dataclass()
-
     async def update_artifact(
         self, artifact_id: uuid.UUID, modifier: ArtifactModifier
     ) -> ArtifactData:

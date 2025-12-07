@@ -13,6 +13,7 @@ from ai.backend.common.api_handlers import (
     PathParam,
     api_handler,
 )
+from ai.backend.common.dto.storage.response import GetVerificationResultResponse
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import ArtifactRevisionResponseData
 from ai.backend.manager.dto.context import ProcessorsCtx
@@ -34,7 +35,6 @@ from ai.backend.manager.dto.response import (
     CancelImportArtifactResponse,
     CleanupArtifactsResponse,
     GetArtifactRevisionReadmeResponse,
-    GetArtifactRevisionVerificationResultResponse,
     GetDownloadProgressResponse,
     ImportArtifactsResponse,
     RejectArtifactRevisionResponse,
@@ -300,7 +300,7 @@ class APIHandler:
             )
         )
 
-        resp = GetArtifactRevisionVerificationResultResponse(
+        resp = GetVerificationResultResponse(
             verification_result=action_result.verification_result,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)

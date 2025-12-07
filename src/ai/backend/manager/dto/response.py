@@ -7,7 +7,6 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
     CombinedDownloadProgress,
-    VerificationStepResult,
 )
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
@@ -85,10 +84,6 @@ class UpdateArtifactResponse(BaseResponseModel):
 
 class GetArtifactRevisionReadmeResponse(BaseResponseModel):
     readme: Optional[str]
-
-
-class GetArtifactRevisionVerificationResultResponse(BaseResponseModel):
-    verification_result: Optional[VerificationStepResult]
 
 
 class VFSStorage(BaseModel):
