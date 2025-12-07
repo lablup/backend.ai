@@ -15,7 +15,7 @@ from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
-from .base import SchedulerHandler
+from ..base import SchedulerHandler
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
