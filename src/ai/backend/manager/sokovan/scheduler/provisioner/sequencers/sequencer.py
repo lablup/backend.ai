@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
-from ..types import SessionWorkload, SystemSnapshot
+from ...types import SessionWorkload, SystemSnapshot
 
 
 class WorkloadSequencer(ABC):

@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import override
 
-from ..types import SessionWorkload, SystemSnapshot
+from ...types import SessionWorkload, SystemSnapshot
 from .sequencer import WorkloadSequencer
 
 

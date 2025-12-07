@@ -53,22 +53,23 @@ from ai.backend.manager.repositories.scheduler import (
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.types import DistributedLockFactory
 
-from .allocators.allocator import SchedulingAllocator
 from .hooks.registry import HookRegistry, HookRegistryArgs
-from .results import ScheduledSessionData, ScheduleResult
-from .selectors.concentrated import ConcentratedAgentSelector
-from .selectors.dispersed import DispersedAgentSelector
-from .selectors.legacy import LegacyAgentSelector
-from .selectors.roundrobin import RoundRobinAgentSelector
-from .selectors.selector import (
+from .provisioner.allocators.allocator import SchedulingAllocator
+from .provisioner.selectors.concentrated import ConcentratedAgentSelector
+from .provisioner.selectors.dispersed import DispersedAgentSelector
+from .provisioner.selectors.legacy import LegacyAgentSelector
+from .provisioner.selectors.roundrobin import RoundRobinAgentSelector
+from .provisioner.selectors.selector import (
     AgentInfo,
     AgentSelectionConfig,
     AgentSelector,
 )
-from .sequencers.drf import DRFSequencer
-from .sequencers.fifo import FIFOSequencer
-from .sequencers.lifo import LIFOSequencer
-from .sequencers.sequencer import SchedulingSequencer, WorkloadSequencer
+from .provisioner.sequencers.drf import DRFSequencer
+from .provisioner.sequencers.fifo import FIFOSequencer
+from .provisioner.sequencers.lifo import LIFOSequencer
+from .provisioner.sequencers.sequencer import SchedulingSequencer, WorkloadSequencer
+from .provisioner.validators.validator import SchedulingValidator
+from .results import ScheduledSessionData, ScheduleResult
 from .types import (
     AllocationBatch,
     ImageConfigData,
@@ -86,7 +87,6 @@ from .types import (
     SessionWorkload,
     SystemSnapshot,
 )
-from .validators.validator import SchedulingValidator
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

@@ -5,7 +5,7 @@ from typing import override
 
 from ai.backend.common.types import AccessKey, ResourceSlot
 
-from ..types import SessionWorkload, SystemSnapshot
+from ...types import SessionWorkload, SystemSnapshot
 from .sequencer import WorkloadSequencer
 
 
