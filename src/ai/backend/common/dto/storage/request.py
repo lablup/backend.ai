@@ -1,3 +1,4 @@
+import uuid
 from pathlib import PurePosixPath
 from typing import Optional
 
@@ -403,4 +404,12 @@ class VFSListFilesReq(BaseRequestModel):
 
     directory: str = Field(
         description="The directory path within VFS storage to list files from.",
+    )
+
+
+class GetVerificationResultReq(BaseRequestModel):
+    """Request for getting verification result of an artifact revision."""
+
+    artifact_revision_id: uuid.UUID = Field(
+        description="The artifact revision ID to get verification result."
     )

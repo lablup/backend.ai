@@ -13,6 +13,7 @@ from ai.backend.common.api_handlers import (
     PathParam,
     api_handler,
 )
+from ai.backend.common.dto.storage.request import GetVerificationResultReq
 from ai.backend.common.dto.storage.response import GetVerificationResultResponse
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import ArtifactRevisionResponseData
@@ -22,7 +23,6 @@ from ai.backend.manager.dto.request import (
     CancelImportArtifactReq,
     CleanupArtifactsReq,
     GetArtifactRevisionReadmeReq,
-    GetArtifactRevisionVerificationResultReq,
     GetDownloadProgressReqPathParam,
     ImportArtifactsReq,
     RejectArtifactRevisionReq,
@@ -282,7 +282,7 @@ class APIHandler:
     @api_handler
     async def get_artifact_revision_verification_result(
         self,
-        path: PathParam[GetArtifactRevisionVerificationResultReq],
+        path: PathParam[GetVerificationResultReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         """
