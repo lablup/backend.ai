@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from http import HTTPStatus
 from typing import TYPE_CHECKING
 
@@ -74,7 +75,9 @@ class ReservoirRegistryAPIHandler:
             models=body.parsed.models,
             storage_step_mappings=body.parsed.storage_step_mappings,
             pipeline=pipeline,
-            artifact_revision_ids=body.parsed.artifact_revision_ids,
+            artifact_revision_ids=[
+                uuid.UUID(rev_id) for rev_id in body.parsed.artifact_revision_ids
+            ],
         )
 
         return APIResponse.build(
