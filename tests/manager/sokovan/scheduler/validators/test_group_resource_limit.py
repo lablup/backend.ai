@@ -6,6 +6,10 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
+from ai.backend.manager.sokovan.scheduler.provisioner.validators import (
+    GroupResourceLimitValidator,
+    GroupResourceQuotaExceeded,
+)
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,
@@ -14,10 +18,6 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionDependencySnapshot,
     SessionWorkload,
     SystemSnapshot,
-)
-from ai.backend.manager.sokovan.scheduler.validators import (
-    GroupResourceLimitValidator,
-    GroupResourceQuotaExceeded,
 )
 
 

@@ -1,6 +1,12 @@
 import pytest
 
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.sokovan.scheduler.provisioner.validators.exceptions import (
+    SchedulingValidationError,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.validators.reserved_batch import (
+    ReservedBatchSessionValidator,
+)
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,
@@ -9,10 +15,6 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionDependencySnapshot,
     SessionWorkload,
     SystemSnapshot,
-)
-from ai.backend.manager.sokovan.scheduler.validators.exceptions import SchedulingValidationError
-from ai.backend.manager.sokovan.scheduler.validators.reserved_batch import (
-    ReservedBatchSessionValidator,
 )
 
 

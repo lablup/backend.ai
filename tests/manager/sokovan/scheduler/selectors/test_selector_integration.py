@@ -6,11 +6,17 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
-from ai.backend.manager.sokovan.scheduler.selectors.concentrated import ConcentratedAgentSelector
-from ai.backend.manager.sokovan.scheduler.selectors.dispersed import DispersedAgentSelector
-from ai.backend.manager.sokovan.scheduler.selectors.legacy import LegacyAgentSelector
-from ai.backend.manager.sokovan.scheduler.selectors.roundrobin import RoundRobinAgentSelector
-from ai.backend.manager.sokovan.scheduler.selectors.selector import (
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
+    ConcentratedAgentSelector,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.dispersed import (
+    DispersedAgentSelector,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.legacy import LegacyAgentSelector
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.roundrobin import (
+    RoundRobinAgentSelector,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentStateTracker,

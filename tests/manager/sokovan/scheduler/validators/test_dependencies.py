@@ -7,6 +7,10 @@ import pytest
 
 from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SessionResult
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.sokovan.scheduler.provisioner.validators import (
+    DependenciesNotSatisfied,
+    DependenciesValidator,
+)
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,
@@ -16,10 +20,6 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionDependencySnapshot,
     SessionWorkload,
     SystemSnapshot,
-)
-from ai.backend.manager.sokovan.scheduler.validators import (
-    DependenciesNotSatisfied,
-    DependenciesValidator,
 )
 
 

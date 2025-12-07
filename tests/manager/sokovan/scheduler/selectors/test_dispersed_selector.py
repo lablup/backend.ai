@@ -6,8 +6,10 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
-from ai.backend.manager.sokovan.scheduler.selectors.dispersed import DispersedAgentSelector
-from ai.backend.manager.sokovan.scheduler.selectors.selector import (
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.dispersed import (
+    DispersedAgentSelector,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentStateTracker,
@@ -348,7 +350,7 @@ class TestDispersedAgentSelector:
         self, basic_criteria: AgentSelectionCriteria, basic_config: AgentSelectionConfig
     ) -> None:
         """Test that dispersed selector makes opposite choices from concentrated."""
-        from ai.backend.manager.sokovan.scheduler.selectors.concentrated import (
+        from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
             ConcentratedAgentSelector,
         )
 
