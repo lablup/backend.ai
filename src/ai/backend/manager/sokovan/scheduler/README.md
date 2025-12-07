@@ -29,15 +29,47 @@ Scheduler is the core module responsible for session scheduling in Backend.AI, a
 │Scheduler│ │Handlers │ │ Kernel  │
 │         │ │         │ │ State   │
 │         │ │         │ │ Engine  │
-└────┬────┘ └─────────┘ └─────────┘
+└────┬────┘ └────┬────┘ └─────────┘
+     │           │
+     │           ├─── lifecycle/    (Session lifecycle)
+     │           ├─── progress/     (Progress checking)
+     │           ├─── recovery/     (Retry and recovery)
+     │           └─── maintenance/  (Cleanup and sweep)
      │
-     │ Plugin System
-     │
-     ├─── Validators   (Resource constraint validation)
-     ├─── Sequencers   (Priority determination)
-     ├─── Selectors    (Agent selection)
-     ├───  Allocators   (Resource allocation)
-     └─── Hooks        (Session type customization)
+     └─── Provisioner (Session provisioning plugins)
+          │
+          ├─── Validators   (Resource constraint validation)
+          ├─── Sequencers   (Priority determination)
+          ├─── Selectors    (Agent selection)
+          └─── Allocators   (Resource allocation)
+```
+
+## Directory Structure
+
+```
+scheduler/
+├── coordinator.py          # ScheduleCoordinator - top-level orchestrator
+├── scheduler.py            # Scheduler - scheduling engine
+├── factory.py              # Component factory
+├── types.py                # Type definitions
+├── results.py              # Result types
+├── exceptions.py           # Exception definitions
+│
+├── provisioner/            # Session provisioning plugins
+│   ├── validators/         # Resource constraint validation
+│   ├── sequencers/         # Priority determination (FIFO, LIFO, DRF)
+│   ├── selectors/          # Agent selection strategies
+│   └── allocators/         # Resource allocation
+│
+├── handlers/               # State-specific handlers
+│   ├── lifecycle/          # Session lifecycle (schedule, start, terminate)
+│   ├── progress/           # Progress checking (pulling, creating, terminating)
+│   ├── recovery/           # Retry and recovery (preparing, creating failures)
+│   └── maintenance/        # Cleanup and sweep operations
+│
+├── hooks/                  # Session type-specific hooks
+├── kernel/                 # Kernel state management
+└── recorder/               # Event recording
 ```
 
 ## Dependencies
@@ -408,9 +440,11 @@ The fourth stage is performed on the agent side. The agent sends a SIGTERM signa
 
 In the fifth stage, termination completion is handled. When kernel cleanup is completed, the agent publishes a kernel_terminated event, and ScheduleCoordinator receives this event to update the kernel's state to TERMINATED. When all kernels belonging to a session are in TERMINATED state, the session's state is also changed to TERMINATED and the agent's occupied_slots is decreased to release allocated resources.
 
-## Plugin System
+## Provisioner Plugin System
 
-Scheduler provides an extensible plugin architecture that allows flexible modification or extension of scheduling policies and algorithms. Each plugin type defines a clear interface, and system administrators can implement and use custom plugins as needed.
+Scheduler provides an extensible plugin architecture through the `provisioner/` package that allows flexible modification or extension of scheduling policies and algorithms. Each plugin type defines a clear interface, and system administrators can implement and use custom plugins as needed.
+
+> **Note:** All provisioning plugins are located in `scheduler/provisioner/`. For detailed documentation on each plugin type, see the [Provisioner README](./provisioner/README.md).
 
 ### Validators
 
@@ -587,43 +621,53 @@ InferenceHook is for inference sessions (model serving), applying configurations
 
 ## State-Specific Handlers
 
-ScheduleCoordinator uses multiple handlers to process various session states. Each handler performs necessary tasks for specific states or situations.
+ScheduleCoordinator uses multiple handlers to process various session states. Each handler performs necessary tasks for specific states or situations. Handlers are organized into four categories under `handlers/`:
 
-### ScheduleSessionsHandler
+### Lifecycle Handlers (`handlers/lifecycle/`)
 
-ScheduleSessionsHandler is the handler that schedules pending sessions. It calls Scheduler's schedule_all_scaling_groups() method to process PENDING sessions for all scaling groups.
+Handlers for core session lifecycle operations.
 
-### StartSessionsHandler
+#### ScheduleSessionsHandler
+Schedules pending sessions by calling Scheduler's schedule_all_scaling_groups() method to process PENDING sessions for all scaling groups.
 
-StartSessionsHandler is the handler that starts scheduled sessions. It calls Scheduler's start_sessions() method to begin actual kernel creation for sessions in SCHEDULED state.
+#### StartSessionsHandler
+Starts scheduled sessions by calling Scheduler's start_sessions() method to begin actual kernel creation for sessions in SCHEDULED state.
 
-### TerminateSessionsHandler
+#### TerminateSessionsHandler
+Terminates sessions by querying sessions with termination requests from the database, then calling Scheduler's terminate_sessions() method to send termination RPC to agents.
 
-TerminateSessionsHandler is the handler that terminates sessions. It queries sessions with termination requests from the database, then calls Scheduler's terminate_sessions() method to send termination RPC to agents.
+### Progress Handlers (`handlers/progress/`)
 
-### CheckPullingProgressHandler
+Handlers for checking operation progress and handling timeouts.
 
-CheckPullingProgressHandler is the handler that checks image pulling progress. It queries sessions that have remained in PULLING state longer than the configured timeout to identify sessions where pulling is delayed or failed and handles them appropriately.
+#### CheckPullingProgressHandler
+Checks image pulling progress. Queries sessions that have remained in PULLING state longer than the configured timeout to identify sessions where pulling is delayed or failed.
 
-### CheckCreatingProgressHandler
+#### CheckCreatingProgressHandler
+Checks kernel creation progress. Queries sessions that have remained in PREPARING state longer than the configured timeout to handle sessions where kernel creation is delayed or failed.
 
-CheckCreatingProgressHandler is the handler that checks kernel creation progress. It queries sessions that have remained in PREPARING state longer than the configured timeout to handle sessions where kernel creation is delayed or failed.
+#### CheckTerminatingProgressHandler
+Checks termination progress. Queries sessions that have remained in TERMINATING state longer than the configured timeout to attempt forced termination for sessions that didn't terminate normally.
 
-### CheckTerminatingProgressHandler
+### Recovery Handlers (`handlers/recovery/`)
 
-CheckTerminatingProgressHandler is the handler that checks termination progress. It queries sessions that have remained in TERMINATING state longer than the configured timeout to attempt forced termination for sessions that didn't terminate normally.
+Handlers for retry and recovery operations.
 
-### RetryPreparingHandler
+#### RetryPreparingHandler
+Retries sessions that failed during preparation stage. Analyzes failure causes to determine if errors are retryable, returns sessions to PENDING state for scheduling retry if retryable, and cancels sessions if not retryable.
 
-RetryPreparingHandler is the handler that retries sessions that failed during preparation stage. It analyzes failure causes to determine if errors are retryable, returns sessions to PENDING state for scheduling retry if retryable, and cancels sessions if not retryable.
+#### RetryCreatingHandler
+Retries sessions that failed during creation stage. Analyzes kernel creation failure causes to determine if errors are temporary or permanent, attempts retry for temporary errors, and cancels sessions for permanent errors.
 
-### RetryCreatingHandler
+### Maintenance Handlers (`handlers/maintenance/`)
 
-RetryCreatingHandler is the handler that retries sessions that failed during creation stage. It analyzes kernel creation failure causes to determine if errors are temporary or permanent, attempts retry for temporary errors, and cancels sessions for permanent errors.
+Handlers for cleanup and maintenance operations.
 
-### SweepSessionsHandler
+#### SweepSessionsHandler
+Cleans up old sessions. Queries long-waiting sessions and cancels or cleans sessions according to configured policy. This removes sessions that occupy resources but aren't actually being used.
 
-SweepSessionsHandler is the handler that cleans up old sessions. It queries long-waiting sessions and cancels or cleans sessions according to configured policy. This removes sessions that occupy resources but aren't actually being used.
+#### SweepLostAgentKernelsHandler
+Sweeps kernels whose agents have been lost or are no longer available. Handles cleanup when agent connectivity is lost.
 
 ## Kernel State Engine
 
