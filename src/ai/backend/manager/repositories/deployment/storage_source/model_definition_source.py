@@ -16,7 +16,6 @@ from ai.backend.manager.repositories.deployment.types.health_check_source import
 if TYPE_CHECKING:
     from ai.backend.manager.models.storage import StorageSessionManager
 
-__all__ = ["ModelDefinitionSource"]
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 

@@ -7,8 +7,6 @@ from typing import Optional
 
 from ai.backend.common.config import ModelHealthCheck
 
-__all__ = ["HealthCheckSource"]
-
 
 class HealthCheckSource(ABC):
     """

@@ -9,8 +9,6 @@ from ai.backend.common.types import MODEL_SERVICE_RUNTIME_PROFILES, RuntimeVaria
 
 from ..types.health_check_source import HealthCheckSource
 
-__all__ = ["RuntimeProfileSource"]
-
 
 class RuntimeProfileSource(HealthCheckSource):
     """Load health check config from predefined runtime profiles."""
