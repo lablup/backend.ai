@@ -13,6 +13,7 @@ from uuid import UUID
 import yarl
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
@@ -260,6 +261,7 @@ class DeploymentNetworkSpec:
     access_token_ids: Optional[list[UUID]] = None
     url: Optional[str] = None
     preferred_domain_name: Optional[str] = None
+    health_check_config: Optional[ModelHealthCheck] = None
 
 
 @dataclass

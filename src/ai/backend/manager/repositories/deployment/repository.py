@@ -875,17 +875,11 @@ class DeploymentRepository:
         from .storage_source import HealthCheckDBSource, ModelDefinitionSource, RuntimeProfileSource
 
         # Get context for merging
-        (
-            runtime_variant,
-            model_definition_path,
-            model_host,
-            model_vfid,
-            db_config,
-        ) = await self._db_source.get_endpoint_health_check_context(endpoint_id)
+        ctx = await self._db_source.get_endpoint_health_check_context(endpoint_id)
 
         # Build source chain: RuntimeProfile -> ModelDefinition -> DB
-        runtime_source = RuntimeProfileSource(runtime_variant)
-        db_source = HealthCheckDBSource(db_config)
+        runtime_source = RuntimeProfileSource(ctx.runtime_variant)
+        db_source = HealthCheckDBSource(ctx.db_health_check_config)
 
         result: Optional[ModelHealthCheck] = None
 
@@ -895,13 +889,13 @@ class DeploymentRepository:
             result = runtime_source.merge(result, runtime_config)
 
         # 2. Load from ModelDefinition (only if model vfolder exists)
-        if model_host is not None and model_vfid is not None:
+        if ctx.model_host is not None and ctx.model_vfid is not None:
             model_def_source = ModelDefinitionSource(
                 storage_manager=self._storage_source._storage_manager,
-                host=model_host,
-                vfid=model_vfid,
-                model_definition_path=model_definition_path,
-                runtime_variant=runtime_variant,
+                host=ctx.model_host,
+                vfid=ctx.model_vfid,
+                model_definition_path=ctx.model_definition_path,
+                runtime_variant=ctx.runtime_variant,
             )
             model_def_config = await model_def_source.load()
             if model_def_config is not None:

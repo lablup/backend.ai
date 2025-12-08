@@ -682,6 +682,11 @@ class EndpointRow(Base):
             cluster_mode=creator.model_revision.resource_spec.cluster_mode,
             cluster_size=creator.model_revision.resource_spec.cluster_size,
             extra_mounts=creator.model_revision.mounts.extra_mounts,
+            health_check_config=(
+                creator.network.health_check_config.model_dump()
+                if creator.network.health_check_config
+                else None
+            ),
             # Fields not in creator - use defaults
             lifecycle_stage=EndpointLifecycle.PENDING,
             retries=0,

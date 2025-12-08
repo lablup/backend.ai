@@ -7,8 +7,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional
 
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import RuntimeVariant, SessionId, VFolderID
 from ai.backend.manager.data.deployment.types import RouteStatus
 
 
@@ -72,3 +73,14 @@ class RouteServiceDiscoveryInfo:
     runtime_variant: str
     kernel_host: str
     kernel_port: int
+
+
+@dataclass
+class EndpointHealthCheckContext:
+    """Context needed for health check config merging from multiple sources."""
+
+    runtime_variant: RuntimeVariant
+    model_definition_path: Optional[str]
+    model_host: Optional[str]
+    model_vfid: Optional[VFolderID]
+    db_health_check_config: Optional[ModelHealthCheck]

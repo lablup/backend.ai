@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common import typed_validators as tv
 from ai.backend.common.api_handlers import BaseFieldModel
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
@@ -482,6 +483,10 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
         description="If set to true, do not require an API key to access the model service",
         default=False,
     )
+    health_check_config: Optional[ModelHealthCheck] = Field(
+        description="Health check configuration for the model service endpoint",
+        default=None,
+    )
     config: ServiceConfigModel
 
     def to_create_action(
@@ -765,6 +770,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
                 draft_model_revision=params.to_model_revision(validation_result),
                 network=DeploymentNetworkSpec(
                     open_to_public=params.open_to_public,
+                    health_check_config=params.health_check_config,
                 ),
             )
         )

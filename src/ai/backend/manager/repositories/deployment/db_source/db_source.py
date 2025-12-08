@@ -17,7 +17,6 @@ from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.types import (
     AccessKey,
     KernelId,
-    RuntimeVariant,
     SessionId,
 )
 from ai.backend.manager.data.agent.types import AgentStatus
@@ -72,6 +71,7 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
 from ai.backend.manager.utils import query_userinfo_from_session
 
 from ..types import (
+    EndpointHealthCheckContext,
     RouteData,
     RouteServiceDiscoveryInfo,
 )
@@ -1384,9 +1384,7 @@ class DeploymentDBSource:
     async def get_endpoint_health_check_context(
         self,
         endpoint_id: uuid.UUID,
-    ) -> tuple[
-        RuntimeVariant, Optional[str], Optional[str], Optional[Any], Optional[ModelHealthCheck]
-    ]:
+    ) -> EndpointHealthCheckContext:
         """
         Get context needed for health check config merging.
 
@@ -1394,7 +1392,8 @@ class DeploymentDBSource:
             endpoint_id: ID of the endpoint
 
         Returns:
-            Tuple of (runtime_variant, model_definition_path, model_host, model_vfid, db_health_check_config)
+            EndpointHealthCheckContext containing runtime_variant, model_definition_path,
+            model_host, model_vfid, and db_health_check_config
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
             endpoint = await EndpointRow.get(
@@ -1410,20 +1409,12 @@ class DeploymentDBSource:
             if endpoint.health_check_config:
                 db_config = ModelHealthCheck.model_validate(endpoint.health_check_config)
 
-            if model:
-                return (
-                    endpoint.runtime_variant,
-                    endpoint.model_definition_path,
-                    model.host,
-                    model.vfid,
-                    db_config,
-                )
-            return (
-                endpoint.runtime_variant,
-                endpoint.model_definition_path,
-                None,
-                None,
-                db_config,
+            return EndpointHealthCheckContext(
+                runtime_variant=endpoint.runtime_variant,
+                model_definition_path=endpoint.model_definition_path,
+                model_host=model.host if model else None,
+                model_vfid=model.vfid if model else None,
+                db_health_check_config=db_config,
             )
 
     async def get_default_architecture_from_scaling_group(
