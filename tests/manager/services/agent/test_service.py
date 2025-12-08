@@ -9,7 +9,7 @@ from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
-from ai.backend.common.exception import PassthroughError
+from ai.backend.common.exception import AgentWatcherResponseError
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
 from ai.backend.manager.agent_cache import AgentRPCCache
@@ -533,7 +533,7 @@ class TestWatcher:
         self, watcher_service_forbidden: AgentService, agent_id: AgentId
     ) -> None:
         # When/Then
-        with pytest.raises(PassthroughError) as exc_info:
+        with pytest.raises(AgentWatcherResponseError) as exc_info:
             await watcher_service_forbidden.watcher_agent_start(
                 WatcherAgentStartAction(agent_id=agent_id)
             )
@@ -546,7 +546,7 @@ class TestWatcher:
         self, watcher_service_error: AgentService, agent_id: AgentId
     ) -> None:
         # When/Then
-        with pytest.raises(PassthroughError) as exc_info:
+        with pytest.raises(AgentWatcherResponseError) as exc_info:
             await watcher_service_error.watcher_agent_stop(
                 WatcherAgentStopAction(agent_id=agent_id)
             )
