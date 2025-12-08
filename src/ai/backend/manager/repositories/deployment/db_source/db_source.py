@@ -15,7 +15,6 @@ from sqlalchemy.orm import selectinload, sessionmaker
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.types import (
-    MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
     KernelId,
     RuntimeVariant,
@@ -53,7 +52,6 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
-    ModelServiceHelper,
 )
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.image import ImageRow
@@ -77,6 +75,7 @@ from ..types import (
     RouteData,
     RouteServiceDiscoveryInfo,
 )
+from ..types.source import HealthCheckSource
 
 
 @dataclass
@@ -1358,61 +1357,74 @@ class DeploymentDBSource:
         self,
         endpoint_id: uuid.UUID,
     ) -> Optional[ModelHealthCheck]:
+        """
+        Get health check configuration stored in DB for an endpoint.
+
+        This returns only the DB-stored config. For merged config from all sources
+        (RuntimeProfile, ModelDefinition, DB), use DeploymentRepository.get_endpoint_health_check_config().
+
+        Args:
+            endpoint_id: ID of the endpoint
+
+        Returns:
+            ModelHealthCheck from DB or None if not set
+        """
         async with self._begin_readonly_session_read_committed() as db_sess:
             endpoint = await EndpointRow.get(
                 db_sess,
                 endpoint_id,
-                load_created_user=True,
-                load_session_owner=True,
-                load_image=True,
-                load_routes=True,
             )
             if not endpoint:
                 raise EndpointNotFound(str(endpoint_id))
 
-            # Get model vfolder for health check config
+            if endpoint.health_check_config:
+                return ModelHealthCheck.model_validate(endpoint.health_check_config)
+            return None
+
+    async def get_endpoint_health_check_context(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> tuple[
+        RuntimeVariant, Optional[str], Optional[str], Optional[Any], Optional[ModelHealthCheck]
+    ]:
+        """
+        Get context needed for health check config merging.
+
+        Args:
+            endpoint_id: ID of the endpoint
+
+        Returns:
+            Tuple of (runtime_variant, model_definition_path, model_host, model_vfid, db_health_check_config)
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            endpoint = await EndpointRow.get(
+                db_sess,
+                endpoint_id,
+            )
+            if not endpoint:
+                raise EndpointNotFound(str(endpoint_id))
+
             model = await VFolderRow.get(db_sess, endpoint.model)
-            if not model:
-                return None
 
-            endpoint_data = endpoint.to_data()
-            _info: ModelHealthCheck | None = None
+            db_config = None
+            if endpoint.health_check_config:
+                db_config = ModelHealthCheck.model_validate(endpoint.health_check_config)
 
-            # Check runtime profile for health check endpoint
-            if _path := MODEL_SERVICE_RUNTIME_PROFILES[
-                endpoint_data.runtime_variant
-            ].health_check_endpoint:
-                _info = ModelHealthCheck(path=_path)
-            elif endpoint_data.runtime_variant == RuntimeVariant.CUSTOM:
-                # For custom runtime, check model definition file
-                model_definition_path = (
-                    await ModelServiceHelper.validate_model_definition_file_exists(
-                        self._storage_manager,
-                        model.host,
-                        model.vfid,
-                        endpoint_data.model_definition_path,
-                    )
-                )
-                model_definition = await ModelServiceHelper.validate_model_definition(
-                    self._storage_manager,
+            if model:
+                return (
+                    endpoint.runtime_variant,
+                    endpoint.model_definition_path,
                     model.host,
                     model.vfid,
-                    model_definition_path,
+                    db_config,
                 )
-
-                # Check each model in the definition for health check config
-                for model_info in model_definition["models"]:
-                    if health_check_info := model_info.get("service", {}).get("health_check"):
-                        _info = ModelHealthCheck(
-                            path=health_check_info["path"],
-                            interval=health_check_info.get("interval"),
-                            max_retries=health_check_info.get("max_retries"),
-                            max_wait_time=health_check_info.get("max_wait_time"),
-                            expected_status_code=health_check_info.get("expected_status_code"),
-                        )
-                        break
-
-            return _info
+            return (
+                endpoint.runtime_variant,
+                endpoint.model_definition_path,
+                None,
+                None,
+                db_config,
+            )
 
     async def get_default_architecture_from_scaling_group(
         self, scaling_group_name: str
@@ -1438,3 +1450,13 @@ class DeploymentDBSource:
             architecture_counts = Counter(architectures)
             most_common_architecture, _ = architecture_counts.most_common(1)[0]
             return most_common_architecture
+
+
+class HealthCheckDBSource(HealthCheckSource):
+    """Load health check config from database (EndpointRow.health_check_config)."""
+
+    def __init__(self, health_check_config: Optional[ModelHealthCheck]) -> None:
+        self._config = health_check_config
+
+    async def load(self) -> Optional[ModelHealthCheck]:
+        return self._config

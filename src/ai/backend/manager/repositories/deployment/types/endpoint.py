@@ -1,5 +1,7 @@
 """Endpoint and route data types for deployment repository."""
 
+from __future__ import annotations
+
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime

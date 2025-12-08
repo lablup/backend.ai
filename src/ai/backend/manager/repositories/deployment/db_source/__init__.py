@@ -1,5 +1,5 @@
 """Database source for deployment repository."""
 
-from .db_source import DeploymentDBSource
+from .db_source import DeploymentDBSource, HealthCheckDBSource
 
-__all__ = ["DeploymentDBSource"]
+__all__ = ["DeploymentDBSource", "HealthCheckDBSource"]

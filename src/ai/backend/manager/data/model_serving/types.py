@@ -69,8 +69,8 @@ class EndpointData:
     lifecycle_stage: EndpointLifecycle
     runtime_variant: RuntimeVariant
     extra_mounts: Sequence[VFolderMount]
+    health_check_config: Optional[ModelHealthCheck]
     routings: Optional[Sequence["RoutingData"]] = None
-    health_check_config: Optional[ModelHealthCheck] = None
 
 
 @dataclass

@@ -1,5 +1,7 @@
 """Main deployment repository implementation."""
 
+from __future__ import annotations
+
 import logging
 import uuid
 from collections import defaultdict
@@ -16,6 +18,7 @@ from ruamel.yaml import YAML
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -848,6 +851,68 @@ class DeploymentRepository:
             connection_info,
             health_check_config,
         )
+
+    @deployment_repository_resilience.apply()
+    async def get_endpoint_health_check_config(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> Optional[ModelHealthCheck]:
+        """
+        Get merged health check configuration for an endpoint.
+
+        The configuration is merged from three sources in order of priority:
+        1. RuntimeProfile (base defaults for known runtimes)
+        2. ModelDefinition (from model-definition.yaml for CUSTOM runtime)
+        3. DB (EndpointRow.health_check_config - highest priority)
+
+        Args:
+            endpoint_id: ID of the endpoint
+
+        Returns:
+            Merged ModelHealthCheck configuration or None if not available
+        """
+
+        from .storage_source import HealthCheckDBSource, ModelDefinitionSource, RuntimeProfileSource
+
+        # Get context for merging
+        (
+            runtime_variant,
+            model_definition_path,
+            model_host,
+            model_vfid,
+            db_config,
+        ) = await self._db_source.get_endpoint_health_check_context(endpoint_id)
+
+        # Build source chain: RuntimeProfile -> ModelDefinition -> DB
+        runtime_source = RuntimeProfileSource(runtime_variant)
+        db_source = HealthCheckDBSource(db_config)
+
+        result: Optional[ModelHealthCheck] = None
+
+        # 1. Load from RuntimeProfile
+        runtime_config = await runtime_source.load()
+        if runtime_config is not None:
+            result = runtime_source.merge(result, runtime_config)
+
+        # 2. Load from ModelDefinition (only if model vfolder exists)
+        if model_host is not None and model_vfid is not None:
+            model_def_source = ModelDefinitionSource(
+                storage_manager=self._storage_source._storage_manager,
+                host=model_host,
+                vfid=model_vfid,
+                model_definition_path=model_definition_path,
+                runtime_variant=runtime_variant,
+            )
+            model_def_config = await model_def_source.load()
+            if model_def_config is not None:
+                result = model_def_source.merge(result, model_def_config)
+
+        # 3. Load from DB (highest priority)
+        db_loaded = await db_source.load()
+        if db_loaded is not None:
+            result = db_source.merge(result, db_loaded)
+
+        return result
 
     @deployment_repository_resilience.apply()
     async def get_endpoint_id_by_session(

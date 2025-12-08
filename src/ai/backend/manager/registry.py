@@ -10,7 +10,6 @@ import re
 import secrets
 import time
 import uuid
-from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import (
     Coroutine,
@@ -31,7 +30,6 @@ from typing import (
     TypeAlias,
     Union,
     cast,
-    override,
 )
 
 import aiodocker
@@ -120,7 +118,6 @@ from ai.backend.common.exception import AliasResolutionFailed, BackendAIError
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
-    MODEL_SERVICE_RUNTIME_PROFILES,
     AbuseReport,
     AccessKey,
     AgentId,
@@ -142,7 +139,6 @@ from ai.backend.common.types import (
     KernelId,
     ModelServiceStatus,
     ResourceSlot,
-    RuntimeVariant,
     SessionEnqueueingConfig,
     SessionId,
     SessionTypes,
@@ -162,7 +158,6 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.endpoint import ModelServiceHelper
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
@@ -251,116 +246,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 SESSION_NAME_LEN_LIMIT = 10
 DEFAULT_WAIT_TIMEOUT_SECONDS = 60
-
-
-class HealthCheckSource(ABC):
-    """
-    Base class for health check configuration sources.
-    Sources are loaded in order and merged with later sources taking priority.
-    """
-
-    @abstractmethod
-    async def load(self) -> Optional[ModelHealthCheck]:
-        """Load health check configuration from this source."""
-        raise NotImplementedError
-
-    def merge(
-        self,
-        base: Optional[ModelHealthCheck],
-        override: Optional[ModelHealthCheck],
-    ) -> Optional[ModelHealthCheck]:
-        """
-        Merge two health check configs. Override takes priority over base.
-        Fields from override are used if present, otherwise base fields are used.
-        """
-        if base is None and override is None:
-            return None
-        if base is None:
-            return override
-        if override is None:
-            return base
-
-        base_data = base.model_dump()
-        override_data = override.model_dump(exclude_unset=True)
-        base_data.update(override_data)
-        return ModelHealthCheck.model_validate(base_data)
-
-
-class RuntimeProfileSource(HealthCheckSource):
-    """Load health check config from predefined runtime profiles."""
-
-    def __init__(self, runtime_variant: RuntimeVariant) -> None:
-        self._runtime_variant = runtime_variant
-
-    @override
-    async def load(self) -> Optional[ModelHealthCheck]:
-        profile = MODEL_SERVICE_RUNTIME_PROFILES.get(self._runtime_variant)
-        if profile and profile.health_check_endpoint:
-            return ModelHealthCheck(path=profile.health_check_endpoint)
-        return None
-
-
-class ModelDefinitionSource(HealthCheckSource):
-    """Load health check config from model-definition.yaml file."""
-
-    def __init__(
-        self,
-        storage_manager: StorageSessionManager,
-        host: str,
-        vfid: Any,
-        model_definition_path: Optional[str],
-        runtime_variant: RuntimeVariant,
-    ) -> None:
-        self._storage_manager = storage_manager
-        self._host = host
-        self._vfid = vfid
-        self._model_definition_path = model_definition_path
-        self._runtime_variant = runtime_variant
-
-    @override
-    async def load(self) -> Optional[ModelHealthCheck]:
-        if self._runtime_variant != RuntimeVariant.CUSTOM:
-            return None
-
-        try:
-            resolved_path = await ModelServiceHelper.validate_model_definition_file_exists(
-                self._storage_manager,
-                self._host,
-                self._vfid,
-                self._model_definition_path,
-            )
-            model_definition = await ModelServiceHelper.validate_model_definition(
-                self._storage_manager,
-                self._host,
-                self._vfid,
-                resolved_path,
-            )
-
-            for model_info in model_definition.get("models", []):
-                health_check_info = model_info.get("service", {}).get("health_check")
-                if health_check_info:
-                    return ModelHealthCheck(
-                        path=health_check_info["path"],
-                        interval=health_check_info["interval"],
-                        max_retries=health_check_info["max_retries"],
-                        max_wait_time=health_check_info["max_wait_time"],
-                        expected_status_code=health_check_info["expected_status_code"],
-                        initial_delay=health_check_info.get("initial_delay"),
-                    )
-        except Exception:
-            log.debug("Failed to load health check config from model-definition.yaml")
-        return None
-
-
-class DBSource(HealthCheckSource):
-    """Load health check config from database (EndpointRow.health_check_config)."""
-
-    def __init__(self, health_check_config: Optional[ModelHealthCheck]) -> None:
-        self._config = health_check_config
-
-    @override
-    async def load(self) -> Optional[ModelHealthCheck]:
-        return self._config
 
 
 class AgentRegistry:
@@ -3671,8 +3556,15 @@ class AgentRegistry:
     ) -> Optional[ModelHealthCheck]:
         """
         Get merged health check config from multiple sources.
-        Priority (highest to lowest): DBSource > ModelDefinitionSource > RuntimeProfileSource
+        Priority (highest to lowest): HealthCheckDBSource > ModelDefinitionSource > RuntimeProfileSource
         """
+        from .repositories.deployment.storage_source import (
+            HealthCheckDBSource,
+            HealthCheckSource,
+            ModelDefinitionSource,
+            RuntimeProfileSource,
+        )
+
         sources: list[HealthCheckSource] = [
             RuntimeProfileSource(endpoint.runtime_variant),
             ModelDefinitionSource(
@@ -3682,7 +3574,7 @@ class AgentRegistry:
                 endpoint.model_definition_path,
                 endpoint.runtime_variant,
             ),
-            DBSource(endpoint.health_check_config),
+            HealthCheckDBSource(endpoint.health_check_config),
         ]
 
         result: Optional[ModelHealthCheck] = None

@@ -324,14 +324,15 @@ class DeploymentExecutor:
         target_revision = deployment.target_revision()
         if not target_revision:
             raise ModelDefinitionNotFound(f"No target revision for deployment {deployment.id}")
-        generator = self._model_definition_generator_registry.get(
-            target_revision.execution.runtime_variant
+
+        # Get merged health check config from repository
+        # (RuntimeProfile -> ModelDefinition -> DB, with DB having highest priority)
+        health_check_config = await self._deployment_repo.get_endpoint_health_check_config(
+            deployment.id
         )
-        model_definition = await generator.generate_model_definition(target_revision)
-        health_check_config = model_definition.health_check_config()
         if not health_check_config:
             log.debug(
-                "No health check configuration found in model definition for deployment {}",
+                "No health check configuration found for deployment {}",
                 deployment.id,
             )
         return await self._create_endpoint_in_proxy(

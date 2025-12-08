@@ -2,6 +2,7 @@
 
 from .auto_scaling import AutoScalingRuleData
 from .endpoint import EndpointCreationArgs, EndpointData, RouteData, RouteServiceDiscoveryInfo
+from .source import HealthCheckSource
 
 __all__ = [
     "EndpointCreationArgs",
@@ -9,4 +10,5 @@ __all__ = [
     "RouteData",
     "RouteServiceDiscoveryInfo",
     "AutoScalingRuleData",
+    "HealthCheckSource",
 ]
