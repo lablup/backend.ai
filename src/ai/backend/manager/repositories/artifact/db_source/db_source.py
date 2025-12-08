@@ -1119,10 +1119,7 @@ class ArtifactDBSource:
 
         async with self._db.begin_readonly_session() as db_sess:
             # Build query with eager loading of revisions
-            query = sa.select(
-                ArtifactRow,
-                sa.func.count().over().label("total_count"),
-            ).options(selectinload(ArtifactRow.revision_rows))
+            query = sa.select(ArtifactRow).options(selectinload(ArtifactRow.revision_rows))
 
             result = await execute_querier(
                 db_sess,
