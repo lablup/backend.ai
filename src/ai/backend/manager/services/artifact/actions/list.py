@@ -11,7 +11,7 @@ from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 @dataclass
 class ListArtifactsAction(ArtifactAction):
-    querier: Optional[Querier] = None
+    querier: Querier
 
     @override
     def entity_id(self) -> Optional[str]:

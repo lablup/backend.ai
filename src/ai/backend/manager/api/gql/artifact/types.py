@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Optional, Self
 
 if TYPE_CHECKING:
-    from .resolver import resolve_artifact_revisions
+    from .resolver import artifact_revisions as resolve_artifact_revisions
 
 import strawberry
 from aiotools import apartial
