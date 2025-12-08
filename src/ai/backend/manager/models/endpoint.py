@@ -30,7 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import contains_eager, foreign, relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
-from ai.backend.common.config import model_definition_iv
+from ai.backend.common.config import ModelHealthCheck, model_definition_iv
 from ai.backend.common.types import (
     AccessKey,
     AutoScalingMetricComparator,
@@ -219,6 +219,10 @@ class EndpointRow(Base):
         nullable=False,
         default=[],
         server_default="[]",
+    )
+
+    health_check_config = sa.Column(
+        "health_check_config", sa.JSON(none_as_null=True), nullable=True, default=None
     )
 
     retries = sa.Column("retries", sa.Integer, nullable=False, default=0, server_default="0")
@@ -585,6 +589,11 @@ class EndpointRow(Base):
             runtime_variant=self.runtime_variant,
             extra_mounts=self.extra_mounts,
             routings=[routing.to_data() for routing in self.routings] if self.routings else None,
+            health_check_config=(
+                ModelHealthCheck.model_validate(self.health_check_config)
+                if self.health_check_config
+                else None
+            ),
         )
 
     @classmethod

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 import yarl
 from pydantic import HttpUrl
 
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import (
     AccessKey,
@@ -69,6 +70,7 @@ class EndpointData:
     runtime_variant: RuntimeVariant
     extra_mounts: Sequence[VFolderMount]
     routings: Optional[Sequence["RoutingData"]] = None
+    health_check_config: Optional[ModelHealthCheck] = None
 
 
 @dataclass
