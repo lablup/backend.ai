@@ -17,7 +17,7 @@ class ModifyContainerRegistryAction(ContainerRegistryAction):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.id)
 
     @override
     @classmethod
@@ -31,4 +31,4 @@ class ModifyContainerRegistryActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.data.id)

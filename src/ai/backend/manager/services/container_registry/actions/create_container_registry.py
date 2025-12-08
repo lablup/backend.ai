@@ -29,4 +29,4 @@ class CreateContainerRegistryActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.data.id)
