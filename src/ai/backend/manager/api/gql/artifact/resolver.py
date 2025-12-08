@@ -101,51 +101,6 @@ from .types import (
 )
 
 
-async def resolve_artifacts(
-    info: Info[StrawberryGQLContext],
-    filter: Optional[ArtifactFilter] = None,
-    order_by: Optional[list[ArtifactOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-) -> ArtifactConnection:
-    # Build querier using adapter
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        ),
-        get_artifact_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
-    )
-
-    # Get artifacts using list action
-    action_result = await info.context.processors.artifact.list_artifacts.wait_for_complete(
-        ListArtifactsAction(querier=querier)
-    )
-
-    registry_meta_loader = DataLoader(
-        apartial(ArtifactRegistryMeta.load_by_id, info.context),
-    )
-
-    # Build GraphQL connection response
-    return await _build_artifact_connection(
-        registry_meta_loader,
-        artifacts=action_result.data,
-        total_count=action_result.total_count,
-        has_next_page=action_result.has_next_page,
-        has_previous_page=action_result.has_previous_page,
-    )
-
-
 async def _build_artifact_connection(
     registry_meta_loader: DataLoader,
     artifacts: list[ArtifactData],
@@ -206,46 +161,6 @@ def _build_artifact_revision_connection(
     )
 
 
-async def resolve_artifact_revisions(
-    info: Info[StrawberryGQLContext],
-    filter: Optional[ArtifactRevisionFilter] = None,
-    order_by: Optional[list[ArtifactRevisionOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-) -> ArtifactRevisionConnection:
-    # Build querier using adapter
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        ),
-        get_artifact_revision_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
-    )
-
-    # Get artifact revisions using list action
-    action_result = await info.context.processors.artifact_revision.list_revision.wait_for_complete(
-        ListArtifactRevisionsAction(querier=querier)
-    )
-
-    # Build GraphQL connection response
-    return _build_artifact_revision_connection(
-        artifact_revisions=action_result.data,
-        total_count=action_result.total_count,
-        has_next_page=action_result.has_next_page,
-        has_previous_page=action_result.has_previous_page,
-    )
-
-
 # Query Fields
 @strawberry.field(
     description=dedent_strip("""
@@ -272,19 +187,38 @@ async def artifacts(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ArtifactConnection:
-    artifacts = await resolve_artifacts(
-        info,
+    # Build querier using adapter
+    querier = info.context.gql_adapter.build_querier(
+        PaginationOptions(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        get_artifact_pagination_spec(),
         filter=filter,
         order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
     )
 
-    return artifacts
+    # Get artifacts using list action
+    action_result = await info.context.processors.artifact.list_artifacts.wait_for_complete(
+        ListArtifactsAction(querier=querier)
+    )
+
+    registry_meta_loader = DataLoader(
+        apartial(ArtifactRegistryMeta.load_by_id, info.context),
+    )
+
+    # Build GraphQL connection response
+    return await _build_artifact_connection(
+        registry_meta_loader,
+        artifacts=action_result.data,
+        total_count=action_result.total_count,
+        has_next_page=action_result.has_next_page,
+        has_previous_page=action_result.has_previous_page,
+    )
 
 
 @strawberry.field(
@@ -340,16 +274,32 @@ async def artifact_revisions(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ArtifactRevisionConnection:
-    return await resolve_artifact_revisions(
-        info,
-        filter,
-        order_by,
-        before,
-        after,
-        first,
-        last,
-        limit,
-        offset,
+    # Build querier using adapter
+    querier = info.context.gql_adapter.build_querier(
+        PaginationOptions(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        get_artifact_revision_pagination_spec(),
+        filter=filter,
+        order_by=order_by,
+    )
+
+    # Get artifact revisions using list action
+    action_result = await info.context.processors.artifact_revision.list_revision.wait_for_complete(
+        ListArtifactRevisionsAction(querier=querier)
+    )
+
+    # Build GraphQL connection response
+    return _build_artifact_revision_connection(
+        artifact_revisions=action_result.data,
+        total_count=action_result.total_count,
+        has_next_page=action_result.has_next_page,
+        has_previous_page=action_result.has_previous_page,
     )
 
 
