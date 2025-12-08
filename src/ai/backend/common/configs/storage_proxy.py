@@ -63,7 +63,7 @@ class TimeoutConfig(BaseConfigSchema):
 _DEFAULT_TIMEOUT = TimeoutConfig()
 
 
-class StorageProxyTimeoutConfig(BaseConfigSchema):
+class StorageProxyClientTimeoutConfig(BaseConfigSchema):
     """
     Per-method timeout configuration for StorageProxyManagerFacingClient.
     Each field corresponds to a method in the client class.

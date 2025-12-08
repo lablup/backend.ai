@@ -7,7 +7,7 @@ from urllib.parse import quote
 
 import aiohttp
 
-from ai.backend.common.configs.storage_proxy import StorageProxyTimeoutConfig
+from ai.backend.common.configs.storage_proxy import StorageProxyClientTimeoutConfig
 from ai.backend.common.dto.storage.request import (
     DeleteObjectReq,
     DownloadObjectReq,
@@ -70,15 +70,15 @@ class StorageProxyManagerFacingClient:
     """
 
     _client: StorageProxyHTTPClient
-    _timeout_config: StorageProxyTimeoutConfig
+    _timeout_config: StorageProxyClientTimeoutConfig
 
     def __init__(
         self,
         client: StorageProxyHTTPClient,
-        timeout_config: StorageProxyTimeoutConfig | None = None,
+        timeout_config: StorageProxyClientTimeoutConfig,
     ) -> None:
         self._client = client
-        self._timeout_config = timeout_config or StorageProxyTimeoutConfig()
+        self._timeout_config = timeout_config
 
     @storage_proxy_client_resilience.apply()
     async def get_volumes(self) -> Mapping[str, Any]:

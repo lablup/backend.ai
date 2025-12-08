@@ -3,7 +3,7 @@ import asyncio
 import pytest
 from aiohttp import ClientTimeout, web
 
-from ai.backend.common.configs.storage_proxy import StorageProxyTimeoutConfig, TimeoutConfig
+from ai.backend.common.configs.storage_proxy import StorageProxyClientTimeoutConfig, TimeoutConfig
 from ai.backend.common.exception import ErrorDetail, ErrorDomain, ErrorOperation, PassthroughError
 from ai.backend.manager.clients.storage_proxy.base import (
     DEFAULT_TIMEOUT,
@@ -125,7 +125,7 @@ class TestStorageProxyManagerFacingClientTimeout:
 
         # Create manager client with custom very short timeout for get_volumes
         custom_timeout = TimeoutConfig(total=0.1, sock_connect=0.05)
-        timeout_config = StorageProxyTimeoutConfig(get_volumes=custom_timeout)
+        timeout_config = StorageProxyClientTimeoutConfig(get_volumes=custom_timeout)
         manager_client = StorageProxyManagerFacingClient(
             client=http_client,
             timeout_config=timeout_config,
@@ -159,7 +159,7 @@ class TestStorageProxyManagerFacingClientTimeout:
 
         # Create manager client with custom timeout for list_files
         custom_timeout = TimeoutConfig(total=0.1)
-        timeout_config = StorageProxyTimeoutConfig(list_files=custom_timeout)
+        timeout_config = StorageProxyClientTimeoutConfig(list_files=custom_timeout)
         manager_client = StorageProxyManagerFacingClient(
             client=http_client,
             timeout_config=timeout_config,
