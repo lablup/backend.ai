@@ -1509,3 +1509,23 @@ class ValkeyStatClient:
         batch = self._invalidate_keypair_concurrencies(batch, access_keys)
 
         await self._client.client.exec(batch, raise_on_error=True)
+
+    @valkey_stat_resilience.apply()
+    async def config_get(self, parameters: Sequence[str]) -> dict[bytes, bytes]:
+        """
+        Get the values of configuration parameters.
+
+        :param parameters: List of configuration parameter names to retrieve.
+        :return: Dictionary mapping parameter names to their values.
+        """
+        return await self._client.client.config_get(cast(list[str | bytes], list(parameters)))
+
+    @valkey_stat_resilience.apply()
+    async def execute_command(self, args: Sequence[str]) -> Any:
+        """
+        Execute a custom Redis/Valkey command.
+
+        :param args: Command arguments (first element is the command name).
+        :return: Command result.
+        """
+        return await self._client.client.custom_command(cast(list[str | bytes], list(args)))

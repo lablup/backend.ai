@@ -296,12 +296,12 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
                     )
 
                 # Sync and compact the persistent database of Redis
-                redis_config = await redis_conn_set.stat.client.client.config_get(["appendonly"])
+                redis_config = await redis_conn_set.stat.config_get(["appendonly"])
                 if redis_config.get(b"appendonly") == b"yes":
-                    await redis_conn_set.stat.client.client.custom_command(["BGREWRITEAOF"])
+                    await redis_conn_set.stat.execute_command(["BGREWRITEAOF"])
                     log.info("Issued BGREWRITEAOF to the Redis database.")
                 else:
-                    await redis_conn_set.stat.client.client.custom_command(["BGSAVE", "SCHEDULE"])
+                    await redis_conn_set.stat.execute_command(["BGSAVE", "SCHEDULE"])
                     log.info("Issued BGSAVE to the Redis database.")
         except Exception:
             log.exception("Unexpected error while cleaning up redis history")
