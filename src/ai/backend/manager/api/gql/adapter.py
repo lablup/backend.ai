@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, final
 
 from ai.backend.manager.api.gql.base import decode_cursor
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
@@ -65,6 +65,69 @@ class PaginationSpec:
 class BaseGQLAdapter:
     """Base adapter providing common GraphQL query building utilities."""
 
+    def _build_pagination(
+        self,
+        options: PaginationOptions,
+        spec: PaginationSpec,
+    ) -> QueryPagination:
+        """Build pagination from GraphQL pagination arguments.
+
+        For cursor-based pagination (first/after or last/before), condition factories
+        and orders are used from the spec. The factories create cursor conditions from
+        decoded cursor values.
+
+        If no pagination parameters are provided, returns a default OffsetPagination
+        with limit=DEFAULT_PAGINATION_LIMIT.
+        """
+        # Validate and build pagination
+        # Count how many pagination modes are being used
+        pagination_modes = sum([
+            options.first is not None,
+            options.last is not None,
+            options.limit is not None,
+        ])
+
+        if pagination_modes > 1:
+            raise InvalidGraphQLParameters(
+                "Only one pagination mode allowed: (first/after) OR (last/before) OR (limit/offset)"
+            )
+
+        # Build appropriate pagination based on parameters
+        if options.first is not None:
+            if options.first <= 0:
+                raise InvalidGraphQLParameters(f"first must be positive, got {options.first}")
+            cursor_condition = None
+            if options.after is not None:
+                cursor_value = decode_cursor(options.after)
+                cursor_condition = spec.forward_condition_factory(cursor_value)
+            return CursorForwardPagination(
+                first=options.first,
+                cursor_order=spec.forward_order,
+                cursor_condition=cursor_condition,
+            )
+        elif options.last is not None:
+            if options.last <= 0:
+                raise InvalidGraphQLParameters(f"last must be positive, got {options.last}")
+            cursor_condition = None
+            if options.before is not None:
+                cursor_value = decode_cursor(options.before)
+                cursor_condition = spec.backward_condition_factory(cursor_value)
+            return CursorBackwardPagination(
+                last=options.last,
+                cursor_order=spec.backward_order,
+                cursor_condition=cursor_condition,
+            )
+        elif options.limit is not None:
+            if options.limit <= 0:
+                raise InvalidGraphQLParameters(f"limit must be positive, got {options.limit}")
+            if options.offset is not None and options.offset < 0:
+                raise InvalidGraphQLParameters(f"offset must be non-negative, got {options.offset}")
+            return OffsetPagination(limit=options.limit, offset=options.offset or 0)
+
+        # Default pagination when no parameters provided
+        return OffsetPagination(limit=DEFAULT_PAGINATION_LIMIT, offset=0)
+
+    @final
     def build_querier(
         self,
         pagination_options: PaginationOptions,
@@ -108,56 +171,9 @@ class BaseGQLAdapter:
             # Apply default order for offset pagination when order_by is not provided
             orders.append(pagination_spec.forward_order)
 
-        pagination = self._build_pagination(pagination_options, pagination_spec)
+        pagination = self._build_pagination(
+            options=pagination_options,
+            spec=pagination_spec,
+        )
 
         return Querier(conditions=conditions, orders=orders, pagination=pagination)
-
-    def _build_pagination(
-        self,
-        options: PaginationOptions,
-        spec: PaginationSpec,
-    ) -> QueryPagination:
-        """Build pagination from GraphQL pagination arguments."""
-        pagination_modes = sum([
-            options.first is not None,
-            options.last is not None,
-            options.limit is not None,
-        ])
-
-        if pagination_modes > 1:
-            raise InvalidGraphQLParameters(
-                "Only one pagination mode allowed: (first/after) OR (last/before) OR (limit/offset)"
-            )
-
-        if options.first is not None:
-            if options.first <= 0:
-                raise InvalidGraphQLParameters(f"first must be positive, got {options.first}")
-            cursor_condition = None
-            if options.after is not None:
-                cursor_value = decode_cursor(options.after)
-                cursor_condition = spec.forward_condition_factory(cursor_value)
-            return CursorForwardPagination(
-                first=options.first,
-                cursor_order=spec.forward_order,
-                cursor_condition=cursor_condition,
-            )
-        elif options.last is not None:
-            if options.last <= 0:
-                raise InvalidGraphQLParameters(f"last must be positive, got {options.last}")
-            cursor_condition = None
-            if options.before is not None:
-                cursor_value = decode_cursor(options.before)
-                cursor_condition = spec.backward_condition_factory(cursor_value)
-            return CursorBackwardPagination(
-                last=options.last,
-                cursor_order=spec.backward_order,
-                cursor_condition=cursor_condition,
-            )
-        elif options.limit is not None:
-            if options.limit <= 0:
-                raise InvalidGraphQLParameters(f"limit must be positive, got {options.limit}")
-            if options.offset is not None and options.offset < 0:
-                raise InvalidGraphQLParameters(f"offset must be non-negative, got {options.offset}")
-            return OffsetPagination(limit=options.limit, offset=options.offset or 0)
-
-        return OffsetPagination(limit=DEFAULT_PAGINATION_LIMIT, offset=0)
