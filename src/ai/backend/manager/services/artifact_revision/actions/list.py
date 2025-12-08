@@ -11,7 +11,7 @@ from ai.backend.manager.services.artifact_revision.actions.base import ArtifactR
 
 @dataclass
 class ListArtifactRevisionsAction(ArtifactRevisionAction):
-    querier: Optional[Querier] = None
+    querier: Querier
 
     @override
     def entity_id(self) -> Optional[str]:

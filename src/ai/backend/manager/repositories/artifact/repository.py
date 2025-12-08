@@ -226,7 +226,7 @@ class ArtifactRepository:
     @artifact_repository_resilience.apply()
     async def search_artifacts(
         self,
-        querier: Optional[Querier] = None,
+        querier: Querier,
     ) -> ArtifactListResult:
         """Search artifacts with querier pattern."""
 
@@ -235,7 +235,7 @@ class ArtifactRepository:
     @artifact_repository_resilience.apply()
     async def search_artifact_revisions(
         self,
-        querier: Optional[Querier] = None,
+        querier: Querier,
     ) -> ArtifactRevisionListResult:
         """Search artifact revisions with querier pattern."""
 
@@ -244,7 +244,7 @@ class ArtifactRepository:
     @artifact_repository_resilience.apply()
     async def search_artifacts_with_revisions(
         self,
-        querier: Optional[Querier] = None,
+        querier: Querier,
     ) -> tuple[list[ArtifactDataWithRevisions], int]:
         """Search artifacts with their revisions using querier pattern."""
 
