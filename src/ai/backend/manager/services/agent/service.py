@@ -1,5 +1,7 @@
 import logging
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Literal
 
 import aiohttp
 import yarl
@@ -10,11 +12,11 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
 from ai.backend.common.exception import (
+    AgentWatcherResponseError,
     ErrorCode,
     ErrorDetail,
     ErrorDomain,
     ErrorOperation,
-    PassthroughError,
 )
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
@@ -84,6 +86,12 @@ from ai.backend.manager.types import OptionalState
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+@dataclass
+class _AgentWatcherResponse:
+    status: int
+    data: dict | str
+
+
 class AgentService:
     _etcd: AsyncEtcd
     _config_provider: ManagerConfigProvider
@@ -144,113 +152,84 @@ class AgentService:
 
         return SyncAgentRegistryActionResult(result=None, agent_data=agent_data)
 
-    async def get_watcher_status(
-        self, action: GetWatcherStatusAction
-    ) -> GetWatcherStatusActionResult:
-        watcher_info = await self._get_watcher_info(action.agent_id)
+    async def _request_watcher(
+        self,
+        agent_id: AgentId,
+        method: Literal["GET", "POST"],
+        endpoint: str,
+    ) -> dict:
+        watcher_info = await self._get_watcher_info(agent_id)
         connector = aiohttp.TCPConnector()
+
         async with aiohttp.ClientSession(connector=connector) as sess:
-            # TODO: Ugly naming?
             with _timeout(5.0):
+                watcher_url = watcher_info["addr"] / endpoint
                 headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-                async with sess.get(watcher_info["addr"], headers=headers) as resp:
+
+                match method:
+                    case "GET":
+                        request_method = sess.get
+                    case "POST":
+                        request_method = sess.post
+
+                async with request_method(watcher_url, headers=headers) as resp:
                     if resp.status // 100 == 2:
-                        data = await resp.json()
-                        return GetWatcherStatusActionResult(
-                            data=data,
-                            agent_id=action.agent_id,
-                        )
+                        return await resp.json()
+
                     error_msg = await resp.text()
-                    raise PassthroughError(
+                    raise AgentWatcherResponseError(
                         status_code=resp.status,
                         error_code=ErrorCode(
                             domain=ErrorDomain.AGENT,
-                            operation=ErrorOperation.READ,
+                            operation=ErrorOperation.READ
+                            if method == "GET"
+                            else ErrorOperation.EXECUTE,
                             error_detail=ErrorDetail.UNAVAILABLE,
                         ),
                         error_message=f"Agent watcher error: {error_msg}",
                     )
+
+    async def get_watcher_status(
+        self, action: GetWatcherStatusAction
+    ) -> GetWatcherStatusActionResult:
+        res = await self._request_watcher(agent_id=action.agent_id, method="GET", endpoint="")
+        return GetWatcherStatusActionResult(
+            data=res,
+            agent_id=action.agent_id,
+        )
 
     async def watcher_agent_start(
         self, action: WatcherAgentStartAction
     ) -> WatcherAgentStartActionResult:
-        watcher_info = await self._get_watcher_info(action.agent_id)
-        connector = aiohttp.TCPConnector()
-        async with aiohttp.ClientSession(connector=connector) as sess:
-            with _timeout(20.0):
-                watcher_url = watcher_info["addr"] / "agent/start"
-                headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-                async with sess.post(watcher_url, headers=headers) as resp:
-                    if resp.status // 100 == 2:
-                        data = await resp.json()
-                        return WatcherAgentStartActionResult(
-                            data=data,
-                            agent_id=action.agent_id,
-                        )
-                    error_msg = await resp.text()
-                    raise PassthroughError(
-                        status_code=resp.status,
-                        error_code=ErrorCode(
-                            domain=ErrorDomain.AGENT,
-                            operation=ErrorOperation.EXECUTE,
-                            error_detail=ErrorDetail.UNAVAILABLE,
-                        ),
-                        error_message=f"Agent watcher error: {error_msg}",
-                    )
+        data = await self._request_watcher(
+            agent_id=action.agent_id, method="POST", endpoint="agent/start"
+        )
+        return WatcherAgentStartActionResult(
+            data=data,
+            agent_id=action.agent_id,
+        )
 
     async def watcher_agent_restart(
         self, action: WatcherAgentRestartAction
     ) -> WatcherAgentRestartActionResult:
-        watcher_info = await self._get_watcher_info(action.agent_id)
-        connector = aiohttp.TCPConnector()
-        async with aiohttp.ClientSession(connector=connector) as sess:
-            with _timeout(20.0):
-                watcher_url = watcher_info["addr"] / "agent/restart"
-                headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-                async with sess.post(watcher_url, headers=headers) as resp:
-                    if resp.status // 100 == 2:
-                        data = await resp.json()
-                        return WatcherAgentRestartActionResult(
-                            data=data,
-                            agent_id=action.agent_id,
-                        )
-                    error_msg = await resp.text()
-                    raise PassthroughError(
-                        status_code=resp.status,
-                        error_code=ErrorCode(
-                            domain=ErrorDomain.AGENT,
-                            operation=ErrorOperation.EXECUTE,
-                            error_detail=ErrorDetail.UNAVAILABLE,
-                        ),
-                        error_message=f"Agent watcher error: {error_msg}",
-                    )
+        data = await self._request_watcher(
+            agent_id=action.agent_id, method="POST", endpoint="agent/restart"
+        )
+        return WatcherAgentRestartActionResult(
+            data=data,
+            agent_id=action.agent_id,
+        )
 
     async def watcher_agent_stop(
         self, action: WatcherAgentStopAction
     ) -> WatcherAgentStopActionResult:
-        watcher_info = await self._get_watcher_info(action.agent_id)
-        connector = aiohttp.TCPConnector()
-        async with aiohttp.ClientSession(connector=connector) as sess:
-            with _timeout(20.0):
-                watcher_url = watcher_info["addr"] / "agent/stop"
-                headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-                async with sess.post(watcher_url, headers=headers) as resp:
-                    if resp.status // 100 == 2:
-                        data = await resp.json()
-                        return WatcherAgentStopActionResult(
-                            data=data,
-                            agent_id=action.agent_id,
-                        )
-                    error_msg = await resp.text()
-                    raise PassthroughError(
-                        status_code=resp.status,
-                        error_code=ErrorCode(
-                            domain=ErrorDomain.AGENT,
-                            operation=ErrorOperation.EXECUTE,
-                            error_detail=ErrorDetail.UNAVAILABLE,
-                        ),
-                        error_message=f"Agent watcher error: {error_msg}",
-                    )
+        data = await self._request_watcher(
+            agent_id=action.agent_id, method="POST", endpoint="agent/stop"
+        )
+        return WatcherAgentStopActionResult(
+            data=data,
+            agent_id=action.agent_id,
+        )
 
     async def recalculate_usage(
         self, action: RecalculateUsageAction
