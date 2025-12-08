@@ -10,10 +10,13 @@ jobs:
       uses: actions/checkout@v6
       with:
         lfs: false
-    - name: Generate the SBOM report
-      uses: CycloneDX/gh-python-generate-sbom@v2
+    - name: Install SBOM tool
+      run: pipx install cyclonedx-bom
+    - name: Create SBOM step
+      # see for usage: https://pypi.org/project/cyclonedx-bom/
+      run: cyclonedx-py requirements -o bom.json
     - name: Upload the SBOM report
       uses: actions/upload-artifact@v5
       with:
         name: SBOM report
-        path: ./bom.xml
+        path: ./bom.json
