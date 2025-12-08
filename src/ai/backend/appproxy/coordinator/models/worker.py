@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 from yarl import URL
 
-from ai.backend.appproxy.common.exceptions import (
+from ai.backend.appproxy.common.errors import (
     ObjectNotFound,
     PortNotAvailable,
     WorkerNotAvailable,
@@ -27,6 +27,7 @@ from ai.backend.appproxy.common.types import (
     SessionConfig,
     Slot,
 )
+from ai.backend.appproxy.coordinator.errors import MissingFrontendConfigError
 from ai.backend.logging import BraceStyleAdapter
 
 from .base import Base, BaseMixin, EnumType, ForeignKeyIDColumn, IDColumn, StrEnumType
@@ -204,10 +205,16 @@ class Worker(Base, BaseMixin):
         w.occupied_slots = 0
         match frontend_mode:
             case FrontendMode.WILDCARD_DOMAIN:
-                assert wildcard_domain
+                if not wildcard_domain:
+                    raise MissingFrontendConfigError(
+                        "Wildcard domain is required for WILDCARD_DOMAIN frontend mode"
+                    )
                 w.available_slots = -1
             case FrontendMode.PORT:
-                assert port_range
+                if not port_range:
+                    raise MissingFrontendConfigError(
+                        "Port range is required for PORT frontend mode"
+                    )
                 w.available_slots = port_range[1] - port_range[0] + 1
 
         return w
@@ -235,7 +242,10 @@ class Worker(Base, BaseMixin):
         circuits: list[Circuit] = (await session.execute(circuit_list_query)).scalars().all()
         match self.frontend_mode:
             case FrontendMode.PORT:
-                assert self.port_range
+                if not self.port_range:
+                    raise MissingFrontendConfigError(
+                        "Port range is required for PORT frontend mode"
+                    )
                 occupied_ports: dict[int, UUID] = {c.port: c.id for c in circuits if c.port}
                 slots = [
                     Slot(
@@ -410,7 +420,8 @@ async def add_circuit(
     else:
         acquired_ports = set([c.port for c in worker.circuits])
         port_range = worker.port_range
-        assert port_range
+        if not port_range:
+            raise MissingFrontendConfigError("Port range is required for PORT frontend mode")
         port_pool = set(range(port_range[0], port_range[1] + 1)) - acquired_ports
         if _requested_port := preferred_port:
             if _requested_port not in port_pool:

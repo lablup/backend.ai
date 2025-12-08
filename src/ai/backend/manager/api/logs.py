@@ -22,6 +22,7 @@ from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 
 from ..defs import LockID
+from ..errors.resource import DBOperationFailed
 from ..models import UserRole, error_logs, groups
 from ..models import association_groups_users as agus
 from .auth import auth_required
@@ -78,7 +79,8 @@ async def append(request: web.Request, params: Any) -> web.Response:
             "traceback": params["traceback"],
         })
         result = await conn.execute(query)
-        assert result.rowcount == 1
+        if result.rowcount != 1:
+            raise DBOperationFailed("Failed to create error log")
     return web.json_response(resp)
 
 
@@ -201,7 +203,8 @@ async def mark_cleared(request: web.Request) -> web.Response:
             )
 
         result = await conn.execute(update_query)
-        assert result.rowcount == 1
+        if result.rowcount != 1:
+            raise DBOperationFailed(f"Failed to update error log: {log_id}")
 
         return web.json_response({"success": True}, status=HTTPStatus.OK)
 

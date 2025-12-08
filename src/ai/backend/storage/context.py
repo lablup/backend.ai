@@ -29,7 +29,7 @@ from ai.backend.logging import BraceStyleAdapter
 from .client.manager import ManagerHTTPClient
 from .config.unified import StorageProxyUnifiedConfig
 from .context_types import ArtifactVerifierContext
-from .exception import InvalidVolumeError
+from .errors import InvalidVolumeError
 from .plugin import (
     StorageArtifactVerifierPluginContext,
 )

@@ -14,7 +14,7 @@ from aiohttp import ClientConnectorError, web
 from multidict import CIMultiDict
 from yarl import URL
 
-from ai.backend.appproxy.common.exceptions import ContainerConnectionRefused, WorkerNotAvailable
+from ai.backend.appproxy.common.errors import ContainerConnectionRefused, WorkerNotAvailable
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,

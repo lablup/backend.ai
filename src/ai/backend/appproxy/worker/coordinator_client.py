@@ -3,7 +3,7 @@ import logging
 import aiohttp
 from aiohttp.client_exceptions import ClientConnectorError
 
-from ai.backend.appproxy.common.exceptions import (
+from ai.backend.appproxy.common.errors import (
     CoordinatorConnectionError,
     InternalServerError,
     ObjectNotFound,

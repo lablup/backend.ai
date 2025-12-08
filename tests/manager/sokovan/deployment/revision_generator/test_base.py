@@ -262,6 +262,7 @@ class _MergeRevisionTestCase:
     service_definition: Optional[ModelServiceDefinition]
     request: _RequestSpec
     expected: _ExpectedResult
+    default_architecture: Optional[str] = None
 
 
 class TestMergeRevision:
@@ -358,6 +359,123 @@ class TestMergeRevision:
                     },  # merged
                 ),
             ),
+            # default_architecture tests
+            _MergeRevisionTestCase(
+                id="default_arch_used_when_no_service_def_env",
+                # No environment in service_definition means architecture comes from default
+                service_definition=ModelServiceDefinition(
+                    environment=None,  # No environment section
+                    resource_slots={"cpu": 4, "mem": "8gb"},
+                    environ=None,
+                ),
+                request=_RequestSpec(
+                    image="request-image:v1",  # Image required when no env
+                    architecture=None,  # No architecture in request
+                    resource_slots=None,
+                    environ=None,
+                ),
+                default_architecture="x86_64",
+                expected=_ExpectedResult(
+                    image="request-image:v1",
+                    architecture="x86_64",  # from default_architecture
+                    resource_slots={"cpu": 4, "mem": "8gb"},
+                    environ=None,
+                ),
+            ),
+            _MergeRevisionTestCase(
+                id="service_def_overrides_default_arch",
+                service_definition=ModelServiceDefinition(
+                    environment=ImageEnvironment(
+                        image="service-image:v1",
+                        architecture="aarch64",  # Service definition has architecture
+                    ),
+                    resource_slots={"cpu": 4, "mem": "8gb"},
+                    environ=None,
+                ),
+                request=_RequestSpec(
+                    image=None,
+                    architecture=None,  # No architecture in request
+                    resource_slots=None,
+                    environ=None,
+                ),
+                default_architecture="x86_64",
+                expected=_ExpectedResult(
+                    image="service-image:v1",
+                    architecture="aarch64",  # service def overrides default
+                    resource_slots={"cpu": 4, "mem": "8gb"},
+                    environ=None,
+                ),
+            ),
+            _MergeRevisionTestCase(
+                id="request_overrides_default_arch",
+                # Use environment=None so service def doesn't provide architecture
+                service_definition=ModelServiceDefinition(
+                    environment=None,
+                    resource_slots={"cpu": 4, "mem": "8gb"},
+                    environ=None,
+                ),
+                request=_RequestSpec(
+                    image="request-image:v1",
+                    architecture="aarch64",  # Request has architecture
+                    resource_slots=None,
+                    environ=None,
+                ),
+                default_architecture="x86_64",
+                expected=_ExpectedResult(
+                    image="request-image:v1",
+                    architecture="aarch64",  # request overrides default
+                    resource_slots={"cpu": 4, "mem": "8gb"},
+                    environ=None,
+                ),
+            ),
+            _MergeRevisionTestCase(
+                id="request_overrides_all_including_default_and_service_def",
+                service_definition=ModelServiceDefinition(
+                    environment=ImageEnvironment(
+                        image="service-image:v1",
+                        architecture="arm64",  # Service definition has architecture
+                    ),
+                    resource_slots={"cpu": 4, "mem": "8gb"},
+                    environ=None,
+                ),
+                request=_RequestSpec(
+                    image=None,
+                    architecture="aarch64",  # Request has highest priority
+                    resource_slots=None,
+                    environ=None,
+                ),
+                default_architecture="x86_64",
+                expected=_ExpectedResult(
+                    image="service-image:v1",
+                    architecture="aarch64",  # request overrides both service def and default
+                    resource_slots={"cpu": 4, "mem": "8gb"},
+                    environ=None,
+                ),
+            ),
+            _MergeRevisionTestCase(
+                id="no_default_arch_uses_service_def",
+                service_definition=ModelServiceDefinition(
+                    environment=ImageEnvironment(
+                        image="service-image:v1",
+                        architecture="x86_64",
+                    ),
+                    resource_slots={"cpu": 4, "mem": "8gb"},
+                    environ=None,
+                ),
+                request=_RequestSpec(
+                    image=None,
+                    architecture=None,
+                    resource_slots=None,
+                    environ=None,
+                ),
+                default_architecture=None,  # No default architecture
+                expected=_ExpectedResult(
+                    image="service-image:v1",
+                    architecture="x86_64",  # from service def
+                    resource_slots={"cpu": 4, "mem": "8gb"},
+                    environ=None,
+                ),
+            ),
         ],
         ids=lambda tc: tc.id,
     )
@@ -389,8 +507,12 @@ class TestMergeRevision:
             ),
         )
 
-        # When: Merging
-        result = base_generator.merge_revision(draft_revision, test_case.service_definition)
+        # When: Merging (with optional default_architecture)
+        result = base_generator.merge_revision(
+            draft_revision,
+            test_case.service_definition,
+            test_case.default_architecture,
+        )
 
         # Then: Should match expected values
         assert result.image_identifier.canonical == test_case.expected.image
@@ -408,6 +530,7 @@ class _CompletePipelineTestCase:
     runtime_variant: str
     request: _RequestSpec
     expected: _ExpectedResult
+    default_architecture: Optional[str] = None
 
 
 class TestCompleteOverridePipeline:
@@ -525,6 +648,103 @@ class TestCompleteOverridePipeline:
                     environ=None,
                 ),
             ),
+            # default_architecture tests with complete pipeline
+            # Note: service_definition_dict must provide architecture since ImageEnvironment requires it
+            _CompletePipelineTestCase(
+                id="complete_pipeline_default_arch_overridden_by_service_def",
+                service_definition_dict={
+                    # Root level
+                    "environment": {
+                        "image": "default-image:latest",
+                        "architecture": "aarch64",  # Architecture in root
+                    },
+                    "resource_slots": {
+                        "cpu": 4,
+                        "mem": "16gb",
+                    },
+                    # vllm variant (inherits architecture from root)
+                    "vllm": {
+                        "resource_slots": {
+                            "cpu": 8,
+                        },
+                    },
+                },
+                runtime_variant="vllm",
+                request=_RequestSpec(
+                    image=None,
+                    architecture=None,  # No architecture in request
+                    resource_slots=None,
+                    environ=None,
+                ),
+                default_architecture="x86_64",
+                expected=_ExpectedResult(
+                    image="default-image:latest",  # from root
+                    architecture="aarch64",  # from service def (overrides default)
+                    resource_slots={"cpu": 8, "mem": "16gb"},  # cpu from vllm, mem from root
+                    environ=None,
+                ),
+            ),
+            _CompletePipelineTestCase(
+                id="complete_pipeline_default_arch_overridden_by_request",
+                service_definition_dict={
+                    # Root level
+                    "environment": {
+                        "image": "default-image:latest",
+                        "architecture": "amd64",  # Provide architecture
+                    },
+                    "resource_slots": {
+                        "cpu": 4,
+                    },
+                },
+                runtime_variant="vllm",
+                request=_RequestSpec(
+                    image=None,
+                    architecture="arm64",  # Request overrides service def and default
+                    resource_slots=None,
+                    environ=None,
+                ),
+                default_architecture="x86_64",
+                expected=_ExpectedResult(
+                    image="default-image:latest",  # from root
+                    architecture="arm64",  # from request (highest priority)
+                    resource_slots={"cpu": 4},
+                    environ=None,
+                ),
+            ),
+            _CompletePipelineTestCase(
+                id="complete_pipeline_full_priority_chain",
+                service_definition_dict={
+                    # Root level
+                    "environment": {
+                        "image": "root-image:latest",
+                        "architecture": "amd64",  # Root has architecture
+                    },
+                    "resource_slots": {
+                        "cpu": 4,
+                    },
+                    # vllm variant (overrides architecture)
+                    "vllm": {
+                        "environment": {
+                            "architecture": "aarch64",  # Variant overrides root
+                        },
+                    },
+                },
+                runtime_variant="vllm",
+                request=_RequestSpec(
+                    image=None,
+                    architecture="arm64",  # Request has highest priority
+                    resource_slots=None,
+                    environ=None,
+                ),
+                default_architecture="x86_64",
+                expected=_ExpectedResult(
+                    image="root-image:latest",  # from root
+                    # Priority: request (arm64) > vllm (aarch64) > root (amd64) > default (x86_64)
+                    architecture="arm64",  # from request (highest)
+                    resource_slots={"cpu": 4},
+                    environ=None,
+                ),
+            ),
         ],
         ids=lambda tc: tc.id,
     )
@@ -564,11 +784,12 @@ class TestCompleteOverridePipeline:
             ),
         )
 
-        # When: Generating revision (complete pipeline)
+        # When: Generating revision (complete pipeline with optional default_architecture)
         result = await base_generator.generate_revision(
             draft_revision=requested_revision,
             vfolder_id=vfolder_id,
             model_definition_path="service-definition.toml",
+            default_architecture=test_case.default_architecture,
         )
 
         # Then: Should match expected values

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from typing import Optional, override
+from typing import Any, Optional, override
 from uuid import UUID
 
 from ai.backend.common.types import RuntimeVariant
@@ -33,6 +33,7 @@ class BaseRevisionGenerator(RevisionGenerator):
         draft_revision: ModelRevisionSpecDraft,
         vfolder_id: UUID,
         model_definition_path: Optional[str],
+        default_architecture: Optional[str] = None,
     ) -> ModelRevisionSpec:
         """
         Generate revision with common override logic and variant-specific validation.
@@ -42,7 +43,7 @@ class BaseRevisionGenerator(RevisionGenerator):
             model_definition_path=model_definition_path,
             runtime_variant=draft_revision.execution.runtime_variant.value,
         )
-        revision = self.merge_revision(draft_revision, service_definition)
+        revision = self.merge_revision(draft_revision, service_definition, default_architecture)
         await self.validate_revision(revision)
 
         return revision
@@ -135,14 +136,16 @@ class BaseRevisionGenerator(RevisionGenerator):
         self,
         draft_revision: ModelRevisionSpecDraft,
         service_definition: Optional[ModelServiceDefinition],
+        default_architecture: Optional[str] = None,
     ) -> ModelRevisionSpec:
         """
         Merge requested revision with service definition.
 
         Override priority (later overrides earlier):
-        1. Root level service definition (base)
-        2. Runtime variant section in service definition
-        3. API request (highest priority)
+        1. Default architecture from scaling group (lowest priority)
+        2. Root level service definition (base)
+        3. Runtime variant section in service definition
+        4. API request (highest priority)
 
         If service definition is None, validates and converts request to revision spec.
         Otherwise, starts with service definition and applies request overrides.
@@ -151,20 +154,22 @@ class BaseRevisionGenerator(RevisionGenerator):
             # No service definition, validate and convert request directly
             return ModelRevisionSpec.model_validate(draft_revision.model_dump(mode="python"))
 
-        return self._override_revision(draft_revision, service_definition)
+        return self._override_revision(draft_revision, service_definition, default_architecture)
 
     def _override_revision(
         self,
         draft_revision: ModelRevisionSpecDraft,
         service_definition: ModelServiceDefinition,
+        default_architecture: Optional[str] = None,
     ) -> ModelRevisionSpec:
         """
         Merge service definition and API request with field-level override.
         API request takes precedence over service definition for each field.
 
         Override priority (later overrides earlier):
-        1. Service definition (already merged from root + variant)
-        2. API request (field-level override)
+        1. Default architecture from scaling group (lowest priority)
+        2. Service definition (already merged from root + variant)
+        3. API request (field-level override, highest priority)
         """
         service_dict: dict = {}
         if service_definition.environment is not None:
@@ -180,7 +185,7 @@ class BaseRevisionGenerator(RevisionGenerator):
             service_dict["environ"] = service_definition.environ
 
         request_dict = draft_revision.model_dump(mode="python")
-        merged_dict = {
+        merged_dict: dict[str, Any] = {
             "image_identifier": {},
             "resource_spec": {
                 "cluster_mode": request_dict["resource_spec"]["cluster_mode"],
@@ -194,12 +199,19 @@ class BaseRevisionGenerator(RevisionGenerator):
             },
         }
 
+        # 1. Default architecture from scaling group (lowest priority)
+        if default_architecture is not None:
+            merged_dict["image_identifier"]["architecture"] = default_architecture
+
+        # 2. Service definition overrides default
         if "environment" in service_dict:
             merged_dict["image_identifier"]["canonical"] = service_dict["environment"]["image"]
-            merged_dict["image_identifier"]["architecture"] = service_dict["environment"][
-                "architecture"
-            ]
+            if service_dict["environment"]["architecture"] is not None:
+                merged_dict["image_identifier"]["architecture"] = service_dict["environment"][
+                    "architecture"
+                ]
 
+        # 3. API request overrides all (highest priority)
         if request_dict["image_identifier"]["canonical"] is not None:
             merged_dict["image_identifier"]["canonical"] = request_dict["image_identifier"][
                 "canonical"

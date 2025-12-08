@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -131,7 +131,7 @@ class NotificationRepository:
     @notification_repository_resilience.apply()
     async def search_channels(
         self,
-        querier: Optional[Querier] = None,
+        querier: Querier,
     ) -> NotificationChannelListResult:
         """Searches notification channels with total count."""
         return await self._db_source.search_channels(querier=querier)
@@ -139,7 +139,7 @@ class NotificationRepository:
     @notification_repository_resilience.apply()
     async def search_rules(
         self,
-        querier: Optional[Querier] = None,
+        querier: Querier,
     ) -> NotificationRuleListResult:
         """Searches notification rules with total count."""
         return await self._db_source.search_rules(querier=querier)

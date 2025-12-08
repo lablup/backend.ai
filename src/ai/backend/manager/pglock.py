@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, AsyncContextManager
 from ai.backend.common.lock import AbstractDistributedLock
 
 from .defs import LockID
+from .errors.resource import DBOperationFailed
 
 if TYPE_CHECKING:
     from .models.utils import ExtendedAsyncSAEngine
@@ -23,7 +24,8 @@ class PgAdvisoryLock(AbstractDistributedLock):
         await self._lock_ctx.__aenter__()
 
     async def __aexit__(self, *exc_info) -> bool | None:
-        assert self._lock_ctx is not None
+        if self._lock_ctx is None:
+            raise DBOperationFailed("Lock context is not initialized")
         try:
             return await self._lock_ctx.__aexit__(*exc_info)
         finally:

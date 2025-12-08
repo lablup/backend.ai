@@ -99,8 +99,10 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
     ) -> Tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
         slots = ResourceSlot.from_json(self.kernel_config["resource_slots"])
         # Ensure that we have intrinsic slots.
-        assert SlotName("cpu") in slots
-        assert SlotName("mem") in slots
+        if SlotName("cpu") not in slots:
+            raise UnsupportedResource("cpu slot is required")
+        if SlotName("mem") not in slots:
+            raise UnsupportedResource("mem slot is required")
         # accept unknown slot type with zero values
         # but reject if they have non-zero values.
         for st, sv in slots.items():

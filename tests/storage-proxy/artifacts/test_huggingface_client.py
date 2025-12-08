@@ -13,7 +13,7 @@ from ai.backend.storage.client.huggingface import (
     HuggingFaceClientArgs,
     HuggingFaceScanner,
 )
-from ai.backend.storage.exception import HuggingFaceAPIError
+from ai.backend.storage.errors import HuggingFaceAPIError
 
 
 @pytest.fixture

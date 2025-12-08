@@ -65,7 +65,7 @@ def test_update_nested_dict():
         },
         "b": 2,
     }
-    with pytest.raises(AssertionError):
+    with pytest.raises(TypeError):
         utils.update_nested_dict(o, {"a": 3})
 
     o = {

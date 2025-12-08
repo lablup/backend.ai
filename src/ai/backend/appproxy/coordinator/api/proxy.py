@@ -9,7 +9,7 @@ import jwt
 from aiohttp import web
 from pydantic import AnyUrl, BaseModel, Field
 
-from ai.backend.appproxy.common.exceptions import (
+from ai.backend.appproxy.common.errors import (
     InvalidCredentials,
     ObjectNotFound,
 )
@@ -24,6 +24,7 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.appproxy.common.utils import mime_match, pydantic_api_handler
 from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
+from ai.backend.appproxy.coordinator.errors import CircuitCreationError
 from ai.backend.logging import BraceStyleAdapter
 
 from ..models import Circuit, Token, Worker, add_circuit
@@ -191,11 +192,10 @@ async def proxy(
             )
         log.debug("created new circuit {}", circuit.id)
 
-    assert circuit and worker
+    if not circuit or not worker:
+        raise CircuitCreationError("Failed to create circuit and worker.")
 
     await root_ctx.circuit_manager.initialize_circuits([circuit])
-
-    assert circuit
     log.debug("Circuit is set (id:{})", str(circuit.id))
     token_to_generate_body = {
         "id": str(token.id),

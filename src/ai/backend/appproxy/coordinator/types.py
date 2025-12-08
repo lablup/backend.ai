@@ -21,6 +21,7 @@ import attrs
 from prometheus_client import generate_latest
 from pydantic import AliasChoices, BaseModel, Field, TypeAdapter
 
+from ai.backend.appproxy.common.errors import ServerMisconfiguredError, ServiceUnavailable
 from ai.backend.appproxy.common.etcd import TraefikEtcd, convert_to_etcd_dict
 from ai.backend.appproxy.common.events import (
     AppProxyCircuitCreatedEvent,
@@ -28,7 +29,6 @@ from ai.backend.appproxy.common.events import (
     AppProxyCircuitRouteUpdatedEvent,
     AppProxyWorkerCircuitAddedEvent,
 )
-from ai.backend.appproxy.common.exceptions import ServerMisconfiguredError, ServiceUnavailable
 from ai.backend.appproxy.common.types import ProxyProtocol, RouteInfo, SerializableCircuit
 from ai.backend.appproxy.coordinator.health_checker import HealthCheckEngine
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient

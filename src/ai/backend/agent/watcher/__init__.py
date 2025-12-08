@@ -201,7 +201,11 @@ async def handle_umount(request: web.Request) -> web.Response:
     if mount_prefix is None:
         mount_prefix = "/mnt"
     mountpoint = Path(mount_prefix) / params["name"]
-    assert Path(mount_prefix) != mountpoint
+    if Path(mount_prefix) == mountpoint:
+        return web.Response(
+            text="Cannot unmount the mount prefix directory itself.",
+            status=HTTPStatus.BAD_REQUEST,
+        )
     proc = await asyncio.create_subprocess_exec(
         *[
             "sudo",
@@ -427,7 +431,10 @@ def main(
         },
     )
     if "file" in logging_config.drivers:
-        assert logging_config.file is not None
+        if logging_config.file is None:
+            raise click.ClickException(
+                "Logging file configuration is required when 'file' driver is enabled."
+            )
         fn = Path(logging_config.file.filename)
         logging_config.file.filename = f"{fn.stem}-watcher{fn.suffix}"
 

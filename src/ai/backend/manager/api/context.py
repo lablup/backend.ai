@@ -56,7 +56,7 @@ if TYPE_CHECKING:
     from ..service.base import ServicesContext
     from ..services.processors import Processors
     from ..types import DistributedLockFactory
-    from .gql.adapters import GQLAdapters
+    from .gql.adapter import BaseGQLAdapter
     from .types import CORSOptions
 
 
@@ -115,5 +115,5 @@ class RootContext(BaseContext):
     message_queue: AbstractMessageQueue
     service_discovery: ServiceDiscovery
     sd_loop: ServiceDiscoveryLoop
-    gql_adapters: GQLAdapters
+    gql_adapter: BaseGQLAdapter
     health_probe: HealthProbe

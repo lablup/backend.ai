@@ -17,7 +17,10 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressRepor
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.artifact.types import (
+    ArtifactRegistryType,
+    VerificationStepResult,
+)
 from ai.backend.common.data.storage.registries.types import FileObjectData, ModelTarget
 from ai.backend.common.data.storage.types import (
     ArtifactStorageImportStep,
@@ -33,7 +36,7 @@ from ai.backend.storage.config.unified import (
     ReservoirConfig,
 )
 from ai.backend.storage.context_types import ArtifactVerifierContext
-from ai.backend.storage.exception import (
+from ai.backend.storage.errors import (
     ArtifactRevisionEmptyError,
     ArtifactStorageEmptyError,
     ObjectStorageBucketNotFoundError,
@@ -445,6 +448,7 @@ class ReservoirService:
             pipeline: ImportPipeline to execute
         """
         success = False
+        verification_result: Optional[VerificationStepResult] = None
         try:
             if model.revision is None:
                 raise ArtifactRevisionEmptyError(f"Revision must be specified for model: {model}")
@@ -462,6 +466,9 @@ class ReservoirService:
             await pipeline.execute(context)
             log.info(f"Model import completed: {model}")
             success = True
+
+            # Extract verification result from context (None if verification step was not executed)
+            verification_result = context.step_metadata.get("verification_result")
         finally:
             await self._event_producer.anycast_event(
                 ModelImportDoneEvent(
@@ -472,6 +479,7 @@ class ReservoirService:
                     registry_type=ArtifactRegistryType.RESERVOIR,
                     # Reservoir registry's artifact's digest will be synced through scan API later
                     digest=None,
+                    verification_result=verification_result,
                 )
             )
 
@@ -1130,7 +1138,7 @@ class TarExtractor:
                     log.warning(f"Failed to remove temp file {temp_file}: {e}")
 
     def _extract_tar(self, tar_path: Path, target_dir: Path) -> None:
-        """Extract tar archive to target directory."""
+        """Extract tar archive to target directory safely."""
         with tarfile.open(tar_path, "r") as tar:
-            tar.extractall(path=target_dir)
+            tar.extractall(path=target_dir, filter=tarfile.data_filter)
         log.debug(f"Tar extraction completed: {tar_path} -> {target_dir}")

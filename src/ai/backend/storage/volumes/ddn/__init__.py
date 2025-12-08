@@ -11,7 +11,12 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
-from ...exception import QuotaScopeAlreadyExists, QuotaScopeNotFoundError
+from ...errors import (
+    DDNCommandFailedError,
+    QuotaScopeAlreadyExists,
+    QuotaScopeNotFoundError,
+    SubprocessStdoutNotAvailableError,
+)
 from ...subproc import run
 from ...types import Optional, QuotaConfig, QuotaUsage
 from ..abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
@@ -80,7 +85,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
                 path,
             ])
         except CalledProcessError as e:
-            raise RuntimeError(f"'lfs setquota -p {pid}' command failed: {e.stderr}")
+            raise DDNCommandFailedError(f"'lfs setquota -p {pid}' command failed: {e.stderr}")
 
     async def _unset_quota_by_project(self, pid: int, path: Path) -> None:
         await self._set_quota_by_project(pid, path, QuotaConfig(0))
@@ -96,7 +101,8 @@ class EXAScalerQuotaModel(BaseQuotaModel):
             stderr=asyncio.subprocess.STDOUT,
         )
         try:
-            assert proc.stdout is not None
+            if proc.stdout is None:
+                raise SubprocessStdoutNotAvailableError("lfs quota process stdout is not available")
             next_line_is_quota = False
             while True:
                 try:
@@ -167,7 +173,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
                 str(qspath),
             ])
         except CalledProcessError as e:
-            raise RuntimeError(f"'lfs project -p {project_id}' command failed: {e.stderr}")
+            raise DDNCommandFailedError(f"'lfs project -p {project_id}' command failed: {e.stderr}")
 
         if options is not None:
             await self._set_quota_by_project(project_id, qspath, options)

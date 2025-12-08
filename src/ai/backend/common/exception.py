@@ -172,6 +172,9 @@ class ErrorDomain(enum.StrEnum):
     MESSAGE_QUEUE = "message-queue"
     NOTIFICATION = "notification"
     HEALTH_CHECK = "health-check"
+    KEYPAIR_RESOURCE_POLICY = "keypair-resource-policy"
+    DATABASE = "database"
+    USER_RESOURCE_POLICY = "user-resource-policy"
 
 
 class ErrorOperation(enum.StrEnum):
@@ -834,4 +837,28 @@ class DatabaseError(BackendAIError, web.HTTPServiceUnavailable):
             domain=ErrorDomain.HEALTH_CHECK,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
+class UserResourcePolicyNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/user-resource-policy-not-found"
+    error_title = "User Resource Policy Not Found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER_RESOURCE_POLICY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class KeypairResourcePolicyNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/keypair-resource-policy-not-found"
+    error_title = "Keypair Resource Policy Not Found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KEYPAIR_RESOURCE_POLICY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
         )

@@ -9,7 +9,7 @@ from uuid import UUID
 import aiohttp
 import sqlalchemy as sa
 
-from ai.backend.appproxy.common.exceptions import ObjectNotFound
+from ai.backend.appproxy.common.errors import ObjectNotFound
 from ai.backend.appproxy.common.types import AppMode, HealthCheckState, RouteInfo
 from ai.backend.appproxy.coordinator.models.utils import (
     ExtendedAsyncSAEngine,

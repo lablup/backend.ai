@@ -352,3 +352,99 @@ class NoAvailableScalingGroup(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class AgentNotAllocated(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/agent-not-allocated"
+    error_title = "Agent ID has not been allocated for the session."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class SessionNotAllocated(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/session-not-allocated"
+    error_title = "Session ID is not available during allocation."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class NoCurrentTaskContext(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/no-current-task-context"
+    error_title = "No current asyncio task context available."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class DatabaseConnectionUnavailable(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/database-connection-unavailable"
+    error_title = "Database connection is not available."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DATABASE,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class InvalidSchedulerState(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/invalid-scheduler-state"
+    error_title = "Scheduler is in an invalid state."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SCALING_GROUP,
+            operation=ErrorOperation.SCHEDULE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class ConfigurationLoadFailed(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/configuration-load-failed"
+    error_title = "Failed to load configuration."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class DataTransformationFailed(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/data-transformation-failed"
+    error_title = "Failed to transform data."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DATABASE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class DBOperationFailed(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/db-operation-failed"
+    error_title = "Database operation failed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DATABASE,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

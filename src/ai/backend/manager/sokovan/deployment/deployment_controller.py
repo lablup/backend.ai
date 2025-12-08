@@ -75,6 +75,14 @@ class DeploymentController:
             DeploymentInfo: Information about the created deployment
         """
         log.info("Creating deployment '{}' in project {}", draft.name, draft.project)
+
+        # Pre-fetch default architecture from scaling group
+        default_architecture = (
+            await self._deployment_repository.get_default_architecture_from_scaling_group(
+                draft.metadata.resource_group
+            )
+        )
+
         generator = self._revision_generator_registry.get(
             draft.draft_model_revision.execution.runtime_variant
         )
@@ -82,6 +90,7 @@ class DeploymentController:
             draft_revision=draft.draft_model_revision,
             vfolder_id=draft.draft_model_revision.mounts.model_vfolder_id,
             model_definition_path=draft.draft_model_revision.mounts.model_definition_path,
+            default_architecture=default_architecture,
         )
         await self._scheduling_controller.validate_session_spec(
             SessionValidationSpec.from_revision(model_revision=model_revision)

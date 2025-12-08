@@ -41,7 +41,12 @@ class RunningRouteHandler(RouteHandler):
     @classmethod
     def target_statuses(cls) -> list[RouteStatus]:
         """Get the target route statuses for this handler."""
-        return [RouteStatus.HEALTHY, RouteStatus.UNHEALTHY, RouteStatus.FAILED_TO_START]
+        return [
+            RouteStatus.DEGRADED,
+            RouteStatus.HEALTHY,
+            RouteStatus.UNHEALTHY,
+            RouteStatus.FAILED_TO_START,
+        ]
 
     @classmethod
     def next_status(cls) -> Optional[RouteStatus]:

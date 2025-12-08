@@ -24,6 +24,7 @@ class HuggingFaceTGIModelDefinitionGenerator(ModelDefinitionGenerator):
         if runtime_profile.health_check_endpoint:
             health_check = ModelHealthCheck(
                 path=runtime_profile.health_check_endpoint,
+                initial_delay=300.0,
             )
 
         model = ModelConfig(

@@ -16,7 +16,10 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressRepor
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.artifact.types import (
+    ArtifactRegistryType,
+    VerificationStepResult,
+)
 from ai.backend.common.data.storage.registries.types import (
     FileObjectData,
     ModelData,
@@ -37,7 +40,7 @@ from ai.backend.storage.client.huggingface import (
 )
 from ai.backend.storage.config.unified import HuggingfaceConfig
 from ai.backend.storage.context_types import ArtifactVerifierContext
-from ai.backend.storage.exception import (
+from ai.backend.storage.errors import (
     HuggingFaceAPIError,
     HuggingFaceModelNotFoundError,
     ObjectStorageConfigInvalidError,
@@ -538,6 +541,7 @@ class HuggingFaceService:
             HuggingFaceAPIError: If API call fails
         """
         success = False
+        verification_result: Optional[VerificationStepResult] = None
         try:
             # Create import context
             context = ImportStepContext(
@@ -551,6 +555,9 @@ class HuggingFaceService:
             # Execute import pipeline
             await pipeline.execute(context)
             success = True
+
+            # Extract verification result from context (None if verification step was not executed)
+            verification_result = context.step_metadata.get("verification_result")
 
             log.info(f"Model import completed: {model}")
         except HuggingFaceModelNotFoundError:
@@ -571,6 +578,7 @@ class HuggingFaceService:
                     registry_name=registry_name,
                     registry_type=ArtifactRegistryType.HUGGINGFACE,
                     digest=commit_hash,
+                    verification_result=verification_result,
                 )
             )
 

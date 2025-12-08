@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
@@ -9,6 +11,7 @@ from typing import AsyncIterator
 from ai.backend.common.json import load_json
 from ai.backend.logging.utils import BraceStyleAdapter
 
+from ...errors import PureStorageCommandFailedError, SubprocessStdoutNotAvailableError
 from ...subproc import run
 from ...types import DirEntry, DirEntryType, Stat, TreeUsage
 from ...utils import fstime2datetime
@@ -38,7 +41,7 @@ class RapidFileToolsv2FSOpModel(RapidFileToolsFSOpModel):
                 os.fsencode(dst_path),
             ])
         except CalledProcessError as e:
-            raise RuntimeError(f'"pcopy" command failed: {e.stderr}')
+            raise PureStorageCommandFailedError(f'"pcopy" command failed: {e.stderr}')
 
     def scan_tree(
         self,
@@ -56,7 +59,8 @@ class RapidFileToolsv2FSOpModel(RapidFileToolsFSOpModel):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
             )
-            assert proc.stdout is not None
+            if proc.stdout is None:
+                raise SubprocessStdoutNotAvailableError("pls process stdout is not available")
             try:
                 while True:
                     line = await proc.stdout.readline()
@@ -106,7 +110,8 @@ class RapidFileToolsv2FSOpModel(RapidFileToolsFSOpModel):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
-        assert proc.stdout is not None
+        if proc.stdout is None:
+            raise SubprocessStdoutNotAvailableError("pdu process stdout is not available")
         try:
             # TODO: check slowdowns when there are millions of files
             while True:

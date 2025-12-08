@@ -11,6 +11,7 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.endpoint.types import EndpointStatus
 from ai.backend.common.events.dispatcher import EventDispatcher
+from ai.backend.common.events.hub import EventHub
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
@@ -27,6 +28,7 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 
 @pytest.fixture
@@ -90,28 +92,48 @@ def mock_valkey_live():
 
 
 @pytest.fixture
+def mock_event_hub():
+    mock_event_hub = MagicMock(spec=EventHub)
+    mock_event_hub.register_event_propagator = MagicMock()
+    mock_event_hub.unregister_event_propagator = MagicMock()
+    return mock_event_hub
+
+
+@pytest.fixture
+def mock_scheduling_controller():
+    mock_scheduling_controller = MagicMock(spec=SchedulingController)
+    mock_scheduling_controller.enqueue_session = AsyncMock()
+    mock_scheduling_controller.mark_sessions_for_termination = AsyncMock()
+    return mock_scheduling_controller
+
+
+@pytest.fixture
 def mock_service(
     database_fixture,  # noqa: ARG001
     database_engine,  # noqa: ARG001
     mock_storage_manager,
     mock_event_dispatcher,
+    mock_event_hub,
     mock_agent_registry,
     mock_background_task_manager,
     mock_config_provider,
     mock_valkey_live,
     mock_repositories,
     mock_deployment_controller,
+    mock_scheduling_controller,
 ) -> ModelServingService:
     return ModelServingService(
         agent_registry=mock_agent_registry,
         background_task_manager=mock_background_task_manager,
         event_dispatcher=mock_event_dispatcher,
+        event_hub=mock_event_hub,
         storage_manager=mock_storage_manager,
         config_provider=mock_config_provider,
         valkey_live=mock_valkey_live,
         repository=mock_repositories.repository,
         admin_repository=mock_repositories.admin_repository,
         deployment_controller=mock_deployment_controller,
+        scheduling_controller=mock_scheduling_controller,
     )
 
 

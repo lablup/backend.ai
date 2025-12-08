@@ -14,6 +14,7 @@ from ai.backend.manager.data.permission.types import (
     OperationType,
     ScopeType,
 )
+from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.types import Creator, OptionalState, PartialModifier, TriState
 
 
@@ -23,7 +24,10 @@ class ProjectType(enum.StrEnum):
 
     @classmethod
     def _missing_(cls, value: Any) -> Optional[ProjectType]:
-        assert isinstance(value, str)
+        if not isinstance(value, str):
+            raise DataTransformationFailed(
+                f"ProjectType value must be a string, got {type(value).__name__}"
+            )
         match value.upper():
             case "GENERAL":
                 return cls.GENERAL

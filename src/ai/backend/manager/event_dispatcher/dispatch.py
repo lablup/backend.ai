@@ -24,7 +24,6 @@ from ai.backend.common.events.event_types.agent.anycast import (
 from ai.backend.common.events.event_types.artifact.anycast import (
     ModelImportDoneEvent,
     ModelMetadataFetchDoneEvent,
-    ModelVerifyDoneEvent,
     ModelVerifyingEvent,
 )
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
@@ -600,11 +599,6 @@ class Dispatchers:
             ModelVerifyingEvent,
             None,
             self._artifact_event_handler.handle_model_verifying,
-        )
-        evd.consume(
-            ModelVerifyDoneEvent,
-            None,
-            self._artifact_event_handler.handle_model_verify_done,
         )
         evd.consume(
             ModelImportDoneEvent,

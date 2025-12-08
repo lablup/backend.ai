@@ -33,7 +33,7 @@ from ai.backend.common.events.event_types.artifact.anycast import (
     ModelMetadataInfo,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.storage.exception import HuggingFaceAPIError
+from ai.backend.storage.errors import HuggingFaceAPIError
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 

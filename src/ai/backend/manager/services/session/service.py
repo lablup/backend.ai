@@ -50,6 +50,7 @@ from ai.backend.manager.errors.common import (
 )
 from ai.backend.manager.errors.image import UnknownImageReferenceError
 from ai.backend.manager.errors.kernel import (
+    InvalidSessionData,
     KernelNotReady,
     QuotaExceeded,
     SessionAlreadyExists,
@@ -58,8 +59,10 @@ from ai.backend.manager.errors.kernel import (
 )
 from ai.backend.manager.errors.resource import (
     AppNotFound,
+    NoCurrentTaskContext,
     TaskTemplateNotFound,
 )
+from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.session import (
@@ -237,7 +240,8 @@ class SessionService:
         filename = action.filename
 
         myself = asyncio.current_task()
-        assert myself is not None
+        if myself is None:
+            raise NoCurrentTaskContext("No current asyncio task context available")
 
         session = await self._session_repository.get_session_validated(
             session_name,
@@ -287,7 +291,8 @@ class SessionService:
         image_owner_id = action.image_owner_id
 
         myself = asyncio.current_task()
-        assert myself is not None
+        if myself is None:
+            raise NoCurrentTaskContext("No current asyncio task context available")
 
         if image_visibility != CustomizedImageVisibilityScope.USER:
             raise InvalidAPIParameters(f"Unsupported visibility scope {image_visibility}")
@@ -786,7 +791,8 @@ class SessionService:
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         try:
-            assert len(files) <= 5, "Too many files"
+            if len(files) > 5:
+                raise VFolderBadRequest("Too many files (maximum 5 files allowed)")
             await self._agent_registry.increment_session_usage(session)
             # TODO: Read all download file contents. Need to fix by using chuncking, etc.
             results = await asyncio.gather(
@@ -844,18 +850,12 @@ class SessionService:
                 mode = action.params.mode
 
                 if mode is None:
-                    # TODO: Create new exception
-                    raise RuntimeError("runId or mode is missing!")
+                    raise InvalidSessionData("runId or mode is missing")
 
-                assert mode in {
-                    "query",
-                    "batch",
-                    "complete",
-                    "continue",
-                    "input",
-                }, "mode has an invalid value."
-                if mode in {"continue", "input"}:
-                    assert run_id is not None, "continuation requires explicit run ID"
+                if mode not in {"query", "batch", "complete", "continue", "input"}:
+                    raise InvalidSessionData(f"mode has an invalid value: {mode}")
+                if mode in {"continue", "input"} and run_id is None:
+                    raise InvalidSessionData("continuation requires explicit run ID")
                 code = action.params.code
                 opts = action.params.options
             else:

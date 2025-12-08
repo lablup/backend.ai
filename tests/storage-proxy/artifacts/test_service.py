@@ -25,7 +25,7 @@ from ai.backend.storage.config.unified import (
     ReservoirClientConfig,
     ReservoirConfig,
 )
-from ai.backend.storage.exception import (
+from ai.backend.storage.errors import (
     ArtifactStorageEmptyError,
     HuggingFaceAPIError,
     ObjectStorageBucketNotFoundError,

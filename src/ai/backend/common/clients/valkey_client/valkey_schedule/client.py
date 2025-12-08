@@ -21,13 +21,15 @@ from ai.backend.common.resilience import (
     RetryArgs,
     RetryPolicy,
 )
-from ai.backend.common.types import KernelId, SessionId, ValkeyTarget
+from ai.backend.common.types import AgentId, KernelId, SessionId, ValkeyTarget
 
 PENDING_QUEUE_EXPIRY_SEC = 600  # 10 minutes
 ROUTE_HEALTH_TTL_SEC = 120  # 2 minutes
 MAX_HEALTH_STALENESS_SEC = 300  # 5 minutes - threshold for health status staleness
 KERNEL_HEALTH_TTL_SEC = 300  # 5 minutes - TTL for kernel health status
 MAX_KERNEL_HEALTH_STALENESS_SEC = 120  # 2 minutes - threshold for kernel health staleness
+AGENT_LAST_CHECK_TTL_SEC = 1200  # 20 minutes - TTL for agent last check timestamp
+ORPHAN_KERNEL_THRESHOLD_SEC = 600  # 10 minutes - threshold for orphan kernel detection
 
 
 class HealthCheckStatus(enum.StrEnum):
@@ -168,6 +170,15 @@ class ValkeyScheduleClient:
         :return: The formatted key string
         """
         return f"kernel:presence:{kernel_id}"
+
+    def _get_agent_last_check_key(self, agent_id: AgentId) -> str:
+        """
+        Generate the Redis key for agent last check timestamp.
+
+        :param agent_id: The agent ID
+        :return: The formatted key string
+        """
+        return f"agent:last_check:{agent_id}"
 
     async def _get_redis_time(self) -> int:
         """
@@ -651,16 +662,19 @@ class ValkeyScheduleClient:
 
     @valkey_schedule_resilience.apply()
     async def check_kernel_presence_status_batch(
-        self, kernel_ids: Sequence[KernelId]
+        self,
+        kernel_ids: Sequence[KernelId],
+        agent_ids: set[AgentId] | None = None,
     ) -> dict[KernelId, KernelStatus | None]:
         """
         Batch check kernel presence status and update last_check timestamp.
         This should be called by Manager during periodic checks.
 
         All operations (hset, expire, hgetall) for all kernels are batched
-        into a single request.
+        into a single request. Optionally updates agent last_check timestamps.
 
         :param kernel_ids: Sequence of kernel IDs to check
+        :param agent_ids: Optional set of agent IDs to update last_check for
         :return: Mapping of kernel_id to status (None if not found)
         """
         if not kernel_ids:
@@ -670,22 +684,36 @@ class ValkeyScheduleClient:
         current_time_str = str(current_time)
         batch = Batch(is_atomic=False)
 
-        # Single batch: update last_check, refresh TTL, and get all data
+        # Update kernel status first, then agent last_check
+        # This ordering prevents timing issues where agent appears alive
+        # but kernels haven't been checked yet
         for kernel_id in kernel_ids:
             key = self._get_kernel_presence_key(kernel_id)
             batch.hset(key, {"last_check": current_time_str})
             batch.expire(key, KERNEL_HEALTH_TTL_SEC)
             batch.hgetall(key)
 
+        # Update agent last_check timestamps after kernel updates
+        if agent_ids:
+            for agent_id in agent_ids:
+                agent_key = self._get_agent_last_check_key(agent_id)
+                batch.set(
+                    agent_key,
+                    current_time_str,
+                    expiry=ExpirySet(ExpiryType.SEC, AGENT_LAST_CHECK_TTL_SEC),
+                )
+
         results = await self._client.client.exec(batch, raise_on_error=False)
         if results is None:
             return {kernel_id: None for kernel_id in kernel_ids}
 
         # Process results - every 3rd result is the hgetall response
+        # Kernel results come first (3 ops each), then agent results (1 op each)
         result: dict[KernelId, KernelStatus | None] = {}
         for i, kernel_id in enumerate(kernel_ids):
             # Results are in groups of 3: hset result, expire result, hgetall result
-            hgetall_result = results[i * 3 + 2] if len(results) > i * 3 + 2 else None
+            idx = i * 3 + 2
+            hgetall_result = results[idx] if len(results) > idx else None
 
             if not hgetall_result:
                 result[kernel_id] = None
@@ -715,4 +743,72 @@ class ValkeyScheduleClient:
                 created_at=int(data["created_at"]) if "created_at" in data else 0,
             )
 
+        return result
+
+    # ==================== Agent Last Check Methods ====================
+
+    @valkey_schedule_resilience.apply()
+    async def get_agent_last_check(self, agent_id: AgentId) -> int | None:
+        """
+        Get the last check timestamp for an agent.
+        This is used by Agent to determine if Manager has checked it.
+
+        :param agent_id: The agent ID
+        :return: Unix timestamp of last check, or None if not found
+        """
+        key = self._get_agent_last_check_key(agent_id)
+        result = await self._client.client.get(key)
+        if result is None:
+            return None
+        return int(result)
+
+    @valkey_schedule_resilience.apply()
+    async def get_kernel_presence_batch(
+        self, kernel_ids: Sequence[KernelId]
+    ) -> dict[KernelId, KernelStatus | None]:
+        """
+        Get kernel presence status without updating last_check.
+        This is for Agent to read status without modifying timestamps.
+
+        :param kernel_ids: Sequence of kernel IDs to check
+        :return: Mapping of kernel_id to status (None if not found)
+        """
+        if not kernel_ids:
+            return {}
+
+        current_time = await self._get_redis_time()
+        batch = Batch(is_atomic=False)
+        for kernel_id in kernel_ids:
+            key = self._get_kernel_presence_key(kernel_id)
+            batch.hgetall(key)
+
+        results = await self._client.client.exec(batch, raise_on_error=False)
+        if results is None:
+            return {kernel_id: None for kernel_id in kernel_ids}
+
+        result: dict[KernelId, KernelStatus | None] = {}
+        for i, kernel_id in enumerate(kernel_ids):
+            hgetall_result = results[i] if len(results) > i else None
+            if not hgetall_result:
+                result[kernel_id] = None
+                continue
+
+            hash_data = cast(dict[bytes, bytes], hgetall_result)
+            if not hash_data or b"presence" not in hash_data:
+                result[kernel_id] = None
+                continue
+
+            data = {k.decode(): v.decode() for k, v in hash_data.items()}
+            presence = await self._validate_health_status(
+                data.get("presence", "0"),
+                data.get("last_presence", "0"),
+                current_time,
+                MAX_KERNEL_HEALTH_STALENESS_SEC,
+            )
+            result[kernel_id] = KernelStatus(
+                presence=presence,
+                last_presence=int(data["last_presence"]) if "last_presence" in data else 0,
+                last_check=int(data["last_check"]) if "last_check" in data else 0,
+                created_at=int(data["created_at"]) if "created_at" in data else 0,
+            )
         return result

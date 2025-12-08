@@ -44,7 +44,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout the revision
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           lfs: false
           ref: ${{ matrix.commits }}
@@ -178,7 +178,7 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           ref: ${{ matrix.target_branch }}
       - name: Cherry-pick
@@ -217,7 +217,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
       - name: Create Backport PR
         id: pr
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.OCTODOG }}
           author: "${{ matrix.author }} <${{ matrix.author_email }}>"

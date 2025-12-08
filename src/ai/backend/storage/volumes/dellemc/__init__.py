@@ -12,7 +12,7 @@ from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
-from ...exception import QuotaDirectoryNotEmptyError
+from ...errors import QuotaDirectoryNotEmptyError
 from ...types import CapacityUsage, FSPerfMetric, QuotaConfig, QuotaUsage
 from ...watcher import WatcherClient
 from ..abc import CAP_FAST_FS_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel

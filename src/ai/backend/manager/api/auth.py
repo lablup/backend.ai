@@ -45,7 +45,7 @@ from ai.backend.manager.services.auth.actions.update_password_no_auth import (
 )
 from ai.backend.manager.services.auth.actions.upload_ssh_keypair import UploadSSHKeypairAction
 
-from ..errors.auth import AuthorizationFailed, InvalidAuthParameters
+from ..errors.auth import AuthorizationFailed, InvalidAuthParameters, InvalidClientIPConfig
 from ..errors.common import RejectedByHook
 from ..models import keypair_resource_policies, keypairs, user_resource_policies, users
 from ..models.utils import execute_with_retry
@@ -347,15 +347,16 @@ def check_date(request: web.Request) -> bool:
 async def sign_request(sign_method: str, request: web.Request, secret_key: str) -> str:
     try:
         mac_type, hash_type = map(lambda s: s.lower(), sign_method.split("-"))
-        assert mac_type == "hmac", "Unsupported request signing method (MAC type)"
-        assert hash_type in hashlib.algorithms_guaranteed, (
-            "Unsupported request signing method (hash type)"
-        )
+        if mac_type != "hmac":
+            raise InvalidAuthParameters("Unsupported request signing method (MAC type)")
+        if hash_type not in hashlib.algorithms_guaranteed:
+            raise InvalidAuthParameters("Unsupported request signing method (hash type)")
 
         new_api_version = request.headers.get("X-BackendAI-Version")
         legacy_api_version = request.headers.get("X-Sorna-Version")
         api_version = new_api_version or legacy_api_version
-        assert api_version is not None, "API version missing in request headers"
+        if api_version is None:
+            raise InvalidAuthParameters("API version missing in request headers")
         body = b""
         if api_version < "v4.20181215":
             if request.can_read_body and request.content_type != "multipart/form-data":
@@ -386,8 +387,6 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
         return hmac.new(sign_key, sign_bytes, hash_type).hexdigest()
     except ValueError:
         raise AuthorizationFailed("Invalid signature")
-    except AssertionError as e:
-        raise InvalidAuthParameters(e.args[0])
 
 
 def validate_ip(request: web.Request, user: Mapping[str, Any]):
@@ -395,7 +394,8 @@ def validate_ip(request: web.Request, user: Mapping[str, Any]):
     if not allowed_client_ip or allowed_client_ip is None:
         # allowed_client_ip is None or [] - empty list
         return
-    assert isinstance(allowed_client_ip, list)
+    if not isinstance(allowed_client_ip, list):
+        raise InvalidClientIPConfig("allowed_client_ip must be a list")
     raw_client_addr: str | None = request.headers.get("X-Forwarded-For") or request.remote
     if raw_client_addr is None:
         raise AuthorizationFailed("Not allowed IP address")
@@ -858,7 +858,8 @@ async def authorize(request: web.Request, params: Any) -> web.StreamResponse:
     if result.stream_response is not None:
         return result.stream_response
 
-    assert result.authorization_result is not None
+    if result.authorization_result is None:
+        raise AuthorizationFailed("Authorization result is missing")
     auth_result = result.authorization_result
     data = AuthSuccessResponse(
         response_type=AuthResponseType.SUCCESS,

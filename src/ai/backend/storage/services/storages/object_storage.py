@@ -7,7 +7,7 @@ from ai.backend.common.dto.storage.response import (
 )
 from ai.backend.common.types import StreamReader
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.storage.exception import (
+from ai.backend.storage.errors import (
     ObjectStorageBucketNotFoundError,
     StorageNotFoundError,
     StorageTypeInvalidError,

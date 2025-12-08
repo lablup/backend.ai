@@ -14,7 +14,7 @@ from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
-from ...exception import (
+from ...errors import (
     ExternalStorageServiceError,
     InvalidQuotaConfig,
     QuotaScopeNotFoundError,
@@ -122,8 +122,7 @@ class VASTQuotaModel(BaseQuotaModel):
                         "Got invalid parameter error but no quota exists with given quota name"
                         f" ({quota_name}). Raise error (orig:{str(e)})"
                     )
-                    raise InvalidQuotaConfig
-                assert existing_quota is not None
+                    raise InvalidQuotaConfig(f"No existing quota found with name {quota_name}")
                 await self._set_vast_quota_id(quota_scope_id, existing_quota.id)
                 await self.api_client.modify_quota(
                     existing_quota.id,

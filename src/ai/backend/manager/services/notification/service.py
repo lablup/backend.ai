@@ -282,6 +282,8 @@ class NotificationService:
         return SearchChannelsActionResult(
             channels=result.items,
             total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def search_rules(
@@ -295,6 +297,8 @@ class NotificationService:
         return SearchRulesActionResult(
             rules=result.items,
             total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def _process_notification(

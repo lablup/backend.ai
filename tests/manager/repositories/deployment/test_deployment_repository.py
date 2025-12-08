@@ -1,4 +1,4 @@
-"""Tests for DeploymentRepository.fetch_route_service_discovery_info()."""
+"""Tests for DeploymentRepository."""
 
 from __future__ import annotations
 
@@ -770,3 +770,346 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             assert 8080 <= info.kernel_port <= 8082
             assert info.runtime_variant == RuntimeVariant.VLLM.value
             assert info.endpoint_name.startswith("endpoint-")
+
+
+class TestGetDefaultArchitectureFromScalingGroup:
+    """Test cases for get_default_architecture_from_scaling_group method."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database engine that auto-cleans data after each test."""
+        yield database_engine
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(sa.delete(AgentRow))
+            await db_sess.execute(sa.delete(ScalingGroupRow))
+
+    @pytest.fixture
+    async def test_scaling_group_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create test scaling group and return name."""
+        sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                description="Test scaling group",
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            db_sess.add(sgroup)
+            await db_sess.flush()
+
+        yield sgroup_name
+
+    @pytest.fixture
+    async def other_scaling_group_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create another scaling group for isolation tests."""
+        sgroup_name = f"other-sgroup-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                description="Other scaling group",
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            db_sess.add(sgroup)
+            await db_sess.flush()
+
+        yield sgroup_name
+
+    @pytest.fixture
+    async def deployment_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[DeploymentRepository, None]:
+        """Create DeploymentRepository instance."""
+        storage_manager = MagicMock()
+        valkey_stat = MagicMock()
+        valkey_live = MagicMock()
+        valkey_schedule = MagicMock()
+
+        repo = DeploymentRepository(
+            db=db_with_cleanup,
+            storage_manager=storage_manager,
+            valkey_stat=valkey_stat,
+            valkey_live=valkey_live,
+            valkey_schedule=valkey_schedule,
+        )
+        yield repo
+
+    async def _create_agent(
+        self,
+        db: ExtendedAsyncSAEngine,
+        scaling_group: str,
+        architecture: str,
+        *,
+        status: AgentStatus = AgentStatus.ALIVE,
+        schedulable: bool = True,
+        suffix: str = "",
+    ) -> AgentId:
+        """Helper to create an agent with given properties."""
+        agent_id = AgentId(f"i-{suffix or uuid.uuid4().hex[:8]}")
+        async with db.begin_session() as db_sess:
+            agent = AgentRow(
+                id=agent_id,
+                status=status,
+                status_changed=datetime.now(tzutc()),
+                region="local",
+                scaling_group=scaling_group,
+                schedulable=schedulable,
+                available_slots=ResourceSlot({"cpu": Decimal("8.0"), "mem": Decimal("16384")}),
+                occupied_slots=ResourceSlot({"cpu": Decimal("0"), "mem": Decimal("0")}),
+                addr=f"127.0.0.{hash(agent_id) % 256}:2001",
+                architecture=architecture,
+                version="24.03.0",
+            )
+            db_sess.add(agent)
+            await db_sess.flush()
+        return agent_id
+
+    @pytest.fixture
+    async def agents_mixed_architecture(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group_name: str,
+    ) -> AsyncGenerator[list[AgentId], None]:
+        """Create 3 x86_64 agents and 2 aarch64 agents."""
+        agent_ids: list[AgentId] = []
+        for i in range(3):
+            agent_id = await self._create_agent(
+                db_with_cleanup,
+                test_scaling_group_name,
+                "x86_64",
+                suffix=f"x86-{i}",
+            )
+            agent_ids.append(agent_id)
+
+        for i in range(2):
+            agent_id = await self._create_agent(
+                db_with_cleanup,
+                test_scaling_group_name,
+                "aarch64",
+                suffix=f"arm-{i}",
+            )
+            agent_ids.append(agent_id)
+
+        yield agent_ids
+
+    @pytest.fixture
+    async def single_aarch64_agent(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group_name: str,
+    ) -> AsyncGenerator[AgentId, None]:
+        """Create a single aarch64 agent."""
+        agent_id = await self._create_agent(
+            db_with_cleanup,
+            test_scaling_group_name,
+            "aarch64",
+            suffix="single",
+        )
+        yield agent_id
+
+    @pytest.fixture
+    async def alive_x86_and_lost_aarch64_agents(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group_name: str,
+    ) -> AsyncGenerator[list[AgentId], None]:
+        """Create 1 ALIVE x86_64 agent and 3 LOST aarch64 agents."""
+        agent_ids: list[AgentId] = []
+
+        agent_id = await self._create_agent(
+            db_with_cleanup,
+            test_scaling_group_name,
+            "x86_64",
+            status=AgentStatus.ALIVE,
+            suffix="alive",
+        )
+        agent_ids.append(agent_id)
+
+        for i in range(3):
+            agent_id = await self._create_agent(
+                db_with_cleanup,
+                test_scaling_group_name,
+                "aarch64",
+                status=AgentStatus.LOST,
+                suffix=f"lost-{i}",
+            )
+            agent_ids.append(agent_id)
+
+        yield agent_ids
+
+    @pytest.fixture
+    async def schedulable_x86_and_non_schedulable_aarch64_agents(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group_name: str,
+    ) -> AsyncGenerator[list[AgentId], None]:
+        """Create 1 schedulable x86_64 agent and 3 non-schedulable aarch64 agents."""
+        agent_ids: list[AgentId] = []
+
+        agent_id = await self._create_agent(
+            db_with_cleanup,
+            test_scaling_group_name,
+            "x86_64",
+            schedulable=True,
+            suffix="sched",
+        )
+        agent_ids.append(agent_id)
+
+        for i in range(3):
+            agent_id = await self._create_agent(
+                db_with_cleanup,
+                test_scaling_group_name,
+                "aarch64",
+                schedulable=False,
+                suffix=f"nonsched-{i}",
+            )
+            agent_ids.append(agent_id)
+
+        yield agent_ids
+
+    @pytest.fixture
+    async def agents_in_different_scaling_groups(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group_name: str,
+        other_scaling_group_name: str,
+    ) -> AsyncGenerator[list[AgentId], None]:
+        """Create 1 agent in target group and 3 agents in other group."""
+        agent_ids: list[AgentId] = []
+
+        agent_id = await self._create_agent(
+            db_with_cleanup,
+            test_scaling_group_name,
+            "x86_64",
+            suffix="target",
+        )
+        agent_ids.append(agent_id)
+
+        for i in range(3):
+            agent_id = await self._create_agent(
+                db_with_cleanup,
+                other_scaling_group_name,
+                "aarch64",
+                suffix=f"other-{i}",
+            )
+            agent_ids.append(agent_id)
+
+        yield agent_ids
+
+    @pytest.mark.asyncio
+    async def test_returns_most_common_architecture(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_scaling_group_name: str,
+        agents_mixed_architecture: list[AgentId],
+    ) -> None:
+        """Test that the most common architecture among active agents is returned."""
+        result = await deployment_repository.get_default_architecture_from_scaling_group(
+            test_scaling_group_name
+        )
+
+        # x86_64 is most common (3 vs 2)
+        assert result == "x86_64"
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_no_agents(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_scaling_group_name: str,
+    ) -> None:
+        """Test that None is returned when no active agents exist."""
+        result = await deployment_repository.get_default_architecture_from_scaling_group(
+            test_scaling_group_name
+        )
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_returns_single_architecture(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_scaling_group_name: str,
+        single_aarch64_agent: AgentId,
+    ) -> None:
+        """Test that single agent's architecture is returned correctly."""
+        result = await deployment_repository.get_default_architecture_from_scaling_group(
+            test_scaling_group_name
+        )
+
+        assert result == "aarch64"
+
+    @pytest.mark.asyncio
+    async def test_excludes_non_alive_agents(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_scaling_group_name: str,
+        alive_x86_and_lost_aarch64_agents: list[AgentId],
+    ) -> None:
+        """Test that non-ALIVE agents are excluded from consideration."""
+        result = await deployment_repository.get_default_architecture_from_scaling_group(
+            test_scaling_group_name
+        )
+
+        # Only ALIVE agent's architecture should be considered
+        assert result == "x86_64"
+
+    @pytest.mark.asyncio
+    async def test_excludes_non_schedulable_agents(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_scaling_group_name: str,
+        schedulable_x86_and_non_schedulable_aarch64_agents: list[AgentId],
+    ) -> None:
+        """Test that non-schedulable agents are excluded from consideration."""
+        result = await deployment_repository.get_default_architecture_from_scaling_group(
+            test_scaling_group_name
+        )
+
+        # Only schedulable agent's architecture should be considered
+        assert result == "x86_64"
+
+    @pytest.mark.asyncio
+    async def test_excludes_agents_from_other_scaling_groups(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_scaling_group_name: str,
+        agents_in_different_scaling_groups: list[AgentId],
+    ) -> None:
+        """Test that agents from other scaling groups are excluded."""
+        result = await deployment_repository.get_default_architecture_from_scaling_group(
+            test_scaling_group_name
+        )
+
+        # Only target scaling group's agent architecture should be considered
+        assert result == "x86_64"
+
+    @pytest.mark.asyncio
+    async def test_returns_none_for_nonexistent_scaling_group(
+        self,
+        deployment_repository: DeploymentRepository,
+    ) -> None:
+        """Test that None is returned for non-existent scaling group."""
+        result = await deployment_repository.get_default_architecture_from_scaling_group(
+            "nonexistent-scaling-group"
+        )
+
+        assert result is None

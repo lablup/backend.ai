@@ -32,6 +32,7 @@ from ai.backend.manager.repositories.reservoir_registry.repositories import (
     ReservoirRegistryRepositories,
 )
 from ai.backend.manager.repositories.resource_preset.repositories import ResourcePresetRepositories
+from ai.backend.manager.repositories.scaling_group.repositories import ScalingGroupRepositories
 from ai.backend.manager.repositories.schedule.repositories import ScheduleRepositories
 from ai.backend.manager.repositories.scheduler.repositories import SchedulerRepositories
 from ai.backend.manager.repositories.session.repositories import SessionRepositories
@@ -64,6 +65,7 @@ class Repositories:
     project_resource_policy: ProjectResourcePolicyRepositories
     reservoir_registry: ReservoirRegistryRepositories
     resource_preset: ResourcePresetRepositories
+    scaling_group: ScalingGroupRepositories
     schedule: ScheduleRepositories
     scheduler: SchedulerRepositories
     session: SessionRepositories
@@ -94,6 +96,7 @@ class Repositories:
         project_resource_policy_repositories = ProjectResourcePolicyRepositories.create(args)
         reservoir_registry_repositories = ReservoirRegistryRepositories.create(args)
         resource_preset_repositories = ResourcePresetRepositories.create(args)
+        scaling_group_repositories = ScalingGroupRepositories.create(args)
         schedule_repositories = ScheduleRepositories.create(args)
         scheduler_repositories = SchedulerRepositories.create(args)
         session_repositories = SessionRepositories.create(args)
@@ -123,6 +126,7 @@ class Repositories:
             project_resource_policy=project_resource_policy_repositories,
             reservoir_registry=reservoir_registry_repositories,
             resource_preset=resource_preset_repositories,
+            scaling_group=scaling_group_repositories,
             schedule=schedule_repositories,
             scheduler=scheduler_repositories,
             session=session_repositories,

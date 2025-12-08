@@ -5,7 +5,7 @@ import jwt
 from aiohttp import web
 from aiohttp.typedefs import Handler
 
-from ai.backend.appproxy.common.exceptions import AuthorizationFailed
+from ai.backend.appproxy.common.errors import AuthorizationFailed
 from ai.backend.appproxy.common.utils import set_handler_attr
 from ai.backend.appproxy.coordinator.types import RootContext
 

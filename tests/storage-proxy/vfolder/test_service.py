@@ -6,7 +6,7 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.types import QuotaConfig, QuotaScopeID, QuotaScopeType, VFolderID
-from ai.backend.storage.exception import VFolderNotFoundError
+from ai.backend.storage.errors import VFolderNotFoundError
 from ai.backend.storage.services.service import VolumeService
 from ai.backend.storage.services.service import log as service_log
 from ai.backend.storage.volumes.pool import VolumePool
