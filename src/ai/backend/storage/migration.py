@@ -31,6 +31,7 @@ from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.types import AGENTID_STORAGE
 from ai.backend.logging import BraceStyleAdapter, LocalLogger, LogLevel
 
+from .client.manager import ManagerHTTPClientPool
 from .config.loaders import load_local_config, make_etcd
 from .config.unified import StorageProxyUnifiedConfig
 from .context import DEFAULT_BACKENDS, EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
@@ -260,6 +261,11 @@ async def check_and_upgrade(
     )
     # Create a dummy health probe for migration context (not started)
     health_probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
+    # Create a dummy ManagerHTTPClientPool for migration context
+    manager_client_pool = ManagerHTTPClientPool(
+        registry_configs={},
+        client_config=local_config.reservoir_client,
+    )
     ctx = RootContext(
         pid=os.getpid(),
         pidx=0,
@@ -275,7 +281,7 @@ async def check_and_upgrade(
         artifact_verifier_ctx=ArtifactVerifierContext(),  # type: ignore[arg-type]
         metric_registry=CommonMetricRegistry(),
         cors_options={},
-        manager_http_clients={},
+        manager_client_pool=manager_client_pool,
         valkey_artifact_client=None,  # type: ignore[arg-type]
         backends={**DEFAULT_BACKENDS},
         volumes={},

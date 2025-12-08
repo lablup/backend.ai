@@ -5,7 +5,7 @@ import uuid
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 import aiohttp
 import yarl
@@ -17,7 +17,7 @@ from ai.backend.common.dto.storage.response import (
     VFSListFilesResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.config.unified import ReservoirClientConfig
+from ai.backend.storage.config.unified import ReservoirClientConfig, ReservoirConfig
 
 _HASH_TYPE = "sha256"
 
@@ -156,3 +156,71 @@ class ManagerHTTPClient:
         rel_url = f"/artifacts/revisions/{artifact_revision_id}/verification-result"
         resp = await self._request("GET", rel_url)
         return GetVerificationResultResponse.model_validate(resp)
+
+
+class ManagerHTTPClientPool:
+    """Pool for managing ManagerHTTPClient instances per registry."""
+
+    _registry_configs: dict[str, ReservoirConfig]
+    _client_config: ReservoirClientConfig
+    _clients: dict[str, ManagerHTTPClient]
+
+    def __init__(
+        self,
+        registry_configs: dict[str, ReservoirConfig],
+        client_config: ReservoirClientConfig,
+    ) -> None:
+        self._registry_configs = registry_configs
+        self._client_config = client_config
+        self._clients = {}
+
+    @property
+    def registry_configs(self) -> dict[str, ReservoirConfig]:
+        return self._registry_configs
+
+    def get_or_create(self, registry_name: str) -> Optional[ManagerHTTPClient]:
+        """
+        Get or create a ManagerHTTPClient for the given registry.
+
+        Args:
+            registry_name: Name of the Reservoir registry
+
+        Returns:
+            ManagerHTTPClient if configuration is valid, None otherwise
+        """
+        # Return cached client if exists
+        if registry_name in self._clients:
+            return self._clients[registry_name]
+
+        # Validate registry configuration
+        registry_config = self._registry_configs.get(registry_name)
+        if not registry_config or not registry_config.endpoint:
+            return None
+
+        if (
+            not registry_config.manager_endpoint
+            or not registry_config.manager_access_key
+            or not registry_config.manager_secret_key
+            or not registry_config.manager_api_version
+        ):
+            return None
+
+        # Create and cache new client
+        manager_client = ManagerHTTPClient(
+            ManagerHTTPClientArgs(
+                name=registry_name,
+                endpoint=registry_config.manager_endpoint,
+                access_key=registry_config.manager_access_key,
+                secret_key=registry_config.manager_secret_key,
+                api_version=registry_config.manager_api_version,
+                client_config=self._client_config,
+            )
+        )
+        self._clients[registry_name] = manager_client
+        return manager_client
+
+    async def cleanup(self) -> None:
+        """Close all manager HTTP client sessions."""
+        for client in self._clients.values():
+            await client.cleanup()
+        self._clients.clear()

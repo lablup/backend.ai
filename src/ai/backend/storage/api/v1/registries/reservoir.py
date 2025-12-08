@@ -12,7 +12,6 @@ from ai.backend.common.api_handlers import (
     BodyParam,
     api_handler,
 )
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.dto.storage.request import (
     ReservoirImportModelsReq,
 )
@@ -20,10 +19,6 @@ from ai.backend.common.dto.storage.response import (
     ReservoirImportModelsResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.config.unified import (
-    LegacyReservoirConfig,
-    ReservoirConfig,
-)
 from ai.backend.storage.services.artifacts.reservoir import (
     ReservoirService,
     ReservoirServiceArgs,
@@ -65,8 +60,7 @@ class ReservoirRegistryAPIHandler:
             transfer_manager=self._reservoir_service._transfer_manager,
             artifact_verifier_ctx=self._reservoir_service._artifact_verifier_ctx,
             event_producer=self._reservoir_service._event_producer,
-            manager_http_clients=self._reservoir_service._manager_http_clients,
-            reservoir_client_config=self._reservoir_service._reservoir_client_config,
+            manager_client_pool=self._reservoir_service._manager_client_pool,
             redis_client=self._reservoir_service._redis_client,
         )
 
@@ -91,27 +85,14 @@ def create_app(ctx: RootContext) -> web.Application:
     app["ctx"] = ctx
     app["prefix"] = "v1/registries/reservoir"
 
-    # Get reservoir configs from new artifact_registries
-    reservoir_registry_configs: dict[str, ReservoirConfig] = {
-        name: r.reservoir
-        for name, r in ctx.local_config.artifact_registries.items()
-        if r.registry_type == ArtifactRegistryType.RESERVOIR and r.reservoir is not None
-    }
-
-    # Legacy registry configs support - add from legacy registries for backward compatibility
-    for legacy_registry in ctx.local_config.registries:
-        if isinstance(legacy_registry.config, LegacyReservoirConfig):
-            reservoir_registry_configs[legacy_registry.name] = legacy_registry.config
-
     reservoir_service = ReservoirService(
         ReservoirServiceArgs(
             background_task_manager=ctx.background_task_manager,
             event_producer=ctx.event_producer,
             storage_pool=ctx.storage_pool,
-            reservoir_registry_configs=reservoir_registry_configs,
+            reservoir_registry_configs=ctx.manager_client_pool.registry_configs,
             artifact_verifier_ctx=ctx.artifact_verifier_ctx,
-            manager_http_clients=ctx.manager_http_clients,
-            reservoir_client_config=ctx.local_config.reservoir_client,
+            manager_client_pool=ctx.manager_client_pool,
             redis_client=ctx.valkey_artifact_client,
         )
     )
