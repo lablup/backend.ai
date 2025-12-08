@@ -8,7 +8,7 @@ from pydantic import AliasChoices, Field
 from ai.backend.common.config import BaseConfigSchema
 
 
-class TimeoutConfig(BaseConfigSchema):
+class HttpTimeoutConfig(BaseConfigSchema):
     """
     Timeout configuration for a single HTTP request.
     Default values follow aiohttp defaults: total=300s, sock_connect=30s.

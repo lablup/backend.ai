@@ -195,9 +195,9 @@ from pydantic import (
 )
 
 from ai.backend.common.config import BaseConfigSchema
+from ai.backend.common.configs.client import HttpTimeoutConfig
 from ai.backend.common.configs.jwt import SharedJWTConfig
 from ai.backend.common.configs.redis import RedisConfig
-from ai.backend.common.configs.storage_proxy import TimeoutConfig
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
@@ -1610,7 +1610,8 @@ class VolumeTypeConfig(BaseConfigSchema):
     )
 
 
-_DEFAULT_TIMEOUT = TimeoutConfig()
+# Same as aiohttp default timeout settings
+_DEFAULT_TIMEOUT = HttpTimeoutConfig()
 
 
 class StorageProxyClientTimeoutConfig(BaseConfigSchema):
@@ -1621,7 +1622,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
     """
 
     # Volume operations
-    get_volumes: TimeoutConfig = Field(
+    get_volumes: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for get_volumes operation.",
         validation_alias=AliasChoices("get-volumes", "get_volumes"),
@@ -1629,25 +1630,25 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
     )
 
     # Folder operations
-    create_folder: TimeoutConfig = Field(
+    create_folder: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for create_folder operation.",
         validation_alias=AliasChoices("create-folder", "create_folder"),
         serialization_alias="create-folder",
     )
-    delete_folder: TimeoutConfig = Field(
+    delete_folder: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for delete_folder operation.",
         validation_alias=AliasChoices("delete-folder", "delete_folder"),
         serialization_alias="delete-folder",
     )
-    clone_folder: TimeoutConfig = Field(
+    clone_folder: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for clone_folder operation.",
         validation_alias=AliasChoices("clone-folder", "clone_folder"),
         serialization_alias="clone-folder",
     )
-    get_mount_path: TimeoutConfig = Field(
+    get_mount_path: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for get_mount_path operation.",
         validation_alias=AliasChoices("get-mount-path", "get_mount_path"),
@@ -1655,13 +1656,13 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
     )
 
     # Volume info operations
-    get_volume_hwinfo: TimeoutConfig = Field(
+    get_volume_hwinfo: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for get_volume_hwinfo operation.",
         validation_alias=AliasChoices("get-volume-hwinfo", "get_volume_hwinfo"),
         serialization_alias="get-volume-hwinfo",
     )
-    get_volume_performance_metric: TimeoutConfig = Field(
+    get_volume_performance_metric: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for get_volume_performance_metric operation.",
         validation_alias=AliasChoices(
@@ -1669,7 +1670,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
         ),
         serialization_alias="get-volume-performance-metric",
     )
-    get_fs_usage: TimeoutConfig = Field(
+    get_fs_usage: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for get_fs_usage operation.",
         validation_alias=AliasChoices("get-fs-usage", "get_fs_usage"),
@@ -1677,31 +1678,31 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
     )
 
     # Quota operations
-    get_volume_quota: TimeoutConfig = Field(
+    get_volume_quota: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for get_volume_quota operation.",
         validation_alias=AliasChoices("get-volume-quota", "get_volume_quota"),
         serialization_alias="get-volume-quota",
     )
-    update_volume_quota: TimeoutConfig = Field(
+    update_volume_quota: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for update_volume_quota operation.",
         validation_alias=AliasChoices("update-volume-quota", "update_volume_quota"),
         serialization_alias="update-volume-quota",
     )
-    get_quota_scope: TimeoutConfig = Field(
+    get_quota_scope: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for get_quota_scope operation.",
         validation_alias=AliasChoices("get-quota-scope", "get_quota_scope"),
         serialization_alias="get-quota-scope",
     )
-    update_quota_scope: TimeoutConfig = Field(
+    update_quota_scope: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for update_quota_scope operation.",
         validation_alias=AliasChoices("update-quota-scope", "update_quota_scope"),
         serialization_alias="update-quota-scope",
     )
-    delete_quota_scope_quota: TimeoutConfig = Field(
+    delete_quota_scope_quota: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for delete_quota_scope_quota operation.",
         validation_alias=AliasChoices("delete-quota-scope-quota", "delete_quota_scope_quota"),
@@ -1709,53 +1710,53 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
     )
 
     # File operations
-    mkdir: TimeoutConfig = Field(
+    mkdir: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for mkdir operation.",
     )
-    rename_file: TimeoutConfig = Field(
+    rename_file: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for rename_file operation.",
         validation_alias=AliasChoices("rename-file", "rename_file"),
         serialization_alias="rename-file",
     )
-    delete_files: TimeoutConfig = Field(
+    delete_files: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for delete_files operation.",
         validation_alias=AliasChoices("delete-files", "delete_files"),
         serialization_alias="delete-files",
     )
-    delete_files_async: TimeoutConfig = Field(
+    delete_files_async: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for delete_files_async operation.",
         validation_alias=AliasChoices("delete-files-async", "delete_files_async"),
         serialization_alias="delete-files-async",
     )
-    move_file: TimeoutConfig = Field(
+    move_file: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for move_file operation.",
         validation_alias=AliasChoices("move-file", "move_file"),
         serialization_alias="move-file",
     )
-    upload_file: TimeoutConfig = Field(
+    upload_file: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for upload_file operation.",
         validation_alias=AliasChoices("upload-file", "upload_file"),
         serialization_alias="upload-file",
     )
-    download_file: TimeoutConfig = Field(
+    download_file: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for download_file operation.",
         validation_alias=AliasChoices("download-file", "download_file"),
         serialization_alias="download-file",
     )
-    list_files: TimeoutConfig = Field(
+    list_files: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for list_files operation.",
         validation_alias=AliasChoices("list-files", "list_files"),
         serialization_alias="list-files",
     )
-    fetch_file: TimeoutConfig = Field(
+    fetch_file: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for fetch_file operation.",
         validation_alias=AliasChoices("fetch-file", "fetch_file"),
@@ -1763,13 +1764,13 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
     )
 
     # Folder usage operations
-    get_folder_usage: TimeoutConfig = Field(
+    get_folder_usage: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for get_folder_usage operation.",
         validation_alias=AliasChoices("get-folder-usage", "get_folder_usage"),
         serialization_alias="get-folder-usage",
     )
-    get_used_bytes: TimeoutConfig = Field(
+    get_used_bytes: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for get_used_bytes operation.",
         validation_alias=AliasChoices("get-used-bytes", "get_used_bytes"),
@@ -1777,31 +1778,31 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
     )
 
     # HuggingFace operations
-    scan_huggingface_models: TimeoutConfig = Field(
+    scan_huggingface_models: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for scan_huggingface_models operation.",
         validation_alias=AliasChoices("scan-huggingface-models", "scan_huggingface_models"),
         serialization_alias="scan-huggingface-models",
     )
-    retrieve_huggingface_models: TimeoutConfig = Field(
+    retrieve_huggingface_models: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for retrieve_huggingface_models operation.",
         validation_alias=AliasChoices("retrieve-huggingface-models", "retrieve_huggingface_models"),
         serialization_alias="retrieve-huggingface-models",
     )
-    retrieve_huggingface_model: TimeoutConfig = Field(
+    retrieve_huggingface_model: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for retrieve_huggingface_model operation.",
         validation_alias=AliasChoices("retrieve-huggingface-model", "retrieve_huggingface_model"),
         serialization_alias="retrieve-huggingface-model",
     )
-    import_huggingface_models: TimeoutConfig = Field(
+    import_huggingface_models: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for import_huggingface_models operation.",
         validation_alias=AliasChoices("import-huggingface-models", "import_huggingface_models"),
         serialization_alias="import-huggingface-models",
     )
-    get_huggingface_model_commit_hash: TimeoutConfig = Field(
+    get_huggingface_model_commit_hash: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for get_huggingface_model_commit_hash operation.",
         validation_alias=AliasChoices(
@@ -1811,7 +1812,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
     )
 
     # Reservoir operations
-    import_reservoir_models: TimeoutConfig = Field(
+    import_reservoir_models: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for import_reservoir_models operation.",
         validation_alias=AliasChoices("import-reservoir-models", "import_reservoir_models"),
@@ -1819,13 +1820,13 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
     )
 
     # S3 operations
-    download_s3_file: TimeoutConfig = Field(
+    download_s3_file: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for download_s3_file operation.",
         validation_alias=AliasChoices("download-s3-file", "download_s3_file"),
         serialization_alias="download-s3-file",
     )
-    get_s3_presigned_download_url: TimeoutConfig = Field(
+    get_s3_presigned_download_url: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for get_s3_presigned_download_url operation.",
         validation_alias=AliasChoices(
@@ -1833,13 +1834,13 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
         ),
         serialization_alias="get-s3-presigned-download-url",
     )
-    get_s3_presigned_upload_url: TimeoutConfig = Field(
+    get_s3_presigned_upload_url: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for get_s3_presigned_upload_url operation.",
         validation_alias=AliasChoices("get-s3-presigned-upload-url", "get_s3_presigned_upload_url"),
         serialization_alias="get-s3-presigned-upload-url",
     )
-    delete_s3_object: TimeoutConfig = Field(
+    delete_s3_object: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for delete_s3_object operation.",
         validation_alias=AliasChoices("delete-s3-object", "delete_s3_object"),
@@ -1847,13 +1848,13 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
     )
 
     # VFS operations
-    download_vfs_file_streaming: TimeoutConfig = Field(
+    download_vfs_file_streaming: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for download_vfs_file_streaming operation.",
         validation_alias=AliasChoices("download-vfs-file-streaming", "download_vfs_file_streaming"),
         serialization_alias="download-vfs-file-streaming",
     )
-    list_vfs_files: TimeoutConfig = Field(
+    list_vfs_files: HttpTimeoutConfig = Field(
         default_factory=lambda: _DEFAULT_TIMEOUT,
         description="Timeout for list_vfs_files operation.",
         validation_alias=AliasChoices("list-vfs-files", "list_vfs_files"),
