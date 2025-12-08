@@ -75,7 +75,7 @@ from ..types import (
     RouteData,
     RouteServiceDiscoveryInfo,
 )
-from ..types.source import HealthCheckSource
+from ..types.health_check_source import HealthCheckSource
 
 
 @dataclass

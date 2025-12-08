@@ -7,7 +7,7 @@ from typing import Optional, override
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.types import MODEL_SERVICE_RUNTIME_PROFILES, RuntimeVariant
 
-from ..types.source import HealthCheckSource
+from ..types.health_check_source import HealthCheckSource
 
 __all__ = ["RuntimeProfileSource"]
 

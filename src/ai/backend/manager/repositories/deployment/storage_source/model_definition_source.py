@@ -11,7 +11,7 @@ from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.types import RuntimeVariant
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.endpoint import ModelServiceHelper
-from ai.backend.manager.repositories.deployment.types.source import HealthCheckSource
+from ai.backend.manager.repositories.deployment.types.health_check_source import HealthCheckSource
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.storage import StorageSessionManager

@@ -8,7 +8,7 @@ from .endpoint import (
     RouteData,
     RouteServiceDiscoveryInfo,
 )
-from .source import HealthCheckSource
+from .health_check_source import HealthCheckSource
 
 __all__ = [
     "EndpointCreationArgs",
