@@ -1,4 +1,4 @@
-from .resolver import agent_stats, agents_v2
+from .resolver import agent_stats, agents_v2, container_count_v2
 from .types import (
     AgentFilterGQL,
     AgentOrderByGQL,
@@ -21,4 +21,5 @@ __all__ = (
     # Resolvers
     "agent_stats",
     "agents_v2",
+    "container_count_v2",
 )

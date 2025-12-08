@@ -115,6 +115,7 @@ enum AgentOrderField {
   SCHEDULABLE
 }
 
+"""Added in 25.18.0. Permissions related to agent operations"""
 enum AgentPermission {
   READ_ATTRIBUTE
   UPDATE_ATTRIBUTE
@@ -2210,6 +2211,9 @@ type Query {
   Supports cursor-based pagination for efficient browsing.
   """
   artifactRevisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
+
+  """Added in 25.18.0"""
+  containerCountV2(agentId: String!): Int!
 
   """
   Added in 25.16.0.

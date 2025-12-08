@@ -5,6 +5,7 @@ from strawberry.schema.config import StrawberryConfig
 from .agent import (
     agent_stats,
     agents_v2,
+    container_count_v2,
 )
 from .app_config import (
     delete_domain_app_config,
@@ -124,6 +125,7 @@ class Query:
     artifacts = artifacts
     artifact_revision = artifact_revision
     artifact_revisions = artifact_revisions
+    container_count_v2 = container_count_v2
     domain_app_config = domain_app_config
     user_app_config = user_app_config
     merged_app_config = merged_app_config
