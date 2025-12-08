@@ -52,6 +52,9 @@ class HttpTimeoutConfig(BaseConfigSchema):
     )
 
     def to_client_timeout(self) -> ClientTimeout:
+        """
+        Convert timeout config to aiohttp ClientTimeout instance.
+        """
         return ClientTimeout(
             total=self.total,
             connect=self.connect,
