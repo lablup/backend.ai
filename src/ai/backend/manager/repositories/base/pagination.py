@@ -14,6 +14,14 @@ if TYPE_CHECKING:
     from sqlalchemy.engine import Row
 
 
+@dataclass(frozen=True)
+class GQLPageInfo:
+    """Page info result for GraphQL layer."""
+
+    has_next_page: bool
+    has_previous_page: bool
+
+
 class QueryPagination(ABC):
     """
     Base class for pagination strategies.
@@ -49,6 +57,20 @@ class QueryPagination(ABC):
 
         Returns:
             _PageInfoResult containing sliced rows and pagination flags
+        """
+
+        raise NotImplementedError
+
+    @abstractmethod
+    def compute_gql_page_info(self, items_count: int, total_count: int) -> GQLPageInfo:
+        """Compute page info for GraphQL layer.
+
+        Args:
+            items_count: Number of items returned in this page
+            total_count: Total count of items matching the query
+
+        Returns:
+            GQLPageInfo with has_next_page and has_previous_page flags
         """
 
         raise NotImplementedError
@@ -100,6 +122,13 @@ class OffsetPagination(QueryPagination):
             rows=rows,
             has_next_page=has_next_page,
             has_previous_page=has_previous_page,
+        )
+
+    def compute_gql_page_info(self, items_count: int, total_count: int) -> GQLPageInfo:
+        """Compute page info for GraphQL layer."""
+        return GQLPageInfo(
+            has_next_page=(self.offset + items_count) < total_count,
+            has_previous_page=self.offset > 0,
         )
 
 
@@ -154,6 +183,13 @@ class CursorForwardPagination(QueryPagination):
             has_previous_page=has_previous_page,
         )
 
+    def compute_gql_page_info(self, items_count: int, total_count: int) -> GQLPageInfo:
+        """Compute page info for GraphQL layer."""
+        return GQLPageInfo(
+            has_next_page=items_count == self.first and items_count < total_count,
+            has_previous_page=self.cursor_condition is not None,
+        )
+
 
 @dataclass
 class CursorBackwardPagination(QueryPagination):
@@ -205,3 +241,164 @@ class CursorBackwardPagination(QueryPagination):
             has_next_page=has_next_page,
             has_previous_page=has_previous_page,
         )
+
+    def compute_gql_page_info(self, items_count: int, total_count: int) -> GQLPageInfo:
+        """Compute page info for GraphQL layer."""
+        return GQLPageInfo(
+            has_next_page=self.cursor_condition is not None,
+            has_previous_page=items_count == self.last,
+        )
+
+
+@dataclass
+class Querier:
+    """Bundles query conditions, orders, and pagination for repository queries."""
+
+    pagination: QueryPagination
+    conditions: list[QueryCondition] = field(default_factory=list)
+    orders: list[QueryOrder] = field(default_factory=list)
+
+
+def combine_conditions_or(conditions: list[QueryCondition]) -> QueryCondition:
+    """Combine multiple QueryConditions with OR logic.
+
+    Args:
+        conditions: List of QueryCondition callables to combine
+
+    Returns:
+        A single QueryCondition that applies all conditions with OR logic
+    """
+
+    def inner() -> sa.sql.expression.ColumnElement[bool]:
+        clauses = [cond() for cond in conditions]
+        return sa.or_(*clauses)
+
+    return inner
+
+
+def negate_conditions(conditions: list[QueryCondition]) -> QueryCondition:
+    """Negate multiple QueryConditions with NOT logic.
+
+    Args:
+        conditions: List of QueryCondition callables to negate
+
+    Returns:
+        A single QueryCondition that negates the AND of all conditions
+    """
+
+    def inner() -> sa.sql.expression.ColumnElement[bool]:
+        clauses = [cond() for cond in conditions]
+        if len(clauses) == 1:
+            return sa.not_(clauses[0])
+        else:
+            return sa.not_(sa.and_(*clauses))
+
+    return inner
+
+
+def _apply_querier(
+    query: sa.sql.Select,
+    querier: Querier,
+) -> sa.sql.Select:
+    """Apply query conditions, orders, and pagination to a SQLAlchemy select statement.
+
+    Args:
+        query: The base SELECT statement
+        querier: Querier containing conditions, orders, and pagination to apply
+
+    Returns:
+        The modified SELECT statement with conditions, orders, and pagination applied
+
+    Note:
+        For cursor-based pagination, the pagination.apply() method applies
+        cursor_order first. User-specified orders are applied after,
+        serving as secondary sort criteria.
+    """
+    # Apply all conditions
+    for condition in querier.conditions:
+        query = query.where(condition())
+
+    # Apply pagination (includes cursor condition and cursor_order for cursor pagination)
+    query = querier.pagination.apply(query)
+
+    # Apply user orders AFTER default order from pagination
+    for order in querier.orders:
+        query = query.order_by(order)
+
+    return query
+
+
+TRow = TypeVar("TRow", bound=Row)
+
+
+@dataclass
+class _PageInfoResult(Generic[TRow]):
+    """Result of compute_page_info containing sliced rows and pagination flags."""
+
+    rows: list[TRow]
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class QuerierResult(Generic[TRow]):
+    """Result of executing a query with querier."""
+
+    rows: list[TRow]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+async def execute_querier(
+    db_sess: SASession,
+    query: sa.sql.Select,
+    querier: Querier,
+) -> QuerierResult[Row]:
+    """Execute query with querier and return rows with total_count and pagination info.
+
+    For offset pagination, uses count().over() window function for efficient counting.
+    For cursor pagination, executes a separate count query with filter conditions.
+
+    Args:
+        db_sess: Database session
+        query: Base SELECT query (without count window function)
+        querier: Querier for filtering, ordering, and pagination
+
+    Returns:
+        QuerierResult containing rows, total_count, and pagination info
+    """
+    initial_query = query
+
+    # Add window function for offset pagination
+    if querier.pagination.uses_window_function:
+        query = query.add_columns(sa.func.count().over().label("total_count"))
+
+    # Apply conditions and pagination to get data rows
+    query = _apply_querier(query, querier)
+    result = await db_sess.execute(query)
+    rows = list(result.all())
+
+    total_count: int
+    if querier.pagination.uses_window_function and rows:
+        # Offset pagination with results: use window function from rows
+        total_count = rows[0].total_count
+    else:
+        # Cursor pagination or offset fallback (rows empty):
+        # Execute pure count query with filter conditions only
+        count_query = sa.select(sa.func.count()).select_from(initial_query.froms[0])
+        for condition in querier.conditions:
+            count_query = count_query.where(condition())
+
+        count_result = await db_sess.execute(count_query)
+        total_count = count_result.scalar() or 0
+
+    # Calculate pagination info
+    page_info = querier.pagination.compute_page_info(rows, total_count)
+
+    return QuerierResult(
+        rows=page_info.rows,
+        total_count=total_count,
+        has_next_page=page_info.has_next_page,
+        has_previous_page=page_info.has_previous_page,
+    )

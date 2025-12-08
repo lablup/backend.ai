@@ -25,7 +25,7 @@ from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
 )
-from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
@@ -163,7 +163,7 @@ class ArtifactVerificationGQLResult:
     Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
     """)
 )
-class ArtifactFilter:
+class ArtifactFilter(GQLFilter):
     type: Optional[list[ArtifactType]] = None
     name: Optional[StringFilter] = None
     registry: Optional[StringFilter] = None
@@ -269,7 +269,7 @@ class ArtifactFilter:
     Specifies the field and direction for ordering artifacts in queries.
     """)
 )
-class ArtifactOrderBy:
+class ArtifactOrderBy(GQLOrderBy):
     field: ArtifactOrderField
     direction: OrderDirection = OrderDirection.ASC
 
@@ -314,7 +314,7 @@ class ArtifactRevisionRemoteStatusFilter:
     Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
     """)
 )
-class ArtifactRevisionFilter:
+class ArtifactRevisionFilter(GQLFilter):
     status: Optional[ArtifactRevisionStatusFilter] = None
     remote_status: Optional[ArtifactRevisionRemoteStatusFilter] = strawberry.field(
         default=None, description="Added in 25.16.0"
@@ -474,7 +474,7 @@ class ArtifactRevisionFilter:
     Specifies the field and direction for ordering artifact revisions in queries.
     """)
 )
-class ArtifactRevisionOrderBy:
+class ArtifactRevisionOrderBy(GQLOrderBy):
     field: ArtifactRevisionOrderField
     direction: OrderDirection = OrderDirection.ASC
 

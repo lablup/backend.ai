@@ -1,88 +1,38 @@
-"""GraphQL adapters for converting artifact filters to repository queries."""
+"""Pagination specifications for artifact GraphQL queries."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from functools import lru_cache
 
-from ai.backend.manager.api.gql.adapter import BaseGQLAdapter
-from ai.backend.manager.repositories.base import (
-    Querier,
-    QueryCondition,
-    QueryOrder,
-    QueryPagination,
-)
-
-if TYPE_CHECKING:
-    from ai.backend.manager.api.gql.artifact import (
-        ArtifactFilter,
-        ArtifactOrderBy,
-        ArtifactRevisionFilter,
-        ArtifactRevisionOrderBy,
-    )
+from ai.backend.manager.api.gql.adapter import PaginationSpec
+from ai.backend.manager.models.artifact import ArtifactRow
+from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 
 __all__ = (
-    "ArtifactGQLAdapter",
-    "ArtifactRevisionGQLAdapter",
+    "get_artifact_pagination_spec",
+    "get_artifact_revision_pagination_spec",
 )
 
 
-class ArtifactGQLAdapter(BaseGQLAdapter):
-    """Adapter for converting GraphQL artifact queries to repository Querier."""
-
-    def build_querier(
-        self,
-        filter: Optional[ArtifactFilter] = None,
-        order_by: Optional[list[ArtifactOrderBy]] = None,
-        first: Optional[int] = None,
-        after: Optional[str] = None,
-        last: Optional[int] = None,
-        before: Optional[str] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
-    ) -> Querier:
-        """Build Querier from GraphQL filter, order_by, and pagination."""
-        conditions: list[QueryCondition] = []
-        orders: list[QueryOrder] = []
-        pagination: Optional[QueryPagination] = None
-
-        if filter:
-            conditions.extend(filter.build_conditions())
-
-        if order_by:
-            for order_spec in order_by:
-                orders.append(order_spec.to_query_order())
-
-        pagination = self.build_pagination(first, after, last, before, limit, offset)
-
-        return Querier(conditions=conditions, orders=orders, pagination=pagination)
+@lru_cache(maxsize=1)
+def get_artifact_pagination_spec() -> PaginationSpec:
+    """Get pagination spec for Artifact queries."""
+    return PaginationSpec(
+        forward_order=ArtifactRow.id.asc(),
+        backward_order=ArtifactRow.id.desc(),
+        forward_condition_factory=lambda cursor_value: lambda: ArtifactRow.id > cursor_value,
+        backward_condition_factory=lambda cursor_value: lambda: ArtifactRow.id < cursor_value,
+    )
 
 
-class ArtifactRevisionGQLAdapter(BaseGQLAdapter):
-    """Adapter for converting GraphQL artifact revision queries to repository Querier."""
-
-    def build_querier(
-        self,
-        filter: Optional[ArtifactRevisionFilter] = None,
-        order_by: Optional[list[ArtifactRevisionOrderBy]] = None,
-        first: Optional[int] = None,
-        after: Optional[str] = None,
-        last: Optional[int] = None,
-        before: Optional[str] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
-    ) -> Querier:
-        """Build Querier from GraphQL filter, order_by, and pagination."""
-        conditions: list[QueryCondition] = []
-        orders: list[QueryOrder] = []
-        pagination: Optional[QueryPagination] = None
-
-        if filter:
-            conditions.extend(filter.build_conditions())
-
-        if order_by:
-            for order_spec in order_by:
-                orders.append(order_spec.to_query_order())
-
-        pagination = self.build_pagination(first, after, last, before, limit, offset)
-
-        return Querier(conditions=conditions, orders=orders, pagination=pagination)
+@lru_cache(maxsize=1)
+def get_artifact_revision_pagination_spec() -> PaginationSpec:
+    """Get pagination spec for ArtifactRevision queries."""
+    return PaginationSpec(
+        forward_order=ArtifactRevisionRow.id.asc(),
+        backward_order=ArtifactRevisionRow.id.desc(),
+        forward_condition_factory=lambda cursor_value: lambda: ArtifactRevisionRow.id
+        > cursor_value,
+        backward_condition_factory=lambda cursor_value: lambda: ArtifactRevisionRow.id
+        < cursor_value,
+    )

@@ -30,6 +30,8 @@ from ...utils import ScenarioBase
             ListArtifactRevisionsActionResult(
                 data=[ARTIFACT_REVISION_FIXTURE_DATA],
                 total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
             ),
         ),
         ScenarioBase.success(
@@ -44,6 +46,8 @@ from ...utils import ScenarioBase
             ListArtifactRevisionsActionResult(
                 data=[ARTIFACT_REVISION_FIXTURE_DATA],
                 total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
             ),
         ),
     ],

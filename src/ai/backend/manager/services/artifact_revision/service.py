@@ -334,13 +334,15 @@ class ArtifactRevisionService:
     async def list_revision(
         self, action: ListArtifactRevisionsAction
     ) -> ListArtifactRevisionsActionResult:
-        (
-            artifacts_data,
-            total_count,
-        ) = await self._artifact_repository.search_artifact_revisions(
+        result = await self._artifact_repository.search_artifact_revisions(
             querier=action.querier,
         )
-        return ListArtifactRevisionsActionResult(data=artifacts_data, total_count=total_count)
+        return ListArtifactRevisionsActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def approve(
         self, action: ApproveArtifactRevisionAction

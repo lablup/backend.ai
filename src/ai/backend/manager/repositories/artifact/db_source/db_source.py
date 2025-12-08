@@ -17,9 +17,11 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactData,
     ArtifactDataWithRevisions,
     ArtifactFilterOptions,
+    ArtifactListResult,
     ArtifactOrderingOptions,
     ArtifactRemoteStatus,
     ArtifactRevisionData,
+    ArtifactRevisionListResult,
     ArtifactStatus,
     ArtifactType,
 )
@@ -1037,21 +1039,22 @@ class ArtifactDBSource:
     async def search_artifacts(
         self,
         querier: Optional[Querier] = None,
-    ) -> tuple[list[ArtifactData], int]:
+    ) -> ArtifactListResult:
         """Search artifacts with querier pattern.
 
         Args:
             querier: Optional querier for filtering, ordering, and pagination
 
         Returns:
-            Tuple of (artifacts list, total count)
+            ArtifactListResult with items, total count, and pagination info
         """
+        if querier is None:
+            from ai.backend.manager.repositories.base import OffsetPagination
+
+            querier = Querier(pagination=OffsetPagination(limit=10, offset=0))
 
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(
-                ArtifactRow,
-                sa.func.count().over().label("total_count"),
-            )
+            query = sa.select(ArtifactRow)
 
             result = await execute_querier(
                 db_sess,
@@ -1061,25 +1064,32 @@ class ArtifactDBSource:
 
             items = [row.ArtifactRow.to_dataclass() for row in result.rows]
 
-            return items, result.total_count
+            return ArtifactListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
 
     async def search_artifact_revisions(
         self,
-        querier: Optional["Querier"] = None,
-    ) -> tuple[list[ArtifactRevisionData], int]:
+        querier: Optional[Querier] = None,
+    ) -> ArtifactRevisionListResult:
         """Search artifact revisions with querier pattern.
 
         Args:
             querier: Optional querier for filtering, ordering, and pagination
 
         Returns:
-            Tuple of (artifact revisions list, total count)
+            ArtifactRevisionListResult with items, total count, and pagination info
         """
+        if querier is None:
+            from ai.backend.manager.repositories.base import OffsetPagination
+
+            querier = Querier(pagination=OffsetPagination(limit=10, offset=0))
+
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(
-                ArtifactRevisionRow,
-                sa.func.count().over().label("total_count"),
-            )
+            query = sa.select(ArtifactRevisionRow)
 
             result = await execute_querier(
                 db_sess,
@@ -1089,7 +1099,12 @@ class ArtifactDBSource:
 
             items = [row.ArtifactRevisionRow.to_dataclass() for row in result.rows]
 
-            return items, result.total_count
+            return ArtifactRevisionListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
 
     async def search_artifacts_with_revisions(
         self,
@@ -1103,6 +1118,10 @@ class ArtifactDBSource:
         Returns:
             Tuple of (artifacts with revisions list, total count)
         """
+        if querier is None:
+            from ai.backend.manager.repositories.base import OffsetPagination
+
+            querier = Querier(pagination=OffsetPagination(limit=10, offset=0))
 
         async with self._db.begin_readonly_session() as db_sess:
             # Build query with eager loading of revisions

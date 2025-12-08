@@ -26,8 +26,9 @@ class ListArtifactsAction(ArtifactAction):
 @dataclass
 class ListArtifactsActionResult(BaseActionResult):
     data: list[ArtifactData]
-    # Note: Total number of artifacts, this is not equals to len(data)
     total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
     @override
     def entity_id(self) -> Optional[str]:

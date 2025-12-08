@@ -343,10 +343,15 @@ class ArtifactService:
         return GetArtifactActionResult(result=artifact)
 
     async def list(self, action: ListArtifactsAction) -> ListArtifactsActionResult:
-        artifacts_data, total_count = await self._artifact_repository.search_artifacts(
+        result = await self._artifact_repository.search_artifacts(
             querier=action.querier,
         )
-        return ListArtifactsActionResult(data=artifacts_data, total_count=total_count)
+        return ListArtifactsActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def list_with_revisions(
         self, action: ListArtifactsWithRevisionsAction

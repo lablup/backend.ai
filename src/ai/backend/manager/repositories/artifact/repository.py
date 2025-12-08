@@ -13,9 +13,11 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactData,
     ArtifactDataWithRevisions,
     ArtifactFilterOptions,
+    ArtifactListResult,
     ArtifactOrderingOptions,
     ArtifactRemoteStatus,
     ArtifactRevisionData,
+    ArtifactRevisionListResult,
     ArtifactStatus,
 )
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
@@ -223,7 +225,7 @@ class ArtifactRepository:
     async def search_artifacts(
         self,
         querier: Optional[Querier] = None,
-    ) -> tuple[list[ArtifactData], int]:
+    ) -> ArtifactListResult:
         """Search artifacts with querier pattern."""
 
         return await self._db_source.search_artifacts(querier=querier)
@@ -232,7 +234,7 @@ class ArtifactRepository:
     async def search_artifact_revisions(
         self,
         querier: Optional[Querier] = None,
-    ) -> tuple[list[ArtifactRevisionData], int]:
+    ) -> ArtifactRevisionListResult:
         """Search artifact revisions with querier pattern."""
 
         return await self._db_source.search_artifact_revisions(querier=querier)
