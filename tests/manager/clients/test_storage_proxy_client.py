@@ -3,7 +3,7 @@ import asyncio
 import pytest
 from aiohttp import ClientTimeout, web
 
-from ai.backend.common.configs.storage_proxy import StorageProxyClientTimeoutConfig, TimeoutConfig
+from ai.backend.common.configs.storage_proxy import TimeoutConfig
 from ai.backend.common.exception import ErrorDetail, ErrorDomain, ErrorOperation, PassthroughError
 from ai.backend.manager.clients.storage_proxy.base import (
     DEFAULT_TIMEOUT,
@@ -13,6 +13,7 @@ from ai.backend.manager.clients.storage_proxy.base import (
 from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
     StorageProxyManagerFacingClient,
 )
+from ai.backend.manager.config.unified import StorageProxyClientTimeoutConfig
 from ai.backend.manager.errors.storage import StorageProxyTimeoutError
 
 

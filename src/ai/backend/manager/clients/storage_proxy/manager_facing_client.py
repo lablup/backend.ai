@@ -7,7 +7,6 @@ from urllib.parse import quote
 
 import aiohttp
 
-from ai.backend.common.configs.storage_proxy import StorageProxyClientTimeoutConfig
 from ai.backend.common.dto.storage.request import (
     DeleteObjectReq,
     DownloadObjectReq,
@@ -44,6 +43,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.clients.storage_proxy.base import StorageProxyHTTPClient
+from ai.backend.manager.config.unified import StorageProxyClientTimeoutConfig
 from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE
 from ai.backend.manager.errors.storage import UnexpectedStorageProxyResponseError
 
