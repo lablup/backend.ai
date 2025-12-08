@@ -101,8 +101,11 @@ class TestStorageProxyManagerFacingClientTimeout:
     """Tests for StorageProxyManagerFacingClient per-method timeout configuration."""
 
     @pytest.mark.asyncio
-    async def test_get_volumes_uses_configured_timeout(self, aiohttp_client) -> None:
-        """Test that get_volumes uses the configured timeout."""
+    async def test_configured_client_timeout_causes_timeout_error(self, aiohttp_client) -> None:
+        """
+        Test that configured short timeout causes timeout error when server is slow.
+        Note: get_volumes is used as an arbitrary method call to test timeout behavior.
+        """
         request_received_timeout: Optional[ClientTimeout] = None
 
         async def volumes_handler(request: web.Request) -> web.Response:
@@ -138,8 +141,11 @@ class TestStorageProxyManagerFacingClientTimeout:
             await manager_client.get_volumes()
 
     @pytest.mark.asyncio
-    async def test_get_volumes_succeeds_with_sufficient_timeout(self, aiohttp_client) -> None:
-        """Test that get_volumes succeeds when timeout is sufficient."""
+    async def test_configured_client_timeout_succeeds(self, aiohttp_client) -> None:
+        """
+        Test that request succeeds when configured timeout is sufficient.
+        Note: get_volumes is used as an arbitrary method call to test timeout behavior.
+        """
 
         async def volumes_handler(request: web.Request) -> web.Response:
             # Short delay that is within timeout
