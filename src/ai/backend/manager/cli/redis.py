@@ -5,6 +5,8 @@ import logging
 from typing import TYPE_CHECKING
 
 import click
+from glide import ConnectionError as GlideConnectionError
+from glide import TimeoutError as GlideTimeoutError
 
 from ai.backend.common.clients.valkey_client.client import AbstractValkeyClient
 from ai.backend.logging import BraceStyleAdapter
@@ -25,7 +27,7 @@ def cli() -> None:
 async def _ping(valkey_client: AbstractValkeyClient) -> None:
     try:
         await valkey_client.ping()
-    except Exception:
+    except (GlideConnectionError, GlideTimeoutError):
         log.exception("ping(): Valkey ping failed")
 
 
