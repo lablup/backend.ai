@@ -46,7 +46,7 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactRevisionOrderingOptions,
     ArtifactStatusFilterType,
 )
-from ai.backend.manager.repositories.base import Querier, execute_querier
+from ai.backend.manager.repositories.base import OffsetPagination, Querier, execute_querier
 from ai.backend.manager.repositories.types import (
     BaseFilterApplier,
     BaseOrderingApplier,
@@ -1067,8 +1067,6 @@ class ArtifactDBSource:
             ArtifactListResult with items, total count, and pagination info
         """
         if querier is None:
-            from ai.backend.manager.repositories.base import OffsetPagination
-
             querier = Querier(pagination=OffsetPagination(limit=10, offset=0))
 
         async with self._db.begin_readonly_session() as db_sess:
@@ -1102,8 +1100,6 @@ class ArtifactDBSource:
             ArtifactRevisionListResult with items, total count, and pagination info
         """
         if querier is None:
-            from ai.backend.manager.repositories.base import OffsetPagination
-
             querier = Querier(pagination=OffsetPagination(limit=10, offset=0))
 
         async with self._db.begin_readonly_session() as db_sess:
@@ -1137,8 +1133,6 @@ class ArtifactDBSource:
             Tuple of (artifacts with revisions list, total count)
         """
         if querier is None:
-            from ai.backend.manager.repositories.base import OffsetPagination
-
             querier = Querier(pagination=OffsetPagination(limit=10, offset=0))
 
         async with self._db.begin_readonly_session() as db_sess:
