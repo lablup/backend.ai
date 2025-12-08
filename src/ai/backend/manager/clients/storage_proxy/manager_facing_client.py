@@ -7,6 +7,7 @@ from urllib.parse import quote
 
 import aiohttp
 
+from ai.backend.common.configs.storage_proxy import StorageProxyTimeoutConfig
 from ai.backend.common.dto.storage.request import (
     DeleteObjectReq,
     DownloadObjectReq,
@@ -69,9 +70,15 @@ class StorageProxyManagerFacingClient:
     """
 
     _client: StorageProxyHTTPClient
+    _timeout_config: StorageProxyTimeoutConfig
 
-    def __init__(self, client: StorageProxyHTTPClient):
+    def __init__(
+        self,
+        client: StorageProxyHTTPClient,
+        timeout_config: StorageProxyTimeoutConfig | None = None,
+    ) -> None:
         self._client = client
+        self._timeout_config = timeout_config or StorageProxyTimeoutConfig()
 
     @storage_proxy_client_resilience.apply()
     async def get_volumes(self) -> Mapping[str, Any]:
@@ -80,7 +87,11 @@ class StorageProxyManagerFacingClient:
 
         :return: Response containing volume information
         """
-        return await self._client.request_with_response("GET", "volumes")
+        return await self._client.request_with_response(
+            "GET",
+            "volumes",
+            timeout=self._timeout_config.get_volumes.to_client_timeout(),
+        )
 
     @storage_proxy_client_resilience.apply()
     async def create_folder(
@@ -108,7 +119,12 @@ class StorageProxyManagerFacingClient:
         }
         if mode is not None:
             body["mode"] = mode
-        await self._client.request("POST", "folder/create", body=body)
+        await self._client.request(
+            "POST",
+            "folder/create",
+            body=body,
+            timeout=self._timeout_config.create_folder.to_client_timeout(),
+        )
 
     @storage_proxy_client_resilience.apply()
     async def delete_folder(
@@ -129,6 +145,7 @@ class StorageProxyManagerFacingClient:
                 "volume": volume,
                 "vfid": vfid,
             },
+            timeout=self._timeout_config.delete_folder.to_client_timeout(),
         )
 
     @storage_proxy_client_resilience.apply()
@@ -153,7 +170,12 @@ class StorageProxyManagerFacingClient:
             "dst_volume": dst_volume,
             "dst_vfid": dst_vfid,
         }
-        data = await self._client.request_with_response("POST", "folder/clone", body=body)
+        data = await self._client.request_with_response(
+            "POST",
+            "folder/clone",
+            body=body,
+            timeout=self._timeout_config.clone_folder.to_client_timeout(),
+        )
         return VFolderCloneResponse.model_validate(data)
 
     @storage_proxy_client_resilience.apply()
@@ -179,6 +201,7 @@ class StorageProxyManagerFacingClient:
                 "vfid": vfid,
                 "subpath": subpath,
             },
+            timeout=self._timeout_config.get_mount_path.to_client_timeout(),
         )
 
     @storage_proxy_client_resilience.apply()
@@ -198,6 +221,7 @@ class StorageProxyManagerFacingClient:
             body={
                 "volume": volume,
             },
+            timeout=self._timeout_config.get_volume_hwinfo.to_client_timeout(),
         )
 
     @storage_proxy_client_resilience.apply()
@@ -217,6 +241,7 @@ class StorageProxyManagerFacingClient:
             body={
                 "volume": volume,
             },
+            timeout=self._timeout_config.get_volume_performance_metric.to_client_timeout(),
         )
 
     @storage_proxy_client_resilience.apply()
@@ -236,6 +261,7 @@ class StorageProxyManagerFacingClient:
             body={
                 "volume": volume,
             },
+            timeout=self._timeout_config.get_fs_usage.to_client_timeout(),
         )
 
     @storage_proxy_client_resilience.apply()
@@ -258,6 +284,7 @@ class StorageProxyManagerFacingClient:
                 "volume": volume,
                 "vfid": vfid,
             },
+            timeout=self._timeout_config.get_volume_quota.to_client_timeout(),
         )
 
     @storage_proxy_client_resilience.apply()
@@ -280,7 +307,12 @@ class StorageProxyManagerFacingClient:
             "vfid": vfid,
             "size_bytes": quota_scope_size,
         }
-        await self._client.request("PATCH", "volume/quota", body=body)
+        await self._client.request(
+            "PATCH",
+            "volume/quota",
+            body=body,
+            timeout=self._timeout_config.update_volume_quota.to_client_timeout(),
+        )
 
     @storage_proxy_client_resilience.apply()
     async def get_quota_scope(
@@ -302,6 +334,7 @@ class StorageProxyManagerFacingClient:
                 "volume": volume,
                 "qsid": qsid,
             },
+            timeout=self._timeout_config.get_quota_scope.to_client_timeout(),
         )
 
     @storage_proxy_client_resilience.apply()
@@ -325,7 +358,12 @@ class StorageProxyManagerFacingClient:
                 "limit_bytes": max_vfolder_size,
             },
         }
-        await self._client.request("PATCH", "quota-scope", body=body)
+        await self._client.request(
+            "PATCH",
+            "quota-scope",
+            body=body,
+            timeout=self._timeout_config.update_quota_scope.to_client_timeout(),
+        )
 
     @storage_proxy_client_resilience.apply()
     async def delete_quota_scope_quota(
@@ -346,6 +384,7 @@ class StorageProxyManagerFacingClient:
                 "volume": volume,
                 "qsid": qsid,
             },
+            timeout=self._timeout_config.delete_quota_scope_quota.to_client_timeout(),
         )
 
     @storage_proxy_client_resilience.apply()
@@ -380,6 +419,7 @@ class StorageProxyManagerFacingClient:
             "POST",
             "folder/file/mkdir",
             body=body,
+            timeout=self._timeout_config.mkdir.to_client_timeout(),
         )
 
     @storage_proxy_client_resilience.apply()
@@ -407,6 +447,7 @@ class StorageProxyManagerFacingClient:
                 "relpath": relpath,
                 "new_name": new_name,
             },
+            timeout=self._timeout_config.rename_file.to_client_timeout(),
         )
 
     @storage_proxy_client_resilience.apply()
@@ -435,6 +476,7 @@ class StorageProxyManagerFacingClient:
                 "relpaths": relpaths,
                 "recursive": recursive,
             },
+            timeout=self._timeout_config.delete_files.to_client_timeout(),
         )
 
     @storage_proxy_client_resilience.apply()
@@ -452,6 +494,7 @@ class StorageProxyManagerFacingClient:
             "POST",
             "folder/file/delete-async",
             body=request.model_dump(mode="json"),
+            timeout=self._timeout_config.delete_files_async.to_client_timeout(),
         )
         return FileDeleteAsyncResponse.model_validate(response)
 
@@ -480,6 +523,7 @@ class StorageProxyManagerFacingClient:
                 "src_relpath": src,
                 "dst_relpath": dst,
             },
+            timeout=self._timeout_config.move_file.to_client_timeout(),
         )
 
     @storage_proxy_client_resilience.apply()
@@ -508,6 +552,7 @@ class StorageProxyManagerFacingClient:
                 "relpath": relpath,
                 "size": size,
             },
+            timeout=self._timeout_config.upload_file.to_client_timeout(),
         )
 
     @storage_proxy_client_resilience.apply()
@@ -540,6 +585,7 @@ class StorageProxyManagerFacingClient:
                 "archive": archive,
                 "unmanaged_path": unmanaged_path,
             },
+            timeout=self._timeout_config.download_file.to_client_timeout(),
         )
 
     @storage_proxy_client_resilience.apply()
@@ -565,6 +611,7 @@ class StorageProxyManagerFacingClient:
                 "vfid": vfid,
                 "relpath": relpath,
             },
+            timeout=self._timeout_config.list_files.to_client_timeout(),
         )
 
     @actxmgr
@@ -590,6 +637,7 @@ class StorageProxyManagerFacingClient:
                 "vfid": vfid,
                 "relpath": relpath,
             },
+            timeout=self._timeout_config.fetch_file.to_client_timeout(),
         ) as response_stream:
             yield response_stream
 
@@ -672,6 +720,7 @@ class StorageProxyManagerFacingClient:
                 "volume": volume,
                 "vfid": vfid,
             },
+            timeout=self._timeout_config.get_folder_usage.to_client_timeout(),
         )
 
     @storage_proxy_client_resilience.apply()
@@ -694,6 +743,7 @@ class StorageProxyManagerFacingClient:
                 "volume": volume,
                 "vfid": vfid,
             },
+            timeout=self._timeout_config.get_used_bytes.to_client_timeout(),
         )
 
     @storage_proxy_client_resilience.apply()
@@ -708,6 +758,7 @@ class StorageProxyManagerFacingClient:
             "POST",
             "v1/registries/huggingface/scan",
             body=req.model_dump(by_alias=True),
+            timeout=self._timeout_config.scan_huggingface_models.to_client_timeout(),
         )
         return HuggingFaceScanModelsResponse.model_validate(resp)
 
@@ -723,6 +774,7 @@ class StorageProxyManagerFacingClient:
             "POST",
             "v1/registries/huggingface/models/batch",
             body=req.model_dump(by_alias=True),
+            timeout=self._timeout_config.retrieve_huggingface_models.to_client_timeout(),
         )
         return HuggingFaceRetrieveModelsResponse.model_validate(resp)
 
@@ -744,6 +796,7 @@ class StorageProxyManagerFacingClient:
                 "registry_name": query.registry_name,
                 "revision": query.revision,
             },
+            timeout=self._timeout_config.retrieve_huggingface_model.to_client_timeout(),
         )
         return HuggingFaceRetrieveModelResponse.model_validate(resp)
 
@@ -759,6 +812,7 @@ class StorageProxyManagerFacingClient:
             "POST",
             "v1/registries/huggingface/import",
             body=req.model_dump(by_alias=True),
+            timeout=self._timeout_config.import_huggingface_models.to_client_timeout(),
         )
         return HuggingFaceImportModelsResponse.model_validate(resp)
 
@@ -780,6 +834,7 @@ class StorageProxyManagerFacingClient:
             "GET",
             f"v1/registries/huggingface/model/{encoded_model_id}/commit-hash",
             params=params,
+            timeout=self._timeout_config.get_huggingface_model_commit_hash.to_client_timeout(),
         )
 
         return HuggingFaceGetCommitHashResponse.model_validate(resp)
@@ -796,6 +851,7 @@ class StorageProxyManagerFacingClient:
             "POST",
             "v1/registries/reservoir/import",
             body=req.model_dump(by_alias=True),
+            timeout=self._timeout_config.import_reservoir_models.to_client_timeout(),
         )
         return ReservoirImportModelsResponse.model_validate(resp)
 
@@ -813,6 +869,7 @@ class StorageProxyManagerFacingClient:
             "POST",
             f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object/download",
             body=req.model_dump(by_alias=True),
+            timeout=self._timeout_config.download_s3_file.to_client_timeout(),
         )
 
     @storage_proxy_client_resilience.apply()
@@ -829,6 +886,7 @@ class StorageProxyManagerFacingClient:
             "POST",
             f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object/presigned/download",
             body=req.model_dump(by_alias=True),
+            timeout=self._timeout_config.get_s3_presigned_download_url.to_client_timeout(),
         )
         return PresignedDownloadObjectResponse.model_validate(resp)
 
@@ -846,6 +904,7 @@ class StorageProxyManagerFacingClient:
             "POST",
             f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object/presigned/upload",
             body=req.model_dump(by_alias=True),
+            timeout=self._timeout_config.get_s3_presigned_upload_url.to_client_timeout(),
         )
         return PresignedUploadObjectResponse.model_validate(resp)
 
@@ -863,6 +922,7 @@ class StorageProxyManagerFacingClient:
             "DELETE",
             f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object",
             body=req.model_dump(by_alias=True),
+            timeout=self._timeout_config.delete_s3_object.to_client_timeout(),
         )
 
     # TODO: Support storage_proxy_client_resilience
@@ -883,6 +943,7 @@ class StorageProxyManagerFacingClient:
             "POST",
             f"v1/storages/vfs/{storage_name}/download",
             body=req.model_dump(by_alias=True),
+            timeout=self._timeout_config.download_vfs_file_streaming.to_client_timeout(),
         ) as response_stream:
             yield response_stream
 
@@ -903,5 +964,6 @@ class StorageProxyManagerFacingClient:
             "GET",
             f"v1/storages/vfs/{storage_name}/files",
             body=req.model_dump(by_alias=True),
+            timeout=self._timeout_config.list_vfs_files.to_client_timeout(),
         )
         return VFSListFilesResponse.model_validate(resp)

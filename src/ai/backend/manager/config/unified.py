@@ -197,6 +197,7 @@ from pydantic import (
 from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.configs.jwt import SharedJWTConfig
 from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.configs.storage_proxy import StorageProxyTimeoutConfig
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
@@ -1658,6 +1659,13 @@ class VolumeProxyConfig(BaseConfigSchema):
         examples=["group-1,group-2"],
         validation_alias=AliasChoices("sftp_scaling_groups", "sftp-scaling-groups"),
         serialization_alias="sftp_scaling_groups",
+    )
+    timeouts: StorageProxyTimeoutConfig = Field(
+        default_factory=StorageProxyTimeoutConfig,
+        description="""
+        Per-method timeout configuration for storage proxy client operations.
+        Allows customizing timeout values for each API method individually.
+        """,
     )
 
 
