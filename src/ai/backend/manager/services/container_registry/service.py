@@ -118,7 +118,7 @@ class ContainerRegistryService:
                 )
                 registries = [registry_data]
             except ContainerRegistryNotFound:
-                pass
+                registries = []
         else:
             registries = await self._container_registry_repository.get_by_registry_name(
                 action.registry
