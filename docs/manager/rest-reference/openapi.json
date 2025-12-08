@@ -749,6 +749,71 @@
         },
         "type": "array"
       },
+      "ModelHealthCheck": {
+        "additionalProperties": true,
+        "properties": {
+          "interval": {
+            "default": 10.0,
+            "description": "Interval in seconds between health checks.",
+            "examples": [
+              10.0
+            ],
+            "title": "Interval",
+            "type": "number"
+          },
+          "path": {
+            "description": "Path to check for health status.",
+            "examples": [
+              "/health"
+            ],
+            "title": "Path",
+            "type": "string"
+          },
+          "max-retries": {
+            "default": 10,
+            "description": "Maximum number of retries for health check.",
+            "examples": [
+              10
+            ],
+            "title": "Max-Retries",
+            "type": "integer"
+          },
+          "max-wait-time": {
+            "default": 15.0,
+            "description": "Maximum time in seconds to wait for a health check response.",
+            "examples": [
+              15.0
+            ],
+            "title": "Max-Wait-Time",
+            "type": "number"
+          },
+          "expected-status-code": {
+            "default": 200,
+            "description": "Expected HTTP status code for a healthy response.",
+            "examples": [
+              200
+            ],
+            "exclusiveMinimum": 100,
+            "title": "Expected-Status-Code",
+            "type": "integer"
+          },
+          "initial-delay": {
+            "default": 60.0,
+            "description": "Initial delay in seconds before the first health check.",
+            "examples": [
+              60.0
+            ],
+            "minimum": 0,
+            "title": "Initial-Delay",
+            "type": "number"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "ModelHealthCheck",
+        "type": "object"
+      },
       "MountOptionModel": {
         "properties": {
           "mount_destination": {
@@ -1085,6 +1150,18 @@
             "description": "If set to true, do not require an API key to access the model service",
             "title": "Open To Public",
             "type": "boolean"
+          },
+          "health_check_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelHealthCheck"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Health check configuration for the model service endpoint"
           },
           "config": {
             "$ref": "#/components/schemas/ServiceConfigModel"
