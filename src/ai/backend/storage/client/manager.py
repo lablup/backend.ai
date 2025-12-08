@@ -131,7 +131,7 @@ class ManagerHTTPClient:
 
         Args:
             storage_name: Name of the VFS storage
-            directory: Directory path to list files from (empty string or root)
+            directory: Directory path to list files from (empty string for root)
 
         Returns:
             Response containing list of files with metadata
