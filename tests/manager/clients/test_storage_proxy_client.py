@@ -96,10 +96,6 @@ class TestStorageProxyClient:
 
         assert "Request to storage proxy timed out" in str(exc_info.value)
 
-
-class TestStorageProxyManagerFacingClientTimeout:
-    """Tests for StorageProxyManagerFacingClient per-method timeout configuration."""
-
     @pytest.mark.asyncio
     async def test_configured_client_timeout_causes_timeout_error(self, aiohttp_client) -> None:
         """
