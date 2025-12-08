@@ -341,11 +341,11 @@ class ModelDefinitionSource(HealthCheckSource):
                 if health_check_info:
                     return ModelHealthCheck(
                         path=health_check_info["path"],
-                        interval=health_check_info.get("interval", 10.0),
-                        max_retries=health_check_info.get("max_retries", 10),
-                        max_wait_time=health_check_info.get("max_wait_time", 15.0),
-                        expected_status_code=health_check_info.get("expected_status_code", 200),
-                        initial_delay=health_check_info.get("initial_delay", 60.0),
+                        interval=health_check_info["interval"],
+                        max_retries=health_check_info["max_retries"],
+                        max_wait_time=health_check_info["max_wait_time"],
+                        expected_status_code=health_check_info["expected_status_code"],
+                        initial_delay=health_check_info.get("initial_delay"),
                     )
         except Exception:
             log.debug("Failed to load health check config from model-definition.yaml")
