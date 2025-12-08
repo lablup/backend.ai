@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Coroutine
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import pytest
 from aiohttp import ClientTimeout, web
+from aiohttp.test_utils import TestClient
 
 from ai.backend.common.configs.client import HttpTimeoutConfig
 from ai.backend.common.exception import ErrorDetail, ErrorDomain, ErrorOperation, PassthroughError
@@ -19,9 +20,6 @@ from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
 )
 from ai.backend.manager.config.unified import StorageProxyClientTimeoutConfig
 from ai.backend.manager.errors.storage import StorageProxyTimeoutError
-
-if TYPE_CHECKING:
-    from aiohttp.test_utils import TestClient
 
 type HandlerType = Callable[[web.Request], Coroutine[Any, Any, web.Response]]
 type StorageProxyClientFactory = Callable[
