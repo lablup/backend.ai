@@ -14,6 +14,14 @@ if TYPE_CHECKING:
     from sqlalchemy.engine import Row
 
 
+@dataclass(frozen=True)
+class GQLPageInfo:
+    """Page info result for GraphQL layer."""
+
+    has_next_page: bool
+    has_previous_page: bool
+
+
 class QueryPagination(ABC):
     """
     Base class for pagination strategies.
@@ -49,6 +57,20 @@ class QueryPagination(ABC):
 
         Returns:
             _PageInfoResult containing sliced rows and pagination flags
+        """
+
+        raise NotImplementedError
+
+    @abstractmethod
+    def compute_gql_page_info(self, items_count: int, total_count: int) -> GQLPageInfo:
+        """Compute page info for GraphQL layer.
+
+        Args:
+            items_count: Number of items returned in this page
+            total_count: Total count of items matching the query
+
+        Returns:
+            GQLPageInfo with has_next_page and has_previous_page flags
         """
 
         raise NotImplementedError
@@ -100,6 +122,13 @@ class OffsetPagination(QueryPagination):
             rows=rows,
             has_next_page=has_next_page,
             has_previous_page=has_previous_page,
+        )
+
+    def compute_gql_page_info(self, items_count: int, total_count: int) -> GQLPageInfo:
+        """Compute page info for GraphQL layer."""
+        return GQLPageInfo(
+            has_next_page=(self.offset + items_count) < total_count,
+            has_previous_page=self.offset > 0,
         )
 
 
@@ -154,6 +183,13 @@ class CursorForwardPagination(QueryPagination):
             has_previous_page=has_previous_page,
         )
 
+    def compute_gql_page_info(self, items_count: int, total_count: int) -> GQLPageInfo:
+        """Compute page info for GraphQL layer."""
+        return GQLPageInfo(
+            has_next_page=items_count == self.first and items_count < total_count,
+            has_previous_page=self.cursor_condition is not None,
+        )
+
 
 @dataclass
 class CursorBackwardPagination(QueryPagination):
@@ -204,6 +240,13 @@ class CursorBackwardPagination(QueryPagination):
             rows=rows,
             has_next_page=has_next_page,
             has_previous_page=has_previous_page,
+        )
+
+    def compute_gql_page_info(self, items_count: int, total_count: int) -> GQLPageInfo:
+        """Compute page info for GraphQL layer."""
+        return GQLPageInfo(
+            has_next_page=self.cursor_condition is not None,
+            has_previous_page=items_count == self.last,
         )
 
 
