@@ -115,6 +115,7 @@ enum AgentOrderField {
   SCHEDULABLE
 }
 
+"""Added in 25.18.0. Permissions related to agent operations"""
 enum AgentPermission {
   READ_ATTRIBUTE
   UPDATE_ATTRIBUTE
