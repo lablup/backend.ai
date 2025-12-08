@@ -66,7 +66,7 @@ def last_execution_time(
                     results.append(result)
             else:
                 redis_key = f"manager.{_manager_id}.{scheduler_name}"
-                exists = await redis_conn_set.live.client.client.exists([redis_key])
+                exists = await redis_conn_set.live.exists([redis_key])
                 if exists == 0:
                     log.warn(
                         "Failed to fetch scheduler information of {} on manager {}. Please check if you have mentioned both manager ID and scheduler name correctly.",
