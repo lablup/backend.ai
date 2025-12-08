@@ -116,7 +116,9 @@ async def test_authorize_invalid_credentials(
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
         status=HookResults.PASSED, result=None, reason=None
     )
-    mock_auth_repository.check_credential_with_migration.return_value = None
+    mock_auth_repository.check_credential_with_migration.side_effect = AuthorizationFailed(
+        "User credential mismatch."
+    )
 
     action = AuthorizeAction(
         type=AuthTokenType.KEYPAIR,

@@ -137,8 +137,10 @@ async def test_update_password_fails_with_incorrect_old_password(
         reason=None,
     )
 
-    # Invalid old password
-    mock_auth_repository.check_credential_without_migration.return_value = None
+    # Invalid old password - raises AuthorizationFailed
+    mock_auth_repository.check_credential_without_migration.side_effect = AuthorizationFailed(
+        "User credential mismatch."
+    )
 
     with pytest.raises(AuthorizationFailed):
         await auth_service.update_password(action)

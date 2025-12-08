@@ -3,7 +3,8 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.manager.errors.common import GenericBadRequest, GenericForbidden
+from ai.backend.manager.errors.auth import AuthorizationFailed
+from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.services.auth.actions.signout import SignoutAction
@@ -85,10 +86,12 @@ async def test_signout_fails_with_invalid_credentials(
         requester_email="user@example.com",
     )
 
-    # Setup invalid credential check - returns None for invalid credentials
-    mock_auth_repository.check_credential_without_migration.return_value = None
+    # Setup invalid credential check - raises AuthorizationFailed for invalid credentials
+    mock_auth_repository.check_credential_without_migration.side_effect = AuthorizationFailed(
+        "User credential mismatch."
+    )
 
-    with pytest.raises(GenericBadRequest):
+    with pytest.raises(AuthorizationFailed):
         await auth_service.signout(action)
 
     mock_auth_repository.check_credential_without_migration.assert_called_once()

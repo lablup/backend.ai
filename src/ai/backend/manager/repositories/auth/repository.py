@@ -45,8 +45,8 @@ class AuthRepository:
         )
 
     @auth_repository_resilience.apply()
-    async def update_user_full_name(self, email: str, domain_name: str, full_name: str) -> bool:
-        return await self._db_source.modify_user_full_name(email, domain_name, full_name)
+    async def update_user_full_name(self, email: str, domain_name: str, full_name: str) -> None:
+        await self._db_source.modify_user_full_name(email, domain_name, full_name)
 
     @auth_repository_resilience.apply()
     async def update_user_password(self, email: str, password_info: PasswordInfo) -> None:
@@ -76,7 +76,7 @@ class AuthRepository:
         domain_name: str,
         email: str,
         target_password_info: PasswordInfo,
-    ) -> Optional[dict]:
+    ) -> dict:
         return await self._db_source.verify_credential_with_migration(
             domain_name, email, target_password_info
         )
@@ -87,14 +87,14 @@ class AuthRepository:
         domain_name: str,
         email: str,
         password: str,
-    ) -> Optional[dict]:
+    ) -> dict:
         """Check credentials without password migration (for signout, etc.)"""
         return await self._db_source.verify_credential_without_migration(
             domain_name, email, password
         )
 
     @auth_repository_resilience.apply()
-    async def get_user_row_by_uuid(self, user_uuid: UUID) -> Optional[UserRow]:
+    async def get_user_row_by_uuid(self, user_uuid: UUID) -> UserRow:
         return await self._db_source.fetch_user_row_by_uuid(user_uuid)
 
     @auth_repository_resilience.apply()
