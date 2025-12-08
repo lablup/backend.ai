@@ -1,5 +1,4 @@
 import logging
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
@@ -84,12 +83,6 @@ from ai.backend.manager.services.agent.actions.watcher_agent_stop import (
 from ai.backend.manager.types import OptionalState
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-@dataclass
-class _AgentWatcherResponse:
-    status: int
-    data: dict | str
 
 
 class AgentService:
