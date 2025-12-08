@@ -57,7 +57,12 @@ from ai.backend.manager.models.vfolder import VFolderOwnershipType
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
 from .db_source import DeploymentDBSource
-from .storage_source import DeploymentStorageSource
+from .storage_source import (
+    DeploymentStorageSource,
+    HealthCheckDBSource,
+    ModelDefinitionSource,
+    RuntimeProfileSource,
+)
 from .types import RouteData, RouteServiceDiscoveryInfo
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -843,7 +848,7 @@ class DeploymentRepository:
         connection_info = await self._db_source.generate_route_connection_info(endpoint_id)
 
         # Get health check config
-        health_check_config = await self._db_source.get_endpoint_health_check_config(endpoint_id)
+        health_check_config = await self.get_endpoint_health_check_config(endpoint_id)
 
         # Update Redis with route info
         await self._valkey_live.update_appproxy_redis_info(
@@ -872,14 +877,12 @@ class DeploymentRepository:
             Merged ModelHealthCheck configuration or None if not available
         """
 
-        from .storage_source import HealthCheckDBSource, ModelDefinitionSource, RuntimeProfileSource
-
         # Get context for merging
         ctx = await self._db_source.get_endpoint_health_check_context(endpoint_id)
 
         # Build source chain: RuntimeProfile -> ModelDefinition -> DB
         runtime_source = RuntimeProfileSource(ctx.runtime_variant)
-        db_source = HealthCheckDBSource(ctx.db_health_check_config)
+        health_check_db_source = HealthCheckDBSource(ctx.db_health_check_config)
 
         result: Optional[ModelHealthCheck] = None
 
@@ -902,9 +905,9 @@ class DeploymentRepository:
                 result = model_def_source.merge(result, model_def_config)
 
         # 3. Load from DB (highest priority)
-        db_loaded = await db_source.load()
+        db_loaded = await health_check_db_source.load()
         if db_loaded is not None:
-            result = db_source.merge(result, db_loaded)
+            result = health_check_db_source.merge(result, db_loaded)
 
         return result
 
