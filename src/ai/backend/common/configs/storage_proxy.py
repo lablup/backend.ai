@@ -11,11 +11,11 @@ from ai.backend.common.config import BaseConfigSchema
 class TimeoutConfig(BaseConfigSchema):
     """
     Timeout configuration for a single HTTP request.
-    All fields are optional; None means no timeout for that particular setting.
+    Default values follow aiohttp defaults: total=300s, sock_connect=30s.
     """
 
     total: Optional[float] = Field(
-        default=None,
+        default=300.0,
         description="""
         Total timeout for the entire request (in seconds).
         None means no timeout.
@@ -31,7 +31,7 @@ class TimeoutConfig(BaseConfigSchema):
         examples=[60.0],
     )
     sock_connect: Optional[float] = Field(
-        default=None,
+        default=30.0,
         description="""
         Timeout for connecting to a peer for a new connection (in seconds).
         None means no timeout.
@@ -60,7 +60,7 @@ class TimeoutConfig(BaseConfigSchema):
         )
 
 
-_DEFAULT_TIMEOUT = TimeoutConfig(total=300.0, sock_connect=30.0)
+_DEFAULT_TIMEOUT = TimeoutConfig()
 
 
 class StorageProxyTimeoutConfig(BaseConfigSchema):
