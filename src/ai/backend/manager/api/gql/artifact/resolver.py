@@ -9,6 +9,11 @@ from strawberry import ID, Info
 from strawberry.dataloader import DataLoader
 
 from ai.backend.common.data.storage.registries.types import ModelSortKey
+from ai.backend.manager.api.gql.adapter import PaginationOptions
+from ai.backend.manager.api.gql.artifact.adapter import (
+    get_artifact_pagination_spec,
+    get_artifact_revision_pagination_spec,
+)
 from ai.backend.manager.api.gql.base import (
     to_global_id,
 )
@@ -24,9 +29,6 @@ from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
 from ai.backend.manager.errors.artifact import (
     ArtifactImportDelegationError,
     ArtifactScanLimitExceededError,
-)
-from ai.backend.manager.repositories.base import (
-    Querier,
 )
 from ai.backend.manager.services.artifact.actions.delegate_scan import DelegateScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.delete_multi import DeleteArtifactsAction
@@ -111,15 +113,18 @@ async def resolve_artifacts(
     offset: Optional[int] = None,
 ) -> ArtifactConnection:
     # Build querier using adapter
-    querier = info.context.gql_adapters.artifact.build_querier(
+    querier = info.context.gql_adapter.build_querier(
+        PaginationOptions(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        get_artifact_pagination_spec(),
         filter=filter,
         order_by=order_by,
-        first=first,
-        after=after,
-        last=last,
-        before=before,
-        limit=limit,
-        offset=offset,
     )
 
     # Get artifacts using list action
@@ -136,7 +141,8 @@ async def resolve_artifacts(
         registry_meta_loader,
         artifacts=action_result.data,
         total_count=action_result.total_count,
-        querier=querier,
+        has_next_page=action_result.has_next_page,
+        has_previous_page=action_result.has_previous_page,
     )
 
 
@@ -144,15 +150,10 @@ async def _build_artifact_connection(
     registry_meta_loader: DataLoader,
     artifacts: list[ArtifactData],
     total_count: int,
-    querier: Optional["Querier"],
+    has_next_page: bool,
+    has_previous_page: bool,
 ) -> ArtifactConnection:
     """Build GraphQL connection from artifacts data"""
-    from ai.backend.manager.repositories.base import (
-        CursorBackwardPagination,
-        CursorForwardPagination,
-        OffsetPagination,
-    )
-
     edges = []
 
     for artifact_data in artifacts:
@@ -163,33 +164,6 @@ async def _build_artifact_connection(
         )
         cursor = to_global_id(Artifact, artifact_data.id)
         edges.append(ArtifactEdge(node=artifact, cursor=cursor))
-
-    # Calculate pagination info
-    has_next_page = False
-    has_previous_page = False
-
-    if querier and querier.pagination:
-        if isinstance(querier.pagination, OffsetPagination):
-            # Offset-based pagination
-            offset = querier.pagination.offset or 0
-            has_previous_page = offset > 0
-            has_next_page = (offset + len(artifacts)) < total_count
-
-        elif isinstance(querier.pagination, CursorForwardPagination):
-            # Forward pagination (after/first)
-            first = querier.pagination.first
-            has_next_page = len(artifacts) == first and len(artifacts) < total_count
-            has_previous_page = querier.pagination.after is not None
-
-        elif isinstance(querier.pagination, CursorBackwardPagination):
-            # Backward pagination (before/last)
-            last = querier.pagination.last
-            has_previous_page = len(artifacts) == last
-            has_next_page = querier.pagination.before is not None
-    else:
-        # Default case - assume we have all items if no pagination specified
-        has_next_page = len(artifacts) < total_count
-        has_previous_page = False
 
     page_info = strawberry.relay.PageInfo(
         has_next_page=has_next_page,
@@ -208,49 +182,15 @@ async def _build_artifact_connection(
 def _build_artifact_revision_connection(
     artifact_revisions: list[ArtifactRevisionData],
     total_count: int,
-    querier: Optional["Querier"],
+    has_next_page: bool,
+    has_previous_page: bool,
 ) -> ArtifactRevisionConnection:
     """Build GraphQL connection from artifact revision data"""
-    from ai.backend.manager.repositories.base import (
-        CursorBackwardPagination,
-        CursorForwardPagination,
-        OffsetPagination,
-    )
-
     edges = []
     for revision_data in artifact_revisions:
         revision = ArtifactRevision.from_dataclass(revision_data)
         cursor = to_global_id(ArtifactRevision, revision_data.id)
         edges.append(ArtifactRevisionEdge(node=revision, cursor=cursor))
-
-    # Calculate pagination info
-    has_next_page = False
-    has_previous_page = False
-
-    if querier and querier.pagination:
-        if isinstance(querier.pagination, OffsetPagination):
-            # Offset-based pagination
-            offset = querier.pagination.offset or 0
-            has_previous_page = offset > 0
-            has_next_page = (offset + len(artifact_revisions)) < total_count
-
-        elif isinstance(querier.pagination, CursorForwardPagination):
-            # Forward pagination (after/first)
-            first = querier.pagination.first
-            has_next_page = (
-                len(artifact_revisions) == first and len(artifact_revisions) < total_count
-            )
-            has_previous_page = querier.pagination.after is not None
-
-        elif isinstance(querier.pagination, CursorBackwardPagination):
-            # Backward pagination (before/last)
-            last = querier.pagination.last
-            has_previous_page = len(artifact_revisions) == last
-            has_next_page = querier.pagination.before is not None
-    else:
-        # Default case - assume we have all items if no pagination specified
-        has_next_page = len(artifact_revisions) < total_count
-        has_previous_page = False
 
     page_info = strawberry.relay.PageInfo(
         has_next_page=has_next_page,
@@ -278,15 +218,18 @@ async def resolve_artifact_revisions(
     offset: Optional[int] = None,
 ) -> ArtifactRevisionConnection:
     # Build querier using adapter
-    querier = info.context.gql_adapters.artifact_revision.build_querier(
+    querier = info.context.gql_adapter.build_querier(
+        PaginationOptions(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        get_artifact_revision_pagination_spec(),
         filter=filter,
         order_by=order_by,
-        first=first,
-        after=after,
-        last=last,
-        before=before,
-        limit=limit,
-        offset=offset,
     )
 
     # Get artifact revisions using list action
@@ -298,7 +241,8 @@ async def resolve_artifact_revisions(
     return _build_artifact_revision_connection(
         artifact_revisions=action_result.data,
         total_count=action_result.total_count,
-        querier=querier,
+        has_next_page=action_result.has_next_page,
+        has_previous_page=action_result.has_previous_page,
     )
 
 

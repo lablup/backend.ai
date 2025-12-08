@@ -1,6 +1,6 @@
 """GraphQL artifact module."""
 
-from .adapter import ArtifactGQLAdapter, ArtifactRevisionGQLAdapter
+from .adapter import get_artifact_pagination_spec, get_artifact_revision_pagination_spec
 from .resolver import (
     approve_artifact_revision,
     artifact,
@@ -57,9 +57,9 @@ from .types import (
 )
 
 __all__ = (
-    # Adapters
-    "ArtifactGQLAdapter",
-    "ArtifactRevisionGQLAdapter",
+    # Pagination specs
+    "get_artifact_pagination_spec",
+    "get_artifact_revision_pagination_spec",
     # Main types
     "Artifact",
     "ArtifactRevision",

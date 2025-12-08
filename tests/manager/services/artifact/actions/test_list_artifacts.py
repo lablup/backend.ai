@@ -29,6 +29,8 @@ from ...utils import ScenarioBase
             ListArtifactsActionResult(
                 data=[ARTIFACT_FIXTURE_DATA],
                 total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
             ),
         ),
         ScenarioBase.success(
@@ -43,6 +45,8 @@ from ...utils import ScenarioBase
             ListArtifactsActionResult(
                 data=[ARTIFACT_FIXTURE_DATA],
                 total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
             ),
         ),
     ],
