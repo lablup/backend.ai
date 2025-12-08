@@ -87,8 +87,8 @@ async def agents_v2(
     return AgentV2Connection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
             start_cursor=edges[0].cursor if edges else None,
             end_cursor=edges[-1].cursor if edges else None,
         ),
