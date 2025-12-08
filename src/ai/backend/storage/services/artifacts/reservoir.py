@@ -556,10 +556,10 @@ class ReservoirService:
                 # Process each model sequentially to avoid overwhelming the system
                 # In a production system, this could be enhanced with parallel processing
                 # and proper job queue management
-                for idx, model in enumerate(models, 1):
+                for idx, (model, artifact_revision_id) in enumerate(
+                    zip(models, artifact_revision_ids, strict=True), 1
+                ):
                     model_id = model.model_id
-                    # Get corresponding artifact_revision_id (1:1 mapping with models list)
-                    artifact_revision_id = artifact_revision_ids[idx - 1]
                     try:
                         log.info(
                             f"Processing model in batch: model_id={model_id}, progress={idx}/{model_count}"
