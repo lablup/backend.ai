@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Optional, override
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.manager.types import Creator, OptionalState, PartialModifier, TriState
@@ -34,6 +34,7 @@ class ContainerRegistryCreator(Creator):
     extra: Optional[dict[str, Any]]
     allowed_groups: Optional[AllowedGroupsModel]
 
+    @override
     def fields_to_store(self) -> dict[str, Any]:
         return {
             "url": self.url,
@@ -61,6 +62,7 @@ class ContainerRegistryModifier(PartialModifier):
     extra: TriState[dict[str, Any]]
     allowed_groups: TriState[AllowedGroupsModel]
 
+    @override
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
         self.url.update_dict(to_update, "url")
