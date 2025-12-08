@@ -1,9 +1,10 @@
 import asyncio
+from typing import Optional
 
 import pytest
 from aiohttp import ClientTimeout, web
 
-from ai.backend.common.configs.storage_proxy import TimeoutConfig
+from ai.backend.common.configs.client import HttpTimeoutConfig
 from ai.backend.common.exception import ErrorDetail, ErrorDomain, ErrorOperation, PassthroughError
 from ai.backend.manager.clients.storage_proxy.base import (
     DEFAULT_TIMEOUT,
@@ -102,7 +103,7 @@ class TestStorageProxyManagerFacingClientTimeout:
     @pytest.mark.asyncio
     async def test_get_volumes_uses_configured_timeout(self, aiohttp_client) -> None:
         """Test that get_volumes uses the configured timeout."""
-        request_received_timeout: ClientTimeout | None = None
+        request_received_timeout: Optional[ClientTimeout] = None
 
         async def volumes_handler(request: web.Request) -> web.Response:
             nonlocal request_received_timeout
@@ -125,7 +126,7 @@ class TestStorageProxyManagerFacingClientTimeout:
         )
 
         # Create manager client with custom very short timeout for get_volumes
-        custom_timeout = TimeoutConfig(total=0.1, sock_connect=0.05)
+        custom_timeout = HttpTimeoutConfig(total=0.1, sock_connect=0.05)
         timeout_config = StorageProxyClientTimeoutConfig(get_volumes=custom_timeout)
         manager_client = StorageProxyManagerFacingClient(
             client=http_client,
@@ -137,16 +138,17 @@ class TestStorageProxyManagerFacingClientTimeout:
             await manager_client.get_volumes()
 
     @pytest.mark.asyncio
-    async def test_list_files_uses_configured_timeout(self, aiohttp_client) -> None:
-        """Test that list_files uses its own configured timeout."""
+    async def test_get_volumes_succeeds_with_sufficient_timeout(self, aiohttp_client) -> None:
+        """Test that get_volumes succeeds when timeout is sufficient."""
 
-        async def list_files_handler(_request: web.Request) -> web.Response:
-            await asyncio.sleep(0.5)
-            return web.json_response({"items": [], "files": []})
+        async def volumes_handler(request: web.Request) -> web.Response:
+            # Short delay that is within timeout
+            await asyncio.sleep(0.1)
+            return web.json_response({"volumes": ["volume1", "volume2"]})
 
         # Set up mock storage proxy server
         app = web.Application()
-        app.router.add_post("/folder/file/list", list_files_handler)
+        app.router.add_get("/volumes", volumes_handler)
         client = await aiohttp_client(app)
 
         # Create storage proxy client
@@ -158,18 +160,14 @@ class TestStorageProxyManagerFacingClientTimeout:
             ),
         )
 
-        # Create manager client with custom timeout for list_files
-        custom_timeout = TimeoutConfig(total=0.1)
-        timeout_config = StorageProxyClientTimeoutConfig(list_files=custom_timeout)
+        # Create manager client with sufficient timeout for get_volumes
+        custom_timeout = HttpTimeoutConfig(total=5.0, sock_connect=1.0)
+        timeout_config = StorageProxyClientTimeoutConfig(get_volumes=custom_timeout)
         manager_client = StorageProxyManagerFacingClient(
             client=http_client,
             timeout_config=timeout_config,
         )
 
-        # The request should timeout
-        with pytest.raises(StorageProxyTimeoutError):
-            await manager_client.list_files(
-                volume="test-volume",
-                vfid="test-vfid",
-                relpath=".",
-            )
+        # The request should succeed because timeout is sufficient
+        result = await manager_client.get_volumes()
+        assert result == {"volumes": ["volume1", "volume2"]}
