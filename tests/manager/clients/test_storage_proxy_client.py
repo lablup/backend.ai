@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import asyncio
-from typing import Optional
+from collections.abc import Callable, Coroutine
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from aiohttp import ClientTimeout, web
@@ -17,14 +20,48 @@ from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
 from ai.backend.manager.config.unified import StorageProxyClientTimeoutConfig
 from ai.backend.manager.errors.storage import StorageProxyTimeoutError
 
+if TYPE_CHECKING:
+    from aiohttp.test_utils import TestClient
+
+type HandlerType = Callable[[web.Request], Coroutine[Any, Any, web.Response]]
+type StorageProxyClientFactory = Callable[
+    [str, HandlerType], Coroutine[Any, Any, StorageProxyHTTPClient]
+]
+
+
+@pytest.fixture
+def storage_proxy_client_factory(
+    aiohttp_client: Any,  # pytest-aiohttp plugin fixture
+) -> StorageProxyClientFactory:
+    """Factory fixture to create StorageProxyHTTPClient with a mock handler."""
+
+    async def _factory(
+        endpoint_path: str,
+        handler: HandlerType,
+    ) -> StorageProxyHTTPClient:
+        app = web.Application()
+        app.router.add_get(f"/{endpoint_path}", handler)
+        client: TestClient = await aiohttp_client(app)
+
+        return StorageProxyHTTPClient(
+            client_session=client.session,
+            args=StorageProxyClientArgs(
+                endpoint=client.make_url("/"),
+                secret="test-secret",
+            ),
+        )
+
+    return _factory
+
 
 class TestStorageProxyClient:
     @pytest.mark.asyncio
-    async def test_client_gracefully_handle_non_json_response(self, aiohttp_client) -> None:
+    async def test_client_gracefully_handle_non_json_response(
+        self, storage_proxy_client_factory: StorageProxyClientFactory
+    ) -> None:
         """Test that StorageProxyHTTPClient gracefully handles non-JSON error responses."""
-
-        # Create a handler that returns non-JSON response
         test_status_code = 403
+        test_endpoint = "invalid-endpoint"
 
         async def invalid_endpoint_handler(_request: web.Request) -> web.Response:
             return web.Response(
@@ -33,19 +70,8 @@ class TestStorageProxyClient:
                 content_type="text/plain",
             )
 
-        # Set up mock storage proxy server
-        app = web.Application()
-        test_endpoint = "invalid-endpoint"
-        app.router.add_get(f"/{test_endpoint}", invalid_endpoint_handler)
-        client = await aiohttp_client(app)
-
-        # Create storage proxy client pointing to the mock server
-        storage_proxy_client = StorageProxyHTTPClient(
-            client_session=client.session,
-            args=StorageProxyClientArgs(
-                endpoint=client.make_url("/"),
-                secret="test-secret",
-            ),
+        storage_proxy_client = await storage_proxy_client_factory(
+            test_endpoint, invalid_endpoint_handler
         )
 
         # Verify that non-JSON response raises PassthroughError with correct error code
@@ -62,27 +88,19 @@ class TestStorageProxyClient:
         assert error_code.error_detail == ErrorDetail.CONTENT_TYPE_MISMATCH
 
     @pytest.mark.asyncio
-    async def test_request_timeout_expiration(self, aiohttp_client) -> None:
+    async def test_request_timeout_expiration(
+        self, storage_proxy_client_factory: StorageProxyClientFactory
+    ) -> None:
         """Test that request properly times out when timeout expires."""
+        test_endpoint = "slow-endpoint"
 
         async def slow_endpoint_handler(_request: web.Request) -> web.Response:
             # Sleep for longer than the timeout
             await asyncio.sleep(2.0)
             return web.json_response({"status": "success"})
 
-        # Set up mock storage proxy server
-        app = web.Application()
-        test_endpoint = "slow-endpoint"
-        app.router.add_get(f"/{test_endpoint}", slow_endpoint_handler)
-        client = await aiohttp_client(app)
-
-        # Create storage proxy client
-        storage_proxy_client = StorageProxyHTTPClient(
-            client_session=client.session,
-            args=StorageProxyClientArgs(
-                endpoint=client.make_url("/"),
-                secret="test-secret",
-            ),
+        storage_proxy_client = await storage_proxy_client_factory(
+            test_endpoint, slow_endpoint_handler
         )
 
         # Make request with very short timeout
@@ -97,32 +115,20 @@ class TestStorageProxyClient:
         assert "Request to storage proxy timed out" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_configured_client_timeout_causes_timeout_error(self, aiohttp_client) -> None:
+    async def test_configured_client_timeout_causes_timeout_error(
+        self, storage_proxy_client_factory: StorageProxyClientFactory
+    ) -> None:
         """
         Test that configured short timeout causes timeout error when server is slow.
         Note: get_volumes is used as an arbitrary method call to test timeout behavior.
         """
-        request_received_timeout: Optional[ClientTimeout] = None
 
-        async def volumes_handler(request: web.Request) -> web.Response:
-            nonlocal request_received_timeout
+        async def volumes_handler(_request: web.Request) -> web.Response:
             # Sleep for a bit to allow timeout to potentially trigger
             await asyncio.sleep(0.5)
             return web.json_response({"volumes": []})
 
-        # Set up mock storage proxy server
-        app = web.Application()
-        app.router.add_get("/volumes", volumes_handler)
-        client = await aiohttp_client(app)
-
-        # Create storage proxy client with short timeout
-        http_client = StorageProxyHTTPClient(
-            client_session=client.session,
-            args=StorageProxyClientArgs(
-                endpoint=client.make_url("/"),
-                secret="test-secret",
-            ),
-        )
+        http_client = await storage_proxy_client_factory("volumes", volumes_handler)
 
         # Create manager client with custom very short timeout for get_volumes
         custom_timeout = HttpTimeoutConfig(total=0.1, sock_connect=0.05)
@@ -137,30 +143,20 @@ class TestStorageProxyClient:
             await manager_client.get_volumes()
 
     @pytest.mark.asyncio
-    async def test_configured_client_timeout_succeeds(self, aiohttp_client) -> None:
+    async def test_configured_client_timeout_succeeds(
+        self, storage_proxy_client_factory: StorageProxyClientFactory
+    ) -> None:
         """
         Test that request succeeds when configured timeout is sufficient.
         Note: get_volumes is used as an arbitrary method call to test timeout behavior.
         """
 
-        async def volumes_handler(request: web.Request) -> web.Response:
+        async def volumes_handler(_request: web.Request) -> web.Response:
             # Short delay that is within timeout
             await asyncio.sleep(0.1)
             return web.json_response({"volumes": ["volume1", "volume2"]})
 
-        # Set up mock storage proxy server
-        app = web.Application()
-        app.router.add_get("/volumes", volumes_handler)
-        client = await aiohttp_client(app)
-
-        # Create storage proxy client
-        http_client = StorageProxyHTTPClient(
-            client_session=client.session,
-            args=StorageProxyClientArgs(
-                endpoint=client.make_url("/"),
-                secret="test-secret",
-            ),
-        )
+        http_client = await storage_proxy_client_factory("volumes", volumes_handler)
 
         # Create manager client with sufficient timeout for get_volumes
         custom_timeout = HttpTimeoutConfig(total=5.0, sock_connect=1.0)
