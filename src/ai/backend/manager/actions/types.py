@@ -10,6 +10,10 @@ class OperationStatus(enum.StrEnum):
     RUNNING = "running"
 
 
+class MonitorTag(enum.StrEnum):
+    SKIP_AUDIT_LOG = "skip_audit_log"
+
+
 @dataclass
 class ActionSpec:
     entity_type: str

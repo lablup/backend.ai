@@ -4,6 +4,7 @@ from typing import Optional, override
 from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import MonitorTag
 from ai.backend.manager.services.agent.actions.base import AgentAction
 
 
@@ -20,6 +21,11 @@ class HandleHeartbeatAction(AgentAction):
     @classmethod
     def operation_type(cls) -> str:
         return "handle_heartbeat"
+
+    @override
+    @classmethod
+    def monitor_tags(cls) -> frozenset[MonitorTag]:
+        return frozenset({MonitorTag.SKIP_AUDIT_LOG})
 
 
 @dataclass
