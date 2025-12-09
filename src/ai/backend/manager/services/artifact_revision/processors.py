@@ -39,6 +39,10 @@ from ai.backend.manager.services.artifact_revision.actions.get_readme import (
     GetArtifactRevisionReadmeAction,
     GetArtifactRevisionReadmeActionResult,
 )
+from ai.backend.manager.services.artifact_revision.actions.get_verification_result import (
+    GetArtifactRevisionVerificationResultAction,
+    GetArtifactRevisionVerificationResultActionResult,
+)
 from ai.backend.manager.services.artifact_revision.actions.import_revision import (
     ImportArtifactRevisionAction,
     ImportArtifactRevisionActionResult,
@@ -58,6 +62,10 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
     get: ActionProcessor[GetArtifactRevisionAction, GetArtifactRevisionActionResult]
     get_readme: ActionProcessor[
         GetArtifactRevisionReadmeAction, GetArtifactRevisionReadmeActionResult
+    ]
+    get_verification_result: ActionProcessor[
+        GetArtifactRevisionVerificationResultAction,
+        GetArtifactRevisionVerificationResultActionResult,
     ]
     get_download_progress: ActionProcessor[
         GetDownloadProgressAction, GetDownloadProgressActionResult
@@ -85,6 +93,9 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
     ) -> None:
         self.get = ActionProcessor(service.get, action_monitors)
         self.get_readme = ActionProcessor(service.get_readme, action_monitors)
+        self.get_verification_result = ActionProcessor(
+            service.get_verification_result, action_monitors
+        )
         self.get_download_progress = ActionProcessor(service.get_download_progress, action_monitors)
         self.list_revision = ActionProcessor(service.list_revision, action_monitors)
         self.approve = ActionProcessor(service.approve, action_monitors)
@@ -107,6 +118,7 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
         return [
             GetArtifactRevisionAction.spec(),
             GetArtifactRevisionReadmeAction.spec(),
+            GetArtifactRevisionVerificationResultAction.spec(),
             GetDownloadProgressAction.spec(),
             ListArtifactRevisionsAction.spec(),
             ApproveArtifactRevisionAction.spec(),

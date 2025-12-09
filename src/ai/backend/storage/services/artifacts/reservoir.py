@@ -4,7 +4,7 @@ import mimetypes
 import tarfile
 import tempfile
 import uuid
-from collections.abc import AsyncIterator, Callable, MutableMapping
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final, Optional, cast, override
@@ -29,10 +29,9 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
 from ai.backend.common.types import DispatchResult, StreamReader
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.storage.client.manager import ManagerHTTPClient, ManagerHTTPClientArgs
+from ai.backend.storage.client.manager import ManagerHTTPClient, ManagerHTTPClientPool
 from ai.backend.storage.client.s3 import S3Client
 from ai.backend.storage.config.unified import (
-    ReservoirClientConfig,
     ReservoirConfig,
 )
 from ai.backend.storage.context_types import ArtifactVerifierContext
@@ -400,8 +399,7 @@ class ReservoirServiceArgs:
     storage_pool: StoragePool
     reservoir_registry_configs: dict[str, ReservoirConfig]
     artifact_verifier_ctx: ArtifactVerifierContext
-    manager_http_clients: MutableMapping[str, ManagerHTTPClient]
-    reservoir_client_config: ReservoirClientConfig  # Passed to ImportStepContext
+    manager_client_pool: ManagerHTTPClientPool
     redis_client: ValkeyArtifactDownloadTrackingClient
 
 
@@ -414,8 +412,7 @@ class ReservoirService:
     _storage_pool: StoragePool
     _transfer_manager: StorageTransferManager
     _artifact_verifier_ctx: ArtifactVerifierContext
-    _manager_http_clients: MutableMapping[str, ManagerHTTPClient]
-    _reservoir_client_config: ReservoirClientConfig
+    _manager_client_pool: ManagerHTTPClientPool
     _redis_client: ValkeyArtifactDownloadTrackingClient
 
     def __init__(self, args: ReservoirServiceArgs):
@@ -425,9 +422,45 @@ class ReservoirService:
         self._storage_pool = args.storage_pool
         self._transfer_manager = StorageTransferManager(args.storage_pool)
         self._artifact_verifier_ctx = args.artifact_verifier_ctx
-        self._manager_http_clients = args.manager_http_clients
-        self._reservoir_client_config = args.reservoir_client_config
+        self._manager_client_pool = args.manager_client_pool
         self._redis_client = args.redis_client
+
+    async def _fetch_remote_verification_result(
+        self,
+        registry_name: str,
+        artifact_revision_id: uuid.UUID,
+    ) -> Optional[VerificationStepResult]:
+        """
+        Fetch verification result from remote reservoir manager.
+
+        Args:
+            registry_name: Name of the Reservoir registry
+            artifact_revision_id: The artifact revision ID to get verification result for
+
+        Returns:
+            VerificationStepResult if available, None otherwise
+        """
+        manager_client = self._manager_client_pool.get_or_create(registry_name)
+
+        try:
+            log.debug(
+                f"Querying verification result from remote reservoir for artifact revision {artifact_revision_id}"
+            )
+            resp = await manager_client.get_verification_result(artifact_revision_id)
+            if resp.verification_result:
+                log.info(
+                    "Fetched verification result from remote reservoir: artifact_revision_id={}",
+                    artifact_revision_id,
+                )
+            return resp.verification_result
+        except Exception as e:
+            log.warning(
+                "Failed to fetch verification result from remote reservoir: "
+                "artifact_revision_id={}, error={}",
+                artifact_revision_id,
+                str(e),
+            )
+            return None
 
     async def import_model(
         self,
@@ -436,6 +469,7 @@ class ReservoirService:
         reporter: ProgressReporter,
         storage_step_mappings: dict[ArtifactStorageImportStep, str],
         pipeline: ImportPipeline,
+        artifact_revision_id: uuid.UUID,
     ) -> None:
         """
         Import a single model from a reservoir registry to a reservoir storage.
@@ -446,6 +480,7 @@ class ReservoirService:
             reporter: ProgressReporter for tracking progress
             storage_step_mappings: Mapping of import steps to storage names
             pipeline: ImportPipeline to execute
+            artifact_revision_id: The artifact revision ID for verification result lookup
         """
         success = False
         verification_result: Optional[VerificationStepResult] = None
@@ -467,8 +502,10 @@ class ReservoirService:
             log.info(f"Model import completed: {model}")
             success = True
 
-            # Extract verification result from context (None if verification step was not executed)
-            verification_result = context.step_metadata.get("verification_result")
+            # Fetch verification result from remote reservoir
+            verification_result = await self._fetch_remote_verification_result(
+                registry_name, artifact_revision_id
+            )
         finally:
             await self._event_producer.anycast_event(
                 ModelImportDoneEvent(
@@ -489,6 +526,7 @@ class ReservoirService:
         models: list[ModelTarget],
         storage_step_mappings: dict[ArtifactStorageImportStep, str],
         pipeline: ImportPipeline,
+        artifact_revision_ids: list[uuid.UUID],
     ) -> uuid.UUID:
         async def _import_models_batch(reporter: ProgressReporter) -> DispatchResult:
             model_count = len(models)
@@ -508,7 +546,9 @@ class ReservoirService:
                 # Process each model sequentially to avoid overwhelming the system
                 # In a production system, this could be enhanced with parallel processing
                 # and proper job queue management
-                for idx, model in enumerate(models, 1):
+                for idx, (model, artifact_revision_id) in enumerate(
+                    zip(models, artifact_revision_ids, strict=True), 1
+                ):
                     model_id = model.model_id
                     try:
                         log.info(
@@ -522,6 +562,7 @@ class ReservoirService:
                             reporter=reporter,
                             storage_step_mappings=storage_step_mappings,
                             pipeline=pipeline,
+                            artifact_revision_id=artifact_revision_id,
                         )
 
                         successful_models += 1
@@ -570,14 +611,12 @@ class ReservoirDownloadStep(ImportStep[None]):
         self,
         registry_configs: dict[str, ReservoirConfig],
         download_storage: AbstractStorage,
-        manager_http_clients: MutableMapping[str, ManagerHTTPClient],
-        reservoir_client_config: ReservoirClientConfig,
+        manager_client_pool: ManagerHTTPClientPool,
         redis_client: ValkeyArtifactDownloadTrackingClient,
     ) -> None:
         self._registry_configs = registry_configs
         self._download_storage = download_storage
-        self._manager_http_clients = manager_http_clients
-        self._reservoir_client_config = reservoir_client_config
+        self._manager_client_pool = manager_client_pool
         self._redis_client = redis_client
 
     @property
@@ -633,7 +672,7 @@ class ReservoirDownloadStep(ImportStep[None]):
                 cast(VFSStorage, self._download_storage).base_path / model.model_id / revision
             )
             bytes_copied = await self._handle_vfs_download(
-                registry_config, context, model_prefix, dest_path, self._reservoir_client_config
+                registry_config, context, model_prefix, dest_path
             )
             # For VFS downloads, create a single entry representing the extracted archive
             file_obj = FileObjectData(
@@ -668,7 +707,6 @@ class ReservoirDownloadStep(ImportStep[None]):
         context: ImportStepContext,
         model_prefix: str,
         dest_path: Path,
-        reservoir_client_config: ReservoirClientConfig,
     ) -> int:
         """Handle file downloads for VFS storage type using individual file downloads."""
 
@@ -680,31 +718,7 @@ class ReservoirDownloadStep(ImportStep[None]):
             )
 
         try:
-            if (
-                not registry_config.manager_endpoint
-                or not registry_config.manager_access_key
-                or not registry_config.manager_secret_key
-                or not registry_config.manager_api_version
-            ):
-                raise ReservoirStorageConfigInvalidError(
-                    f"Manager access key not configured for reservoir registry: {context.registry_name}"
-                )
-
-            # Get or create ManagerHTTPClient from the pool
-            if context.registry_name not in self._manager_http_clients:
-                manager_client = ManagerHTTPClient(
-                    ManagerHTTPClientArgs(
-                        name=context.registry_name,
-                        endpoint=registry_config.manager_endpoint,
-                        access_key=registry_config.manager_access_key,
-                        secret_key=registry_config.manager_secret_key,
-                        api_version=registry_config.manager_api_version,
-                        client_config=reservoir_client_config,
-                    )
-                )
-                self._manager_http_clients[context.registry_name] = manager_client
-            else:
-                manager_client = self._manager_http_clients[context.registry_name]
+            manager_client = self._manager_client_pool.get_or_create(context.registry_name)
 
             if not registry_config.storage_name:
                 raise ReservoirStorageConfigInvalidError(
@@ -1044,8 +1058,7 @@ def create_reservoir_import_pipeline(
     transfer_manager: StorageTransferManager,
     artifact_verifier_ctx: ArtifactVerifierContext,
     event_producer: EventProducer,
-    manager_http_clients: MutableMapping[str, ManagerHTTPClient],
-    reservoir_client_config: ReservoirClientConfig,
+    manager_client_pool: ManagerHTTPClientPool,
     redis_client: ValkeyArtifactDownloadTrackingClient,
 ) -> ImportPipeline:
     """Create ImportPipeline for Reservoir based on storage step mappings."""
@@ -1063,8 +1076,7 @@ def create_reservoir_import_pipeline(
             ReservoirDownloadStep(
                 registry_configs,
                 download_storage,
-                manager_http_clients,
-                reservoir_client_config,
+                manager_client_pool,
                 redis_client,
             )
         )
