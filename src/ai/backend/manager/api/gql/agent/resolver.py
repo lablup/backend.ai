@@ -100,20 +100,6 @@ async def agents_v2(
     )
 
 
-@strawberry.field(description="Added in 25.18.0")
-async def container_count_v2(
-    info: Info[StrawberryGQLContext],
-    agent_id: str,
-) -> int:
-    """
-    Get the container count for a specific agent.
-    """
-    dataloader = info.context.dataloader_registry.get_loader(
-        batch_load_container_counts, info.context
-    )
-    return await dataloader.load(agent_id)
-
-
 async def batch_load_container_counts(
     ctx: StrawberryGQLContext,
     agent_ids: list[str],
