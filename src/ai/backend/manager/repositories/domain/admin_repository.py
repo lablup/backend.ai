@@ -4,23 +4,27 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.exception import BackendAIError, DomainNotFound, InvalidAPIParameters
-from ai.backend.common.metrics.metric import DomainType, LayerType
-from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
-from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
-from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.domain.types import (
     DomainCreator,
     DomainData,
     DomainModifier,
     UserInfo,
 )
+from ai.backend.manager.decorators.repository_decorator import (
+    create_layer_aware_repository_decorator,
+)
+from ai.backend.manager.errors.resource import DomainDataProcessingError, DomainNotFound
 from ai.backend.manager.models import groups
 from ai.backend.manager.models.domain import DomainRow, domains, row_to_data
 from ai.backend.manager.models.group import ProjectType
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
+
+# Layer-specific decorator for admin domain repository
+admin_repository_decorator = create_layer_aware_repository_decorator(LayerType.DOMAIN)
 
 
 class AdminDomainRepository:
@@ -61,7 +65,7 @@ class AdminDomainRepository:
         assert result is not None
         return result
 
-    @domain_repository_resilience.apply()
+    @admin_repository_decorator()
     async def modify_domain_force(self, domain_name: str, modifier: DomainModifier) -> DomainData:
         """
         Modifies an existing domain without permission checks.
@@ -82,7 +86,7 @@ class AdminDomainRepository:
                 raise DomainNotFound(f"Domain not found: {domain_name}")
             return row_to_data(row)
 
-    @domain_repository_resilience.apply()
+    @admin_repository_decorator()
     async def soft_delete_domain_force(self, domain_name: str) -> None:
         """
         Soft deletes a domain by setting is_active to False without permission checks.
@@ -129,7 +133,7 @@ class AdminDomainRepository:
             )
             domain_row = await session.scalar(insert_and_returning)
             if domain_row is None:
-                raise DomainNodeCreationFailed(f"Failed to create domain node: {creator.name}")
+                raise DomainDataProcessingError(f"Failed to create domain node: {creator.name}")
 
             if scaling_groups is not None:
                 await session.execute(

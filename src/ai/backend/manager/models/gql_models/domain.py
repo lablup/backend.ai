@@ -20,9 +20,6 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ai.backend.common.exception import (
-    DomainNotFound,
-)
 from ai.backend.common.types import ResourceSlot, Sentinel
 from ai.backend.manager.data.domain.types import (
     DomainCreator,

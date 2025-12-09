@@ -4,11 +4,8 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.exception import BackendAIError, DomainNotFound, InvalidAPIParameters
-from ai.backend.common.metrics.metric import DomainType, LayerType
-from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
-from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
-from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.domain.types import (
     DomainCreator,
     DomainData,
@@ -18,7 +15,7 @@ from ai.backend.manager.data.domain.types import (
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
-from ai.backend.manager.errors.resource import DomainDataProcessingError
+from ai.backend.manager.errors.resource import DomainDataProcessingError, DomainNotFound
 from ai.backend.manager.models import groups, users
 from ai.backend.manager.models.domain import DomainRow, domains, get_domains
 from ai.backend.manager.models.group import ProjectType
@@ -100,7 +97,7 @@ class DomainRepository:
                 raise DomainNotFound(f"Domain not found: {domain_name}")
             return row.to_data()
 
-    @domain_repository_resilience.apply()
+    @repository_decorator()
     async def soft_delete_domain_validated(self, domain_name: str) -> None:
         """
         Soft deletes a domain by setting is_active to False.
@@ -329,7 +326,7 @@ class DomainRepository:
         Validates domain and scaling group permissions.
         """
 
-        async def _update(db_session: SASession) -> Optional[DomainData]:
+        async def _update(db_session: SASession) -> DomainData:
             client_ctx = ClientContext(
                 self._db, user_info.domain_name, user_info.id, user_info.role
             )
@@ -360,7 +357,11 @@ class DomainRepository:
             )
 
         async with self._db.connect() as db_conn:
-            return await execute_with_txn_retry(_update, self._db.begin_session, db_conn)
+            return await execute_with_txn_retry(
+                _update,
+                self._db.begin_session,
+                db_conn,  # type: ignore[call-overload]
+            )
 
     async def _ensure_sgroup_permission(
         self, user_info: UserInfo, sgroup_names: Iterable[str], *, db_session: SASession

@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.domain.types import (
     DomainCreator,
@@ -20,6 +20,7 @@ from ai.backend.manager.data.domain.types import (
     DomainModifier,
     UserInfo,
 )
+from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.domain import domains, row_to_data
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.user import UserRole, UserStatus, users
