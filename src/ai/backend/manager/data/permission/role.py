@@ -154,3 +154,13 @@ class RoleListResult:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+
+
+@dataclass(frozen=True)
+class AssignedUserListResult:
+    """Result of assigned user search with pagination info."""
+
+    items: list[AssignedUserData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool

@@ -8,6 +8,8 @@ from sqlalchemy.orm import contains_eager, selectinload
 
 from ...data.permission.id import ObjectId, ScopeId
 from ...data.permission.role import (
+    AssignedUserData,
+    AssignedUserListResult,
     RoleCreateInput,
     RoleDeleteInput,
     RoleListResult,
@@ -26,6 +28,7 @@ from ...models.rbac_models.permission.permission import PermissionRow
 from ...models.rbac_models.permission.permission_group import PermissionGroupRow
 from ...models.rbac_models.role import RoleRow
 from ...models.rbac_models.user_role import UserRoleRow
+from ...models.user import UserRow
 from ...models.utils import ExtendedAsyncSAEngine
 from ...repositories.base import Querier, execute_querier
 
@@ -349,3 +352,46 @@ class PermissionDBSource:
             if role_row is None:
                 raise RoleNotFound(f"Role with ID {role_id} does not exist.")
             return role_row
+
+    async def search_users_assigned_to_role(
+        self,
+        role_id: uuid.UUID,
+        querier: Querier,
+    ) -> AssignedUserListResult:
+        """Searches users assigned to a specific role with pagination and filtering."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = (
+                sa.select(UserRow, UserRoleRow)
+                .select_from(
+                    sa.join(
+                        UserRow,
+                        UserRoleRow,
+                        UserRoleRow.user_id == UserRow.uuid,
+                    )
+                )
+                .where(UserRoleRow.role_id == role_id)
+            )
+
+            result = await execute_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [
+                AssignedUserData(
+                    user_id=row.uuid,
+                    username=row.username,
+                    email=row.email,
+                    granted_by=row.granted_by,
+                    granted_at=row.granted_at,
+                )
+                for row in result.rows
+            ]
+
+            return AssignedUserListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )

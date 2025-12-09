@@ -4,6 +4,10 @@ from .create_role import CreateRoleAction, CreateRoleActionResult
 from .delete_role import DeleteRoleAction, DeleteRoleActionResult
 from .get_role_detail import GetRoleDetailAction, GetRoleDetailActionResult
 from .search_roles import SearchRolesAction, SearchRolesActionResult
+from .search_users_assigned_to_role import (
+    SearchUsersAssignedToRoleAction,
+    SearchUsersAssignedToRoleActionResult,
+)
 from .update_role import UpdateRoleAction, UpdateRoleActionResult
 
 __all__ = [
@@ -19,6 +23,8 @@ __all__ = [
     "GetRoleDetailActionResult",
     "SearchRolesAction",
     "SearchRolesActionResult",
+    "SearchUsersAssignedToRoleAction",
+    "SearchUsersAssignedToRoleActionResult",
     "UpdateRoleAction",
     "UpdateRoleActionResult",
 ]

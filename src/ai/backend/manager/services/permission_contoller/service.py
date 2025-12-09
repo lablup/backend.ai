@@ -25,6 +25,10 @@ from ai.backend.manager.services.permission_contoller.actions.search_roles impor
     SearchRolesAction,
     SearchRolesActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
+    SearchUsersAssignedToRoleAction,
+    SearchUsersAssignedToRoleActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.update_role import (
     UpdateRoleAction,
     UpdateRoleActionResult,
@@ -91,3 +95,13 @@ class PermissionControllerService:
         """Search roles with pagination and filtering."""
         roles = await self._repository.search_roles(action.querier)
         return SearchRolesActionResult(roles=roles)
+
+    async def search_users_assigned_to_role(
+        self, action: SearchUsersAssignedToRoleAction
+    ) -> SearchUsersAssignedToRoleActionResult:
+        """Search users assigned to a specific role with pagination and filtering."""
+        users = await self._repository.search_users_assigned_to_role(
+            role_id=action.role_id,
+            querier=action.querier,
+        )
+        return SearchUsersAssignedToRoleActionResult(users=users)
