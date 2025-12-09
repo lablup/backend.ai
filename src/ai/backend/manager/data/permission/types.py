@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import enum
 
+from ai.backend.common.data.permission.types import RoleSource
 
-class RoleSource(enum.StrEnum):
-    """
-    Definition source of the role.
-    """
-
-    SYSTEM = "system"  # System-defined role, e.g., default roles
-    CUSTOM = "custom"  # Custom role defined
+__all__ = (
+    "RoleSource",
+    "OperationType",
+    "EntityType",
+    "ScopeType",
+    "GLOBAL_SCOPE_ID",
+)
 
 
 class OperationType(enum.StrEnum):

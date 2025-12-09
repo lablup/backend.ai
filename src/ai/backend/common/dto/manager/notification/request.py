@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.query import StringFilter
 
 from .types import (
     NotificationChannelOrderField,
@@ -83,15 +84,6 @@ class UpdateNotificationChannelRequest(BaseRequestModel):
         if isinstance(v, dict):
             return WebhookConfig(**v)
         raise ValueError(f"Invalid config type: {type(v)}")
-
-
-class StringFilter(BaseRequestModel):
-    """String field filter with case-sensitive and case-insensitive options."""
-
-    equals: Optional[str] = Field(default=None, description="Exact match (case-sensitive)")
-    i_equals: Optional[str] = Field(default=None, description="Exact match (case-insensitive)")
-    contains: Optional[str] = Field(default=None, description="Contains (case-sensitive)")
-    i_contains: Optional[str] = Field(default=None, description="Contains (case-insensitive)")
 
 
 class NotificationChannelFilter(BaseRequestModel):
