@@ -1107,16 +1107,16 @@ class ModelServiceHelper:
         return cast(dict[str, Any], result)
 
     @staticmethod
-    async def validate_model_definition_file_exists(
+    async def find_model_definition_file(
         storage_manager: StorageSessionManager,
         folder_host: str,
         vfid: VFolderID,
         suggested_path: str | None,
-    ) -> str:
+    ) -> str | None:
         """
-        Checks if model definition file exists in target model VFolder. Returns path to resolved model definition filename.
-        Since model service counts both `model-definition.yml` and `model-definition.yaml` as valid definition file name, this function ensures
-        at least one model definition file exists under the target VFolder and returns the matched filename.
+        Finds model definition file in target model VFolder. Returns path to resolved model definition filename or None if not found.
+        Since model service counts both `model-definition.yml` and `model-definition.yaml` as valid definition file name, this function
+        checks if at least one model definition file exists under the target VFolder and returns the matched filename.
         """
         proxy_name, volume_name = storage_manager.get_proxy_and_volume(folder_host)
 
@@ -1128,10 +1128,7 @@ class ModelServiceHelper:
             for item in storage_reply["items"]:
                 if item["name"] == path.name:
                     return suggested_path
-            else:
-                raise InvalidAPIParameters(
-                    f"Model definition YAML file {suggested_path} not found inside the model storage"
-                )
+            return None
         else:
             storage_reply = await ModelServiceHelper._listdir(
                 storage_manager, proxy_name, volume_name, vfid, "."
@@ -1140,10 +1137,32 @@ class ModelServiceHelper:
             for item in storage_reply["items"]:
                 if item["name"] in model_definition_candidates:
                     return item["name"]
+            return None
+
+    @staticmethod
+    async def validate_model_definition_file_exists(
+        storage_manager: StorageSessionManager,
+        folder_host: str,
+        vfid: VFolderID,
+        suggested_path: str | None,
+    ) -> str:
+        """
+        Checks if model definition file exists in target model VFolder. Returns path to resolved model definition filename.
+        Raises InvalidAPIParameters if not found.
+        """
+        result = await ModelServiceHelper.find_model_definition_file(
+            storage_manager, folder_host, vfid, suggested_path
+        )
+        if result is None:
+            if suggested_path:
+                raise InvalidAPIParameters(
+                    f"Model definition YAML file {suggested_path} not found inside the model storage"
+                )
             else:
                 raise InvalidAPIParameters(
                     'Model definition YAML file "model-definition.yaml" or "model-definition.yml" not found inside the model storage'
                 )
+        return result
 
     @staticmethod
     async def _read_model_definition(

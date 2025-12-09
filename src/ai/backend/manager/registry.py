@@ -140,7 +140,6 @@ from ai.backend.common.types import (
     KernelId,
     ModelServiceStatus,
     ResourceSlot,
-    RuntimeVariant,
     SessionEnqueueingConfig,
     SessionId,
     SessionTypes,
@@ -3557,24 +3556,32 @@ class AgentRegistry:
     async def get_health_check_info(
         self, endpoint: EndpointData, model: VFolderRow
     ) -> ModelHealthCheck | None:
+        """
+        Get health check configuration for the endpoint.
+
+        Priority:
+        1. If model-definition.yml exists, use health_check from it (for all variants)
+        2. If file doesn't exist, use RuntimeProfile default (for non-CUSTOM variants)
+        3. For CUSTOM variant without model-definition.yml, return None
+        """
         _info: ModelHealthCheck | None = None
 
-        if _path := MODEL_SERVICE_RUNTIME_PROFILES[endpoint.runtime_variant].health_check_endpoint:
-            _info = ModelHealthCheck(path=_path)
-        elif endpoint.runtime_variant == RuntimeVariant.CUSTOM:
-            model_definition_path = await ModelServiceHelper.validate_model_definition_file_exists(
-                self.storage_manager,
-                model.host,
-                model.vfid,
-                endpoint.model_definition_path,
-            )
+        # Try to find model-definition.yml first (applies to all variants)
+        model_definition_path = await ModelServiceHelper.find_model_definition_file(
+            self.storage_manager,
+            model.host,
+            model.vfid,
+            endpoint.model_definition_path,
+        )
+
+        if model_definition_path is not None:
+            # File exists - extract health check from model definition
             model_definition = await ModelServiceHelper.validate_model_definition(
                 self.storage_manager,
                 model.host,
                 model.vfid,
                 model_definition_path,
             )
-
             for model_info in model_definition["models"]:
                 if health_check_info := model_info.get("service", {}).get("health_check"):
                     _info = ModelHealthCheck(
@@ -3586,6 +3593,13 @@ class AgentRegistry:
                         initial_delay=health_check_info.get("initial_delay"),
                     )
                     break
+        else:
+            # File not found - use RuntimeProfile default for non-CUSTOM variants
+            if _path := MODEL_SERVICE_RUNTIME_PROFILES[
+                endpoint.runtime_variant
+            ].health_check_endpoint:
+                _info = ModelHealthCheck(path=_path)
+
         return _info
 
     async def create_appproxy_endpoint(

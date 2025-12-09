@@ -228,6 +228,7 @@ from ai.backend.common.utils import (
     cancel_tasks,
     chown,
     current_loop,
+    deep_merge,
     mount,
     umount,
 )
@@ -3331,6 +3332,14 @@ class AbstractAgent(
         service_ports: list[ServicePort],
         kernel_config: KernelCreationConfig,
     ) -> Any:
+        """
+        Load model definition for the given runtime variant.
+
+        Priority:
+        1. If model-definition.yml exists, use it (for all variants)
+        2. If file doesn't exist, generate default definition (for non-CUSTOM variants)
+        3. For CUSTOM variant without model-definition.yml, raise error
+        """
         image_command = await self.extract_image_command(kernel_config["image"]["canonical"])
         if runtime_variant != RuntimeVariant.CUSTOM and not image_command:
             raise ImageCommandRequiredError(
@@ -3344,6 +3353,12 @@ class AbstractAgent(
 
         model_folder: VFolderMount = model_folders[0]
 
+        # Try to load model-definition.yml (applies to all variants)
+        model_definition_from_file = await self._try_load_model_definition_file(
+            model_folder, kernel_config
+        )
+
+        # Generate base definition based on runtime variant
         match runtime_variant:
             case RuntimeVariant.VLLM:
                 _model = {
@@ -3359,7 +3374,7 @@ class AbstractAgent(
                         },
                     },
                 }
-                raw_definition = {"models": [_model]}
+                base_definition: dict = {"models": [_model]}
 
             case RuntimeVariant.HUGGINGFACE_TGI:
                 _model = {
@@ -3375,7 +3390,7 @@ class AbstractAgent(
                         },
                     },
                 }
-                raw_definition = {"models": [_model]}
+                base_definition = {"models": [_model]}
 
             case RuntimeVariant.NIM:
                 _model = {
@@ -3391,7 +3406,7 @@ class AbstractAgent(
                         },
                     },
                 }
-                raw_definition = {"models": [_model]}
+                base_definition = {"models": [_model]}
 
             case RuntimeVariant.SGLANG:
                 _model = {
@@ -3407,7 +3422,7 @@ class AbstractAgent(
                         },
                     },
                 }
-                raw_definition = {"models": [_model]}
+                base_definition = {"models": [_model]}
 
             case RuntimeVariant.MODULAR_MAX:
                 _model = {
@@ -3423,7 +3438,7 @@ class AbstractAgent(
                         },
                     },
                 }
-                raw_definition = {"models": [_model]}
+                base_definition = {"models": [_model]}
 
             case RuntimeVariant.CMD:
                 _model = {
@@ -3434,44 +3449,22 @@ class AbstractAgent(
                         "port": 8000,
                     },
                 }
-                raw_definition = {"models": [_model]}
+                base_definition = {"models": [_model]}
 
             case RuntimeVariant.CUSTOM:
-                if _fname := (kernel_config.get("internal_data") or {}).get(
-                    "model_definition_path"
-                ):
-                    model_definition_candidates = [_fname]
-                else:
-                    model_definition_candidates = [
-                        "model-definition.yaml",
-                        "model-definition.yml",
-                    ]
-
-                model_definition_path = None
-                for filename in model_definition_candidates:
-                    if (Path(model_folder.host_path) / filename).is_file():
-                        model_definition_path = Path(model_folder.host_path) / filename
-                        break
-
-                if not model_definition_path:
+                if model_definition_from_file is None:
                     raise ModelDefinitionNotFoundError(
-                        f"Model definition file ({' or '.join(model_definition_candidates)}) does not exist under vFolder"
+                        f"Model definition file (model-definition.yaml or model-definition.yml) does not exist under vFolder"
                         f" {model_folder.name} (ID {model_folder.vfid})",
                     )
-                try:
-                    model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
-                        None, model_definition_path.read_text
-                    )
-                except FileNotFoundError as e:
-                    raise ModelDefinitionNotFoundError(
-                        "Model definition file (model-definition.yml) does not exist under"
-                        f" vFolder {model_folder.name} (ID {model_folder.vfid})",
-                    ) from e
-                try:
-                    yaml = YAML()
-                    raw_definition = yaml.load(model_definition_yaml)
-                except YAMLError as e:
-                    raise ModelDefinitionInvalidYAMLError(f"Invalid YAML syntax: {e}") from e
+                # CUSTOM variant has no base definition - uses file content only
+                base_definition = {}
+
+        # Merge: base definition + model-definition.yml (file overrides base)
+        if model_definition_from_file is not None:
+            raw_definition = deep_merge(base_definition, model_definition_from_file)
+        else:
+            raw_definition = base_definition
         try:
             model_definition = model_definition_iv.check(raw_definition)
             if model_definition is None:
@@ -3504,6 +3497,45 @@ class AbstractAgent(
                 "Failed to validate model definition from vFolder"
                 f" {model_folder.name} (ID {model_folder.vfid})",
             ) from e
+
+    async def _try_load_model_definition_file(
+        self,
+        model_folder: VFolderMount,
+        kernel_config: KernelCreationConfig,
+    ) -> dict | None:
+        """
+        Try to load model-definition.yml from the model folder.
+        Returns the parsed definition or None if file doesn't exist.
+        """
+        if _fname := (kernel_config.get("internal_data") or {}).get("model_definition_path"):
+            model_definition_candidates = [_fname]
+        else:
+            model_definition_candidates = [
+                "model-definition.yaml",
+                "model-definition.yml",
+            ]
+
+        model_definition_path = None
+        for filename in model_definition_candidates:
+            if (Path(model_folder.host_path) / filename).is_file():
+                model_definition_path = Path(model_folder.host_path) / filename
+                break
+
+        if model_definition_path is None:
+            return None
+
+        try:
+            model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
+                None, model_definition_path.read_text
+            )
+        except FileNotFoundError:
+            return None
+
+        try:
+            yaml = YAML()
+            return yaml.load(model_definition_yaml)
+        except YAMLError as e:
+            raise ModelDefinitionInvalidYAMLError(f"Invalid YAML syntax: {e}") from e
 
     def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
         return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]

@@ -18,7 +18,6 @@ from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
     KernelId,
-    RuntimeVariant,
     SessionId,
 )
 from ai.backend.manager.data.agent.types import AgentStatus
@@ -1378,29 +1377,22 @@ class DeploymentDBSource:
             endpoint_data = endpoint.to_data()
             _info: ModelHealthCheck | None = None
 
-            # Check runtime profile for health check endpoint
-            if _path := MODEL_SERVICE_RUNTIME_PROFILES[
-                endpoint_data.runtime_variant
-            ].health_check_endpoint:
-                _info = ModelHealthCheck(path=_path)
-            elif endpoint_data.runtime_variant == RuntimeVariant.CUSTOM:
-                # For custom runtime, check model definition file
-                model_definition_path = (
-                    await ModelServiceHelper.validate_model_definition_file_exists(
-                        self._storage_manager,
-                        model.host,
-                        model.vfid,
-                        endpoint_data.model_definition_path,
-                    )
-                )
+            # Try to find model-definition.yml first (applies to all variants)
+            model_definition_path = await ModelServiceHelper.find_model_definition_file(
+                self._storage_manager,
+                model.host,
+                model.vfid,
+                endpoint_data.model_definition_path,
+            )
+
+            if model_definition_path is not None:
+                # File exists - extract health check from model definition
                 model_definition = await ModelServiceHelper.validate_model_definition(
                     self._storage_manager,
                     model.host,
                     model.vfid,
                     model_definition_path,
                 )
-
-                # Check each model in the definition for health check config
                 for model_info in model_definition["models"]:
                     if health_check_info := model_info.get("service", {}).get("health_check"):
                         _info = ModelHealthCheck(
@@ -1411,6 +1403,12 @@ class DeploymentDBSource:
                             expected_status_code=health_check_info.get("expected_status_code"),
                         )
                         break
+            else:
+                # File not found - use RuntimeProfile default for non-CUSTOM variants
+                if _path := MODEL_SERVICE_RUNTIME_PROFILES[
+                    endpoint_data.runtime_variant
+                ].health_check_endpoint:
+                    _info = ModelHealthCheck(path=_path)
 
             return _info
 

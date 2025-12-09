@@ -691,14 +691,18 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
             resource_policy,
         )
 
-    if params.runtime_variant == RuntimeVariant.CUSTOM:
-        vfid = VFolderID(folder_row["quota_scope_id"], folder_row["id"])
-        yaml_path = await ModelServiceHelper.validate_model_definition_file_exists(
-            root_ctx.storage_manager,
-            folder_row["host"],
-            vfid,
-            params.config.model_definition_path,
-        )
+    vfid = VFolderID(folder_row["quota_scope_id"], folder_row["id"])
+
+    # Try to find model-definition.yml for all variants
+    yaml_path = await ModelServiceHelper.find_model_definition_file(
+        root_ctx.storage_manager,
+        folder_row["host"],
+        vfid,
+        params.config.model_definition_path,
+    )
+
+    if yaml_path is not None:
+        # File exists - validate it for all variants
         await ModelServiceHelper.validate_model_definition(
             root_ctx.storage_manager,
             folder_row["host"],
@@ -706,6 +710,14 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
             yaml_path,
         )
     else:
+        # File not found
+        if params.runtime_variant == RuntimeVariant.CUSTOM:
+            # CUSTOM variant requires model-definition.yml
+            raise InvalidAPIParameters(
+                'Model definition YAML file "model-definition.yaml" or "model-definition.yml" not found inside the model storage'
+            )
+        # For non-CUSTOM variants, model-definition.yml is optional
+        # Apply mount destination validation for non-CUSTOM variants without model-definition.yml
         if (
             params.runtime_variant != RuntimeVariant.CMD
             and params.config.model_mount_destination != "/models"

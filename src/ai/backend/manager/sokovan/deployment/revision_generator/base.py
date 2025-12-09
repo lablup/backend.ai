@@ -6,12 +6,15 @@ from dataclasses import asdict
 from typing import Any, Optional, override
 from uuid import UUID
 
+from ai.backend.common.config import ModelDefinition
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.data.deployment.types import (
     ModelRevisionSpec,
     ModelRevisionSpecDraft,
     ModelServiceDefinition,
 )
+from ai.backend.manager.errors.deployment import DefinitionFileNotFound
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.revision_generator.abc import RevisionGenerator
 
@@ -19,7 +22,9 @@ from ai.backend.manager.sokovan.deployment.revision_generator.abc import Revisio
 class BaseRevisionGenerator(RevisionGenerator):
     """
     Base implementation of revision processor.
-    Subclasses only need to implement variant-specific validation.
+
+    Validates model-definition.yml if it exists (for all variants).
+    For CUSTOM variant, model-definition.yml is required.
     """
 
     _deployment_repository: DeploymentRepository
@@ -240,7 +245,34 @@ class BaseRevisionGenerator(RevisionGenerator):
 
     async def validate_revision(self, revision: ModelRevisionSpec) -> None:
         """
-        Default validation does nothing.
-        Subclasses can override for variant-specific validation.
+        Validate revision by checking model definition if it exists.
+
+        For all runtime variants:
+        - If model-definition.yml exists, validate its schema
+        - If model-definition.yml doesn't exist:
+          - CUSTOM variant: raise error (file is required)
+          - Other variants: pass (file is optional)
         """
-        pass
+        runtime_variant = revision.execution.runtime_variant
+
+        try:
+            model_definition_content = await self._deployment_repository.fetch_model_definition(
+                vfolder_id=revision.mounts.model_vfolder_id,
+                model_definition_path=revision.mounts.model_definition_path,
+            )
+            # File exists - validate schema for all variants
+            try:
+                ModelDefinition.model_validate(model_definition_content)
+            except Exception as e:
+                raise InvalidAPIParameters(
+                    f"Invalid model definition for {runtime_variant.value} variant: {e}"
+                ) from e
+        except DefinitionFileNotFound:
+            # File not found
+            if runtime_variant == RuntimeVariant.CUSTOM:
+                # CUSTOM variant requires model-definition.yml
+                raise DefinitionFileNotFound(
+                    "model-definition.yml is required for CUSTOM runtime variant"
+                )
+            # Other variants don't require model-definition.yml
+            pass

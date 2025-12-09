@@ -83,9 +83,7 @@ class DeploymentController:
             )
         )
 
-        generator = self._revision_generator_registry.get(
-            draft.draft_model_revision.execution.runtime_variant
-        )
+        generator = self._revision_generator_registry.get()
         model_revision = await generator.generate_revision(
             draft_revision=draft.draft_model_revision,
             vfolder_id=draft.draft_model_revision.mounts.model_vfolder_id,
