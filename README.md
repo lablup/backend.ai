@@ -22,7 +22,7 @@ Requirements
 
 ### Python & Build Tools
 
-- **Python**: 3.13.x (main branch requires CPython 3.13.7)
+- **Python**: 3.14.x (main branch requires CPython 3.14.1)
 - **Pantsbuild**: 2.27.x
 - See [full version compatibility table](src/ai/backend/README.md#development-setup)
 
