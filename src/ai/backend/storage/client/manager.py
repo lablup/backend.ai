@@ -5,7 +5,7 @@ import uuid
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 import aiohttp
 import yarl
@@ -18,6 +18,7 @@ from ai.backend.common.dto.storage.response import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.config.unified import ReservoirClientConfig, ReservoirConfig
+from ai.backend.storage.errors import RegistryNotFoundError, ReservoirStorageConfigInvalidError
 
 _HASH_TYPE = "sha256"
 
@@ -178,7 +179,7 @@ class ManagerHTTPClientPool:
     def registry_configs(self) -> dict[str, ReservoirConfig]:
         return self._registry_configs
 
-    def get_or_create(self, registry_name: str) -> Optional[ManagerHTTPClient]:
+    def get_or_create(self, registry_name: str) -> ManagerHTTPClient:
         """
         Get or create a ManagerHTTPClient for the given registry.
 
@@ -186,7 +187,11 @@ class ManagerHTTPClientPool:
             registry_name: Name of the Reservoir registry
 
         Returns:
-            ManagerHTTPClient if configuration is valid, None otherwise
+            ManagerHTTPClient instance
+
+        Raises:
+            RegistryNotFoundError: If registry configuration is not found
+            ReservoirStorageConfigInvalidError: If manager connection config is incomplete
         """
         # Return cached client if exists
         if registry_name in self._clients:
@@ -195,7 +200,9 @@ class ManagerHTTPClientPool:
         # Validate registry configuration
         registry_config = self._registry_configs.get(registry_name)
         if not registry_config or not registry_config.endpoint:
-            return None
+            raise RegistryNotFoundError(
+                extra_msg=f"Registry configuration not found for: {registry_name}"
+            )
 
         if (
             not registry_config.manager_endpoint
@@ -203,7 +210,9 @@ class ManagerHTTPClientPool:
             or not registry_config.manager_secret_key
             or not registry_config.manager_api_version
         ):
-            return None
+            raise ReservoirStorageConfigInvalidError(
+                extra_msg=f"Manager connection configuration incomplete for registry: {registry_name}"
+            )
 
         # Create and cache new client
         manager_client = ManagerHTTPClient(

@@ -441,8 +441,6 @@ class ReservoirService:
             VerificationStepResult if available, None otherwise
         """
         manager_client = self._manager_client_pool.get_or_create(registry_name)
-        if not manager_client:
-            return None
 
         try:
             log.debug(
@@ -712,10 +710,6 @@ class ReservoirDownloadStep(ImportStep[None]):
 
         try:
             manager_client = self._manager_client_pool.get_or_create(context.registry_name)
-            if not manager_client:
-                raise ReservoirStorageConfigInvalidError(
-                    f"Manager access key not configured for reservoir registry: {context.registry_name}"
-                )
 
             if not registry_config.storage_name:
                 raise ReservoirStorageConfigInvalidError(
