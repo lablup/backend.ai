@@ -19,7 +19,19 @@ class RoleNotFound(BackendAIError, web.HTTPNotFound):
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
+            domain=ErrorDomain.ROLE,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class RoleAlreadyAssigned(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/role-already-assigned"
+    error_title = "The role is already assigned to the user."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ROLE,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.ALREADY_EXISTS,
         )

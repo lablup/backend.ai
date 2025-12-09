@@ -3,6 +3,7 @@ from collections.abc import Iterable
 from typing import Optional, cast
 
 import sqlalchemy as sa
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
@@ -21,7 +22,7 @@ from ...data.permission.status import (
 )
 from ...data.permission.types import OperationType, ScopeType
 from ...errors.common import ObjectNotFound
-from ...errors.permission import RoleNotFound
+from ...errors.permission import RoleAlreadyAssigned, RoleNotFound
 from ...models.rbac_models.association_scopes_entities import AssociationScopesEntitiesRow
 from ...models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ...models.rbac_models.permission.permission import PermissionRow
@@ -91,10 +92,15 @@ class PermissionDBSource:
     async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleRow:
         async with self._db.begin_session() as db_session:
             user_role_row = UserRoleRow.from_input(data)
-            db_session.add(user_role_row)  # type: ignore[arg-type]
-            await db_session.flush()
-            await db_session.refresh(user_role_row)
-            return user_role_row
+            try:
+                db_session.add(user_role_row)  # type: ignore[arg-type]
+                await db_session.flush()
+                await db_session.refresh(user_role_row)
+                return user_role_row
+            except IntegrityError as e:
+                raise RoleAlreadyAssigned(
+                    f"Role {data.role_id} is already assigned to user {data.user_id}."
+                ) from e
 
     async def get_role(self, role_id: uuid.UUID) -> Optional[RoleRow]:
         async with self._db.begin_readonly_session() as db_session:
