@@ -205,6 +205,8 @@ class AdminDomainRepository:
                 sa.insert(DomainRow).values(data).returning(DomainRow)
             )
             domain_row = await session.scalar(insert_and_returning)
+            if domain_row is None:
+                raise DomainNodeCreationFailed(f"Failed to create domain node: {creator.name}")
 
             if scaling_groups is not None:
                 await session.execute(
@@ -216,8 +218,6 @@ class AdminDomainRepository:
                 )
 
             await session.commit()
-            if domain_row is None:
-                raise DomainNodeCreationFailed(f"Failed to create domain node: {creator.name}")
             result = row_to_data(domain_row)
             if result is None:
                 raise DataTransformationFailed("Failed to transform domain row to data")
