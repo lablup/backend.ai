@@ -614,9 +614,9 @@ class libcudart(LibraryBase):
     @classmethod
     def get_device_props(cls, device_idx: int):
         props_struct: cudaDeviceProp_t
-        if cls.get_version() >= (12, 0):
+        if cls.get_version() >= (13, 0):
             props_struct = cudaDeviceProp_v13()
-        if cls.get_version() >= (12, 0):
+        elif cls.get_version() >= (12, 0):
             props_struct = cudaDeviceProp_v12()
         elif cls.get_version() >= (11, 0):
             props_struct = cudaDeviceProp_v11()
