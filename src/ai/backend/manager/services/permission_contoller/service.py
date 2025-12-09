@@ -1,4 +1,3 @@
-import dataclasses
 import logging
 
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -85,16 +84,8 @@ class PermissionControllerService:
 
     async def get_role_detail(self, action: GetRoleDetailAction) -> GetRoleDetailActionResult:
         """Get role with all permission details and assigned users."""
-        # Step 1: Get role with permissions (without users)
         role_data = await self._repository.get_role_with_permissions(action.role_id)
-
-        # Step 2: Get assigned users separately
-        assigned_users = await self._repository.get_role_assigned_users(action.role_id)
-
-        # Step 3: Combine
-        complete_role_data = dataclasses.replace(role_data, assigned_users=assigned_users)
-
-        return GetRoleDetailActionResult(role=complete_role_data)
+        return GetRoleDetailActionResult(role=role_data)
 
     async def search_roles(self, action: SearchRolesAction) -> SearchRolesActionResult:
         """Search roles with pagination and filtering."""

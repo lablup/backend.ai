@@ -89,7 +89,7 @@ class AssignedUserData:
 class RoleDetailData:
     """
     Detailed information about a role.
-    It includes permission groups, object permissions, and assigned users.
+    It includes permission groups and object permissions.
     """
 
     id: uuid.UUID
@@ -99,7 +99,6 @@ class RoleDetailData:
 
     permission_groups: list[PermissionGroupExtendedData]
     object_permissions: list[ObjectPermissionData]
-    assigned_users: list[AssignedUserData]
 
     created_at: datetime
     updated_at: Optional[datetime]

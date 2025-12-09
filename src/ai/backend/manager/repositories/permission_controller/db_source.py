@@ -8,7 +8,6 @@ from sqlalchemy.orm import contains_eager, selectinload
 
 from ...data.permission.id import ObjectId, ScopeId
 from ...data.permission.role import (
-    AssignedUserData,
     RoleCreateInput,
     RoleDeleteInput,
     RoleListResult,
@@ -350,28 +349,3 @@ class PermissionDBSource:
             if role_row is None:
                 raise RoleNotFound(f"Role with ID {role_id} does not exist.")
             return role_row
-
-    async def get_role_assigned_users(self, role_id: uuid.UUID) -> list[AssignedUserData]:
-        """Get users assigned to a specific role."""
-        async with self._db.begin_readonly_session() as db_sess:
-            stmt = (
-                sa.select(UserRoleRow)
-                .where(UserRoleRow.role_id == role_id)
-                .options(selectinload(UserRoleRow.user_row))
-            )
-            result = await db_sess.execute(stmt)
-            user_role_rows = result.scalars().all()
-
-            assigned_users = []
-            for user_role_row in user_role_rows:
-                if user_role_row.user_row:
-                    assigned_users.append(
-                        AssignedUserData(
-                            user_id=user_role_row.user_id,
-                            username=user_role_row.user_row.username,
-                            email=user_role_row.user_row.email,
-                            granted_by=user_role_row.granted_by,
-                            granted_at=user_role_row.granted_at,
-                        )
-                    )
-            return assigned_users
