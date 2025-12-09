@@ -511,8 +511,6 @@ class TestAuthRepository:
     @pytest.mark.asyncio
     async def test_get_user_row_by_uuid_not_found(self, auth_repository: AuthRepository) -> None:
         """Test getting user row by UUID when user doesn't exist"""
-        from ai.backend.common.exception import UserNotFound
-
         non_existent_uuid = UUID("99999999-9999-9999-9999-999999999999")
 
         with pytest.raises(UserNotFound):
