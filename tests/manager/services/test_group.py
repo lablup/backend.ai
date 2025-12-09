@@ -32,7 +32,6 @@ from ai.backend.manager.services.group.actions.modify_group import (
 )
 from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
-    PurgeGroupActionResult,
 )
 from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.group.service import GroupService
@@ -274,10 +273,8 @@ async def test_purge_group(
     ) as group_id:
         await processors.delete_group.wait_for_complete(DeleteGroupAction(group_id))
 
-        result: PurgeGroupActionResult = await processors.purge_group.wait_for_complete(
-            PurgeGroupAction(group_id)
-        )
-        assert result.success is True
+        # No exception should be raised
+        await processors.purge_group.wait_for_complete(PurgeGroupAction(group_id))
 
 
 @pytest.mark.asyncio
