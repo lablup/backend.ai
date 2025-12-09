@@ -15,7 +15,6 @@ from .abc import AbstractKernelRegistryWriter
 from .types import KernelRegistrySaveMetadata
 
 if TYPE_CHECKING:
-    from ai.backend.agent.docker.kernel import DockerKernel
     from ai.backend.agent.kernel import AbstractKernel
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -32,6 +31,8 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
         self,
         kernel: AbstractKernel,
     ) -> Optional[KernelRecoveryData]:
+        from ai.backend.agent.docker.kernel import DockerKernel
+
         match kernel:
             case DockerKernel():
                 return KernelRecoveryData.from_docker_kernel(kernel)

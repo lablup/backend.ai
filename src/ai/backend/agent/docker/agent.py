@@ -1403,15 +1403,17 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             agent_class=agent_class,
         )
         self.checked_invalid_images = set()
-        pickle_loader_writer_creator = PickleBasedLoaderWriterCreator(
+        pickle_loader_writer_creator = PickleBasedLoaderWriterCreator.create(
             PickleBasedKernelRegistryCreatorArgs(
                 scratch_root=local_config.container.scratch_root,
                 ipc_base_path=local_config.agent.ipc_base_path,
                 var_base_path=local_config.agent.var_base_path,
+                agent_class=self.agent_class,
                 agent_id=self.id,
                 local_instance_id=self.local_instance_id,
             ),
         )
+        pickle_loader = pickle_loader_writer_creator.create_loader()
         pickle_writer = pickle_loader_writer_creator.create_writer()
         container_loader_writer_creator = ContainerBasedLoaderWriterCreator(
             ContainerBasedKernelRegistryCreatorArgs(
@@ -1419,10 +1421,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 agent=self,
             )
         )
-        container_loader = container_loader_writer_creator.create_loader()
         container_writer = container_loader_writer_creator.create_writer()
         self._kernel_recovery = DockerKernelRegistryRecovery(
-            loader=container_loader,
+            loader=pickle_loader,
             writers=[pickle_writer, container_writer],
         )
 

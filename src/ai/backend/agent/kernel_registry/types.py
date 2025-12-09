@@ -77,6 +77,8 @@ class KernelRecoveryData(BaseModel):
         return result
 
     def to_docker_kernel(self) -> DockerKernel:
+        from ai.backend.agent.docker.kernel import DockerKernel
+
         return DockerKernel(
             ownership_data=self.ownership_data,
             network_id=self.network_id,

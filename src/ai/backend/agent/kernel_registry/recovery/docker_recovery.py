@@ -11,7 +11,7 @@ from ai.backend.logging import BraceStyleAdapter
 from .base_recovery import BaseKernelRegistryRecovery
 
 if TYPE_CHECKING:
-    from ai.backend.agent.agent import AbstractAgent
+    from ai.backend.agent.agent import AbstractAgent, AgentClass
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -21,6 +21,7 @@ class DockerKernelRegistryRecoveryArgs:
     scratch_root: Path
     ipc_base_path: Path
     var_base_path: Path
+    agent_class: AgentClass
     agent_id: AgentId
     local_instance_id: str
 
