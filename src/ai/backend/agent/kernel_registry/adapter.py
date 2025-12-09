@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from ai.backend.logging import BraceStyleAdapter
 
+from .exception import KernelRegistryNotFound
 from .loader.abc import AbstractKernelRegistryLoader
 from .writer.abc import AbstractKernelRegistryWriter
 from .writer.types import KernelRegistrySaveMetadata
@@ -35,7 +36,11 @@ class KernelRecoveryDataAdapter:
         self._targets = targets
 
     async def adapt_recovery_data(self) -> None:
-        source_data = await self._source_loader.load_kernel_registry()
+        try:
+            source_data = await self._source_loader.load_kernel_registry()
+        except KernelRegistryNotFound:
+            log.info("No source kernel registry found to adapt.")
+            return
         for target in self._targets:
             data = await target.loader.load_kernel_registry()
             for kernel_id, kernel in source_data.items():
