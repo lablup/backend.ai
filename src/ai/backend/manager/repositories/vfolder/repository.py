@@ -23,7 +23,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderPermissionData,
 )
 from ai.backend.manager.errors.common import ObjectNotFound
-from ai.backend.manager.errors.resource import DBOperationFailed, GroupNotFound
+from ai.backend.manager.errors.resource import DBOperationFailed, ProjectNotFound
 from ai.backend.manager.errors.storage import (
     VFolderDeletionNotAllowed,
     VFolderInvalidParameter,
@@ -140,7 +140,7 @@ class VfolderRepository:
                     sa.select(GroupRow).where(GroupRow.id == group_uuid)
                 )
                 if group_row is None:
-                    raise GroupNotFound(object_name="Group", object_id=group_uuid)
+                    raise ProjectNotFound(f"Project with {group_uuid} not found.")
 
                 return group_row.allowed_vfolder_hosts
 
@@ -171,7 +171,7 @@ class VfolderRepository:
                     .options(selectinload(GroupRow.resource_policy_row))
                 )
                 if group_row is None:
-                    raise GroupNotFound(object_name="Group", object_id=group_uuid)
+                    raise ProjectNotFound(f"Project with {group_uuid} not found.")
 
                 return group_row.resource_policy_row.max_vfolder_count
 

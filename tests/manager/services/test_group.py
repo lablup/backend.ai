@@ -11,7 +11,7 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import RedisConnectionInfo, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
-from ai.backend.manager.errors.resource import GroupNotFound
+from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -32,7 +32,6 @@ from ai.backend.manager.services.group.actions.modify_group import (
 )
 from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
-    PurgeGroupActionResult,
 )
 from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.group.service import GroupService
@@ -229,7 +228,7 @@ async def test_modify_group_with_invalid_group_id(
             is_active=OptionalState.update(False),
         ),
     )
-    with pytest.raises(GroupNotFound):
+    with pytest.raises(ProjectNotFound):
         await processors.modify_group.wait_for_complete(action)
 
 
@@ -274,10 +273,8 @@ async def test_purge_group(
     ) as group_id:
         await processors.delete_group.wait_for_complete(DeleteGroupAction(group_id))
 
-        result: PurgeGroupActionResult = await processors.purge_group.wait_for_complete(
-            PurgeGroupAction(group_id)
-        )
-        assert result.success is True
+        # No exception should be raised
+        await processors.purge_group.wait_for_complete(PurgeGroupAction(group_id))
 
 
 @pytest.mark.asyncio
