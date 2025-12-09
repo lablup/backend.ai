@@ -4,8 +4,6 @@ Resource management exceptions (groups, domains, scaling groups, instances).
 
 from __future__ import annotations
 
-from typing import Any, Optional, Union
-
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -31,21 +29,9 @@ class DomainNotFound(ObjectNotFound):
         )
 
 
-class GroupNotFound(ObjectNotFound):
-    object_name = "user group (or project)"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.GROUP,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class GroupHasActiveKernelsError(BackendAIError, web.HTTPConflict):
-    error_type = "https://api.backend.ai/probs/group-has-active-kernels"
-    error_title = "Group has active kernels."
+class ProjectHasActiveKernelsError(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/project-has-active-kernels"
+    error_title = "Project has active kernels."
 
     @classmethod
     def error_code(cls) -> ErrorCode:
@@ -56,9 +42,9 @@ class GroupHasActiveKernelsError(BackendAIError, web.HTTPConflict):
         )
 
 
-class GroupHasVFoldersMountedError(BackendAIError, web.HTTPConflict):
-    error_type = "https://api.backend.ai/probs/group-has-vfolders-mounted"
-    error_title = "Group has vfolders mounted to active kernels."
+class ProjectHasVFoldersMountedError(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/project-has-vfolders-mounted"
+    error_title = "Project has vfolders mounted to active kernels."
 
     @classmethod
     def error_code(cls) -> ErrorCode:
@@ -69,9 +55,9 @@ class GroupHasVFoldersMountedError(BackendAIError, web.HTTPConflict):
         )
 
 
-class GroupHasActiveEndpointsError(BackendAIError, web.HTTPConflict):
-    error_type = "https://api.backend.ai/probs/group-has-active-endpoints"
-    error_title = "Group has active endpoints."
+class ProjectHasActiveEndpointsError(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/project-has-active-endpoints"
+    error_title = "Project has active endpoints."
 
     @classmethod
     def error_code(cls) -> ErrorCode:
@@ -135,9 +121,6 @@ class InstanceNotAvailable(BackendAIError, web.HTTPServiceUnavailable):
 class ProjectNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/project-not-found"
     error_title = "Project not found."
-
-    def __init__(self, project_id: Optional[Union[str, Any]] = None) -> None:
-        super().__init__(f"Project not found: {project_id}")
 
     @classmethod
     def error_code(cls) -> ErrorCode:

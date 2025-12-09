@@ -20,7 +20,7 @@ from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupMo
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
-from ai.backend.manager.errors.resource import GroupNotFound
+from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import GroupRow, association_groups_users, groups
 from ai.backend.manager.models.kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, kernels
@@ -157,7 +157,7 @@ class GroupRepository:
                 row = await session.scalar(query_stmt)
                 row = cast(Optional[GroupRow], row)
                 if row is None:
-                    raise GroupNotFound(f"Group not found: {group_id}")
+                    raise ProjectNotFound(f"Project not found: {group_id}")
                 return row.to_data()
 
             # If only user updates were performed, return None
@@ -177,7 +177,7 @@ class GroupRepository:
             )
             if result.rowcount > 0:
                 return
-            raise GroupNotFound(f"Group not found: {group_id}")
+            raise ProjectNotFound(f"Group not found: {group_id}")
 
     @repository_decorator()
     async def get_container_stats_for_period(
