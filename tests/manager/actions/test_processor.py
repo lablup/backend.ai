@@ -289,16 +289,16 @@ class TestMonitorTagFiltering:
     # Tests
 
     @pytest.mark.asyncio
-    async def test_action_with_skip_audit_tag_does_not_trigger_monitor_done(
+    async def test_tag_unaware_monitor_calls_done_even_with_skip_audit_tag(
         self,
         processor_with_tag_unaware: ActionProcessor,
         tagged_action: MockActionWithTag,
         tag_unaware_monitor: TagUnawareMonitor,
     ) -> None:
-        """Actions with SKIP_AUDIT_LOG tag should trigger prepare() but not done()
-
-        This simulates the AuditLogMonitor behavior which checks the tag
-        in its done() method and skips logging.
+        """Tag-unaware monitors call both prepare() and done() even when SKIP_AUDIT_LOG tag is present.
+        This test demonstrates that TagUnawareMonitor does not respect the SKIP_AUDIT_LOG tag,
+        and calls done() regardless. This is why tag-aware monitors (like AuditLogMonitor)
+        need to check the tag themselves in their done() method and skip logging if present.
         """
         result = await processor_with_tag_unaware.wait_for_complete(tagged_action)
 
