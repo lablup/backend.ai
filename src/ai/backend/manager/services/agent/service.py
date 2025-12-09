@@ -159,13 +159,7 @@ class AgentService:
                 watcher_url = watcher_info["addr"] / endpoint
                 headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
 
-                match method:
-                    case "GET":
-                        request_method = sess.get
-                    case "POST":
-                        request_method = sess.post
-
-                async with request_method(watcher_url, headers=headers) as resp:
+                async with sess.request(method, watcher_url, headers=headers) as resp:
                     if resp.status // 100 == 2:
                         return await resp.json()
 

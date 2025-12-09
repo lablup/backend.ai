@@ -392,7 +392,7 @@ class TestWatcher:
 
     @pytest.fixture
     def _setup_http_mock(self, mock_etcd: AsyncMock):
-        def _setup(agent_id: AgentId, status: int, data: dict | str, method: str = "post"):
+        def _setup(agent_id: AgentId, status: int, data: dict | str):
             # Setup etcd
             mock_etcd.get.side_effect = lambda key: {
                 f"nodes/agents/{agent_id}/ip": "192.168.1.100",
@@ -402,6 +402,7 @@ class TestWatcher:
             # Setup HTTP response
             mock_response = AsyncMock()
             mock_response.status = status
+            mock_response.ok = status // 100 == 2
             if isinstance(data, dict):
                 mock_response.json = AsyncMock(return_value=data)
             else:
@@ -411,10 +412,7 @@ class TestWatcher:
 
             # Setup HTTP session
             mock_session = AsyncMock()
-            if method == "post":
-                mock_session.post = MagicMock(return_value=mock_response)
-            else:
-                mock_session.get = MagicMock(return_value=mock_response)
+            mock_session.request = MagicMock(return_value=mock_response)
             mock_session.__aenter__ = AsyncMock(return_value=mock_session)
             mock_session.__aexit__ = AsyncMock(return_value=None)
 
@@ -424,7 +422,7 @@ class TestWatcher:
 
     @pytest.fixture
     def watcher_service_ok(self, agent_service: AgentService, agent_id: AgentId, _setup_http_mock):
-        mock_session, _ = _setup_http_mock(agent_id, HTTPStatus.OK, {"result": "ok"}, method="post")
+        mock_session, _ = _setup_http_mock(agent_id, HTTPStatus.OK, {"result": "ok"})
 
         with patch(
             "ai.backend.manager.services.agent.service.aiohttp.ClientSession",
@@ -440,7 +438,6 @@ class TestWatcher:
             agent_id,
             HTTPStatus.OK,
             {"agent-status": "active", "watcher-status": "active"},
-            method="get",
         )
 
         with patch(
@@ -453,9 +450,7 @@ class TestWatcher:
     def watcher_service_forbidden(
         self, agent_service: AgentService, agent_id: AgentId, _setup_http_mock
     ):
-        mock_session, _ = _setup_http_mock(
-            agent_id, HTTPStatus.FORBIDDEN, "Invalid token", method="post"
-        )
+        mock_session, _ = _setup_http_mock(agent_id, HTTPStatus.FORBIDDEN, "Invalid token")
 
         with patch(
             "ai.backend.manager.services.agent.service.aiohttp.ClientSession",
@@ -468,7 +463,7 @@ class TestWatcher:
         self, agent_service: AgentService, agent_id: AgentId, _setup_http_mock
     ):
         mock_session, _ = _setup_http_mock(
-            agent_id, HTTPStatus.INTERNAL_SERVER_ERROR, "Systemctl command failed", method="post"
+            agent_id, HTTPStatus.INTERNAL_SERVER_ERROR, "Systemctl command failed"
         )
 
         with patch(
