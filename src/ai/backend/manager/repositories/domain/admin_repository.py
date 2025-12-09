@@ -4,6 +4,11 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.exception import BackendAIError, DomainNotFound, InvalidAPIParameters
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.domain.types import (
     DomainCreator,
     DomainData,
@@ -35,6 +40,11 @@ class AdminDomainRepository:
         For superadmin use only.
         """
         async with self._db.begin() as conn:
+            check_query = sa.select(DomainRow).where(DomainRow.name == creator.name)
+            existing_domain = await conn.scalar(check_query)
+            if existing_domain is not None:
+                raise InvalidAPIParameters(f"Domain with name '{creator.name}' already exists")
+
             data = creator.fields_to_store()
             insert_query = sa.insert(domains).values(data).returning(domains)
             result = await conn.execute(insert_query)
@@ -51,9 +61,8 @@ class AdminDomainRepository:
         assert result is not None
         return result
 
-    async def modify_domain_force(
-        self, domain_name: str, modifier: DomainModifier
-    ) -> Optional[DomainData]:
+    @domain_repository_resilience.apply()
+    async def modify_domain_force(self, domain_name: str, modifier: DomainModifier) -> DomainData:
         """
         Modifies an existing domain without permission checks.
         For superadmin use only.
@@ -70,11 +79,11 @@ class AdminDomainRepository:
             row = result.first()
 
             if result.rowcount == 0:
-                return None
+                raise DomainNotFound(f"Domain not found: {domain_name}")
+            return row_to_data(row)
 
-        return row_to_data(row)
-
-    async def soft_delete_domain_force(self, domain_name: str) -> bool:
+    @domain_repository_resilience.apply()
+    async def soft_delete_domain_force(self, domain_name: str) -> None:
         """
         Soft deletes a domain by setting is_active to False without permission checks.
         For superadmin use only.
@@ -84,7 +93,8 @@ class AdminDomainRepository:
                 sa.update(domains).values({"is_active": False}).where(domains.c.name == domain_name)
             )
             result = await conn.execute(update_query)
-            return result.rowcount > 0
+            if result.rowcount == 0:
+                raise DomainNotFound(f"Domain not found: {domain_name}")
 
     async def purge_domain_force(self, domain_name: str) -> bool:
         """
@@ -109,10 +119,17 @@ class AdminDomainRepository:
         """
         async with self._db.begin_session() as session:
             data = creator.fields_to_store()
+            check_query = sa.select(DomainRow).where(DomainRow.name == creator.name)
+            existing_domain = await session.scalar(check_query)
+            if existing_domain is not None:
+                raise InvalidAPIParameters(f"Domain with name '{creator.name}' already exists")
+
             insert_and_returning = sa.select(DomainRow).from_statement(
                 sa.insert(DomainRow).values(data).returning(DomainRow)
             )
             domain_row = await session.scalar(insert_and_returning)
+            if domain_row is None:
+                raise DomainNodeCreationFailed(f"Failed to create domain node: {creator.name}")
 
             if scaling_groups is not None:
                 await session.execute(
@@ -124,56 +141,9 @@ class AdminDomainRepository:
                 )
 
             await session.commit()
-            if domain_row is None:
-                raise RuntimeError(f"Failed to create domain node: {creator.name}")
-            assert domain_row is not None
             result = row_to_data(domain_row)
             assert result is not None
             return result
-
-    async def modify_domain_node_force(
-        self,
-        domain_name: str,
-        modifier_fields: dict,
-        sgroups_to_add: Optional[set[str]] = None,
-        sgroups_to_remove: Optional[set[str]] = None,
-    ) -> Optional[DomainData]:
-        """
-        Modifies a domain node with scaling group changes without permission checks.
-        For superadmin use only.
-        """
-        async with self._db.begin_session() as session:
-            if sgroups_to_add is not None:
-                await session.execute(
-                    sa.insert(ScalingGroupForDomainRow),
-                    [
-                        {"scaling_group": sgroup_name, "domain": domain_name}
-                        for sgroup_name in sgroups_to_add
-                    ],
-                )
-
-            if sgroups_to_remove is not None:
-                await session.execute(
-                    sa.delete(ScalingGroupForDomainRow).where(
-                        (ScalingGroupForDomainRow.domain == domain_name)
-                        & (ScalingGroupForDomainRow.scaling_group.in_(sgroups_to_remove))
-                    ),
-                )
-
-            update_stmt = (
-                sa.update(DomainRow)
-                .where(DomainRow.name == domain_name)
-                .values(modifier_fields)
-                .returning(DomainRow)
-            )
-            await session.execute(update_stmt)
-
-            domain_row = await session.scalar(
-                sa.select(DomainRow).where(DomainRow.name == domain_name)
-            )
-
-            await session.commit()
-            return row_to_data(domain_row) if domain_row else None
 
     async def _create_model_store_group(self, conn: SAConnection, domain_name: str) -> None:
         """
@@ -224,19 +194,42 @@ class AdminDomainRepository:
         user_info: UserInfo,
         sgroups_to_add: Optional[set[str]] = None,
         sgroups_to_remove: Optional[set[str]] = None,
-    ) -> Optional[DomainData]:
+    ) -> DomainData:
         """
         Modifies a domain node with scaling group changes without permission checks.
         For superadmin use only.
         """
+        async with self._db.begin_session() as session:
+            if sgroups_to_add is not None:
+                await session.execute(
+                    sa.insert(ScalingGroupForDomainRow),
+                    [
+                        {"scaling_group": sgroup_name, "domain": domain_name}
+                        for sgroup_name in sgroups_to_add
+                    ],
+                )
 
-        async def _update(db_session: SASession) -> Optional[DomainData]:
-            return await self.modify_domain_node_force(
-                domain_name,
-                modifier_fields,
-                sgroups_to_add,
-                sgroups_to_remove,
+            if sgroups_to_remove is not None:
+                await session.execute(
+                    sa.delete(ScalingGroupForDomainRow).where(
+                        (ScalingGroupForDomainRow.domain == domain_name)
+                        & (ScalingGroupForDomainRow.scaling_group.in_(sgroups_to_remove))
+                    ),
+                )
+
+            update_stmt = (
+                sa.update(DomainRow)
+                .where(DomainRow.name == domain_name)
+                .values(modifier_fields)
+                .returning(DomainRow)
+            )
+            await session.execute(update_stmt)
+
+            domain_row = await session.scalar(
+                sa.select(DomainRow).where(DomainRow.name == domain_name)
             )
 
-        async with self._db.connect() as db_conn:
-            return await execute_with_txn_retry(_update, self._db.begin_session, db_conn)
+            await session.commit()
+            if domain_row is None:
+                raise DomainNotFound(f"Domain not found (id:{domain_name})")
+            return row_to_data(domain_row)

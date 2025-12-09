@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.domain.types import (
     DomainCreator,
@@ -165,8 +166,6 @@ async def create_domain(
                     dotfiles=b"\x90",
                     integration_id=None,
                 ),
-                success=True,
-                description="domain test-create-domain-node created",
             ),
         ),
         ScenarioBase.failure(
@@ -174,7 +173,6 @@ async def create_domain(
             CreateDomainNodeAction(
                 creator=DomainCreator(
                     name="default",
-                    description="Test domain",
                 ),
                 user_info=UserInfo(
                     id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
@@ -182,7 +180,7 @@ async def create_domain(
                     domain_name="default",
                 ),
             ),
-            ValueError,
+            InvalidAPIParameters,
         ),
     ],
 )
@@ -223,8 +221,6 @@ async def test_create_domain_node(
                     dotfiles=b"\x90",
                     integration_id=None,
                 ),
-                success=True,
-                description="domain test-modify-domain-node modified",
             ),
         ),
         ScenarioBase.failure(
@@ -240,7 +236,7 @@ async def test_create_domain_node(
                     description=TriState.update("Domain Description Modified"),
                 ),
             ),
-            ValueError,
+            DomainNotFound,
         ),
         ScenarioBase.failure(
             "Modify a domain without enough permission",
@@ -298,11 +294,9 @@ async def test_modify_domain_node(
                     dotfiles=b"\x90",
                     integration_id=None,
                 ),
-                success=True,
-                description="domain creation succeed",
             ),
         ),
-        ScenarioBase.success(
+        ScenarioBase.failure(
             "Create a domain with duplicated name, return none",
             CreateDomainAction(
                 creator=DomainCreator(
@@ -315,13 +309,9 @@ async def test_modify_domain_node(
                     domain_name="default",
                 ),
             ),
-            CreateDomainActionResult(
-                domain_data=None,
-                success=False,
-                description="integrity error",
-            ),
+            InvalidAPIParameters,
         ),
-        ScenarioBase.success(
+        ScenarioBase.failure(
             "Create a domain with empty name, return failure",
             CreateDomainAction(
                 creator=DomainCreator(
@@ -334,11 +324,7 @@ async def test_modify_domain_node(
                     domain_name="default",
                 ),
             ),
-            CreateDomainActionResult(
-                domain_data=None,
-                success=False,
-                description="domain creation failed",
-            ),
+            InvalidAPIParameters,  # Validation error for empty name
         ),
         ScenarioBase.success(
             "Create a domain with complex resource slots",
@@ -379,8 +365,6 @@ async def test_modify_domain_node(
                     dotfiles=b"\x90",
                     integration_id=None,
                 ),
-                success=True,
-                description="domain creation succeed",
             ),
         ),
     ],
@@ -441,11 +425,9 @@ async def test_create_model_store_after_domain_created(
                     dotfiles=b"\x90",
                     integration_id=None,
                 ),
-                success=True,
-                description="domain modification succeed",
             ),
         ),
-        ScenarioBase.success(
+        ScenarioBase.failure(
             "Modify a domain not exists",
             ModifyDomainAction(
                 domain_name="not-exist-domain",
@@ -458,11 +440,7 @@ async def test_create_model_store_after_domain_created(
                     description=TriState.update("Domain Description Modified"),
                 ),
             ),
-            ModifyDomainActionResult(
-                domain_data=None,
-                success=False,
-                description="domain not found",
-            ),
+            DomainNotFound,  # DomainNotFound exception
         ),
         ScenarioBase.success(
             "Modify domain deactivation",
@@ -490,8 +468,6 @@ async def test_create_model_store_after_domain_created(
                     dotfiles=b"\x90",
                     integration_id=None,
                 ),
-                success=True,
-                description="domain modification succeed",
             ),
         ),
         ScenarioBase.success(
@@ -521,8 +497,6 @@ async def test_create_model_store_after_domain_created(
                     dotfiles=b"\x90",
                     integration_id=None,
                 ),
-                success=True,
-                description="domain modification succeed",
             ),
         ),
     ],
@@ -555,11 +529,10 @@ async def test_modify_domain(
                 ),
             ),
             DeleteDomainActionResult(
-                success=True,
-                description="domain test-delete-domain deleted successfully",
+                name="test-delete-domain",
             ),
         ),
-        ScenarioBase.success(
+        ScenarioBase.failure(
             "Delete a domain not exists",
             DeleteDomainAction(
                 name="not-exist-domain",
@@ -569,10 +542,7 @@ async def test_modify_domain(
                     domain_name="default",
                 ),
             ),
-            DeleteDomainActionResult(
-                success=False,
-                description="no matching not-exist-domain",
-            ),
+            DomainNotFound,
         ),
     ],
 )
@@ -636,8 +606,7 @@ async def test_delete_domain_in_db(
                 ),
             ),
             PurgeDomainActionResult(
-                success=True,
-                description="domain test-purge-domain purged successfully",
+                name="test-purge-domain",
             ),
         ),
         ScenarioBase.success(
@@ -782,7 +751,7 @@ async def test_modify_domain_node_scaling_group_overlap_error(
             sgroups_to_remove={"sg1", "sg3"},
         )
 
-        with pytest.raises(ValueError, match="Should be no scaling group names included"):
+        with pytest.raises(InvalidAPIParameters):
             await processors.modify_domain_node.wait_for_complete(action)
 
 
@@ -845,7 +814,6 @@ async def test_create_domain_with_invalid_resource_slots(
         ),
     )
     result = await processors.create_domain.wait_for_complete(action)
-    assert result.success is True
     assert result.domain_data is not None
 
 
@@ -909,14 +877,8 @@ async def test_modify_domain_name_change(
                 name=OptionalState.update("renamed-domain"),
             ),
         )
-
-        try:
-            result = await processors.modify_domain.wait_for_complete(action)
-            if result.success:
-                assert result.domain_data is not None
-        except Exception:
-            # May not be supported or may have constraints
-            pass
+        result = await processors.modify_domain.wait_for_complete(action)
+        assert result.domain_data is not None
 
 
 @pytest.mark.asyncio
@@ -937,7 +899,6 @@ async def test_modify_domain_resource_slots_update(
         )
 
         result = await processors.modify_domain.wait_for_complete(action)
-        assert result.success is True
         assert result.domain_data is not None
 
 
@@ -1005,14 +966,9 @@ async def test_modify_domain_node_dotfiles_update(
 
         try:
             result = await processors.modify_domain_node.wait_for_complete(action)
-            if result.success:
-                assert result.domain_data is not None
-        except ValueError as e:
-            if "Not allowed to update domain" in str(e):
-                # Expected behavior - domain updates may be restricted in test environment
-                pass
-            else:
-                raise
+            assert result.domain_data is not None
+        except DomainUpdateNotAllowed:
+            pass
 
 
 @pytest.mark.asyncio
@@ -1024,8 +980,7 @@ async def test_delete_domain_already_deleted(
     async with create_domain(database_engine, domain_name):
         # First deletion
         action = DeleteDomainAction(name=domain_name, user_info=admin_user)
-        result1 = await processors.delete_domain.wait_for_complete(action)
-        assert result1.success is True
+        await processors.delete_domain.wait_for_complete(action)
 
         # Second deletion attempt (idempotent)
         result2 = await processors.delete_domain.wait_for_complete(action)
@@ -1043,9 +998,8 @@ async def test_delete_domain_with_active_resources(
         # Create some resources in the domain
         async with create_test_group(database_engine, "active-group", domain_name):
             action = DeleteDomainAction(name=domain_name, user_info=admin_user)
-            result = await processors.delete_domain.wait_for_complete(action)
+            await processors.delete_domain.wait_for_complete(action)
             # Soft delete should succeed even with active resources
-            assert result.success is True
 
 
 @pytest.mark.asyncio
@@ -1069,10 +1023,9 @@ async def test_purge_domain_with_terminated_kernels_only(
             )
 
         # Purge should succeed with only terminated kernels
-        result = await processors.purge_domain.wait_for_complete(
+        await processors.purge_domain.wait_for_complete(
             PurgeDomainAction(name=domain_name, user_info=admin_user)
         )
-        assert result.success is True
 
 
 # Edge cases and error scenarios
@@ -1092,9 +1045,8 @@ async def test_create_domain_transaction_rollback_scenario(
     )
 
     try:
-        result = await processors.create_domain.wait_for_complete(action)
+        await processors.create_domain.wait_for_complete(action)
         # In normal cases, this should succeed
-        assert result.success is True
     except Exception:
         # Transaction rollback scenario - both domain and model-store should not exist
         pass
@@ -1128,9 +1080,9 @@ async def test_modify_domain_concurrent_access(
         result1 = await processors.modify_domain.wait_for_complete(action1)
         result2 = await processors.modify_domain.wait_for_complete(action2)
 
-        # Both should succeed (last one wins)
-        assert result1.success is True
-        assert result2.success is True
+        # Both should succeed (last one wins) - ModifyDomainActionResult has no success field
+        assert result1.domain_data is not None
+        assert result2.domain_data is not None
 
 
 @pytest.mark.asyncio
@@ -1159,7 +1111,6 @@ async def test_create_domain_with_comprehensive_settings(
     )
 
     result = await processors.create_domain.wait_for_complete(action)
-    assert result.success is True
     assert result.domain_data is not None
     assert result.domain_data.name == "test-comprehensive-domain"
     assert result.domain_data.integration_id == "test-integration-123"
@@ -1200,7 +1151,6 @@ async def test_domain_lifecycle_complete_workflow(
         user_info=admin_user,
     )
     create_result = await processors.create_domain.wait_for_complete(create_action)
-    assert create_result.success is True
     assert create_result.domain_data is not None
 
     try:
@@ -1216,14 +1166,12 @@ async def test_domain_lifecycle_complete_workflow(
             ),
         )
         modify_result = await processors.modify_domain.wait_for_complete(modify_action)
-        assert modify_result.success is True
         assert modify_result.domain_data is not None
         assert modify_result.domain_data.description == "Modified lifecycle test domain"
 
         # 3. Delete domain (soft delete)
         delete_action = DeleteDomainAction(name=domain_name, user_info=admin_user)
-        delete_result = await processors.delete_domain.wait_for_complete(delete_action)
-        assert delete_result.success is True
+        await processors.delete_domain.wait_for_complete(delete_action)
 
         # 4. Prepare for purge by deactivating model-store group
         async with database_engine.begin_session() as session:
@@ -1235,8 +1183,7 @@ async def test_domain_lifecycle_complete_workflow(
 
         # 5. Purge domain (hard delete)
         purge_action = PurgeDomainAction(name=domain_name, user_info=admin_user)
-        purge_result = await processors.purge_domain.wait_for_complete(purge_action)
-        assert purge_result.success is True
+        await processors.purge_domain.wait_for_complete(purge_action)
 
         # 6. Verify complete removal
         async with database_engine.begin_session() as session:
@@ -1247,3 +1194,133 @@ async def test_domain_lifecycle_complete_workflow(
         # Cleanup in case of test failure
         async with database_engine.begin_session() as session:
             await session.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
+
+
+class TestDomainService:
+    @pytest.fixture
+    def mock_repository(self) -> MagicMock:
+        """Create a mock DomainRepository"""
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_admin_repository(self) -> MagicMock:
+        """Create a mock AdminDomainRepository"""
+        return MagicMock()
+
+    @pytest.fixture
+    def service(
+        self, mock_repository: MagicMock, mock_admin_repository: MagicMock
+    ) -> DomainService:
+        """Create a DomainService with mocked repositories"""
+        return DomainService(
+            repository=mock_repository,
+            admin_repository=mock_admin_repository,
+        )
+
+    @pytest.mark.asyncio
+    async def test_purge_domain_success_as_admin(
+        self, service: DomainService, mock_repository: MagicMock, admin_user: UserInfo
+    ) -> None:
+        mock_repository.purge_domain_validated = AsyncMock()
+        action = PurgeDomainAction(name="test-domain", user_info=admin_user)
+
+        result = await service.purge_domain(action)
+
+        mock_repository.purge_domain_validated.assert_called_once_with("test-domain")
+        assert result.name == "test-domain"
+
+    @pytest.mark.asyncio
+    async def test_purge_domain_success_as_superadmin(
+        self, service: DomainService, mock_admin_repository: MagicMock, superadmin_user: UserInfo
+    ) -> None:
+        mock_admin_repository.purge_domain_force = AsyncMock()
+        action = PurgeDomainAction(name="test-domain", user_info=superadmin_user)
+
+        result = await service.purge_domain(action)
+
+        mock_admin_repository.purge_domain_force.assert_called_once_with("test-domain")
+        assert result.name == "test-domain"
+
+    @pytest.mark.asyncio
+    async def test_purge_domain_fails_with_active_kernels_as_admin(
+        self, service: DomainService, mock_repository: MagicMock, admin_user: UserInfo
+    ) -> None:
+        mock_repository.purge_domain_validated = AsyncMock(
+            side_effect=DomainHasActiveKernels("Domain has some active kernels")
+        )
+        action = PurgeDomainAction(name="test-domain", user_info=admin_user)
+
+        with pytest.raises(DomainHasActiveKernels):
+            await service.purge_domain(action)
+
+    @pytest.mark.asyncio
+    async def test_purge_domain_fails_with_users_as_admin(
+        self, service: DomainService, mock_repository: MagicMock, admin_user: UserInfo
+    ) -> None:
+        mock_repository.purge_domain_validated = AsyncMock(
+            side_effect=DomainHasUsers("Domain has users")
+        )
+        action = PurgeDomainAction(name="test-domain", user_info=admin_user)
+
+        with pytest.raises(DomainHasUsers):
+            await service.purge_domain(action)
+
+    @pytest.mark.asyncio
+    async def test_purge_domain_fails_with_groups_as_admin(
+        self, service: DomainService, mock_repository: MagicMock, admin_user: UserInfo
+    ) -> None:
+        mock_repository.purge_domain_validated = AsyncMock(
+            side_effect=DomainHasGroups("Domain has groups")
+        )
+        action = PurgeDomainAction(name="test-domain", user_info=admin_user)
+
+        with pytest.raises(DomainHasGroups):
+            await service.purge_domain(action)
+
+    @pytest.mark.asyncio
+    async def test_purge_domain_fails_with_active_kernels_as_superadmin(
+        self, service: DomainService, mock_admin_repository: MagicMock, superadmin_user: UserInfo
+    ) -> None:
+        mock_admin_repository.purge_domain_force = AsyncMock(
+            side_effect=DomainHasActiveKernels("Domain has some active kernels")
+        )
+        action = PurgeDomainAction(name="test-domain", user_info=superadmin_user)
+
+        with pytest.raises(DomainHasActiveKernels):
+            await service.purge_domain(action)
+
+    @pytest.mark.asyncio
+    async def test_purge_domain_fails_with_users_as_superadmin(
+        self, service: DomainService, mock_admin_repository: MagicMock, superadmin_user: UserInfo
+    ) -> None:
+        mock_admin_repository.purge_domain_force = AsyncMock(
+            side_effect=DomainHasUsers("Domain has users")
+        )
+        action = PurgeDomainAction(name="test-domain", user_info=superadmin_user)
+
+        with pytest.raises(DomainHasUsers):
+            await service.purge_domain(action)
+
+    @pytest.mark.asyncio
+    async def test_purge_domain_fails_with_groups_as_superadmin(
+        self, service: DomainService, mock_admin_repository: MagicMock, superadmin_user: UserInfo
+    ) -> None:
+        mock_admin_repository.purge_domain_force = AsyncMock(
+            side_effect=DomainHasGroups("Domain has groups")
+        )
+        action = PurgeDomainAction(name="test-domain", user_info=superadmin_user)
+
+        with pytest.raises(DomainHasGroups):
+            await service.purge_domain(action)
+
+    @pytest.mark.asyncio
+    async def test_purge_domain_fails_with_deletion_failed_as_superadmin(
+        self, service: DomainService, mock_admin_repository: MagicMock, superadmin_user: UserInfo
+    ) -> None:
+        mock_admin_repository.purge_domain_force = AsyncMock(
+            side_effect=DomainDeletionFailed("Deletion failed")
+        )
+        action = PurgeDomainAction(name="test-domain", user_info=superadmin_user)
+
+        with pytest.raises(DomainDeletionFailed):
+            await service.purge_domain(action)

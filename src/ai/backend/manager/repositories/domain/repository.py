@@ -4,7 +4,11 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import BackendAIError, DomainNotFound, InvalidAPIParameters
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.domain.types import (
     DomainCreator,
     DomainData,
@@ -25,6 +29,7 @@ from ai.backend.manager.models.kernel import (
 from ai.backend.manager.models.rbac import SystemScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import DomainPermission, ScalingGroupPermission
+from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, get_scaling_groups
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
@@ -49,6 +54,11 @@ class DomainRepository:
         Validates domain creation permissions.
         """
         async with self._db.begin_session() as db_session:
+            check_query = sa.select(DomainRow).where(DomainRow.name == creator.name)
+            existing_domain = await db_session.scalar(check_query)
+            if existing_domain is not None:
+                raise InvalidAPIParameters(f"Domain with name '{creator.name}' already exists")
+
             domain = DomainRow.from_input(creator)
             db_session.add(domain)
             await db_session.flush()
@@ -60,12 +70,12 @@ class DomainRepository:
             # Create model-store group for the domain
             await self._create_model_store_group(db_session, creator.name)
 
-        return result
+            return result
 
     @repository_decorator()
     async def modify_domain_validated(
         self, domain_name: str, modifier: DomainModifier
-    ) -> Optional[DomainData]:
+    ) -> DomainData:
         """
         Modifies an existing domain.
         Validates domain modification permissions.
@@ -86,10 +96,12 @@ class DomainRepository:
 
             row = cast(Optional[DomainRow], await db_session.scalar(query_stmt))
 
-            return row.to_data() if row is not None else None
+            if row is None:
+                raise DomainNotFound(f"Domain not found: {domain_name}")
+            return row.to_data()
 
-    @repository_decorator()
-    async def soft_delete_domain_validated(self, domain_name: str) -> bool:
+    @domain_repository_resilience.apply()
+    async def soft_delete_domain_validated(self, domain_name: str) -> None:
         """
         Soft deletes a domain by setting is_active to False.
         Validates domain deletion permissions.
@@ -99,7 +111,8 @@ class DomainRepository:
                 sa.update(domains).values({"is_active": False}).where(domains.c.name == domain_name)
             )
             result = await conn.execute(update_query)
-            return result.rowcount > 0
+            if result.rowcount == 0:
+                raise DomainNotFound(f"Domain not found: {domain_name}")
 
     @repository_decorator()
     async def purge_domain_validated(self, domain_name: str) -> bool:
@@ -137,6 +150,11 @@ class DomainRepository:
         Validates domain node creation permissions.
         """
         async with self._db.begin_session() as session:
+            check_query = sa.select(DomainRow).where(DomainRow.name == creator.name)
+            existing_domain = await session.scalar(check_query)
+            if existing_domain is not None:
+                raise InvalidAPIParameters(f"Domain with name '{creator.name}' already exists")
+
             data = creator.fields_to_store()
             insert_and_returning = sa.select(DomainRow).from_statement(
                 sa.insert(DomainRow).values(data).returning(DomainRow)
@@ -171,7 +189,7 @@ class DomainRepository:
         modifier_fields: dict,
         sgroups_to_add: Optional[set[str]] = None,
         sgroups_to_remove: Optional[set[str]] = None,
-    ) -> Optional[DomainData]:
+    ) -> DomainData:
         """
         Modifies a domain node with scaling group changes.
         Validates domain node modification permissions.
@@ -206,13 +224,25 @@ class DomainRepository:
                 sa.select(DomainRow).where(DomainRow.name == domain_name)
             )
 
+            if domain_row is None:
+                raise DomainNotFound(f"Domain not found (id:{domain_name})")
+
             await session.commit()
-            return domain_row.to_data() if domain_row is not None else None
+            return domain_row.to_data()
 
     async def _create_model_store_group(self, db_session: SASession, domain_name: str) -> None:
         """
         Private method to create model-store group for a domain.
         """
+        # Validate that default resource policy exists
+        policy_exists = await db_session.scalar(
+            sa.select(sa.exists().where(keypair_resource_policies.c.name == "default"))
+        )
+        if not policy_exists:
+            raise InvalidAPIParameters(
+                "Cannot create model-store group: Default resource policy does not exist"
+            )
+
         model_store_insert_query = sa.insert(groups).values({
             "name": "model-store",
             "description": "Model Store",
@@ -293,7 +323,7 @@ class DomainRepository:
         user_info: UserInfo,
         sgroups_to_add: Optional[set[str]] = None,
         sgroups_to_remove: Optional[set[str]] = None,
-    ) -> Optional[DomainData]:
+    ) -> DomainData:
         """
         Modifies a domain node with scaling group changes and permission checks.
         Validates domain and scaling group permissions.
