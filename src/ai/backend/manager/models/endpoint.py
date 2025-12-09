@@ -1111,8 +1111,8 @@ class ModelServiceHelper:
         storage_manager: StorageSessionManager,
         folder_host: str,
         vfid: VFolderID,
-        suggested_path: str | None,
-    ) -> str | None:
+        suggested_path: Optional[str],
+    ) -> Optional[str]:
         """
         Finds model definition file in target model VFolder. Returns path to resolved model definition filename or None if not found.
         Since model service counts both `model-definition.yml` and `model-definition.yaml` as valid definition file name, this function
@@ -1144,7 +1144,7 @@ class ModelServiceHelper:
         storage_manager: StorageSessionManager,
         folder_host: str,
         vfid: VFolderID,
-        suggested_path: str | None,
+        suggested_path: Optional[str],
     ) -> str:
         """
         Checks if model definition file exists in target model VFolder. Returns path to resolved model definition filename.
