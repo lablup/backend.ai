@@ -68,6 +68,10 @@ from ai.backend.manager.services.notification.processors import NotificationProc
 from ai.backend.manager.services.notification.service import NotificationService
 from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
 from ai.backend.manager.services.object_storage.service import ObjectStorageService
+from ai.backend.manager.services.permission_contoller.processors import (
+    PermissionControllerProcessors,
+)
+from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
@@ -147,6 +151,7 @@ class Services:
     auth: AuthService
     notification: NotificationService
     object_storage: ObjectStorageService
+    permission_controller: PermissionControllerService
     vfs_storage: VFSStorageService
     artifact: ArtifactService
     artifact_revision: ArtifactRevisionService
@@ -272,6 +277,9 @@ class Services:
             repository=repositories.notification.repository,
             notification_center=args.notification_center,
         )
+        permission_controller_service = PermissionControllerService(
+            repository=repositories.permission_controller.repository,
+        )
         object_storage_service = ObjectStorageService(
             artifact_repository=repositories.artifact.repository,
             object_storage_repository=repositories.object_storage.repository,
@@ -338,6 +346,7 @@ class Services:
             auth=auth,
             notification=notification_service,
             object_storage=object_storage_service,
+            permission_controller=permission_controller_service,
             vfs_storage=vfs_storage_service,
             artifact=artifact_service,
             artifact_revision=artifact_revision_service,
@@ -376,6 +385,7 @@ class Processors(AbstractProcessorPackage):
     auth: AuthProcessors
     notification: NotificationProcessors
     object_storage: ObjectStorageProcessors
+    permission_controller: PermissionControllerProcessors
     vfs_storage: VFSStorageProcessors
     artifact: ArtifactProcessors
     artifact_registry: ArtifactRegistryProcessors
@@ -423,6 +433,9 @@ class Processors(AbstractProcessorPackage):
         )
         auth = AuthProcessors(services.auth, action_monitors)
         notification_processors = NotificationProcessors(services.notification, action_monitors)
+        permission_controller_processors = PermissionControllerProcessors(
+            services.permission_controller, action_monitors
+        )
         object_storage_processors = ObjectStorageProcessors(
             services.object_storage, action_monitors
         )
@@ -467,6 +480,7 @@ class Processors(AbstractProcessorPackage):
             auth=auth,
             notification=notification_processors,
             object_storage=object_storage_processors,
+            permission_controller=permission_controller_processors,
             vfs_storage=vfs_storage_processors,
             artifact=artifact_processors,
             artifact_registry=artifact_registry_processors,
@@ -500,6 +514,7 @@ class Processors(AbstractProcessorPackage):
             *self.auth.supported_actions(),
             *self.notification.supported_actions(),
             *self.object_storage.supported_actions(),
+            *self.permission_controller.supported_actions(),
             *self.vfs_storage.supported_actions(),
             *self.artifact_registry.supported_actions(),
             *self.artifact_revision.supported_actions(),
