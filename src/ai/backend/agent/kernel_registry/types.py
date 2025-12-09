@@ -55,11 +55,6 @@ class KernelRecoveryData(BaseModel):
     resource_spec: KernelResourceSpec = Field(description="Resource specifications for the kernel")
     environ: Mapping[str, str] = Field(description="Environment variables for the kernel")
 
-    kernel_host: str = Field(
-        description="Host where the kernel is running. Could be an IP address or hostname.",
-        examples=["127.0.0.1"],
-    )
-
     @classmethod
     def from_docker_kernel(cls, kernel: DockerKernel) -> Self:
         result = cls(
@@ -74,7 +69,6 @@ class KernelRecoveryData(BaseModel):
             resource_spec=kernel.resource_spec,
             service_ports=kernel.service_ports,
             environ=kernel.environ,
-            kernel_host=kernel.data["kernel_host"],
             block_service_ports=kernel.data["block_service_ports"],
             domain_socket_proxies=kernel.data["domain_socket_proxies"],
             repl_in_port=kernel.data["repl_in_port"],

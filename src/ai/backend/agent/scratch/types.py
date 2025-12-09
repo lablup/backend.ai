@@ -35,8 +35,6 @@ class KernelRecoveryScratchData(BaseModel):
     repl_in_port: int
     repl_out_port: int
 
-    kernel_host: str
-
     @classmethod
     def from_kernel_recovery_data(
         cls,
@@ -56,7 +54,6 @@ class KernelRecoveryScratchData(BaseModel):
             service_ports=data.service_ports,
             repl_in_port=data.repl_in_port,
             repl_out_port=data.repl_out_port,
-            kernel_host=data.kernel_host,
         )
 
     def to_kernel_recovery_data(
@@ -80,5 +77,4 @@ class KernelRecoveryScratchData(BaseModel):
             repl_out_port=self.repl_out_port,
             resource_spec=resource_spec,
             environ=environ,
-            kernel_host=self.kernel_host,
         )
