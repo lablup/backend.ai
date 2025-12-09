@@ -38,6 +38,8 @@ class KernelRecoveryDataAdapter:
         source_data = await self._source_loader.load_kernel_registry()
         for target in self._targets:
             data = await target.loader.load_kernel_registry()
-            data_to_save = {**data, **source_data}
+            for kernel_id, kernel in source_data.items():
+                if kernel_id not in data:
+                    data[kernel_id] = kernel
             metadata = KernelRegistrySaveMetadata(force=True)
-            await target.writer.save_kernel_registry(data_to_save, metadata)
+            await target.writer.save_kernel_registry(data, metadata)
