@@ -176,6 +176,19 @@ class StorageTransferManager:
             None, shutil.move, str(source_path), str(dest_path)
         )
 
+        # Ensure cleanup for cross-filesystem moves
+        if source_path.exists():
+            try:
+                await asyncio.get_event_loop().run_in_executor(
+                    None, shutil.rmtree, str(source_path)
+                )
+                log.warning(
+                    "Cross-filesystem move fallback: manually removed source {}", source_path
+                )
+            except Exception as e:
+                log.error("Failed to cleanup source after move: {}", e)
+                raise
+
         # Cleanup empty artifact directories
         self._cleanup_empty_parents(source_path.parent, source_storage.base_path)
 
