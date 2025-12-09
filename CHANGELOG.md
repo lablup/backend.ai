@@ -16,6 +16,20 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.15.4 (2025-12-09)
+
+### Improvements
+* Explicitly raise error when Group operation fails ([#7101](https://github.com/lablup/backend.ai/issues/7101))
+* Explicitly raise error when Domain operation fails ([#7102](https://github.com/lablup/backend.ai/issues/7102))
+
+### Fixes
+* Raise error when trying to purge domain with active user, group or kernel instead of returning 204 success response ([#6590](https://github.com/lablup/backend.ai/issues/6590))
+* fix Pure Storage client to properly handle authentication tokens. Previously, tokens were incorrectly stored in context variables, which could cause the client to lose access to authentication credentials ([#6913](https://github.com/lablup/backend.ai/issues/6913))
+* Fixed a error when domain admin validated quota scope access by using the `domain_name` key instead of `domain`. This change prevents errors for both user dictionaries and UserRow ORM objects, avoiding lazy-loading issues outside database sessions. ([#7017](https://github.com/lablup/backend.ai/issues/7017))
+* `is_active` is not applied to `groups` GQL resolver when client role is `USER` ([#7116](https://github.com/lablup/backend.ai/issues/7116))
+* Fixed SQLAlchemy session synchronization errors and foreign key constraint violations in group endpoint deletion by adding proper execution_options and reordering deletions. ([#7132](https://github.com/lablup/backend.ai/issues/7132))
+
+
 ## 25.15.3 (2025-11-23)
 
 ### Features
