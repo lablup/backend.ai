@@ -16,7 +16,13 @@ from ai.backend.manager.data.domain.types import (
     DomainNodeModifier,
     UserInfo,
 )
-from ai.backend.manager.errors.resource import DomainNotFound
+from ai.backend.manager.errors.resource import (
+    DomainDeletionFailed,
+    DomainHasActiveKernels,
+    DomainHasGroups,
+    DomainHasUsers,
+    DomainNotFound,
+)
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -610,9 +616,7 @@ async def test_delete_domain_in_db(
                 name="test-purge-domain",
             ),
         ),
-        # Note: Purging a non-existent domain returns True from repository
-        # (rowcount > 0 check) which effectively means no-op for non-existent domains
-        ScenarioBase.success(
+        ScenarioBase.failure(
             "Purge a domain not exists",
             PurgeDomainAction(
                 name="not-exist-domain",
@@ -622,9 +626,7 @@ async def test_delete_domain_in_db(
                     domain_name="default",
                 ),
             ),
-            PurgeDomainActionResult(
-                name="not-exist-domain",
-            ),
+            DomainDeletionFailed,
         ),
     ],
 )
@@ -766,9 +768,7 @@ async def test_purge_domain_with_active_users_fails(
             await processors.delete_domain.wait_for_complete(
                 DeleteDomainAction(name=domain_name, user_info=admin_user)
             )
-
-            # purge_domain_validated should raise RuntimeError for domain with users
-            with pytest.raises(RuntimeError, match="users"):
+            with pytest.raises(DomainHasUsers):
                 await processors.purge_domain.wait_for_complete(
                     PurgeDomainAction(name=domain_name, user_info=admin_user)
                 )
@@ -783,15 +783,10 @@ async def test_purge_domain_with_active_groups_fails(
             await processors.delete_domain.wait_for_complete(
                 DeleteDomainAction(name=domain_name, user_info=admin_user)
             )
-
-            # purge_domain_validated should raise RuntimeError for domain with groups
-            with pytest.raises(RuntimeError, match="groups"):
+            with pytest.raises(DomainHasGroups):
                 await processors.purge_domain.wait_for_complete(
                     PurgeDomainAction(name=domain_name, user_info=admin_user)
                 )
-
-
-# Additional Missing Test Cases from test.md
 
 
 @pytest.mark.asyncio
@@ -1247,11 +1242,11 @@ class TestDomainService:
         self, service: DomainService, mock_repository: MagicMock, admin_user: UserInfo
     ) -> None:
         mock_repository.purge_domain_validated = AsyncMock(
-            side_effect=RuntimeError("Domain has some active kernels")
+            side_effect=DomainHasActiveKernels("Domain has some active kernels")
         )
         action = PurgeDomainAction(name="test-domain", user_info=admin_user)
 
-        with pytest.raises(RuntimeError, match="kernels"):
+        with pytest.raises(DomainHasActiveKernels):
             await service.purge_domain(action)
 
     @pytest.mark.asyncio
@@ -1259,11 +1254,11 @@ class TestDomainService:
         self, service: DomainService, mock_repository: MagicMock, admin_user: UserInfo
     ) -> None:
         mock_repository.purge_domain_validated = AsyncMock(
-            side_effect=RuntimeError("Domain has users")
+            side_effect=DomainHasUsers("Domain has users")
         )
         action = PurgeDomainAction(name="test-domain", user_info=admin_user)
 
-        with pytest.raises(RuntimeError, match="users"):
+        with pytest.raises(DomainHasUsers):
             await service.purge_domain(action)
 
     @pytest.mark.asyncio
@@ -1271,11 +1266,11 @@ class TestDomainService:
         self, service: DomainService, mock_repository: MagicMock, admin_user: UserInfo
     ) -> None:
         mock_repository.purge_domain_validated = AsyncMock(
-            side_effect=RuntimeError("Domain has groups")
+            side_effect=DomainHasGroups("Domain has groups")
         )
         action = PurgeDomainAction(name="test-domain", user_info=admin_user)
 
-        with pytest.raises(RuntimeError, match="groups"):
+        with pytest.raises(DomainHasGroups):
             await service.purge_domain(action)
 
     @pytest.mark.asyncio
@@ -1283,11 +1278,11 @@ class TestDomainService:
         self, service: DomainService, mock_admin_repository: MagicMock, superadmin_user: UserInfo
     ) -> None:
         mock_admin_repository.purge_domain_force = AsyncMock(
-            side_effect=RuntimeError("Domain has some active kernels")
+            side_effect=DomainHasActiveKernels("Domain has some active kernels")
         )
         action = PurgeDomainAction(name="test-domain", user_info=superadmin_user)
 
-        with pytest.raises(RuntimeError, match="kernels"):
+        with pytest.raises(DomainHasActiveKernels):
             await service.purge_domain(action)
 
     @pytest.mark.asyncio
@@ -1295,11 +1290,11 @@ class TestDomainService:
         self, service: DomainService, mock_admin_repository: MagicMock, superadmin_user: UserInfo
     ) -> None:
         mock_admin_repository.purge_domain_force = AsyncMock(
-            side_effect=RuntimeError("Domain has users")
+            side_effect=DomainHasUsers("Domain has users")
         )
         action = PurgeDomainAction(name="test-domain", user_info=superadmin_user)
 
-        with pytest.raises(RuntimeError, match="users"):
+        with pytest.raises(DomainHasUsers):
             await service.purge_domain(action)
 
     @pytest.mark.asyncio
@@ -1307,11 +1302,11 @@ class TestDomainService:
         self, service: DomainService, mock_admin_repository: MagicMock, superadmin_user: UserInfo
     ) -> None:
         mock_admin_repository.purge_domain_force = AsyncMock(
-            side_effect=RuntimeError("Domain has groups")
+            side_effect=DomainHasGroups("Domain has groups")
         )
         action = PurgeDomainAction(name="test-domain", user_info=superadmin_user)
 
-        with pytest.raises(RuntimeError, match="groups"):
+        with pytest.raises(DomainHasGroups):
             await service.purge_domain(action)
 
     @pytest.mark.asyncio
@@ -1319,9 +1314,9 @@ class TestDomainService:
         self, service: DomainService, mock_admin_repository: MagicMock, superadmin_user: UserInfo
     ) -> None:
         mock_admin_repository.purge_domain_force = AsyncMock(
-            side_effect=RuntimeError("Deletion failed")
+            side_effect=DomainDeletionFailed("Deletion failed")
         )
         action = PurgeDomainAction(name="test-domain", user_info=superadmin_user)
 
-        with pytest.raises(RuntimeError, match="Deletion failed"):
+        with pytest.raises(DomainDeletionFailed):
             await service.purge_domain(action)
