@@ -10,10 +10,10 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import VFolderID
 from ai.backend.manager.errors.resource import (
-    GroupHasActiveEndpointsError,
-    GroupHasActiveKernelsError,
-    GroupHasVFoldersMountedError,
-    GroupNotFound,
+    ProjectHasActiveEndpointsError,
+    ProjectHasActiveKernelsError,
+    ProjectHasVFoldersMountedError,
+    ProjectNotFound,
 )
 from ai.backend.manager.errors.storage import VFolderOperationFailed
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
@@ -183,7 +183,7 @@ class AdminGroupRepository:
         # Check for active endpoints
         active_endpoints = [ep.id for ep in endpoints if ep.is_active]
         if len(active_endpoints) > 0:
-            raise GroupHasActiveEndpointsError(f"project {group_id} has active endpoints")
+            raise ProjectHasActiveEndpointsError(f"project {group_id} has active endpoints")
 
         # Delete endpoint-related data
         endpoint_ids = [ep.id for ep in endpoints]
@@ -218,12 +218,12 @@ class AdminGroupRepository:
         async with self._db.begin_session() as session:
             # Pre-flight checks
             if await self._check_group_vfolders_mounted_to_active_kernels(session, group_id):
-                raise GroupHasVFoldersMountedError(
+                raise ProjectHasVFoldersMountedError(
                     f"error on deleting project {group_id} with vfolders mounted to active kernels"
                 )
 
             if await self._check_group_has_active_kernels(session, group_id):
-                raise GroupHasActiveKernelsError(
+                raise ProjectHasActiveKernelsError(
                     f"error on deleting project {group_id} with active kernels"
                 )
 
@@ -246,4 +246,4 @@ class AdminGroupRepository:
 
             if result.rowcount > 0:
                 return True
-            raise GroupNotFound("project not found")
+            raise ProjectNotFound("project not found")

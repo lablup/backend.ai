@@ -11,7 +11,7 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import RedisConnectionInfo, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
-from ai.backend.manager.errors.resource import GroupNotFound
+from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -228,7 +228,7 @@ async def test_modify_group_with_invalid_group_id(
             is_active=OptionalState.update(False),
         ),
     )
-    with pytest.raises(GroupNotFound):
+    with pytest.raises(ProjectNotFound):
         await processors.modify_group.wait_for_complete(action)
 
 

@@ -12,7 +12,7 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
-from ai.backend.manager.errors.resource import GroupHasActiveEndpointsError
+from ai.backend.manager.errors.resource import ProjectHasActiveEndpointsError
 from ai.backend.manager.models import (
     DomainRow,
     EndpointRow,
@@ -544,7 +544,7 @@ class TestAdminGroupRepositoryDeleteEndpoints:
     ) -> None:
         """Test that active endpoints raise an exception"""
         # Call _delete_group_endpoints and expect exception
-        with pytest.raises(GroupHasActiveEndpointsError):
+        with pytest.raises(ProjectHasActiveEndpointsError):
             async with db_with_cleanup.begin_session() as session:
                 await admin_group_repository._delete_group_endpoints(session, test_group)
 

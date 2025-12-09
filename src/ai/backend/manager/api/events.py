@@ -55,7 +55,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from ..errors.common import GenericForbidden
 from ..errors.kernel import SessionNotFound
-from ..errors.resource import GroupNotFound, NoCurrentTaskContext
+from ..errors.resource import NoCurrentTaskContext, ProjectNotFound
 from ..events.hub.propagators.session import SessionEventPropagator
 from ..exceptions import InvalidArgument
 from ..models import UserRole, groups
@@ -144,7 +144,7 @@ async def push_session_events(
             result = await conn.execute(query)
             row = result.first()
             if row is None:
-                raise GroupNotFound
+                raise ProjectNotFound
             group_id = row["id"]
 
     filters = {
