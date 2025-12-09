@@ -23,8 +23,7 @@ class DeleteDomainAction(DomainAction):
 
 @dataclass
 class DeleteDomainActionResult(BaseActionResult):
-    success: bool
-    description: str
+    name: str
 
     @override
     def entity_id(self) -> Optional[str]:
