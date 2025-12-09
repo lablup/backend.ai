@@ -55,7 +55,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from ..errors.common import GenericForbidden
 from ..errors.kernel import SessionNotFound
-from ..errors.resource import NoCurrentTaskContext, ProjectNotFound
+from ..errors.resource import ProjectNotFound
 from ..events.hub.propagators.session import SessionEventPropagator
 from ..exceptions import InvalidArgument
 from ..models import UserRole, groups

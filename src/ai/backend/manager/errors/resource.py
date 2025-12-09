@@ -122,7 +122,8 @@ class ProjectNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/project-not-found"
     error_title = "Project not found."
 
-    def error_code(self) -> ErrorCode:
+    @classmethod
+    def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
             operation=ErrorOperation.READ,

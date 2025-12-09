@@ -18,16 +18,15 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderListResult,
     VFolderPermissionData,
 )
-from ai.backend.manager.errors.common import ObjectNotFound
-from ai.backend.manager.errors.resource import DBOperationFailed, ProjectNotFound
-from ai.backend.manager.errors.storage import (
-    VFolderDeletionNotAllowed,
-    VFolderInvalidParameter,
-    VFolderNotFound,
+from ai.backend.manager.decorators.repository_decorator import (
+    create_layer_aware_repository_decorator,
 )
 from ai.backend.manager.errors.common import ObjectNotFound
-from ai.backend.manager.errors.resource import GroupNotFound
-from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed, VFolderNotFound
+from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.errors.storage import (
+    VFolderDeletionNotAllowed,
+    VFolderNotFound,
+)
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.keypair import KeyPairRow

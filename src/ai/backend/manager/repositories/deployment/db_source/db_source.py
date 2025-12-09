@@ -36,10 +36,6 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderLocation
-from ai.backend.manager.errors.deployment import (
-    DeploymentHasNoTargetRevision,
-    UserNotFoundInDeployment,
-)
 from ai.backend.manager.errors.resource import ProjectNotFound, ScalingGroupProxyTargetNotFound
 from ai.backend.manager.errors.service import (
     AutoScalingRuleNotFound,
