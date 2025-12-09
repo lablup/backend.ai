@@ -34,10 +34,7 @@ from ai.backend.manager.services.group.actions.modify_group import (
 )
 from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
-    PurgeGroupActionActiveEndpointsError,
-    PurgeGroupActionActiveKernelsError,
     PurgeGroupActionResult,
-    PurgeGroupActionVFoldersMountedToActiveKernelsError,
 )
 from ai.backend.manager.services.group.actions.usage_per_month import (
     UsagePerMonthAction,
@@ -99,29 +96,8 @@ class GroupService:
         return DeleteGroupActionResult(group_id=action.group_id)
 
     async def purge_group(self, action: PurgeGroupAction) -> PurgeGroupActionResult:
-        from ai.backend.manager.errors.resource import (
-            GroupHasActiveEndpointsError,
-            GroupHasActiveKernelsError,
-            GroupHasVFoldersMountedError,
-        )
-
-        try:
-            result = await self._admin_group_repository.purge_group_force(action.group_id)
-            return PurgeGroupActionResult(data=None, success=result)
-        except GroupHasVFoldersMountedError:
-            log.error(
-                f"error on deleting group {action.group_id} with vfolders mounted to active kernels"
-            )
-            raise PurgeGroupActionVFoldersMountedToActiveKernelsError()
-        except GroupHasActiveKernelsError:
-            log.error(f"error on deleting group {action.group_id} with active kernels")
-            raise PurgeGroupActionActiveKernelsError()
-        except GroupHasActiveEndpointsError:
-            log.error(f"error on deleting group {action.group_id} with active endpoints")
-            raise PurgeGroupActionActiveEndpointsError()
-        except Exception as e:
-            log.warning("purge_group(): error ({})", repr(e))
-            return PurgeGroupActionResult(data=None, success=False)
+        await self._admin_group_repository.purge_group_force(action.group_id)
+        return PurgeGroupActionResult(group_id=action.group_id)
 
     async def _get_project_stats_for_period(
         self,

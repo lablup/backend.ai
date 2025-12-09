@@ -36,7 +36,11 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderLocation
-from ai.backend.manager.errors.resource import GroupNotFound, ScalingGroupProxyTargetNotFound
+from ai.backend.manager.errors.deployment import (
+    DeploymentHasNoTargetRevision,
+    UserNotFoundInDeployment,
+)
+from ai.backend.manager.errors.resource import ProjectNotFound, ScalingGroupProxyTargetNotFound
 from ai.backend.manager.errors.service import (
     AutoScalingRuleNotFound,
     EndpointNotFound,
@@ -188,7 +192,7 @@ class DeploymentDBSource:
 
         result = await db_sess.execute(query)
         if result.first() is None:
-            raise GroupNotFound(f"Group {group_id} not found in domain {domain_name}")
+            raise ProjectNotFound(f"Project {group_id} not found in domain {domain_name}")
 
     async def get_endpoint(
         self,
