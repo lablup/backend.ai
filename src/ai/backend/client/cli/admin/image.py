@@ -5,12 +5,8 @@ from typing import Optional
 import click
 
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.func.image import _default_list_fields_admin
-from ai.backend.client.session import Session
-from ai.backend.common.bgtask.types import BgtaskStatus
 
 from ...compat import asyncio_run
-from ...session import AsyncSession
 from ..extensions import pass_ctx_obj
 from ..pretty import ProgressBarWithSpinner, print_done, print_error, print_fail, print_warn
 from ..types import CLIContext
@@ -31,6 +27,9 @@ def list(ctx: CLIContext, operation: bool) -> None:
     """
     Show the list of registered images in this cluster.
     """
+    from ai.backend.client.func.image import _default_list_fields_admin
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             items = session.Image.list(operation=operation)
@@ -59,6 +58,9 @@ def rescan(registry: str, project: Optional[str] = None) -> None:
     """
     Update the kernel image metadata from the configured registries.
     """
+    from ai.backend.common.bgtask.types import BgtaskStatus
+
+    from ...session import AsyncSession
 
     async def rescan_images_impl(registry: str, project: Optional[str]) -> None:
         async with AsyncSession() as session:
@@ -116,6 +118,8 @@ def rescan(registry: str, project: Optional[str] = None) -> None:
 @click.option("--arch", type=str, default=None, help="Set an explicit architecture.")
 def alias(alias, target, arch):
     """Add an image alias."""
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             result = session.Image.alias_image(alias, target, arch)
@@ -132,6 +136,8 @@ def alias(alias, target, arch):
 @click.argument("alias", type=str)
 def dealias(alias):
     """Remove an image alias."""
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             result = session.Image.dealias_image(alias)
