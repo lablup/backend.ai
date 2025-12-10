@@ -26,8 +26,17 @@ fi
 BACKEND_AI_PATH="$(pwd)/backend.ai"
 echo -e "${GREEN}✅ Found backend.ai at: $BACKEND_AI_PATH${NC}"
 
-# Check current shell using $SHELL environment variable
-SHELL_TYPE=$(basename "$SHELL")
+# Check current shell - prefer $0 (actual running shell) over $SHELL
+if [[ -n "$BASH_VERSION" ]]; then
+    SHELL_TYPE="bash"
+elif [[ -n "$ZSH_VERSION" ]]; then
+    SHELL_TYPE="zsh"
+elif [[ "$0" == *"fish"* ]]; then
+    SHELL_TYPE="fish"
+else
+    # Fallback to $SHELL environment variable
+    SHELL_TYPE=$(basename "$SHELL")
+fi
 
 echo -e "${GREEN}✅ Detected shell: $SHELL_TYPE${NC}"
 
@@ -61,7 +70,8 @@ if [[ "$SHELL_TYPE" == "zsh" ]]; then
     
 elif [[ "$SHELL_TYPE" == "bash" ]]; then
     # Load bash completion
-    eval $(_BACKEND_AI_COMPLETE=bash_source "$BACKEND_AI_PATH" 2>/dev/null | sed "s|backend\\.ai|$BACKEND_AI_PATH|g")
+    COMP_CODE=$(_BACKEND_AI_COMPLETE=bash_source "$BACKEND_AI_PATH" 2>/dev/null | sed "s|backend\\.ai|\"$BACKEND_AI_PATH\"|g")
+    eval "$COMP_CODE"
     echo -e "${GREEN}✅ Loaded bash completion${NC}"
     
 elif [[ "$SHELL_TYPE" == "fish" ]]; then
