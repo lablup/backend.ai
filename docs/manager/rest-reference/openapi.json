@@ -10229,6 +10229,178 @@
         ],
         "description": "Validate a notification rule by rendering its template with test data.\n\n**Preconditions:**\n* User privilege required.\n"
       }
+    },
+    "/rbac/roles": {
+      "post": {
+        "operationId": "rbac.create_role",
+        "tags": [
+          "rbac"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Create a new role.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/rbac/roles/search": {
+      "post": {
+        "operationId": "rbac.search_roles",
+        "tags": [
+          "rbac"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search roles with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/rbac/roles/{role_id}": {
+      "get": {
+        "operationId": "rbac.get_role",
+        "tags": [
+          "rbac"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific role.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "rbac.update_role",
+        "tags": [
+          "rbac"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an existing role.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "rbac.delete_role",
+        "tags": [
+          "rbac"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Delete a role.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/rbac/role-assignments": {
+      "post": {
+        "operationId": "rbac.assign_role",
+        "tags": [
+          "rbac"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Assign a role to a user.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/rbac/roles/{role_id}/users/search": {
+      "post": {
+        "operationId": "rbac.search_users_assigned_to_role",
+        "tags": [
+          "rbac"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Search users assigned to a specific role with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
     }
   }
 }
