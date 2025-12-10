@@ -1,22 +1,12 @@
-import asyncio
-import importlib
-import json
 from pathlib import Path
 from typing import Any, Optional
 
-import aiohttp_cors
 import click
-import tomli_w
-from aiohttp import web
 from setproctitle import setproctitle
 
-from ai.backend.appproxy.common.config import generate_example_json
-from ai.backend.appproxy.common.openapi import generate_openapi
-from ai.backend.appproxy.common.utils import ensure_json_serializable
 from ai.backend.common.cli import LazyGroup
 from ai.backend.logging.types import LogLevel
 
-from ..config import ServerConfig
 from .context import CLIContext
 
 
@@ -73,6 +63,13 @@ def generate_example_configuration(output: Path) -> None:
     """
     Generates example TOML configuration file for Backend.AI Proxy Worker.
     """
+    import tomli_w
+
+    from ai.backend.appproxy.common.config import generate_example_json
+    from ai.backend.appproxy.common.utils import ensure_json_serializable
+
+    from ..config import ServerConfig
+
     generated_example = generate_example_json(ServerConfig)
     if output == "-" or output is None:
         print(tomli_w.dumps(ensure_json_serializable(generated_example)))
@@ -82,6 +79,13 @@ def generate_example_configuration(output: Path) -> None:
 
 
 async def _generate() -> dict[str, Any]:
+    import importlib
+
+    import aiohttp_cors
+    from aiohttp import web
+
+    from ai.backend.appproxy.common.openapi import generate_openapi
+
     from ..server import global_subapp_pkgs
 
     cors_options = {
@@ -110,6 +114,9 @@ def generate_openapi_spec(output: Path) -> None:
     """
     Generates OpenAPI specification of Backend.AI API.
     """
+    import asyncio
+    import json
+
     openapi = asyncio.run(_generate())
     if output == "-" or output is None:
         print(json.dumps(openapi, ensure_ascii=False, indent=2))
