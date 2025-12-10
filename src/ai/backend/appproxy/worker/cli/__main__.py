@@ -2,12 +2,13 @@ from pathlib import Path
 from typing import Any, Optional
 
 import click
-from setproctitle import setproctitle
 
 from ai.backend.common.cli import LazyGroup
-from ai.backend.logging.types import LogLevel
 
 from .context import CLIContext
+
+# LogLevel values for click.Choice - avoid importing ai.backend.logging at module level
+_LOG_LEVELS = ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "TRACE", "NOTSET"]
 
 
 @click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
@@ -31,7 +32,7 @@ from .context import CLIContext
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogLevel.__members__.keys()], case_sensitive=False),
+    type=click.Choice(_LOG_LEVELS, case_sensitive=False),
     default="INFO",
     help="Set the logging verbosity level",
 )
@@ -45,6 +46,10 @@ def main(
     """
     Proxy Worker Administration CLI
     """
+    from setproctitle import setproctitle
+
+    from ai.backend.logging.types import LogLevel
+
     setproctitle("backend.ai: proxy-worker.cli")
     if debug:
         log_level = "DEBUG"
