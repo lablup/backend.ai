@@ -26,16 +26,18 @@ fi
 BACKEND_AI_PATH="$(pwd)/backend.ai"
 echo -e "${GREEN}✅ Found backend.ai at: $BACKEND_AI_PATH${NC}"
 
-# Check current shell - prefer $0 (actual running shell) over $SHELL
+# Check current shell by detecting shell-specific environment variables
 if [[ -n "$BASH_VERSION" ]]; then
     SHELL_TYPE="bash"
 elif [[ -n "$ZSH_VERSION" ]]; then
     SHELL_TYPE="zsh"
-elif [[ "$0" == *"fish"* ]]; then
+elif [[ -n "$FISH_VERSION" ]]; then
     SHELL_TYPE="fish"
 else
-    # Fallback to $SHELL environment variable
-    SHELL_TYPE=$(basename "$SHELL")
+    echo -e "${RED}❌ Error: Unsupported shell detected${NC}"
+    echo -e "${YELLOW}This script supports bash, zsh, and fish only.${NC}"
+    echo -e "${YELLOW}Current shell: $SHELL${NC}"
+    return 1 2>/dev/null || exit 1
 fi
 
 echo -e "${GREEN}✅ Detected shell: $SHELL_TYPE${NC}"
