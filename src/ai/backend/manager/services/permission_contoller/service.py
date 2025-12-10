@@ -50,7 +50,6 @@ class PermissionControllerService:
         result = await self._repository.create_role(action.input)
         return CreateRoleActionResult(
             data=result,
-            success=True,
         )
 
     async def update_role(self, action: UpdateRoleAction) -> UpdateRoleActionResult:
@@ -84,7 +83,7 @@ class PermissionControllerService:
         """
         data = await self._repository.assign_role(action.input)
 
-        return AssignRoleActionResult(success=True, data=data)
+        return AssignRoleActionResult(data=data)
 
     async def get_role_detail(self, action: GetRoleDetailAction) -> GetRoleDetailActionResult:
         """Get role with all permission details and assigned users."""

@@ -456,6 +456,9 @@ class Processors(AbstractProcessorPackage):
         storage_namespace_processors = StorageNamespaceProcessors(
             services.storage_namespace, action_monitors
         )
+        permission_controller_processors = PermissionControllerProcessors(
+            services.permission_controller, action_monitors
+        )
 
         return cls(
             agent=agent_processors,
@@ -521,4 +524,5 @@ class Processors(AbstractProcessorPackage):
             *self.artifact.supported_actions(),
             *(self.deployment.supported_actions() if self.deployment else []),
             *self.storage_namespace.supported_actions(),
+            *self.permission_controller.supported_actions(),
         ]
