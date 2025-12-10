@@ -3,13 +3,13 @@ from enum import StrEnum
 from typing import Optional, Self
 
 import strawberry
-from strawberry import ID
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.manager.api.gql.adapter import GQLOrderBy
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
-from ai.backend.manager.api.gql.types import GQLFilter
+from ai.backend.manager.api.gql.types import GQLFilter, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.agent.types import AgentData, AgentStatus
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
@@ -311,6 +311,21 @@ class AgentV2GQL(Node):
             quota management, and workload isolation across different user groups or projects.
         """)
     )
+
+    @strawberry.field(description="Added in 25.18.0")
+    async def container_count_v2(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> int:
+        """
+        Get the container count for a specific agent.
+        """
+        from .resolver import batch_load_container_counts
+
+        dataloader = info.context.dataloader_registry.get_loader(
+            batch_load_container_counts, info.context
+        )
+        return await dataloader.load(str(self.id))
 
     @classmethod
     def from_action_result(cls, data: AgentData, permissions: list[AgentPermission]) -> Self:

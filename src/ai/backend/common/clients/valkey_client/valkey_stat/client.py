@@ -402,6 +402,37 @@ class ValkeyStatClient:
                 counts.append(0)
         return counts
 
+    @valkey_stat_resilience.apply()
+    async def get_agent_container_counts_as_dict(self, agent_ids: list[str]) -> dict[str, int]:
+        """
+        Get container counts for multiple agents as a dictionary.
+
+        :param agent_ids: List of agent IDs to get container counts for.
+        :return: Dict mapping agent IDs to their container counts (0 for non-existent agents).
+        """
+        if not agent_ids:
+            return {}
+
+        keys = [self._get_container_count_key(agent_id) for agent_id in agent_ids]
+        results = await self._get_multiple_keys(keys)
+
+        counts_dict: dict[str, int] = {}
+        for i, result in enumerate(results):
+            agent_id = agent_ids[i]
+            if result is None:
+                counts_dict[agent_id] = 0
+                continue
+            try:
+                counts_dict[agent_id] = int(result.decode("utf-8"))
+            except (ValueError, UnicodeDecodeError):
+                log.warning(
+                    "Failed to decode container count for agent {}: {}",
+                    agent_id,
+                    repr(result),
+                )
+                counts_dict[agent_id] = 0
+        return counts_dict
+
     def _get_manager_status_key(self, node_id: str, pid: int) -> str:
         """
         Generate manager status key.

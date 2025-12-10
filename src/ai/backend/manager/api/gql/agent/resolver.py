@@ -6,6 +6,7 @@ from typing import Optional
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.types import AgentId
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.agent.types import (
     AgentConditions,
@@ -21,6 +22,9 @@ from ai.backend.manager.api.gql.agent.types import (
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.services.agent.actions.get_total_resources import GetTotalResourcesAction
+from ai.backend.manager.services.agent.actions.load_container_counts import (
+    LoadContainerCountsAction,
+)
 from ai.backend.manager.services.agent.actions.search_agents import SearchAgentsAction
 
 
@@ -94,3 +98,19 @@ async def agents_v2(
         ),
         count=action_result.total_count,
     )
+
+
+async def batch_load_container_counts(
+    ctx: StrawberryGQLContext,
+    agent_ids: list[str],
+) -> list[int]:
+    processors = ctx.processors
+    casted_agent_ids = [AgentId(agent_id) for agent_id in agent_ids]
+    result = await processors.agent.load_container_counts.wait_for_complete(
+        LoadContainerCountsAction(agent_ids=casted_agent_ids)
+    )
+
+    # Convert dict to list in the same order as input agent_ids
+    # This is required by Strawberry DataLoader contract which expects list[Value]
+    container_counts = result.container_counts
+    return [container_counts[aid] for aid in casted_agent_ids]
