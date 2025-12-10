@@ -2147,6 +2147,25 @@ class ArtifactRegistryConfig(BaseConfigSchema):
     )
 
 
+class DeploymentConfig(BaseConfigSchema):
+    enable_model_definition_override: bool = Field(
+        default=False,
+        description="""
+        Enable model definition override from storage for non-CUSTOM runtime variants.
+        When enabled, after generating the model definition programmatically,
+        the system will attempt to fetch a custom model definition from storage
+        if model_definition_path is specified in the revision.
+        If the fetch succeeds, the custom definition overrides the generated one.
+        If the fetch fails, the generated definition is used as fallback.
+        """,
+        examples=[True, False],
+        validation_alias=AliasChoices(
+            "enable-model-definition-override", "enable_model_definition_override"
+        ),
+        serialization_alias="enable-model-definition-override",
+    )
+
+
 class ManagerUnifiedConfig(BaseConfigSchema):
     # From legacy local config
     db: DatabaseConfig = Field(
@@ -2341,6 +2360,13 @@ class ManagerUnifiedConfig(BaseConfigSchema):
         default=None,
         description="""
         Reservoir configuration.
+        """,
+    )
+    deployment: DeploymentConfig = Field(
+        default_factory=DeploymentConfig,
+        description="""
+        Deployment and model serving configuration.
+        Controls behavior of model deployment features.
         """,
     )
 
