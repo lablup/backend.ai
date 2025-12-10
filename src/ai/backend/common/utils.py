@@ -518,7 +518,7 @@ def deep_merge(*args: Mapping[str, Any]) -> Mapping[str, Any]:
             va = merged.get(k)
             if isinstance(va, Mapping) and isinstance(vb, Mapping):
                 merged[k] = deep_merge(va, vb)
-            else:
+            elif vb is not None:
                 merged[k] = vb
     return merged
 
