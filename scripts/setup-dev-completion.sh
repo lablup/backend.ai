@@ -49,30 +49,57 @@ if [[ "$SHELL_TYPE" == "zsh" ]]; then
     autoload -U compdef
     autoload -U compinit && compinit -D 2>/dev/null
     
-    # Generate and load zsh completion
-    COMP_CODE=$(_BACKEND_AI_COMPLETE=zsh_source "$BACKEND_AI_PATH" 2>/dev/null | sed '/^#compdef/d')
-    eval "$COMP_CODE" 2>/dev/null
+    # Ensure Click's completion system is available
+    # Try to load basic Click completion infrastructure first
+    if command -v python3 >/dev/null 2>&1; then
+        python3 -c "import click" 2>/dev/null || echo -e "${YELLOW}⚠️  Click not available, completion may be limited${NC}"
+    fi
     
-    # Register completion manually in _comps array to avoid compdef issues
+    # Generate and load zsh completion using the full path
+    # Replace 'backend.ai' with the full path in all places
+    COMP_CODE=$(_BACKEND_AI_COMPLETE=zsh_source "$BACKEND_AI_PATH" 2>/dev/null | \
+        sed '/^#compdef/d' | \
+        sed '/(( ! \$+commands\[backend\.ai\] ))/d' | \
+        sed "s|_BACKEND_AI_COMPLETE=zsh_complete backend\.ai|_BACKEND_AI_COMPLETE=zsh_complete \"$BACKEND_AI_PATH\"|g")
+    eval "$COMP_CODE" 2>/dev/null
+
+    # Create alias to make 'backend.ai' command available for interactive use
+    alias backend.ai="$BACKEND_AI_PATH"
+
+    # Verify completion function was loaded
     if type _backendai_completion >/dev/null 2>&1; then
-        _comps[./backend.ai]=_backendai_completion 2>/dev/null || echo -e "${YELLOW}⚠️  Direct registration failed, but completion function is loaded${NC}"
+        # Register completion for both 'backend.ai' (alias) and './backend.ai' (script)
+        compdef _backendai_completion backend.ai 2>/dev/null
+        compdef _backendai_completion ./backend.ai 2>/dev/null
     else
         echo -e "${RED}❌ Failed to load completion function${NC}"
         return 1
     fi
     echo -e "${GREEN}✅ Loaded zsh completion${NC}"
-    echo ""
-    echo -e "${YELLOW}⚠️  Note: Your zsh completion system has conflicts.${NC}"
     echo -e "${BLUE}💡 If tab completion doesn't work, try this in a new terminal:${NC}"
     echo "   zsh -f"
     echo "   cd $(pwd)"
     echo "   source scripts/setup-dev-completion.sh"
     
 elif [[ "$SHELL_TYPE" == "bash" ]]; then
-    # Load bash completion
-    COMP_CODE=$(_BACKEND_AI_COMPLETE=bash_source "$BACKEND_AI_PATH" 2>/dev/null | sed "s|backend\\.ai|\"$BACKEND_AI_PATH\"|g")
+    # Load bash completion using the full path
+    # Replace 'backend.ai' with the full path in all places
+    COMP_CODE=$(_BACKEND_AI_COMPLETE=bash_source "$BACKEND_AI_PATH" 2>/dev/null | \
+        sed "s|_BACKEND_AI_COMPLETE=bash_complete backend\.ai|_BACKEND_AI_COMPLETE=bash_complete \"$BACKEND_AI_PATH\"|g")
     eval "$COMP_CODE"
-    echo -e "${GREEN}✅ Loaded bash completion${NC}"
+
+    # Create alias to make 'backend.ai' command available for interactive use
+    alias backend.ai="$BACKEND_AI_PATH"
+
+    # Verify completion function was loaded and register for both forms
+    if type _backendai_completion &>/dev/null; then
+        complete -o nosort -F _backendai_completion backend.ai
+        complete -o nosort -F _backendai_completion ./backend.ai
+        echo -e "${GREEN}✅ Loaded bash completion${NC}"
+    else
+        echo -e "${RED}❌ Failed to load completion function${NC}"
+        return 1
+    fi
     
 elif [[ "$SHELL_TYPE" == "fish" ]]; then
     echo -e "${YELLOW}🐟 Fish shell detected. Please use the fish-specific script:${NC}"
