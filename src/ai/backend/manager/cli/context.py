@@ -4,29 +4,18 @@ import contextlib
 import sys
 from pathlib import Path
 from pprint import pformat
-from typing import AsyncIterator, Optional, Self
+from typing import TYPE_CHECKING, Any, AsyncIterator, Optional, Self
 
-import attrs
 import click
 
-from ai.backend.common import redis_helper
-from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
-from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.config import find_config_file
-from ai.backend.common.defs import (
-    REDIS_IMAGE_DB,
-    REDIS_LIVE_DB,
-    REDIS_STATISTICS_DB,
-    REDIS_STREAM_DB,
-    RedisRole,
-)
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.exception import ConfigurationError
-from ai.backend.common.types import RedisConnectionInfo
-from ai.backend.logging import AbstractLogger, LocalLogger, LogLevel
-from ai.backend.manager.config.bootstrap import BootstrapConfig
-from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
-from ai.backend.manager.config.unified import ManagerUnifiedConfig, RedisConfig
+if TYPE_CHECKING:
+    from ai.backend.common.etcd import AsyncEtcd
+    from ai.backend.logging import AbstractLogger
+    from ai.backend.logging.types import LogLevel
+    from ai.backend.manager.config.bootstrap import BootstrapConfig
+    from ai.backend.manager.config.unified import ManagerUnifiedConfig
+
+    from .types import RedisConnectionSet
 
 
 class CLIContext:
@@ -39,6 +28,10 @@ class CLIContext:
         self._bootstrap_config = None
 
     async def get_bootstrap_config(self) -> BootstrapConfig:
+        from ai.backend.common.config import find_config_file
+        from ai.backend.common.exception import ConfigurationError
+        from ai.backend.manager.config.bootstrap import BootstrapConfig
+
         # Lazy-load the configuration only when requested.
         try:
             if self._bootstrap_config is None:
@@ -58,6 +51,8 @@ class CLIContext:
         return self._bootstrap_config
 
     def __enter__(self) -> Self:
+        from ai.backend.logging import LocalLogger
+
         # The "start-server" command is injected by ai.backend.cli from the entrypoint
         # and it has its own multi-process-aware logging initialization.
         # If we duplicate the local logging with it, the process termination may hang.
@@ -67,7 +62,7 @@ class CLIContext:
             self._logger.__enter__()
         return self
 
-    def __exit__(self, *exc_info) -> None:
+    def __exit__(self, *exc_info: Any) -> None:
         click_ctx = click.get_current_context()
         if click_ctx.invoked_subcommand != "start-server":
             self._logger.__exit__()
@@ -75,6 +70,9 @@ class CLIContext:
 
 @contextlib.asynccontextmanager
 async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
+    from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+    from ai.backend.common.exception import ConfigurationError
+
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     etcd_config_data = bootstrap_config.etcd.to_dataclass()
     creds = None
@@ -106,6 +104,10 @@ async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
 
 @contextlib.asynccontextmanager
 async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerUnifiedConfig]:
+    from ai.backend.common.etcd import AsyncEtcd
+    from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+    from ai.backend.manager.config.unified import ManagerUnifiedConfig
+
     # scope_prefix_map is created inside ConfigServer
 
     bootstrap_config = await cli_ctx.get_bootstrap_config()
@@ -121,16 +123,24 @@ async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerUnifiedConfig]
         await etcd_loader.close()
 
 
-@attrs.define(auto_attribs=True, frozen=True, slots=True)
-class RedisConnectionSet:
-    live: RedisConnectionInfo
-    stat: ValkeyStatClient
-    image: ValkeyImageClient
-    stream: RedisConnectionInfo
-
-
 @contextlib.asynccontextmanager
 async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
+    from ai.backend.common import redis_helper
+    from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+    from ai.backend.common.defs import (
+        REDIS_IMAGE_DB,
+        REDIS_LIVE_DB,
+        REDIS_STATISTICS_DB,
+        REDIS_STREAM_DB,
+        RedisRole,
+    )
+    from ai.backend.common.etcd import AsyncEtcd
+    from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+    from ai.backend.manager.config.unified import RedisConfig
+
+    from .types import RedisConnectionSet
+
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     etcd_config_data = bootstrap_config.etcd.to_dataclass()
     etcd = AsyncEtcd.initialize(etcd_config_data)
