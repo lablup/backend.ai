@@ -48,6 +48,7 @@ from ..agent import (
 from ..config.unified import AgentUnifiedConfig
 from ..exception import UnsupportedResource
 from ..kernel import AbstractKernel
+from ..kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ..resources import (
     AbstractComputePlugin,
     ComputerContext,
@@ -269,6 +270,18 @@ class DummyAgent(
         flush_timeout: float,
     ):
         return {"status": "not-implemented"}
+
+    @override
+    async def _load_kernel_registry_from_recovery(self) -> dict[KernelId, AbstractKernel]:
+        return {}
+
+    @override
+    async def _write_kernel_registry_to_recovery(
+        self,
+        kernel_registry: Mapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+    ) -> None:
+        pass
 
     @override
     def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
