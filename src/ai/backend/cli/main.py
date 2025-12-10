@@ -1,7 +1,6 @@
 import click
 
-from ai.backend.common.cli import get_completion_command
-
+from .completion import get_completion_command
 from .extensions import ExtendedCommandGroup
 from .types import CliContextInfo
 
@@ -29,5 +28,21 @@ def main(ctx: click.Context, **kwargs) -> None:
     ctx.obj = CliContextInfo(info=kwargs)
 
 
-# Add completion command
-main.add_command(get_completion_command("backend.ai"), name="completion")
+# Add completion command (lazy loading to avoid import issues)
+@main.command()
+@click.option(
+    "--shell",
+    type=click.Choice(["bash", "zsh", "fish"], case_sensitive=False),
+    default=None,
+    help="The shell type. If not provided, it will be auto-detected.",
+)
+@click.option(
+    "--show",
+    is_flag=True,
+    help="Show the completion script instead of installing it.",
+)
+def completion(shell, show):
+    """Install or show shell completion script."""
+    # Import and call the completion command only when needed
+    cmd = get_completion_command("backend.ai")
+    return cmd.callback(shell, show)

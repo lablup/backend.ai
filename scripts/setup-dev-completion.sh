@@ -1,8 +1,9 @@
 #!/bin/bash
 # Backend.AI CLI Development Environment Completion Setup
+# 
+# IMPORTANT: This script must be SOURCED, not executed!
 # Usage: source scripts/setup-dev-completion.sh
-
-set -e
+#        NOT: ./scripts/setup-dev-completion.sh
 
 # Colors for output
 RED='\033[0;31m'
@@ -25,89 +26,42 @@ fi
 BACKEND_AI_PATH="$(pwd)/backend.ai"
 echo -e "${GREEN}✅ Found backend.ai at: $BACKEND_AI_PATH${NC}"
 
-# Check current shell
-if [[ -n "$ZSH_VERSION" ]]; then
-    SHELL_TYPE="zsh"
-elif [[ -n "$BASH_VERSION" ]]; then
-    SHELL_TYPE="bash"
-elif [[ -n "$FISH_VERSION" ]]; then
-    SHELL_TYPE="fish"
-else
-    # Fallback: check process name or $0
-    case "$(ps -p $$ -o comm= 2>/dev/null || basename "$0")" in
-        *fish*)
-            SHELL_TYPE="fish"
-            ;;
-        *zsh*)
-            SHELL_TYPE="zsh"
-            ;;
-        *bash*)
-            SHELL_TYPE="bash"
-            ;;
-        *)
-            echo -e "${YELLOW}⚠️  Warning: Shell type detection failed. Assuming bash.${NC}"
-            SHELL_TYPE="bash"
-            ;;
-    esac
-fi
+# Check current shell using $SHELL environment variable
+SHELL_TYPE=$(basename "$SHELL")
 
 echo -e "${GREEN}✅ Detected shell: $SHELL_TYPE${NC}"
 
-# Set up alias (shell-specific)
-if [[ "$SHELL_TYPE" == "fish" ]]; then
-    # Fish uses different alias syntax in sourced scripts
-    alias backend.ai "$BACKEND_AI_PATH"
-    echo -e "${GREEN}✅ Created fish alias: backend.ai -> $BACKEND_AI_PATH${NC}"
-else
-    alias backend.ai="$BACKEND_AI_PATH"
-    echo -e "${GREEN}✅ Created alias: backend.ai -> $BACKEND_AI_PATH${NC}"
-fi
+# Clean up any existing completions to avoid conflicts
+unset -f _backendai_completion 2>/dev/null || true
 
 if [[ "$SHELL_TYPE" == "zsh" ]]; then
-    # Initialize zsh completion system
-    autoload -U compinit && compinit 2>/dev/null
+    # Reinitialize zsh completion system to avoid conflicts
+    unfunction compdef 2>/dev/null || true
+    autoload -U compdef
+    autoload -U compinit && compinit -D 2>/dev/null
     
-    # Create custom completion function for zsh
-    _backendai_dev_completion() {
-        local -a completions
-        local -a completions_with_descriptions
-        local -a response
-        
-        # Use absolute path for completion
-        response=("${(@f)$(env COMP_WORDS="${words[*]}" COMP_CWORD=$((CURRENT-1)) _BACKEND_AI_COMPLETE=zsh_complete "$BACKEND_AI_PATH" 2>/dev/null)}")
-        
-        for type key descr in ${response}; do
-            if [[ "$type" == "plain" ]]; then
-                if [[ "$descr" == "_" ]]; then
-                    completions+=("$key")
-                else
-                    completions_with_descriptions+=("$key":"$descr")
-                fi
-            elif [[ "$type" == "dir" ]]; then
-                _path_files -/
-                return 0
-            elif [[ "$type" == "file" ]]; then
-                _path_files -f
-                return 0
-            fi
-        done
-        
-        if (( ${#completions_with_descriptions[@]} )); then
-            _describe -V unsorted completions_with_descriptions -U
-        fi
-        
-        if (( ${#completions[@]} )); then
-            compadd -U -V unsorted -a completions
-        fi
-    }
+    # Generate and load zsh completion
+    COMP_CODE=$(_BACKEND_AI_COMPLETE=zsh_source "$BACKEND_AI_PATH" 2>/dev/null | sed '/^#compdef/d')
+    eval "$COMP_CODE" 2>/dev/null
     
-    # Register completion for zsh
-    compdef _backendai_dev_completion backend.ai
-    echo -e "${GREEN}✅ Registered zsh completion function${NC}"
+    # Register completion manually in _comps array to avoid compdef issues
+    if type _backendai_completion >/dev/null 2>&1; then
+        _comps[./backend.ai]=_backendai_completion 2>/dev/null || echo -e "${YELLOW}⚠️  Direct registration failed, but completion function is loaded${NC}"
+    else
+        echo -e "${RED}❌ Failed to load completion function${NC}"
+        return 1
+    fi
+    echo -e "${GREEN}✅ Loaded zsh completion${NC}"
+    echo ""
+    echo -e "${YELLOW}⚠️  Note: Your zsh completion system has conflicts.${NC}"
+    echo -e "${BLUE}💡 If tab completion doesn't work, try this in a new terminal:${NC}"
+    echo "   zsh -f"
+    echo "   cd $(pwd)"
+    echo "   source scripts/setup-dev-completion.sh"
     
 elif [[ "$SHELL_TYPE" == "bash" ]]; then
     # Load bash completion
-    eval "$(_BACKEND_AI_COMPLETE=bash_source "$BACKEND_AI_PATH" 2>/dev/null | sed "s|backend\.ai|$BACKEND_AI_PATH|g")"
+    eval $(_BACKEND_AI_COMPLETE=bash_source "$BACKEND_AI_PATH" 2>/dev/null | sed "s|backend\\.ai|$BACKEND_AI_PATH|g")
     echo -e "${GREEN}✅ Loaded bash completion${NC}"
     
 elif [[ "$SHELL_TYPE" == "fish" ]]; then
@@ -120,11 +74,11 @@ fi
 echo -e "${GREEN}🎉 Setup complete!${NC}"
 echo ""
 echo -e "${YELLOW}📋 Usage:${NC}"
-echo "  backend.ai <tab>              # Show all available commands"
-echo "  backend.ai session <tab>      # Session management commands"
-echo "  backend.ai admin <tab>        # Admin commands" 
-echo "  backend.ai mgr <tab>          # Manager commands"
-echo "  backend.ai --<tab>            # Global options"
+echo "  ./backend.ai <tab>            # Show all available commands"
+echo "  ./backend.ai session <tab>    # Session management commands"
+echo "  ./backend.ai admin <tab>      # Admin commands" 
+echo "  ./backend.ai mgr <tab>        # Manager commands"
+echo "  ./backend.ai --<tab>          # Global options"
 echo ""
 echo -e "${YELLOW}💡 Tips:${NC}"
 echo "• This setup is temporary and only applies to the current shell session"

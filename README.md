@@ -367,7 +367,7 @@ For detailed development setup, build system usage, and contribution guidelines:
 To enable shell tab completion for the Backend.AI CLI during development:
 
 ```bash
-# For bash/zsh (from repository root)
+# For bash/zsh (from repository root) - MUST use 'source', not execute directly
 source scripts/setup-dev-completion.sh
 
 # For fish shell
