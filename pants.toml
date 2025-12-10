@@ -105,13 +105,13 @@ known_versions = [
 install_from_resolve = "black"
 
 [ruff]
-version = "0.14.0"
+version = "0.14.8"
 # take tar.gz files and their checksums from the GitHub release (darwin and linux-musl)
 known_versions = [
-    "0.14.0|macos_arm64|0b7c193d5c45eda02226720eb75239fabeca995d5a0eb3830fd2973caa3030ec|12364514",
-    "0.14.0|macos_x86_64|880ae046b435eb306cd557a7481eed6da463b85f283ba1f2c1e2ad7c139ed6c5|13149751",
-    "0.14.0|linux_arm64|34a25398f03e7d32a4ec406c5c841c6e183fa0a96fbdd40b7e7eec1f177b360e|12465179",
-    "0.14.0|linux_x86_64|ed6d1b8407a1d228dc332fb19057e86e04a6cd3c2beacdb324ad6ff2a3f9071b|13647531",
+    "0.14.8|macos_arm64|4efc019832a6b9225f650ee256d31b2e875021cae662963d533c78b5cf865f52|12262293",
+    "0.14.8|macos_x86_64|c53af0ba3cbc5e9e8f7768d28a7ff2d0795843e39302891093227bc6df343e94|13284305",
+    "0.14.8|linux_arm64|0b3464f54fa56f514c29e92bcf05867b914ad6c246e2ddbe4cce5c0700f2a3d9|12604548",
+    "0.14.8|linux_x86_64|0f5496a3d2413b3cb85bbf9e4a6f95b5db127ac10989ecb3d8c0c0a0a74a892b|13826546",
 ]
 
 [pytest]
