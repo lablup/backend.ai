@@ -520,6 +520,9 @@ def deep_merge(*args: Mapping[str, Any]) -> Mapping[str, Any]:
                 merged[k] = deep_merge(va, vb)
             elif vb is not None:
                 merged[k] = vb
+            else:
+                merged[k] = va
+
     return merged
 
 
