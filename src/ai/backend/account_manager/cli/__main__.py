@@ -3,13 +3,14 @@ from pathlib import Path
 import click
 from setproctitle import setproctitle
 
-from ai.backend.logging import LogLevel
+# Use string list instead of LogLevel enum to avoid heavy ai.backend.logging import at CLI startup
+_LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NOTSET"]
 
 
 @click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
 @click.option(
     "--log-level",
-    type=click.Choice([*LogLevel.__members__.keys()], case_sensitive=False),
+    type=click.Choice(_LOG_LEVELS, case_sensitive=False),
     default="INFO",
     help="Set the logging verbosity level",
 )
