@@ -45,7 +45,7 @@ class NotificationCenter:
         )
         self._template_env = jinja2.Environment(
             loader=jinja2.BaseLoader(),
-            autoescape=jinja2.select_autoescape(),
+            autoescape=False,
         )
 
     async def close(self) -> None:

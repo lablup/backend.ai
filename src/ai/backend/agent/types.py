@@ -215,8 +215,12 @@ class KernelOwnershipData:
     owner_project_id: Optional[uuid.UUID] = None
 
     def __post_init__(self):
-        def to_uuid(value: Optional[str]) -> Optional[uuid.UUID]:
-            return uuid.UUID(value) if value is not None else None
+        def to_uuid(value: Optional[str | uuid.UUID]) -> Optional[uuid.UUID]:
+            if value is None:
+                return None
+            elif isinstance(value, uuid.UUID):
+                return value
+            return uuid.UUID(value)
 
         self.owner_user_id = to_uuid(self.owner_user_id)
         self.owner_project_id = to_uuid(self.owner_project_id)
