@@ -7,8 +7,12 @@ until the command is actually executed, improving CLI startup time.
 
 from __future__ import annotations
 
+import click
 
-def main() -> None:
+
+@click.command()
+@click.pass_context
+def main(ctx: click.Context) -> None:
     """
     Start the account-manager service as a foreground process.
 
@@ -16,4 +20,4 @@ def main() -> None:
     """
     from ai.backend.account_manager.server import main as server_main
 
-    server_main()
+    ctx.invoke(server_main)
