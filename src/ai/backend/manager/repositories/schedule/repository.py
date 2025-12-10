@@ -89,7 +89,7 @@ from ai.backend.manager.scheduler.types import (
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.types import SessionAllocation
 
-from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentInfo
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentInfo
 from ai.backend.manager.sokovan.scheduler.types import (
     AllocationBatch,
     ConcurrencySnapshot,
@@ -440,7 +440,8 @@ class ScheduleRepository:
         await session.execute(update_query)
         query = sa.select(AgentRow.addr).where(AgentRow.id == agent_id)
         agent_addr = await session.scalar(query)
-        assert agent_addr is not None
+        if agent_addr is None:
+            raise AgentNotFound(f"Agent address not found for agent_id: {agent_id}")
         return AgentAllocationContext(agent_id, agent_addr, scaling_group)
 
     async def _apply_cancellation(

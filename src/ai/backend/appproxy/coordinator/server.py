@@ -39,19 +39,18 @@ from ai.backend.appproxy.common.defs import (
     APPPROXY_ANYCAST_STREAM_KEY,
     APPPROXY_BROADCAST_CHANNEL,
 )
-from ai.backend.appproxy.common.etcd import TraefikEtcd
-from ai.backend.appproxy.common.events import (
-    DoCheckUnusedPortEvent,
-    WorkerLostEvent,
-)
-from ai.backend.appproxy.common.exceptions import (
-    BackendError,
+from ai.backend.appproxy.common.errors import (
     GenericBadRequest,
     GenericForbidden,
     InternalServerError,
     MethodNotAllowed,
     ObjectNotFound,
     URLNotFound,
+)
+from ai.backend.appproxy.common.etcd import TraefikEtcd
+from ai.backend.appproxy.common.events import (
+    DoCheckUnusedPortEvent,
+    WorkerLostEvent,
 )
 from ai.backend.appproxy.common.types import (
     AppCreator,
@@ -79,6 +78,7 @@ from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.event_types.model_serving.anycast import (
     EndpointRouteListUpdatedEvent,
 )
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.health_checker.types import ComponentId
@@ -112,6 +112,13 @@ from . import __version__
 from .config import ServerConfig
 from .config import load as load_config
 from .defs import EVENT_DISPATCHER_CONSUMER_GROUP
+from .errors import (
+    CleanupContextNotInitializedError,
+    MissingHealthCheckInfoError,
+    MissingProfilingConfigError,
+    MissingRouteInfoError,
+    MissingTraefikConfigError,
+)
 from .health.database import DatabaseHealthChecker
 from .models import Circuit, Endpoint, Worker
 from .models.utils import execute_with_txn_retry
@@ -184,7 +191,7 @@ async def exception_middleware(
     except ValidationError as ex:
         log.exception("Failed to create response model: {}", ex.json(indent=2))
         raise InternalServerError()
-    except BackendError as ex:
+    except BackendAIError as ex:
         if ex.status_code == 500:
             log.warning("Internal server error raised inside handlers")
         log.exception("")
@@ -437,7 +444,10 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def etcd_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     if root_ctx.local_config.proxy_coordinator.enable_traefik:
         traefik_config = root_ctx.local_config.proxy_coordinator.traefik
-        assert traefik_config
+        if not traefik_config:
+            raise MissingTraefikConfigError(
+                "Traefik configuration is required when enable_traefik is True"
+            )
 
         creds: dict[str, str] | None = None
         if traefik_config.etcd.password:
@@ -487,20 +497,26 @@ async def on_route_update_event(
         f"endpoint.{event.endpoint_id}.health_check_enabled",
         f"endpoint.{event.endpoint_id}.health_check_config",
     ])
-    assert route_connection_info_json, (
-        f"EndpointRouteListUpdatedEvent fired but no route info present on redis - expected 'endpoint.{event.endpoint_id}.route_connection_info' key to be present on redis_live"
-    )
-    assert health_check_enabled_str, (
-        f"EndpointRouteListUpdatedEvent fired but no health check info present on redis - expected 'endpoint.{event.endpoint_id}.health_check_enabled' key to be present on redis_live"
-    )
+    if not route_connection_info_json:
+        raise MissingRouteInfoError(
+            f"EndpointRouteListUpdatedEvent fired but no route info present on redis - "
+            f"expected 'endpoint.{event.endpoint_id}.route_connection_info' key to be present on redis_live"
+        )
+    if not health_check_enabled_str:
+        raise MissingHealthCheckInfoError(
+            f"EndpointRouteListUpdatedEvent fired but no health check info present on redis - "
+            f"expected 'endpoint.{event.endpoint_id}.health_check_enabled' key to be present on redis_live"
+        )
     route_connection_info = InferenceAppConfigDict.validate_json(route_connection_info_json)
 
     health_check_enabled = health_check_enabled_str.decode("utf-8") == "true"
     health_check_config: ModelHealthCheck | None
     if health_check_enabled:
-        assert health_check_config_json, (
-            f"EndpointRouteListUpdatedEvent fired but invalid health check configuration provided - expected 'endpoint.{event.endpoint_id}.health_check_config' key to be present on redis_live"
-        )
+        if not health_check_config_json:
+            raise MissingHealthCheckInfoError(
+                f"EndpointRouteListUpdatedEvent fired but invalid health check configuration provided - "
+                f"expected 'endpoint.{event.endpoint_id}.health_check_config' key to be present on redis_live"
+            )
         health_check_config = ModelHealthCheck.model_validate_json(
             health_check_config_json.decode("utf-8")
         )
@@ -965,7 +981,8 @@ def build_root_app(
 
     async def _cleanup_context_wrapper(app: web.Application) -> AsyncIterator[None]:
         # aiohttp's cleanup contexts are just async generators, not async context managers.
-        assert cleanup_contexts is not None
+        if cleanup_contexts is None:
+            raise CleanupContextNotInitializedError("Cleanup contexts are not initialized")
         async with AsyncExitStack() as stack:
             for cctx in cleanup_contexts:
                 cctx_instance = cctx(root_ctx)
@@ -1152,7 +1169,10 @@ def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel
     if ctx.invoked_subcommand is None:
         tracker: memray.Tracker | None = None
         if server_config.profiling.enable_pyroscope:
-            assert server_config.profiling.pyroscope_config
+            if not server_config.profiling.pyroscope_config:
+                raise MissingProfilingConfigError(
+                    "Pyroscope configuration is required when enable_pyroscope is True"
+                )
             pyroscope.configure(**server_config.profiling.pyroscope_config.model_dump())
         if server_config.profiling.enable_memray:
             tracker = memray.Tracker(

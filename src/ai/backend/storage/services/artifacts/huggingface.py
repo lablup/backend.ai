@@ -11,12 +11,15 @@ from typing import Any, Callable, Final, Optional, override
 
 import aiohttp
 
-from ai.backend.common.artifact_storage import AbstractStoragePool
+from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.artifact.types import (
+    ArtifactRegistryType,
+    VerificationStepResult,
+)
 from ai.backend.common.data.storage.registries.types import (
     FileObjectData,
     ModelData,
@@ -37,7 +40,7 @@ from ai.backend.storage.client.huggingface import (
 )
 from ai.backend.storage.config.unified import HuggingfaceConfig
 from ai.backend.storage.context_types import ArtifactVerifierContext
-from ai.backend.storage.exception import (
+from ai.backend.storage.errors import (
     HuggingFaceAPIError,
     HuggingFaceModelNotFoundError,
     ObjectStorageConfigInvalidError,
@@ -538,6 +541,7 @@ class HuggingFaceService:
             HuggingFaceAPIError: If API call fails
         """
         success = False
+        verification_result: Optional[VerificationStepResult] = None
         try:
             # Create import context
             context = ImportStepContext(
@@ -551,6 +555,9 @@ class HuggingFaceService:
             # Execute import pipeline
             await pipeline.execute(context)
             success = True
+
+            # Extract verification result from context (None if verification step was not executed)
+            verification_result = context.step_metadata.get("verification_result")
 
             log.info(f"Model import completed: {model}")
         except HuggingFaceModelNotFoundError:
@@ -571,6 +578,7 @@ class HuggingFaceService:
                     registry_name=registry_name,
                     registry_type=ArtifactRegistryType.HUGGINGFACE,
                     digest=commit_hash,
+                    verification_result=verification_result,
                 )
             )
 
@@ -706,6 +714,23 @@ class HuggingFaceDownloadStep(ImportStep[None]):
     def step_type(self) -> ArtifactStorageImportStep:
         return ArtifactStorageImportStep.DOWNLOAD
 
+    @property
+    @override
+    def registry_type(self) -> ArtifactRegistryType:
+        return ArtifactRegistryType.HUGGINGFACE
+
+    @override
+    def stage_storage(self, context: ImportStepContext) -> AbstractStorage:
+        download_storage_name = context.storage_step_mappings.get(
+            ArtifactStorageImportStep.DOWNLOAD
+        )
+        if not download_storage_name:
+            raise StorageStepRequiredStepNotProvided(
+                "No storage mapping provided for DOWNLOAD step cleanup"
+            )
+
+        return context.storage_pool.get_storage(download_storage_name)
+
     def _make_scanner(self, registry_name: str) -> HuggingFaceScanner:
         config = self._registry_configs.get(registry_name)
         if not config:
@@ -828,30 +853,6 @@ class HuggingFaceDownloadStep(ImportStep[None]):
 
         log.info(f"[download] Successfully downloaded to {storage_name}: {storage_key}")
         return storage_key
-
-    @override
-    async def cleanup_stage(self, context: ImportStepContext) -> None:
-        """Clean up files from download storage after successful transfer"""
-        download_storage_name = context.storage_step_mappings.get(
-            ArtifactStorageImportStep.DOWNLOAD
-        )
-        if not download_storage_name:
-            return
-
-        revision = context.model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
-        model_prefix = f"{context.model.model_id}/{revision}"
-
-        try:
-            storage = context.storage_pool.get_storage(download_storage_name)
-            await storage.delete_file(model_prefix)
-            log.info(f"[cleanup] Removed download files: {download_storage_name}:{model_prefix}")
-        except Exception as e:
-            log.warning(
-                f"[cleanup] Failed to cleanup download: {download_storage_name}:{model_prefix}: {str(e)}"
-            )
-
-        # Note: Redis tracking data is kept for 24 hours (TTL) to allow inspection
-        # of download results, whether successful or failed
 
 
 class HuggingFaceVerifyStep(ModelVerifyStep):

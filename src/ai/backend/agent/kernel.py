@@ -65,7 +65,17 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from .exception import InvalidSocket, UnsupportedBaseDistroError
+from .errors import (
+    KernelRunnerNotInitializedError,
+    OutputQueueMismatchError,
+    OutputQueueNotInitializedError,
+    RunIdNotSetError,
+)
+from .exception import (
+    InvalidArgumentError,
+    InvalidSocket,
+    UnsupportedBaseDistroError,
+)
 from .resources import KernelResourceSpec
 from .types import AgentEventData, KernelLifecycleStatus, KernelOwnershipData
 
@@ -410,7 +420,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     async def ping(self) -> dict[str, float] | None:
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         return await self.runner.ping()
 
     async def execute(
@@ -423,7 +434,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         api_version: int,
         flush_timeout: float,
     ) -> NextResult:
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         try:
             log.info(
                 "kernel.execute(k:{0}, run_id:{1}, mode:{2}, opts:{3})",
@@ -1048,7 +1060,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         records = []
         result: NextResult
         try:
-            assert self.output_queue is not None
+            if self.output_queue is None:
+                raise OutputQueueNotInitializedError
             with timeout(flush_timeout if has_continuation else None):
                 while True:
                     rec = await self.output_queue.get()
@@ -1141,7 +1154,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         # Context: per API request
         if run_id is None:
             run_id = secrets.token_hex(16)
-        assert run_id is not None
+        if run_id is None:
+            raise InvalidArgumentError("run_id cannot be None")
         if run_id not in self.pending_queues:
             q: asyncio.Queue[ResultRecord] = asyncio.Queue(maxsize=4096)
             activated = asyncio.Event()
@@ -1166,7 +1180,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 await activated.wait()
                 activated.clear()
         self.current_run_id = run_id
-        assert self.output_queue is q
+        if self.output_queue is not q:
+            raise OutputQueueMismatchError
 
     def resume_output_queue(self) -> None:
         """
@@ -1185,7 +1200,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         """
         Use this to conclude get_next_result() when we have finished a "run".
         """
-        assert self.current_run_id is not None
+        if self.current_run_id is None:
+            raise RunIdNotSetError
         self.pending_queues.pop(self.current_run_id, None)
         self.current_run_id = None
         if len(self.pending_queues) > 0:

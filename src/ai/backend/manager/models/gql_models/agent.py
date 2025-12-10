@@ -25,7 +25,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.bgtask.tasks.rescan_gpu_alloc_maps import RescanGPUAllocMapsManifest
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
-from ai.backend.manager.data.agent.types import AgentData, AgentDataExtended
+from ai.backend.manager.data.agent.types import AgentData
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
 
@@ -155,13 +155,13 @@ class AgentNode(graphene.ObjectType):
         graphene_ctx: GraphQueryContext = info.context
         _, raw_agent_id = AsyncNode.resolve_global_id(info, id)
         condition = [QueryConditions.by_ids([AgentId(raw_agent_id)])]
-        agent_list = await graphene_ctx.agent_repository.list_extended_data(condition)
+        agent_list = await graphene_ctx.agent_repository.list_data(condition)
         if len(agent_list) == 0:
             return None
-        return cls.from_extended_data(agent_list[0])
+        return cls.from_data(agent_list[0])
 
     @classmethod
-    def from_extended_data(cls, data: AgentDataExtended) -> Self:
+    def from_data(cls, data: AgentData) -> Self:
         return cls(
             id=data.id,
             row_id=data.id,
@@ -305,11 +305,11 @@ class AgentNode(graphene.ObjectType):
             agent_permissions[row.id] = list(permissions)
         list_order = {agent_id: idx for idx, agent_id in enumerate(agent_ids)}
         condition = [QueryConditions.by_ids(agent_ids)]
-        agent_list = await graph_ctx.agent_repository.list_extended_data(condition)
+        agent_list = await graph_ctx.agent_repository.list_data(condition)
 
         result: list[AgentNode] = []
         for agent in sorted(agent_list, key=lambda obj: list_order[obj.id]):
-            agent_node = cls.from_extended_data(agent)
+            agent_node = cls.from_data(agent)
             agent_node.permissions = agent_permissions.get(agent.id, [])
             result.append(agent_node)
 
@@ -392,10 +392,6 @@ class Agent(graphene.ObjectType):
             used_gpu_slots=float(data.actual_occupied_slots.get("cuda.device", 0)),
             used_tpu_slots=float(data.actual_occupied_slots.get("tpu.device", 0)),
         )
-
-    @classmethod
-    def from_extended_data(cls, data: AgentDataExtended) -> Self:
-        return cls.from_data(data)
 
     async def resolve_compute_containers(
         self, info: graphene.ResolveInfo, *, status: Optional[str] = None
@@ -539,10 +535,9 @@ class Agent(graphene.ObjectType):
                 agent_ids.append(row.id)
         list_order = {agent_id: idx for idx, agent_id in enumerate(agent_ids)}
         condition = [QueryConditions.by_ids(agent_ids)]
-        agent_list = await graph_ctx.agent_repository.list_extended_data(condition)
+        agent_list = await graph_ctx.agent_repository.list_data(condition)
         return [
-            cls.from_extended_data(agent)
-            for agent in sorted(agent_list, key=lambda obj: list_order[obj.id])
+            cls.from_data(agent) for agent in sorted(agent_list, key=lambda obj: list_order[obj.id])
         ]
 
     @classmethod
@@ -559,8 +554,8 @@ class Agent(graphene.ObjectType):
         if raw_status is not None:
             conditions.append(QueryConditions.by_statuses([AgentStatus[raw_status]]))
 
-        agent_list = await graph_ctx.agent_repository.list_extended_data(conditions)
-        return [cls.from_extended_data(agent) for agent in agent_list]
+        agent_list = await graph_ctx.agent_repository.list_data(conditions)
+        return [cls.from_data(agent) for agent in agent_list]
 
     @classmethod
     async def batch_load(
@@ -574,10 +569,10 @@ class Agent(graphene.ObjectType):
         order = [QueryOrders.id(ascending=True)]
         if raw_status is not None:
             condition.append(QueryConditions.by_statuses([AgentStatus[raw_status]]))
-        agent_list = await graph_ctx.agent_repository.list_extended_data(
+        agent_list = await graph_ctx.agent_repository.list_data(
             conditions=condition, order_by=order
         )
-        return [cls.from_extended_data(agent) for agent in agent_list]
+        return [cls.from_data(agent) for agent in agent_list]
 
     @classmethod
     async def batch_load_live_stat(

@@ -5,7 +5,8 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
-from ai.backend.common.artifact_storage import ImportStepContext
+from ai.backend.common.artifact_storage import AbstractStorage, ImportStepContext
+from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
 from ai.backend.common.data.storage.registries.types import FileObjectData
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.logging import BraceStyleAdapter
@@ -29,6 +30,7 @@ class VerifyStepResult:
     verified_files: list[tuple[FileObjectData, str]]  # (file_info, storage_key)
     storage_name: str
     total_bytes: int
+    verification_result: VerificationStepResult
 
 
 InputType = TypeVar("InputType")
@@ -48,10 +50,28 @@ class ImportStep(abc.ABC, Generic[InputType]):
         """Execute step and return data to pass to next step"""
         pass
 
+    @property
     @abc.abstractmethod
-    async def cleanup_stage(self, context: ImportStepContext) -> None:
-        """Perform cleanup after stage completion, or after failure"""
+    def registry_type(self) -> ArtifactRegistryType:
+        """Return the registry type for this step (used for revision resolution)"""
         pass
+
+    @abc.abstractmethod
+    def stage_storage(self, context: ImportStepContext) -> AbstractStorage:
+        """Return the storage for this step"""
+        pass
+
+    async def cleanup_stage(self, context: ImportStepContext) -> None:
+        """Default cleanup implementation that removes files"""
+        storage = self.stage_storage(context)
+        revision = context.model.resolve_revision(self.registry_type)
+        model_prefix = f"{context.model.model_id}/{revision}"
+
+        try:
+            await storage.delete_file(model_prefix)
+            log.info(f"[cleanup] Removed files: {model_prefix}")
+        except Exception as e:
+            log.warning(f"[cleanup] Failed to cleanup: {model_prefix}: {str(e)}")
 
 
 class ImportPipeline:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -11,9 +12,13 @@ import yarl
 from dateutil.tz import tzutc
 
 from ai.backend.common.auth.utils import generate_signature
-from ai.backend.common.dto.storage.response import VFSListFilesResponse
+from ai.backend.common.dto.storage.response import (
+    GetVerificationResultResponse,
+    VFSListFilesResponse,
+)
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.config.unified import ReservoirClientConfig
+from ai.backend.storage.config.unified import ReservoirClientConfig, ReservoirConfig
+from ai.backend.storage.errors import RegistryNotFoundError, ReservoirStorageConfigInvalidError
 
 _HASH_TYPE = "sha256"
 
@@ -136,3 +141,95 @@ class ManagerHTTPClient:
         request_body = {"directory": directory}
         resp = await self._request("GET", rel_url, json=request_body)
         return VFSListFilesResponse.model_validate(resp)
+
+    async def get_verification_result(
+        self, artifact_revision_id: uuid.UUID
+    ) -> GetVerificationResultResponse:
+        """
+        Get verification result for an artifact revision from the remote manager.
+
+        Args:
+            artifact_revision_id: The artifact revision ID to get verification result for
+
+        Returns:
+            GetVerificationResultResponse containing the verification result
+        """
+        rel_url = f"/artifacts/revisions/{artifact_revision_id}/verification-result"
+        resp = await self._request("GET", rel_url)
+        return GetVerificationResultResponse.model_validate(resp)
+
+
+class ManagerHTTPClientPool:
+    """Pool for managing ManagerHTTPClient instances per registry."""
+
+    _registry_configs: dict[str, ReservoirConfig]
+    _client_config: ReservoirClientConfig
+    _clients: dict[str, ManagerHTTPClient]
+
+    def __init__(
+        self,
+        registry_configs: dict[str, ReservoirConfig],
+        client_config: ReservoirClientConfig,
+    ) -> None:
+        self._registry_configs = registry_configs
+        self._client_config = client_config
+        self._clients = {}
+
+    @property
+    def registry_configs(self) -> dict[str, ReservoirConfig]:
+        return self._registry_configs
+
+    def get_or_create(self, registry_name: str) -> ManagerHTTPClient:
+        """
+        Get or create a ManagerHTTPClient for the given registry.
+
+        Args:
+            registry_name: Name of the Reservoir registry
+
+        Returns:
+            ManagerHTTPClient instance
+
+        Raises:
+            RegistryNotFoundError: If registry configuration is not found
+            ReservoirStorageConfigInvalidError: If manager connection config is incomplete
+        """
+        # Return cached client if exists
+        if registry_name in self._clients:
+            return self._clients[registry_name]
+
+        # Validate registry configuration
+        registry_config = self._registry_configs.get(registry_name)
+        if not registry_config or not registry_config.endpoint:
+            raise RegistryNotFoundError(
+                extra_msg=f"Registry configuration not found for: {registry_name}"
+            )
+
+        if (
+            not registry_config.manager_endpoint
+            or not registry_config.manager_access_key
+            or not registry_config.manager_secret_key
+            or not registry_config.manager_api_version
+        ):
+            raise ReservoirStorageConfigInvalidError(
+                extra_msg=f"Manager connection configuration incomplete for registry: {registry_name}"
+            )
+
+        # Create and cache new client
+        manager_client = ManagerHTTPClient(
+            ManagerHTTPClientArgs(
+                name=registry_name,
+                endpoint=registry_config.manager_endpoint,
+                access_key=registry_config.manager_access_key,
+                secret_key=registry_config.manager_secret_key,
+                api_version=registry_config.manager_api_version,
+                client_config=self._client_config,
+            )
+        )
+        self._clients[registry_name] = manager_client
+        return manager_client
+
+    async def cleanup(self) -> None:
+        """Close all manager HTTP client sessions."""
+        for client in self._clients.values():
+            await client.cleanup()
+        self._clients.clear()

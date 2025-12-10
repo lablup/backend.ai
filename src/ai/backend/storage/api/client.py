@@ -38,7 +38,7 @@ from ai.backend.common.types import BinarySize, VFolderID
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__
-from ..exception import InvalidAPIParameters
+from ..errors import InvalidAPIParameters
 from ..types import SENTINEL
 from ..utils import CheckParamSource, check_params
 

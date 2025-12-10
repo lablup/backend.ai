@@ -75,6 +75,7 @@ from ..data.model_serving.types import (
 )
 from ..errors.api import InvalidAPIParameters
 from ..errors.common import ObjectNotFound, ServiceUnavailable
+from ..errors.resource import DataTransformationFailed
 from ..models.storage import StorageSessionManager
 from ..types import MountOptionModel, UserScope
 from .base import (
@@ -529,6 +530,12 @@ class EndpointRow(Base):
         session_id_to_route_map = {r.session: r for r in active_routes}
         connection_info: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
         for kernel in running_main_kernels:
+            if kernel.service_ports is None:
+                log.debug(
+                    "generate_route_info(): Kernel {} has no service ports defined. Skipping.",
+                    kernel.id,
+                )
+                continue
             num_inference_ports = len([*filter(lambda x: x["is_inference"], kernel.service_ports)])
             if num_inference_ports > 1:
                 log.warning(
@@ -1185,7 +1192,8 @@ class ModelServiceHelper:
 
         try:
             model_definition = model_definition_iv.check(raw_model_definition)
-            assert model_definition is not None
+            if model_definition is None:
+                raise DataTransformationFailed("Model definition validation returned None")
             return model_definition
         except t.DataError as e:
             raise InvalidAPIParameters(

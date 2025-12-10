@@ -2,16 +2,8 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
-from ai.backend.common.exception import (
-    BackendAIError,
-    ErrorCode,
-    ErrorDetail,
-    ErrorDomain,
-    ErrorOperation,
-)
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.group.actions.base import GroupAction
-from ai.backend.manager.services.group.types import GroupData
 
 
 @dataclass
@@ -30,45 +22,8 @@ class PurgeGroupAction(GroupAction):
 
 @dataclass
 class PurgeGroupActionResult(BaseActionResult):
-    data: Optional[GroupData]
-    success: bool
+    group_id: uuid.UUID
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.data.id) if self.data is not None else None
-
-
-class PurgeGroupActionActiveKernelsError(BackendAIError):
-    error_type = "https://api.backend.ai/probs/group-active-kernels"
-    error_title = "Group has active kernels."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.GROUP,
-            operation=ErrorOperation.HARD_DELETE,
-            error_detail=ErrorDetail.CONFLICT,
-        )
-
-
-class PurgeGroupActionVFoldersMountedToActiveKernelsError(BackendAIError):
-    error_type = "https://api.backend.ai/probs/group-vfolders-mounted-to-active-kernels"
-    error_title = "Group has vfolders mounted to active kernels."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.GROUP,
-            operation=ErrorOperation.HARD_DELETE,
-            error_detail=ErrorDetail.CONFLICT,
-        )
-
-
-class PurgeGroupActionActiveEndpointsError(BackendAIError):
-    error_type = "https://api.backend.ai/probs/group-active-endpoints"
-    error_title = "Group has active endpoints."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.GROUP,
-            operation=ErrorOperation.HARD_DELETE,
-            error_detail=ErrorDetail.CONFLICT,
-        )
+        return str(self.group_id)

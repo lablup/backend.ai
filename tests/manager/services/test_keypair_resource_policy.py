@@ -5,9 +5,9 @@ from typing import Any, AsyncGenerator, Optional
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.exception import KeypairResourcePolicyNotFound
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
-from ai.backend.manager.errors.storage import ObjectNotFound
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.keypair_resource_policy.repository import (
@@ -253,7 +253,7 @@ async def test_create_keypair_resource_policy_failure(
                     idle_timeout=OptionalState.update(3600),
                     max_containers_per_session=OptionalState.update(3),
                     max_pending_session_count=TriState.update(20),
-                    allowed_vfolder_hosts=OptionalState.update({"shared": {}}),
+                    allowed_vfolder_hosts=OptionalState.update({"shared": set()}),
                 ),
             ),
             ModifyKeyPairResourcePolicyActionResult(
@@ -271,7 +271,7 @@ async def test_create_keypair_resource_policy_failure(
                     max_concurrent_sftp_sessions=10,
                     max_containers_per_session=3,
                     idle_timeout=3600,
-                    allowed_vfolder_hosts={"shared": {}},
+                    allowed_vfolder_hosts={"shared": set()},
                 )
             ),
         ),
@@ -352,14 +352,14 @@ async def test_modify_keypair_resource_policy(
     "test_scenario",
     [
         ScenarioBase.failure(
-            "Modify non-existent keypair resource policy should raise ObjectNotFound",
+            "Modify non-existent keypair resource policy should raise KeypairResourcePolicyNotFound",
             ModifyKeyPairResourcePolicyAction(
                 name="non-existent-policy",
                 modifier=KeyPairResourcePolicyModifier(
                     max_concurrent_sessions=OptionalState.update(5),
                 ),
             ),
-            ObjectNotFound,
+            KeypairResourcePolicyNotFound,
         ),
     ],
 )
@@ -425,9 +425,9 @@ async def test_delete_keypair_resource_policy(
     "test_scenario",
     [
         ScenarioBase.failure(
-            "Delete non-existent keypair resource policy should raise ObjectNotFound",
+            "Delete non-existent keypair resource policy should raise KeypairResourcePolicyNotFound",
             DeleteKeyPairResourcePolicyAction(name="non-existent-policy"),
-            ObjectNotFound,
+            KeypairResourcePolicyNotFound,
         ),
     ],
 )

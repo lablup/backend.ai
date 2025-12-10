@@ -10,7 +10,7 @@ import aiofiles.os
 from ai.backend.common.types import BinarySize, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
-from ...exception import QuotaScopeNotFoundError
+from ...errors import CephNotInstalledError, QuotaScopeNotFoundError
 from ...subproc import run
 from ...types import CapacityUsage, Optional, QuotaConfig, QuotaUsage, TreeUsage
 from ..abc import (
@@ -141,7 +141,7 @@ class CephFSVolume(BaseVolume):
         try:
             await run([b"ceph", b"--version"])
         except FileNotFoundError:
-            raise RuntimeError("Ceph is not installed. ")
+            raise CephNotInstalledError("Ceph is not installed.")
         await super().init()
 
     async def create_quota_model(self) -> AbstractQuotaModel:

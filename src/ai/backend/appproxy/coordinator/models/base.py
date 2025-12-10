@@ -23,8 +23,9 @@ from sqlalchemy.dialects.postgresql import CIDR, ENUM, JSONB, UUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 
-from ai.backend.appproxy.common.exceptions import InvalidAPIParameters
+from ai.backend.appproxy.common.errors import InvalidAPIParameters
 from ai.backend.appproxy.common.utils import ensure_json_serializable
+from ai.backend.appproxy.coordinator.errors import InvalidEnumTypeError
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
@@ -87,7 +88,8 @@ class EnumType(TypeDecorator, SchemaType):  # type: ignore
     cache_ok = True
 
     def __init__(self, enum_cls, **opts):
-        assert issubclass(enum_cls, enum.Enum)
+        if not issubclass(enum_cls, enum.Enum):
+            raise InvalidEnumTypeError(f"Expected an Enum subclass, got {enum_cls}")
         if "name" not in opts:
             opts["name"] = enum_cls.__name__.lower()
         self._opts = opts

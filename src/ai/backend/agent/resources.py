@@ -14,12 +14,14 @@ from collections.abc import (
     MutableMapping,
     Sequence,
 )
+from dataclasses import dataclass
 from decimal import Decimal
 from functools import cached_property
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
+    Iterable,
     Optional,
     TextIO,
     Type,
@@ -29,6 +31,8 @@ from typing import (
 
 import aiodocker
 import attrs
+from pydantic import GetCoreSchemaHandler
+from pydantic_core import CoreSchema, core_schema
 
 import ai.backend.agent.alloc_map as alloc_map_mod
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ResourceAllocationMode
@@ -100,6 +104,13 @@ class ComputerContext:
     alloc_map: AbstractAllocMap
 
 
+@dataclass
+class DeviceView:
+    device: DeviceName
+    slot: SlotName
+    device_alloc: Mapping[DeviceId, Decimal]
+
+
 @attrs.define(slots=True)
 class KernelResourceSpec:
     """
@@ -124,6 +135,11 @@ class KernelResourceSpec:
     mounts: list["Mount"] = attrs.Factory(list)
     """The mounted vfolder list."""
 
+    unified_devices: Iterable[tuple[DeviceName, SlotName]] = attrs.Factory(list)
+    """
+    Represents unified devices mounted to the kernel.
+    """
+
     def freeze(self) -> None:
         """Replace the attribute setter to make it immutable."""
         # TODO: implement
@@ -136,14 +152,36 @@ class KernelResourceSpec:
         # # TODO: wrap slots and allocations with frozendict?
         # setattr(self, '__setattr__', _frozen_setattr)  # <-- __setattr__ is read-only... :(
 
+    @property
+    def device_list(self) -> Iterable[DeviceView]:
+        """
+        View of effective list of devices mounted to kernel, aggregating both non-unified and unified devices.
+        DeviceView representing unified devices will always have empty `device_alloc` map.
+        Unlike the `allocations` property, this view will not list slots with zero allocation - that is, slots without any alloc map defined.
+        """
+        devices = []
+        for device, allocs in self.allocations.items():
+            for slot, device_alloc in allocs.items():
+                alloc_sum = Decimal(0)
+                for dev_id, per_dev_alloc in device_alloc.items():
+                    alloc_sum += per_dev_alloc
+                if alloc_sum > 0:
+                    devices.append(DeviceView(device, slot, device_alloc))
+        for device, slot in self.unified_devices:
+            devices.append(DeviceView(device, slot, {}))
+
+        return devices
+
     def write_to_string(self) -> str:
         mounts_str = ",".join(map(str, self.mounts))
         slots_str = dump_json_str({k: str(v) for k, v in self.slots.items()})
+        unified_devices_str = dump_json_str(self.unified_devices)
 
         resource_str = ""
         resource_str += f"SCRATCH_SIZE={BinarySize(self.scratch_disk_size):m}\n"
         resource_str += f"MOUNTS={mounts_str}\n"
         resource_str += f"SLOTS={slots_str}\n"
+        resource_str += f"UNIFIED_DEVICES={unified_devices_str}\n"
 
         for device_name, slots in self.allocations.items():
             for slot_name, per_device_alloc in slots.items():
@@ -208,6 +246,7 @@ class KernelResourceSpec:
         return cls(
             scratch_disk_size=BinarySize.finite_from_str(kvpairs["SCRATCH_SIZE"]),
             allocations=dict(allocations),
+            unified_devices=load_json(kvpairs.get("UNIFIED_DEVICES") or "[]"),
             slots=ResourceSlot.from_json(load_json(kvpairs["SLOTS"])),
             mounts=mounts,
         )
@@ -248,6 +287,20 @@ class KernelResourceSpec:
 
     def to_json(self) -> str:
         return dump_json_str(self.to_json_serializable_dict())
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        def validate(value: Any) -> KernelResourceSpec:
+            return cls(
+                slots=value.slots,
+                allocations=value.allocations,
+                scratch_disk_size=value.scratch_disk_size,
+                mounts=value.mounts,
+            )
+
+        return core_schema.no_info_plain_validator_function(validate)
 
 
 class AbstractComputeDevice:
@@ -614,7 +667,6 @@ class ResourceAllocator(aobject):
             devices_allocated_slots.append(device_allocated_slots)
 
             agent_alloc_map = await ctx.instance.create_alloc_map()
-            agent_alloc_map.update_device_slot_amounts(device_allocated_slots)
             agent_computers[device_name] = ComputerContext(
                 ctx.instance, ctx.devices, agent_alloc_map
             )
@@ -687,7 +739,8 @@ class ResourceAllocator(aobject):
         agent_config: AgentUnifiedConfig,
     ) -> Decimal:
         resource_config = agent_config.resource
-        assert resource_config.allocations is not None
+        if resource_config.allocations is None:
+            raise InvalidResourceConfigError("Resource allocations are not configured.")
 
         if slot_name == SlotName("cpu"):
             return Decimal(resource_config.allocations.cpu)

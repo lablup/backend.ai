@@ -1,3 +1,4 @@
+import uuid
 from pathlib import PurePosixPath
 from typing import Optional
 
@@ -336,6 +337,11 @@ class ReservoirImportModelsReq(BaseRequestModel):
         """,
         examples=[{"download": "fast-storage", "archive": "long-term-storage"}],
     )
+    # Used by storage proxy to fetch verification results from remote reservoir.
+    # Must have 1:1 correspondence with the models list.
+    artifact_revision_ids: list[str] = Field(
+        description="Artifact revision IDs corresponding to each model in the models list.",
+    )
 
 
 class DeleteObjectReq(BaseRequestModel):
@@ -398,4 +404,12 @@ class VFSListFilesReq(BaseRequestModel):
 
     directory: str = Field(
         description="The directory path within VFS storage to list files from.",
+    )
+
+
+class GetVerificationResultReq(BaseRequestModel):
+    """Request for getting verification result of an artifact revision."""
+
+    artifact_revision_id: uuid.UUID = Field(
+        description="The artifact revision ID to get verification result."
     )

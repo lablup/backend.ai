@@ -4,8 +4,9 @@ from asyncio import subprocess
 
 from yarl import URL
 
-from ai.backend.appproxy.common.exceptions import ServerMisconfiguredError
+from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.common.types import RouteInfo
+from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError, SubprocessPipeError
 from ai.backend.appproxy.worker.proxy.backend.h2 import BackendConfig, H2Backend
 from ai.backend.appproxy.worker.types import Circuit, SubdomainFrontendInfo
 from ai.backend.logging import BraceStyleAdapter
@@ -53,7 +54,8 @@ class SubdomainFrontend(H2Frontend[str]):
             self.root_context.local_config.proxy_worker.http2.nghttpx_path,
             *nghttpx_args,
         )
-        assert proc.stdout and proc.stderr
+        if not proc.stdout or not proc.stderr:
+            raise SubprocessPipeError("Subprocess stdout or stderr is not available")
         self.process = proc
         self.log_monitor_tasks.append(
             asyncio.create_task(self._log_monitor_task(proc.stdout, "stdout"))
@@ -94,5 +96,8 @@ class SubdomainFrontend(H2Frontend[str]):
         await backend.update_config([])
 
     def get_circuit_key(self, circuit: Circuit) -> str:
-        assert isinstance(circuit.frontend, SubdomainFrontendInfo)
+        if not isinstance(circuit.frontend, SubdomainFrontendInfo):
+            raise InvalidFrontendTypeError(
+                f"Expected SubdomainFrontendInfo, got {type(circuit.frontend).__name__}"
+            )
         return circuit.frontend.subdomain.lower()

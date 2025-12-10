@@ -38,20 +38,19 @@ from ai.backend.appproxy.common.defs import (
     APPPROXY_ANYCAST_STREAM_KEY,
     APPPROXY_BROADCAST_CHANNEL,
 )
-from ai.backend.appproxy.common.events import (
-    AppProxyCircuitCreatedEvent,
-    AppProxyCircuitRemovedEvent,
-    AppProxyCircuitRouteUpdatedEvent,
-    AppProxyWorkerCircuitAddedEvent,
-)
-from ai.backend.appproxy.common.exceptions import (
-    BackendError,
+from ai.backend.appproxy.common.errors import (
     CoordinatorConnectionError,
     GenericBadRequest,
     GenericForbidden,
     InternalServerError,
     MethodNotAllowed,
     URLNotFound,
+)
+from ai.backend.appproxy.common.events import (
+    AppProxyCircuitCreatedEvent,
+    AppProxyCircuitRemovedEvent,
+    AppProxyCircuitRouteUpdatedEvent,
+    AppProxyWorkerCircuitAddedEvent,
 )
 from ai.backend.appproxy.common.types import (
     AppCreator,
@@ -77,6 +76,7 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
 from ai.backend.common.events.dispatcher import EventDispatcher, EventHandler, EventProducer
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.health_checker.types import ComponentId
@@ -108,6 +108,13 @@ from .coordinator_client import (
     list_worker_circuits,
     ping_worker,
     register_worker,
+)
+from .errors import (
+    CleanupContextNotInitializedError,
+    MissingAnnounceAddressError,
+    MissingPortProxyConfigError,
+    MissingProfilingConfigError,
+    MissingTraefikConfigError,
 )
 from .metrics import collect_inference_metric
 from .proxy.frontend import (
@@ -176,7 +183,7 @@ async def exception_middleware(
 
     try:
         resp = await handler(request)
-    except BackendError as ex:
+    except BackendAIError as ex:
         if ex.status_code == 500:
             log.exception("Internal server error raised inside handlers")
         if mime_match(request.headers.get("accept", "text/html"), "application/json", strict=True):
@@ -387,17 +394,23 @@ async def proxy_frontend_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.local_config.proxy_worker.frontend_mode,
     ):
         case (ProxyProtocol.HTTP, FrontendServerMode.TRAEFIK):
-            assert root_ctx.local_config.proxy_worker.traefik
+            if not root_ctx.local_config.proxy_worker.traefik:
+                raise MissingTraefikConfigError(
+                    "Traefik configuration is required for TRAEFIK mode"
+                )
             match root_ctx.local_config.proxy_worker.traefik.frontend_mode:
                 case FrontendMode.PORT:
                     root_ctx.proxy_frontend = TraefikPortFrontend(root_ctx)
                 case FrontendMode.WILDCARD_DOMAIN:
                     root_ctx.proxy_frontend = TraefikSubdomainFrontend(root_ctx)
         case (ProxyProtocol.TCP, FrontendServerMode.TRAEFIK):
-            assert (
+            if not (
                 root_ctx.local_config.proxy_worker.traefik
                 and root_ctx.local_config.proxy_worker.traefik.port_proxy
-            )
+            ):
+                raise MissingPortProxyConfigError(
+                    "Traefik and port proxy configuration are required for TCP TRAEFIK mode"
+                )
             root_ctx.proxy_frontend = TraefikTCPFrontend(root_ctx)
         case (ProxyProtocol.HTTP, FrontendServerMode.PORT):
             root_ctx.proxy_frontend = HTTPPortFrontend(root_ctx)
@@ -526,7 +539,8 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     # Determine announce addresses
     announce_addr = root_ctx.local_config.proxy_worker.announce_addr
-    assert announce_addr is not None  # auto-populated if None
+    if announce_addr is None:
+        raise MissingAnnounceAddressError("Announce address is not configured")
     sd_loop = ServiceDiscoveryLoop(
         sd_type,
         service_discovery,
@@ -754,7 +768,8 @@ def build_root_app(
 
     async def _cleanup_context_wrapper(app: web.Application) -> AsyncIterator[None]:
         # aiohttp's cleanup contexts are just async generators, not async context managers.
-        assert cleanup_contexts is not None
+        if cleanup_contexts is None:
+            raise CleanupContextNotInitializedError("Cleanup contexts are not initialized")
         async with AsyncExitStack() as stack:
             for cctx in cleanup_contexts:
                 cctx_instance = cctx(root_ctx)
@@ -943,7 +958,10 @@ def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel
     if ctx.invoked_subcommand is None:
         tracker: memray.Tracker | None = None
         if server_config.profiling.enable_pyroscope:
-            assert server_config.profiling.pyroscope_config
+            if not server_config.profiling.pyroscope_config:
+                raise MissingProfilingConfigError(
+                    "Pyroscope configuration is required when enable_pyroscope is True"
+                )
             pyroscope.configure(**server_config.profiling.pyroscope_config.model_dump())
         if server_config.profiling.enable_memray:
             tracker = memray.Tracker(

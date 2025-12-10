@@ -34,6 +34,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.errors.resource import InvalidSchedulerState
 
 from ..models import AgentRow, KernelRow, SessionRow
 from ..models.scaling_group import ScalingGroupOpts
@@ -151,7 +152,8 @@ class AbstractScheduler(ABC):
         if not pending_sessions:
             return -1, []
         priorities = {s.priority for s in pending_sessions}
-        assert len(priorities) > 0
+        if len(priorities) == 0:
+            raise InvalidSchedulerState("Priority set is empty despite having pending sessions")
         top_priority = max(priorities)
         return top_priority, [*filter(lambda s: s.priority == top_priority, pending_sessions)]
 

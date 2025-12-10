@@ -108,9 +108,22 @@ from ..agent import (
     ScanImagesResult,
 )
 from ..config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchType
-from ..exception import ContainerCreationError, UnsupportedResource
+from ..exception import ContainerCreationError, InvalidArgumentError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel, KernelRegistry
+from ..kernel_registry.adapter import KernelRecoveryDataAdapter, KernelRecoveryDataAdapterTarget
+from ..kernel_registry.container.creator import (
+    ContainerBasedKernelRegistryCreatorArgs,
+    ContainerBasedLoaderWriterCreator,
+)
+from ..kernel_registry.pickle.creator import (
+    PickleBasedKernelRegistryCreatorArgs,
+    PickleBasedLoaderWriterCreator,
+)
+from ..kernel_registry.recovery.docker_recovery import (
+    DockerKernelRegistryRecovery,
+)
+from ..kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ..plugin.network import ContainerNetworkCapability, ContainerNetworkInfo, NetworkPluginContext
 from ..proxy import DomainSocketProxy, proxy_connection
 from ..resources import (
@@ -355,8 +368,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         else:
             slots = ResourceSlot.from_json(self.kernel_config["resource_slots"])
             # Ensure that we have intrinsic slots.
-            assert SlotName("cpu") in slots
-            assert SlotName("mem") in slots
+            if SlotName("cpu") not in slots:
+                raise UnsupportedResource("cpu slot is required")
+            if SlotName("mem") not in slots:
+                raise UnsupportedResource("mem slot is required")
             # accept unknown slot type with zero values
             # but reject if they have non-zero values.
             for st, sv in slots.items():
@@ -1042,7 +1057,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 host_ips.append("127.0.0.1")
             else:
                 host_ips.append(str(container_bind_host))
-        assert len(host_ips) == len(host_ports) == len(exposed_ports)
+        if len(host_ips) != len(host_ports) or len(host_ports) != len(exposed_ports):
+            raise InvalidArgumentError(
+                f"Port list length mismatch: host_ips={len(host_ips)}, "
+                f"host_ports={len(host_ports)}, exposed_ports={len(exposed_ports)}"
+            )
 
         if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
             try:
@@ -1188,7 +1207,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 container = await docker.containers.create(
                     config=container_config, name=kernel_name
                 )
-                assert container is not None
+                if container is None:
+                    raise ContainerCreationError(
+                        container_id="",
+                        message="Docker API returned None when creating container",
+                    )
                 cid = cast(str, container._id)
                 async with AsyncFileWriter(
                     target_filename=self.config_dir / "resource.txt",
@@ -1200,7 +1223,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 if container is not None:
                     raise ContainerCreationError(
                         container_id=ContainerId(container.id),
-                        message="Container creation cancelled",
+                        message="Container creation was cancelled",
                     )
                 raise
             except Exception as e:
@@ -1209,7 +1232,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 if container is not None:
                     raise ContainerCreationError(
                         container_id=ContainerId(container.id),
-                        message=f"unknown. {repr(e)}",
+                        message=f"Unexpected error during container creation: {repr(e)}",
                     )
                 raise
 
@@ -1217,10 +1240,16 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 await container.start()
             except asyncio.CancelledError:
                 await _rollback_container_creation()
-                raise ContainerCreationError(container_id=cid, message="Container start cancelled")
+                raise ContainerCreationError(
+                    container_id=cid,
+                    message="Container start was cancelled",
+                )
             except Exception as e:
                 await _rollback_container_creation()
-                raise ContainerCreationError(container_id=cid, message=f"unknown. {repr(e)}")
+                raise ContainerCreationError(
+                    container_id=cid,
+                    message=f"Unexpected error during container start: {repr(e)}",
+                )
 
             if self.internal_data.get("sudo_session_enabled", False):
                 exec = await container.exec(
@@ -1272,7 +1301,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             if container_network_info:
                 kernel_host = container_network_info.container_host
                 port_map = container_network_info.services
-                assert "replin" in port_map and "replout" in port_map
+                if "replin" not in port_map or "replout" not in port_map:
+                    raise InvalidArgumentError("replin and replout ports are required in port_map")
 
                 repl_in_port = port_map["replin"][2000]
                 repl_out_port = port_map["replout"][2001]
@@ -1293,7 +1323,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     ports: Optional[list[PortInfo]] = await container.port(port)
                     if not ports:
                         raise ContainerCreationError(
-                            container_id=cid, message="Container port not found"
+                            container_id=cid,
+                            message=f"Container port {port} not found in port mapping",
                         )
                     host_port = int(ports[0]["HostPort"])
                     if host_port != host_ports[idx]:
@@ -1302,7 +1333,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                             container_id=cid,
                             message=f"Port mapping mismatch. {host_port = }, {host_ports[idx] = }",
                         )
-                    assert host_port == host_ports[idx]
                     if port == 2000:  # intrinsic
                         repl_in_port = host_port
                     elif port == 2001:  # intrinsic
@@ -1319,8 +1349,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     )
                     sport["host_ports"] = created_host_ports
 
-        assert repl_in_port != 0, "repl_in_port should have been assigned."
-        assert repl_out_port != 0, "repl_out_port should have been assigned."
+        if repl_in_port == 0:
+            raise InvalidArgumentError("repl_in_port should have been assigned")
+        if repl_out_port == 0:
+            raise InvalidArgumentError("repl_out_port should have been assigned")
         return {
             "container_id": container._id,
             "kernel_host": kernel_host,
@@ -1372,13 +1404,42 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             agent_class=agent_class,
         )
         self.checked_invalid_images = set()
+        pickle_loader_writer_creator = PickleBasedLoaderWriterCreator.create(
+            PickleBasedKernelRegistryCreatorArgs(
+                scratch_root=local_config.container.scratch_root,
+                ipc_base_path=local_config.agent.ipc_base_path,
+                var_base_path=local_config.agent.var_base_path,
+                agent_class=self.agent_class,
+                agent_id=self.id,
+                local_instance_id=self.local_instance_id,
+            ),
+        )
+        pickle_loader = pickle_loader_writer_creator.create_loader()
+        pickle_writer = pickle_loader_writer_creator.create_writer()
+        container_loader_writer_creator = ContainerBasedLoaderWriterCreator(
+            ContainerBasedKernelRegistryCreatorArgs(
+                scratch_root=local_config.container.scratch_root,
+                agent=self,
+            )
+        )
+        container_loader = container_loader_writer_creator.create_loader()
+        container_writer = container_loader_writer_creator.create_writer()
+        self._kernel_recovery = DockerKernelRegistryRecovery(
+            loader=container_loader,
+            writers=[pickle_writer, container_writer],
+        )
+        self._kernel_recovery_adapter = KernelRecoveryDataAdapter(
+            pickle_loader,
+            [KernelRecoveryDataAdapterTarget(container_loader, container_writer)],
+        )
 
     async def __ainit__(self) -> None:
         async with closing_async(Docker()) as docker:
             docker_host = ""
             match docker.connector:
                 case aiohttp.TCPConnector():
-                    assert docker.docker_host is not None
+                    if docker.docker_host is None:
+                        raise InvalidArgumentError("docker_host is not set for TCP connector")
                     docker_host = docker.docker_host
                 case aiohttp.NamedPipeConnector() | aiohttp.UnixConnector() as connector:
                     docker_host = connector.path
@@ -1407,6 +1468,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 docker_info["CgroupVersion"],
             )
             self.docker_info = docker_info
+        await self._kernel_recovery_adapter.adapt_recovery_data()
         await super().__ainit__()
         try:
             async with Docker() as docker:
@@ -1476,6 +1538,18 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
         if self.docker:
             await self.docker.close()
+
+    @override
+    async def _load_kernel_registry_from_recovery(self) -> MutableMapping[KernelId, AbstractKernel]:
+        return await self._kernel_recovery.load_kernel_registry()
+
+    @override
+    async def _write_kernel_registry_to_recovery(
+        self,
+        kernel_registry: MutableMapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+    ) -> None:
+        await self._kernel_recovery.save_kernel_registry(kernel_registry, metadata)
 
     @override
     def get_cgroup_path(self, controller: str, container_id: str) -> Path:

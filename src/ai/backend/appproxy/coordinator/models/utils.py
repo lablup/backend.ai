@@ -38,7 +38,8 @@ from tenacity import (
 )
 from yarl import URL
 
-from ai.backend.appproxy.common.exceptions import DatabaseError
+from ai.backend.appproxy.common.errors import DatabaseError
+from ai.backend.appproxy.coordinator.errors import TransactionResultError
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging import BraceStyleAdapter
 
@@ -314,7 +315,8 @@ async def execute_with_txn_retry(
         raise asyncio.TimeoutError(
             f"DB serialization failed after {max_attempts} retry transactions"
         )
-    assert result is not Sentinel.TOKEN
+    if result is Sentinel.TOKEN:
+        raise TransactionResultError("Transaction did not produce a result")
     return result
 
 

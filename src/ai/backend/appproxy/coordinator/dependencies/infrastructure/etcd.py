@@ -11,6 +11,7 @@ from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
 from ai.backend.common.types import HostPortPair
 
 from ...config import ServerConfig
+from ...errors import MissingTraefikConfigError
 
 
 class EtcdProvider(DependencyProvider[ServerConfig, TraefikEtcd | None]):
@@ -25,7 +26,10 @@ class EtcdProvider(DependencyProvider[ServerConfig, TraefikEtcd | None]):
         """Create and provide Traefik etcd connection if enabled."""
         if setup_input.proxy_coordinator.enable_traefik:
             traefik_config = setup_input.proxy_coordinator.traefik
-            assert traefik_config
+            if not traefik_config:
+                raise MissingTraefikConfigError(
+                    "Traefik is enabled but traefik configuration is missing."
+                )
 
             creds: dict[str, str] | None = None
             if traefik_config.etcd.password:

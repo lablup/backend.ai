@@ -6,7 +6,7 @@ import pytest
 from ai.backend.common.artifact_storage import AbstractStorage
 from ai.backend.common.types import StreamReader
 from ai.backend.storage.config.unified import ObjectStorageConfig, ReservoirConfig
-from ai.backend.storage.exception import (
+from ai.backend.storage.errors import (
     FileStreamDownloadError,
     ObjectInfoFetchError,
     ObjectStorageBucketNotFoundError,

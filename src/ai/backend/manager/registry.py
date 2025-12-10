@@ -174,12 +174,20 @@ from .errors.api import InvalidAPIParameters
 from .errors.common import GenericForbidden, RejectedByHook
 from .errors.image import ImageNotFound
 from .errors.kernel import (
+    InvalidKernelConfig,
     QuotaExceeded,
     SessionAlreadyExists,
     SessionNotFound,
     TooManySessionsMatched,
 )
-from .errors.resource import InstanceNotFound, ScalingGroupNotFound
+from .errors.resource import (
+    AgentNotAllocated,
+    DatabaseConnectionUnavailable,
+    InstanceNotFound,
+    NoCurrentTaskContext,
+    ScalingGroupNotFound,
+    SessionNotAllocated,
+)
 from .exceptions import MultiAgentError
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -466,7 +474,8 @@ class AgentRegistry:
         resp: MutableMapping[str, Any] = {}
 
         current_task = asyncio.current_task()
-        assert current_task is not None
+        if current_task is None:
+            raise NoCurrentTaskContext("No current task context")
 
         mount_id_map = config.get("mount_id_map")
         mount_map = config.get("mount_map")
@@ -601,7 +610,8 @@ class AgentRegistry:
 
         async with self.db.begin_readonly_session() as db_session:
             conn = await db_session.connection()
-            assert conn
+            if conn is None:
+                raise DatabaseConnectionUnavailable("Database connection not available")
             # check if network exists
             if _network_id := config.get("attach_network"):
                 network = await NetworkRow.get(db_session, _network_id)
@@ -745,7 +755,8 @@ class AgentRegistry:
         resp: MutableMapping[str, Any] = {}
 
         current_task = asyncio.current_task()
-        assert current_task is not None
+        if current_task is None:
+            raise NoCurrentTaskContext("No current task context")
 
         # Check existing (access_key, session) kernel instance
         try:
@@ -867,7 +878,8 @@ class AgentRegistry:
         session_creation_id = secrets.token_urlsafe(16)
         kernel_id: Optional[KernelId] = None
         current_task = asyncio.current_task()
-        assert current_task is not None
+        if current_task is None:
+            raise NoCurrentTaskContext("No current task context")
 
         if attach_network:
             async with self.db.begin_readonly_session() as db_sess:
@@ -1080,9 +1092,11 @@ class AgentRegistry:
         session_id = SessionId(uuid.uuid4())
 
         kernel_enqueue_configs = session_enqueue_configs["kernel_configs"]
-        assert len(kernel_enqueue_configs) >= 1
+        if len(kernel_enqueue_configs) < 1:
+            raise InvalidKernelConfig("At least one kernel configuration is required")
         main_kernel_config = kernel_enqueue_configs[0]
-        assert main_kernel_config["cluster_role"] == DEFAULT_ROLE
+        if main_kernel_config["cluster_role"] != DEFAULT_ROLE:
+            raise InvalidKernelConfig("Main kernel must have the default cluster role")
         session_creation_config: Mapping = session_enqueue_configs["creation_config"]
 
         # Check keypair resource limit
@@ -1094,7 +1108,8 @@ class AgentRegistry:
 
         async with self.db.begin_readonly_session() as sess:
             conn = await sess.connection()
-            assert conn
+            if conn is None:
+                raise DatabaseConnectionUnavailable("Database connection not available")
             checked_scaling_group = await check_scaling_group(
                 conn,
                 scaling_group,
@@ -1569,7 +1584,8 @@ class AgentRegistry:
                 - keys are image names as strings
                 - values are background task IDs
         """
-        assert agent_alloc_ctx.agent_id is not None
+        if agent_alloc_ctx.agent_id is None:
+            raise AgentNotAllocated("Agent ID is not allocated")
 
         agent_client = self._get_agent_client(agent_alloc_ctx.agent_id)
         resp = await agent_client.check_and_pull(image_configs)
@@ -1722,8 +1738,10 @@ class AgentRegistry:
                 ):
                     network_name = f"bai-singlenode-{scheduled_session.id}"
                     agent_alloc_ctx = kernel_agent_bindings[0].agent_alloc_ctx
-                    assert agent_alloc_ctx.agent_id is not None
-                    assert scheduled_session.id is not None
+                    if agent_alloc_ctx.agent_id is None:
+                        raise AgentNotAllocated("Agent ID is not allocated")
+                    if scheduled_session.id is None:
+                        raise SessionNotAllocated("Session ID is not available")
                     try:
                         agent_client = self._get_agent_client(
                             agent_alloc_ctx.agent_id,
@@ -1766,7 +1784,8 @@ class AgentRegistry:
                         key=keyfunc,
                     ):
                         for index, item in enumerate(group_iterator):
-                            assert item.agent_alloc_ctx.agent_id is not None
+                            if item.agent_alloc_ctx.agent_id is None:
+                                raise AgentNotAllocated("Agent ID is not allocated")
                             agent_client = self._get_agent_client(
                                 item.agent_alloc_ctx.agent_id,
                                 order_key=str(scheduled_session.id),
@@ -1914,8 +1933,10 @@ class AgentRegistry:
         cluster_info: ClusterInfo,
         idle_timeout: float | int,
     ) -> None:
-        assert agent_alloc_ctx.agent_id is not None
-        assert scheduled_session.id is not None
+        if agent_alloc_ctx.agent_id is None:
+            raise AgentNotAllocated("Agent ID is not allocated")
+        if scheduled_session.id is None:
+            raise SessionNotAllocated("Session ID is not available")
 
         async def _update_kernel() -> None:
             async with self.db.begin_session() as db_sess:
@@ -3540,7 +3561,9 @@ class AgentRegistry:
 
         if _path := MODEL_SERVICE_RUNTIME_PROFILES[endpoint.runtime_variant].health_check_endpoint:
             _info = ModelHealthCheck(path=_path)
-        elif endpoint.runtime_variant == RuntimeVariant.CUSTOM:
+
+        if endpoint.runtime_variant == RuntimeVariant.CUSTOM:
+            # CUSTOM: full validation required
             model_definition_path = await ModelServiceHelper.validate_model_definition_file_exists(
                 self.storage_manager,
                 model.host,
@@ -3562,8 +3585,59 @@ class AgentRegistry:
                         max_retries=health_check_info["max_retries"],
                         max_wait_time=health_check_info["max_wait_time"],
                         expected_status_code=health_check_info["expected_status_code"],
+                        initial_delay=health_check_info.get("initial_delay"),
                     )
                     break
+        elif (
+            self.config_provider.config.deployment.enable_model_definition_override
+            and endpoint.model_definition_path
+        ):
+            # non-CUSTOM with override: read raw definition and override non-None values only
+            try:
+                model_definition_path = (
+                    await ModelServiceHelper.validate_model_definition_file_exists(
+                        self.storage_manager,
+                        model.host,
+                        model.vfid,
+                        endpoint.model_definition_path,
+                    )
+                )
+                raw_model_definition = await ModelServiceHelper._read_model_definition(
+                    self.storage_manager,
+                    model.host,
+                    model.vfid,
+                    model_definition_path,
+                )
+
+                for model_info in raw_model_definition.get("models", []):
+                    if health_check_info := model_info.get("service", {}).get("health_check"):
+                        if _info is None:
+                            _info = ModelHealthCheck(path=health_check_info["path"])
+                        override_kwargs: dict[str, float | int | str] = {}
+                        if health_check_info.get("path") is not None:
+                            override_kwargs["path"] = health_check_info["path"]
+                        if health_check_info.get("interval") is not None:
+                            override_kwargs["interval"] = health_check_info["interval"]
+                        if health_check_info.get("max_retries") is not None:
+                            override_kwargs["max_retries"] = health_check_info["max_retries"]
+                        if health_check_info.get("max_wait_time") is not None:
+                            override_kwargs["max_wait_time"] = health_check_info["max_wait_time"]
+                        if health_check_info.get("expected_status_code") is not None:
+                            override_kwargs["expected_status_code"] = health_check_info[
+                                "expected_status_code"
+                            ]
+                        if health_check_info.get("initial_delay") is not None:
+                            override_kwargs["initial_delay"] = health_check_info["initial_delay"]
+                        if override_kwargs:
+                            _info = _info.model_copy(update=override_kwargs)
+                        break
+            except Exception:
+                log.debug(
+                    "Failed to read health check override from model definition for endpoint {}, "
+                    "using default health check settings",
+                    endpoint.id,
+                    exc_info=True,
+                )
         return _info
 
     async def create_appproxy_endpoint(
@@ -4225,7 +4299,8 @@ async def check_scaling_group(
                 )
         else:
             raise ScalingGroupNotFound(err_msg)
-    assert scaling_group is not None
+    if scaling_group is None:
+        raise ScalingGroupNotFound("Scaling group not found")
     return scaling_group
 
 

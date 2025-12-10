@@ -7,9 +7,10 @@ import jinja2
 from aiohttp import web
 from aiohttp.typedefs import Handler
 
-from ai.backend.appproxy.common.exceptions import GenericBadRequest, ServerMisconfiguredError
+from ai.backend.appproxy.common.errors import GenericBadRequest, ServerMisconfiguredError
 from ai.backend.logging import BraceStyleAdapter
 
+from ....errors import InvalidFrontendTypeError
 from ....types import Circuit, PortFrontendInfo
 from .base import BaseHTTPFrontend
 
@@ -98,5 +99,8 @@ class PortFrontend(BaseHTTPFrontend[int]):
         return await handler(request)
 
     def get_circuit_key(self, circuit: Circuit) -> int:
-        assert isinstance(circuit.frontend, PortFrontendInfo)
+        if not isinstance(circuit.frontend, PortFrontendInfo):
+            raise InvalidFrontendTypeError(
+                f"Expected PortFrontendInfo, got {type(circuit.frontend).__name__}"
+            )
         return circuit.frontend.port

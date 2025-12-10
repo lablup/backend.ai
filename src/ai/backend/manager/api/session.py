@@ -12,7 +12,7 @@ from collections.abc import Iterable, Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Annotated, Any, Optional, cast, get_args
+from typing import TYPE_CHECKING, Annotated, Any, Optional, cast
 from uuid import UUID
 
 import aiohttp_cors
@@ -105,6 +105,8 @@ from ai.backend.logging import BraceStyleAdapter
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
 from ..errors.api import InvalidAPIParameters
 from ..errors.auth import InsufficientPrivilege
+from ..errors.kernel import InvalidSessionData, SessionNotFound
+from ..errors.resource import NoCurrentTaskContext
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     SessionDependencyRow,
@@ -726,7 +728,8 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     access_key: AccessKey = request["keypair"]["access_key"]
     service: str = params["app"]
     myself = asyncio.current_task()
-    assert myself is not None
+    if myself is None:
+        raise NoCurrentTaskContext("No current task context")
     result = await root_ctx.processors.session.start_service.wait_for_complete(
         StartServiceAction(
             session_name=session_name,
@@ -759,7 +762,8 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
 
     myself = asyncio.current_task()
-    assert myself is not None
+    if myself is None:
+        raise NoCurrentTaskContext("No current task context")
 
     log.info(
         "GET_COMMIT_STATUS (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
@@ -1335,13 +1339,14 @@ async def _find_dependency_sessions(
         access_key=access_key,
     )
 
-    assert len(sessions) >= 1, "session not found!"
+    if len(sessions) < 1:
+        raise SessionNotFound("session not found!")
 
     session_id = str(sessions[0].id)
     session_name = sessions[0].name
 
-    assert isinstance(session_id, get_args(UUID | str))
-    assert isinstance(session_name, str)
+    if not isinstance(session_name, str):
+        raise InvalidSessionData("Invalid session_name type")
 
     kernel_query = (
         sa.select([

@@ -26,11 +26,11 @@ def test_model_service_metadata_to_service_metadata() -> None:
     assert service_meta.endpoint.address == "10.0.1.50"
     assert service_meta.endpoint.port == 8080
     assert service_meta.endpoint.protocol == "http"
-    assert service_meta.endpoint.prometheus_address == "10.0.1.50:8080/metrics"
+    assert service_meta.endpoint.prometheus_address == "10.0.1.50:8080"
 
 
 def test_model_service_metadata_custom_metrics_path() -> None:
-    """Test custom metrics path is included in prometheus_address."""
+    """Test prometheus_address contains only host:port (no metrics path)."""
     metadata = ModelServiceMetadata(
         route_id=uuid.uuid4(),
         model_service_name="test-service",
@@ -41,7 +41,8 @@ def test_model_service_metadata_custom_metrics_path() -> None:
 
     service_meta = metadata.to_service_metadata()
 
-    assert service_meta.endpoint.prometheus_address == "192.168.1.100:9090/stats"
+    # prometheus_address should only contain host:port
+    assert service_meta.endpoint.prometheus_address == "192.168.1.100:9090"
 
 
 def test_model_service_metadata_labels_auto_added() -> None:

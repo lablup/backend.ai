@@ -1,7 +1,7 @@
 """Database source implementation for deployment repository."""
 
 import uuid
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
@@ -21,6 +21,7 @@ from ai.backend.common.types import (
     RuntimeVariant,
     SessionId,
 )
+from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.deployment.creator import DeploymentCreator
 from ai.backend.manager.data.deployment.modifier import DeploymentModifier
 from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
@@ -41,13 +42,14 @@ from ai.backend.manager.errors.deployment import (
     DeploymentHasNoTargetRevision,
     UserNotFoundInDeployment,
 )
-from ai.backend.manager.errors.resource import GroupNotFound, ScalingGroupProxyTargetNotFound
+from ai.backend.manager.errors.resource import ProjectNotFound, ScalingGroupProxyTargetNotFound
 from ai.backend.manager.errors.service import (
     AutoScalingRuleNotFound,
     EndpointNotFound,
     NoUpdatesToApply,
 )
 from ai.backend.manager.errors.storage import VFolderNotFound
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
@@ -195,7 +197,7 @@ class DeploymentDBSource:
 
         result = await db_sess.execute(query)
         if result.first() is None:
-            raise GroupNotFound(f"Group {group_id} not found in domain {domain_name}")
+            raise ProjectNotFound(f"Project {group_id} not found in domain {domain_name}")
 
     async def get_endpoint(
         self,
@@ -1411,3 +1413,28 @@ class DeploymentDBSource:
                         break
 
             return _info
+
+    async def get_default_architecture_from_scaling_group(
+        self, scaling_group_name: str
+    ) -> Optional[str]:
+        """
+        Get the default (most common) architecture from active agents in a scaling group.
+        Returns None if no active agents exist.
+        """
+        async with self._db.begin_readonly_session() as session:
+            query = sa.select(AgentRow.architecture).where(
+                sa.and_(
+                    AgentRow.scaling_group == scaling_group_name,
+                    AgentRow.status == AgentStatus.ALIVE,
+                    AgentRow.schedulable == sa.true(),
+                )
+            )
+            result = await session.execute(query)
+            architectures = [row.architecture for row in result]
+
+            if not architectures:
+                return None
+
+            architecture_counts = Counter(architectures)
+            most_common_architecture, _ = architecture_counts.most_common(1)[0]
+            return most_common_architecture

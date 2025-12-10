@@ -164,6 +164,7 @@ class ErrorDomain(enum.StrEnum):
     MODEL_DEPLOYMENT = "model-deployment"
     RESOURCE_PRESET = "resource-preset"
     STORAGE = "storage"
+    WATCHER = "watcher"
     AGENT = "agent"
     KERNEL_REGISTRY = "kernel-registry"
     PERMISSION = "permission"
@@ -172,6 +173,9 @@ class ErrorDomain(enum.StrEnum):
     MESSAGE_QUEUE = "message-queue"
     NOTIFICATION = "notification"
     HEALTH_CHECK = "health-check"
+    KEYPAIR_RESOURCE_POLICY = "keypair-resource-policy"
+    DATABASE = "database"
+    USER_RESOURCE_POLICY = "user-resource-policy"
 
 
 class ErrorOperation(enum.StrEnum):
@@ -835,3 +839,54 @@ class DatabaseError(BackendAIError, web.HTTPServiceUnavailable):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.UNAVAILABLE,
         )
+
+
+class UserResourcePolicyNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/user-resource-policy-not-found"
+    error_title = "User Resource Policy Not Found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER_RESOURCE_POLICY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class KeypairResourcePolicyNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/keypair-resource-policy-not-found"
+    error_title = "Keypair Resource Policy Not Found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KEYPAIR_RESOURCE_POLICY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class AgentWatcherResponseError(BackendAIError, web.HTTPServiceUnavailable):
+    """
+    Wraps and forwards errors from agent watcher requests with original status code and message.
+    This allows transparent error propagation from requests to API clients.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent-watcher-response-error"
+    error_title = "Agent Watcher Response Error"
+
+    def __init__(
+        self,
+        status_code: int,
+        error_code: ErrorCode,
+        error_message: Optional[str] = None,
+    ) -> None:
+        self.status_code = status_code
+        self._error_code = error_code
+        extra_msg = (
+            error_message
+            or f"An error occurred while processing agent watcher request with status code {status_code}"
+        )
+        super().__init__(extra_msg=extra_msg)
+
+    def error_code(self) -> ErrorCode:
+        return self._error_code

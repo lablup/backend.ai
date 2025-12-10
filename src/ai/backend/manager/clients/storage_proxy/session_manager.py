@@ -99,7 +99,8 @@ class StorageSessionManager:
                         endpoint=yarl.URL(proxy_config.manager_api),
                         secret=proxy_config.secret,
                     ),
-                )
+                ),
+                timeout_config=proxy_config.timeouts,
             )
         return manager_facing_clients
 

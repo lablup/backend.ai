@@ -6,8 +6,6 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from ai.backend.common.dto.manager.notification import (
     NotificationChannelDTO,
     NotificationChannelFilter,
@@ -31,6 +29,7 @@ from ai.backend.manager.data.notification import (
     NotificationRuleData,
     NotificationRuleModifier,
 )
+from ai.backend.manager.errors.notification import InvalidNotificationConfig
 from ai.backend.manager.repositories.base import (
     OffsetPagination,
     Querier,
@@ -81,7 +80,10 @@ class NotificationChannelAdapter(BaseFilterAdapter):
             modifier.description = OptionalState.update(request.description)
         if request.config is not None:
             # config validator ensures this is WebhookConfig
-            assert isinstance(request.config, WebhookConfig)
+            if not isinstance(request.config, WebhookConfig):
+                raise InvalidNotificationConfig(
+                    f"Expected WebhookConfig, got {type(request.config).__name__}"
+                )
             modifier.config = OptionalState.update(request.config)
         if request.enabled is not None:
             modifier.enabled = OptionalState.update(request.enabled)
@@ -140,13 +142,9 @@ class NotificationChannelAdapter(BaseFilterAdapter):
         else:
             raise ValueError(f"Unknown order field: {order.field}")
 
-    def _build_pagination(
-        self, limit: Optional[int], offset: Optional[int]
-    ) -> Optional[OffsetPagination]:
+    def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""
-        if limit is None:
-            return None
-        return OffsetPagination(limit=limit, offset=offset or 0)
+        return OffsetPagination(limit=limit, offset=offset)
 
 
 class NotificationRuleAdapter(BaseFilterAdapter):
@@ -234,10 +232,6 @@ class NotificationRuleAdapter(BaseFilterAdapter):
         else:
             raise ValueError(f"Unknown order field: {order.field}")
 
-    def _build_pagination(
-        self, limit: Optional[int], offset: Optional[int]
-    ) -> Optional[OffsetPagination]:
+    def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""
-        if limit is None:
-            return None
-        return OffsetPagination(limit=limit, offset=offset or 0)
+        return OffsetPagination(limit=limit, offset=offset)

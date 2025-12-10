@@ -1,17 +1,19 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Optional
+from typing import TYPE_CHECKING, Self
 
 from pydantic import BaseModel, Field
 
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.types import AgentId, ContainerId, KernelId, ServicePort, SessionTypes
+from ai.backend.common.types import AgentId, KernelId, ServicePort, SessionTypes
 
-from ..kernel import AbstractKernel, KernelLifecycleStatus, KernelOwnershipData
-from ..proxy import DomainSocketProxy
+from ..kernel import KernelOwnershipData
+from ..proxy import DomainSocketPathPair
 from ..resources import KernelResourceSpec
-from ..types import AgentBackend
 
-KernelRegistryType = Mapping[KernelId, AbstractKernel]
+if TYPE_CHECKING:
+    from ai.backend.agent.docker.kernel import DockerKernel
 
 
 class KernelRecoveryData(BaseModel):
@@ -20,10 +22,6 @@ class KernelRecoveryData(BaseModel):
     Agent should load and write Kernel data using this structure
     rather than directly manipulating AbstractKernel instances.
     """
-
-    kernel_backend: AgentBackend = Field(
-        description="Backend type of the kernel", examples=[AgentBackend.DOCKER]
-    )
 
     id: KernelId = Field(description="ID of the kernel")
     agent_id: AgentId = Field(description="ID of the agent that owns the kernel")
@@ -37,17 +35,13 @@ class KernelRecoveryData(BaseModel):
         description="Network driver name. It is managed by Agent-side network plugin.",
         examples=["bridge"],
     )
-    container_id: Optional[ContainerId] = Field(
-        description="Container ID if the kernel has an associated container"
-    )
     session_type: SessionTypes = Field(description="Type of session associated with the kernel")
-    state: KernelLifecycleStatus = Field(description="Lifecycle status of the kernel")
 
     block_service_ports: bool = Field(
         description="Whether to block service ports. If true, cannot start any service of the kernel"
     )
-    domain_socket_proxies: list[DomainSocketProxy] = Field(
-        description="List of domain socket proxies associated with the kernel"
+    domain_socket_proxies: list[DomainSocketPathPair] = Field(
+        description="List of domain socket path pairs associated with the kernel"
     )
     service_ports: list[ServicePort] = Field(
         description="List of service port mappings exposed by the kernel"
@@ -60,3 +54,45 @@ class KernelRecoveryData(BaseModel):
     )
     resource_spec: KernelResourceSpec = Field(description="Resource specifications for the kernel")
     environ: Mapping[str, str] = Field(description="Environment variables for the kernel")
+
+    @classmethod
+    def from_docker_kernel(cls, kernel: DockerKernel) -> Self:
+        result = cls(
+            id=kernel.kernel_id,
+            agent_id=kernel.agent_id,
+            image_ref=kernel.image,
+            session_type=kernel.session_type,
+            ownership_data=kernel.ownership_data,
+            network_id=kernel.network_id,
+            version=kernel.version,
+            network_driver=kernel.network_driver,
+            resource_spec=kernel.resource_spec,
+            service_ports=kernel.service_ports,
+            environ=kernel.environ,
+            block_service_ports=kernel.data["block_service_ports"],
+            domain_socket_proxies=kernel.data["domain_socket_proxies"],
+            repl_in_port=kernel.data["repl_in_port"],
+            repl_out_port=kernel.data["repl_out_port"],
+        )
+        return result
+
+    def to_docker_kernel(self) -> DockerKernel:
+        from ai.backend.agent.docker.kernel import DockerKernel
+
+        return DockerKernel(
+            ownership_data=self.ownership_data,
+            network_id=self.network_id,
+            image=self.image_ref,
+            version=self.version,
+            network_driver=self.network_driver,
+            agent_config={},
+            resource_spec=self.resource_spec,
+            service_ports=self.service_ports,
+            environ=self.environ,
+            data={
+                "repl_in_port": self.repl_in_port,
+                "repl_out_port": self.repl_out_port,
+                "block_service_ports": self.block_service_ports,
+                "domain_socket_proxies": self.domain_socket_proxies,
+            },
+        )

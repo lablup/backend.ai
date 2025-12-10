@@ -1,447 +1,423 @@
-"""
-Tests for KeypairResourcePolicyRepository functionality.
-Tests the repository layer with mocked database operations.
-"""
+from __future__ import annotations
 
-from datetime import datetime
+from collections.abc import AsyncGenerator
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from uuid import uuid4
 
 import pytest
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
+import sqlalchemy as sa
 
-from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
-from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
-from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.common.exception import KeypairResourcePolicyNotFound
+from ai.backend.common.types import (
+    DefaultForUnspecified,
+    ResourceSlot,
+    VFolderHostPermission,
+)
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.keypair_resource_policy.repository import (
     KeypairResourcePolicyRepository,
 )
+from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
+    KeyPairResourcePolicyModifier,
+)
+from ai.backend.manager.services.keypair_resource_policy.types import (
+    KeyPairResourcePolicyCreator,
+)
+from ai.backend.manager.types import OptionalState, TriState
 
 
 class TestKeypairResourcePolicyRepository:
     """Test cases for KeypairResourcePolicyRepository"""
 
     @pytest.fixture
-    def mock_db_engine(self) -> MagicMock:
-        """Create mocked database engine"""
-        return MagicMock(spec=ExtendedAsyncSAEngine)
+    async def db_with_cleanup(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database engine that auto-cleans keypair resource policy data after each test"""
+        # Get existing policy names to preserve
+        existing_policy_names: set[str] = set()
+        async with database_engine.begin_readonly_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(KeyPairResourcePolicyRow.name).select_from(KeyPairResourcePolicyRow)
+            )
+            existing_policy_names = {row[0] for row in result.fetchall()}
+
+        yield database_engine
+
+        # Cleanup only test-created policies
+        async with database_engine.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(KeyPairResourcePolicyRow.name).select_from(KeyPairResourcePolicyRow)
+            )
+            current_policy_names = {row[0] for row in result.fetchall()}
+            test_created_names = current_policy_names - existing_policy_names
+
+            if test_created_names:
+                await db_sess.execute(
+                    sa.delete(KeyPairResourcePolicyRow).where(
+                        KeyPairResourcePolicyRow.name.in_(test_created_names)
+                    )
+                )
 
     @pytest.fixture
-    def keypair_resource_policy_repository(
-        self, mock_db_engine: MagicMock
-    ) -> KeypairResourcePolicyRepository:
-        """Create KeypairResourcePolicyRepository instance with mocked database"""
-        return KeypairResourcePolicyRepository(db=mock_db_engine)
+    def sample_resource_slots(self) -> ResourceSlot:
+        """Sample resource slots for testing"""
+        return ResourceSlot({"cpu": "4", "mem": "8g", "gpu": "1"})
 
     @pytest.fixture
-    def sample_policy_row(self) -> KeyPairResourcePolicyRow:
-        """Create sample keypair resource policy row for testing"""
-        return KeyPairResourcePolicyRow(
-            name="test-policy",
-            max_concurrent_sessions=5,
-            max_containers_per_session=2,
-            total_resource_slots={"cpu": 8, "mem": "16g"},
-            idle_timeout=3600,
-        )
-
-    @pytest.fixture
-    def sample_policy_data(self) -> KeyPairResourcePolicyData:
-        """Create sample keypair resource policy data for testing"""
-        return KeyPairResourcePolicyData(
-            name="test-policy",
-            created_at=datetime.now(),
-            default_for_unspecified=DefaultForUnspecified.UNLIMITED,
-            total_resource_slots=ResourceSlot({"cpu": "8", "mem": "16g"}),
-            max_session_lifetime=86400,
-            max_concurrent_sessions=5,
-            max_pending_session_count=10,
-            max_pending_session_resource_slots={"cpu": 2, "mem": "4g"},
-            max_concurrent_sftp_sessions=3,
-            max_containers_per_session=2,
-            idle_timeout=3600,
-            allowed_vfolder_hosts={"local": None},
-        )
-
-    @pytest.fixture
-    def new_policy_fields(self) -> dict[str, Any]:
-        """Create fields for new policy creation testing"""
+    async def sample_allowed_vfolder_hosts(self) -> dict[str, Any]:
+        """Fixture for sample allowed_vfolder_hosts"""
         return {
-            "name": "new-policy",
-            "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
-            "total_resource_slots": {"cpu": 16, "mem": "32g"},
-            "max_session_lifetime": 86400,
-            "max_concurrent_sessions": 10,
-            "max_pending_session_count": 20,
-            "max_pending_session_resource_slots": {"cpu": 4, "mem": "8g"},
-            "max_concurrent_sftp_sessions": 5,
-            "max_containers_per_session": 3,
-            "idle_timeout": 7200,
-            "allowed_vfolder_hosts": {"local": None},
+            "s3": {
+                VFolderHostPermission.CREATE,
+                VFolderHostPermission.UPLOAD_FILE,
+                VFolderHostPermission.DOWNLOAD_FILE,
+            },
+            "azure": {
+                VFolderHostPermission.CREATE,
+                VFolderHostPermission.MOUNT_IN_SESSION,
+            },
+            "local": {
+                VFolderHostPermission.CREATE,
+                VFolderHostPermission.UPLOAD_FILE,
+                VFolderHostPermission.DOWNLOAD_FILE,
+                VFolderHostPermission.MOUNT_IN_SESSION,
+            },
         }
 
-    @pytest.mark.asyncio
-    async def test_create_success(
+    @pytest.fixture
+    def sample_creator(
         self,
-        keypair_resource_policy_repository: KeypairResourcePolicyRepository,
-        mock_db_engine: MagicMock,
-        new_policy_fields: dict[str, Any],
-    ) -> None:
-        """Test successful keypair resource policy creation"""
-        # Mock database session
-        mock_session = AsyncMock(spec=AsyncSession)
-        mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
-
-        # Create expected policy data matching the new fields
-        expected_policy_data = KeyPairResourcePolicyData(
-            created_at=datetime.now(), **new_policy_fields
+        sample_resource_slots: ResourceSlot,
+        sample_allowed_vfolder_hosts: dict[str, Any],
+    ) -> KeyPairResourcePolicyCreator:
+        """Create a sample KeyPairResourcePolicyCreator for testing"""
+        return KeyPairResourcePolicyCreator(
+            name=str(uuid4()),
+            default_for_unspecified=DefaultForUnspecified.LIMITED,
+            total_resource_slots=sample_resource_slots,
+            max_session_lifetime=86400,
+            max_concurrent_sessions=10,
+            max_containers_per_session=3,
+            idle_timeout=3600,
+            allowed_vfolder_hosts=sample_allowed_vfolder_hosts,
+            max_concurrent_sftp_sessions=5,
+            max_pending_session_count=5,
+            max_pending_session_resource_slots=ResourceSlot({"cpu": "1", "mem": "1g"}),
+            max_quota_scope_size=None,
+            max_vfolder_count=None,
+            max_vfolder_size=None,
         )
 
-        # Mock the to_dataclass method
-        mock_policy_row = MagicMock()
-        mock_policy_row.to_dataclass.return_value = expected_policy_data
-
-        # Mock session.add and flush
-        mock_session.add = Mock()
-        mock_session.flush = AsyncMock()
-
-        # Patch the class at the location where it's used in the repository
-        with patch(
-            "ai.backend.manager.repositories.keypair_resource_policy.repository.KeyPairResourcePolicyRow"
-        ) as mock_policy_class:
-            mock_policy_class.return_value = mock_policy_row
-            result = await keypair_resource_policy_repository.create(new_policy_fields)
-
-            assert result == expected_policy_data
-            assert result.name == "new-policy"
-            assert result.max_concurrent_sessions == 10
-            assert result.max_containers_per_session == 3
-            assert result.total_resource_slots == {"cpu": 16, "mem": "32g"}
-            assert result.idle_timeout == 7200
-            assert result.max_session_lifetime == 86400
-            assert result.max_pending_session_count == 20
-
-            # Verify the class was instantiated with correct fields
-            mock_policy_class.assert_called_once_with(**new_policy_fields)
-            mock_session.add.assert_called_once()
-            # Check that the mock_policy_row was added
-            assert mock_session.add.call_args[0][0] == mock_policy_row
-
-    @pytest.mark.asyncio
-    async def test_create_duplicate_name(
+    @pytest.fixture
+    async def sample_policy_name(
         self,
-        keypair_resource_policy_repository: KeypairResourcePolicyRepository,
-        mock_db_engine: MagicMock,
-        new_policy_fields: dict[str, Any],
-    ) -> None:
-        """Test keypair resource policy creation with duplicate name"""
-        # Mock database session
-        mock_session = AsyncMock(spec=AsyncSession)
-        mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_creator: KeyPairResourcePolicyCreator,
+    ) -> AsyncGenerator[str, None]:
+        """Create sample keypair resource policy directly in DB and return its name"""
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy_row = KeyPairResourcePolicyRow.from_creator(sample_creator)
+            db_sess.add(policy_row)
+            await db_sess.flush()
 
-        # Mock session.add to raise IntegrityError
-        mock_session.add = Mock()
-        mock_session.flush = AsyncMock(side_effect=IntegrityError("duplicate key", None, None))
+        assert sample_creator.name is not None
+        yield sample_creator.name
 
-        with pytest.raises(IntegrityError):
-            await keypair_resource_policy_repository.create(new_policy_fields)
-
-    @pytest.mark.asyncio
-    async def test_get_by_name_success(
+    @pytest.fixture
+    async def multiple_policies(
         self,
-        keypair_resource_policy_repository: KeypairResourcePolicyRepository,
-        mock_db_engine: MagicMock,
-        sample_policy_row: KeyPairResourcePolicyRow,
-        sample_policy_data: KeyPairResourcePolicyData,
-    ) -> None:
-        """Test successful policy retrieval by name"""
-        # Mock database session
-        mock_session = AsyncMock(spec=AsyncSession)
-        mock_db_engine.begin_readonly_session.return_value.__aenter__.return_value = mock_session
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_resource_slots: ResourceSlot,
+        sample_allowed_vfolder_hosts: dict[str, Any],
+    ) -> AsyncGenerator[list[str], None]:
+        """Create multiple sample policies for testing"""
+        policy_names = []
+        async with db_with_cleanup.begin_session() as db_sess:
+            for i in range(3):
+                creator = KeyPairResourcePolicyCreator(
+                    name=str(uuid4()),
+                    default_for_unspecified=DefaultForUnspecified.LIMITED,
+                    total_resource_slots=sample_resource_slots,
+                    max_session_lifetime=86400,
+                    max_concurrent_sessions=10 + i,
+                    max_containers_per_session=3,
+                    idle_timeout=3600,
+                    allowed_vfolder_hosts=sample_allowed_vfolder_hosts,
+                    max_concurrent_sftp_sessions=5,
+                    max_pending_session_count=None,
+                    max_pending_session_resource_slots=None,
+                    max_quota_scope_size=None,
+                    max_vfolder_count=None,
+                    max_vfolder_size=None,
+                )
+                policy_row = KeyPairResourcePolicyRow.from_creator(creator)
+                db_sess.add(policy_row)
+                assert creator.name is not None
+                policy_names.append(creator.name)
+            await db_sess.flush()
 
-        # Mock query result
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = sample_policy_row
-        mock_session.execute = AsyncMock(return_value=mock_result)
+        yield policy_names
 
-        # Mock to_dataclass method
-        sample_policy_row.to_dataclass = Mock(return_value=sample_policy_data)  # type: ignore
-
-        result = await keypair_resource_policy_repository.get_by_name("test-policy")
-
-        assert result == sample_policy_data
-        mock_session.execute.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_get_by_name_not_found(
+    @pytest.fixture
+    def repository(
         self,
-        keypair_resource_policy_repository: KeypairResourcePolicyRepository,
-        mock_db_engine: MagicMock,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> KeypairResourcePolicyRepository:
+        """Create KeypairResourcePolicyRepository instance with database"""
+        return KeypairResourcePolicyRepository(db=db_with_cleanup)
+
+    @pytest.mark.parametrize(
+        "policy_creator",
+        [
+            pytest.param(
+                KeyPairResourcePolicyCreator(
+                    name=f"unlimited-policy-{uuid4()}",
+                    default_for_unspecified=DefaultForUnspecified.UNLIMITED,
+                    total_resource_slots=ResourceSlot({"cpu": "4", "mem": "8g", "gpu": "1"}),
+                    max_session_lifetime=0,
+                    max_concurrent_sessions=100,
+                    max_containers_per_session=10,
+                    idle_timeout=0,
+                    allowed_vfolder_hosts={
+                        "local": {
+                            VFolderHostPermission.CREATE,
+                            VFolderHostPermission.UPLOAD_FILE,
+                            VFolderHostPermission.DOWNLOAD_FILE,
+                            VFolderHostPermission.MOUNT_IN_SESSION,
+                        },
+                        "nfs": {
+                            VFolderHostPermission.CREATE,
+                            VFolderHostPermission.MOUNT_IN_SESSION,
+                        },
+                    },
+                    max_concurrent_sftp_sessions=10,
+                    max_pending_session_count=None,
+                    max_pending_session_resource_slots=None,
+                    max_quota_scope_size=None,
+                    max_vfolder_count=None,
+                    max_vfolder_size=None,
+                ),
+                id="unlimited",
+            ),
+            pytest.param(
+                KeyPairResourcePolicyCreator(
+                    name=f"complex-resource-policy-{uuid4()}",
+                    default_for_unspecified=DefaultForUnspecified.LIMITED,
+                    total_resource_slots=ResourceSlot({
+                        "cpu": "16",
+                        "mem": "64g",
+                        "gpu": "4",
+                        "tpu": "2",
+                        "cuda.shares": "8",
+                    }),
+                    max_session_lifetime=172800,
+                    max_concurrent_sessions=50,
+                    max_containers_per_session=5,
+                    idle_timeout=7200,
+                    allowed_vfolder_hosts={
+                        "local": {
+                            VFolderHostPermission.CREATE,
+                            VFolderHostPermission.MODIFY,
+                            VFolderHostPermission.DELETE,
+                            VFolderHostPermission.UPLOAD_FILE,
+                            VFolderHostPermission.DOWNLOAD_FILE,
+                            VFolderHostPermission.MOUNT_IN_SESSION,
+                        },
+                        "nfs": {
+                            VFolderHostPermission.CREATE,
+                            VFolderHostPermission.MOUNT_IN_SESSION,
+                        },
+                    },
+                    max_concurrent_sftp_sessions=10,
+                    max_pending_session_count=10,
+                    max_pending_session_resource_slots=ResourceSlot({"cpu": "2", "mem": "4g"}),
+                    max_quota_scope_size=None,
+                    max_vfolder_count=None,
+                    max_vfolder_size=None,
+                ),
+                id="complex_resource",
+            ),
+            pytest.param(
+                KeyPairResourcePolicyCreator(
+                    name=f"minimal-policy-{uuid4()}",
+                    default_for_unspecified=DefaultForUnspecified.LIMITED,
+                    total_resource_slots=ResourceSlot({"cpu": "4", "mem": "8g", "gpu": "1"}),
+                    max_session_lifetime=0,
+                    max_concurrent_sessions=1,
+                    max_containers_per_session=1,
+                    idle_timeout=0,
+                    allowed_vfolder_hosts={
+                        "local": {VFolderHostPermission.MOUNT_IN_SESSION},
+                        "nfs": set(),
+                    },
+                    max_concurrent_sftp_sessions=1,
+                    max_pending_session_count=None,
+                    max_pending_session_resource_slots=None,
+                    max_quota_scope_size=None,
+                    max_vfolder_count=None,
+                    max_vfolder_size=None,
+                ),
+                id="minimal",
+            ),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_create_keypair_resource_policy(
+        self,
+        repository: KeypairResourcePolicyRepository,
+        policy_creator: KeyPairResourcePolicyCreator,
     ) -> None:
-        """Test policy retrieval when policy not found"""
-        # Mock database session
-        mock_session = AsyncMock(spec=AsyncSession)
-        mock_db_engine.begin_readonly_session.return_value.__aenter__.return_value = mock_session
+        """Test creating a new keypair resource policy with various configurations"""
+        result = await repository.create_keypair_resource_policy(policy_creator)
 
-        # Mock query result to return None
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_session.execute = AsyncMock(return_value=mock_result)
-
-        with pytest.raises(ObjectNotFound) as exc_info:
-            await keypair_resource_policy_repository.get_by_name("nonexistent-policy")
-
-        assert "Keypair resource policy with name nonexistent-policy not found" in str(
-            exc_info.value
+        assert result.name == policy_creator.name
+        assert result.default_for_unspecified == policy_creator.default_for_unspecified
+        assert result.total_resource_slots == policy_creator.total_resource_slots
+        assert result.max_session_lifetime == policy_creator.max_session_lifetime
+        assert result.max_concurrent_sessions == policy_creator.max_concurrent_sessions
+        assert result.max_containers_per_session == policy_creator.max_containers_per_session
+        assert result.idle_timeout == policy_creator.idle_timeout
+        assert result.allowed_vfolder_hosts == policy_creator.allowed_vfolder_hosts
+        assert result.max_concurrent_sftp_sessions == policy_creator.max_concurrent_sftp_sessions
+        assert result.max_pending_session_count == policy_creator.max_pending_session_count
+        assert (
+            result.max_pending_session_resource_slots
+            == policy_creator.max_pending_session_resource_slots
         )
 
+    @pytest.mark.parametrize(
+        "update_modifier,expected_values",
+        [
+            pytest.param(
+                KeyPairResourcePolicyModifier(
+                    default_for_unspecified=OptionalState.update(DefaultForUnspecified.UNLIMITED),
+                    total_resource_slots=OptionalState.update(
+                        ResourceSlot({"cpu": "8", "mem": "16g", "gpu": "2"})
+                    ),
+                    max_concurrent_sessions=OptionalState.update(20),
+                    idle_timeout=OptionalState.update(7200),
+                ),
+                {
+                    "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
+                    "total_resource_slots": ResourceSlot({"cpu": "8", "mem": "16g", "gpu": "2"}),
+                    "max_concurrent_sessions": 20,
+                    "idle_timeout": 7200,
+                },
+                id="full_update",
+            ),
+            pytest.param(
+                KeyPairResourcePolicyModifier(
+                    max_concurrent_sessions=OptionalState.update(15),
+                ),
+                {"max_concurrent_sessions": 15},
+                id="partial_update",
+            ),
+            pytest.param(
+                KeyPairResourcePolicyModifier(
+                    max_pending_session_count=TriState.nullify(),
+                    max_pending_session_resource_slots=TriState.nullify(),
+                ),
+                {
+                    "max_pending_session_count": None,
+                    "max_pending_session_resource_slots": None,
+                },
+                id="nullify",
+            ),
+            pytest.param(
+                KeyPairResourcePolicyModifier(
+                    max_pending_session_count=TriState.update(15),
+                ),
+                {"max_pending_session_count": 15},
+                id="tristate_update",
+            ),
+        ],
+    )
     @pytest.mark.asyncio
-    async def test_update_success(
+    async def test_update_keypair_resource_policy(
         self,
-        keypair_resource_policy_repository: KeypairResourcePolicyRepository,
-        mock_db_engine: MagicMock,
-        sample_policy_row: KeyPairResourcePolicyRow,
-        sample_policy_data: KeyPairResourcePolicyData,
+        repository: KeypairResourcePolicyRepository,
+        sample_policy_name: str,
+        update_modifier: KeyPairResourcePolicyModifier,
+        expected_values: dict[str, Any],
     ) -> None:
-        """Test successful policy update"""
-        # Mock database session
-        mock_session = AsyncMock(spec=AsyncSession)
-        mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
+        """Test updating an existing keypair resource policy with various modifiers"""
+        result = await repository.update_keypair_resource_policy(
+            sample_policy_name, update_modifier
+        )
 
-        # Mock query result
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = sample_policy_row
-        mock_session.execute = AsyncMock(return_value=mock_result)
-        mock_session.flush = AsyncMock()
+        assert result.name == sample_policy_name
 
-        # Mock to_dataclass method
-        sample_policy_row.to_dataclass = Mock(return_value=sample_policy_data)  # type: ignore
-
-        update_fields = {
-            "max_concurrent_sessions": 10,
-            "idle_timeout": 7200,
-        }
-
-        result = await keypair_resource_policy_repository.update("test-policy", update_fields)
-
-        assert result == sample_policy_data
-        mock_session.execute.assert_called_once()
-        mock_session.flush.assert_called_once()
-
-        # Verify fields were updated
-        for key, value in update_fields.items():
-            assert hasattr(sample_policy_row, key)
-
-    @pytest.mark.asyncio
-    async def test_update_not_found(
-        self,
-        keypair_resource_policy_repository: KeypairResourcePolicyRepository,
-        mock_db_engine: MagicMock,
-    ) -> None:
-        """Test policy update when policy not found"""
-        # Mock database session
-        mock_session = AsyncMock(spec=AsyncSession)
-        mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
-
-        # Mock query result to return None
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_session.execute = AsyncMock(return_value=mock_result)
-
-        with pytest.raises(ObjectNotFound) as exc_info:
-            await keypair_resource_policy_repository.update(
-                "nonexistent-policy", {"max_concurrent_sessions": 30}
+        for field_name, expected_value in expected_values.items():
+            actual_value = getattr(result, field_name)
+            assert actual_value == expected_value, (
+                f"Field {field_name}: expected {expected_value}, got {actual_value}"
             )
 
-        assert "Keypair resource policy with name nonexistent-policy not found" in str(
-            exc_info.value
+    @pytest.mark.asyncio
+    async def test_update_nonexistent_policy_raises_error(
+        self,
+        repository: KeypairResourcePolicyRepository,
+    ) -> None:
+        """Test that updating a non-existent policy raises KeypairResourcePolicyNotFound"""
+        modifier = KeyPairResourcePolicyModifier(
+            max_concurrent_sessions=OptionalState.update(99),
+        )
+
+        with pytest.raises(KeypairResourcePolicyNotFound):
+            await repository.update_keypair_resource_policy("nonexistent-policy", modifier)
+
+    @pytest.mark.asyncio
+    async def test_remove_keypair_resource_policy(
+        self,
+        repository: KeypairResourcePolicyRepository,
+        sample_policy_name: str,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test removing a keypair resource policy"""
+        result = await repository.remove_keypair_resource_policy(sample_policy_name)
+
+        assert result.name == sample_policy_name
+
+        # Verify policy is deleted
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            query = sa.select(KeyPairResourcePolicyRow).where(
+                KeyPairResourcePolicyRow.name == sample_policy_name
+            )
+            deleted_policy = await db_sess.scalar(query)
+            assert deleted_policy is None
+
+    @pytest.mark.asyncio
+    async def test_remove_nonexistent_policy_raises_error(
+        self,
+        repository: KeypairResourcePolicyRepository,
+    ) -> None:
+        """Test that removing a non-existent policy raises KeypairResourcePolicyNotFound"""
+        with pytest.raises(KeypairResourcePolicyNotFound):
+            await repository.remove_keypair_resource_policy("nonexistent-policy")
+
+    @pytest.fixture
+    async def allowed_vfolder_modifier(
+        self,
+        sample_allowed_vfolder_hosts: dict[str, Any],
+    ) -> KeyPairResourcePolicyModifier:
+        """Fixture for allowed_vfolder_hosts modifier"""
+        return KeyPairResourcePolicyModifier(
+            allowed_vfolder_hosts=OptionalState.update(sample_allowed_vfolder_hosts),
         )
 
     @pytest.mark.asyncio
-    async def test_update_partial_fields(
+    async def test_update_allowed_vfolder_hosts(
         self,
-        keypair_resource_policy_repository: KeypairResourcePolicyRepository,
-        mock_db_engine: MagicMock,
-        sample_policy_row: KeyPairResourcePolicyRow,
-        sample_policy_data: KeyPairResourcePolicyData,
+        repository: KeypairResourcePolicyRepository,
+        sample_policy_name: str,
+        allowed_vfolder_modifier: KeyPairResourcePolicyModifier,
+        sample_allowed_vfolder_hosts: dict[str, Any],
     ) -> None:
-        """Test partial update of policy fields"""
-        # Mock database session
-        mock_session = AsyncMock(spec=AsyncSession)
-        mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
-
-        # Mock query result
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = sample_policy_row
-        mock_session.execute = AsyncMock(return_value=mock_result)
-        mock_session.flush = AsyncMock()
-
-        # Mock to_dataclass method
-        sample_policy_row.to_dataclass = Mock(return_value=sample_policy_data)  # type: ignore
-
-        # Update only one field
-        update_fields = {"max_concurrent_sessions": 25}
-
-        result = await keypair_resource_policy_repository.update("test-policy", update_fields)
-
-        assert result == sample_policy_data
-
-        # Verify only specified field was updated
-        setattr(sample_policy_row, "max_concurrent_sessions", 25)
-
-    @pytest.mark.asyncio
-    async def test_delete_success(
-        self,
-        keypair_resource_policy_repository: KeypairResourcePolicyRepository,
-        mock_db_engine: MagicMock,
-        sample_policy_row: KeyPairResourcePolicyRow,
-        sample_policy_data: KeyPairResourcePolicyData,
-    ) -> None:
-        """Test successful policy deletion"""
-        # Mock database session
-        mock_session = AsyncMock(spec=AsyncSession)
-        mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
-
-        # Mock query result
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = sample_policy_row
-        mock_session.execute = AsyncMock(return_value=mock_result)
-        mock_session.delete = AsyncMock()
-
-        # Mock to_dataclass method
-        sample_policy_row.to_dataclass = Mock(return_value=sample_policy_data)  # type: ignore
-
-        result = await keypair_resource_policy_repository.delete("test-policy")
-
-        assert result == sample_policy_data
-        mock_session.execute.assert_called_once()
-        mock_session.delete.assert_called_once_with(sample_policy_row)
-
-    @pytest.mark.asyncio
-    async def test_delete_not_found(
-        self,
-        keypair_resource_policy_repository: KeypairResourcePolicyRepository,
-        mock_db_engine: MagicMock,
-    ) -> None:
-        """Test policy deletion when policy not found"""
-        # Mock database session
-        mock_session = AsyncMock(spec=AsyncSession)
-        mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
-
-        # Mock query result to return None
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_session.execute = AsyncMock(return_value=mock_result)
-
-        with pytest.raises(ObjectNotFound) as exc_info:
-            await keypair_resource_policy_repository.delete("nonexistent-policy")
-
-        assert "Keypair resource policy with name nonexistent-policy not found" in str(
-            exc_info.value
+        """Test updating allowed_vfolder_hosts configuration"""
+        result = await repository.update_keypair_resource_policy(
+            sample_policy_name, allowed_vfolder_modifier
         )
-
-    @pytest.mark.asyncio
-    async def test_create_with_all_fields(
-        self,
-        keypair_resource_policy_repository: KeypairResourcePolicyRepository,
-        mock_db_engine: MagicMock,
-    ) -> None:
-        """Test creating policy with all possible fields"""
-        # Mock database session
-        mock_session = AsyncMock(spec=AsyncSession)
-        mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
-
-        name = "comprehensive-policy"
-        max_concurrent_sessions = 50
-        max_containers_per_session = 5
-        total_resource_slots = ResourceSlot({"cpu": "32", "mem": "64g", "cuda.device": "2"})
-        idle_timeout = 14400
-        max_session_lifetime = 86400
-        all_fields = {
-            "name": name,
-            "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
-            "total_resource_slots": total_resource_slots,
-            "max_session_lifetime": max_session_lifetime,
-            "max_concurrent_sessions": max_concurrent_sessions,
-            "max_pending_session_count": 50,
-            "max_pending_session_resource_slots": {"cpu": 8, "mem": "16g"},
-            "max_concurrent_sftp_sessions": 10,
-            "max_containers_per_session": max_containers_per_session,
-            "idle_timeout": idle_timeout,
-            "allowed_vfolder_hosts": {"local": None, "shared": None},
-        }
-
-        mock_policy_data = KeyPairResourcePolicyData(
-            name=name,
-            created_at=datetime.now(),
-            default_for_unspecified=DefaultForUnspecified.UNLIMITED,
-            total_resource_slots=total_resource_slots,
-            max_session_lifetime=max_session_lifetime,
-            max_concurrent_sessions=max_concurrent_sessions,
-            max_pending_session_count=50,
-            max_pending_session_resource_slots={"cpu": 8, "mem": "16g"},
-            max_concurrent_sftp_sessions=10,
-            max_containers_per_session=max_containers_per_session,
-            idle_timeout=idle_timeout,
-            allowed_vfolder_hosts={"local": None, "shared": None},
-        )
-        mock_policy_row = MagicMock()
-        mock_policy_row.to_dataclass.return_value = mock_policy_data
-
-        mock_session.add = Mock()
-        mock_session.flush = AsyncMock()
-
-        with patch(
-            "ai.backend.manager.repositories.keypair_resource_policy.repository.KeyPairResourcePolicyRow"
-        ) as mock_policy_class:
-            mock_policy_class.return_value = mock_policy_row
-            result = await keypair_resource_policy_repository.create(all_fields)
-
-            assert result.name == "comprehensive-policy"
-            assert result.max_concurrent_sessions == 50
-            assert result.max_containers_per_session == 5
-            assert result.total_resource_slots == total_resource_slots
-            assert result.idle_timeout == 14400
-            assert result.max_session_lifetime == 86400
-            assert result.max_pending_session_count == 50
-            assert result.max_concurrent_sftp_sessions == 10
-
-            # Verify the class was instantiated with correct fields
-            mock_policy_class.assert_called_once_with(**all_fields)
-
-    @pytest.mark.asyncio
-    async def test_repository_with_transaction_rollback(
-        self,
-        keypair_resource_policy_repository: KeypairResourcePolicyRepository,
-        mock_db_engine: MagicMock,
-    ) -> None:
-        """Test repository handles transaction rollback properly"""
-        # Mock database session
-        mock_session = AsyncMock(spec=AsyncSession)
-        mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
-
-        # Make flush raise an exception
-        mock_session.add = Mock()
-        mock_session.flush = AsyncMock(side_effect=Exception("Database error"))
-
-        # Provide all required fields
-        policy_fields = {
-            "name": "fail-policy",
-            "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
-            "total_resource_slots": {"cpu": 8, "mem": "16g"},
-            "max_session_lifetime": 86400,
-            "max_concurrent_sessions": 10,
-            "max_pending_session_count": 20,
-            "max_pending_session_resource_slots": {"cpu": 2, "mem": "4g"},
-            "max_concurrent_sftp_sessions": 3,
-            "max_containers_per_session": 2,
-            "idle_timeout": 3600,
-            "allowed_vfolder_hosts": {"local": None},
-        }
-
-        with pytest.raises(Exception) as exc_info:
-            await keypair_resource_policy_repository.create(policy_fields)
-
-        assert "Database error" in str(exc_info.value)
+        assert result.allowed_vfolder_hosts == sample_allowed_vfolder_hosts

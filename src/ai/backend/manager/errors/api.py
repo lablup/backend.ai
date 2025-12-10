@@ -85,3 +85,15 @@ class InvalidGraphQLParameters(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+class InvalidCursor(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-cursor"
+    error_title = "Invalid cursor format."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )

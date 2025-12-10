@@ -16,18 +16,20 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
-from ai.backend.manager.sokovan.scheduler.scheduler import (
-    Scheduler,
-    SchedulerArgs,
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
+    AgentSelectionError,
 )
-from ai.backend.manager.sokovan.scheduler.selectors.exceptions import AgentSelectionError
-from ai.backend.manager.sokovan.scheduler.selectors.selector import (
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentInfo,
     AgentSelection,
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentSelector,
     ResourceRequirements,
+)
+from ai.backend.manager.sokovan.scheduler.scheduler import (
+    Scheduler,
+    SchedulerArgs,
 )
 from ai.backend.manager.sokovan.scheduler.types import (
     KernelWorkload,
@@ -187,7 +189,7 @@ class TestSchedulerAllocation:
                     max_available = available_cpu
 
             if not best_agent:
-                from ai.backend.manager.sokovan.scheduler.selectors.exceptions import (
+                from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
                     NoCompatibleAgentError,
                 )
 
@@ -204,7 +206,9 @@ class TestSchedulerAllocation:
         ) -> list[AgentSelection]:
             # Extract resource requirements from criteria
             resource_requirements = criteria.get_resource_requirements()
-            from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentSelection
+            from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
+                AgentSelection,
+            )
 
             selections = []
             for resource_req in resource_requirements:
@@ -412,7 +416,9 @@ class TestSchedulerAllocation:
         )
 
         # Execute allocation - should raise NoCompatibleAgentError
-        from ai.backend.manager.sokovan.scheduler.selectors.exceptions import NoCompatibleAgentError
+        from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
+            NoCompatibleAgentError,
+        )
 
         with pytest.raises(NoCompatibleAgentError):
             await scheduler._allocate_workload(
@@ -471,7 +477,9 @@ class TestSchedulerAllocation:
             config: AgentSelectionConfig,
             designated_agent_ids: Optional[list[AgentId]],
         ) -> list[AgentSelection]:
-            from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentSelection
+            from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
+                AgentSelection,
+            )
 
             resource_requirements = criteria.get_resource_requirements()
             selections = []
@@ -553,7 +561,9 @@ class TestSchedulerAllocation:
         )
 
         # Execute allocation - should raise NoCompatibleAgentError
-        from ai.backend.manager.sokovan.scheduler.selectors.exceptions import NoCompatibleAgentError
+        from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
+            NoCompatibleAgentError,
+        )
 
         with pytest.raises(NoCompatibleAgentError):
             await scheduler._allocate_workload(

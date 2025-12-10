@@ -26,10 +26,10 @@ from ai.backend.common.health_checker.probe import HealthProbe
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.logging import BraceStyleAdapter
 
-from .client.manager import ManagerHTTPClient
+from .client.manager import ManagerHTTPClientPool
 from .config.unified import StorageProxyUnifiedConfig
 from .context_types import ArtifactVerifierContext
-from .exception import InvalidVolumeError
+from .errors import InvalidVolumeError
 from .plugin import (
     StorageArtifactVerifierPluginContext,
 )
@@ -101,7 +101,7 @@ class RootContext:
     metric_registry: CommonMetricRegistry
     background_task_manager: BackgroundTaskManager
     cors_options: Mapping[str, aiohttp_cors.ResourceOptions]
-    manager_http_clients: MutableMapping[str, ManagerHTTPClient]
+    manager_client_pool: ManagerHTTPClientPool
     valkey_artifact_client: ValkeyArtifactDownloadTrackingClient
     health_probe: HealthProbe
 
@@ -153,5 +153,4 @@ class RootContext:
 
     async def shutdown_manager_http_clients(self) -> None:
         """Close all manager HTTP client sessions."""
-        for client in self.manager_http_clients.values():
-            await client.cleanup()
+        await self.manager_client_pool.cleanup()

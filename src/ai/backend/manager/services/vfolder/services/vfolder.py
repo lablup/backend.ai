@@ -159,7 +159,7 @@ class VFolderService:
                     group_id_or_name, domain_name
                 )
                 if not group_info:
-                    raise ProjectNotFound(group_id_or_name)
+                    raise ProjectNotFound(f"Project with {group_id_or_name} not found.")
                 group_uuid, max_vfolder_count, max_quota_scope_size, group_type = group_info
                 container_uid = None
             case None:
@@ -170,7 +170,7 @@ class VFolderService:
                 group_uuid = None
                 group_type = None
             case _:
-                raise ProjectNotFound(group_id_or_name)
+                raise ProjectNotFound(f"Project with {group_id_or_name} not found.")
 
         vfolder_permission_mode = (
             VFOLDER_GROUP_PERMISSION_MODE if container_uid is not None else None
@@ -178,7 +178,7 @@ class VFolderService:
 
         # Check if group exists when it's given a non-empty value.
         if group_id_or_name and group_uuid is None:
-            raise ProjectNotFound(group_id_or_name)
+            raise ProjectNotFound(f"Project with {group_id_or_name} not found.")
 
         # Determine the ownership type and the quota scope ID.
         if group_uuid is not None:
@@ -223,7 +223,8 @@ class VFolderService:
             if ownership_type == "user":
                 current_count = await self._vfolder_repository.count_vfolders_by_user(user_uuid)
             else:
-                assert group_uuid is not None
+                if group_uuid is None:
+                    raise VFolderInvalidParameter("Group UUID is required for group-owned vfolders")
                 current_count = await self._vfolder_repository.count_vfolders_by_group(group_uuid)
 
             if current_count >= max_vfolder_count:

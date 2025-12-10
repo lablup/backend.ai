@@ -48,6 +48,7 @@ from ..agent import (
 from ..config.unified import AgentUnifiedConfig
 from ..exception import UnsupportedResource
 from ..kernel import AbstractKernel
+from ..kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ..resources import (
     AbstractComputePlugin,
     ComputerContext,
@@ -99,8 +100,10 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
     ) -> Tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
         slots = ResourceSlot.from_json(self.kernel_config["resource_slots"])
         # Ensure that we have intrinsic slots.
-        assert SlotName("cpu") in slots
-        assert SlotName("mem") in slots
+        if SlotName("cpu") not in slots:
+            raise UnsupportedResource("cpu slot is required")
+        if SlotName("mem") not in slots:
+            raise UnsupportedResource("mem slot is required")
         # accept unknown slot type with zero values
         # but reject if they have non-zero values.
         for st, sv in slots.items():
@@ -267,6 +270,18 @@ class DummyAgent(
         flush_timeout: float,
     ):
         return {"status": "not-implemented"}
+
+    @override
+    async def _load_kernel_registry_from_recovery(self) -> dict[KernelId, AbstractKernel]:
+        return {}
+
+    @override
+    async def _write_kernel_registry_to_recovery(
+        self,
+        kernel_registry: Mapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+    ) -> None:
+        pass
 
     @override
     def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
