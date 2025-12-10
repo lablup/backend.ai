@@ -3562,12 +3562,8 @@ class AgentRegistry:
         if _path := MODEL_SERVICE_RUNTIME_PROFILES[endpoint.runtime_variant].health_check_endpoint:
             _info = ModelHealthCheck(path=_path)
 
-        should_read_model_definition = endpoint.runtime_variant == RuntimeVariant.CUSTOM or (
-            self.config_provider.config.deployment.enable_model_definition_override
-            and endpoint.model_definition_path
-        )
-
-        if should_read_model_definition:
+        if endpoint.runtime_variant == RuntimeVariant.CUSTOM:
+            # CUSTOM: full validation required
             model_definition_path = await ModelServiceHelper.validate_model_definition_file_exists(
                 self.storage_manager,
                 model.host,
@@ -3583,18 +3579,38 @@ class AgentRegistry:
 
             for model_info in model_definition["models"]:
                 if health_check_info := model_info.get("service", {}).get("health_check"):
-                    if endpoint.runtime_variant == RuntimeVariant.CUSTOM:
-                        # CUSTOM: replace entirely
-                        _info = ModelHealthCheck(
-                            path=health_check_info["path"],
-                            interval=health_check_info["interval"],
-                            max_retries=health_check_info["max_retries"],
-                            max_wait_time=health_check_info["max_wait_time"],
-                            expected_status_code=health_check_info["expected_status_code"],
-                            initial_delay=health_check_info.get("initial_delay"),
-                        )
-                    else:
-                        # non-CUSTOM with override: only override non-None values
+                    _info = ModelHealthCheck(
+                        path=health_check_info["path"],
+                        interval=health_check_info["interval"],
+                        max_retries=health_check_info["max_retries"],
+                        max_wait_time=health_check_info["max_wait_time"],
+                        expected_status_code=health_check_info["expected_status_code"],
+                        initial_delay=health_check_info.get("initial_delay"),
+                    )
+                    break
+        elif (
+            self.config_provider.config.deployment.enable_model_definition_override
+            and endpoint.model_definition_path
+        ):
+            # non-CUSTOM with override: read raw definition and override non-None values only
+            try:
+                model_definition_path = (
+                    await ModelServiceHelper.validate_model_definition_file_exists(
+                        self.storage_manager,
+                        model.host,
+                        model.vfid,
+                        endpoint.model_definition_path,
+                    )
+                )
+                raw_model_definition = await ModelServiceHelper._read_model_definition(
+                    self.storage_manager,
+                    model.host,
+                    model.vfid,
+                    model_definition_path,
+                )
+
+                for model_info in raw_model_definition.get("models", []):
+                    if health_check_info := model_info.get("service", {}).get("health_check"):
                         if _info is None:
                             _info = ModelHealthCheck(path=health_check_info["path"])
                         override_kwargs: dict[str, float | int | str] = {}
@@ -3614,7 +3630,14 @@ class AgentRegistry:
                             override_kwargs["initial_delay"] = health_check_info["initial_delay"]
                         if override_kwargs:
                             _info = _info.model_copy(update=override_kwargs)
-                    break
+                        break
+            except Exception:
+                log.debug(
+                    "Failed to read health check override from model definition for endpoint {}, "
+                    "using default health check settings",
+                    endpoint.id,
+                    exc_info=True,
+                )
         return _info
 
     async def create_appproxy_endpoint(
