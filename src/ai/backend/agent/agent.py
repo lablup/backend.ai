@@ -6,10 +6,8 @@ import logging
 import os
 import pickle
 import re
-import shutil
 import signal
 import sys
-import time
 import traceback
 import weakref
 import zlib
@@ -1083,7 +1081,6 @@ class AbstractAgent(
         )
 
         loop = current_loop()
-        self.last_registry_written_time = time.monotonic()
         self.container_lifecycle_handler = loop.create_task(self.process_lifecycle_events())
 
         # Notify the gateway.
@@ -2316,23 +2313,7 @@ class AbstractAgent(
         Scan currently running kernels and recreate the kernel objects in
         ``self.kernel_registry`` if any missing.
         """
-        ipc_base_path = self.local_config.agent.ipc_base_path
-        var_base_path = self.local_config.agent.var_base_path
-        ipc_last_registry_file = self._resolve_conflicting_registry_file(ipc_base_path)
-        last_registry_file = self._resolve_conflicting_registry_file(var_base_path)
-        if (ipc_base_path / ipc_last_registry_file).is_file():
-            shutil.move(ipc_base_path / ipc_last_registry_file, var_base_path / last_registry_file)
-        try:
-            with open(var_base_path / last_registry_file, "rb") as f:
-                kernel_registry: MutableMapping[KernelId, AbstractKernel] = pickle.load(f)
-                for kernel_id, kernel in kernel_registry.items():
-                    self.kernel_registry[kernel_id] = kernel
-        except EOFError:
-            log.warning(
-                "Failed to load the last kernel registry: {}", (var_base_path / last_registry_file)
-            )
-        except FileNotFoundError:
-            pass
+        self.kernel_registry = await self._load_kernel_registry_from_recovery()
         for kernel_obj in self.kernel_registry.values():
             kernel_obj.agent_config = self.local_config.model_dump(by_alias=True)
             try:
@@ -3790,58 +3771,10 @@ class AbstractAgent(
         return await self.kernel_registry[kernel_id].ping()
 
     async def save_last_registry(self, force=False) -> None:
-        now = time.monotonic()
-        if (not force) and (now <= self.last_registry_written_time + 60):
-            return  # don't save too frequently
-        var_base_path = self.local_config.agent.var_base_path
-        last_registry_file = self._last_registry_file
-        try:
-            with open(var_base_path / last_registry_file, "wb") as f:
-                pickle.dump(dict(self.kernel_registry), f)
-            self.last_registry_written_time = now
-            log.debug("saved {}", last_registry_file)
-        except Exception as e:
-            log.exception("unable to save {}", last_registry_file, exc_info=e)
-            try:
-                os.remove(var_base_path / last_registry_file)
-            except FileNotFoundError:
-                pass
-
-    @property
-    def _last_registry_file(self) -> str:
-        match self.agent_class:
-            case AgentClass.PRIMARY:
-                return self._primary_last_registry_file
-            case AgentClass.AUXILIARY:
-                return self._auxiliary_last_registry_file
-
-    @property
-    def _primary_last_registry_file(self) -> str:
-        return f"last_registry.{self.local_instance_id}.dat"
-
-    @property
-    def _auxiliary_last_registry_file(self) -> str:
-        return f"last_registry.{self.id}.dat"
-
-    def _resolve_conflicting_registry_file(self, base_dir: Path) -> str:
-        if self.agent_class != AgentClass.PRIMARY:
-            # Non-primary agents must never use local_instance_id based file name.
-            return self._last_registry_file
-
-        primary_agent_file = base_dir / self._primary_last_registry_file
-        auxiliary_agent_file = base_dir / self._auxiliary_last_registry_file
-
-        match primary_agent_file.is_file(), auxiliary_agent_file.is_file():
-            case True, True if (
-                primary_agent_file.stat().st_mtime < auxiliary_agent_file.stat().st_mtime
-            ):
-                # Case 1: If both files exist for primary agent, and ID-based file is more recent.
-                return self._auxiliary_last_registry_file
-            case False, True:
-                # Case 2: Only ID-based file exists.
-                return self._auxiliary_last_registry_file
-            case _:
-                return self._primary_last_registry_file
+        await self._write_kernel_registry_to_recovery(
+            self.kernel_registry,
+            KernelRegistrySaveMetadata(force),
+        )
 
 
 async def handle_volume_mount(

@@ -31,15 +31,12 @@ class KubernetesKernelRegistryRecovery(BaseKernelRegistryRecovery):
     @classmethod
     def create(cls, args: KubernetesKernelRegistryRecoveryArgs) -> Self:
         registry_file_name = f"last_registry.{args.agent_id}.dat"
-        fallback_registry_file_name = f"last_registry.{args.local_instance_id}.dat"
         legacy_registry_file_path = args.ipc_base_path / registry_file_name
-        fallback_registry_file_path = args.var_base_path / fallback_registry_file_name
         last_registry_file_path = args.var_base_path / registry_file_name
 
         return cls(
             loader=PickleBasedKernelRegistryLoader(
                 last_registry_file_path,
-                fallback_registry_file_path,
                 legacy_registry_file_path,
             ),
             writers=[PickleBasedKernelRegistryWriter(last_registry_file_path)],

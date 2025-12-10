@@ -111,6 +111,11 @@ from ..config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchTy
 from ..exception import ContainerCreationError, InvalidArgumentError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel, KernelRegistry
+from ..kernel_registry.adapter import KernelRecoveryDataAdapter, KernelRecoveryDataAdapterTarget
+from ..kernel_registry.container.creator import (
+    ContainerBasedKernelRegistryCreatorArgs,
+    ContainerBasedLoaderWriterCreator,
+)
 from ..kernel_registry.pickle.creator import (
     PickleBasedKernelRegistryCreatorArgs,
     PickleBasedLoaderWriterCreator,
@@ -1399,20 +1404,33 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             agent_class=agent_class,
         )
         self.checked_invalid_images = set()
-        pickle_loader_writer_creator = PickleBasedLoaderWriterCreator(
+        pickle_loader_writer_creator = PickleBasedLoaderWriterCreator.create(
             PickleBasedKernelRegistryCreatorArgs(
                 scratch_root=local_config.container.scratch_root,
                 ipc_base_path=local_config.agent.ipc_base_path,
                 var_base_path=local_config.agent.var_base_path,
+                agent_class=self.agent_class,
                 agent_id=self.id,
                 local_instance_id=self.local_instance_id,
             ),
         )
         pickle_loader = pickle_loader_writer_creator.create_loader()
         pickle_writer = pickle_loader_writer_creator.create_writer()
+        container_loader_writer_creator = ContainerBasedLoaderWriterCreator(
+            ContainerBasedKernelRegistryCreatorArgs(
+                scratch_root=local_config.container.scratch_root,
+                agent=self,
+            )
+        )
+        container_loader = container_loader_writer_creator.create_loader()
+        container_writer = container_loader_writer_creator.create_writer()
         self._kernel_recovery = DockerKernelRegistryRecovery(
-            loader=pickle_loader,
-            writers=[pickle_writer],
+            loader=container_loader,
+            writers=[pickle_writer, container_writer],
+        )
+        self._kernel_recovery_adapter = KernelRecoveryDataAdapter(
+            pickle_loader,
+            [KernelRecoveryDataAdapterTarget(container_loader, container_writer)],
         )
 
     async def __ainit__(self) -> None:
@@ -1450,6 +1468,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 docker_info["CgroupVersion"],
             )
             self.docker_info = docker_info
+        await self._kernel_recovery_adapter.adapt_recovery_data()
         await super().__ainit__()
         try:
             async with Docker() as docker:

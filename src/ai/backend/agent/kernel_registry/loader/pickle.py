@@ -24,26 +24,15 @@ class PickleBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
     def __init__(
         self,
         last_registry_file_path: Path,
-        fallback_registry_file_path: Path,
         legacy_registry_file_path: Path,
     ) -> None:
         self._last_registry_file_path = last_registry_file_path
-        self._fallback_registry_file_path = fallback_registry_file_path
         self._legacy_registry_file_path = legacy_registry_file_path
 
     @override
     async def load_kernel_registry(self) -> MutableMapping[KernelId, AbstractKernel]:
         legacy_registry_file = self._legacy_registry_file_path
-        fallback_registry_file = self._fallback_registry_file_path
         final_file_path = self._last_registry_file_path
-        if not final_file_path.is_file():
-            log.warning(
-                "Registry file with name {} not found. "
-                "Falling back to path with local instance id: {}",
-                final_file_path,
-                fallback_registry_file,
-            )
-            final_file_path = fallback_registry_file
         try:
             if os.path.isfile(legacy_registry_file):
                 shutil.move(legacy_registry_file, final_file_path)
