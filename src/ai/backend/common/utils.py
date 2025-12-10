@@ -500,10 +500,35 @@ def b64encode(s: str) -> str:
 T = TypeVar("T", bound=BaseModel)
 
 
+def _deep_merge_lists(base: list[Any], override: list[Any]) -> list[Any]:
+    """
+    Merge two lists by index. If both elements at the same index are Mappings,
+    deep merge them. If both are lists, recursively merge them.
+    Otherwise, override element takes precedence.
+    """
+    result: list[Any] = []
+    max_len = max(len(base), len(override))
+    for i in range(max_len):
+        if i >= len(base):
+            result.append(override[i])
+        elif i >= len(override):
+            result.append(base[i])
+        elif isinstance(base[i], Mapping) and isinstance(override[i], Mapping):
+            result.append(deep_merge(base[i], override[i]))
+        elif isinstance(base[i], list) and isinstance(override[i], list):
+            result.append(_deep_merge_lists(base[i], override[i]))
+        elif override[i] is not None:
+            result.append(override[i])
+        else:
+            result.append(base[i])
+    return result
+
+
 def deep_merge(*args: Mapping[str, Any]) -> Mapping[str, Any]:
     """
     Recursively merge any number of mappings.
     Later mappings override earlier ones on key conflicts.
+    For lists, merge elements at the same index if both are Mappings.
 
     Example
     -------
@@ -511,6 +536,10 @@ def deep_merge(*args: Mapping[str, Any]) -> Mapping[str, Any]:
     ...            {"b": {"y": 2}, "c": 3},
     ...            {"b": {"x": 10}})
     {'a': 1, 'b': {'x': 10, 'y': 2}, 'c': 3}
+
+    >>> deep_merge({"items": [{"name": "a", "value": 1}]},
+    ...            {"items": [{"name": "a", "extra": 2}]})
+    {'items': [{'name': 'a', 'value': 1, 'extra': 2}]}
     """
     merged: dict[str, Any] = {}
     for m in args:
@@ -518,6 +547,8 @@ def deep_merge(*args: Mapping[str, Any]) -> Mapping[str, Any]:
             va = merged.get(k)
             if isinstance(va, Mapping) and isinstance(vb, Mapping):
                 merged[k] = deep_merge(va, vb)
+            elif isinstance(va, list) and isinstance(vb, list):
+                merged[k] = _deep_merge_lists(va, vb)
             elif vb is not None:
                 merged[k] = vb
             else:
