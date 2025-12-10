@@ -22,40 +22,7 @@ from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
     ModelDefinitionGeneratorRegistry,
     RegistryArgs,
-    _deep_merge_dicts,
 )
-
-
-class TestDeepMergeDicts:
-    @pytest.mark.parametrize(
-        ("base", "override", "expected"),
-        [
-            ({"a": 1, "b": 2}, {"b": 3, "c": 4}, {"a": 1, "b": 3, "c": 4}),
-            ({"items": [1, 2, 3]}, {"items": [4, 5]}, {"items": [4, 5]}),
-            ({"key": {"nested": "value"}}, {"key": "simple"}, {"key": "simple"}),
-            ({"a": 1}, {}, {"a": 1}),
-            ({}, {"a": 1}, {"a": 1}),
-            ({"a": 1}, {"a": None}, {"a": None}),
-            (
-                {"l1": {"a": 1, "l2": {"x": 10}}},
-                {"l1": {"b": 2, "l2": {"y": 20}}},
-                {"l1": {"a": 1, "b": 2, "l2": {"x": 10, "y": 20}}},
-            ),
-        ],
-        ids=[
-            "simple_merge",
-            "list_replacement",
-            "non_dict_override",
-            "empty_override",
-            "empty_base",
-            "none_value",
-            "nested_merge",
-        ],
-    )
-    def test_merge(
-        self, base: dict[str, Any], override: dict[str, Any], expected: dict[str, Any]
-    ) -> None:
-        assert _deep_merge_dicts(base, override) == expected
 
 
 @dataclass(frozen=True)

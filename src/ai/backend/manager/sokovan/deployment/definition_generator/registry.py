@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.exception import RuntimeVariantNotSupportedError
 from ai.backend.common.types import RuntimeVariant
+from ai.backend.common.utils import deep_merge
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.deployment import DefinitionFileNotFound
 from ai.backend.manager.repositories.deployment import DeploymentRepository
@@ -43,20 +44,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class RegistryArgs:
     deployment_repository: DeploymentRepository
     enable_model_definition_override: bool = False
-
-
-def _deep_merge_dicts(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-    """
-    Recursively deep merge override dict into base dict.
-    Override values take precedence. Lists are replaced, not merged.
-    """
-    result = base.copy()
-    for key, override_value in override.items():
-        if key in result and isinstance(result[key], dict) and isinstance(override_value, dict):
-            result[key] = _deep_merge_dicts(result[key], override_value)
-        else:
-            result[key] = override_value
-    return result
 
 
 class ModelDefinitionGeneratorRegistry:
@@ -134,7 +121,7 @@ class ModelDefinitionGeneratorRegistry:
                 model_definition_path=model_revision.mounts.model_definition_path,
             )
             base_dict = base_definition.model_dump(exclude_none=True, by_alias=True)
-            merged_dict = _deep_merge_dicts(base_dict, override_dict)
+            merged_dict = deep_merge(base_dict, override_dict)
             merged_definition = ModelDefinition.model_validate(merged_dict)
             log.debug(
                 "Model definition override applied successfully for vfolder {}",
