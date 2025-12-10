@@ -3561,7 +3561,9 @@ class AgentRegistry:
 
         if _path := MODEL_SERVICE_RUNTIME_PROFILES[endpoint.runtime_variant].health_check_endpoint:
             _info = ModelHealthCheck(path=_path)
-        elif endpoint.runtime_variant == RuntimeVariant.CUSTOM:
+
+        if endpoint.runtime_variant == RuntimeVariant.CUSTOM:
+            # CUSTOM: full validation required
             model_definition_path = await ModelServiceHelper.validate_model_definition_file_exists(
                 self.storage_manager,
                 model.host,
@@ -3586,6 +3588,56 @@ class AgentRegistry:
                         initial_delay=health_check_info.get("initial_delay"),
                     )
                     break
+        elif (
+            self.config_provider.config.deployment.enable_model_definition_override
+            and endpoint.model_definition_path
+        ):
+            # non-CUSTOM with override: read raw definition and override non-None values only
+            try:
+                model_definition_path = (
+                    await ModelServiceHelper.validate_model_definition_file_exists(
+                        self.storage_manager,
+                        model.host,
+                        model.vfid,
+                        endpoint.model_definition_path,
+                    )
+                )
+                raw_model_definition = await ModelServiceHelper._read_model_definition(
+                    self.storage_manager,
+                    model.host,
+                    model.vfid,
+                    model_definition_path,
+                )
+
+                for model_info in raw_model_definition.get("models", []):
+                    if health_check_info := model_info.get("service", {}).get("health_check"):
+                        if _info is None:
+                            _info = ModelHealthCheck(path=health_check_info["path"])
+                        override_kwargs: dict[str, float | int | str] = {}
+                        if health_check_info.get("path") is not None:
+                            override_kwargs["path"] = health_check_info["path"]
+                        if health_check_info.get("interval") is not None:
+                            override_kwargs["interval"] = health_check_info["interval"]
+                        if health_check_info.get("max_retries") is not None:
+                            override_kwargs["max_retries"] = health_check_info["max_retries"]
+                        if health_check_info.get("max_wait_time") is not None:
+                            override_kwargs["max_wait_time"] = health_check_info["max_wait_time"]
+                        if health_check_info.get("expected_status_code") is not None:
+                            override_kwargs["expected_status_code"] = health_check_info[
+                                "expected_status_code"
+                            ]
+                        if health_check_info.get("initial_delay") is not None:
+                            override_kwargs["initial_delay"] = health_check_info["initial_delay"]
+                        if override_kwargs:
+                            _info = _info.model_copy(update=override_kwargs)
+                        break
+            except Exception:
+                log.debug(
+                    "Failed to read health check override from model definition for endpoint {}, "
+                    "using default health check settings",
+                    endpoint.id,
+                    exc_info=True,
+                )
         return _info
 
     async def create_appproxy_endpoint(
