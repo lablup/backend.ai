@@ -6,12 +6,12 @@
 // {
 //   "version": 4,
 //   "valid_for_interpreter_constraints": [
-//     "CPython==3.14.1"
+//     "CPython==3.14.2"
 //   ],
 //   "generated_with_requirements": [
 //     "mypy==1.18.2",
 //     "pydantic~=2.12.0",
-//     "strawberry-graphql~=0.278.0"
+//     "strawberry-graphql~=0.287.2"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -392,13 +392,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "8b91566e34bbfaa4a5e576369333e15982eaceac17c44e262200319d7e87a1cf",
-              "url": "https://files.pythonhosted.org/packages/50/fd/a04e880ea1f25bd3e6a3a94dd2585880d49852e966fba33e9ea982d8932c/strawberry_graphql-0.278.1-py3-none-any.whl"
+              "hash": "ca1e1593d34bbbeac85d5c699bea97e08324c2ef25bc5c98d3bedae60c19705e",
+              "url": "https://files.pythonhosted.org/packages/ff/2a/9d0e2a2c6fcf3d108a9be4f3b2f3f6bcf5cdf9b576b344127e0a50d953c5/strawberry_graphql-0.287.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "ac32e96eb2ea6a67738eefca8226d712e11706b80491e293f3e743455e9c301b",
-              "url": "https://files.pythonhosted.org/packages/cd/be/800e268d2a92241414ed89f2f2cc68ebcb01b6f4d0bcb2b1d09c1a6f2c75/strawberry_graphql-0.278.1.tar.gz"
+              "hash": "7d61f03fc44317ba427d78bce6ba0ec8092ffa90ebd41392011641d3908ccb33",
+              "url": "https://files.pythonhosted.org/packages/95/00/833f60b0398c1c379c7ab06688d55815039b6a02f90c979efe4155ffb5e5/strawberry_graphql-0.287.2.tar.gz"
             }
           ],
           "project_name": "strawberry-graphql",
@@ -422,10 +422,11 @@
             "packaging>=23",
             "pydantic>1.6.1; extra == \"pydantic\"",
             "pygments<3.0,>=2.3; extra == \"cli\"",
-            "pygments<3.0,>=2.3; extra == \"debug-server\"",
+            "pygments>=2.3; extra == \"debug-server\"",
             "pyinstrument>=4.0.0; extra == \"pyinstrument\"",
-            "python-dateutil<3.0,>=2.7",
+            "python-dateutil>=2.7",
             "python-multipart>=0.0.7; extra == \"asgi\"",
+            "python-multipart>=0.0.7; extra == \"cli\"",
             "python-multipart>=0.0.7; extra == \"debug-server\"",
             "python-multipart>=0.0.7; extra == \"fastapi\"",
             "quart>=0.19.3; extra == \"quart\"",
@@ -434,15 +435,18 @@
             "rich>=12.0.0; extra == \"debug-server\"",
             "sanic>=20.12.2; extra == \"sanic\"",
             "starlette>=0.18.0; extra == \"asgi\"",
+            "starlette>=0.18.0; extra == \"cli\"",
             "starlette>=0.18.0; extra == \"debug-server\"",
-            "typer>=0.7.0; extra == \"cli\"",
-            "typer>=0.7.0; extra == \"debug-server\"",
+            "typer>=0.12.4; extra == \"cli\"",
+            "typer>=0.12.4; extra == \"debug-server\"",
             "typing-extensions>=4.5.0",
+            "uvicorn>=0.11.6; extra == \"cli\"",
             "uvicorn>=0.11.6; extra == \"debug-server\"",
+            "websockets<16,>=15.0.1; extra == \"cli\"",
             "websockets<16,>=15.0.1; extra == \"debug-server\""
           ],
-          "requires_python": "<4.0,>=3.9",
-          "version": "0.278.1"
+          "requires_python": "<4.0,>=3.10",
+          "version": "0.287.2"
         },
         {
           "artifacts": [
@@ -497,10 +501,10 @@
   "requirements": [
     "mypy==1.18.2",
     "pydantic~=2.12.0",
-    "strawberry-graphql~=0.278.0"
+    "strawberry-graphql~=0.287.2"
   ],
   "requires_python": [
-    "CPython==3.14.1"
+    "CPython==3.14.2"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

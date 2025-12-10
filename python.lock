@@ -6,7 +6,7 @@
 // {
 //   "version": 4,
 //   "valid_for_interpreter_constraints": [
-//     "CPython==3.14.1"
+//     "CPython==3.14.2"
 //   ],
 //   "generated_with_requirements": [
 //     "Jinja2~=3.1.6",
@@ -68,7 +68,7 @@
 //     "msgpack~=1.1.2",
 //     "multidict~=6.7.0",
 //     "namedlist~=1.8",
-//     "networkx~=3.3.0",
+//     "networkx~=3.6.1",
 //     "opentelemetry-api~=1.39.0",
 //     "opentelemetry-exporter-otlp-proto-grpc~=1.39.0",
 //     "opentelemetry-instrumentation-aiohttp-client~=0.60b0",
@@ -97,7 +97,8 @@
 //     "ruamel.yaml~=0.18.10",
 //     "setproctitle~=1.3.7",
 //     "setuptools~=80.0.0",
-//     "strawberry-graphql~=0.278.0",
+//     "sniffio~=1.3.1",
+//     "strawberry-graphql~=0.287.2",
 //     "tabulate~=0.8.9",
 //     "temporenc~=0.1.0",
 //     "tenacity~=9.0",
@@ -4286,41 +4287,57 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "28575580c6ebdaf4505b22c6256a2b9de86b316dc63ba9e93abde3d78dfdbcf2",
-              "url": "https://files.pythonhosted.org/packages/38/e9/5f72929373e1a0e8d142a130f3f97e6ff920070f87f91c4e13e40e0fba5a/networkx-3.3-py3-none-any.whl"
+              "hash": "d47fbf302e7d9cbbb9e2555a0d267983d2aa476bac30e90dfbe5669bd57f3762",
+              "url": "https://files.pythonhosted.org/packages/9e/c9/b2622292ea83fbb4ec318f5b9ab867d0a28ab43c5717bb85b0a5f6b3b0a4/networkx-3.6.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "0c127d8b2f4865f59ae9cb8aafcd60b5c70f3241ebd66f7defad7c4ab90126c9",
-              "url": "https://files.pythonhosted.org/packages/04/e6/b164f94c869d6b2c605b5128b7b0cfe912795a87fc90e78533920001f3ec/networkx-3.3.tar.gz"
+              "hash": "26b7c357accc0c8cde558ad486283728b65b6a95d85ee1cd66bafab4c8168509",
+              "url": "https://files.pythonhosted.org/packages/6a/51/63fe664f3908c97be9d2e4f1158eb633317598cfa6e1fc14af5383f17512/networkx-3.6.1.tar.gz"
             }
           ],
           "project_name": "networkx",
           "requires_dists": [
-            "changelist==0.5; extra == \"developer\"",
+            "asv; extra == \"benchmarking\"",
+            "build>=0.10; extra == \"release\"",
+            "cairocffi>=1.7; extra == \"example\"",
+            "changelist==0.5; extra == \"release\"",
+            "contextily>=1.6; extra == \"example\"",
+            "igraph>=0.11; extra == \"example\"",
+            "intersphinx-registry; extra == \"doc\"",
+            "iplotx>=0.9.0; extra == \"example\"",
             "lxml>=4.6; extra == \"extra\"",
-            "matplotlib>=3.6; extra == \"default\"",
-            "mypy>=1.1; extra == \"developer\"",
-            "myst-nb>=1.0; extra == \"doc\"",
-            "numpy>=1.23; extra == \"default\"",
-            "numpydoc>=1.7; extra == \"doc\"",
-            "pandas>=1.4; extra == \"default\"",
-            "pillow>=9.4; extra == \"doc\"",
-            "pre-commit>=3.2; extra == \"developer\"",
-            "pydata-sphinx-theme>=0.14; extra == \"doc\"",
-            "pydot>=2.0; extra == \"extra\"",
-            "pygraphviz>=1.12; extra == \"extra\"",
+            "matplotlib>=3.8; extra == \"default\"",
+            "momepy>=0.7.2; extra == \"example\"",
+            "mypy>=1.15; extra == \"developer\"",
+            "myst-nb>=1.1; extra == \"doc\"",
+            "numpy>=1.25; extra == \"default\"",
+            "numpydoc>=1.8.0; extra == \"doc\"",
+            "osmnx>=2.0.0; extra == \"example\"",
+            "pandas>=2.0; extra == \"default\"",
+            "pillow>=10; extra == \"doc\"",
+            "pre-commit>=4.1; extra == \"developer\"",
+            "pydata-sphinx-theme>=0.16; extra == \"doc\"",
+            "pydot>=3.0.1; extra == \"extra\"",
+            "pygraphviz>=1.14; extra == \"extra\"",
             "pytest-cov>=4.0; extra == \"test\"",
+            "pytest-mpl; extra == \"test-extras\"",
+            "pytest-randomly; extra == \"test-extras\"",
+            "pytest-xdist>=3.0; extra == \"test\"",
             "pytest>=7.2; extra == \"test\"",
-            "rtoml; extra == \"developer\"",
-            "scipy!=1.11.0,!=1.11.1,>=1.9; extra == \"default\"",
-            "sphinx-gallery>=0.14; extra == \"doc\"",
-            "sphinx>=7; extra == \"doc\"",
+            "scikit-learn>=1.5; extra == \"example\"",
+            "scipy>=1.11.2; extra == \"default\"",
+            "seaborn>=0.13; extra == \"example\"",
+            "sphinx-gallery>=0.18; extra == \"doc\"",
+            "sphinx>=8.0; extra == \"doc\"",
             "sympy>=1.10; extra == \"extra\"",
-            "texext>=0.6.7; extra == \"doc\""
+            "texext>=0.6.7; extra == \"doc\"",
+            "twine>=4.0; extra == \"release\"",
+            "virtualenv; extra == \"benchmarking\"",
+            "wheel>=0.40; extra == \"release\""
           ],
-          "requires_python": ">=3.10",
-          "version": "3.3"
+          "requires_python": "!=3.14.1,>=3.11",
+          "version": "3.6.1"
         },
         {
           "artifacts": [
@@ -6238,6 +6255,24 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2",
+              "url": "https://files.pythonhosted.org/packages/e9/44/75a9c9421471a6c4805dbf2356f7c181a29c1879239abab1ea2cc8f38b40/sniffio-1.3.1-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc",
+              "url": "https://files.pythonhosted.org/packages/a2/87/a6771e1546d97e7e041b6ae58d80074f81b7d5121207425c964ddf5cfdbd/sniffio-1.3.1.tar.gz"
+            }
+          ],
+          "project_name": "sniffio",
+          "requires_dists": [],
+          "requires_python": ">=3.7",
+          "version": "1.3.1"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "4470fbed088c35dc20b78a39aaf4ae54fe81790c783b3264872a0224f437c31a",
               "url": "https://files.pythonhosted.org/packages/ce/af/20290b55d469e873cba9d41c0206ab5461ff49d759989b3fe65010f9d265/sqlalchemy-1.4.54.tar.gz"
             }
@@ -6289,13 +6324,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "8b91566e34bbfaa4a5e576369333e15982eaceac17c44e262200319d7e87a1cf",
-              "url": "https://files.pythonhosted.org/packages/50/fd/a04e880ea1f25bd3e6a3a94dd2585880d49852e966fba33e9ea982d8932c/strawberry_graphql-0.278.1-py3-none-any.whl"
+              "hash": "ca1e1593d34bbbeac85d5c699bea97e08324c2ef25bc5c98d3bedae60c19705e",
+              "url": "https://files.pythonhosted.org/packages/ff/2a/9d0e2a2c6fcf3d108a9be4f3b2f3f6bcf5cdf9b576b344127e0a50d953c5/strawberry_graphql-0.287.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "ac32e96eb2ea6a67738eefca8226d712e11706b80491e293f3e743455e9c301b",
-              "url": "https://files.pythonhosted.org/packages/cd/be/800e268d2a92241414ed89f2f2cc68ebcb01b6f4d0bcb2b1d09c1a6f2c75/strawberry_graphql-0.278.1.tar.gz"
+              "hash": "7d61f03fc44317ba427d78bce6ba0ec8092ffa90ebd41392011641d3908ccb33",
+              "url": "https://files.pythonhosted.org/packages/95/00/833f60b0398c1c379c7ab06688d55815039b6a02f90c979efe4155ffb5e5/strawberry_graphql-0.287.2.tar.gz"
             }
           ],
           "project_name": "strawberry-graphql",
@@ -6319,10 +6354,11 @@
             "packaging>=23",
             "pydantic>1.6.1; extra == \"pydantic\"",
             "pygments<3.0,>=2.3; extra == \"cli\"",
-            "pygments<3.0,>=2.3; extra == \"debug-server\"",
+            "pygments>=2.3; extra == \"debug-server\"",
             "pyinstrument>=4.0.0; extra == \"pyinstrument\"",
-            "python-dateutil<3.0,>=2.7",
+            "python-dateutil>=2.7",
             "python-multipart>=0.0.7; extra == \"asgi\"",
+            "python-multipart>=0.0.7; extra == \"cli\"",
             "python-multipart>=0.0.7; extra == \"debug-server\"",
             "python-multipart>=0.0.7; extra == \"fastapi\"",
             "quart>=0.19.3; extra == \"quart\"",
@@ -6331,15 +6367,18 @@
             "rich>=12.0.0; extra == \"debug-server\"",
             "sanic>=20.12.2; extra == \"sanic\"",
             "starlette>=0.18.0; extra == \"asgi\"",
+            "starlette>=0.18.0; extra == \"cli\"",
             "starlette>=0.18.0; extra == \"debug-server\"",
-            "typer>=0.7.0; extra == \"cli\"",
-            "typer>=0.7.0; extra == \"debug-server\"",
+            "typer>=0.12.4; extra == \"cli\"",
+            "typer>=0.12.4; extra == \"debug-server\"",
             "typing-extensions>=4.5.0",
+            "uvicorn>=0.11.6; extra == \"cli\"",
             "uvicorn>=0.11.6; extra == \"debug-server\"",
+            "websockets<16,>=15.0.1; extra == \"cli\"",
             "websockets<16,>=15.0.1; extra == \"debug-server\""
           ],
-          "requires_python": "<4.0,>=3.9",
-          "version": "0.278.1"
+          "requires_python": "<4.0,>=3.10",
+          "version": "0.287.2"
         },
         {
           "artifacts": [
@@ -7754,7 +7793,7 @@
     "msgpack~=1.1.2",
     "multidict~=6.7.0",
     "namedlist~=1.8",
-    "networkx~=3.3.0",
+    "networkx~=3.6.1",
     "opentelemetry-api~=1.39.0",
     "opentelemetry-exporter-otlp-proto-grpc~=1.39.0",
     "opentelemetry-instrumentation-aiohttp-client~=0.60b0",
@@ -7783,7 +7822,8 @@
     "ruamel.yaml~=0.18.10",
     "setproctitle~=1.3.7",
     "setuptools~=80.0.0",
-    "strawberry-graphql~=0.278.0",
+    "sniffio~=1.3.1",
+    "strawberry-graphql~=0.287.2",
     "tabulate~=0.8.9",
     "temporenc~=0.1.0",
     "tenacity~=9.0",
@@ -7818,7 +7858,7 @@
     "zipstream-new~=1.1.8"
   ],
   "requires_python": [
-    "CPython==3.14.1"
+    "CPython==3.14.2"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
