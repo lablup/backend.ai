@@ -5,7 +5,7 @@
       "id": "d3b07384-d9a1-4d3b-9d3b-97384d9a1d5b",
       "meta": {
         "title": "Lablup Customer Support Bot",
-        "avatar": "office-worker-medium",
+        "avatar": "🧑‍💼",
         "background": "linear-gradient(135deg, #00416A 0%, #E4E5E6 100%)",
         "descriptions": "Provide Customer Support about Lablup Inc.",
         "tags": ["lablup", "backendai", "customer-support"]
@@ -27,7 +27,7 @@
       "id": "d3b07384-d9a1-4d3b-9d3b-07384d9a1d3b",
       "meta": {
         "title": "General Assistant",
-        "avatar": "robot",
+        "avatar": "🤖",
         "background": "#f0f2f5",
         "descriptions": "A versatile AI assistant that can help with a wide range of tasks including writing, analysis, and problem-solving.",
         "tags": ["general", "writing", "analysis"]
@@ -49,7 +49,7 @@
       "id": "d3b07384-d9a1-4d3b-9d3b-07384d9a1d4b",
       "meta": {
         "title": "Code Expert",
-        "avatar": "laptop",
+        "avatar": "💻",
         "background": "#1e1e1e",
         "descriptions": "Specialized in software development, code review, and technical problem-solving across multiple programming languages.",
         "tags": ["coding", "development", "technical"]
@@ -72,7 +72,7 @@
       "id": "d3b07384-d9a1-4d3b-9d3b-07384d9a1d5b",
       "meta": {
         "title": "Data Analyst",
-        "avatar": "bar-chart",
+        "avatar": "📊",
         "background": "linear-gradient(135deg, #00416A 0%, #E4E5E6 100%)",
         "descriptions": "Specialized in data analysis, visualization, and statistical interpretation.",
         "tags": ["data", "analysis", "statistics"]
@@ -94,7 +94,7 @@
       "id": "d3b07384-d9a1-4d3b-9d3b-07384d9a1d6b",
       "meta": {
         "title": "Creative Writer",
-        "avatar": "pencil",
+        "avatar": "✏️",
         "background": "#faf3e0",
         "descriptions": "Specialized in creative writing, storytelling, and content creation with a focus on engaging narratives.",
         "tags": ["writing", "creative", "storytelling"]
@@ -116,7 +116,7 @@
       "id": "d3b07384-d9a1-4d3b-9d3b-07384d9a1d7b",
       "meta": {
         "title": "Math Tutor",
-        "avatar": "abacus",
+        "avatar": "🧮",
         "background": "#e8f4f8",
         "descriptions": "Expert in mathematics education, from basic arithmetic to advanced calculus and statistics.",
         "tags": ["mathematics", "education", "tutoring"]
@@ -138,7 +138,7 @@
       "id": "d3b07384-d9a1-4d3b-9d3b-07384d9a1d8b",
       "meta": {
         "title": "Research Assistant",
-        "avatar": "microscope",
+        "avatar": "🔬",
         "background": "#f5f5f5",
         "descriptions": "Assists with academic research, literature review, and scholarly writing across various disciplines.",
         "tags": ["research", "academic", "analysis"]
@@ -160,7 +160,7 @@
       "id": "d3b07384-d9a1-4d3b-9d3b-07384d9a1d9b",
       "meta": {
         "title": "Language Teacher",
-        "avatar": "teacher-medium",
+        "avatar": "🧑‍🏫",
         "background": "#fff4e6",
         "descriptions": "Specialized in language learning and teaching, with expertise in grammar, vocabulary, and conversation.",
         "tags": ["language", "education", "teaching"]
@@ -182,7 +182,7 @@
       "id": "d3b07384-d9a1-4d3b-9d3b-07384d9a1d0a",
       "meta": {
         "title": "Business Consultant",
-        "avatar": "briefcase",
+        "avatar": "💼",
         "background": "#e6f3ff",
         "descriptions": "Provides strategic business advice, market analysis, and organizational development guidance.",
         "tags": ["business", "strategy", "consulting"]
@@ -204,7 +204,7 @@
       "id": "d3b07384-d9a1-4d3b-9d3b-07384d9a1d1a",
       "meta": {
         "title": "Legal Assistant",
-        "avatar": "judge-medium",
+        "avatar": "🧑‍⚖️",
         "background": "#f8f9fa",
         "descriptions": "Assists with legal research, document review, and basic legal information across various jurisdictions.",
         "tags": ["legal", "research", "documentation"]
@@ -226,7 +226,7 @@
       "id": "d3b07384-d9a1-4d3b-9d3b-07384d9a1d2a",
       "meta": {
         "title": "UX Designer",
-        "avatar": "artist-palette",
+        "avatar": "🎨",
         "background": "#f0f4f8",
         "descriptions": "Specialized in user experience design, interface optimization, and user research methodologies.",
         "tags": ["design", "UX", "interface"]
@@ -248,7 +248,7 @@
       "id": "d3b07384-d9a1-4d3b-9d3b-07384d9a1d3a",
       "meta": {
         "title": "Marketing Strategist",
-        "avatar": "megaphone",
+        "avatar": "📣",
         "background": "linear-gradient(135deg, #FF9A8B 0%, #FF6A88 100%)",
         "descriptions": "Expert in digital marketing, brand strategy, and campaign optimization.",
         "tags": ["marketing", "strategy", "digital"]
@@ -270,7 +270,7 @@
       "id": "d3b07384-d9a1-4d3b-9d3b-07384d9a1d4a",
       "meta": {
         "title": "Science Educator",
-        "avatar": "atom-symbol",
+        "avatar": "⚛️",
         "background": "#e3f2fd",
         "descriptions": "Explains scientific concepts across physics, chemistry, biology, and other natural sciences.",
         "tags": ["science", "education", "explanation"]
@@ -292,7 +292,7 @@
       "id": "d3b07384-d9a1-4d3b-9d3b-07384d9a1d5a",
       "meta": {
         "title": "Project Manager",
-        "avatar": "clipboard",
+        "avatar": "📋",
         "background": "#f5f5f5",
         "descriptions": "Assists with project planning, resource allocation, and team coordination.",
         "tags": ["project management", "organization", "planning"]
@@ -314,7 +314,7 @@
       "id": "d3b07384-d9a1-4d3b-9d3b-07384d9a1d6a",
       "meta": {
         "title": "Financial Advisor",
-        "avatar": "money-bag",
+        "avatar": "💰",
         "background": "#e8f5e9",
         "descriptions": "Provides guidance on personal finance, investment strategies, and financial planning.",
         "tags": ["finance", "investment", "planning"]
@@ -336,7 +336,7 @@
       "id": "d3b07384-d9a1-4d3b-9d3b-07384d9a1d7a",
       "meta": {
         "title": "Health Coach",
-        "avatar": "red-apple",
+        "avatar": "🍎",
         "background": "#e8f5e9",
         "descriptions": "Provides guidance on nutrition, exercise, and general wellness practices.",
         "tags": ["health", "wellness", "fitness"]
@@ -358,7 +358,7 @@
       "id": "d3b07384-d9a1-4d3b-9d3b-07384d9a1d8a",
       "meta": {
         "title": "Technical Writer",
-        "avatar": "memo",
+        "avatar": "📝",
         "background": "#f8f9fa",
         "descriptions": "Specializes in creating clear technical documentation, user guides, and API references.",
         "tags": ["technical writing", "documentation", "guides"]
@@ -380,7 +380,7 @@
       "id": "d3b07384-d9a1-4d3b-9d3b-07384d9a1d9a",
       "meta": {
         "title": "Career Coach",
-        "avatar": "compass",
+        "avatar": "🧭",
         "background": "#fff3e0",
         "descriptions": "Provides guidance on career development, job searching, and professional growth.",
         "tags": ["career", "professional", "development"]
