@@ -1,28 +1,17 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import pathlib
-import subprocess
-import sys
-import uuid
-from datetime import datetime
-from functools import partial
-from typing import Optional, cast
+from typing import Optional
 
 import click
-from more_itertools import chunked
 from setproctitle import setproctitle
 
 from ai.backend.cli.params import BoolExprType, OptionalType
-from ai.backend.cli.types import ExitCode
-from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
-from ai.backend.common.validators import TimeDuration
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 
-from ..errors.resource import ConfigurationLoadFailed
-from .context import CLIContext, redis_ctx
+from .context import CLIContext
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 
@@ -108,6 +97,12 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
     Note that you do not have to specify connection-related options
     because the dbshell command fills out them from the manager configuration.
     """
+    import asyncio
+    import subprocess
+    import sys
+
+    from ai.backend.cli.types import ExitCode
+
     bootstrap_config = asyncio.run(cli_ctx.get_bootstrap_config())
     db_config = bootstrap_config.db
     if psql_help:
@@ -205,6 +200,8 @@ def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) 
     """
     from zmq.auth.certs import create_certificates, load_certificate
 
+    from ..errors.resource import ConfigurationLoadFailed
+
     log.info("Generating a RPC keypair...")
     public_key_path, secret_key_path = create_certificates(dst_dir, name)
     public_key, secret_key = load_certificate(secret_key_path)
@@ -241,12 +238,23 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     Delete old records from the kernels, error_logs tables and
     invoke the PostgreSQL's vaccuum operation to clear up the actual disk space.
     """
+    import asyncio
+    import uuid
+    from datetime import datetime
+    from functools import partial
+    from typing import cast
+
     import sqlalchemy as sa
+    from more_itertools import chunked
     from redis.asyncio import Redis
     from redis.asyncio.client import Pipeline
 
+    from ai.backend.common import redis_helper
+    from ai.backend.common.validators import TimeDuration
     from ai.backend.manager.models import SessionRow, error_logs, kernels
     from ai.backend.manager.models.utils import connect_database, vacuum_db
+
+    from .context import redis_ctx
 
     today = datetime.now()
     duration = TimeDuration()
