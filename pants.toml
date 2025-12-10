@@ -54,8 +54,9 @@ enable_resolves = true
 #   - Run `pants export` again
 #   - Update their local IDE/editor's interpreter path configurations
 interpreter_constraints = ["CPython==3.14.1"]
+interpreter_versions_universe = ["3.11", "3.12", "3.13", "3.14"]
 tailor_pex_binary_targets = false
-pip_version = "25.2"
+pip_version = "25.3"
 
 [python-bootstrap]
 search_path = ["<PYENV>"]
@@ -89,12 +90,12 @@ bin = [
 [pex-cli]
 # Pants 2.27 uses PEX 2.33.2 by default.
 # Pin the PEX version to get benefits from a-scie/lift#116.
-version = "v2.50.4"
+version = "v2.74.1"
 known_versions = [
-    "v2.50.4|macos_arm64|7b7be5cee59a6515d15751e6467317d272f671e9a8adcf2125c073e00ff27a84|4774138",
-    "v2.50.4|macos_x86_64|7b7be5cee59a6515d15751e6467317d272f671e9a8adcf2125c073e00ff27a84|4774138",
-    "v2.50.4|linux_arm64|7b7be5cee59a6515d15751e6467317d272f671e9a8adcf2125c073e00ff27a84|4774138",
-    "v2.50.4|linux_x86_64|7b7be5cee59a6515d15751e6467317d272f671e9a8adcf2125c073e00ff27a84|4774138",
+    "v2.74.1|macos_arm64|24d62a8297c53277614d26c2f8293276fdb1045274411a9018f04ad241f7c3ea|4943888",
+    "v2.74.1|macos_x86_64|24d62a8297c53277614d26c2f8293276fdb1045274411a9018f04ad241f7c3ea|4943888",
+    "v2.74.1|linux_arm64|24d62a8297c53277614d26c2f8293276fdb1045274411a9018f04ad241f7c3ea|4943888",
+    "v2.74.1|linux_x86_64|24d62a8297c53277614d26c2f8293276fdb1045274411a9018f04ad241f7c3ea|4943888",
 ]
 # When trying a new pex version, you could find out the hash and size-in-bytes as follows:
 # $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.28.1/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
