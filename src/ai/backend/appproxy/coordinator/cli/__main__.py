@@ -1,26 +1,13 @@
-import asyncio
-import importlib
-import json
 import logging
-import subprocess
-import sys
 from pathlib import Path
 from typing import Any, Optional
 
-import aiohttp_cors
 import click
-import tomli_w
-from aiohttp import web
 from setproctitle import setproctitle
 
-from ai.backend.appproxy.common.config import generate_example_json
-from ai.backend.appproxy.common.openapi import generate_openapi
-from ai.backend.appproxy.common.utils import ensure_json_serializable
-from ai.backend.cli.types import ExitCode
 from ai.backend.common.cli import LazyGroup
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 
-from ..config import ServerConfig
 from .context import CLIContext
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
@@ -79,6 +66,13 @@ def generate_example_configuration(output: Path) -> None:
     """
     Generates example TOML configuration file for Backend.AI Proxy Coordinator.
     """
+    import tomli_w
+
+    from ai.backend.appproxy.common.config import generate_example_json
+    from ai.backend.appproxy.common.utils import ensure_json_serializable
+
+    from ..config import ServerConfig
+
     if output == "-" or output is None:
         print(tomli_w.dumps(ensure_json_serializable(generate_example_json(ServerConfig))))
     else:
@@ -87,6 +81,13 @@ def generate_example_configuration(output: Path) -> None:
 
 
 async def _generate() -> dict[str, Any]:
+    import importlib
+
+    import aiohttp_cors
+    from aiohttp import web
+
+    from ai.backend.appproxy.common.openapi import generate_openapi
+
     from ..server import global_subapp_pkgs
 
     cors_options = {
@@ -115,6 +116,9 @@ def generate_openapi_spec(output: Path) -> None:
     """
     Generates OpenAPI specification of Backend.AI API.
     """
+    import asyncio
+    import json
+
     openapi = asyncio.run(_generate())
     if output == "-" or output is None:
         print(json.dumps(openapi, ensure_ascii=False, indent=2))
@@ -162,6 +166,11 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
     Note that you do not have to specify connection-related options
     because the dbshell command fills out them from the manager configuration.
     """
+    import subprocess
+    import sys
+
+    from ai.backend.cli.types import ExitCode
+
     db_config = cli_ctx.local_config.db
     if psql_help:
         psql_args = ["--help"]

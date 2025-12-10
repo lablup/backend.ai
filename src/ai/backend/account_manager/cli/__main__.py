@@ -1,13 +1,9 @@
 from pathlib import Path
 
 import click
-import tomlkit
 from setproctitle import setproctitle
 
 from ai.backend.logging import LogLevel
-
-from ..config import ServerConfig, generate_example_json
-from ..utils import ensure_json_serializable
 
 
 @click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
@@ -40,6 +36,11 @@ def generate_example_configuration(output: Path) -> None:
     """
     Generates example TOML configuration file for Backend.AI Account Manager.
     """
+    import tomlkit
+
+    from ..config import ServerConfig, generate_example_json
+    from ..utils import ensure_json_serializable
+
     generated_example = generate_example_json(ServerConfig)
     if output == "-" or output is None:
         print(tomlkit.dumps(ensure_json_serializable(generated_example)))
