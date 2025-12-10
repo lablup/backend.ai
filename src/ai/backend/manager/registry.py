@@ -3561,7 +3561,13 @@ class AgentRegistry:
 
         if _path := MODEL_SERVICE_RUNTIME_PROFILES[endpoint.runtime_variant].health_check_endpoint:
             _info = ModelHealthCheck(path=_path)
-        elif endpoint.runtime_variant == RuntimeVariant.CUSTOM:
+
+        should_read_model_definition = endpoint.runtime_variant == RuntimeVariant.CUSTOM or (
+            self.config_provider.config.deployment.enable_model_definition_override
+            and endpoint.model_definition_path
+        )
+
+        if should_read_model_definition:
             model_definition_path = await ModelServiceHelper.validate_model_definition_file_exists(
                 self.storage_manager,
                 model.host,
@@ -3577,14 +3583,37 @@ class AgentRegistry:
 
             for model_info in model_definition["models"]:
                 if health_check_info := model_info.get("service", {}).get("health_check"):
-                    _info = ModelHealthCheck(
-                        path=health_check_info["path"],
-                        interval=health_check_info["interval"],
-                        max_retries=health_check_info["max_retries"],
-                        max_wait_time=health_check_info["max_wait_time"],
-                        expected_status_code=health_check_info["expected_status_code"],
-                        initial_delay=health_check_info.get("initial_delay"),
-                    )
+                    if endpoint.runtime_variant == RuntimeVariant.CUSTOM:
+                        # CUSTOM: replace entirely
+                        _info = ModelHealthCheck(
+                            path=health_check_info["path"],
+                            interval=health_check_info["interval"],
+                            max_retries=health_check_info["max_retries"],
+                            max_wait_time=health_check_info["max_wait_time"],
+                            expected_status_code=health_check_info["expected_status_code"],
+                            initial_delay=health_check_info.get("initial_delay"),
+                        )
+                    else:
+                        # non-CUSTOM with override: only override non-None values
+                        if _info is None:
+                            _info = ModelHealthCheck(path=health_check_info["path"])
+                        override_kwargs: dict[str, float | int | str] = {}
+                        if health_check_info.get("path") is not None:
+                            override_kwargs["path"] = health_check_info["path"]
+                        if health_check_info.get("interval") is not None:
+                            override_kwargs["interval"] = health_check_info["interval"]
+                        if health_check_info.get("max_retries") is not None:
+                            override_kwargs["max_retries"] = health_check_info["max_retries"]
+                        if health_check_info.get("max_wait_time") is not None:
+                            override_kwargs["max_wait_time"] = health_check_info["max_wait_time"]
+                        if health_check_info.get("expected_status_code") is not None:
+                            override_kwargs["expected_status_code"] = health_check_info[
+                                "expected_status_code"
+                            ]
+                        if health_check_info.get("initial_delay") is not None:
+                            override_kwargs["initial_delay"] = health_check_info["initial_delay"]
+                        if override_kwargs:
+                            _info = _info.model_copy(update=override_kwargs)
                     break
         return _info
 
