@@ -2,7 +2,6 @@ import sys
 
 import click
 
-from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.func.image import _default_list_fields_admin
@@ -14,7 +13,7 @@ from .pretty import print_done, print_error, print_fail, print_warn
 from .types import CLIContext
 
 
-@main.group()
+@click.group()
 def image() -> None:
     """
     Image commands.
