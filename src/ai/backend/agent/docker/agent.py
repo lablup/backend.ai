@@ -111,6 +111,7 @@ from ..config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchTy
 from ..exception import ContainerCreationError, InvalidArgumentError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel, KernelRegistry
+from ..kernel_registry.adapter import KernelRecoveryDataAdapter, KernelRecoveryDataAdapterTarget
 from ..kernel_registry.container.creator import (
     ContainerBasedKernelRegistryCreatorArgs,
     ContainerBasedLoaderWriterCreator,
@@ -1421,10 +1422,15 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 agent=self,
             )
         )
+        container_loader = container_loader_writer_creator.create_loader()
         container_writer = container_loader_writer_creator.create_writer()
         self._kernel_recovery = DockerKernelRegistryRecovery(
-            loader=pickle_loader,
+            loader=container_loader,
             writers=[pickle_writer, container_writer],
+        )
+        self._kernel_recovery_adapter = KernelRecoveryDataAdapter(
+            pickle_loader,
+            [KernelRecoveryDataAdapterTarget(container_loader, container_writer)],
         )
 
     async def __ainit__(self) -> None:
@@ -1462,6 +1468,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 docker_info["CgroupVersion"],
             )
             self.docker_info = docker_info
+        await self._kernel_recovery_adapter.adapt_recovery_data()
         await super().__ainit__()
         try:
             async with Docker() as docker:
