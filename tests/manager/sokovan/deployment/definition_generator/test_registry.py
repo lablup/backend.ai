@@ -79,7 +79,7 @@ def create_override_dict(expected: VariantExpectation) -> dict[str, Any]:
         "port": expected.port,
     }
     if expected.health_check_path:
-        service["health_check"] = {
+        service["health-check"] = {
             "path": expected.health_check_path,
             "interval": 30.0,
             "initial-delay": 600.0,
