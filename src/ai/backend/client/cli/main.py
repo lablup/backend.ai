@@ -1,12 +1,12 @@
 import warnings
+from pathlib import Path
 
 import click
 
 from ai.backend.cli.extensions import ExtendedCommandGroup
-from ai.backend.client import __version__
-from ai.backend.client.cli.types import CLIContext, OutputMode
-from ai.backend.client.config import APIConfig, set_config
-from ai.backend.client.output import get_output_handler
+
+# Read version directly from file to avoid heavy ai.backend.client import
+__version__ = (Path(__file__).parent.parent / "VERSION").read_text().strip()
 
 
 @click.group(
@@ -32,6 +32,10 @@ def main(ctx: click.Context, skip_sslcert_validation: bool, output: str) -> None
     """
     Backend.AI command line interface.
     """
+    from ai.backend.client.cli.types import CLIContext, OutputMode
+    from ai.backend.client.config import APIConfig, set_config
+    from ai.backend.client.output import get_output_handler
+
     from .announcement import announce
 
     config = APIConfig(
