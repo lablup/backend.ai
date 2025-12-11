@@ -39,8 +39,8 @@ class ScalingDeploymentHandler(DeploymentHandler):
 
     @property
     def lock_id(self) -> Optional[LockID]:
-        """No lock needed for scaling deployments."""
-        return None
+        """Lock for scaling deployments."""
+        return LockID.LOCKID_DEPLOYMENT_AUTO_SCALER
 
     @classmethod
     def target_statuses(cls) -> list[EndpointLifecycle]:
