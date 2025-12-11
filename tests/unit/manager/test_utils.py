@@ -111,40 +111,64 @@ class TestClampAgentCpuUtil:
         assert result["node"]["cpu_util"]["pct"] == "200"
         assert result["node"]["cpu_util"]["extra_field"] == 999  # Not clamped
 
-    @pytest.fixture
-    def stat_data_4_cores_capacity_50(self) -> dict[str, Any]:
-        """Stat data with capacity=50 to test different capacity values."""
-        return {
-            "node": {"cpu_util": {"current": "300", "capacity": "50"}},
-            "devices": {"cpu_util": {"cpu0": {}, "cpu1": {}, "cpu2": {}, "cpu3": {}}},
-        }
-
-    async def test_different_capacity_values(
-        self, stat_data_4_cores_capacity_50: dict[str, Any]
+    # ===== PARAMETRIZED TEST GROUP 2: Clamping Logic Scenarios =====
+    @pytest.mark.parametrize(
+        "input_data,expected_current,expected_pct",
+        [
+            # 4 cores, capacity 50, current 300 → clamped to 200
+            pytest.param(
+                {
+                    "node": {"cpu_util": {"current": "300", "capacity": "50"}},
+                    "devices": {"cpu_util": {"cpu0": {}, "cpu1": {}, "cpu2": {}, "cpu3": {}}},
+                },
+                "200",
+                None,
+                id="4_cores_capacity_50",
+            ),
+            # 4 cores, capacity 100, current 500 → clamped to 400
+            pytest.param(
+                {
+                    "node": {"cpu_util": {"current": "500", "capacity": "100"}},
+                    "devices": {"cpu_util": {"cpu0": {}, "cpu1": {}, "cpu2": {}, "cpu3": {}}},
+                },
+                "400",
+                None,
+                id="4_cores_capacity_100",
+            ),
+            # 4 cores with decimal precision
+            pytest.param(
+                {
+                    "node": {
+                        "cpu_util": {"current": "450.5", "capacity": "100.25", "pct": "425.75"}
+                    },
+                    "devices": {"cpu_util": {"cpu0": {}, "cpu1": {}, "cpu2": {}, "cpu3": {}}},
+                },
+                "401.00",
+                "400",
+                id="decimal_precision",
+            ),
+            # 2 cores, current and pct both need clamping
+            pytest.param(
+                {
+                    "node": {"cpu_util": {"current": "500", "capacity": "100", "pct": "500"}},
+                    "devices": {"cpu_util": {"cpu0": {}, "cpu1": {}}},
+                },
+                "200",
+                "200",
+                id="2_cores_both_fields_clamped",
+            ),
+        ],
+    )
+    async def test_clamping_various_scenarios(
+        self,
+        input_data: dict[str, Any],
+        expected_current: str,
+        expected_pct: str | None,
     ) -> None:
-        """Test clamping with various capacity values."""
-        result = clamp_agent_cpu_util(stat_data_4_cores_capacity_50)
+        """Test clamping with various core counts, capacity values, and precision."""
+        result = clamp_agent_cpu_util(input_data)
 
         assert result is not None
-        # Capacity 50 * 4 cores = 200 max
-        assert result["node"]["cpu_util"]["current"] == "200"
-
-    @pytest.fixture
-    def stat_data_4_cores_decimal_precision(self) -> dict[str, Any]:
-        """Stat data with decimal values to test precision handling."""
-        return {
-            "node": {"cpu_util": {"current": "450.5", "capacity": "100.25", "pct": "425.75"}},
-            "devices": {"cpu_util": {"cpu0": {}, "cpu1": {}, "cpu2": {}, "cpu3": {}}},
-        }
-
-    async def test_decimal_precision(
-        self, stat_data_4_cores_decimal_precision: dict[str, Any]
-    ) -> None:
-        """Test that Decimal handles fractional values correctly."""
-        result = clamp_agent_cpu_util(stat_data_4_cores_decimal_precision)
-
-        assert result is not None
-        # capacity (100.25) * num_cores (4) = 401.00
-        assert result["node"]["cpu_util"]["current"] == "401.00"
-        # num_cores (4) * 100 = 400
-        assert result["node"]["cpu_util"]["pct"] == "400"
+        assert result["node"]["cpu_util"]["current"] == expected_current
+        if expected_pct is not None:
+            assert result["node"]["cpu_util"]["pct"] == expected_pct
