@@ -166,10 +166,11 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
         """
         headers_base = self._get_auth_headers()
         async with self._session.head(
-            self._url, headers=headers_base, allow_redirects=True
+            self._url,
+            headers=headers_base,
+            allow_redirects=True,
+            raise_for_status=True,
         ) as resp:
-            resp.raise_for_status()
-
             content_length = resp.headers.get("Content-Length")
             if not content_length or not content_length.isdigit():
                 raise aiohttp.ClientPayloadError(
@@ -195,19 +196,19 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
         headers_base = self._get_auth_headers()
 
         offset = 0
-        total = 0
         backoff = 1.0
         retries = 0
 
         self._download_complete = False
         self._progress_task = None
 
+        # Probe head first - if this fails, we can't proceed
+        probe_info = await self._probe_head()
+        total = probe_info.total
+        etag = probe_info.etag
+        accept_ranges = probe_info.accept_ranges
+
         try:
-            # Probe head first - if this fails, we can't proceed
-            probe_info = await self._probe_head()
-            total = probe_info.total
-            etag = probe_info.etag
-            accept_ranges = probe_info.accept_ranges
             # Start background progress task
             self._progress_task = asyncio.create_task(
                 self._periodic_progress_update(
@@ -223,10 +224,8 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
 
                 try:
                     async with self._session.get(
-                        self._url, headers=headers, allow_redirects=True
+                        self._url, headers=headers, allow_redirects=True, raise_for_status=True
                     ) as resp:
-                        resp.raise_for_status()
-
                         # Validate partial content when resuming
                         if offset and accept_ranges and resp.status != 206:
                             raise aiohttp.ClientPayloadError(f"Expected 206, got {resp.status}")
