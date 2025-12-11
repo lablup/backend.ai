@@ -105,9 +105,14 @@ class LockID(enum.IntEnum):
     # Retry timers (only long cycle - 30 seconds)
     LOCKID_SOKOVAN_RETRY_PREPARING_TIMER = 220
     LOCKID_SOKOVAN_RETRY_CREATING_TIMER = 221
-    # Deployment auto-scaler timer
-    LOCKID_DEPLOYMENT_AUTO_SCALER = 222
-
+    # Deployment locks
+    LOCKID_DEPLOYMENT_AUTO_SCALER = 222  # Lock for deployment auto-scaler
+    LOCKID_DEPLOYMENT_PROVISIONING_ROUTES = 223  # Lock for provisioning routes
+    LOCKID_DEPLOYMENT_HEALTH_CHECK_ROUTES = 224  # Lock for health check routes
+    LOCKID_DEPLOYMENT_RUNNING_ROUTES = 225  # Lock for running routes
+    LOCKID_DEPLOYMENT_CHECK_PENDING = 226  # For operations checking PENDING sessions
+    LOCKID_DEPLOYMENT_CHECK_REPLICA = 227  # For operations checking REPLICA sessions
+    LOCKID_DEPLOYMENT_DESTROYING = 228  # For operations destroying deployments
     # Sokovan target status locks (prevent concurrent operations on same status)
     LOCKID_SOKOVAN_TARGET_PENDING = 230  # For operations targeting PENDING sessions
     LOCKID_SOKOVAN_TARGET_PREPARING = 231  # For operations targeting PREPARING/PULLING sessions
