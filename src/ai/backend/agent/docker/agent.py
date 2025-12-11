@@ -1086,9 +1086,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         if resource_opts and resource_opts.get("shmem"):
             shmem = int(resource_opts.get("shmem", "0"))
+            # Only set ShmSize limit for tmpfs (/dev/shm).
+            # Do NOT subtract shmem from Memory/MemorySwap because:
+            # - shm (tmpfs) and app memory share the Memory cgroup space
+            # - Pre-deducting would unnecessarily reduce available memory
             self.computer_docker_args["HostConfig"]["ShmSize"] = shmem
-            self.computer_docker_args["HostConfig"]["MemorySwap"] -= shmem
-            self.computer_docker_args["HostConfig"]["Memory"] -= shmem
 
         service_ports_label: list[str] = []
         service_ports_label += image_labels.get("ai.backend.service-ports", "").split(",")
