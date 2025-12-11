@@ -169,7 +169,6 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
             self._url,
             headers=headers_base,
             allow_redirects=True,
-            raise_for_status=True,
         ) as resp:
             content_length = resp.headers.get("Content-Length")
             if not content_length or not content_length.isdigit():
@@ -191,6 +190,7 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
         self._session = aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=None, sock_read=None),
             auto_decompress=False,
+            raise_for_status=True,
         )
 
         headers_base = self._get_auth_headers()
@@ -224,7 +224,7 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
 
                 try:
                     async with self._session.get(
-                        self._url, headers=headers, allow_redirects=True, raise_for_status=True
+                        self._url, headers=headers, allow_redirects=True
                     ) as resp:
                         # Validate partial content when resuming
                         if offset and accept_ranges and resp.status != 206:
