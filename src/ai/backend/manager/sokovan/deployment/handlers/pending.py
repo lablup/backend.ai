@@ -38,8 +38,8 @@ class CheckPendingDeploymentHandler(DeploymentHandler):
 
     @property
     def lock_id(self) -> Optional[LockID]:
-        """No lock needed for checking pending deployments."""
-        return None
+        """Lock for checking pending deployments."""
+        return LockID.LOCKID_DEPLOYMENT_CHECK_PENDING
 
     @classmethod
     def target_statuses(cls) -> list[EndpointLifecycle]:

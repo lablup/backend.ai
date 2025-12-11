@@ -39,8 +39,8 @@ class DestroyingDeploymentHandler(DeploymentHandler):
 
     @property
     def lock_id(self) -> Optional[LockID]:
-        """No lock needed for destroying deployments."""
-        return None
+        """Lock for destroying deployments."""
+        return LockID.LOCKID_DEPLOYMENT_DESTROYING
 
     @classmethod
     def target_statuses(cls) -> list[EndpointLifecycle]:

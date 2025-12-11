@@ -38,8 +38,8 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
 
     @property
     def lock_id(self) -> Optional[LockID]:
-        """No lock needed for checking replicas."""
-        return None
+        """Lock for checking replicas."""
+        return LockID.LOCKID_DEPLOYMENT_CHECK_REPLICA
 
     @classmethod
     def target_statuses(cls) -> list[EndpointLifecycle]:
