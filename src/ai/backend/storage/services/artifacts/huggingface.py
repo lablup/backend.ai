@@ -91,6 +91,7 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
     _file_path: str
     _download_complete: bool
     _progress_task: Optional[asyncio.Task[None]]
+    _token: Optional[str]
 
     def __init__(
         self,
@@ -102,6 +103,7 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
         model_id: str,
         revision: str,
         file_path: str,
+        token: Optional[str] = None,
     ) -> None:
         self._url = url
         self._chunk_size = chunk_size
@@ -113,6 +115,7 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
         self._file_path = file_path
         self._download_complete = False
         self._progress_task = None
+        self._token = token
 
     async def _periodic_progress_update(
         self,
@@ -148,13 +151,20 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
                     str(e),
                 )
 
+    def _get_auth_headers(self) -> dict[str, str]:
+        """Get authentication headers if token is available."""
+        headers = dict(_PROBE_HEAD_BASE_HEADER)
+        if self._token:
+            headers["Authorization"] = f"Bearer {self._token}"
+        return headers
+
     async def _probe_head(self) -> _ProbeHeadInfo:
         """
         Probe metadata via HEAD.
         - Sets total size, etag, and Accept-Ranges support.
         - Raises error if Content-Length is not available.
         """
-        headers_base = _PROBE_HEAD_BASE_HEADER
+        headers_base = self._get_auth_headers()
         async with self._session.head(
             self._url, headers=headers_base, allow_redirects=True
         ) as resp:
@@ -180,7 +190,7 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
             auto_decompress=False,
         )
 
-        headers_base = _PROBE_HEAD_BASE_HEADER
+        headers_base = self._get_auth_headers()
 
         offset = 0
         backoff = 1.0
@@ -797,6 +807,7 @@ class HuggingFaceDownloadStep(ImportStep[None]):
                 storage_pool=context.storage_pool,
                 download_chunk_size=chunk_size,
                 redis_client=self._redis_client,
+                token=registry_config.token,
             )
             downloaded_files.append((file_info, storage_key))
             total_bytes += file_info.size
@@ -821,6 +832,7 @@ class HuggingFaceDownloadStep(ImportStep[None]):
         storage_pool: AbstractStoragePool,
         download_chunk_size: int,
         redis_client: ValkeyArtifactDownloadTrackingClient,
+        token: Optional[str] = None,
     ) -> str:
         """Download file from HuggingFace to specified storage"""
         storage = storage_pool.get_storage(storage_name)
@@ -844,6 +856,7 @@ class HuggingFaceDownloadStep(ImportStep[None]):
             model_id=model.model_id,
             revision=revision,
             file_path=file_info.path,
+            token=token,
         )
 
         await storage.stream_upload(

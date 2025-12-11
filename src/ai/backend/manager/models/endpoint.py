@@ -530,6 +530,12 @@ class EndpointRow(Base):
         session_id_to_route_map = {r.session: r for r in active_routes}
         connection_info: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
         for kernel in running_main_kernels:
+            if kernel.service_ports is None:
+                log.debug(
+                    "generate_route_info(): Kernel {} has no service ports defined. Skipping.",
+                    kernel.id,
+                )
+                continue
             num_inference_ports = len([*filter(lambda x: x["is_inference"], kernel.service_ports)])
             if num_inference_ports > 1:
                 log.warning(

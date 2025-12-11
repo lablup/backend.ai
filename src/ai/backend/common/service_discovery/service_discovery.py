@@ -53,8 +53,8 @@ class ModelServiceMetadata(BaseModel):
         """
         Convert to ServiceMetadata for service discovery backend storage.
         """
-        # Build prometheus_address with metrics path
-        prometheus_address = f"{self.host}:{self.port}{self.metrics_path}"
+        # Build prometheus_address with host:port only (no path)
+        prometheus_address = f"{self.host}:{self.port}"
 
         # Add route_id and model_service_name to labels
         labels = {

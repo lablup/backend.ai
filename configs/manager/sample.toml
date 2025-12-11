@@ -780,3 +780,14 @@
   # Maps different import steps (download, archive) to specific storage backends.
   # Required for artifact model import operations.
   [reservoir.storage_step_selection]
+
+# Deployment and model serving configuration.
+# Controls behavior of model deployment features.
+[deployment]
+  # Enable model definition override from storage for non-CUSTOM runtime variants.
+  # When enabled, after generating the model definition programmatically,
+  # the system will attempt to fetch a custom model definition from storage
+  # if model_definition_path is specified in the revision.
+  # If the fetch succeeds, the custom definition overrides the generated one.
+  # If the fetch fails, the generated definition is used as fallback.
+  enable-model-definition-override = false

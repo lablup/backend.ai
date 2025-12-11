@@ -61,6 +61,7 @@ pexpect~=4.8
 prometheus-client~=0.21.1
 psutil~=7.0
 pycryptodome~=3.21
+pycares~=4.11.0
 pyhumps~=3.8.0
 pyroscope-io~=0.8.8
 python-dateutil~=2.9
@@ -95,7 +96,7 @@ typeguard~=4.3
 typing_extensions~=4.11
 textual~=0.79.1
 uvloop~=0.22.1; sys_platform != "Windows"
-valkey-glide~=2.2.1
+valkey-glide~=2.2.2
 yarl~=1.22.0
 zipstream-new~=1.1.8
 

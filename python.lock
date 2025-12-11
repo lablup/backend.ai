@@ -80,6 +80,7 @@
 //     "pexpect~=4.8",
 //     "prometheus-client~=0.21.1",
 //     "psutil~=7.0",
+//     "pycares~=4.11.0",
 //     "pycryptodome~=3.21",
 //     "pydantic[email]~=2.12.0",
 //     "pyhumps~=3.8.0",
@@ -128,7 +129,7 @@
 //     "types-tqdm",
 //     "typing_extensions~=4.11",
 //     "uvloop~=0.22.1; sys_platform != \"Windows\"",
-//     "valkey-glide~=2.2.1",
+//     "valkey-glide~=2.2.2",
 //     "yarl~=1.22.0",
 //     "zipstream-new~=1.1.8"
 //   ],
@@ -264,21 +265,21 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "9fa49f812648374d046436a3b96491afb141320cd0b501df83880f034d0b5b85",
-              "url": "https://files.pythonhosted.org/packages/dc/ae/10adb8d683bdb800ad6ae1460d2099db7045a67eff13985955a72448e8c1/aiodns-3.6.0-py3-none-any.whl"
+              "hash": "46233ccad25f2037903828c5d05b64590eaa756e51d12b4a5616e2defcbc98c7",
+              "url": "https://files.pythonhosted.org/packages/09/e3/9f777774ebe8f664bcd564f9de3936490a16effa82a969372161c9b0fb21/aiodns-3.6.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "9b0ef54339e6687cdbd39a7d73d7de2467cb5c115281da28f2598f058633dac8",
-              "url": "https://files.pythonhosted.org/packages/e6/11/238e97cbf5c1c0f725d590a092e0618dcdc50f44dbd1e2a926fae27e6f06/aiodns-3.6.0.tar.gz"
+              "hash": "b0e9ce98718a5b8f7ca8cd16fc393163374bc2412236b91f6c851d066e3324b6",
+              "url": "https://files.pythonhosted.org/packages/85/2f/9d1ee4f937addda60220f47925dac6c6b3782f6851fd578987284a8d2491/aiodns-3.6.1.tar.gz"
             }
           ],
           "project_name": "aiodns",
           "requires_dists": [
-            "pycares>=4.9.0"
+            "pycares<5,>=4.9.0"
           ],
           "requires_python": ">=3.9",
-          "version": "3.6.0"
+          "version": "3.6.1"
         },
         {
           "artifacts": [
@@ -4366,13 +4367,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "3c3b3ca5c5687b1b5b37e5c5027ff68eacea8675241b29f13110a8ffbb8f0459",
-              "url": "https://files.pythonhosted.org/packages/05/85/d831a9bc0a9e0e1a304ff3d12c1489a5fbc9bf6690a15dcbdae372bbca45/opentelemetry_api-1.39.0-py3-none-any.whl"
+              "hash": "2edd8463432a7f8443edce90972169b195e7d6a05500cd29e6d13898187c9950",
+              "url": "https://files.pythonhosted.org/packages/cf/df/d3f1ddf4bb4cb50ed9b1139cc7b1c54c34a1e7ce8fd1b9a37c0d1551a6bd/opentelemetry_api-1.39.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6130644268c5ac6bdffaf660ce878f10906b3e789f7e2daa5e169b047a2933b9",
-              "url": "https://files.pythonhosted.org/packages/c0/0b/e5428c009d4d9af0515b0a8371a8aaae695371af291f45e702f7969dce6b/opentelemetry_api-1.39.0.tar.gz"
+              "hash": "fbde8c80e1b937a2c61f20347e91c0c18a1940cecf012d62e65a7caf08967c9c",
+              "url": "https://files.pythonhosted.org/packages/97/b9/3161be15bb8e3ad01be8be5a968a9237c3027c5be504362ff800fca3e442/opentelemetry_api-1.39.1.tar.gz"
             }
           ],
           "project_name": "opentelemetry-api",
@@ -4381,39 +4382,39 @@
             "typing-extensions>=4.5.0"
           ],
           "requires_python": ">=3.9",
-          "version": "1.39.0"
+          "version": "1.39.1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "3d77be7c4bdf90f1a76666c934368b8abed730b5c6f0547a2ec57feb115849ac",
-              "url": "https://files.pythonhosted.org/packages/ef/c6/215edba62d13a3948c718b289539f70e40965bc37fc82ecd55bb0b749c1a/opentelemetry_exporter_otlp_proto_common-1.39.0-py3-none-any.whl"
+              "hash": "08f8a5862d64cc3435105686d0216c1365dc5701f86844a8cd56597d0c764fde",
+              "url": "https://files.pythonhosted.org/packages/8c/02/ffc3e143d89a27ac21fd557365b98bd0653b98de8a101151d5805b5d4c33/opentelemetry_exporter_otlp_proto_common-1.39.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a135fceed1a6d767f75be65bd2845da344dd8b9258eeed6bc48509d02b184409",
-              "url": "https://files.pythonhosted.org/packages/11/cb/3a29ce606b10c76d413d6edd42d25a654af03e73e50696611e757d2602f3/opentelemetry_exporter_otlp_proto_common-1.39.0.tar.gz"
+              "hash": "763370d4737a59741c89a67b50f9e39271639ee4afc999dadfe768541c027464",
+              "url": "https://files.pythonhosted.org/packages/e9/9d/22d241b66f7bbde88a3bfa6847a351d2c46b84de23e71222c6aae25c7050/opentelemetry_exporter_otlp_proto_common-1.39.1.tar.gz"
             }
           ],
           "project_name": "opentelemetry-exporter-otlp-proto-common",
           "requires_dists": [
-            "opentelemetry-proto==1.39.0"
+            "opentelemetry-proto==1.39.1"
           ],
           "requires_python": ">=3.9",
-          "version": "1.39.0"
+          "version": "1.39.1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "758641278050de9bb895738f35ff8840e4a47685b7e6ef4a201fe83196ba7a05",
-              "url": "https://files.pythonhosted.org/packages/56/e8/d420b94ffddfd8cff85bb4aa5d98da26ce7935dc3cf3eca6b83cd39ab436/opentelemetry_exporter_otlp_proto_grpc-1.39.0-py3-none-any.whl"
+              "hash": "fa1c136a05c7e9b4c09f739469cbdb927ea20b34088ab1d959a849b5cc589c18",
+              "url": "https://files.pythonhosted.org/packages/81/a3/cc9b66575bd6597b98b886a2067eea2693408d2d5f39dad9ab7fc264f5f3/opentelemetry_exporter_otlp_proto_grpc-1.39.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7e7bb3f436006836c0e0a42ac619097746ad5553ad7128a5bd4d3e727f37fc06",
-              "url": "https://files.pythonhosted.org/packages/7e/62/4db083ee9620da3065eeb559e9fc128f41a1d15e7c48d7c83aafbccd354c/opentelemetry_exporter_otlp_proto_grpc-1.39.0.tar.gz"
+              "hash": "772eb1c9287485d625e4dbe9c879898e5253fea111d9181140f51291b5fec3ad",
+              "url": "https://files.pythonhosted.org/packages/53/48/b329fed2c610c2c32c9366d9dc597202c9d1e58e631c137ba15248d8850f/opentelemetry_exporter_otlp_proto_grpc-1.39.1.tar.gz"
             }
           ],
           "project_name": "opentelemetry-exporter-otlp-proto-grpc",
@@ -4423,119 +4424,119 @@
             "grpcio<2.0.0,>=1.66.2; python_version >= \"3.13\"",
             "opentelemetry-api~=1.15",
             "opentelemetry-exporter-credential-provider-gcp>=0.59b0; extra == \"gcp-auth\"",
-            "opentelemetry-exporter-otlp-proto-common==1.39.0",
-            "opentelemetry-proto==1.39.0",
-            "opentelemetry-sdk~=1.39.0",
+            "opentelemetry-exporter-otlp-proto-common==1.39.1",
+            "opentelemetry-proto==1.39.1",
+            "opentelemetry-sdk~=1.39.1",
             "typing-extensions>=4.6.0"
           ],
           "requires_python": ">=3.9",
-          "version": "1.39.0"
+          "version": "1.39.1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "aaafa1483543a402819f1bdfb06af721c87d60dd109501f9997332862a35c76a",
-              "url": "https://files.pythonhosted.org/packages/5c/7b/5b5b9f8cfe727a28553acf9cd287b1d7f706f5c0a00d6e482df55b169483/opentelemetry_instrumentation-0.60b0-py3-none-any.whl"
+              "hash": "04480db952b48fb1ed0073f822f0ee26012b7be7c3eac1a3793122737c78632d",
+              "url": "https://files.pythonhosted.org/packages/77/d2/6788e83c5c86a2690101681aeef27eeb2a6bf22df52d3f263a22cee20915/opentelemetry_instrumentation-0.60b1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "4e9fec930f283a2677a2217754b40aaf9ef76edae40499c165bc7f1d15366a74",
-              "url": "https://files.pythonhosted.org/packages/55/3c/bd53dbb42eff93d18e3047c7be11224aa9966ce98ac4cc5bfb860a32c95a/opentelemetry_instrumentation-0.60b0.tar.gz"
+              "hash": "57ddc7974c6eb35865af0426d1a17132b88b2ed8586897fee187fd5b8944bd6a",
+              "url": "https://files.pythonhosted.org/packages/41/0f/7e6b713ac117c1f5e4e3300748af699b9902a2e5e34c9cf443dde25a01fa/opentelemetry_instrumentation-0.60b1.tar.gz"
             }
           ],
           "project_name": "opentelemetry-instrumentation",
           "requires_dists": [
             "opentelemetry-api~=1.4",
-            "opentelemetry-semantic-conventions==0.60b0",
+            "opentelemetry-semantic-conventions==0.60b1",
             "packaging>=18.0",
             "wrapt<2.0.0,>=1.0.0"
           ],
           "requires_python": ">=3.9",
-          "version": "0.60b0"
+          "version": "0.60b1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d1a0b2cf1696c52b3b3dc019c714d44e358efbad226cc70cb51f444d7ee36c93",
-              "url": "https://files.pythonhosted.org/packages/de/f2/a53315a6278a25373de004fbf95a20dd5f20e1e4b98f5daf431367bb518c/opentelemetry_instrumentation_aiohttp_client-0.60b0-py3-none-any.whl"
+              "hash": "34c5097256a30b16c5a2a88a409ed82b92972a494c43212c85632d204a78c2a1",
+              "url": "https://files.pythonhosted.org/packages/ca/f4/1a1ec632c86269750ae833c8fbdd4c8d15316eb1c21e3544e34791c805ee/opentelemetry_instrumentation_aiohttp_client-0.60b1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "22ff1db43404bb67572628b45d99d284251621bfc80f772d05919e6233a88bf4",
-              "url": "https://files.pythonhosted.org/packages/fc/b1/97b2c06107b496a93f748c3d12ad439604bdccccdd2be05fe1ad63faa7df/opentelemetry_instrumentation_aiohttp_client-0.60b0.tar.gz"
+              "hash": "d0e7d5aa057791ca4d9090b0d3c9982f253c1a24b6bc78a734fc18d8dd97927b",
+              "url": "https://files.pythonhosted.org/packages/c0/79/95be90c555fd7efde79dcba36ea5c668815aa2d0a4250b63687e0f91c74a/opentelemetry_instrumentation_aiohttp_client-0.60b1.tar.gz"
             }
           ],
           "project_name": "opentelemetry-instrumentation-aiohttp-client",
           "requires_dists": [
             "aiohttp~=3.0; extra == \"instruments\"",
             "opentelemetry-api~=1.12",
-            "opentelemetry-instrumentation==0.60b0",
-            "opentelemetry-semantic-conventions==0.60b0",
-            "opentelemetry-util-http==0.60b0",
+            "opentelemetry-instrumentation==0.60b1",
+            "opentelemetry-semantic-conventions==0.60b1",
+            "opentelemetry-util-http==0.60b1",
             "wrapt<2.0.0,>=1.0.0"
           ],
           "requires_python": ">=3.9",
-          "version": "0.60b0"
+          "version": "0.60b1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "113de91e82971805ba34bd3c12d11b9992d7f3d51dfdcdbfe1b7202c64aadbc8",
-              "url": "https://files.pythonhosted.org/packages/eb/45/3820224fa36f520cce6d539ac1f169a7f05a5210135b4ee01da5e99d7ace/opentelemetry_instrumentation_aiohttp_server-0.60b0-py3-none-any.whl"
+              "hash": "97618c95c8020a4c5f1f846d2134470584ded25edd33b4d3fd425cf5f9d5a038",
+              "url": "https://files.pythonhosted.org/packages/a0/8d/c38ea730c1a46272725f97b722039c8e79c6ea47fcee9b7f15e65720ccec/opentelemetry_instrumentation_aiohttp_server-0.60b1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "742189b3c8c4a947ea600b1bae58f04bd162b8677b5a68e4c000d8c5675af73a",
-              "url": "https://files.pythonhosted.org/packages/d7/a8/b4fac9a46f4eb9195eaedf7c0cbc2a3d7d663743bbd6b044b7dfefaf467d/opentelemetry_instrumentation_aiohttp_server-0.60b0.tar.gz"
+              "hash": "ca283014a103c97add5352839549e7572dbdeeeaf721e974316d226883fcc254",
+              "url": "https://files.pythonhosted.org/packages/4a/83/2abf02aa19f099a842a621693b78470f144211667f045f1f22931037eb94/opentelemetry_instrumentation_aiohttp_server-0.60b1.tar.gz"
             }
           ],
           "project_name": "opentelemetry-instrumentation-aiohttp-server",
           "requires_dists": [
             "aiohttp~=3.0; extra == \"instruments\"",
             "opentelemetry-api~=1.12",
-            "opentelemetry-instrumentation==0.60b0",
-            "opentelemetry-semantic-conventions==0.60b0",
-            "opentelemetry-util-http==0.60b0",
+            "opentelemetry-instrumentation==0.60b1",
+            "opentelemetry-semantic-conventions==0.60b1",
+            "opentelemetry-util-http==0.60b1",
             "wrapt<2.0.0,>=1.0.0"
           ],
           "requires_python": ">=3.9",
-          "version": "0.60b0"
+          "version": "0.60b1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "af75b3020911b9b6a1b4b19819a165eb131ce9bfdd313062d578fc2dc9a5cd0f",
-              "url": "https://files.pythonhosted.org/packages/00/89/6d4f5d8d03376637bff5b8d9e91356104a6f1ce9a34a2099bb2f4bf5e2b5/opentelemetry_instrumentation_logging-0.60b0-py3-none-any.whl"
+              "hash": "f2e18cbc7e1dd3628c80e30d243897fdc93c5b7e0c8ae60abd2b9b6a99f82343",
+              "url": "https://files.pythonhosted.org/packages/f1/f9/8a4ce3901bc52277794e4b18c4ac43dc5929806eff01d22812364132f45f/opentelemetry_instrumentation_logging-0.60b1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6d87840666669cbbcd53d2230c7a33476862d0bf7f1adc67a95519c6ccfc8281",
-              "url": "https://files.pythonhosted.org/packages/5b/8b/a1aed0b695a58a1f0bdcf90fae5e468cc0fd7de2b74b9816b17e45c38e43/opentelemetry_instrumentation_logging-0.60b0.tar.gz"
+              "hash": "98f4b9c7aeb9314a30feee7c002c7ea9abea07c90df5f97fb058b850bc45b89a",
+              "url": "https://files.pythonhosted.org/packages/60/a6/4515895b383113677fd2ad21813df5e56108a2df14ebb7916c962c9a0234/opentelemetry_instrumentation_logging-0.60b1.tar.gz"
             }
           ],
           "project_name": "opentelemetry-instrumentation-logging",
           "requires_dists": [
             "opentelemetry-api~=1.12",
-            "opentelemetry-instrumentation==0.60b0"
+            "opentelemetry-instrumentation==0.60b1"
           ],
           "requires_python": ">=3.9",
-          "version": "0.60b0"
+          "version": "0.60b1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "1e086552ac79acb501485ff0ce75533f70f3382d43d0a30728eeee594f7bf818",
-              "url": "https://files.pythonhosted.org/packages/e3/4d/d500e1862beed68318705732d1976c390f4a72ca8009c4983ff627acff20/opentelemetry_proto-1.39.0-py3-none-any.whl"
+              "hash": "22cdc78efd3b3765d09e68bfbd010d4fc254c9818afd0b6b423387d9dee46007",
+              "url": "https://files.pythonhosted.org/packages/51/95/b40c96a7b5203005a0b03d8ce8cd212ff23f1793d5ba289c87a097571b18/opentelemetry_proto-1.39.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c1fa48678ad1a1624258698e59be73f990b7fc1f39e73e16a9d08eef65dd838c",
-              "url": "https://files.pythonhosted.org/packages/48/b5/64d2f8c3393cd13ea2092106118f7b98461ba09333d40179a31444c6f176/opentelemetry_proto-1.39.0.tar.gz"
+              "hash": "6c8e05144fc0d3ed4d22c2289c6b126e03bcd0e6a7da0f16cedd2e1c2772e2c8",
+              "url": "https://files.pythonhosted.org/packages/49/1d/f25d76d8260c156c40c97c9ed4511ec0f9ce353f8108ca6e7561f82a06b2/opentelemetry_proto-1.39.1.tar.gz"
             }
           ],
           "project_name": "opentelemetry-proto",
@@ -4543,68 +4544,68 @@
             "protobuf<7.0,>=5.0"
           ],
           "requires_python": ">=3.9",
-          "version": "1.39.0"
+          "version": "1.39.1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "90cfb07600dfc0d2de26120cebc0c8f27e69bf77cd80ef96645232372709a514",
-              "url": "https://files.pythonhosted.org/packages/a4/b4/2adc8bc83eb1055ecb592708efb6f0c520cc2eb68970b02b0f6ecda149cf/opentelemetry_sdk-1.39.0-py3-none-any.whl"
+              "hash": "4d5482c478513ecb0a5d938dcc61394e647066e0cc2676bee9f3af3f3f45f01c",
+              "url": "https://files.pythonhosted.org/packages/7c/98/e91cf858f203d86f4eccdf763dcf01cf03f1dae80c3750f7e635bfa206b6/opentelemetry_sdk-1.39.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c22204f12a0529e07aa4d985f1bca9d6b0e7b29fe7f03e923548ae52e0e15dde",
-              "url": "https://files.pythonhosted.org/packages/51/e3/7cd989003e7cde72e0becfe830abff0df55c69d237ee7961a541e0167833/opentelemetry_sdk-1.39.0.tar.gz"
+              "hash": "cf4d4563caf7bff906c9f7967e2be22d0d6b349b908be0d90fb21c8e9c995cc6",
+              "url": "https://files.pythonhosted.org/packages/eb/fb/c76080c9ba07e1e8235d24cdcc4d125ef7aa3edf23eb4e497c2e50889adc/opentelemetry_sdk-1.39.1.tar.gz"
             }
           ],
           "project_name": "opentelemetry-sdk",
           "requires_dists": [
-            "opentelemetry-api==1.39.0",
-            "opentelemetry-semantic-conventions==0.60b0",
+            "opentelemetry-api==1.39.1",
+            "opentelemetry-semantic-conventions==0.60b1",
             "typing-extensions>=4.5.0"
           ],
           "requires_python": ">=3.9",
-          "version": "1.39.0"
+          "version": "1.39.1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "069530852691136018087b52688857d97bba61cd641d0f8628d2d92788c4f78a",
-              "url": "https://files.pythonhosted.org/packages/d0/56/af0306666f91bae47db14d620775604688361f0f76a872e0005277311131/opentelemetry_semantic_conventions-0.60b0-py3-none-any.whl"
+              "hash": "9fa8c8b0c110da289809292b0591220d3a7b53c1526a23021e977d68597893fb",
+              "url": "https://files.pythonhosted.org/packages/7a/5e/5958555e09635d09b75de3c4f8b9cae7335ca545d77392ffe7331534c402/opentelemetry_semantic_conventions-0.60b1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "227d7aa73cbb8a2e418029d6b6465553aa01cf7e78ec9d0bc3255c7b3ac5bf8f",
-              "url": "https://files.pythonhosted.org/packages/71/0e/176a7844fe4e3cb5de604212094dffaed4e18b32f1c56b5258bcbcba85c2/opentelemetry_semantic_conventions-0.60b0.tar.gz"
+              "hash": "87c228b5a0669b748c76d76df6c364c369c28f1c465e50f661e39737e84bc953",
+              "url": "https://files.pythonhosted.org/packages/91/df/553f93ed38bf22f4b999d9be9c185adb558982214f33eae539d3b5cd0858/opentelemetry_semantic_conventions-0.60b1.tar.gz"
             }
           ],
           "project_name": "opentelemetry-semantic-conventions",
           "requires_dists": [
-            "opentelemetry-api==1.39.0",
+            "opentelemetry-api==1.39.1",
             "typing-extensions>=4.5.0"
           ],
           "requires_python": ">=3.9",
-          "version": "0.60b0"
+          "version": "0.60b1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "4f366f1a48adb74ffa6f80aee26f96882e767e01b03cd1cfb948b6e1020341fe",
-              "url": "https://files.pythonhosted.org/packages/53/5d/a448862f6d10c95685ed0e703596b6bd1784074e7ad90bffdc550abb7b68/opentelemetry_util_http-0.60b0-py3-none-any.whl"
+              "hash": "66381ba28550c91bee14dcba8979ace443444af1ed609226634596b4b0faf199",
+              "url": "https://files.pythonhosted.org/packages/16/5c/d3f1733665f7cd582ef0842fb1d2ed0bc1fba10875160593342d22bba375/opentelemetry_util_http-0.60b1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e42b7bb49bba43b6f34390327d97e5016eb1c47949ceaf37c4795472a4e3a82d",
-              "url": "https://files.pythonhosted.org/packages/38/0d/786a713445cf338131fef3a84fab1378e4b2ef3c3ea348eeb0c915eb804a/opentelemetry_util_http-0.60b0.tar.gz"
+              "hash": "0d97152ca8c8a41ced7172d29d3622a219317f74ae6bb3027cfbdcf22c3cc0d6",
+              "url": "https://files.pythonhosted.org/packages/50/fc/c47bb04a1d8a941a4061307e1eddfa331ed4d0ab13d8a9781e6db256940a/opentelemetry_util_http-0.60b1.tar.gz"
             }
           ],
           "project_name": "opentelemetry-util-http",
           "requires_dists": [],
           "requires_python": ">=3.9",
-          "version": "0.60b0"
+          "version": "0.60b1"
         },
         {
           "artifacts": [
@@ -6630,54 +6631,54 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "b5e735ab2889d7ed33b32a459cac490eda71a1ba6857b0118de476ab6c366c04",
-              "url": "https://files.pythonhosted.org/packages/ae/2d/f5f5707b655ce2317190183868cd0f6822a1121b4baeae509ceb9590d0bd/tornado-6.5.2-cp39-abi3-musllinux_1_2_x86_64.whl"
+              "hash": "892595c100cd9b53a768cbfc109dfc55dec884afe2de5290611a566078d9692d",
+              "url": "https://files.pythonhosted.org/packages/70/b1/1d03ae4526a393b0b839472a844397337f03c7f3a1e6b5c82241f0e18281/tornado-6.5.3-cp39-abi3-musllinux_1_2_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "ab53c8f9a0fa351e2c0741284e06c7a45da86afb544133201c5cc8578eb076a0",
-              "url": "https://files.pythonhosted.org/packages/09/ce/1eb500eae19f4648281bb2186927bb062d2438c2e5093d1360391afd2f90/tornado-6.5.2.tar.gz"
+              "hash": "dbc4b4c32245b952566e17a20d5c1648fbed0e16aec3fc7e19f3974b36e0e47c",
+              "url": "https://files.pythonhosted.org/packages/58/e2/7a7535d23133443552719dba526dacbb7415f980157da9f14950ddb88ad6/tornado-6.5.3-cp39-abi3-musllinux_1_2_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "06ceb1300fd70cb20e43b1ad8aaee0266e69e7ced38fa910ad2e03285009ce7c",
-              "url": "https://files.pythonhosted.org/packages/11/92/fe6d57da897776ad2e01e279170ea8ae726755b045fe5ac73b75357a5a3f/tornado-6.5.2-cp39-abi3-musllinux_1_2_aarch64.whl"
+              "hash": "f72ac800be2ac73ddc1504f7aa21069a4137e8d70c387172c063d363d04f2208",
+              "url": "https://files.pythonhosted.org/packages/78/f6/685b869f5b5b9d9547571be838c6106172082751696355b60fc32a4988ed/tornado-6.5.3-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b0fe179f28d597deab2842b86ed4060deec7388f1fd9c1b4a41adf8af058907e",
-              "url": "https://files.pythonhosted.org/packages/1b/4e/619174f52b120efcf23633c817fd3fed867c30bff785e2cd5a53a70e483c/tornado-6.5.2-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "16abdeb0211796ffc73765bc0a20119712d68afeeaf93d1a3f2edf6b3aee8d5a",
+              "url": "https://files.pythonhosted.org/packages/7f/2e/3d22d478f27cb4b41edd4db7f10cd7846d0a28ea443342de3dba97035166/tornado-6.5.3.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "b186e85d1e3536d69583d2298423744740986018e393d0321df7340e71898882",
-              "url": "https://files.pythonhosted.org/packages/95/fa/87b41709552bbd393c85dd18e4e3499dcd8983f66e7972926db8d96aa065/tornado-6.5.2-cp39-abi3-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
+              "hash": "c43c4fc4f5419c6561cfb8b884a8f6db7b142787d47821e1a0e1296253458265",
+              "url": "https://files.pythonhosted.org/packages/91/4c/f0d19edf24912b7f21ae5e941f7798d132ad4d9b71441c1e70917a297265/tornado-6.5.3-cp39-abi3-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "74db443e0f5251be86cbf37929f84d8c20c27a355dd452a5cfa2aada0d001ec4",
-              "url": "https://files.pythonhosted.org/packages/9b/02/c8f4f6c9204526daf3d760f4aa555a7a33ad0e60843eac025ccfd6ff4a93/tornado-6.5.2-cp39-abi3-musllinux_1_2_i686.whl"
+              "hash": "db238e8a174b4bfd0d0238b8cfcff1c14aebb4e2fcdafbf0ea5da3b81caceb4c",
+              "url": "https://files.pythonhosted.org/packages/a0/1f/9ff92eca81ff17a86286ec440dcd5eab0400326eb81761aa9a4eecb1ffb9/tornado-6.5.3-cp39-abi3-musllinux_1_2_i686.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "583a52c7aa94ee046854ba81d9ebb6c81ec0fd30386d96f7640c96dad45a03ef",
-              "url": "https://files.pythonhosted.org/packages/f2/b5/9b575a0ed3e50b00c40b08cbce82eb618229091d09f6d14bce80fc01cb0b/tornado-6.5.2-cp39-abi3-macosx_10_9_x86_64.whl"
+              "hash": "5977a396f83496657779f59a48c38096ef01edfe4f42f1c0634b791dde8165d0",
+              "url": "https://files.pythonhosted.org/packages/ca/9c/594b631f0b8dc5977080c7093d1e96f1377c10552577d2c31bb0208c9362/tornado-6.5.3-cp39-abi3-macosx_10_9_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "2436822940d37cde62771cff8774f4f00b3c8024fe482e16ca8387b8a2724db6",
-              "url": "https://files.pythonhosted.org/packages/f6/48/6a7529df2c9cc12efd2e8f5dd219516184d703b34c06786809670df5b3bd/tornado-6.5.2-cp39-abi3-macosx_10_9_universal2.whl"
+              "hash": "2dd7d7e8d3e4635447a8afd4987951e3d4e8d1fb9ad1908c54c4002aabab0520",
+              "url": "https://files.pythonhosted.org/packages/d3/e9/bf22f66e1d5d112c0617974b5ce86666683b32c09b355dfcd59f8d5c8ef6/tornado-6.5.3-cp39-abi3-macosx_10_9_universal2.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e792706668c87709709c18b353da1f7662317b563ff69f00bab83595940c7108",
-              "url": "https://files.pythonhosted.org/packages/f9/41/fb15f06e33d7430ca89420283a8762a4e6b8025b800ea51796ab5e6d9559/tornado-6.5.2-cp39-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "de8b3fed4b3afb65d542d7702ac8767b567e240f6a43020be8eaef59328f117b",
+              "url": "https://files.pythonhosted.org/packages/eb/2b/e02da94f4a4aef2bb3b923c838ef284a77548a5f06bac2a8682b36b4eead/tornado-6.5.3-cp39-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             }
           ],
           "project_name": "tornado",
           "requires_dists": [],
           "requires_python": ">=3.9",
-          "version": "6.5.2"
+          "version": "6.5.3"
         },
         {
           "artifacts": [
@@ -6932,19 +6933,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "1be8adf7fb15b67231fc874d972c5ea602f1eaa05ddd3d72dcf9a7f2e26d35dd",
-              "url": "https://files.pythonhosted.org/packages/65/d8/50897a9c69621ce95cda190890115f335bafda03cd762854be0814761cb0/types_psutil-7.1.3.20251210-py3-none-any.whl"
+              "hash": "369872d955d7d47d77f4832b41e2300f832126e3fa97eb107d2d6a294c23c650",
+              "url": "https://files.pythonhosted.org/packages/29/61/658be05b56aeec195386b3f5c48cfa5bdaf8e989de3e4d802eeba457bd05/types_psutil-7.1.3.20251211-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "0fef0f363574d76965385e5170a0c95f88ef2c67327e4337298b3a1d35e61be4",
-              "url": "https://files.pythonhosted.org/packages/a0/70/b05213239cf57a6638b7e75565c495a3821406c6a52c161c376dfe407340/types_psutil-7.1.3.20251210.tar.gz"
+              "hash": "2c25f8fd3a1a4aebdffb861b97755c9a2d5d8019dd6ec1a2f2a77ec796652c89",
+              "url": "https://files.pythonhosted.org/packages/d2/d5/85165865b060fed80b5991574c2ae0ddfd4786398dc8bceddfe0a8960b74/types_psutil-7.1.3.20251211.tar.gz"
             }
           ],
           "project_name": "types-psutil",
           "requires_dists": [],
           "requires_python": ">=3.9",
-          "version": "7.1.3.20251210"
+          "version": "7.1.3.20251211"
         },
         {
           "artifacts": [
@@ -7331,38 +7332,39 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "cca93b8011bd016e0e5d347521cb1989ddf72024e63bc2e4905e083b12099182",
-              "url": "https://files.pythonhosted.org/packages/6b/2c/785fc73c2139e76232e26910eda12b5fcb62cb0dae15881a9b9072f56d13/valkey_glide-2.2.1-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "383aeaf6d6fe675e595f4f3e8fc0e123d9895ce534dcc2fc3b71031f6ff5f70c",
+              "url": "https://files.pythonhosted.org/packages/4f/c6/b8011db621375fa66190fa8fddcc687cdba7cb179c6508f25ef13d748d67/valkey_glide-2.2.2-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f8a5ac391b855d6598de5744f88bc8de2195dbb89cff8c47eec4be1166cf3f80",
-              "url": "https://files.pythonhosted.org/packages/09/02/cdc70a753e11c298640d782b9ae7118c9c696cca4946a22e5ffb881ecf58/valkey_glide-2.2.1-cp314-cp314-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "9286e83c48bfb360af1cbe812b6575736bc2028ce19a784a3e9312d66b74a71a",
+              "url": "https://files.pythonhosted.org/packages/22/ac/5beb80aeea58b8593e82f74e26e14d980c9a49692b77a183328d0f6e741b/valkey_glide-2.2.2.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "d663a60a903dbf402dbca57f8dc909bf2fb941b66f8f8cf31ba8042285cef70d",
-              "url": "https://files.pythonhosted.org/packages/54/54/0cad127db543be379a0ed0eae9bf097363d46730b7d0aa6bedfa828aac83/valkey_glide-2.2.1-cp314-cp314-macosx_11_0_arm64.whl"
+              "hash": "15bec8f3d6d1bf2a889c194852cb7f62f482e1ae4fcc0dc22f338bb56b5323de",
+              "url": "https://files.pythonhosted.org/packages/7c/c2/13c29a0fc97b99087a0181f5307dffa565b60201a99107d668ad9846ef28/valkey_glide-2.2.2-cp314-cp314-macosx_11_0_arm64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "5938e857ef6aa01bf6da52e3d819112d6c6e7504ef3a37aed7277991d7d733f2",
-              "url": "https://files.pythonhosted.org/packages/a9/df/d5709dee5bc158136e7c57a0d9057ff0276fdac7bcf04ae2a1c6eaf559f6/valkey_glide-2.2.1-cp314-cp314-macosx_10_7_x86_64.whl"
+              "hash": "25ca02f0c44c92501770b02257ed63592a471c616c3bece6611f8408cfbd407c",
+              "url": "https://files.pythonhosted.org/packages/d1/8c/3af7c4e2fa4660a530b7f04915d93fb5f2f0fd75c6876eaa4279f4f225cc/valkey_glide-2.2.2-cp314-cp314-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "aff0cf5cc8c9814a680a1bc046fde1d931f9c10df7bea4cd71c9a9c1d525360f",
-              "url": "https://files.pythonhosted.org/packages/ea/08/546285ec298251905e848b762b5e2a87f66b8f0649f3999f4c8b94b41ce4/valkey_glide-2.2.1.tar.gz"
+              "hash": "8691d24fefcd2dbc39a69d1bcc1d3d1f5aedb2fe89fb90f0b0caf4d5103840f4",
+              "url": "https://files.pythonhosted.org/packages/de/4f/3f1b10601ac77266b6cecb6444cec6902075af60a5951a062dd8d5f517e3/valkey_glide-2.2.2-cp314-cp314-macosx_10_7_x86_64.whl"
             }
           ],
           "project_name": "valkey-glide",
           "requires_dists": [
             "anyio>=4.9.0",
             "protobuf>=6.20",
+            "sniffio",
             "typing-extensions>=4.8.0; python_version < \"3.11\""
           ],
           "requires_python": ">=3.9",
-          "version": "2.2.1"
+          "version": "2.2.2"
         },
         {
           "artifacts": [
@@ -7805,6 +7807,7 @@
     "pexpect~=4.8",
     "prometheus-client~=0.21.1",
     "psutil~=7.0",
+    "pycares~=4.11.0",
     "pycryptodome~=3.21",
     "pydantic[email]~=2.12.0",
     "pyhumps~=3.8.0",
@@ -7853,7 +7856,7 @@
     "types-tqdm",
     "typing_extensions~=4.11",
     "uvloop~=0.22.1; sys_platform != \"Windows\"",
-    "valkey-glide~=2.2.1",
+    "valkey-glide~=2.2.2",
     "yarl~=1.22.0",
     "zipstream-new~=1.1.8"
   ],
