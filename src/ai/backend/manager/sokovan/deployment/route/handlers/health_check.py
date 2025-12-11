@@ -35,8 +35,8 @@ class HealthCheckRouteHandler(RouteHandler):
 
     @property
     def lock_id(self) -> Optional[LockID]:
-        """No lock needed for health check."""
-        return None
+        """Lock for health check routes."""
+        return LockID.LOCKID_DEPLOYMENT_HEALTH_CHECK_ROUTES
 
     @classmethod
     def target_statuses(cls) -> list[RouteStatus]:
