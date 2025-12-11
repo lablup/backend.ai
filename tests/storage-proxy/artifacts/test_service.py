@@ -146,6 +146,22 @@ def mock_redis_client() -> MagicMock:
 
 
 @pytest.fixture
+def hf_stream_reader(mock_redis_client: MagicMock) -> HuggingFaceFileDownloadStreamReader:
+    """Create HuggingFaceFileDownloadStreamReader instance for testing."""
+    return HuggingFaceFileDownloadStreamReader(
+        url="http://test.com/file",
+        chunk_size=_DEFAULT_CHUNK_SIZE,
+        max_retries=8,
+        content_type="application/octet-stream",
+        redis_client=mock_redis_client,
+        model_id="test-model",
+        revision="main",
+        file_path="test.bin",
+        token=None,
+    )
+
+
+@pytest.fixture
 def hf_download_step(
     mock_registry_configs: dict[str, HuggingfaceConfig],
     mock_redis_client: MagicMock,
@@ -555,6 +571,30 @@ class TestHuggingFaceDownloadStep:
 
         assert chunks == [b"chunk1", b"chunk2"]
         mock_session.close.assert_called_once()
+
+    def test_get_auth_headers_with_token(
+        self,
+        hf_stream_reader: HuggingFaceFileDownloadStreamReader,
+    ) -> None:
+        """Test _get_auth_headers returns Authorization header when token is provided."""
+        test_token = "hf_test_token_12345"
+        hf_stream_reader._token = test_token
+
+        headers = hf_stream_reader._get_auth_headers()
+
+        assert "Authorization" in headers
+        assert headers["Authorization"] == f"Bearer {test_token}"
+        assert headers["Accept-Encoding"] == "identity"
+
+    def test_get_auth_headers_without_token(
+        self,
+        hf_stream_reader: HuggingFaceFileDownloadStreamReader,
+    ) -> None:
+        """Test _get_auth_headers returns no Authorization header when token is None."""
+        headers = hf_stream_reader._get_auth_headers()
+
+        assert "Authorization" not in headers
+        assert headers["Accept-Encoding"] == "identity"
 
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
