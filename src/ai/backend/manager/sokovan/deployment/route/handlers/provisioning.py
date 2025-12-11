@@ -35,8 +35,8 @@ class ProvisioningRouteHandler(RouteHandler):
 
     @property
     def lock_id(self) -> Optional[LockID]:
-        """No lock needed for provisioning routes."""
-        return None
+        """Lock for provisioning routes."""
+        return LockID.LOCKID_DEPLOYMENT_PROVISIONING_ROUTES
 
     @classmethod
     def target_statuses(cls) -> list[RouteStatus]:
