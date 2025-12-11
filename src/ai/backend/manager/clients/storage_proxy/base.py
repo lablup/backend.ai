@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import Mapping
 from contextlib import asynccontextmanager as actxmgr
@@ -7,6 +8,7 @@ from typing import Any, AsyncIterator, Final, Optional
 
 import aiohttp
 import yarl
+from aiohttp import ClientTimeout
 
 from ai.backend.common.exception import (
     ErrorCode,
@@ -21,6 +23,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.storage import (
     QuotaScopeNotFoundError,
     StorageProxyConnectionError,
+    StorageProxyTimeoutError,
     UnexpectedStorageProxyResponseError,
     VFolderBadRequest,
     VFolderGone,
@@ -29,6 +32,7 @@ from ai.backend.manager.errors.storage import (
 )
 
 AUTH_TOKEN_HDR: Final = "X-BackendAI-Storage-Auth-Token"
+DEFAULT_TIMEOUT: Final = ClientTimeout(total=300, sock_connect=30)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -131,6 +135,7 @@ class StorageProxyHTTPClient:
         *,
         body: Mapping[str, Any] | None = None,
         params: Mapping[str, Any] | None = None,
+        timeout: ClientTimeout,
     ) -> AsyncIterator[aiohttp.ClientResponse]:
         """
         Make an HTTP request using the session client.
@@ -138,6 +143,7 @@ class StorageProxyHTTPClient:
         :param method: HTTP method (GET, POST, etc.)
         :param url: URL to send the request to
         :param body: JSON body data to send with the request
+        :param timeout: Timeout configuration for the request
         :return: Response data as a dictionary, or None if no content
         """
         headers = {
@@ -150,11 +156,16 @@ class StorageProxyHTTPClient:
                 headers=headers,
                 json=body,
                 params=params,
+                timeout=timeout,
             ) as client_resp:
                 if client_resp.status // 100 == 2:
                     yield client_resp
                     return
                 await self._handle_exceptional_response(client_resp)
+        except asyncio.TimeoutError as e:
+            raise StorageProxyTimeoutError(
+                extra_msg="Request to storage proxy timed out",
+            ) from e
         except aiohttp.ClientConnectionError as e:
             raise StorageProxyConnectionError(
                 extra_msg="Failed to connect to storage proxy",
@@ -167,6 +178,7 @@ class StorageProxyHTTPClient:
         *,
         body: Mapping[str, Any] | None = None,
         params: Mapping[str, Any] | None = None,
+        timeout: ClientTimeout,
     ) -> Optional[Mapping[str, Any]]:
         """
         Make an HTTP request using the session client.
@@ -174,10 +186,11 @@ class StorageProxyHTTPClient:
         :param method: HTTP method (GET, POST, etc.)
         :param url: URL to send the request to
         :param body: JSON body data to send with the request
+        :param timeout: Timeout configuration for the request
         :return: Response data as a dictionary, or None if no content
         """
         async with self.request_stream_response(
-            method, url, body=body, params=params
+            method, url, body=body, params=params, timeout=timeout
         ) as response_stream:
             if response_stream.status == HTTPStatus.NO_CONTENT:
                 return None
@@ -193,6 +206,7 @@ class StorageProxyHTTPClient:
         *,
         body: Mapping[str, Any] | None = None,
         params: Mapping[str, Any] | None = None,
+        timeout: ClientTimeout,
     ) -> Mapping[str, Any]:
         """
         Make an HTTP request and return the response as a dictionary.
@@ -200,9 +214,10 @@ class StorageProxyHTTPClient:
         :param method: HTTP method (GET, POST, etc.)
         :param url: URL to send the request to
         :param body: JSON body data to send with the request
+        :param timeout: Timeout configuration for the request
         :return: Response object from the request
         """
-        response = await self.request(method, url, body=body, params=params)
+        response = await self.request(method, url, body=body, params=params, timeout=timeout)
         if response is None:
             raise UnexpectedStorageProxyResponseError(
                 "Unexpected response from storage proxy: None",

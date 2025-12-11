@@ -74,6 +74,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.types import SessionStatus
 
 from .defs import DEFAULT_ROLE, LockID
+from .errors.kernel import IdlePolicyNotFound
 from .models.kernel import LIVE_STATUS, kernels
 from .models.keypair import keypairs
 from .models.resource_policy import keypair_resource_policies
@@ -319,7 +320,10 @@ class IdleCheckerHost:
                     )
                     result = await conn.execute(query)
                     policy = result.first()
-                    assert policy is not None
+                    if policy is None:
+                        raise IdlePolicyNotFound(
+                            f"Resource policy not found for access_key={kernel['access_key']}"
+                        )
                     policy_cache[kernel["access_key"]] = policy
 
                 check_tasks = [
@@ -994,7 +998,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
         self, redis_obj: ValkeyLiveClient, session_id: SessionId
     ) -> Optional[dict[str, Any]]:
         key = self.get_extra_info_key(session_id)
-        assert key is not None
+        if key is None:
+            raise IdlePolicyNotFound(f"extra_info_key not defined for session {session_id}")
         data = await redis_obj.get_live_data(key)
         return msgpack.unpackb(data) if data is not None else None
 
@@ -1176,7 +1181,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
             "resources": util_avg_thresholds.to_dict(),
         }
         _key = self.get_extra_info_key(session_id)
-        assert _key is not None
+        if _key is None:
+            raise IdlePolicyNotFound(f"extra_info_key not defined for session {session_id}")
         await self._redis_live.store_live_data(
             _key,
             msgpack.packb(report),

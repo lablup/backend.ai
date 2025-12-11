@@ -14,7 +14,7 @@ from .base import NotificationAction
 class SearchRulesAction(NotificationAction):
     """Action to search notification rules."""
 
-    querier: Optional[Querier] = None
+    querier: Querier
 
     @override
     @classmethod
@@ -32,6 +32,8 @@ class SearchRulesActionResult(BaseActionResult):
 
     rules: list[NotificationRuleData]
     total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
     @override
     def entity_id(self) -> Optional[str]:

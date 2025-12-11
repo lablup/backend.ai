@@ -26,6 +26,7 @@ class VLLMModelDefinitionGenerator(ModelDefinitionGenerator):
                 path=runtime_profile.health_check_endpoint,
                 interval=10.0,
                 max_retries=10,
+                initial_delay=300.0,
             )
 
         model = ModelConfig(

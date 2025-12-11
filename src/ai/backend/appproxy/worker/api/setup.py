@@ -11,7 +11,7 @@ from tenacity import AsyncRetrying, TryAgain, retry_if_exception_type, wait_expo
 from tenacity.stop import stop_after_attempt
 
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
-from ai.backend.appproxy.common.exceptions import (
+from ai.backend.appproxy.common.errors import (
     InvalidAPIParameters,
     ServerMisconfiguredError,
 )
@@ -32,6 +32,7 @@ from ..config import (
     WildcardDomainConfig,
 )
 from ..coordinator_client import get_circuit_info
+from ..errors import MissingPortConfigError
 from ..types import FrontendServerMode, InteractiveAppInfo, RootContext
 
 
@@ -143,7 +144,8 @@ async def setup(
             raise ServerMisconfiguredError(
                 f"proxy_worker: Invalid root-level 'frontend_mode': {config.frontend_mode}"
             )
-    assert port_config is not None
+    if port_config is None:
+        raise MissingPortConfigError("Port configuration is required")
 
     use_tls = config.tls_advertised or config.tls_listen
     if not isinstance(circuit.app_info, InteractiveAppInfo):
@@ -172,6 +174,10 @@ async def setup(
                 PERMIT_COOKIE_NAME,
                 calculate_permit_hash(root_ctx.local_config.permit_hash, circuit.app_info.user_id),
                 domain=cookie_domain,
+                httponly=True,
+                secure=use_tls,
+                samesite="Lax",
+                max_age=604800,  # 7 days
             )
             return response
         case ProxyProtocol.TCP:

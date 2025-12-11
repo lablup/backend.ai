@@ -9,7 +9,7 @@ import aiotools
 
 from ai.backend.agent.agent import AbstractAgent, AgentClass
 from ai.backend.agent.config.unified import AgentUnifiedConfig
-from ai.backend.agent.errors.runtime import AgentIdNotFoundError
+from ai.backend.agent.errors import AgentIdNotFoundError
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.kernel import KernelRegistry
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext

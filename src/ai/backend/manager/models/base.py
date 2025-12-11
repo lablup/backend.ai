@@ -73,6 +73,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 
 from ..errors.api import InvalidAPIParameters
 from ..errors.common import GenericForbidden
+from ..errors.resource import DataTransformationFailed
 from .gql_relay import (
     AsyncListConnectionField,
     AsyncNode,
@@ -1357,11 +1358,15 @@ async def populate_fixture(
         if table_name.startswith("__"):
             # skip reserved names like "__mode"
             continue
-        assert not isinstance(rows, str)
+        if isinstance(rows, str):
+            raise DataTransformationFailed(
+                f"Invalid fixture data for table {table_name}: expected sequence, got string"
+            )
 
         table: sa.Table = metadata.tables.get(table_name)
 
-        assert isinstance(table, sa.Table)
+        if not isinstance(table, sa.Table):
+            raise DataTransformationFailed(f"Table {table_name} not found in metadata")
         if not rows:
             return
         log.debug("Loading the fixture table {0} (mode:{1})", table_name, op_mode.name)

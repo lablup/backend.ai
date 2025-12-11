@@ -6,10 +6,8 @@ import logging
 import os
 import pickle
 import re
-import shutil
 import signal
 import sys
-import time
 import traceback
 import weakref
 import zlib
@@ -68,6 +66,11 @@ from tenacity import (
 )
 from trafaret import DataError
 
+from ai.backend.agent.errors import (
+    AsyncioTaskNotAvailableError,
+    InvalidChunkSizeError,
+    KernelNotFoundError,
+)
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.metrics.metric import (
     StatScope,
@@ -232,16 +235,34 @@ from ai.backend.logging.formatter import pretty
 from . import __version__ as VERSION
 from .affinity_map import AffinityMap
 from .config.unified import AgentUnifiedConfig, ContainerSandboxType
-from .exception import AgentError, ContainerCreationError, ResourceError
+from .errors import (
+    ContainerCreationFailedError,
+    ContainerStartupCancelledError,
+    ContainerStartupFailedError,
+    ContainerStartupTimeoutError,
+    ImageArchitectureMismatchError,
+    ImageCommandRequiredError,
+    ImagePullTimeoutError,
+    ModelDefinitionEmptyError,
+    ModelDefinitionInvalidYAMLError,
+    ModelDefinitionNotFoundError,
+    ModelDefinitionValidationError,
+    ModelFolderNotSpecifiedError,
+    PortConflictError,
+    ReservedPortError,
+)
+from .exception import ContainerCreationError, ResourceError
 from .kernel import (
     RUN_ID_FOR_BATCH_JOB,
     AbstractKernel,
     KernelRegistry,
     match_distro_data,
 )
+from .kernel_registry.writer.types import KernelRegistrySaveMetadata
 from .observer.heartbeat import HeartbeatObserver
 from .observer.host_port import HostPortObserver
 from .observer.kernel_presence import KernelPresenceObserver
+from .observer.orphan_kernel_cleanup import OrphanKernelCleanupObserver
 from .resources import (
     AbstractComputePlugin,
     ComputerContext,
@@ -386,6 +407,11 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     async def prepare_resource_spec(
         self,
     ) -> tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
+        """
+        Generates base resource spec lacking non agent backend agnostic information
+        (e.g. unified device allocation). Do not call this method directly outside
+        `generate_resource_spec` implementation.
+        """
         raise NotImplementedError
 
     @abstractmethod
@@ -670,37 +696,36 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         # Inject ComputeDevice-specific hooks
         already_injected_hooks: set[Path] = set()
 
-        for dev_type, device_alloc in resource_spec.allocations.items():
-            computer_ctx = self.computers[dev_type]
+        for device_view in resource_spec.device_list:
+            computer_ctx = self.computers[device_view.device]
             await self.apply_accelerator_allocation(
                 computer_ctx.instance,
-                device_alloc,
+                {device_view.slot: device_view.device_alloc},
             )
             accelerator_mounts = await self.generate_accelerator_mounts(
                 computer_ctx.instance,
-                device_alloc,
+                {device_view.slot: device_view.device_alloc},
             )
 
             for mount_info in accelerator_mounts:
                 _mount(mount_info.mode, mount_info.src_path, mount_info.dst_path.as_posix())
-            alloc_sum = Decimal(0)
-            for dev_id, per_dev_alloc in device_alloc.items():
-                alloc_sum += sum(per_dev_alloc.values())
-            if alloc_sum > 0:
-                hook_paths = await computer_ctx.instance.get_hooks(distro, arch)
-                if hook_paths:
-                    log.debug(
-                        "accelerator {} provides hooks: {}",
-                        type(computer_ctx.instance).__name__,
-                        ", ".join(map(str, hook_paths)),
-                    )
-                for hook_path in map(lambda p: Path(p).absolute(), hook_paths):
-                    if hook_path in already_injected_hooks:
-                        continue
-                    container_hook_path = f"/opt/kernel/{hook_path.name}"
-                    _mount(MountTypes.BIND, hook_path, container_hook_path)
-                    environ["LD_PRELOAD"] += ":" + container_hook_path
-                    already_injected_hooks.add(hook_path)
+
+            # `.device_list()` guarantees every listed device (slot) would
+            # actually attach device to the container
+            hook_paths = await computer_ctx.instance.get_hooks(distro, arch)
+            if hook_paths:
+                log.debug(
+                    "accelerator {} provides hooks: {}",
+                    type(computer_ctx.instance).__name__,
+                    ", ".join(map(str, hook_paths)),
+                )
+            for hook_path in map(lambda p: Path(p).absolute(), hook_paths):
+                if hook_path in already_injected_hooks:
+                    continue
+                container_hook_path = f"/opt/kernel/{hook_path.name}"
+                _mount(MountTypes.BIND, hook_path, container_hook_path)
+                environ["LD_PRELOAD"] += ":" + container_hook_path
+                already_injected_hooks.add(hook_path)
 
     async def inject_additional_device_env_vars(
         self, resource_spec: KernelResourceSpec, environ: MutableMapping[str, str]
@@ -732,6 +757,27 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     def get_supplementary_gids(self) -> set[int]:
         # TODO(BA-3073): This should be separated out to its own class/module.
         return self.supplementary_gids
+
+    async def generate_resource_spec(self) -> tuple[KernelResourceSpec, Mapping[str, Any] | None]:
+        """
+        Creates complete set of `KernelResourceSpec` based on the results from
+        `prepare_resource_spec()` result.
+        """
+        base_resource_spec, resource_opts = await self.prepare_resource_spec()
+        unified_devices: list[tuple[DeviceName, SlotName]] = []
+
+        # implicitly attach unified accelerators to every created kernels
+        for dev_type, computer_ctx in self.computers.items():
+            for slot_name, slot_type in computer_ctx.instance.slot_types:
+                if slot_type == SlotTypes.UNIFIED:
+                    log.debug(
+                        "mount_krunner(): Attaching Unified device {} to kernel {}",
+                        slot_name,
+                        self.kernel_id,
+                    )
+                    unified_devices.append((dev_type, slot_name))
+        base_resource_spec.unified_devices = unified_devices
+        return base_resource_spec, resource_opts
 
 
 KernelCreationContextType = TypeVar(
@@ -1015,9 +1061,11 @@ class AbstractAgent(
         container_observer = HeartbeatObserver(self, self.event_producer)
         host_port_observer = HostPortObserver(self)
         kernel_presence_observer = KernelPresenceObserver(self, self.valkey_schedule_client)
+        orphan_cleanup_observer = OrphanKernelCleanupObserver(self, self.valkey_schedule_client)
         await self._agent_runner.register_observer(container_observer)
         await self._agent_runner.register_observer(host_port_observer)
         await self._agent_runner.register_observer(kernel_presence_observer)
+        await self._agent_runner.register_observer(orphan_cleanup_observer)
         await self._agent_runner.start()
 
         if abuse_report_path := self.local_config.agent.abuse_report_path:
@@ -1033,7 +1081,6 @@ class AbstractAgent(
         )
 
         loop = current_loop()
-        self.last_registry_written_time = time.monotonic()
         self.container_lifecycle_handler = loop.create_task(self.process_lifecycle_events())
 
         # Notify the gateway.
@@ -1106,12 +1153,25 @@ class AbstractAgent(
         await self.valkey_stat_client.close()
         await self.valkey_bgtask_client.close()
         await self.valkey_image_client.close()
+        await self.valkey_schedule_client.close()
 
     @property
     def rpc_addr(self) -> HostPortPair:
         if self.local_config.agent.advertised_rpc_addr:
             return self.local_config.agent.advertised_rpc_addr
         return self.local_config.agent.rpc_listen_addr
+
+    @abstractmethod
+    async def _load_kernel_registry_from_recovery(self) -> MutableMapping[KernelId, AbstractKernel]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def _write_kernel_registry_to_recovery(
+        self,
+        kernel_registry: MutableMapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+    ) -> None:
+        raise NotImplementedError
 
     async def _pre_anycast_event(self, event: AbstractEvent) -> None:
         if self.local_config.debug.log_heartbeats:
@@ -1272,7 +1332,10 @@ class AbstractAgent(
                         chunk_buffer.close()
                         chunk_buffer = next_chunk_buffer
 
-            assert chunk_length < chunk_size
+            if chunk_length >= chunk_size:
+                raise InvalidChunkSizeError(
+                    f"Chunk length ({chunk_length}) must be less than chunk size ({chunk_size})."
+                )
             if chunk_length > 0:
                 chunk_log_item = ContainerLogData.from_log(
                     ContainerLogType.ZLIB, chunk_buffer.getvalue()
@@ -1364,7 +1427,8 @@ class AbstractAgent(
         )
         try:
             current_task = asyncio.current_task()
-            assert current_task is not None
+            if current_task is None:
+                raise AsyncioTaskNotAvailableError("No current asyncio task is available.")
             if ev.kernel_id not in self._ongoing_destruction_tasks:
                 self._ongoing_destruction_tasks[ev.kernel_id] = current_task
             async with self.registry_lock:
@@ -1731,7 +1795,8 @@ class AbstractAgent(
                     kernel_id,
                 )
         else:
-            assert kernel_obj is not None
+            if kernel_obj is None:
+                raise KernelNotFoundError(f"Kernel object for {kernel_id} is not found.")
             if kernel_obj.termination_reason:
                 reason = kernel_obj.termination_reason
             if container_id is not None:
@@ -2248,23 +2313,7 @@ class AbstractAgent(
         Scan currently running kernels and recreate the kernel objects in
         ``self.kernel_registry`` if any missing.
         """
-        ipc_base_path = self.local_config.agent.ipc_base_path
-        var_base_path = self.local_config.agent.var_base_path
-        ipc_last_registry_file = self._resolve_conflicting_registry_file(ipc_base_path)
-        last_registry_file = self._resolve_conflicting_registry_file(var_base_path)
-        if (ipc_base_path / ipc_last_registry_file).is_file():
-            shutil.move(ipc_base_path / ipc_last_registry_file, var_base_path / last_registry_file)
-        try:
-            with open(var_base_path / last_registry_file, "rb") as f:
-                kernel_registry: MutableMapping[KernelId, AbstractKernel] = pickle.load(f)
-                for kernel_id, kernel in kernel_registry.items():
-                    self.kernel_registry[kernel_id] = kernel
-        except EOFError:
-            log.warning(
-                "Failed to load the last kernel registry: {}", (var_base_path / last_registry_file)
-            )
-        except FileNotFoundError:
-            pass
+        self.kernel_registry = await self._load_kernel_registry_from_recovery()
         for kernel_obj in self.kernel_registry.values():
             kernel_obj.agent_config = self.local_config.model_dump(by_alias=True)
             try:
@@ -2598,7 +2647,7 @@ class AbstractAgent(
                 agent_architecture = get_arch_name()
                 if agent_architecture != ctx.image_ref.architecture:
                     # disable running different architecture's image
-                    raise AgentError(
+                    raise ImageArchitectureMismatchError(
                         f"cannot run {ctx.image_ref.architecture} image on"
                         f" {agent_architecture} machine",
                     )
@@ -2633,7 +2682,7 @@ class AbstractAgent(
                         log.exception(
                             f"Image pull timeout after {image_pull_timeout} seconds. Destroying kernel (k:{kernel_id}, img:{ctx.image_ref.canonical})"
                         )
-                        raise AgentError(
+                        raise ImagePullTimeoutError(
                             f"Image pull timeout after {image_pull_timeout} seconds. (img:{ctx.image_ref.canonical})"
                         )
                 else:
@@ -2652,7 +2701,8 @@ class AbstractAgent(
 
                 # Get the resource spec from existing kernel scratches
                 # or create a new resource spec from ctx.kernel_config
-                resource_spec, resource_opts = await ctx.prepare_resource_spec()
+                resource_spec, resource_opts = await ctx.generate_resource_spec()
+
                 # When creating a new kernel,
                 # we need to allocate agent resources, prepare the networks,
                 # adn specify the container mounts.
@@ -2850,12 +2900,14 @@ class AbstractAgent(
                             port_map[sport["name"]] = sport
                         for port_no in preopen_ports:
                             if port_no in (2000, 2001):
-                                raise AgentError("Port 2000 and 2001 are reserved for internal use")
+                                raise ReservedPortError(
+                                    "Port 2000 and 2001 are reserved for internal use"
+                                )
                             overlapping_services = [
                                 s for s in service_ports if port_no in s["container_ports"]
                             ]
                             if len(overlapping_services) > 0:
-                                raise AgentError(
+                                raise PortConflictError(
                                     f"Port {port_no} overlaps with built-in service"
                                     f" {overlapping_services[0]['name']}"
                                 )
@@ -3018,7 +3070,7 @@ class AbstractAgent(
                             KernelLifecycleEventReason.FAILED_TO_CREATE,
                             container_id=ContainerId(cid),
                         )
-                        raise AgentError(
+                        raise ContainerCreationFailedError(
                             f"Kernel failed to create container (k:{str(ctx.kernel_id)}, detail:{msg})"
                         )
                     except Exception as e:
@@ -3032,7 +3084,7 @@ class AbstractAgent(
                             LifecycleEvent.DESTROY,
                             KernelLifecycleEventReason.FAILED_TO_CREATE,
                         )
-                        raise AgentError(
+                        raise ContainerCreationFailedError(
                             f"Kernel failed to create container (k:{str(kernel_id)}, detail: {str(e)})"
                         )
                     try:
@@ -3056,7 +3108,8 @@ class AbstractAgent(
                     )
 
                     current_task = asyncio.current_task()
-                    assert current_task is not None
+                    if current_task is None:
+                        raise AsyncioTaskNotAvailableError("No current asyncio task is available.")
                     self._pending_creation_tasks[kernel_id].add(current_task)
                     kernel_init_polling_attempt = (
                         self.local_config.kernel_lifecycles.init_polling_attempt
@@ -3120,7 +3173,7 @@ class AbstractAgent(
                             KernelLifecycleEventReason.FAILED_TO_START,
                             container_id=ContainerId(container_data["container_id"]),
                         )
-                        raise AgentError(
+                        raise ContainerStartupTimeoutError(
                             f"Timeout during container startup (k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
                         )
                     except asyncio.CancelledError:
@@ -3131,7 +3184,7 @@ class AbstractAgent(
                             KernelLifecycleEventReason.FAILED_TO_START,
                             container_id=ContainerId(container_data["container_id"]),
                         )
-                        raise AgentError(
+                        raise ContainerStartupCancelledError(
                             f"Cancelled waiting of container startup (k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
                         )
                     except RetryError:
@@ -3147,7 +3200,7 @@ class AbstractAgent(
                             f"(k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
                         )
                         log.exception(err_msg)
-                        raise AgentError(err_msg)
+                        raise ContainerStartupFailedError(err_msg)
                     except BaseException as e:
                         log.exception(
                             "unexpected error while waiting container startup (k: {}, e: {})",
@@ -3274,12 +3327,14 @@ class AbstractAgent(
     ) -> Any:
         image_command = await self.extract_image_command(kernel_config["image"]["canonical"])
         if runtime_variant != RuntimeVariant.CUSTOM and not image_command:
-            raise AgentError(
-                "image should have its own command when runtime variant is set to values other than CUSTOM!"
+            raise ImageCommandRequiredError(
+                "Image should have its own command when runtime variant is set to values other than CUSTOM"
             )
 
         if len(model_folders) == 0:
-            raise AgentError("At least one model virtual folder must be specified.")
+            raise ModelFolderNotSpecifiedError(
+                "At least one model virtual folder must be specified"
+            )
 
         model_folder: VFolderMount = model_folders[0]
 
@@ -3393,7 +3448,7 @@ class AbstractAgent(
                         break
 
                 if not model_definition_path:
-                    raise AgentError(
+                    raise ModelDefinitionNotFoundError(
                         f"Model definition file ({' or '.join(model_definition_candidates)}) does not exist under vFolder"
                         f" {model_folder.name} (ID {model_folder.vfid})",
                     )
@@ -3402,7 +3457,7 @@ class AbstractAgent(
                         None, model_definition_path.read_text
                     )
                 except FileNotFoundError as e:
-                    raise AgentError(
+                    raise ModelDefinitionNotFoundError(
                         "Model definition file (model-definition.yml) does not exist under"
                         f" vFolder {model_folder.name} (ID {model_folder.vfid})",
                     ) from e
@@ -3410,25 +3465,23 @@ class AbstractAgent(
                     yaml = YAML()
                     raw_definition = yaml.load(model_definition_yaml)
                 except YAMLError as e:
-                    raise AgentError(f"Invalid YAML syntax: {e}") from e
+                    raise ModelDefinitionInvalidYAMLError(f"Invalid YAML syntax: {e}") from e
         try:
             model_definition = model_definition_iv.check(raw_definition)
             if model_definition is None:
-                raise AgentError(
-                    "Model definition is empty. Please check your model definition file"
-                )
+                raise ModelDefinitionEmptyError
             for model in model_definition["models"]:
                 if "BACKEND_MODEL_NAME" not in environ:
                     environ["BACKEND_MODEL_NAME"] = model["name"]
                 environ["BACKEND_MODEL_PATH"] = model["model_path"]
                 if service := model.get("service"):
                     if service["port"] in (2000, 2001):
-                        raise AgentError("Port 2000 and 2001 are reserved for internal use")
+                        raise ReservedPortError("Port 2000 and 2001 are reserved for internal use")
                     overlapping_services = [
                         s for s in service_ports if service["port"] in s["container_ports"]
                     ]
                     if len(overlapping_services) > 0:
-                        raise AgentError(
+                        raise PortConflictError(
                             f"Port {service['port']} overlaps with built-in service"
                             f" {overlapping_services[0]['name']}"
                         )
@@ -3441,7 +3494,7 @@ class AbstractAgent(
                     })
             return model_definition
         except DataError as e:
-            raise AgentError(
+            raise ModelDefinitionValidationError(
                 "Failed to validate model definition from vFolder"
                 f" {model_folder.name} (ID {model_folder.vfid})",
             ) from e
@@ -3718,52 +3771,10 @@ class AbstractAgent(
         return await self.kernel_registry[kernel_id].ping()
 
     async def save_last_registry(self, force=False) -> None:
-        now = time.monotonic()
-        if (not force) and (now <= self.last_registry_written_time + 60):
-            return  # don't save too frequently
-        var_base_path = self.local_config.agent.var_base_path
-        last_registry_file = self._last_registry_file
-        try:
-            with open(var_base_path / last_registry_file, "wb") as f:
-                pickle.dump(dict(self.kernel_registry), f)
-            self.last_registry_written_time = now
-            log.debug("saved {}", last_registry_file)
-        except Exception as e:
-            log.exception("unable to save {}", last_registry_file, exc_info=e)
-            try:
-                os.remove(var_base_path / last_registry_file)
-            except FileNotFoundError:
-                pass
-
-    @property
-    def _last_registry_file(self) -> str:
-        match self.agent_class:
-            case AgentClass.PRIMARY:
-                return self._primary_last_registry_file
-            case AgentClass.AUXILIARY:
-                return self._auxiliary_last_registry_file
-
-    @property
-    def _primary_last_registry_file(self) -> str:
-        return f"last_registry.{self.local_instance_id}.dat"
-
-    @property
-    def _auxiliary_last_registry_file(self) -> str:
-        return f"last_registry.{self.id}.dat"
-
-    def _resolve_conflicting_registry_file(self, base_dir: Path) -> str:
-        primary_agent_file = base_dir / self._primary_last_registry_file
-        auxiliary_agent_file = base_dir / self._auxiliary_last_registry_file
-        if primary_agent_file.is_file() and auxiliary_agent_file.is_file():
-            primary_modification_time = primary_agent_file.stat().st_mtime
-            auxiliary_modification_time = auxiliary_agent_file.stat().st_mtime
-
-            if primary_modification_time > auxiliary_modification_time:
-                return self._primary_last_registry_file
-            else:
-                return self._auxiliary_last_registry_file
-        else:
-            return self._last_registry_file
+        await self._write_kernel_registry_to_recovery(
+            self.kernel_registry,
+            KernelRegistrySaveMetadata(force),
+        )
 
 
 async def handle_volume_mount(

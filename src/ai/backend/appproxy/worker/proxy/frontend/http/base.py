@@ -7,7 +7,7 @@ import jwt
 from aiohttp import web
 
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
-from ai.backend.appproxy.common.exceptions import BackendError, InvalidCredentials
+from ai.backend.appproxy.common.errors import InvalidCredentials
 from ai.backend.appproxy.common.types import RouteInfo, WebRequestHandler
 from ai.backend.appproxy.common.utils import ensure_json_serializable, is_permit_valid, mime_match
 from ai.backend.appproxy.worker.proxy.backend.http import HTTPBackend
@@ -18,6 +18,7 @@ from ai.backend.appproxy.worker.types import (
     RootContext,
     TCircuitKey,
 )
+from ai.backend.common.exception import BackendAIError
 from ai.backend.logging import BraceStyleAdapter
 
 from ..base import BaseFrontend
@@ -104,7 +105,7 @@ class BaseHTTPFrontend(Generic[TCircuitKey], BaseFrontend[HTTPBackend, TCircuitK
     ) -> web.StreamResponse:
         try:
             resp = await handler(request)
-        except BackendError as ex:
+        except BackendAIError as ex:
             if ex.status_code == 500:
                 log.exception("Internal server error raised inside handlers")
             if mime_match(

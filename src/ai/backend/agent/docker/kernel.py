@@ -33,6 +33,7 @@ from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
+from ..errors import KernelRunnerNotInitializedError, SubprocessStreamError
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
 from ..types import AgentEventData, KernelOwnershipData
@@ -105,13 +106,15 @@ class DockerKernel(AbstractKernel):
 
     @override
     async def get_completions(self, text: str, opts: Mapping[str, Any]) -> CodeCompletionResp:
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         result = await self.runner.feed_and_get_completion(text, opts)
         return CodeCompletionResp(result=result)
 
     @override
     async def check_status(self):
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         result = await self.runner.feed_and_get_status()
         return result
 
@@ -125,13 +128,15 @@ class DockerKernel(AbstractKernel):
 
     @override
     async def interrupt_kernel(self):
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_interrupt()
         return {"status": "finished"}
 
     @override
     async def start_service(self, service: str, opts: Mapping[str, Any]):
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         if self.data.get("block_service_ports", False):
             return {
                 "status": "failed",
@@ -153,18 +158,21 @@ class DockerKernel(AbstractKernel):
 
     @override
     async def start_model_service(self, model_service: Mapping[str, Any]):
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         result = await self.runner.feed_start_model_service(model_service)
         return result
 
     @override
     async def shutdown_service(self, service: str):
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_shutdown_service(service)
 
     @override
     async def get_service_apps(self):
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         result = await self.runner.feed_service_apps()
         return result
 
@@ -191,7 +199,8 @@ class DockerKernel(AbstractKernel):
         filename: str | None = None,
         extra_labels: dict[str, str] = {},
     ) -> None:
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
 
         loop = asyncio.get_running_loop()
         path, lock_path = self._get_commit_path(kernel_id, subdir)
@@ -330,7 +339,8 @@ class DockerKernel(AbstractKernel):
                 with await container.get_archive(str(container_abspath)) as tarobj:
                     # FIXME: Replace this API call to a streaming version and cut the download if
                     #        the downloaded size exceeds the limit.
-                    assert tarobj.fileobj is not None
+                    if tarobj.fileobj is None:
+                        raise SubprocessStreamError("Tar file object is not available")
                     tar_fobj = cast(io.BufferedIOBase, tarobj.fileobj)
                     tar_fobj.seek(0, io.SEEK_END)
                     tar_size = tar_fobj.tell()
@@ -357,7 +367,8 @@ class DockerKernel(AbstractKernel):
                 with await container.get_archive(str(container_abspath)) as tarobj:
                     # FIXME: Replace this API call to a streaming version and cut the download if
                     #        the downloaded size exceeds the limit.
-                    assert tarobj.fileobj is not None
+                    if tarobj.fileobj is None:
+                        raise SubprocessStreamError("Tar file object is not available")
                     tar_fobj = cast(io.BufferedIOBase, tarobj.fileobj)
                     tar_fobj.seek(0, io.SEEK_END)
                     tar_size = tar_fobj.tell()
@@ -436,7 +447,8 @@ class DockerKernel(AbstractKernel):
 
     @override
     async def notify_event(self, evdata: AgentEventData):
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_event(evdata)
 
 
@@ -661,7 +673,8 @@ async def prepare_kernel_metadata_uri_handling(local_config: AgentUnifiedConfig)
             stderr=asyncio.subprocess.PIPE,
         )
         await proc.wait()
-        assert proc.stdout is not None
+        if proc.stdout is None:
+            raise SubprocessStreamError("Subprocess stdout is not available")
         raw_rules = await proc.stdout.read()
         rules = raw_rules.decode()
         if LinuxKit_IPTABLES_RULE.search(rules) is None:

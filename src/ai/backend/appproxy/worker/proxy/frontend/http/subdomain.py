@@ -7,10 +7,11 @@ import jinja2
 from aiohttp import web
 from aiohttp.typedefs import Handler
 
-from ai.backend.appproxy.common.exceptions import GenericBadRequest, ServerMisconfiguredError
+from ai.backend.appproxy.common.errors import GenericBadRequest, ServerMisconfiguredError
 from ai.backend.logging import BraceStyleAdapter
 
 from ....config import WildcardDomainConfig
+from ....errors import InvalidFrontendTypeError
 from ....types import Circuit, SubdomainFrontendInfo
 from .base import BaseHTTPFrontend
 
@@ -95,5 +96,8 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
         return await self.exception_safe_handler_wrapper(request, _exception_safe_handler)
 
     def get_circuit_key(self, circuit: Circuit) -> str:
-        assert isinstance(circuit.frontend, SubdomainFrontendInfo)
+        if not isinstance(circuit.frontend, SubdomainFrontendInfo):
+            raise InvalidFrontendTypeError(
+                f"Expected SubdomainFrontendInfo, got {type(circuit.frontend).__name__}"
+            )
         return circuit.frontend.subdomain.lower()

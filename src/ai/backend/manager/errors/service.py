@@ -130,3 +130,15 @@ class ModelServiceDependencyNotCleared(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.SOFT_DELETE,
             error_detail=ErrorDetail.CONFLICT,
         )
+
+
+class AppServiceStartFailed(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/app-service-start-failed"
+    error_title = "Failed to start the application service."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.START,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

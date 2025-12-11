@@ -28,6 +28,7 @@ from ai.backend.common.types import DeviceId, DeviceName, SlotName, SlotTypes
 from ai.backend.logging import BraceStyleAdapter
 
 from .affinity_map import AffinityHint, AffinityPolicy
+from .errors import ResourceAllocationError
 from .exception import (
     FractionalResourceFragmented,
     InsufficientResource,
@@ -236,17 +237,6 @@ class AbstractAllocMap(metaclass=ABCMeta):
                     hint_for_next_allocation.append(dev)
         affinity_hint.devices = hint_for_next_allocation
 
-    @final
-    def update_device_slot_amounts(self, slot_amounts: Mapping[SlotName, Decimal]) -> None:
-        self.device_slots = {
-            device_id: DeviceSlotInfo(
-                slot_type=slot_info.slot_type,
-                slot_name=slot_info.slot_name,
-                amount=slot_amounts[slot_info.slot_name],
-            )
-            for device_id, slot_info in self.device_slots.items()
-        }
-
     @abstractmethod
     def allocate(
         self,
@@ -370,7 +360,11 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
             # fill up starting from the most free devices considering affinity hint
             for dev_id, current_alloc in sorted_dev_allocs:
                 current_alloc = self.allocations[slot_name][dev_id]
-                assert slot_name == self.device_slots[dev_id].slot_name
+                if slot_name != self.device_slots[dev_id].slot_name:
+                    raise ResourceAllocationError(
+                        f"Slot name mismatch: expected {slot_name}, "
+                        f"got {self.device_slots[dev_id].slot_name} for device {dev_id}."
+                    )
                 total_allocatable += int(self.device_slots[dev_id].amount - current_alloc)
             if total_allocatable < requested_alloc:
                 raise InsufficientResource(
@@ -640,7 +634,11 @@ class FractionAllocMap(AbstractAllocMap):
 
             for dev_id, current_alloc in sorted_dev_allocs:
                 current_alloc = self.allocations[slot_name][dev_id]
-                assert slot_name == self.device_slots[dev_id].slot_name
+                if slot_name != self.device_slots[dev_id].slot_name:
+                    raise ResourceAllocationError(
+                        f"Slot name mismatch: expected {slot_name}, "
+                        f"got {self.device_slots[dev_id].slot_name} for device {dev_id}."
+                    )
                 total_allocatable += self.device_slots[dev_id].amount - current_alloc
             if total_allocatable < alloc:
                 raise InsufficientResource(

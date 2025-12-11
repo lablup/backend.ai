@@ -13,6 +13,8 @@ from ai.backend.common.api_handlers import (
     PathParam,
     api_handler,
 )
+from ai.backend.common.dto.storage.request import GetVerificationResultReq
+from ai.backend.common.dto.storage.response import GetVerificationResultResponse
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import ArtifactRevisionResponseData
 from ai.backend.manager.dto.context import ProcessorsCtx
@@ -53,6 +55,9 @@ from ai.backend.manager.services.artifact_revision.actions.get_download_progress
 )
 from ai.backend.manager.services.artifact_revision.actions.get_readme import (
     GetArtifactRevisionReadmeAction,
+)
+from ai.backend.manager.services.artifact_revision.actions.get_verification_result import (
+    GetArtifactRevisionVerificationResultAction,
 )
 from ai.backend.manager.services.artifact_revision.actions.import_revision import (
     ImportArtifactRevisionAction,
@@ -275,6 +280,33 @@ class APIHandler:
 
     @auth_required_for_method
     @api_handler
+    async def get_artifact_revision_verification_result(
+        self,
+        path: PathParam[GetVerificationResultReq],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """
+        Retrieve the verification result for a specific artifact revision.
+
+        Returns the verification result data associated with the artifact revision,
+        which contains results from all verifiers that have been run on the artifact.
+        """
+        processors = processors_ctx.processors
+        action_result = (
+            await processors.artifact_revision.get_verification_result.wait_for_complete(
+                GetArtifactRevisionVerificationResultAction(
+                    artifact_revision_id=path.parsed.artifact_revision_id,
+                )
+            )
+        )
+
+        resp = GetVerificationResultResponse(
+            verification_result=action_result.verification_result,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    @auth_required_for_method
+    @api_handler
     async def get_download_progress(
         self,
         path: PathParam[GetDownloadProgressReqPathParam],
@@ -332,6 +364,13 @@ def create_app(
             "GET",
             "/revisions/{artifact_revision_id}/readme",
             api_handler.get_artifact_revision_readme,
+        )
+    )
+    cors.add(
+        app.router.add_route(
+            "GET",
+            "/revisions/{artifact_revision_id}/verification-result",
+            api_handler.get_artifact_revision_verification_result,
         )
     )
     cors.add(

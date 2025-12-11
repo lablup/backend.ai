@@ -24,6 +24,8 @@ from ai.backend.common.utils import mount as _mount
 from ai.backend.common.utils import umount as _umount
 from ai.backend.logging import BraceStyleAdapter
 
+from .errors import InvalidDataLengthError, InvalidSocketPathError
+
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
@@ -320,7 +322,7 @@ class Response:
 
 def get_zmq_socket_file_path(path: str | Path | None, pidx: int) -> str:
     if path is None:
-        raise ValueError("Socket path should not be None")
+        raise InvalidSocketPathError("Socket path should not be None")
     return f"ipc://{path}-{pidx}"
 
 
@@ -337,7 +339,7 @@ class Protocol:
             raise asyncio.CancelledError
         data = await insock.recv_multipart()
         if (data_len := len(data)) != 2:
-            raise ValueError(f"data length for request should be 2, not {data_len}")
+            raise InvalidDataLengthError(f"data length for request should be 2, not {data_len}")
         return Request.deserialize((data[0], data[1]))
 
     @classmethod
@@ -352,7 +354,7 @@ class Protocol:
             raise asyncio.CancelledError
         data = await outsock.recv_multipart()
         if (data_len := len(data)) != 2:
-            raise ValueError(f"data length for respond should be 2, not {data_len}")
+            raise InvalidDataLengthError(f"data length for respond should be 2, not {data_len}")
         return Response.deserialize((data[0], data[1]))
 
 

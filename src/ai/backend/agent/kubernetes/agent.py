@@ -71,6 +71,11 @@ from ..agent import (
 from ..config.unified import AgentUnifiedConfig, ScratchType
 from ..exception import K8sError, UnsupportedResource
 from ..kernel import AbstractKernel, KernelRegistry
+from ..kernel_registry.recovery.kubernetes_recovery import (
+    KubernetesKernelRegistryRecovery,
+    KubernetesKernelRegistryRecoveryArgs,
+)
+from ..kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ..resources import (
     AbstractComputePlugin,
     ComputerContext,
@@ -184,8 +189,10 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         else:
             slots = ResourceSlot.from_json(self.kernel_config["resource_slots"])
             # Ensure that we have intrinsic slots.
-            assert SlotName("cpu") in slots
-            assert SlotName("mem") in slots
+            if SlotName("cpu") not in slots:
+                raise UnsupportedResource("cpu slot is required")
+            if SlotName("mem") not in slots:
+                raise UnsupportedResource("mem slot is required")
             # accept unknown slot type with zero values
             # but reject if they have non-zero values.
             for st, sv in slots.items():
@@ -348,7 +355,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         core_api = kube_client.CoreV1Api()
 
         # Get hash of public key
-        enc = hashlib.md5()
+        enc = hashlib.md5(usedforsecurity=False)
         enc.update(sshkey["public_key"].encode("ascii"))
         hash = enc.digest().decode("utf-8")
 
@@ -758,7 +765,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             log.exception("Error while rollup: {}", e)
             raise
 
-        assert expose_service_api_response.spec is not None
+        if expose_service_api_response.spec is None:
+            raise K8sError("expose_service_api_response.spec is None")
         node_ports: List[V1ServicePort] = expose_service_api_response.spec.ports
         arguments.append((
             None,
@@ -860,6 +868,15 @@ class KubernetesAgent(
             computers=computers,
             slots=slots,
             agent_class=agent_class,
+        )
+        self._kernel_recovery = KubernetesKernelRegistryRecovery.create(
+            KubernetesKernelRegistryRecoveryArgs(
+                scratch_root=self.local_config.container.scratch_root,
+                ipc_base_path=self.local_config.agent.ipc_base_path,
+                var_base_path=self.local_config.agent.var_base_path,
+                agent_id=self.id,
+                local_instance_id=self.local_instance_id,
+            )
         )
 
     async def __ainit__(self) -> None:
@@ -977,6 +994,18 @@ class KubernetesAgent(
         finally:
             # Stop k8s event monitoring.
             pass
+
+    @override
+    async def _load_kernel_registry_from_recovery(self) -> MutableMapping[KernelId, AbstractKernel]:
+        return await self._kernel_recovery.load_kernel_registry()
+
+    @override
+    async def _write_kernel_registry_to_recovery(
+        self,
+        kernel_registry: MutableMapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+    ) -> None:
+        await self._kernel_recovery.save_kernel_registry(kernel_registry, metadata)
 
     @override
     def get_cgroup_path(self, controller: str, container_id: str) -> Path:

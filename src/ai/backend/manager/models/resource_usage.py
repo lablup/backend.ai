@@ -67,7 +67,6 @@ class ResourceUsage:
                 "ResourceUsage should only be added to `ResourceUsage` type,"
                 f" not `{type(other)}` type."
             )
-        assert isinstance(other, ResourceUsage)
         self.nfs |= other.nfs  # Is this correct??
         self.device_type |= other.device_type
         self.cpu_allocated += other.cpu_allocated

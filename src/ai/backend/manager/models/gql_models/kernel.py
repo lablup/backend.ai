@@ -257,7 +257,10 @@ class ComputeContainer(graphene.ObjectType):
 
     @classmethod
     def parse_row(cls, ctx: GraphQueryContext, row: KernelRow) -> Mapping[str, Any]:
-        assert row is not None
+        from ai.backend.manager.errors.resource import DataTransformationFailed
+
+        if row is None:
+            raise DataTransformationFailed("Kernel row is None")
         from .user import UserRole
 
         is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
@@ -681,7 +684,10 @@ class LegacyComputeSession(graphene.ObjectType):
 
     @classmethod
     def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
-        assert row is not None
+        from ai.backend.manager.errors.resource import DataTransformationFailed
+
+        if row is None:
+            raise DataTransformationFailed("Legacy compute session row is None")
         from .user import UserRole
 
         mega = 2**20

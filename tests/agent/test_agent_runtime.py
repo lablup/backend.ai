@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from ai.backend.agent.errors.runtime import AgentIdNotFoundError
+from ai.backend.agent.errors import AgentIdNotFoundError
 from ai.backend.agent.runtime import AgentRuntime
 from ai.backend.common.types import AgentId
 

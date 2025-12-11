@@ -19,13 +19,14 @@ from ai.backend.common.data.storage.types import (
     ArtifactStorageImportStep,
 )
 from ai.backend.storage.client.huggingface import HuggingFaceClient
+from ai.backend.storage.client.manager import ManagerHTTPClientPool
 from ai.backend.storage.config.unified import (
     HuggingfaceConfig,
     ObjectStorageConfig,
     ReservoirClientConfig,
     ReservoirConfig,
 )
-from ai.backend.storage.exception import (
+from ai.backend.storage.errors import (
     ArtifactStorageEmptyError,
     HuggingFaceAPIError,
     ObjectStorageBucketNotFoundError,
@@ -274,11 +275,15 @@ def reservoir_download_step(
     mock_redis_client = MagicMock()
     mock_redis_client.init_artifact_download = AsyncMock()
     mock_redis_client.update_file_progress = AsyncMock()
+    # Create ManagerHTTPClientPool
+    manager_client_pool = ManagerHTTPClientPool(
+        registry_configs=mock_reservoir_registry_configs,
+        client_config=ReservoirClientConfig(),
+    )
     return ReservoirDownloadStep(
         registry_configs=mock_reservoir_registry_configs,
         download_storage=mock_download_storage,
-        manager_http_clients={},
-        reservoir_client_config=ReservoirClientConfig(),
+        manager_client_pool=manager_client_pool,
         redis_client=mock_redis_client,
     )
 
@@ -996,11 +1001,15 @@ class TestReservoirDownloadStep:
         mock_redis_client = MagicMock()
         mock_redis_client.init_artifact_download = AsyncMock()
         mock_redis_client.update_file_progress = AsyncMock()
+        # Create ManagerHTTPClientPool with empty configs
+        manager_client_pool = ManagerHTTPClientPool(
+            registry_configs={},
+            client_config=ReservoirClientConfig(),
+        )
         step = ReservoirDownloadStep(
             registry_configs={},
             download_storage=mock_download_storage,
-            manager_http_clients={},
-            reservoir_client_config=ReservoirClientConfig(),
+            manager_client_pool=manager_client_pool,
             redis_client=mock_redis_client,
         )
 

@@ -267,6 +267,17 @@ class SchedulingController:
             session_data.name,
             session_id,
         )
+
+        # Broadcast PENDING status event
+        await self._event_producer.broadcast_events_batch([
+            SchedulingBroadcastEvent(
+                session_id=session_id,
+                creation_id=session_data.creation_id,
+                status_transition=str(SessionStatus.PENDING),
+                reason="Session enqueued",
+            )
+        ])
+
         try:
             await self.mark_scheduling_needed(ScheduleType.SCHEDULE)
         except Exception as e:
@@ -323,7 +334,8 @@ class SchedulingController:
                 len(result.terminating_sessions),
             )
 
-            cancelled_events: list[AbstractBroadcastEvent] = [
+            # Broadcast status events for cancelled and terminating sessions
+            broadcast_events: list[AbstractBroadcastEvent] = [
                 SchedulingBroadcastEvent(
                     session_id=session_id,
                     creation_id="",
@@ -332,8 +344,17 @@ class SchedulingController:
                 )
                 for session_id in result.cancelled_sessions
             ]
-            if cancelled_events:
-                await self._event_producer.broadcast_events_batch(cancelled_events)
+            broadcast_events.extend([
+                SchedulingBroadcastEvent(
+                    session_id=session_id,
+                    creation_id="",
+                    status_transition=str(SessionStatus.TERMINATING),
+                    reason=reason,
+                )
+                for session_id in result.terminating_sessions
+            ])
+            if broadcast_events:
+                await self._event_producer.broadcast_events_batch(broadcast_events)
             # Record metric for termination attempts
             self._operation_metrics.observe_success(
                 operation="mark_sessions_terminating",

@@ -20,7 +20,8 @@ config = context.config
 # This line sets up loggers basically.
 
 if not logging_active.get():
-    assert config.config_file_name is not None
+    if config.config_file_name is None:
+        raise RuntimeError("Alembic config file name is not set")
     fileConfig(config.config_file_name)
 
 # Import the shared metadata and all models.

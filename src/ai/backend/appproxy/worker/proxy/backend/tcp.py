@@ -6,7 +6,7 @@ from typing import Final
 
 import aiotools
 
-from ai.backend.appproxy.common.exceptions import WorkerNotAvailable
+from ai.backend.appproxy.common.errors import WorkerNotAvailable
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.logging import BraceStyleAdapter
 

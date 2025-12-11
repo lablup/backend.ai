@@ -133,20 +133,19 @@ class KeyPairResourcePolicyRow(Base):
         )
 
     @classmethod
-    def from_dataclass(cls, data: KeyPairResourcePolicyData) -> Self:
+    def from_creator(cls, creator: KeyPairResourcePolicyCreator) -> Self:
         return cls(
-            name=data.name,
-            created_at=data.created_at,
-            default_for_unspecified=data.default_for_unspecified,
-            total_resource_slots=data.total_resource_slots,
-            max_session_lifetime=data.max_session_lifetime,
-            max_concurrent_sessions=data.max_concurrent_sessions,
-            max_pending_session_count=data.max_pending_session_count,
-            max_pending_session_resource_slots=data.max_pending_session_resource_slots,
-            max_concurrent_sftp_sessions=data.max_concurrent_sftp_sessions,
-            max_containers_per_session=data.max_containers_per_session,
-            idle_timeout=data.idle_timeout,
-            allowed_vfolder_hosts=data.allowed_vfolder_hosts,
+            name=creator.name,
+            default_for_unspecified=creator.default_for_unspecified,
+            total_resource_slots=creator.total_resource_slots,
+            max_session_lifetime=creator.max_session_lifetime,
+            max_concurrent_sessions=creator.max_concurrent_sessions,
+            max_pending_session_count=creator.max_pending_session_count,
+            max_pending_session_resource_slots=creator.max_pending_session_resource_slots,
+            max_concurrent_sftp_sessions=creator.max_concurrent_sftp_sessions,
+            max_containers_per_session=creator.max_containers_per_session,
+            idle_timeout=creator.idle_timeout,
+            allowed_vfolder_hosts=creator.allowed_vfolder_hosts,
         )
 
 
@@ -179,6 +178,16 @@ class UserResourcePolicyRow(Base):
         self.max_quota_scope_size = max_quota_scope_size
         self.max_session_count_per_model_session = max_session_count_per_model_session
         self.max_customized_image_count = max_customized_image_count
+
+    @classmethod
+    def from_creator(cls, creator: UserResourcePolicyCreator) -> Self:
+        return cls(
+            name=creator.name,
+            max_vfolder_count=creator.max_vfolder_count,
+            max_quota_scope_size=creator.max_quota_scope_size,
+            max_session_count_per_model_session=creator.max_session_count_per_model_session,
+            max_customized_image_count=creator.max_customized_image_count,
+        )
 
     @classmethod
     def from_dataclass(cls, data: UserResourcePolicyData) -> Self:

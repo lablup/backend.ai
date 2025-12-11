@@ -6,6 +6,7 @@ from aiohttp import web
 from ai.backend.appproxy.common.types import CORSOptions, FrontendMode, WebMiddleware
 
 from .. import __version__
+from ..errors import MissingPortProxyConfigError
 from ..types import RootContext
 
 
@@ -37,7 +38,8 @@ async def status(request: web.Request) -> web.Response:
     if worker_config.frontend_mode == FrontendMode.WILDCARD_DOMAIN:
         available_slots = 0
     else:
-        assert worker_config.port_proxy is not None
+        if worker_config.port_proxy is None:
+            raise MissingPortProxyConfigError("Port proxy configuration is required for PORT mode")
         available_slots = (
             worker_config.port_proxy.bind_port_range[1]
             - worker_config.port_proxy.bind_port_range[0]

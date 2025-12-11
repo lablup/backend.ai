@@ -10,8 +10,6 @@ from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
 
-from ..kernel.types import KernelInfo
-
 
 class AgentStatus(enum.Enum):
     ALIVE = 0
@@ -82,12 +80,6 @@ class AgentData:
     compute_plugins: list[str]
     public_key: Optional[PublicKey]
     auto_terminate_abusing_kernel: bool
-
-
-@dataclass
-class AgentDataExtended(AgentData):
-    known_slot_types: Mapping[SlotName, SlotTypes]
-    kernels: list[KernelInfo]
 
 
 @dataclass

@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import secrets
 import uuid
@@ -11,28 +10,26 @@ from yarl import URL
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
-    EventHandler,
 )
 from ai.backend.common.events.event_types.kernel.types import (
     KernelLifecycleEventReason,
 )
-from ai.backend.common.events.event_types.model_serving.broadcast import (
-    ModelServiceStatusBroadcastEvent,
-)
 from ai.backend.common.events.event_types.session.broadcast import (
-    SessionCancelledBroadcastEvent,
-    SessionEnqueuedBroadcastEvent,
-    SessionPreparingBroadcastEvent,
-    SessionStartedBroadcastEvent,
-    SessionTerminatedBroadcastEvent,
+    SchedulingBroadcastEvent,
 )
+from ai.backend.common.events.hub import EventHub
+from ai.backend.common.events.hub.propagators.bypass import AsyncBypassPropagator
+from ai.backend.common.events.types import EventDomain
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import (
-    AgentId,
+    AccessKey,
     ImageAlias,
+    KernelEnqueueingConfig,
     SessionTypes,
+    VFolderID,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -49,6 +46,7 @@ from ai.backend.manager.data.model_serving.types import (
 from ai.backend.manager.data.model_serving.types import (
     EndpointTokenData as ServiceEndpointTokenData,
 )
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.service import (
     EndpointNotFound,
     ModelServiceNotFound,
@@ -60,7 +58,6 @@ from ai.backend.manager.models.endpoint import (
     EndpointTokenRow,
 )
 from ai.backend.manager.models.routing import RouteStatus
-from ai.backend.manager.models.session import KernelLoadingStrategy
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import VFolderOwnershipType, VFolderRow
@@ -69,6 +66,9 @@ from ai.backend.manager.repositories.model_serving.admin_repository import (
     AdminModelServingRepository,
 )
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
+from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    SessionCreationSpec,
+)
 from ai.backend.manager.services.model_serving.actions.clear_error import (
     ClearErrorAction,
     ClearErrorActionResult,
@@ -123,6 +123,7 @@ from ai.backend.manager.services.model_serving.exceptions import (
 )
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import UserScope
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -132,6 +133,7 @@ class ModelServingService:
     _agent_registry: AgentRegistry
     _background_task_manager: BackgroundTaskManager
     _event_dispatcher: EventDispatcher
+    _event_hub: EventHub
     _storage_manager: StorageSessionManager
     _config_provider: ManagerConfigProvider
     _repository: ModelServingRepository
@@ -139,28 +141,47 @@ class ModelServingService:
 
     _valkey_live: ValkeyLiveClient
     _deployment_controller: DeploymentController
+    _scheduling_controller: SchedulingController
 
     def __init__(
         self,
         agent_registry: AgentRegistry,
         background_task_manager: BackgroundTaskManager,
         event_dispatcher: EventDispatcher,
+        event_hub: EventHub,
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
         valkey_live: ValkeyLiveClient,
         repository: ModelServingRepository,
         admin_repository: AdminModelServingRepository,
         deployment_controller: DeploymentController,
+        scheduling_controller: SchedulingController,
     ) -> None:
         self._agent_registry = agent_registry
         self._background_task_manager = background_task_manager
         self._event_dispatcher = event_dispatcher
+        self._event_hub = event_hub
         self._storage_manager = storage_manager
         self._config_provider = config_provider
         self._valkey_live = valkey_live
         self._repository = repository
         self._admin_repository = admin_repository
         self._deployment_controller = deployment_controller
+        self._scheduling_controller = scheduling_controller
+        # Map SessionStatus to legacy event names for backward compatibility
+        self._status_to_event_name: dict[SessionStatus, str] = {
+            SessionStatus.PENDING: "session_enqueued",
+            SessionStatus.SCHEDULED: "session_scheduled",
+            SessionStatus.PREPARING: "session_preparing",
+            SessionStatus.PULLING: "session_preparing",
+            SessionStatus.PREPARED: "session_prepared",
+            SessionStatus.CREATING: "session_creating",
+            SessionStatus.RUNNING: "session_started",
+            SessionStatus.TERMINATING: "session_terminating",
+            SessionStatus.TERMINATED: "session_terminated",
+            SessionStatus.CANCELLED: "session_cancelled",
+            SessionStatus.ERROR: "session_cancelled",
+        }
 
     async def _fetch_file_from_storage_proxy(
         self,
@@ -424,138 +445,118 @@ class ModelServingService:
         }
         sudo_session_enabled = action.sudo_session_enabled
 
+        # Build SessionCreationSpec for dry-run
+        session_creation_id = secrets.token_urlsafe(16)
+        session_name = f"model-eval-{session_creation_id}"
+
+        # Prepare mounts and environ
+        mounts = [
+            service_prepare_ctx.model_id,
+            *[m.vfid for m in service_prepare_ctx.extra_mounts],
+        ]
+        mount_map: dict[uuid.UUID | VFolderID, str] = {
+            service_prepare_ctx.model_id: action.config.model_mount_destination,
+        }
+        for m in service_prepare_ctx.extra_mounts:
+            mount_map[m.vfid] = str(m.kernel_path)
+        mount_options = {
+            m.vfid: {"permission": m.mount_perm} for m in service_prepare_ctx.extra_mounts
+        }
+        environ = creation_config.get("environ", {})
+
+        # Create single kernel spec - cluster replication is handled by ClusterPreparerRule
+        kernel_spec = KernelEnqueueingConfig(
+            image_ref=image_row.image_ref,
+            cluster_role="main",
+            cluster_idx=1,
+            local_rank=0,
+            cluster_hostname="main1",
+            creation_config={
+                "mounts": mounts,
+                "mount_map": mount_map,
+                "mount_options": mount_options,
+                "environ": environ,
+                "resources": creation_config.get("resources", {}),
+                "resource_opts": creation_config.get("resource_opts", {}),
+            },
+            bootstrap_script=action.bootstrap_script or "",
+            startup_command=action.startup_command,
+            # uid/main_gid/supplementary_gids are filled from context.container_user_info
+            uid=None,
+            main_gid=None,
+            supplementary_gids=[],
+        )
+
+        session_spec = SessionCreationSpec(
+            session_creation_id=session_creation_id,
+            session_name=session_name,
+            access_key=AccessKey(service_prepare_ctx.owner_access_key),
+            user_scope=UserScope(
+                domain_name=action.domain_name,
+                group_id=service_prepare_ctx.group_id,
+                user_uuid=created_user.uuid,
+                user_role=created_user.role,
+            ),
+            session_type=SessionTypes.INFERENCE,
+            cluster_mode=action.cluster_mode,
+            cluster_size=action.cluster_size,
+            priority=SESSION_PRIORITY_DEFAULT,
+            resource_policy=service_prepare_ctx.resource_policy,
+            kernel_specs=[kernel_spec],
+            creation_spec={
+                "mounts": mounts,
+                "mount_map": mount_map,
+                "mount_options": mount_options,
+                "model_definition_path": service_prepare_ctx.model_definition_path,
+                "runtime_variant": action.runtime_variant,
+                "environ": environ,
+                "scaling_group": service_prepare_ctx.scaling_group,
+                "resources": creation_config.get("resources", {}),
+                "resource_opts": creation_config.get("resource_opts", {}),
+                "preopen_ports": None,
+                "agent_list": None,
+            },
+            scaling_group=service_prepare_ctx.scaling_group,
+            session_tag=action.tag,
+            callback_url=URL(action.callback_url.unicode_string()) if action.callback_url else None,
+            sudo_session_enabled=sudo_session_enabled,
+        )
+
+        # Enqueue session before starting background task to avoid race conditions
+        session_id = await self._scheduling_controller.enqueue_session(session_spec)
+        session_id_str = str(session_id)
+
         async def _task(reporter: ProgressReporter) -> None:
-            terminated_event = asyncio.Event()
-
-            result = await self._agent_registry.create_session(
-                f"model-eval-{secrets.token_urlsafe(16)}",
-                image_row.image_ref,
-                UserScope(
-                    domain_name=action.domain_name,
-                    group_id=service_prepare_ctx.group_id,
-                    user_uuid=created_user.uuid,
-                    user_role=created_user.role,
-                ),
-                service_prepare_ctx.owner_access_key,
-                service_prepare_ctx.resource_policy,
-                SessionTypes.INFERENCE,
-                {
-                    "mounts": [
-                        service_prepare_ctx.model_id,
-                        *[m.vfid for m in service_prepare_ctx.extra_mounts],
-                    ],
-                    "mount_map": {
-                        service_prepare_ctx.model_id: action.config.model_mount_destination,
-                        **{m.vfid: m.kernel_path for m in service_prepare_ctx.extra_mounts},
-                    },
-                    "mount_options": {
-                        m.vfid: {"permission": m.mount_perm}
-                        for m in service_prepare_ctx.extra_mounts
-                    },
-                    "model_definition_path": service_prepare_ctx.model_definition_path,
-                    "environ": creation_config["environ"],
-                    "scaling_group": service_prepare_ctx.scaling_group,
-                    "resources": creation_config["resources"],
-                    "resource_opts": creation_config["resource_opts"],
-                    "preopen_ports": None,
-                    "agent_list": None,
-                },
-                action.cluster_mode,
-                action.cluster_size,
-                bootstrap_script=action.bootstrap_script,
-                startup_command=action.startup_command,
-                tag=action.tag,
-                callback_url=URL(action.callback_url.unicode_string())
-                if action.callback_url
-                else None,
-                enqueue_only=True,
-                sudo_session_enabled=sudo_session_enabled,
-            )
-
-            await reporter.update(
-                message=dump_json_str({
-                    "event": "session_enqueued",
-                    "session_id": str(result["sessionId"]),
-                })
-            )
-
-            async def _handle_event(
-                _context: None,
-                _source: AgentId,
-                event: SessionEnqueuedBroadcastEvent
-                | SessionPreparingBroadcastEvent
-                | SessionStartedBroadcastEvent
-                | SessionCancelledBroadcastEvent
-                | SessionTerminatedBroadcastEvent
-                | ModelServiceStatusBroadcastEvent,
-            ) -> None:
-                task_message = {"event": event.event_name(), "session_id": str(event.session_id)}
-                match event:
-                    case ModelServiceStatusBroadcastEvent():
-                        task_message["is_healthy"] = event.new_status.value
-                await reporter.update(message=dump_json_str(task_message))
-
-                match event:
-                    case SessionTerminatedBroadcastEvent() | SessionCancelledBroadcastEvent():
-                        terminated_event.set()
-                    case ModelServiceStatusBroadcastEvent():
-                        session = await self._repository.get_session_by_id(
-                            result["sessionId"],
-                            KernelLoadingStrategy.ALL_KERNELS,
-                        )
-                        if not session:
-                            log.warning(
-                                "Session {} not found for event {}",
-                                result["sessionId"],
-                                event.event_name(),
-                            )
-                            return
-                        await self._agent_registry.destroy_session(
-                            session,
-                            forced=True,
-                        )
-
-            session_event_matcher = lambda args: args[0] == str(result["sessionId"])
-            model_service_event_matcher = lambda args: args[1] == str(result["sessionId"])
-
-            handlers: list[EventHandler] = [
-                self._event_dispatcher.subscribe(
-                    SessionPreparingBroadcastEvent,
-                    None,
-                    _handle_event,
-                    args_matcher=session_event_matcher,
-                ),
-                self._event_dispatcher.subscribe(
-                    SessionStartedBroadcastEvent,
-                    None,
-                    _handle_event,
-                    args_matcher=session_event_matcher,
-                ),
-                self._event_dispatcher.subscribe(
-                    SessionCancelledBroadcastEvent,
-                    None,
-                    _handle_event,
-                    args_matcher=session_event_matcher,
-                ),
-                self._event_dispatcher.subscribe(
-                    SessionTerminatedBroadcastEvent,
-                    None,
-                    _handle_event,
-                    args_matcher=session_event_matcher,
-                ),
-                self._event_dispatcher.subscribe(
-                    ModelServiceStatusBroadcastEvent,
-                    None,
-                    _handle_event,
-                    args_matcher=model_service_event_matcher,
-                ),
-            ]
-
+            # Use AsyncBypassPropagator to receive SchedulingBroadcastEvent
+            propagator = AsyncBypassPropagator()
             try:
-                await terminated_event.wait()
+                self._event_hub.register_event_propagator(
+                    propagator, aliases=[(EventDomain.SESSION, session_id_str)]
+                )
+
+                async for event in propagator.receive():
+                    if isinstance(event, SchedulingBroadcastEvent):
+                        status = SessionStatus(event.status_transition)
+                        # Convert status to legacy event name for backward compatibility
+                        event_name = self._status_to_event_name.get(status, event.status_transition)
+                        task_message = {
+                            "event": event_name,
+                            "session_id": str(event.session_id),
+                        }
+                        await reporter.update(message=dump_json_str(task_message))
+
+                        # When session becomes RUNNING, mark for termination and exit
+                        if status == SessionStatus.RUNNING:
+                            await self._scheduling_controller.mark_sessions_for_termination(
+                                [session_id],
+                                reason="DRY_RUN_COMPLETE",
+                            )
+
+                        # Exit loop on terminal states
+                        if status.is_terminal():
+                            break
             finally:
-                for handler in handlers:
-                    self._event_dispatcher.unsubscribe(handler)
+                self._event_hub.unregister_event_propagator(propagator.id())
 
         task_id = await self._background_task_manager.start(_task)
         return DryRunModelServiceActionResult(task_id)

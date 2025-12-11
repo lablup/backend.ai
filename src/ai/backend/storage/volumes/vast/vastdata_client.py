@@ -15,7 +15,11 @@ from yarl import URL
 
 from ai.backend.logging import BraceStyleAdapter
 
-from ...exception import ExternalStorageServiceError, QuotaScopeAlreadyExists
+from ...errors import (
+    ExternalStorageServiceError,
+    QuotaScopeAlreadyExists,
+    VolumeNotInitializedError,
+)
 from ...types import CapacityUsage
 from .config import APIVersion
 from .exceptions import (
@@ -166,7 +170,8 @@ class VASTAPIClient:
 
     @property
     def _req_header(self) -> Mapping[str, str]:
-        assert self._auth_token is not None
+        if self._auth_token is None:
+            raise VolumeNotInitializedError("VAST auth token is not initialized")
         return {
             "Authorization": f"Bearer {self._auth_token['access_token']}",
             "Content-Type": "application/json",

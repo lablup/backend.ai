@@ -4,8 +4,6 @@ Resource management exceptions (groups, domains, scaling groups, instances).
 
 from __future__ import annotations
 
-from typing import Any, Optional, Union
-
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -30,20 +28,9 @@ class DomainNotFound(ObjectNotFound):
         )
 
 
-class GroupNotFound(ObjectNotFound):
-    object_name = "user group (or project)"
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.GROUP,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class GroupHasActiveKernelsError(BackendAIError, web.HTTPConflict):
-    error_type = "https://api.backend.ai/probs/group-has-active-kernels"
-    error_title = "Group has active kernels."
+class ProjectHasActiveKernelsError(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/project-has-active-kernels"
+    error_title = "Project has active kernels."
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
@@ -53,9 +40,9 @@ class GroupHasActiveKernelsError(BackendAIError, web.HTTPConflict):
         )
 
 
-class GroupHasVFoldersMountedError(BackendAIError, web.HTTPConflict):
-    error_type = "https://api.backend.ai/probs/group-has-vfolders-mounted"
-    error_title = "Group has vfolders mounted to active kernels."
+class ProjectHasVFoldersMountedError(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/project-has-vfolders-mounted"
+    error_title = "Project has vfolders mounted to active kernels."
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
@@ -65,9 +52,9 @@ class GroupHasVFoldersMountedError(BackendAIError, web.HTTPConflict):
         )
 
 
-class GroupHasActiveEndpointsError(BackendAIError, web.HTTPConflict):
-    error_type = "https://api.backend.ai/probs/group-has-active-endpoints"
-    error_title = "Group has active endpoints."
+class ProjectHasActiveEndpointsError(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/project-has-active-endpoints"
+    error_title = "Project has active endpoints."
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
@@ -126,9 +113,6 @@ class InstanceNotAvailable(BackendAIError, web.HTTPServiceUnavailable):
 class ProjectNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/project-not-found"
     error_title = "Project not found."
-
-    def __init__(self, project_id: Optional[Union[str, Any]] = None) -> None:
-        super().__init__(f"Project not found: {project_id}")
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
@@ -351,4 +335,100 @@ class NoAvailableScalingGroup(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.SCALING_GROUP,
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class AgentNotAllocated(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/agent-not-allocated"
+    error_title = "Agent ID has not been allocated for the session."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class SessionNotAllocated(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/session-not-allocated"
+    error_title = "Session ID is not available during allocation."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class NoCurrentTaskContext(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/no-current-task-context"
+    error_title = "No current asyncio task context available."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class DatabaseConnectionUnavailable(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/database-connection-unavailable"
+    error_title = "Database connection is not available."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DATABASE,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class InvalidSchedulerState(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/invalid-scheduler-state"
+    error_title = "Scheduler is in an invalid state."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SCALING_GROUP,
+            operation=ErrorOperation.SCHEDULE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class ConfigurationLoadFailed(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/configuration-load-failed"
+    error_title = "Failed to load configuration."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class DataTransformationFailed(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/data-transformation-failed"
+    error_title = "Failed to transform data."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DATABASE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class DBOperationFailed(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/db-operation-failed"
+    error_title = "Database operation failed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DATABASE,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )

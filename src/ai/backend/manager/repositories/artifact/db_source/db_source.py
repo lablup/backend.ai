@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload, sessionmaker
 from sqlalchemy.sql import Select
 
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
@@ -380,6 +380,10 @@ class ArtifactDBSource:
 
                 if existing_revision is None:
                     # Create new revision
+                    verification_result = None
+                    if revision_data.verification_result is not None:
+                        verification_result = revision_data.verification_result.model_dump()
+
                     new_revision = ArtifactRevisionRow(
                         id=revision_data.id,
                         artifact_id=revision_data.artifact_id,
@@ -391,6 +395,7 @@ class ArtifactDBSource:
                         created_at=revision_data.created_at,
                         updated_at=revision_data.updated_at,
                         digest=revision_data.digest,
+                        verification_result=verification_result,
                     )
                     db_sess.add(new_revision)
                     await db_sess.flush()
@@ -399,10 +404,15 @@ class ArtifactDBSource:
                     artifact_ids_to_update.add(revision_data.artifact_id)
                 else:
                     # Update existing revision only if there are changes
+                    verification_result = None
+                    if revision_data.verification_result is not None:
+                        verification_result = revision_data.verification_result.model_dump()
+
                     has_changes = (
                         existing_revision.readme != revision_data.readme
                         or existing_revision.digest != revision_data.digest
                         or existing_revision.remote_status != revision_data.remote_status
+                        or existing_revision.verification_result != verification_result,
                     )
 
                     if has_changes:
@@ -411,6 +421,7 @@ class ArtifactDBSource:
                         existing_revision.created_at = revision_data.created_at
                         existing_revision.updated_at = revision_data.updated_at
                         existing_revision.digest = revision_data.digest
+                        existing_revision.verification_result = verification_result
 
                         # This must be done to avoid overwriting local revisions' remote_status with None
                         if revision_data.remote_status is not None:
@@ -785,13 +796,15 @@ class ArtifactDBSource:
             return artifact_revision_id
 
     async def update_artifact_revision_verification_result(
-        self, artifact_revision_id: uuid.UUID, verification_result: dict[str, Any]
+        self,
+        artifact_revision_id: uuid.UUID,
+        verification_result: VerificationStepResult,
     ) -> uuid.UUID:
         async with self._begin_session_read_committed() as db_sess:
             stmt = (
                 sa.update(ArtifactRevisionRow)
                 .where(ArtifactRevisionRow.id == artifact_revision_id)
-                .values(verification_result=verification_result)
+                .values(verification_result=verification_result.model_dump())
             )
             await db_sess.execute(stmt)
             return artifact_revision_id

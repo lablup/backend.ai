@@ -33,6 +33,7 @@ from ai.backend.common.config import (
     ConfigurationError,
 )
 from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.defs import (
     NOOP_STORAGE_VOLUME_NAME,
     REDIS_BGTASK_DB,
@@ -80,8 +81,15 @@ from ai.backend.logging.otel import OpenTelemetrySpec
 from ai.backend.storage.context_types import ArtifactVerifierContext
 
 from . import __version__ as VERSION
+from .client.manager import ManagerHTTPClientPool
 from .config.loaders import load_local_config, make_etcd
-from .config.unified import EventLoopType, StorageProxyUnifiedConfig
+from .config.unified import (
+    EventLoopType,
+    LegacyReservoirConfig,
+    ReservoirConfig,
+    StorageProxyUnifiedConfig,
+)
+from .errors import InvalidConfigurationSourceError, InvalidSocketPathError
 from .watcher import WatcherClient
 
 if TYPE_CHECKING:
@@ -288,14 +296,14 @@ async def watcher_ctx(
 ) -> AsyncGenerator[WatcherClient | None]:
     if local_config.storage_proxy.use_watcher:
         if not _is_root():
-            raise ValueError(
+            raise InvalidConfigurationSourceError(
                 "Storage proxy must be run as root if watcher is enabled. Else, set"
                 " `use-watcher` to false in your local config file."
             )
         insock_path: str | None = local_config.storage_proxy.watcher_insock_path_prefix
         outsock_path: str | None = local_config.storage_proxy.watcher_outsock_path_prefix
         if insock_path is None or outsock_path is None:
-            raise ValueError(
+            raise InvalidSocketPathError(
                 "Socket path must be not null. Please set valid socket path to"
                 " `watcher-insock-path-prefix` and `watcher-outsock-path-prefix` in your local"
                 " config file."
@@ -629,6 +637,21 @@ async def server_main(
         await health_probe.start()
         storage_init_stack.push_async_callback(health_probe.stop)
 
+        # Build reservoir registry configs for ManagerHTTPClientPool
+        reservoir_registry_configs: dict[str, ReservoirConfig] = {
+            name: r.reservoir
+            for name, r in local_config.artifact_registries.items()
+            if r.registry_type == ArtifactRegistryType.RESERVOIR and r.reservoir is not None
+        }
+        for legacy_registry in local_config.registries:
+            if isinstance(legacy_registry.config, LegacyReservoirConfig):
+                reservoir_registry_configs[legacy_registry.name] = legacy_registry.config
+
+        manager_client_pool = ManagerHTTPClientPool(
+            reservoir_registry_configs,
+            local_config.reservoir_client,
+        )
+
         root_ctx = RootContext(
             pid=os.getpid(),
             pidx=pidx,
@@ -647,7 +670,7 @@ async def server_main(
                     allow_credentials=False, expose_headers="*", allow_headers="*"
                 ),
             },
-            manager_http_clients={},
+            manager_client_pool=manager_client_pool,
             valkey_artifact_client=valkey_artifact_client,
             health_probe=health_probe,
             backends={**DEFAULT_BACKENDS},
@@ -787,7 +810,7 @@ def main(
 
                 if local_config.storage_proxy.use_watcher:
                     if not _is_root():
-                        raise ValueError(
+                        raise InvalidConfigurationSourceError(
                             "Storage proxy must be run as root if watcher is enabled. Else, set"
                             " `use-watcher` to false in your local config file."
                         )
@@ -796,7 +819,7 @@ def main(
                         local_config.storage_proxy.watcher_outsock_path_prefix
                     )
                     if insock_path is None or outsock_path is None:
-                        raise ValueError(
+                        raise InvalidSocketPathError(
                             "Socket path must be not null. Please set valid socket path to"
                             " `watcher-insock-path-prefix` and `watcher-outsock-path-prefix` in"
                             " your local config file."

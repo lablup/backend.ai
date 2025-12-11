@@ -33,7 +33,6 @@ class ModifyGroupAction(GroupAction):
 @dataclass
 class ModifyGroupActionResult(BaseActionResult):
     data: Optional[GroupData]
-    success: bool
 
     @override
     def entity_id(self) -> Optional[str]:

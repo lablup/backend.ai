@@ -23,7 +23,6 @@ class CreateGroupAction(GroupAction):
 @dataclass
 class CreateGroupActionResult(BaseActionResult):
     data: Optional[GroupData]
-    success: bool
 
     @override
     def entity_id(self) -> Optional[str]:

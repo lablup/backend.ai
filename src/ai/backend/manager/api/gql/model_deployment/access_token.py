@@ -13,6 +13,7 @@ from ai.backend.manager.data.deployment.types import (
     AccessTokenOrderField,
     ModelDeploymentAccessTokenData,
 )
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
 )
@@ -83,7 +84,8 @@ async def create_access_token(
     input: CreateAccessTokenInput, info: Info[StrawberryGQLContext]
 ) -> CreateAccessTokenPayload:
     deployment_processor = info.context.processors.deployment
-    assert deployment_processor is not None
+    if deployment_processor is None:
+        raise ServerMisconfiguredError("Deployment processor is not available")
     result = await deployment_processor.create_access_token.wait_for_complete(
         action=CreateAccessTokenAction(input.to_creator())
     )

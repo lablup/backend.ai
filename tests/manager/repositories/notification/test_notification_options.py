@@ -27,7 +27,12 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import Querier
+from ai.backend.manager.repositories.base import (
+    CursorBackwardPagination,
+    CursorForwardPagination,
+    OffsetPagination,
+    Querier,
+)
 from ai.backend.manager.repositories.notification import NotificationRepository
 from ai.backend.manager.repositories.notification.options import (
     NotificationChannelConditions,
@@ -348,6 +353,7 @@ class TestNotificationOptions:
         """Test case-sensitive name contains filter"""
         # sample_channels_for_filter creates channels with various names
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
                 NotificationChannelConditions.by_name_contains("Test", case_insensitive=False)
             ],
@@ -368,6 +374,7 @@ class TestNotificationOptions:
         """Test case-insensitive name contains filter"""
         # sample_channels_for_filter creates channels with various names
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
                 NotificationChannelConditions.by_name_contains("test", case_insensitive=True)
             ],
@@ -389,6 +396,7 @@ class TestNotificationOptions:
         """Test case-sensitive name equals filter"""
         # sample_channels_for_filter creates channels with various names
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
                 NotificationChannelConditions.by_name_equals("Test Channel", case_insensitive=False)
             ],
@@ -409,6 +417,7 @@ class TestNotificationOptions:
         """Test case-insensitive name equals filter"""
         # sample_channels_for_filter creates channels with various names
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
                 NotificationChannelConditions.by_name_equals("test channel", case_insensitive=True)
             ],
@@ -430,6 +439,7 @@ class TestNotificationOptions:
         """Test filter by channel types"""
         # sample_channels_for_filter creates all WEBHOOK type channels
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
                 NotificationChannelConditions.by_channel_types([NotificationChannelType.WEBHOOK])
             ],
@@ -450,6 +460,7 @@ class TestNotificationOptions:
         """Test filter by enabled=True"""
         # sample_channels_for_filter creates 4 enabled and 1 disabled
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[NotificationChannelConditions.by_enabled(True)],
             orders=[],
         )
@@ -467,6 +478,7 @@ class TestNotificationOptions:
         """Test filter by enabled=False"""
         # sample_channels_for_filter creates 4 enabled and 1 disabled
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[NotificationChannelConditions.by_enabled(False)],
             orders=[],
         )
@@ -487,6 +499,7 @@ class TestNotificationOptions:
         """Test ordering by name ascending (A-Z)"""
         # sample_channels_for_order creates: Zebra, Alpha, Beta
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationChannelOrders.name(ascending=True)],
         )
@@ -506,6 +519,7 @@ class TestNotificationOptions:
         """Test ordering by name descending (Z-A)"""
         # sample_channels_for_order creates: Zebra, Alpha, Beta
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationChannelOrders.name(ascending=False)],
         )
@@ -525,6 +539,7 @@ class TestNotificationOptions:
         """Test ordering by created_at ascending (oldest first)"""
         # sample_channels_for_order creates with different created_at timestamps
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationChannelOrders.created_at(ascending=True)],
         )
@@ -545,6 +560,7 @@ class TestNotificationOptions:
         """Test ordering by created_at descending (newest first)"""
         # sample_channels_for_order creates with different created_at timestamps
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationChannelOrders.created_at(ascending=False)],
         )
@@ -565,6 +581,7 @@ class TestNotificationOptions:
         """Test ordering by updated_at ascending"""
         # sample_channels_for_order creates with different updated_at timestamps
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationChannelOrders.updated_at(ascending=True)],
         )
@@ -585,6 +602,7 @@ class TestNotificationOptions:
         """Test ordering by updated_at descending"""
         # sample_channels_for_order creates with different updated_at timestamps
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationChannelOrders.updated_at(ascending=False)],
         )
@@ -607,6 +625,7 @@ class TestNotificationOptions:
         """Test case-sensitive name contains filter for rules"""
         # sample_rules_for_filter creates rules with various names
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
                 NotificationRuleConditions.by_name_contains("Test", case_insensitive=False)
             ],
@@ -627,6 +646,7 @@ class TestNotificationOptions:
         """Test case-insensitive name contains filter for rules"""
         # sample_rules_for_filter creates rules with various names
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[NotificationRuleConditions.by_name_contains("test", case_insensitive=True)],
             orders=[],
         )
@@ -646,6 +666,7 @@ class TestNotificationOptions:
         """Test case-sensitive name equals filter for rules"""
         # sample_rules_for_filter creates rules with various names
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
                 NotificationRuleConditions.by_name_equals("Test Rule", case_insensitive=False)
             ],
@@ -666,6 +687,7 @@ class TestNotificationOptions:
         """Test case-insensitive name equals filter for rules"""
         # sample_rules_for_filter creates rules with various names
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
                 NotificationRuleConditions.by_name_equals("test rule", case_insensitive=True)
             ],
@@ -687,6 +709,7 @@ class TestNotificationOptions:
         """Test filter by rule types"""
         # sample_rules_for_filter creates 3 SESSION_STARTED and 2 SESSION_TERMINATED
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
                 NotificationRuleConditions.by_rule_types([NotificationRuleType.SESSION_STARTED])
             ],
@@ -707,6 +730,7 @@ class TestNotificationOptions:
         """Test filter by enabled=True"""
         # sample_rules_for_filter creates 4 enabled and 1 disabled
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[NotificationRuleConditions.by_enabled(True)],
             orders=[],
         )
@@ -724,6 +748,7 @@ class TestNotificationOptions:
         """Test filter by enabled=False"""
         # sample_rules_for_filter creates 4 enabled and 1 disabled
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[NotificationRuleConditions.by_enabled(False)],
             orders=[],
         )
@@ -744,6 +769,7 @@ class TestNotificationOptions:
         """Test ordering by name ascending (A-Z)"""
         # sample_rules_for_order creates: Zebra, Alpha, Beta
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationRuleOrders.name(ascending=True)],
         )
@@ -763,6 +789,7 @@ class TestNotificationOptions:
         """Test ordering by name descending (Z-A)"""
         # sample_rules_for_order creates: Zebra, Alpha, Beta
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationRuleOrders.name(ascending=False)],
         )
@@ -782,6 +809,7 @@ class TestNotificationOptions:
         """Test ordering by created_at ascending (oldest first)"""
         # sample_rules_for_order creates with different created_at timestamps
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationRuleOrders.created_at(ascending=True)],
         )
@@ -802,6 +830,7 @@ class TestNotificationOptions:
         """Test ordering by created_at descending (newest first)"""
         # sample_rules_for_order creates with different created_at timestamps
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationRuleOrders.created_at(ascending=False)],
         )
@@ -822,6 +851,7 @@ class TestNotificationOptions:
         """Test ordering by updated_at ascending"""
         # sample_rules_for_order creates with different updated_at timestamps
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationRuleOrders.updated_at(ascending=True)],
         )
@@ -842,6 +872,7 @@ class TestNotificationOptions:
         """Test ordering by updated_at descending"""
         # sample_rules_for_order creates with different updated_at timestamps
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[NotificationRuleOrders.updated_at(ascending=False)],
         )
@@ -861,6 +892,7 @@ class TestNotificationOptions:
     ) -> None:
         """Test that searching for non-existent channel returns empty with total_count=0"""
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[NotificationChannelConditions.by_name_equals("NonexistentChannelName")],
             orders=[],
         )
@@ -878,6 +910,7 @@ class TestNotificationOptions:
     ) -> None:
         """Test that searching for non-existent rule returns empty with total_count=0"""
         querier = Querier(
+            pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[NotificationRuleConditions.by_name_equals("NonexistentRuleName")],
             orders=[],
         )
@@ -886,3 +919,299 @@ class TestNotificationOptions:
         # WHERE condition matches nothing
         assert len(rules.items) == 0
         assert rules.total_count == 0
+
+
+class TestNotificationCursorPagination:
+    """Test cases for cursor-based pagination with notification channels.
+
+    Validates that forward/backward cursor pagination works correctly:
+    - Forward (first/after): DESC order, newest first, next page shows older items
+    - Backward (last/before): ASC order, fetches older items (reversed for display)
+    """
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database engine that auto-cleans notification data after each test"""
+        yield database_engine
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(sa.delete(NotificationRuleRow))
+            await db_sess.execute(sa.delete(NotificationChannelRow))
+
+    @pytest.fixture
+    async def test_domain_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create test domain and return domain name"""
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            domain = DomainRow(
+                name=domain_name,
+                description="Test domain for cursor pagination",
+                is_active=True,
+                total_resource_slots={},
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+            )
+            db_sess.add(domain)
+            await db_sess.flush()
+
+        try:
+            yield domain_name
+        finally:
+            async with db_with_cleanup.begin_session() as db_sess:
+                await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
+
+    @pytest.fixture
+    async def test_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create test resource policy and return policy name"""
+        policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_session_count_per_model_session=5,
+                max_customized_image_count=3,
+            )
+            db_sess.add(policy)
+            await db_sess.flush()
+
+        try:
+            yield policy_name
+        finally:
+            async with db_with_cleanup.begin_session() as db_sess:
+                await db_sess.execute(
+                    sa.delete(UserResourcePolicyRow).where(
+                        UserResourcePolicyRow.name == policy_name
+                    )
+                )
+
+    @pytest.fixture
+    async def test_user(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_resource_policy_name: str,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create test user and return user UUID"""
+        user_uuid = uuid.uuid4()
+
+        password_info = PasswordInfo(
+            password="dummy",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=600_000,
+            salt_size=32,
+        )
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            user = UserRow(
+                uuid=user_uuid,
+                username=f"testuser-{user_uuid.hex[:8]}",
+                email=f"test-{user_uuid.hex[:8]}@example.com",
+                password=password_info,
+                need_password_change=False,
+                status=UserStatus.ACTIVE,
+                status_info="active",
+                domain_name=test_domain_name,
+                role=UserRole.USER,
+                resource_policy=test_resource_policy_name,
+            )
+            db_sess.add(user)
+            await db_sess.flush()
+
+        try:
+            yield user_uuid
+        finally:
+            async with db_with_cleanup.begin_session() as db_sess:
+                await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
+
+    @pytest.fixture
+    async def notification_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[NotificationRepository, None]:
+        """Create NotificationRepository instance with database"""
+        repo = NotificationRepository(db=db_with_cleanup)
+        yield repo
+
+    @pytest.fixture
+    async def channels_for_cursor_pagination(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_user: uuid.UUID,
+    ) -> AsyncGenerator[list[uuid.UUID], None]:
+        """Create 5 channels with distinct created_at times for cursor pagination testing.
+
+        Created order (oldest to newest): Channel-1, Channel-2, Channel-3, Channel-4, Channel-5
+        """
+        channel_ids = []
+        base_time = datetime.now()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            for i in range(1, 6):
+                channel_id = uuid.uuid4()
+                config = WebhookConfig(url=f"https://example.com/webhook/{i}")
+                channel = NotificationChannelRow(
+                    id=channel_id,
+                    name=f"Channel-{i}",
+                    description=None,
+                    channel_type=NotificationChannelType.WEBHOOK,
+                    config=config.model_dump(),
+                    enabled=True,
+                    created_by=test_user,
+                    created_at=base_time
+                    - timedelta(days=5 - i),  # Channel-1 oldest, Channel-5 newest
+                    updated_at=base_time,
+                )
+                db_sess.add(channel)
+                channel_ids.append(channel_id)
+            await db_sess.flush()
+
+        yield channel_ids
+
+    @pytest.mark.asyncio
+    async def test_forward_pagination_first_page_shows_newest_first(
+        self,
+        notification_repository: NotificationRepository,
+        channels_for_cursor_pagination: list[uuid.UUID],
+    ) -> None:
+        """Test forward pagination first page shows newest items first (DESC order).
+
+        With 5 channels (oldest to newest: Channel-1 to Channel-5),
+        first page with first=3 should return: Channel-5, Channel-4, Channel-3
+        """
+        querier = Querier(
+            pagination=CursorForwardPagination(
+                first=3,
+                cursor_order=NotificationChannelOrders.created_at(ascending=False),  # DESC
+                cursor_condition=None,  # No cursor = first page
+            ),
+        )
+        result = await notification_repository.search_channels(querier=querier)
+
+        assert len(result.items) == 3
+        # Should be newest first
+        assert result.items[0].name == "Channel-5"
+        assert result.items[1].name == "Channel-4"
+        assert result.items[2].name == "Channel-3"
+        assert result.has_previous_page is False  # First page
+        assert result.has_next_page is True  # More items exist
+
+    @pytest.mark.asyncio
+    async def test_forward_pagination_with_cursor_shows_older_items(
+        self,
+        notification_repository: NotificationRepository,
+        channels_for_cursor_pagination: list[uuid.UUID],
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test forward pagination with cursor shows older items (next page).
+
+        After viewing Channel-5, Channel-4, Channel-3 (first page),
+        using Channel-3's cursor should return: Channel-2, Channel-1
+        """
+        # First, get the cursor value (Channel-3's ID)
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(NotificationChannelRow.id).where(
+                    NotificationChannelRow.name == "Channel-3"
+                )
+            )
+            channel_3_id = result.scalar_one()
+
+        # Forward cursor condition: created_at < cursor's created_at
+        cursor_condition = NotificationChannelConditions.by_cursor_forward(str(channel_3_id))
+
+        querier = Querier(
+            pagination=CursorForwardPagination(
+                first=3,
+                cursor_order=NotificationChannelOrders.created_at(ascending=False),  # DESC
+                cursor_condition=cursor_condition,
+            ),
+        )
+        result = await notification_repository.search_channels(querier=querier)
+
+        # Should return older items (Channel-2, Channel-1)
+        assert len(result.items) == 2
+        assert result.items[0].name == "Channel-2"
+        assert result.items[1].name == "Channel-1"
+        assert result.has_previous_page is True  # Has items before (cursor was provided)
+        assert result.has_next_page is False  # No more items
+
+    @pytest.mark.asyncio
+    async def test_backward_pagination_last_page_fetches_oldest_first(
+        self,
+        notification_repository: NotificationRepository,
+        channels_for_cursor_pagination: list[uuid.UUID],
+    ) -> None:
+        """Test backward pagination without cursor fetches from the end (oldest first in DB order).
+
+        With 5 channels, last=3 without cursor should fetch the 3 newest items
+        but in ASC order for DB query, then results need to be reversed for display.
+        """
+        querier = Querier(
+            pagination=CursorBackwardPagination(
+                last=3,
+                cursor_order=NotificationChannelOrders.created_at(ascending=True),  # ASC
+                cursor_condition=None,  # No cursor = last page
+            ),
+        )
+        result = await notification_repository.search_channels(querier=querier)
+
+        # Backward pagination returns in ascending order (oldest first in this slice)
+        # These are the 3 oldest items: Channel-1, Channel-2, Channel-3
+        assert len(result.items) == 3
+        assert result.items[0].name == "Channel-1"
+        assert result.items[1].name == "Channel-2"
+        assert result.items[2].name == "Channel-3"
+        assert result.has_previous_page is True  # More items exist before
+        assert result.has_next_page is False  # No cursor = last page
+
+    @pytest.mark.asyncio
+    async def test_backward_pagination_with_cursor_shows_newer_items(
+        self,
+        notification_repository: NotificationRepository,
+        channels_for_cursor_pagination: list[uuid.UUID],
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test backward pagination with cursor shows newer items (previous page).
+
+        If we're at Channel-1, Channel-2, Channel-3 and go back (before Channel-3),
+        we should get Channel-4, Channel-5 (items newer than the current view).
+        """
+        # Get the cursor value (Channel-3's ID)
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(NotificationChannelRow.id).where(
+                    NotificationChannelRow.name == "Channel-3"
+                )
+            )
+            channel_3_id = result.scalar_one()
+
+        # Backward cursor condition: created_at > cursor's created_at
+        cursor_condition = NotificationChannelConditions.by_cursor_backward(str(channel_3_id))
+
+        querier = Querier(
+            pagination=CursorBackwardPagination(
+                last=3,
+                cursor_order=NotificationChannelOrders.created_at(ascending=True),  # ASC
+                cursor_condition=cursor_condition,
+            ),
+        )
+        result = await notification_repository.search_channels(querier=querier)
+
+        # Should return newer items (Channel-4, Channel-5) in ASC order
+        assert len(result.items) == 2
+        assert result.items[0].name == "Channel-4"
+        assert result.items[1].name == "Channel-5"
+        assert result.has_previous_page is False  # No more newer items
+        assert result.has_next_page is True  # Has items after (cursor was provided)
