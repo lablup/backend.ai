@@ -94,8 +94,125 @@ and come back here again.
 Install and activate [`git-lfs`](https://git-lfs.github.com/) to work with pre-built binaries in
 `src/ai/backend/runner`.
 
-```console
-$ git lfs install
+### CPU Monitoring
+- Track per-container CPU usage via cgroups
+- Measure CPU time in user and system modes
+- Calculate CPU utilization percentages
+- Enforce CPU quotas and limits
+
+### Memory Monitoring
+- Track RSS (Resident Set Size) per container
+- Measure cache and swap usage
+- Detect OOM (Out-of-Memory) conditions
+- Enforce memory limits via cgroups
+
+### Shared Memory (shmem)
+Containers can request shared memory (`/dev/shm`) for inter-process communication.
+
+**Docker Memory Architecture**:
+- shm (tmpfs) and app memory share the Memory cgroup space
+- shm has an additional ShmSize limit (tmpfs maximum size)
+- Effective shm limit = `min(ShmSize, Memory cgroup available space)`
+
+**OOM Conditions**:
+| Signal | Exit Code | Condition |
+|--------|-----------|-----------|
+| SIGKILL | 137 | shm + app > Memory cgroup limit |
+| SIGBUS | 135 | shm > ShmSize |
+
+**Configuration**:
+- Set via `resource_opts.shmem` in session specification
+- Docker HostConfig: `ShmSize` parameter
+
+**References**:
+- [Linux Kernel cgroup v1 Memory](https://docs.kernel.org/admin-guide/cgroup-v1/memory.html) - tmpfs/shm charged to cgroup
+- [Linux Kernel cgroup v2](https://docs.kernel.org/admin-guide/cgroup-v2.html) - shmem in memory.stat
+
+### GPU Monitoring
+- Query NVIDIA GPUs via NVML (nvidia-ml-py)
+- Query AMD GPUs via ROCm SMI
+- Track GPU utilization and memory usage
+- Measure GPU temperature and power consumption
+
+### Disk I/O Monitoring
+- Track read/write operations per container
+- Measure I/O bandwidth usage
+- Monitor disk space consumption
+- Enforce I/O throttling when configured
+
+## Plugin System
+
+Agent can uses plugin system for accelerator support:
+
+### CUDA Plugin
+- Detect NVIDIA GPUs via `nvidia-smi`
+- Allocate GPU devices to containers
+- Set `CUDA_VISIBLE_DEVICES` environment variable
+- Monitor GPU metrics via NVML
+
+### ROCm Plugin
+- Detect AMD GPUs via `rocm-smi`
+- Allocate GPU devices to containers
+- Set `HIP_VISIBLE_DEVICES` environment variable
+- Monitor GPU metrics via ROCm
+
+### TPU Plugin
+- Detect Google TPUs
+- Configure TPU access for TensorFlow
+- Monitor TPU utilization
+
+## Communication Protocols
+
+### Manager → Agent (ZeroMQ RPC)
+- **Port**: 6011 (default)
+- **Protocol**: ZeroMQ request-response
+- **Operations**:
+  - `create_kernel`: Create new container
+  - `destroy_kernel`: Terminate container
+  - `restart_kernel`: Restart container
+  - `execute_code`: Execute code in container
+  - `get_status`: Query agent and kernel status
+
+### Agent → Manager (HTTP Watcher API)
+- **Port**: 6009 (default)
+- **Protocol**: HTTP
+- **Operations**:
+  - Heartbeat signals
+  - Resource usage reporting
+  - Kernel status updates
+  - Error notifications
+
+### Agent → Storage Proxy
+- **Protocol**: HTTP
+- **Operations**:
+  - Mount vfolder
+  - Unmount vfolder
+  - Query vfolder metadata
+
+## Container Execution Flow
+
+```
+1. Manager sends create_kernel RPC
+   ↓
+2. Agent validates resource availability
+   ↓
+3. Agent pulls container image (if needed)
+   ↓
+4. Agent creates scratch directory
+   ↓
+5. Agent mounts vfolders via Storage Proxy
+   ↓
+6. Agent creates container with resources
+   ↓
+7. Agent starts container and runs init script
+   ↓
+8. Agent registers service ports
+   ↓
+9. Agent reports kernel status to Manager
+   ↓
+10. Container runs until termination
+   ↓
+11. Agent cleans up resources upon termination
 ```
 
 Next, prepare the source clone of the agent and install from it as follows.
