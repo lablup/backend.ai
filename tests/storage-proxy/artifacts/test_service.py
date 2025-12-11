@@ -661,6 +661,7 @@ class TestHuggingFaceDownloadStep:
                 model_id=mock_import_step_context.model.model_id,
                 revision=mock_import_step_context.model.revision,
                 file_path=mock_file_info.path,
+                token=None,
             )
 
             # Get the mock storage from the pool and check it was called
