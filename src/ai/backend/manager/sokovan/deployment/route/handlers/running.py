@@ -35,8 +35,8 @@ class RunningRouteHandler(RouteHandler):
 
     @property
     def lock_id(self) -> Optional[LockID]:
-        """No lock needed for checking running routes."""
-        return None
+        """Lock for checking running routes."""
+        return LockID.LOCKID_DEPLOYMENT_RUNNING_ROUTES
 
     @classmethod
     def target_statuses(cls) -> list[RouteStatus]:
