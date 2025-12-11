@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 from typing import Any
 
 from ai.backend.logging import BraceStyleAdapter
@@ -28,30 +29,37 @@ def clamp_agent_cpu_util(stat_data: dict[str, Any] | None) -> dict[str, Any] | N
     if num_cores == 0:
         return stat_data
 
-    max_cpu_util = num_cores * 100
-
     # Early return if no node cpu_util
     node_cpu_util = stat_data.get("node", {}).get("cpu_util")
     if not node_cpu_util:
         return stat_data
 
-    # Clamp all relevant fields and track changes
-    clamped_fields = False
-    original_cpu_util = 0
-    for field in ("current", "pct"):
-        if field in node_cpu_util:
-            original = node_cpu_util[field]
-            if original > max_cpu_util:
-                node_cpu_util[field] = max_cpu_util
-                clamped_fields = True
-                original_cpu_util = original  # Record the original value only when clamping
+    # Clamp pct
+    original_pct = node_cpu_util.get("pct")
+    if original_pct is not None:
+        max_cpu_util = num_cores * 100
+        if Decimal(original_pct) > Decimal(max_cpu_util):
+            stat_data["node"]["cpu_util"]["pct"] = str(max_cpu_util)
+            log.debug(
+                "Clamped node CPU utilization pct from {} to {} (max: {} cores * 100)",
+                original_pct,
+                max_cpu_util,
+                num_cores,
+            )
 
-    if clamped_fields:
-        log.debug(
-            "Clamped CPU utilization from {} to {} (max: {} cores * 100)",
-            original_cpu_util,
-            max_cpu_util,
-            num_cores,
-        )
+    # Clamp current
+    original_current = node_cpu_util.get("current")
+    original_capacity = node_cpu_util.get("capacity")
+    if original_current is not None and original_capacity is not None:
+        max_current = Decimal(original_capacity) * num_cores
+        if Decimal(original_current) > max_current:
+            stat_data["node"]["cpu_util"]["current"] = str(max_current)
+            log.debug(
+                "Clamped node CPU utilization current from {} to {} (capacity {} * {} cores)",
+                original_current,
+                max_current,
+                original_capacity,
+                num_cores,
+            )
 
     return stat_data
