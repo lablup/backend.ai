@@ -31,6 +31,8 @@ from typing import (
 
 import aiodocker
 import attrs
+from pydantic import GetCoreSchemaHandler
+from pydantic_core import CoreSchema, core_schema
 
 import ai.backend.agent.alloc_map as alloc_map_mod
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ResourceAllocationMode
@@ -285,6 +287,20 @@ class KernelResourceSpec:
 
     def to_json(self) -> str:
         return dump_json_str(self.to_json_serializable_dict())
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        def validate(value: Any) -> KernelResourceSpec:
+            return cls(
+                slots=value.slots,
+                allocations=value.allocations,
+                scratch_disk_size=value.scratch_disk_size,
+                mounts=value.mounts,
+            )
+
+        return core_schema.no_info_plain_validator_function(validate)
 
 
 class AbstractComputeDevice:

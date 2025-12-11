@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import shutil
+from pathlib import Path
 
 from ai.backend.common.artifact_storage import AbstractStorage
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -51,9 +52,9 @@ class StorageTransferManager:
         )
 
         try:
-            # Optimize VFS-to-VFS transfer using direct file copy
+            # Optimize VFS-to-VFS transfer using direct file move
             if isinstance(source_storage, VFSStorage) and isinstance(dest_storage, VFSStorage):
-                await self._copy_vfs_to_vfs(source_storage, dest_storage, source_path, dest_path)
+                await self._move_vfs_to_vfs(source_storage, dest_storage, source_path, dest_path)
             else:
                 # Generic storage-to-storage transfer via streaming
                 await self._copy_via_stream(source_storage, dest_storage, source_path, dest_path)
@@ -91,9 +92,26 @@ class StorageTransferManager:
             return 0
 
         source_storage = self._storage_pool.get_storage(source_storage_name)
+        dest_storage = self._storage_pool.get_storage(dest_storage_name)
 
         try:
-            # Get list of files to transfer
+            # VFS-to-VFS: move entire directory at once (no empty directory cleanup needed)
+            if isinstance(source_storage, VFSStorage) and isinstance(dest_storage, VFSStorage):
+                file_count = len(await self._list_files_with_prefix(source_storage, source_prefix))
+                if file_count == 0:
+                    log.warning(f"No files found with prefix: {source_prefix}")
+                    return 0
+
+                await self._move_vfs_directory(
+                    source_storage, dest_storage, source_prefix, dest_prefix
+                )
+                log.info(
+                    f"Successfully moved directory from {source_storage_name} to {dest_storage_name}: "
+                    f"{source_prefix} -> {dest_prefix} ({file_count} files)"
+                )
+                return file_count
+
+            # Other storage types: transfer files individually
             file_list = await self._list_files_with_prefix(source_storage, source_prefix)
 
             if not file_list:
@@ -135,43 +153,80 @@ class StorageTransferManager:
                 f"{source_prefix} -> {dest_prefix}: {str(e)}"
             ) from e
 
-    async def _copy_vfs_to_vfs(
+    async def _move_vfs_directory(
+        self,
+        source_storage: VFSStorage,
+        dest_storage: VFSStorage,
+        source_prefix: str,
+        dest_prefix: str,
+    ) -> None:
+        """Move entire directory between VFS storages."""
+        source_path = source_storage.resolve_path(source_prefix)
+        dest_path = dest_storage.resolve_path(dest_prefix)
+
+        if not source_path.exists():
+            raise StorageTransferError(f"Source path does not exist: {source_path}")
+
+        if dest_path.exists():
+            await asyncio.get_event_loop().run_in_executor(None, shutil.rmtree, str(dest_path))
+
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+        await asyncio.get_event_loop().run_in_executor(
+            None, shutil.move, str(source_path), str(dest_path)
+        )
+
+        # Ensure cleanup for cross-filesystem moves
+        if source_path.exists():
+            try:
+                await asyncio.get_event_loop().run_in_executor(
+                    None, shutil.rmtree, str(source_path)
+                )
+                log.warning(
+                    "Cross-filesystem move fallback: manually removed source {}", source_path
+                )
+            except Exception as e:
+                log.error("Failed to cleanup source after move: {}", e)
+                raise
+
+        # Cleanup empty artifact directories
+        self._cleanup_empty_parents(source_path.parent, source_storage.base_path)
+
+    def _cleanup_empty_parents(self, path: Path, base_path: Path) -> None:
+        """Remove empty parent directories up to base_path."""
+        current = path
+        while current != base_path and current.exists():
+            try:
+                current.rmdir()  # Only removes if empty
+                current = current.parent
+            except OSError:
+                break  # Not empty or other error
+
+    async def _move_vfs_to_vfs(
         self,
         source_storage: VFSStorage,
         dest_storage: VFSStorage,
         source_path: str,
         dest_path: str,
     ) -> None:
-        """Optimized copy between VFS storages using direct file system operations."""
+        """Optimized move between VFS storages using direct file system operations."""
         source_full_path = source_storage.resolve_path(source_path)
         dest_full_path = dest_storage.resolve_path(dest_path)
 
-        # Check if source is a file or directory
-        if source_full_path.is_file():
-            # Ensure destination directory exists
-            dest_full_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Copy file
-            await asyncio.get_event_loop().run_in_executor(
-                None, shutil.copy2, str(source_full_path), str(dest_full_path)
-            )
-        elif source_full_path.is_dir():
-            # Copy entire directory tree
-            # Remove destination if it exists to avoid conflicts
-            if dest_full_path.exists():
-                await asyncio.get_event_loop().run_in_executor(
-                    None, shutil.rmtree, str(dest_full_path)
-                )
-
-            # Ensure parent directory exists
-            dest_full_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Copy directory tree
-            await asyncio.get_event_loop().run_in_executor(
-                None, shutil.copytree, str(source_full_path), str(dest_full_path)
-            )
-        else:
+        if not source_full_path.exists():
             raise StorageTransferError(f"Source path does not exist: {source_full_path}")
+
+        # Remove destination if it exists to avoid conflicts
+        if dest_full_path.exists():
+            await asyncio.get_event_loop().run_in_executor(None, shutil.rmtree, str(dest_full_path))
+
+        # Ensure parent directory exists
+        dest_full_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Move file or directory (automatically removes source)
+        await asyncio.get_event_loop().run_in_executor(
+            None, shutil.move, str(source_full_path), str(dest_full_path)
+        )
 
     async def _copy_via_stream(
         self,

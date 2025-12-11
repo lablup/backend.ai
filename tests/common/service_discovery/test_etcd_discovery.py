@@ -247,9 +247,7 @@ async def test_etcd_sync_model_service_routes_single(
     assert len(services) == 1
     assert services[0].id == route.route_id
     assert services[0].display_name == route.model_service_name
-    assert (
-        services[0].endpoint.prometheus_address == f"{route.host}:{route.port}{route.metrics_path}"
-    )
+    assert services[0].endpoint.prometheus_address == f"{route.host}:{route.port}"
 
 
 async def test_etcd_sync_model_service_routes_multiple(

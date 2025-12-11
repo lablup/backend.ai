@@ -13,7 +13,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from ..errors.api import InvalidAPIParameters
 from ..errors.common import GenericForbidden
-from ..errors.resource import GroupNotFound
+from ..errors.resource import ProjectNotFound
 from ..errors.storage import (
     DotfileAlreadyExists,
     DotfileCreationFailed,
@@ -73,13 +73,13 @@ async def create(request: web.Request, params: Any) -> web.Response:
             # if group UUID is given, override input domain
             domain = await query_group_domain(conn, group_id)
         if group_id is None or domain is None:
-            raise GroupNotFound
+            raise ProjectNotFound
         if not request["is_superadmin"] and request["user"]["domain_name"] != domain:
             raise GenericForbidden("Admins cannot create group dotfiles of other domains")
 
         dotfiles, leftover_space = await query_group_dotfiles(conn, group_id)
         if dotfiles is None:
-            raise GroupNotFound
+            raise ProjectNotFound
         if leftover_space == 0:
             raise DotfileCreationFailed("No leftover space for dotfile storage")
         if len(dotfiles) == 100:
@@ -135,7 +135,7 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
             group_id = group_id_or_name
             domain = await query_group_domain(conn, group_id)
         if group_id is None or domain is None:
-            raise GroupNotFound
+            raise ProjectNotFound
         if not request["is_superadmin"]:
             if request["is_admin"]:
                 if request["user"]["domain_name"] != domain:
@@ -157,7 +157,7 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
         if params["path"]:
             dotfiles, _ = await query_group_dotfiles(conn, group_id)
             if dotfiles is None:
-                raise GroupNotFound
+                raise ProjectNotFound
             for dotfile in dotfiles:
                 if dotfile["path"] == params["path"]:
                     return web.json_response(dotfile)
@@ -165,7 +165,7 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
         else:
             dotfiles, _ = await query_group_dotfiles(conn, group_id)
             if dotfiles is None:
-                raise GroupNotFound
+                raise ProjectNotFound
             for entry in dotfiles:
                 resp.append({
                     "path": entry["path"],
@@ -208,13 +208,13 @@ async def update(request: web.Request, params: Any) -> web.Response:
             group_id = group_id_or_name
             domain = await query_group_domain(conn, group_id)
         if group_id is None or domain is None:
-            raise GroupNotFound
+            raise ProjectNotFound
         if not request["is_superadmin"] and request["user"]["domain_name"] != domain:
             raise GenericForbidden("Admins cannot update group dotfiles of other domains")
 
         dotfiles, _ = await query_group_dotfiles(conn, group_id)
         if dotfiles is None:
-            raise GroupNotFound
+            raise ProjectNotFound
         new_dotfiles = [x for x in dotfiles if x["path"] != params["path"]]
         if len(new_dotfiles) == len(dotfiles):
             raise DotfileNotFound
@@ -262,7 +262,7 @@ async def delete(request: web.Request, params: Any) -> web.Response:
             group_id = group_id_or_name
             domain = await query_group_domain(conn, group_id)
         if group_id is None or domain is None:
-            raise GroupNotFound
+            raise ProjectNotFound
         if not request["is_superadmin"] and request["user"]["domain_name"] != domain:
             raise GenericForbidden("Admins cannot delete dotfiles of other domains")
 

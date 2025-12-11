@@ -3,7 +3,7 @@
   "info": {
     "title": "Backend.AI Manager API",
     "description": "Backend.AI Manager REST API specification",
-    "version": "25.18.0rc2",
+    "version": "25.18.0rc3",
     "contact": {
       "name": "Lablup Inc.",
       "url": "https://docs.backend.ai",
@@ -1896,6 +1896,35 @@
           }
         ],
         "description": "\nRetrieve the README content for a specific artifact revision.\n\nReturns the README documentation associated with the artifact revision,\nwhich typically contains usage instructions and model information.\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/artifacts/revisions/{artifact_revision_id}/verification-result": {
+      "get": {
+        "operationId": "artifacts.get_artifact_revision_verification_result",
+        "tags": [
+          "artifacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nRetrieve the verification result for a specific artifact revision.\n\nReturns the verification result data associated with the artifact revision,\nwhich contains results from all verifiers that have been run on the artifact.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifacts/revisions/{artifact_revision_id}/download-progress": {
