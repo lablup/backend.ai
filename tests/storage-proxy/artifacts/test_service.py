@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from aiohttp import ClientError, ClientResponseError
+from aioresponses import aioresponses
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.data.storage.registries.types import (
@@ -666,29 +667,17 @@ class TestHuggingFaceDownloadStep:
                 pass
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession")
     async def test_probe_head_raises_on_http_error(
         self,
-        mock_client_session: MagicMock,
         hf_stream_reader: HuggingFaceFileDownloadStreamReader,
     ) -> None:
         """Test _probe_head raises ClientResponseError on HTTP error status."""
-        mock_session, mock_response = create_mock_aiohttp_session()
-        mock_client_session.return_value = mock_session
+        with aioresponses() as mocked:
+            mocked.head("http://test.com/file", status=401)
 
-        # Simulate raise_for_status=True behavior by raising ClientResponseError
-        mock_response.__aenter__ = AsyncMock(
-            side_effect=ClientResponseError(
-                request_info=MagicMock(),
-                history=(),
-                status=401,
-                message="Unauthorized",
-            )
-        )
-
-        with pytest.raises(ClientResponseError):
-            async for _ in hf_stream_reader.read():
-                pass
+            with pytest.raises(ClientResponseError):
+                async for _ in hf_stream_reader.read():
+                    pass
 
     @pytest.mark.asyncio
     async def test_upload_model_file_success(
