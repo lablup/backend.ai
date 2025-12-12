@@ -133,10 +133,10 @@ For example,
 
 .. code-block:: console
 
-   $ curl -L "https://github.com/astral-sh/python-build-standalone/releases/download/20241219/cpython-3.13.3+20250409-x86_64-unknown-linux-gnu-install_only.tar.gz" > cpython-3.13.3+20250409-x86_64-unknown-linux-gnu-install_only.tar.gz
-   $ tar -xf "cpython-3.13.3+20241219-x86_64-unknown-linux-gnu-install_only.tar.gz"
+   $ curl -L "https://github.com/astral-sh/python-build-standalone/releases/download/20251209/cpython-3.14.2+20251209-x86_64-unknown-linux-gnu-install_only.tar.gz" > cpython-3.14.2+20251209-x86_64-unknown-linux-gnu-install_only.tar.gz
+   $ tar -xf "cpython-3.14.2+20251209-x86_64-unknown-linux-gnu-install_only.tar.gz"
    $ mkdir -p "/home/bai/.static-python/versions"
-   $ mv python "/home/bai/.static-python/versions/3.13.3"
+   $ mv python "/home/bai/.static-python/versions/3.14.2"
 
 Then, you can create multiple virtual environments per service. To create a
 virtual environment for Backend.AI Manager and activate it, for example, you may run:

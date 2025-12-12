@@ -403,7 +403,7 @@ class ContainerConfigTest:
         ) -> RawConfigT: ...
 
     @pytest.fixture
-    def make_raw_config() -> MakeRawConfig:
+    def make_raw_config(self) -> MakeRawConfig:
         def _make(
             scratch_type: ScratchType = ScratchType.HOSTDIR,
             sandbox_type: ContainerSandboxType | None = None,

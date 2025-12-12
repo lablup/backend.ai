@@ -233,7 +233,7 @@ class DockerKernel(AbstractKernel):
                     docker_info = await docker.system.info()
                     docker_version = docker_info["ServerVersion"]
                     major, _, patch = docker_version.split(".", maxsplit=2)
-                    config = None
+                    config: dict[str, Any] | None = None
                     if (int(major) == 23 and int(patch) < 8) or (
                         int(major) == 24 and int(patch) < 1
                     ):
