@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING
 
 import click
 from glide import ConnectionError as GlideConnectionError
@@ -18,20 +18,9 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class Pingable(Protocol):
-    async def ping(self) -> None: ...
-
-
 @click.group()
 def cli() -> None:
     pass
-
-
-async def _ping(valkey_client: Pingable) -> None:
-    try:
-        await valkey_client.ping()
-    except (GlideConnectionError, GlideTimeoutError):
-        log.exception("ping(): Valkey ping failed")
 
 
 @cli.command()
@@ -45,13 +34,16 @@ def ping(cli_ctx: CLIContext) -> None:
     configuration in manager.toml.
     """
 
-    async def _impl():
+    async def _impl() -> None:
         enforce_debug_logging(["glide", "ai.backend.common.clients.valkey_client"])
         async with redis_ctx(cli_ctx) as redis_conn_set:
-            await _ping(redis_conn_set.live)
-            await _ping(redis_conn_set.stat)
-            await _ping(redis_conn_set.image)
-            await _ping(redis_conn_set.stream)
-            print("Redis is healthy")
+            try:
+                await redis_conn_set.live.ping()
+                await redis_conn_set.stat.ping()
+                await redis_conn_set.image.ping()
+                await redis_conn_set.stream.ping()
+                print("Redis is healthy")
+            except (GlideConnectionError, GlideTimeoutError):
+                log.exception("ping(): Valkey ping failed")
 
     asyncio.run(_impl())
