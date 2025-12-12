@@ -384,6 +384,31 @@ class TestCheckPresetsOccupiedSlots:
         return await create_agent()
 
     @pytest.fixture
+    async def alive_and_non_alive_agents(
+        self,
+        create_agent: Callable[..., Coroutine[Any, Any, AgentId]],
+    ) -> list[AgentId]:
+        """Create ALIVE and non-ALIVE agents for testing agent status filtering."""
+        agent_ids = []
+        # Create ALIVE agents (should be counted): 2 x 16 CPU, 32GB
+        agent_ids.append(await create_agent())
+        agent_ids.append(await create_agent())
+
+        # Create non-ALIVE agents (should be excluded): 3 x 100 CPU, 200GB
+        non_alive_slots = ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("204800")})
+        agent_ids.append(
+            await create_agent(status=AgentStatus.LOST, available_slots=non_alive_slots)
+        )
+        agent_ids.append(
+            await create_agent(status=AgentStatus.TERMINATED, available_slots=non_alive_slots)
+        )
+        agent_ids.append(
+            await create_agent(status=AgentStatus.RESTARTING, available_slots=non_alive_slots)
+        )
+
+        return agent_ids
+
+    @pytest.fixture
     async def test_resource_policy_dict(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -940,22 +965,12 @@ class TestCheckPresetsOccupiedSlots:
         test_user_uuid: uuid.UUID,
         test_keypair_access_key: AccessKey,
         test_resource_policy_dict: dict[str, str],
-        create_agent: Callable[..., Coroutine[Any, Any, AgentId]],
+        alive_and_non_alive_agents: list[AgentId],
     ) -> None:
         """
         Test that non-ALIVE agents (LOST, TERMINATED, RESTARTING) are excluded
         from remaining resource calculation. Only ALIVE agents should contribute.
         """
-        # Create ALIVE agents (should be counted)
-        await create_agent()  # 16 CPU, 32GB
-        await create_agent()  # 16 CPU, 32GB
-
-        # Create non-ALIVE agents (should be excluded)
-        non_alive_slots = ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("204800")})
-        await create_agent(status=AgentStatus.LOST, available_slots=non_alive_slots)
-        await create_agent(status=AgentStatus.TERMINATED, available_slots=non_alive_slots)
-        await create_agent(status=AgentStatus.RESTARTING, available_slots=non_alive_slots)
-
         result: CheckPresetsResult = await repository.check_presets(
             access_key=test_keypair_access_key,
             user_id=test_user_uuid,
