@@ -361,7 +361,7 @@
       "CannotDeleteFolder": "Cannot delete folder mounted in one or more sessions. Please terminate the session first.",
       "CannotDeletePipelineFolder": "You can't delete pipeline folders.",
       "CannotRestorePipelineFolder": "You can't restore pipeline folders.",
-      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Model project folders can only be created in model store–exclusive projects. Change the current project or user type.",
+      "ChangeTheVFolderTypeToCreateAutoMountFolder": "Unable to create the auto-mount folder as a project folder.",
       "CloneAFolder": "Clone folder",
       "CloneFolder": "Clone folder",
       "Cloneable": "Cloneable",
@@ -514,6 +514,7 @@
     "ErrorOccurred": "Error Occurred",
     "PleaseTypeToConfirm": "Please type {{ confirmText }} to confirm.",
     "ask": {
+      "DoYouWantToDelete": "Are you sure you want to delete?",
       "DoYouWantToDeleteSomething": "Are you sure you want to delete \"{{ name }}\"?",
       "DoYouWantToProceed": "Do you want to proceed?",
       "DoYouWantToResetChanges": "Do you want to reset your changes?"

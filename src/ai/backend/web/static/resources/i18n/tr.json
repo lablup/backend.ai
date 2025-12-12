@@ -358,7 +358,7 @@
       "CannotDeleteFolder": "Bir veya daha fazla oturuma bağlı klasör silinemez. Lütfen önce oturumu sonlandırın.",
       "CannotDeletePipelineFolder": "Boru hattı klasörlerini silemezsiniz.",
       "CannotRestorePipelineFolder": "Boru hattı klasörlerini geri yükleyemezsiniz.",
-      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Model proje klasörleri yalnızca model mağaza özel projelerinde oluşturulabilir. \nGeçerli projeyi veya kullanıcı türünü değiştirin.",
+      "ChangeTheVFolderTypeToCreateAutoMountFolder": "Otomatik bağlanan klasör proje klasörü olarak oluşturulamıyor.",
       "CloneAFolder": "Klasörü klonla",
       "CloneFolder": "Klasör klonlama",
       "Cloneable": "klonlanabilir",
@@ -511,6 +511,7 @@
     "ErrorOccurred": "Hata oluştu",
     "PleaseTypeToConfirm": "Onaylamak için lütfen {{confirmText}} yazın.",
     "ask": {
+      "DoYouWantToDelete": "Silmek istediğinizden emin misiniz?",
       "DoYouWantToDeleteSomething": "\"{{ name }}\" silmek istediğinizden emin misiniz?",
       "DoYouWantToProceed": "Devam etmek istiyor musunuz?",
       "DoYouWantToResetChanges": "Değişikliklerinizi sıfırlamak istiyor musunuz?"

@@ -357,7 +357,7 @@
       "CannotDeleteFolder": "Tidak dapat menghapus folder yang dipasang dalam satu atau lebih sesi. Tamatkan sesi terlebih dahulu.",
       "CannotDeletePipelineFolder": "Anda tidak boleh memadam folder saluran paip.",
       "CannotRestorePipelineFolder": "Anda tidak boleh memulihkan folder saluran paip.",
-      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Folder projek model hanya boleh dibuat dalam projek eksklusif kedai model. \nTukar projek semasa atau jenis pengguna.",
+      "ChangeTheVFolderTypeToCreateAutoMountFolder": "Gagal membuat folder pemasangan automatik sebagai folder projek.",
       "CloneAFolder": "Klon folder",
       "CloneFolder": "Klon folder",
       "Cloneable": "Boleh diklon",
@@ -510,6 +510,7 @@
     "ErrorOccurred": "Ralat Berlaku",
     "PleaseTypeToConfirm": "Sila taipkan {{confirmText}} untuk mengesahkan.",
     "ask": {
+      "DoYouWantToDelete": "Adakah anda pasti mahu memadam?",
       "DoYouWantToDeleteSomething": "Adakah anda pasti mahu memadamkan \"{{ name }}\"?",
       "DoYouWantToProceed": "Adakah anda mahu meneruskan?",
       "DoYouWantToResetChanges": "Adakah anda mahu menetapkan semula perubahan anda?"

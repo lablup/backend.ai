@@ -360,7 +360,7 @@
       "CannotDeleteFolder": "폴더가 하나 이상의 세션에 마운트 되어있어 삭제할 수 없습니다. 세션 종료 후 삭제가 가능합니다.",
       "CannotDeletePipelineFolder": "파이프라인 폴더는 삭제할 수 없습니다.",
       "CannotRestorePipelineFolder": "파이프라인 폴더는 복원할 수 없습니다.",
-      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "모델 스토어 전용 프로젝트에서만 모델용 프로젝트 폴더 생성이 가능합니다. 현재 프로젝트 또는 종류를 변경하세요.",
+      "ChangeTheVFolderTypeToCreateAutoMountFolder": "자동 마운트 폴더를 프로젝트 폴더로 생성할 수 없습니다.",
       "CloneAFolder": "폴더 복사",
       "CloneFolder": "폴더 클론",
       "Cloneable": "복사 가능 여부",
@@ -513,6 +513,7 @@
     "ErrorOccurred": "문제가 발생했습니다",
     "PleaseTypeToConfirm": "{{confirmText}}를 입력하십시오.",
     "ask": {
+      "DoYouWantToDelete": "정말로 삭제하시겠습니까?",
       "DoYouWantToDeleteSomething": "\"{{ name }}\"을(를) 삭제하시겠습니까?",
       "DoYouWantToProceed": "계속 진행하시겠습니까?",
       "DoYouWantToResetChanges": "변경사항을 초기화하시겠습니까?"

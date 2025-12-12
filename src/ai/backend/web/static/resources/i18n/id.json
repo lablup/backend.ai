@@ -357,7 +357,7 @@
       "CannotDeleteFolder": "Tidak dapat menghapus folder yang dipasang di satu atau beberapa sesi. Mohon hentikan sesi terlebih dahulu.",
       "CannotDeletePipelineFolder": "Anda tidak dapat menghapus folder pipa.",
       "CannotRestorePipelineFolder": "Anda tidak dapat mengembalikan folder pipa.",
-      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Folder Proyek Model hanya dapat dibuat di proyek Model Store -Eksklusif. \nUbah proyek atau jenis pengguna saat ini.",
+      "ChangeTheVFolderTypeToCreateAutoMountFolder": "Tidak dapat membuat folder mount otomatis sebagai folder proyek.",
       "CloneAFolder": "Klon folder",
       "CloneFolder": "Folder klon",
       "Cloneable": "Dapat diklon",
@@ -510,6 +510,7 @@
     "ErrorOccurred": "Terjadi Galat",
     "PleaseTypeToConfirm": "Harap ketik {{confirmText}} untuk mengonfirmasi.",
     "ask": {
+      "DoYouWantToDelete": "Apakah Anda yakin ingin menghapus?",
       "DoYouWantToDeleteSomething": "Apakah Anda yakin ingin menghapus \"{{ nama }}\"?",
       "DoYouWantToProceed": "Apakah Anda ingin lanjut?",
       "DoYouWantToResetChanges": "Apakah Anda ingin mengatur ulang perubahan Anda?"
