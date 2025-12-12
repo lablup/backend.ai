@@ -1202,6 +1202,24 @@ class ModelServiceHelper:
         except YAMLError as e:
             raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
 
+    @staticmethod
+    async def unsafe_load_model_definition(
+        storage_manager: StorageSessionManager,
+        folder_host: str,
+        vfid: VFolderID,
+        model_definition_path: str,
+    ) -> dict[str, Any]:
+        """
+        Checks if model definition YAML exists and is syntactically perfect.
+        Returns validated model definition configuration.
+        """
+        return await ModelServiceHelper._read_model_definition(
+            storage_manager,
+            folder_host,
+            vfid,
+            model_definition_path,
+        )
+
 
 class EndpointStatistics:
     @classmethod

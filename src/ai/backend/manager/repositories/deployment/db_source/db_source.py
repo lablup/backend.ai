@@ -1383,7 +1383,7 @@ class DeploymentDBSource:
                 endpoint_data.runtime_variant
             ].health_check_endpoint:
                 _info = ModelHealthCheck(path=_path)
-            elif endpoint_data.runtime_variant == RuntimeVariant.CUSTOM:
+            try:
                 # For custom runtime, check model definition file
                 model_definition_path = (
                     await ModelServiceHelper.validate_model_definition_file_exists(
@@ -1393,7 +1393,7 @@ class DeploymentDBSource:
                         endpoint_data.model_definition_path,
                     )
                 )
-                model_definition = await ModelServiceHelper.validate_model_definition(
+                model_definition = await ModelServiceHelper._read_model_definition(
                     self._storage_manager,
                     model.host,
                     model.vfid,
@@ -1404,14 +1404,19 @@ class DeploymentDBSource:
                 for model_info in model_definition["models"]:
                     if health_check_info := model_info.get("service", {}).get("health_check"):
                         _info = ModelHealthCheck(
-                            path=health_check_info["path"],
-                            interval=health_check_info.get("interval"),
-                            max_retries=health_check_info.get("max_retries"),
-                            max_wait_time=health_check_info.get("max_wait_time"),
-                            expected_status_code=health_check_info.get("expected_status_code"),
-                            initial_delay=health_check_info.get("initial_delay"),
+                            path=health_check_info.get("path", _info.path if _info else None),
+                            interval=health_check_info.get("interval", _info.interval if _info else None),
+                            max_retries=health_check_info.get("max_retries", _info.max_retries if _info else None),
+                            max_wait_time=health_check_info.get("max_wait_time", _info.max_wait_time if _info else None),
+                            expected_status_code=health_check_info.get("expected_status_code", _info.expected_status_code if _info else None),
+                            initial_delay=health_check_info.get("initial_delay", _info.initial_delay if _info else None)
                         )
                         break
+            except Exception as e:
+                if endpoint_data.runtime_variant == RuntimeVariant.CUSTOM:
+                    raise
+                if _info is None:
+                    raise e
 
             return _info
 
