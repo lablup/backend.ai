@@ -356,7 +356,7 @@
       "CannotDeleteFolder": "Δεν είναι δυνατή η διαγραφή του φακέλου που είναι τοποθετημένος σε μία ή περισσότερες περιόδους σύνδεσης. Κλείστε πρώτα τη συνεδρία.",
       "CannotDeletePipelineFolder": "Δεν μπορείτε να διαγράψετε τους φακέλους αγωγών.",
       "CannotRestorePipelineFolder": "Δεν μπορείτε να επαναφέρετε τους φακέλους αγωγών.",
-      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Οι φακέλοι έργων μοντέλων μπορούν να δημιουργηθούν μόνο σε αποκλειστικά έργα Model Store. \nΑλλάξτε το τρέχον έργο ή τον τύπο χρήστη.",
+      "ChangeTheVFolderTypeToCreateAutoMountFolder": "Δεν είναι δυνατή η δημιουργία του φακέλου αυτόματης προσάρτησης ως φακέλου του έργου.",
       "CloneAFolder": "Κλωνοποίηση φακέλου",
       "CloneFolder": "Φάκελος κλωνοποίησης",
       "Cloneable": "Κλωνοποιήσιμο",
@@ -508,6 +508,7 @@
   "dialog": {
     "ErrorOccurred": "Προέκυψε σφάλμα",
     "ask": {
+      "DoYouWantToDelete": "Είστε σίγουροι ότι θέλετε να διαγράψετε;",
       "DoYouWantToDeleteSomething": "Είστε σίγουροι ότι θέλετε να διαγράψετε το \"{{ name }}\";",
       "DoYouWantToProceed": "Θέλετε να συνεχίσετε?",
       "DoYouWantToResetChanges": "Θέλετε να επαναφέρετε τις αλλαγές σας;"

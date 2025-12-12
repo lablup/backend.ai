@@ -358,7 +358,7 @@
       "CannotDeleteFolder": "Nie można usunąć folderu zamontowanego w co najmniej jednej sesji. Najpierw zakończ sesję.",
       "CannotDeletePipelineFolder": "Nie możesz usunąć folderów rurociągów.",
       "CannotRestorePipelineFolder": "Nie możesz przywrócić folderów rurociągów.",
-      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Modelowe foldery projektu można tworzyć tylko w projektach ekskluzywnych w magazynie modeli. \nZmień bieżący projekt lub typ użytkownika.",
+      "ChangeTheVFolderTypeToCreateAutoMountFolder": "Nie można utworzyć folderu automatycznego montowania jako folderu projektu.",
       "CloneAFolder": "Sklonuj folder",
       "CloneFolder": "Klonowanie folderu",
       "Cloneable": "Możliwość klonowania",
@@ -511,6 +511,7 @@
     "ErrorOccurred": "Wystąpił błąd",
     "PleaseTypeToConfirm": "Wpisz {{confirmText}}, aby potwierdzić.",
     "ask": {
+      "DoYouWantToDelete": "Czy na pewno chcesz to usunąć?",
       "DoYouWantToDeleteSomething": "Czy na pewno chcesz usunąć \"{{ name }}\"?",
       "DoYouWantToProceed": "Czy chcesz kontynuować?",
       "DoYouWantToResetChanges": "Czy chcesz zresetować zmiany?"

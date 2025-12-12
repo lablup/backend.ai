@@ -358,7 +358,7 @@
       "CannotDeleteFolder": "ไม่สามารถลบโฟลเดอร์ที่ถูกเมาท์ในหนึ่งหรือหลายเซสชัน กรุณายุติเซสชันก่อน",
       "CannotDeletePipelineFolder": "คุณไม่สามารถลบโฟลเดอร์ไปป์ไลน์ได้",
       "CannotRestorePipelineFolder": "คุณไม่สามารถกู้คืนโฟลเดอร์ไปป์ไลน์ได้",
-      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "โมเดลโฟลเดอร์โครงการสามารถสร้างขึ้นได้ในโครงการโมเดล - โครงการพิเศษเท่านั้น \nเปลี่ยนโครงการหรือประเภทผู้ใช้ปัจจุบัน",
+      "ChangeTheVFolderTypeToCreateAutoMountFolder": "ไม่สามารถสร้างโฟลเดอร์ที่เมานต์โดยอัตโนมัติให้เป็นโฟลเดอร์โปรเจกต์ได้",
       "CloneAFolder": "โคลนโฟลเดอร์",
       "CloneFolder": "โคลนโฟลเดอร์",
       "Cloneable": "สามารถโคลนได้",
@@ -505,6 +505,7 @@
     "ErrorOccurred": "เกิดข้อผิดพลาด",
     "PleaseTypeToConfirm": "กรุณาพิมพ์ {{confirmText}} เพื่อยืนยัน",
     "ask": {
+      "DoYouWantToDelete": "คุณแน่ใจว่าต้องการลบหรือไม่?",
       "DoYouWantToDeleteSomething": "คุณแน่ใจหรือไม่ที่จะลบ \"{{ name }}\"?",
       "DoYouWantToProceed": "คุณต้องการดำเนินการต่อหรือไม่?",
       "DoYouWantToResetChanges": "คุณต้องการรีเซ็ตการเปลี่ยนแปลงของคุณหรือไม่?"

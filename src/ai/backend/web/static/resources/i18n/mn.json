@@ -357,7 +357,7 @@
       "CannotDeleteFolder": "Нэг буюу хэд хэдэн хэсэгт суулгасан фолдерыг устгах боломжгүй. Эхлээд хуралдааныг зогсооно уу.",
       "CannotDeletePipelineFolder": "Та дамжуулах хоолойн хавтасыг устгах боломжгүй.",
       "CannotRestorePipelineFolder": "Та дамжуулах хоолойн хавтасыг сэргээх боломжгүй.",
-      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Загвар төслийн фолдеруудыг зөвхөн загвар дэлгүүрийн онцгой төсөлд бий болгож болно. \nОдоогийн төсөл эсвэл хэрэглэгчийн төрлийг өөрчлөх.",
+      "ChangeTheVFolderTypeToCreateAutoMountFolder": "Автомат холбогдох хавтасыг төслийн хавтас болгон үүсгэж чадахгүй.",
       "CloneAFolder": "Фолдерыг хуул",
       "CloneFolder": "Фолдерыг хувилах",
       "Cloneable": "Cloneable",
@@ -509,6 +509,7 @@
     "ErrorOccurred": "Алдаа гарлаа",
     "PleaseTypeToConfirm": "Баталгаажуулахын тулд {{confirmText}} оруулна уу.",
     "ask": {
+      "DoYouWantToDelete": "Та үүнийг устгахдаа итгэлтэй байна уу?",
       "DoYouWantToDeleteSomething": "Та \"{{ name }}\"-г устгахдаа итгэлтэй байна уу?",
       "DoYouWantToProceed": "Та үргэлжлүүлэхийг хүсч байна уу?",
       "DoYouWantToResetChanges": "Та өөрчлөлтөө дахин тохируулахыг хүсэж байна уу?"

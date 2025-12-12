@@ -358,7 +358,7 @@
       "CannotDeleteFolder": "Không thể xóa thư mục được gắn trong một hoặc nhiều phiên. Vui lòng kết thúc phiên trước.",
       "CannotDeletePipelineFolder": "Bạn không thể xóa các thư mục đường ống.",
       "CannotRestorePipelineFolder": "Bạn không thể khôi phục các thư mục đường ống.",
-      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Các thư mục mô hình dự án chỉ có thể được tạo trong các dự án độc quyền của mô hình lưu trữ. \nThay đổi dự án hiện tại hoặc loại người dùng.",
+      "ChangeTheVFolderTypeToCreateAutoMountFolder": "Không thể tạo thư mục tự động gắn kết làm thư mục dự án.",
       "CloneAFolder": "Sao chép một thư mục",
       "CloneFolder": "Sao chép thư mục",
       "Cloneable": "Có thể nhân bản",
@@ -511,6 +511,7 @@
     "ErrorOccurred": "Xảy ra lỗi",
     "PleaseTypeToConfirm": "Vui lòng nhập {{confirmText}} để xác nhận.",
     "ask": {
+      "DoYouWantToDelete": "Bạn có chắc chắn muốn xóa không?",
       "DoYouWantToDeleteSomething": "Bạn có chắc chắn muốn xóa \"{{ name }}\" không?",
       "DoYouWantToProceed": "Bạn có muốn tiếp tục?",
       "DoYouWantToResetChanges": "Bạn có muốn đặt lại các thay đổi của mình không?"

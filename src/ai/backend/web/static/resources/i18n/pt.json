@@ -358,7 +358,7 @@
       "CannotDeleteFolder": "Não é possível excluir a pasta montada em uma ou mais sessões. Por favor, termine a sessão primeiro.",
       "CannotDeletePipelineFolder": "Você não pode excluir pastas de pipeline.",
       "CannotRestorePipelineFolder": "Você não pode restaurar pastas de pipeline.",
-      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "As pastas de projeto modelo só podem ser criadas em projetos exclusivos da loja de modelos. \nAltere o projeto atual ou o tipo de usuário.",
+      "ChangeTheVFolderTypeToCreateAutoMountFolder": "Não é possível criar a pasta de montagem automática como pasta do projeto.",
       "CloneAFolder": "Clonar uma pasta",
       "CloneFolder": "Clonar pasta",
       "Cloneable": "Clonável",
@@ -511,6 +511,7 @@
     "ErrorOccurred": "Ocorreu um erro",
     "PleaseTypeToConfirm": "Digite {{confirmText}} para confirmar.",
     "ask": {
+      "DoYouWantToDelete": "Tem certeza de que deseja excluir?",
       "DoYouWantToDeleteSomething": "Tem a certeza de que pretende eliminar \"{{ name }}\"?",
       "DoYouWantToProceed": "Você quer prosseguir?",
       "DoYouWantToResetChanges": "Deseja redefinir suas alterações?"

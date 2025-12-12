@@ -358,7 +358,7 @@
       "CannotDeleteFolder": "Impossible de supprimer le dossier monté dans une ou plusieurs sessions. Veuillez d'abord terminer la session.",
       "CannotDeletePipelineFolder": "Vous ne pouvez pas supprimer les dossiers du pipeline.",
       "CannotRestorePipelineFolder": "Vous ne pouvez pas restaurer les dossiers du pipeline.",
-      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Les dossiers de projets modèles ne peuvent être créés que dans des projets exclusifs en magasin de modèles. \nModifiez le projet ou le type d'utilisateur actuel.",
+      "ChangeTheVFolderTypeToCreateAutoMountFolder": "Impossible de créer le dossier de montage automatique en tant que dossier de projet.",
       "CloneAFolder": "Cloner un dossier",
       "CloneFolder": "Cloner un dossier",
       "Cloneable": "Clonable",
@@ -511,6 +511,7 @@
     "ErrorOccurred": "Erreur est survenue",
     "PleaseTypeToConfirm": "Veuillez taper {{confirmText}} pour confirmer.",
     "ask": {
+      "DoYouWantToDelete": "Voulez-vous vraiment supprimer ?",
       "DoYouWantToDeleteSomething": "Êtes-vous sûr de vouloir supprimer \"{{ nom }}\" ?",
       "DoYouWantToProceed": "Voulez-vous poursuivre?",
       "DoYouWantToResetChanges": "Voulez-vous réinitialiser vos modifications ?"

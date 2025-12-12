@@ -358,7 +358,7 @@
       "CannotDeleteFolder": "無法刪除安裝在一個或多個會話中的文件夾。請先終止會話。",
       "CannotDeletePipelineFolder": "您無法刪除管道文件夾。",
       "CannotRestorePipelineFolder": "您無法還原管道文件夾。",
-      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "模型項目文件夾只能在模型商店的獨家項目中創建。更改當前項目或用戶類型。",
+      "ChangeTheVFolderTypeToCreateAutoMountFolder": "無法將自動掛載資料夾建立為專案資料夾。",
       "CloneAFolder": "克隆文件夾",
       "CloneFolder": "克隆文件夹",
       "Cloneable": "可克隆",
@@ -512,6 +512,7 @@
     "ErrorOccurred": "錯誤發生",
     "PleaseTypeToConfirm": "請鍵入{{confirmText}}以確認。",
     "ask": {
+      "DoYouWantToDelete": "您確定要刪除嗎？",
       "DoYouWantToDeleteSomething": "您确定要删除\"{{ 名称 }}}\"吗？",
       "DoYouWantToProceed": "您要繼續嗎？",
       "DoYouWantToResetChanges": "您想重置您的變更嗎？"

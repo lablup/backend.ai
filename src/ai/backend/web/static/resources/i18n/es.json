@@ -358,7 +358,7 @@
       "CannotDeleteFolder": "No se puede eliminar la carpeta montada en una o más sesiones. Por favor, termine la sesión primero.",
       "CannotDeletePipelineFolder": "No puede eliminar las carpetas de tuberías.",
       "CannotRestorePipelineFolder": "No puedes restaurar las carpetas de tuberías.",
-      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Las carpetas de proyectos modelo solo se pueden crear en proyectos exclusivos de Model Store. \nCambie el proyecto o tipo de usuario actual.",
+      "ChangeTheVFolderTypeToCreateAutoMountFolder": "No se puede crear la carpeta de montaje automática como carpeta del proyecto.",
       "CloneAFolder": "Clonar una carpeta",
       "CloneFolder": "Clonar carpeta",
       "Cloneable": "Clonable",
@@ -511,6 +511,7 @@
     "ErrorOccurred": "Se ha producido un error",
     "PleaseTypeToConfirm": "Escriba {{confirmText}} para confirmar.",
     "ask": {
+      "DoYouWantToDelete": "¿Está seguro de que desea eliminar?",
       "DoYouWantToDeleteSomething": "¿Estás seguro de que quieres borrar \"{{ name }}\"?",
       "DoYouWantToProceed": "¿Quieres continuar?",
       "DoYouWantToResetChanges": "¿Quieres restablecer tus cambios?"

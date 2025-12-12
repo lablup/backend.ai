@@ -358,7 +358,7 @@
       "CannotDeleteFolder": "Невозможно удалить папку, установленную в одном или нескольких сеансах. Пожалуйста, сначала завершите сеанс.",
       "CannotDeletePipelineFolder": "Вы не можете удалить папки трубопровода.",
       "CannotRestorePipelineFolder": "Вы не можете восстановить папки трубопровода.",
-      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Папки моделей проектов могут быть созданы только в эксклюзивных проектах Model Store. \nИзмените текущий проект или тип пользователя.",
+      "ChangeTheVFolderTypeToCreateAutoMountFolder": "Невозможно создать автоматически монтируемую папку как папку проекта.",
       "CloneAFolder": "Клонировать папку",
       "CloneFolder": "Клонировать папку",
       "Cloneable": "Клонируемый",
@@ -511,6 +511,7 @@
     "ErrorOccurred": "Возникла ошибка",
     "PleaseTypeToConfirm": "Пожалуйста, введите {{confirmText}}, чтобы подтвердить.",
     "ask": {
+      "DoYouWantToDelete": "Вы уверены, что хотите удалить?",
       "DoYouWantToDeleteSomething": "Вы уверены, что хотите удалить \"{{ имя }}\"?",
       "DoYouWantToProceed": "Вы хотите продолжить?",
       "DoYouWantToResetChanges": "Вы хотите сбросить изменения?"

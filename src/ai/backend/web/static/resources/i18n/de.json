@@ -358,7 +358,7 @@
       "CannotDeleteFolder": "Der in einer oder mehreren Sitzungen bereitgestellte Ordner kann nicht gelöscht werden. Bitte beenden Sie zuerst die Sitzung.",
       "CannotDeletePipelineFolder": "Sie können Pipeline -Ordner nicht löschen.",
       "CannotRestorePipelineFolder": "Sie können Pipeline -Ordner nicht wiederherstellen.",
-      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Modellprojektordner können nur in Model Store -Exclusive -Projekten erstellt werden. \nÄndern Sie das aktuelle Projekt- oder Benutzertyp.",
+      "ChangeTheVFolderTypeToCreateAutoMountFolder": "Der automatisch eingebundene Ordner kann nicht als Projektordner angelegt werden.",
       "CloneAFolder": "Einen Ordner klonen",
       "CloneFolder": "Ordner klonen",
       "Cloneable": "klonbar",
@@ -511,6 +511,7 @@
     "ErrorOccurred": "Ein Fehler ist aufgetreten",
     "PleaseTypeToConfirm": "Bitte geben Sie {{confirmText}} ein, um zu bestätigen.",
     "ask": {
+      "DoYouWantToDelete": "Möchten Sie dies wirklich löschen?",
       "DoYouWantToDeleteSomething": "Sind Sie sicher, dass Sie \"{{ Name }}\" löschen wollen?",
       "DoYouWantToProceed": "Willst du fortfahren?",
       "DoYouWantToResetChanges": "Möchten Sie Ihre Änderungen zurücksetzen?"

@@ -358,7 +358,7 @@
       "CannotDeleteFolder": "Yhdessä tai useammassa istunnossa asennettua kansiota ei voi poistaa. Lopeta istunto ensin.",
       "CannotDeletePipelineFolder": "Et voi poistaa putkilinjan kansioita.",
       "CannotRestorePipelineFolder": "Putkilinjan kansiot eivät voi palauttaa.",
-      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Malliprojektin kansiot voidaan luoda vain Model Store - Exclusive -projekteihin. \nVaihda nykyinen projekti tai käyttäjätyyppi.",
+      "ChangeTheVFolderTypeToCreateAutoMountFolder": "Automaattisesti liitettävää kansiota ei voi luoda projektikansioksi.",
       "CloneAFolder": "Kloonaa kansio",
       "CloneFolder": "Kloonattu kansio",
       "Cloneable": "Kloonattavissa",
@@ -511,6 +511,7 @@
     "ErrorOccurred": "Tapahtunut virhe",
     "PleaseTypeToConfirm": "Kirjoita {{confirmText}} vahvistaaksesi.",
     "ask": {
+      "DoYouWantToDelete": "Haluatko varmasti poistaa tämän?",
       "DoYouWantToDeleteSomething": "Oletko varma, että haluat poistaa \"{{ name }}\"?\"?",
       "DoYouWantToProceed": "Haluatteko jatkaa?",
       "DoYouWantToResetChanges": "Haluatko nollata tekemäsi muutokset?"

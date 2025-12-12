@@ -357,7 +357,7 @@
       "CannotDeleteFolder": "Impossibile eliminare la cartella montata in una o più sessioni. Si prega di terminare prima la sessione.",
       "CannotDeletePipelineFolder": "Non puoi eliminare le cartelle della pipeline.",
       "CannotRestorePipelineFolder": "Non puoi ripristinare le cartelle della pipeline.",
-      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Le cartelle del progetto di modello possono essere create solo in progetti esclusivi del negozio di modelli. \nModificare il progetto corrente o il tipo di utente.",
+      "ChangeTheVFolderTypeToCreateAutoMountFolder": "Impossibile creare la cartella di montaggio automatica come cartella del progetto.",
       "CloneAFolder": "Clonare una cartella",
       "CloneFolder": "Clona la cartella",
       "Cloneable": "Clonabile",
@@ -510,6 +510,7 @@
     "ErrorOccurred": "Errore",
     "PleaseTypeToConfirm": "Si prega di digitare {{confirmText}} per confermare.",
     "ask": {
+      "DoYouWantToDelete": "Sei sicuro di voler eliminare?",
       "DoYouWantToDeleteSomething": "Si è sicuri di voler eliminare \"{{ nome }}\"?",
       "DoYouWantToProceed": "Vuoi procedere?",
       "DoYouWantToResetChanges": "Vuoi ripristinare le modifiche?"
