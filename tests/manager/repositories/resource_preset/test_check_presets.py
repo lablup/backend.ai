@@ -384,6 +384,25 @@ class TestCheckPresetsOccupiedSlots:
         return await create_agent()
 
     @pytest.fixture
+    async def test_resource_policy_dict(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_resource_policy_name: str,
+    ) -> dict[str, str]:
+        """Get resource policy dict for check_presets API"""
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            kp_policy_result = await db_sess.execute(
+                sa.select(KeyPairResourcePolicyRow).where(
+                    KeyPairResourcePolicyRow.name == test_resource_policy_name
+                )
+            )
+            kp_policy = kp_policy_result.scalar_one()
+            return {
+                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
+                "default_for_unspecified": str(kp_policy.default_for_unspecified),
+            }
+
+    @pytest.fixture
     def mock_config_provider(self) -> MagicMock:
         """Create mocked ManagerConfigProvider for repository"""
         mock = MagicMock()
@@ -915,13 +934,12 @@ class TestCheckPresetsOccupiedSlots:
     async def test_non_alive_agents_excluded_from_remaining_calculation(
         self,
         repository: ResourcePresetRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_scaling_group_name: str,
-        test_resource_policy_name: str,
-        test_group_id: uuid.UUID,
+        test_group_name: str,
         test_user_uuid: uuid.UUID,
         test_keypair_access_key: AccessKey,
+        test_resource_policy_dict: dict[str, str],
         create_agent: Callable[..., Coroutine[Any, Any, AgentId]],
     ) -> None:
         """
@@ -938,29 +956,12 @@ class TestCheckPresetsOccupiedSlots:
         await create_agent(status=AgentStatus.TERMINATED, available_slots=non_alive_slots)
         await create_agent(status=AgentStatus.RESTARTING, available_slots=non_alive_slots)
 
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            group_result = await db_sess.execute(
-                sa.select(GroupRow.name).where(GroupRow.id == test_group_id)
-            )
-            group_name = group_result.scalar_one()
-
-            kp_policy_result = await db_sess.execute(
-                sa.select(KeyPairResourcePolicyRow).where(
-                    KeyPairResourcePolicyRow.name == test_resource_policy_name
-                )
-            )
-            kp_policy = kp_policy_result.scalar_one()
-            resource_policy_dict = {
-                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
-                "default_for_unspecified": str(kp_policy.default_for_unspecified),
-            }
-
         result: CheckPresetsResult = await repository.check_presets(
             access_key=test_keypair_access_key,
             user_id=test_user_uuid,
-            group_name=group_name,
+            group_name=test_group_name,
             domain_name=test_domain_name,
-            resource_policy=resource_policy_dict,
+            resource_policy=test_resource_policy_dict,
             scaling_group=test_scaling_group_name,
         )
 
