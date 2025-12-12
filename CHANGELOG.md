@@ -16,6 +16,20 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.18.0 (2025-12-12)
+
+### Fixes
+* Skip generating route info when kernel service port is none ([#7211](https://github.com/lablup/backend.ai/issues/7211))
+* remove unnecessary shmem pre-deduction from Memory cgroup ([#7222](https://github.com/lablup/backend.ai/issues/7222))
+* Add missing lock IDs to handlers with short cycle preventing race conditions caused by concurrent execution between short and long cycles ([#7223](https://github.com/lablup/backend.ai/issues/7223))
+* Fix huggingFace token not applied in `HuggingFaceFileDownloadStreamReader` ([#7227](https://github.com/lablup/backend.ai/issues/7227))
+* Add missing `raise_for_status` for huggingface downloader ([#7233](https://github.com/lablup/backend.ai/issues/7233))
+* Fix `check_presets` API returning inflated remaining resources by excluding non-ALIVE agents from calculation ([#7238](https://github.com/lablup/backend.ai/issues/7238))
+
+### External Dependency Updates
+* Fix pycares version to 4.11 because aiohttp does not support pycares 5.0, which introduced breaking changes. ([#7231](https://github.com/lablup/backend.ai/issues/7231))
+
+
 ## 25.18.0rc3 (2025-12-10)
 
 ### Features
