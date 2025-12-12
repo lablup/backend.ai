@@ -334,17 +334,15 @@ class TestCheckPresetsOccupiedSlots:
             # Cleanup handled by db_with_cleanup
             pass
 
-    @pytest.fixture
-    def create_agent(
+    def _create_agent_factory(
         self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_scaling_group_name: str,
+        db: ExtendedAsyncSAEngine,
+        scaling_group_name: str,
     ) -> Callable[..., Coroutine[Any, Any, AgentId]]:
-        """Factory fixture to create agents with specified status and resources."""
-        # Assume agents length exceeds 255
+        """Private factory method to create agents with specified status and resources."""
         _addr_counter = [0]
 
-        async def _create_agent(
+        async def _create(
             *,
             status: AgentStatus = AgentStatus.ALIVE,
             available_slots: ResourceSlot | None = None,
@@ -353,13 +351,13 @@ class TestCheckPresetsOccupiedSlots:
         ) -> AgentId:
             _addr_counter[0] += 1
             agent_id = AgentId(f"agent-{status.name.lower()}-{uuid.uuid4().hex[:8]}")
-            async with db_with_cleanup.begin_session() as db_sess:
+            async with db.begin_session() as db_sess:
                 agent = AgentRow(
                     id=agent_id,
                     status=status,
                     status_changed=datetime.now(tzutc()),
                     region="test-region",
-                    scaling_group=test_scaling_group_name,
+                    scaling_group=scaling_group_name,
                     schedulable=schedulable,
                     available_slots=available_slots
                     or ResourceSlot({"cpu": Decimal("16"), "mem": Decimal("32768")}),
@@ -373,22 +371,27 @@ class TestCheckPresetsOccupiedSlots:
                 await db_sess.flush()
             return agent_id
 
-        return _create_agent
+        return _create
 
     @pytest.fixture
     async def test_agent_id(
         self,
-        create_agent: Callable[..., Coroutine[Any, Any, AgentId]],
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group_name: str,
     ) -> AgentId:
         """Create test ALIVE agent and return agent ID"""
+        create_agent = self._create_agent_factory(db_with_cleanup, test_scaling_group_name)
         return await create_agent()
 
     @pytest.fixture
     async def alive_and_non_alive_agents(
         self,
-        create_agent: Callable[..., Coroutine[Any, Any, AgentId]],
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group_name: str,
     ) -> list[AgentId]:
-        """Create ALIVE and non-ALIVE agents for testing agent status filtering."""
+        """Given: ALIVE and non-ALIVE agents exist in the scaling group."""
+        create_agent = self._create_agent_factory(db_with_cleanup, test_scaling_group_name)
+
         agent_ids = []
         # Create ALIVE agents (should be counted): 2 x 16 CPU, 32GB
         agent_ids.append(await create_agent())
