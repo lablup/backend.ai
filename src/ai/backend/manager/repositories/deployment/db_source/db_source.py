@@ -1409,6 +1409,7 @@ class DeploymentDBSource:
                             max_retries=health_check_info.get("max_retries"),
                             max_wait_time=health_check_info.get("max_wait_time"),
                             expected_status_code=health_check_info.get("expected_status_code"),
+                            initial_delay=health_check_info.get("initial_delay"),
                         )
                         break
 
