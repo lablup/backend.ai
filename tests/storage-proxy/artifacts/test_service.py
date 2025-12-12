@@ -6,7 +6,8 @@ from typing import Tuple
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
-from aiohttp import ClientError
+from aiohttp import ClientError, ClientResponseError
+from aioresponses import aioresponses
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.data.storage.registries.types import (
@@ -664,6 +665,19 @@ class TestHuggingFaceDownloadStep:
             )
             async for chunk in download_stream.read():
                 pass
+
+    @pytest.mark.asyncio
+    async def test_probe_head_raises_on_http_error(
+        self,
+        hf_stream_reader: HuggingFaceFileDownloadStreamReader,
+    ) -> None:
+        """Test _probe_head raises ClientResponseError on HTTP error status."""
+        with aioresponses() as mocked:
+            mocked.head("http://test.com/file", status=401)
+
+            with pytest.raises(ClientResponseError):
+                async for _ in hf_stream_reader.read():
+                    pass
 
     @pytest.mark.asyncio
     async def test_upload_model_file_success(
