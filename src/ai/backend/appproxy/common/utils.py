@@ -22,6 +22,7 @@ from typing import (
 from uuid import UUID
 
 import humps
+import redis
 import yaml
 from aiohttp import web, web_response
 from aiohttp.typedefs import Handler
@@ -346,6 +347,6 @@ class BackendAIAccessLogger(AccessLogger):
 async def ping_redis_connection(connection: RedisConnectionInfo) -> bool:
     try:
         return await redis_helper.execute(connection, lambda r: r.ping())
-    except Exception as e:
+    except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
         log.exception(f"ping_redis_connection(): Connecting to redis failed: {e}")
         raise e
