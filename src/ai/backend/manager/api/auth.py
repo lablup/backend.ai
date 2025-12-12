@@ -942,7 +942,7 @@ async def update_full_name(request: web.Request, params: Any) -> web.Response:
     domain_name = request["user"]["domain_name"]
     email = request["user"]["email"]
     log.info("AUTH.UPDATE_FULL_NAME(d:{}, email:{})", domain_name, email)
-    result = await root_ctx.processors.auth.update_full_name.wait_for_complete(
+    await root_ctx.processors.auth.update_full_name.wait_for_complete(
         UpdateFullNameAction(
             user_id=request["user"]["uuid"],
             full_name=params["full_name"],
@@ -950,11 +950,6 @@ async def update_full_name(request: web.Request, params: Any) -> web.Response:
             email=email,
         )
     )
-
-    if not result.success:
-        log.info("AUTH.UPDATE_FULL_NAME(d:{}, email:{}): Unknown user", domain_name, email)
-        return web.json_response({"error_msg": "Unknown user"}, status=HTTPStatus.BAD_REQUEST)
-
     return web.json_response({}, status=HTTPStatus.OK)
 
 

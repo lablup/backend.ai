@@ -2,6 +2,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from ai.backend.common.exception import UserNotFound
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.services.auth.actions.update_full_name import (
     UpdateFullNameAction,
@@ -60,16 +61,18 @@ async def test_update_full_name_fails_for_nonexistent_user(
         full_name="Some Name",
     )
 
-    mock_auth_repository.update_user_full_name.return_value = False
+    mock_auth_repository.update_user_full_name.side_effect = UserNotFound(
+        extra_data={"email": action.email, "domain": action.domain_name}
+    )
 
-    result = await auth_service.update_full_name(action)
+    with pytest.raises(UserNotFound):
+        await auth_service.update_full_name(action)
 
     mock_auth_repository.update_user_full_name.assert_called_once_with(
         action.email,
         action.domain_name,
         action.full_name,
     )
-    assert result.success is False
 
 
 @pytest.mark.asyncio

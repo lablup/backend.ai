@@ -18,7 +18,6 @@ from ai.backend.manager.errors.auth import (
     GroupMembershipNotFoundError,
     PasswordExpired,
     UserCreationError,
-    UserNotFound,
 )
 from ai.backend.manager.errors.common import (
     GenericBadRequest,
@@ -139,16 +138,12 @@ class AuthService:
                 action.email,
                 target_password_info=target_password_info,
             )
-        if user is None:
-            raise AuthorizationFailed("User credential mismatch.")
         if user["status"] == UserStatus.BEFORE_VERIFICATION:
             raise AuthorizationFailed("This account needs email verification.")
         if user["status"] in INACTIVE_USER_STATUSES:
             raise AuthorizationFailed("User credential mismatch.")
         await self._check_password_age(user, auth_config)
         user_row = await self._auth_repository.get_user_row_by_uuid(user["uuid"])
-        if user_row is None:
-            raise UserNotFound(extra_data=user["uuid"])
         main_keypair_row = user_row.get_main_keypair_row()
         if main_keypair_row is None:
             raise AuthorizationFailed("No API keypairs found.")
@@ -288,22 +283,20 @@ class AuthService:
         if action.email != action.requester_email:
             raise GenericForbidden("Not the account owner")
         email = action.email
-        result = await self._auth_repository.check_credential_without_migration(
+        await self._auth_repository.check_credential_without_migration(
             action.domain_name,
             email,
             action.password,
         )
-        if result is None:
-            raise GenericBadRequest("Invalid email and/or password")
         await self._auth_repository.deactivate_user_and_keypairs(email)
 
         return SignoutActionResult(success=True)
 
     async def update_full_name(self, action: UpdateFullNameAction) -> UpdateFullNameActionResult:
-        success = await self._auth_repository.update_user_full_name(
+        await self._auth_repository.update_user_full_name(
             action.email, action.domain_name, action.full_name
         )
-        return UpdateFullNameActionResult(success=success)
+        return UpdateFullNameActionResult(success=True)
 
     async def update_password(self, action: UpdatePasswordAction) -> UpdatePasswordActionResult:
         domain_name = action.domain_name
@@ -316,13 +309,14 @@ class AuthService:
                 success=False,
                 message="new password mismatch",
             )
-        user = await self._auth_repository.check_credential_without_migration(
-            domain_name,
-            email,
-            action.old_password,
-        )
-        if user is None:
-            log.info(log_fmt + ": old password mismtach", *log_args)
+        try:
+            await self._auth_repository.check_credential_without_migration(
+                domain_name,
+                email,
+                action.old_password,
+            )
+        except AuthorizationFailed:
+            log.info(log_fmt + ": old password mismatch", *log_args)
             raise AuthorizationFailed("Old password mismatch")
 
         # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
@@ -364,8 +358,6 @@ class AuthService:
             action.email,
             password=action.current_password,
         )
-        if checked_user is None:
-            raise AuthorizationFailed("User credential mismatch.")
         new_password = action.new_password
         if compare_to_hashed_password(new_password, checked_user["password"]):
             raise AuthorizationFailed("Cannot update to the same password as an existing password.")

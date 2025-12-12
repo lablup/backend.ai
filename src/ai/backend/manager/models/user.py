@@ -23,6 +23,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_serving.types import UserData as ModelServingUserData
 from ai.backend.manager.data.user.types import UserCreator, UserData, UserRole, UserStatus
+from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 
 from .base import (
@@ -253,23 +254,6 @@ class UserRow(Base):
         return joinedload(UserRow.resource_policy_row)
 
     @classmethod
-    async def query_user_by_uuid(
-        cls,
-        user_uuid: UUID,
-        db_session: SASession,
-    ) -> Optional[Self]:
-        user_query = (
-            sa.select(UserRow)
-            .where(UserRow.uuid == user_uuid)
-            .options(
-                joinedload(UserRow.main_keypair),
-                selectinload(UserRow.keypairs),
-            )
-        )
-        user_row = await db_session.scalar(user_query)
-        return user_row
-
-    @classmethod
     async def query_by_condition(
         cls,
         conditions: Sequence[QueryCondition],
@@ -440,7 +424,7 @@ async def check_credential_with_migration(
     domain: str,
     email: str,
     target_password_info: PasswordInfo,
-) -> Any:
+) -> dict:
     """
     Check user credentials and optionally migrate password hash if needed.
 
@@ -451,8 +435,12 @@ async def check_credential_with_migration(
         target_password_info: Password configuration containing password and target hash settings
 
     Returns:
-        User row if credentials are valid, None otherwise
+        User row if credentials are valid
+
+    Raises:
+        AuthorizationFailed: If user not found, password not set, or password mismatch
     """
+
     async with db.begin_readonly() as conn:
         result = await conn.execute(
             sa.select([users])
@@ -463,16 +451,15 @@ async def check_credential_with_migration(
         )
     row = result.first()
     if row is None:
-        return None
+        raise AuthorizationFailed("User credential mismatch.")
     if row["password"] is None:
-        # user password is not set.
-        return None
+        raise AuthorizationFailed("User credential mismatch.")
 
     try:
         if not _verify_password(target_password_info.password, row["password"]):
-            return None
+            raise AuthorizationFailed("User credential mismatch.")
     except ValueError:
-        return None
+        raise AuthorizationFailed("User credential mismatch.")
 
     # Password is valid, check if we need to migrate the hash
     current_hash_info = HashInfo.from_hash_string(row["password"])
@@ -498,7 +485,7 @@ async def check_credential(
     domain: str,
     email: str,
     password: str,
-) -> Any:
+) -> dict[str, Any]:
     """
     Check user credentials without migration (for signout, update password, etc.)
 
@@ -509,8 +496,12 @@ async def check_credential(
         password: Plain text password to verify
 
     Returns:
-        User row if credentials are valid, None otherwise
+        User row if credentials are valid
+
+    Raises:
+        AuthorizationFailed: If user not found, password not set, or password mismatch
     """
+
     async with db.begin_readonly() as conn:
         result = await conn.execute(
             sa.select([users])
@@ -521,15 +512,14 @@ async def check_credential(
         )
     row = result.first()
     if row is None:
-        return None
+        raise AuthorizationFailed("User credential mismatch.")
     if row["password"] is None:
-        # user password is not set.
-        return None
+        raise AuthorizationFailed("User credential mismatch.")
 
     try:
         if not _verify_password(password, row["password"]):
-            return None
+            raise AuthorizationFailed("User credential mismatch.")
     except ValueError:
-        return None
+        raise AuthorizationFailed("User credential mismatch.")
 
     return row

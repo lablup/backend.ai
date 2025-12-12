@@ -11,6 +11,7 @@ from uuid import UUID
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.exception import UserNotFound
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.types import UserData
 from ai.backend.manager.data.group.types import GroupData
@@ -359,11 +360,9 @@ class TestAuthRepository:
     ) -> None:
         """Test updating user full name"""
         update_name = "Updated Full Name"
-        result = await auth_repository.update_user_full_name(
+        await auth_repository.update_user_full_name(
             sample_user_data.email, sample_user_data.domain_name, update_name
         )
-
-        assert result is True
 
         # Verify full name was updated
         async with database_engine.begin_session() as db_sess:
@@ -372,6 +371,16 @@ class TestAuthRepository:
             )
             assert user is not None
             assert user.full_name == update_name
+
+    @pytest.mark.asyncio
+    async def test_update_user_full_name_not_found(
+        self, auth_repository: AuthRepository, default_domain: DomainTestData
+    ) -> None:
+        """Test updating user full name when user doesn't exist"""
+        with pytest.raises(UserNotFound):
+            await auth_repository.update_user_full_name(
+                "nonexistent@example.com", default_domain.name, "Some Name"
+            )
 
     @pytest.mark.asyncio
     async def test_update_user_password(
@@ -498,6 +507,14 @@ class TestAuthRepository:
         assert isinstance(result, UserRow)
         assert result.uuid == sample_user_data.uuid
         assert result.email == sample_user_data.email
+
+    @pytest.mark.asyncio
+    async def test_get_user_row_by_uuid_not_found(self, auth_repository: AuthRepository) -> None:
+        """Test getting user row by UUID when user doesn't exist"""
+        non_existent_uuid = UUID("99999999-9999-9999-9999-999999999999")
+
+        with pytest.raises(UserNotFound):
+            await auth_repository.get_user_row_by_uuid(non_existent_uuid)
 
     @pytest.mark.asyncio
     async def test_get_current_time(self, auth_repository: AuthRepository) -> None:
