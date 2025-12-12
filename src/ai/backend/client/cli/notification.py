@@ -9,7 +9,6 @@ from uuid import UUID
 
 import click
 
-from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.session import Session
 from ai.backend.common.data.notification import (
@@ -35,7 +34,7 @@ from .pretty import print_done, print_fail
 from .types import CLIContext
 
 
-@main.group()
+@click.group()
 def notification():
     """Set of notification operations (channels and rules)"""
 

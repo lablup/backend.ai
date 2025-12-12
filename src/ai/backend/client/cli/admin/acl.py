@@ -1,8 +1,6 @@
 import sys
 
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.func.acl import _default_list_fields
-from ai.backend.client.session import Session
 
 from ..extensions import pass_ctx_obj
 from ..types import CLIContext
@@ -22,6 +20,9 @@ def list(ctx: CLIContext) -> None:
     """
     List atomic permissions.
     """
+    from ai.backend.client.func.acl import _default_list_fields
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             items = session.Permission.list()

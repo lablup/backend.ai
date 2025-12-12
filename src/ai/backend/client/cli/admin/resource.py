@@ -2,7 +2,6 @@ from typing import Sequence
 
 import click
 
-from ...session import Session
 from ..pretty import print_error
 from . import admin
 
@@ -19,6 +18,8 @@ def query_slots() -> None:
     """
     Get available resource slots.
     """
+    from ...session import Session
+
     with Session() as session:
         try:
             ret = session.Resource.get_resource_slots()
@@ -33,6 +34,8 @@ def vfolder_types() -> None:
     """
     Get available vfolder types.
     """
+    from ...session import Session
+
     with Session() as session:
         try:
             ret = session.Resource.get_vfolder_types()
@@ -47,6 +50,8 @@ def container_registries() -> None:
     """
     Get registered container registries.
     """
+    from ...session import Session
+
     with Session() as session:
         try:
             ret = session.Resource.get_container_registries()
@@ -64,6 +69,8 @@ def recalculate_usage() -> None:
     Sometime, reported allocated resources is deviated from the actual value.
     By executing this command, the discrepancy will be corrected with real value.
     """
+    from ...session import Session
+
     with Session() as session:
         try:
             session.Resource.recalculate_usage()
@@ -83,6 +90,8 @@ def usage_per_month(month: str, groups: Sequence[str]) -> None:
     MONTH: Target month to get usage (yyyymm).
     GROUP_IDS: IDs of target groups to get usage (UUID).
     """
+    from ...session import Session
+
     with Session() as session:
         ret = session.Resource.usage_per_month(month, list(groups))
         for item in ret:
@@ -139,6 +148,8 @@ def usage_per_month(month: str, groups: Sequence[str]) -> None:
 @click.argument("start_date")
 @click.argument("end_date")
 def usage_per_period(group: str, start_date: str, end_date: str) -> None:
+    from ...session import Session
+
     with Session() as session:
         items = session.Resource.usage_per_period(group, start_date, end_date)
         for item in items:

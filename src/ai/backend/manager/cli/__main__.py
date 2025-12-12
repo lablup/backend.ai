@@ -1,30 +1,25 @@
 from __future__ import annotations
 
-import asyncio
-import logging
 import pathlib
-import subprocess
-import sys
-import uuid
-from datetime import datetime
-from functools import partial
-from typing import Optional, cast
+from typing import Optional
 
 import click
-from more_itertools import chunked
-from setproctitle import setproctitle
 
 from ai.backend.cli.params import BoolExprType, OptionalType
-from ai.backend.cli.types import ExitCode
-from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
-from ai.backend.common.validators import TimeDuration
-from ai.backend.logging import BraceStyleAdapter, LogLevel
 
-from ..errors.resource import ConfigurationLoadFailed
-from .context import CLIContext, redis_ctx
+from .context import CLIContext
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
+# LogLevel values for click.Choice - avoid importing ai.backend.logging at module level
+_LOG_LEVELS = ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "TRACE", "NOTSET"]
+
+
+def _get_logger():
+    import logging
+
+    from ai.backend.logging import BraceStyleAdapter
+
+    return BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 
 
 @click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
@@ -48,25 +43,29 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogLevel], case_sensitive=False),
-    default=LogLevel.NOTSET,
+    type=click.Choice(_LOG_LEVELS, case_sensitive=False),
+    default="NOTSET",
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     ctx: click.Context,
-    log_level: LogLevel,
+    log_level: str,
     debug: bool,
     config_path: Optional[pathlib.Path] = None,
 ) -> None:
     """
     Manager Administration CLI
     """
+    from setproctitle import setproctitle
+
+    from ai.backend.logging.types import LogLevel
+
     setproctitle("backend.ai: manager.cli")
     if debug:
-        log_level = LogLevel.DEBUG
+        log_level = "DEBUG"
 
-    ctx.obj = ctx.with_resource(CLIContext(config_path=config_path, log_level=log_level))
+    ctx.obj = ctx.with_resource(CLIContext(config_path=config_path, log_level=LogLevel(log_level)))
 
 
 @main.command(
@@ -108,6 +107,12 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
     Note that you do not have to specify connection-related options
     because the dbshell command fills out them from the manager configuration.
     """
+    import asyncio
+    import subprocess
+    import sys
+
+    from ai.backend.cli.types import ExitCode
+
     bootstrap_config = asyncio.run(cli_ctx.get_bootstrap_config())
     db_config = bootstrap_config.db
     if psql_help:
@@ -148,7 +153,7 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         subprocess.run(cmd)
         return
     # Use the container to start the psql client command
-    log.info(f"using the db container {container_name} ...")
+    _get_logger().info(f"using the db container {container_name} ...")
     cmd = [
         "docker",
         "exec",
@@ -173,7 +178,7 @@ def generate_api_keypair(cli_ctx: CLIContext) -> None:
     """
     from ..models.keypair import generate_keypair as _gen_keypair
 
-    log.info("Generating a manager API keypair...")
+    _get_logger().info("Generating a manager API keypair...")
     ak, sk = _gen_keypair()
     print(f"Access Key: {ak} ({len(ak)} bytes)")
     print(f"Secret Key: {sk} ({len(sk)} bytes)")
@@ -205,7 +210,9 @@ def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) 
     """
     from zmq.auth.certs import create_certificates, load_certificate
 
-    log.info("Generating a RPC keypair...")
+    from ..errors.resource import ConfigurationLoadFailed
+
+    _get_logger().info("Generating a RPC keypair...")
     public_key_path, secret_key_path = create_certificates(dst_dir, name)
     public_key, secret_key = load_certificate(secret_key_path)
     if secret_key is None:
@@ -241,13 +248,25 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     Delete old records from the kernels, error_logs tables and
     invoke the PostgreSQL's vaccuum operation to clear up the actual disk space.
     """
+    import asyncio
+    import uuid
+    from datetime import datetime
+    from functools import partial
+    from typing import cast
+
     import sqlalchemy as sa
+    from more_itertools import chunked
     from redis.asyncio import Redis
     from redis.asyncio.client import Pipeline
 
+    from ai.backend.common import redis_helper
+    from ai.backend.common.validators import TimeDuration
     from ai.backend.manager.models import SessionRow, error_logs, kernels
     from ai.backend.manager.models.utils import connect_database, vacuum_db
 
+    from .context import redis_ctx
+
+    log = _get_logger()
     today = datetime.now()
     duration = TimeDuration()
     expiration_date = today - duration.check_and_return(retention)

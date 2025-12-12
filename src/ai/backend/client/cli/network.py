@@ -4,7 +4,6 @@ from typing import Any, Iterable
 
 import click
 
-from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
@@ -22,7 +21,7 @@ _default_list_fields = (
 )
 
 
-@main.group()
+@click.group()
 def network():
     """Set of inter-container network operations"""
 
