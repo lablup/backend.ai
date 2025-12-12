@@ -8,10 +8,10 @@ Addresses BA-3054: Wrong parse of inference metrics.
 """
 
 import uuid
-from collections.abc import AsyncGenerator, Callable, Coroutine
+from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -334,44 +334,38 @@ class TestCheckPresetsOccupiedSlots:
             # Cleanup handled by db_with_cleanup
             pass
 
-    def _create_agent_factory(
+    async def _create_agent(
         self,
         db: ExtendedAsyncSAEngine,
         scaling_group_name: str,
-    ) -> Callable[..., Coroutine[Any, Any, AgentId]]:
-        """Private factory method to create agents with specified status and resources."""
-        _addr_counter = [0]
-
-        async def _create(
-            *,
-            status: AgentStatus = AgentStatus.ALIVE,
-            available_slots: Optional[ResourceSlot] = None,
-            occupied_slots: Optional[ResourceSlot] = None,
-            schedulable: bool = True,
-        ) -> AgentId:
-            _addr_counter[0] += 1
-            agent_id = AgentId(f"agent-{status.name.lower()}-{uuid.uuid4().hex[:8]}")
-            async with db.begin_session() as db_sess:
-                agent = AgentRow(
-                    id=agent_id,
-                    status=status,
-                    status_changed=datetime.now(tzutc()),
-                    region="test-region",
-                    scaling_group=scaling_group_name,
-                    schedulable=schedulable,
-                    available_slots=available_slots
-                    or ResourceSlot({"cpu": Decimal("16"), "mem": Decimal("32768")}),
-                    occupied_slots=occupied_slots
-                    or ResourceSlot({"cpu": Decimal("0"), "mem": Decimal("0")}),
-                    addr=f"10.0.0.{_addr_counter[0]}:2001",
-                    version="v25.03.0",
-                    architecture="x86_64",
-                )
-                db_sess.add(agent)
-                await db_sess.flush()
-            return agent_id
-
-        return _create
+        addr: str,
+        *,
+        status: AgentStatus = AgentStatus.ALIVE,
+        available_slots: Optional[ResourceSlot] = None,
+        occupied_slots: Optional[ResourceSlot] = None,
+        schedulable: bool = True,
+    ) -> AgentId:
+        """Helper method to create an agent with specified status and resources."""
+        agent_id = AgentId(f"agent-{status.name.lower()}-{uuid.uuid4().hex[:8]}")
+        async with db.begin_session() as db_sess:
+            agent = AgentRow(
+                id=agent_id,
+                status=status,
+                status_changed=datetime.now(tzutc()),
+                region="test-region",
+                scaling_group=scaling_group_name,
+                schedulable=schedulable,
+                available_slots=available_slots
+                or ResourceSlot({"cpu": Decimal("16"), "mem": Decimal("32768")}),
+                occupied_slots=occupied_slots
+                or ResourceSlot({"cpu": Decimal("0"), "mem": Decimal("0")}),
+                addr=addr,
+                version="v25.03.0",
+                architecture="x86_64",
+            )
+            db_sess.add(agent)
+            await db_sess.flush()
+        return agent_id
 
     @pytest.fixture
     async def test_agent_id(
@@ -380,8 +374,11 @@ class TestCheckPresetsOccupiedSlots:
         test_scaling_group_name: str,
     ) -> AgentId:
         """Create test ALIVE agent and return agent ID"""
-        create_agent = self._create_agent_factory(db_with_cleanup, test_scaling_group_name)
-        return await create_agent()
+        return await self._create_agent(
+            db_with_cleanup,
+            test_scaling_group_name,
+            "10.0.0.1:2001",
+        )
 
     @pytest.fixture
     async def alive_and_non_alive_agents(
@@ -390,23 +387,45 @@ class TestCheckPresetsOccupiedSlots:
         test_scaling_group_name: str,
     ) -> list[AgentId]:
         """Given: ALIVE and non-ALIVE agents exist in the scaling group."""
-        create_agent = self._create_agent_factory(db_with_cleanup, test_scaling_group_name)
+        non_alive_slots = ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("204800")})
 
-        agent_ids = []
+        agent_ids: list[AgentId] = []
+
         # Create ALIVE agents (should be counted): 2 x 16 CPU, 32GB
-        agent_ids.append(await create_agent())
-        agent_ids.append(await create_agent())
+        agent_ids.append(
+            await self._create_agent(db_with_cleanup, test_scaling_group_name, "10.0.0.1:2001")
+        )
+        agent_ids.append(
+            await self._create_agent(db_with_cleanup, test_scaling_group_name, "10.0.0.2:2001")
+        )
 
         # Create non-ALIVE agents (should be excluded): 3 x 100 CPU, 200GB
-        non_alive_slots = ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("204800")})
         agent_ids.append(
-            await create_agent(status=AgentStatus.LOST, available_slots=non_alive_slots)
+            await self._create_agent(
+                db_with_cleanup,
+                test_scaling_group_name,
+                "10.0.0.3:2001",
+                status=AgentStatus.LOST,
+                available_slots=non_alive_slots,
+            )
         )
         agent_ids.append(
-            await create_agent(status=AgentStatus.TERMINATED, available_slots=non_alive_slots)
+            await self._create_agent(
+                db_with_cleanup,
+                test_scaling_group_name,
+                "10.0.0.4:2001",
+                status=AgentStatus.TERMINATED,
+                available_slots=non_alive_slots,
+            )
         )
         agent_ids.append(
-            await create_agent(status=AgentStatus.RESTARTING, available_slots=non_alive_slots)
+            await self._create_agent(
+                db_with_cleanup,
+                test_scaling_group_name,
+                "10.0.0.5:2001",
+                status=AgentStatus.RESTARTING,
+                available_slots=non_alive_slots,
+            )
         )
 
         return agent_ids
