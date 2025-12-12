@@ -30,7 +30,10 @@ import click
 )
 @click.option(
     "--log-level",
-    type=str,
+    type=click.Choice(
+        ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "TRACE", "NOTSET"],
+        case_sensitive=False,
+    ),
     default="NOTSET",
     help="Set the logging verbosity level",
 )
