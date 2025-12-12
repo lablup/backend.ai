@@ -11,7 +11,7 @@ import uuid
 from collections.abc import AsyncGenerator, Callable, Coroutine
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -345,8 +345,8 @@ class TestCheckPresetsOccupiedSlots:
         async def _create(
             *,
             status: AgentStatus = AgentStatus.ALIVE,
-            available_slots: ResourceSlot | None = None,
-            occupied_slots: ResourceSlot | None = None,
+            available_slots: Optional[ResourceSlot] = None,
+            occupied_slots: Optional[ResourceSlot] = None,
             schedulable: bool = True,
         ) -> AgentId:
             _addr_counter[0] += 1
