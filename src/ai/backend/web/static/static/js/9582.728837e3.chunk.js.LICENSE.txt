@@ -1,0 +1,46 @@
+/*!
+ * @antv/g-dom-mutation-observer-api
+ * @description A simple implementation of DOM MutationObserver API.
+ * @version 2.0.38
+ * @date 7/30/2025, 1:34:51 PM
+ * @author AntVis
+ * @docs https://g.antv.antgroup.com/
+ */
+
+/*!
+ * @antv/g-math
+ * @description Geometry util
+ * @version 3.0.1
+ * @date 5/9/2025, 8:18:51 AM
+ * @author AntVis
+ * @docs https://g.antv.antgroup.com/
+ */
+
+/*!
+ * @antv/g-plugin-canvas-path-generator
+ * @description A G plugin of path generator with Canvas2D API
+ * @version 2.1.22
+ * @date 7/30/2025, 1:35:25 PM
+ * @author AntVis
+ * @docs https://g.antv.antgroup.com/
+ */
+
+/*!
+ * @antv/g-plugin-image-loader
+ * @description A G plugin for loading image
+ * @version 2.1.26
+ * @date 7/30/2025, 1:35:52 PM
+ * @author AntVis
+ * @docs https://g.antv.antgroup.com/
+ */
+
+/*!
+ * @antv/g-web-animations-api
+ * @description A simple implementation of Web Animations API.
+ * @version 2.1.28
+ * @date 7/30/2025, 1:36:24 PM
+ * @author AntVis
+ * @docs https://g.antv.antgroup.com/
+ */
+
+/*! decimal.js-light v2.5.1 https://github.com/MikeMcl/decimal.js-light/LICENCE */
