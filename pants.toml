@@ -12,6 +12,7 @@ backend_packages = [
     "pants.backend.plugin_development",
     "setupgen",
     "platform_resources",
+    "accelerator_wheels",
 ]
 pants_ignore = [
     ".*/",
