@@ -16,6 +16,15 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.15.5 (2025-12-12)
+
+### Fixes
+* Skip generating route info when kernel service port is none ([#7211](https://github.com/lablup/backend.ai/issues/7211))
+* remove unnecessary shmem pre-deduction from Memory cgroup ([#7222](https://github.com/lablup/backend.ai/issues/7222))
+* Add missing lock IDs to handlers with short cycle preventing race conditions caused by concurrent execution between short and long cycles ([#7223](https://github.com/lablup/backend.ai/issues/7223))
+* Fix `check_presets` API returning inflated remaining resources by excluding non-ALIVE agents from calculation ([#7238](https://github.com/lablup/backend.ai/issues/7238))
+
+
 ## 25.15.4 (2025-12-09)
 
 ### Improvements
