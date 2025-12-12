@@ -8,9 +8,10 @@ Addresses BA-3054: Wrong parse of inference metrics.
 """
 
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable, Coroutine
 from datetime import datetime, timedelta
 from decimal import Decimal
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -334,42 +335,53 @@ class TestCheckPresetsOccupiedSlots:
             pass
 
     @pytest.fixture
-    async def test_agent_id(
+    def create_agent(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
-    ) -> AsyncGenerator[AgentId, None]:
-        """Create test agent and return agent ID"""
-        agent_id = AgentId(f"agent-{uuid.uuid4().hex[:8]}")
+    ) -> Callable[..., Coroutine[Any, Any, AgentId]]:
+        """Factory fixture to create agents with specified status and resources."""
+        # Assume agents length exceeds 255
+        _addr_counter = [0]
 
-        async with db_with_cleanup.begin_session() as db_sess:
-            agent = AgentRow(
-                id=agent_id,
-                status=AgentStatus.ALIVE,
-                status_changed=datetime.now(tzutc()),
-                region="test-region",
-                scaling_group=test_scaling_group_name,
-                schedulable=True,
-                available_slots=ResourceSlot({
-                    "cpu": Decimal("16"),
-                    "mem": Decimal("32768"),  # 32GB
-                }),
-                occupied_slots=ResourceSlot({  # Cached value - should be ignored
-                    "cpu": Decimal("0"),
-                    "mem": Decimal("0"),
-                }),
-                addr="10.0.0.1:2001",
-                version="v25.03.0",  # Required NOT NULL field
-                architecture="x86_64",
-            )
-            db_sess.add(agent)
-            await db_sess.flush()
+        async def _create_agent(
+            *,
+            status: AgentStatus = AgentStatus.ALIVE,
+            available_slots: ResourceSlot | None = None,
+            occupied_slots: ResourceSlot | None = None,
+            schedulable: bool = True,
+        ) -> AgentId:
+            _addr_counter[0] += 1
+            agent_id = AgentId(f"agent-{status.name.lower()}-{uuid.uuid4().hex[:8]}")
+            async with db_with_cleanup.begin_session() as db_sess:
+                agent = AgentRow(
+                    id=agent_id,
+                    status=status,
+                    status_changed=datetime.now(tzutc()),
+                    region="test-region",
+                    scaling_group=test_scaling_group_name,
+                    schedulable=schedulable,
+                    available_slots=available_slots
+                    or ResourceSlot({"cpu": Decimal("16"), "mem": Decimal("32768")}),
+                    occupied_slots=occupied_slots
+                    or ResourceSlot({"cpu": Decimal("0"), "mem": Decimal("0")}),
+                    addr=f"10.0.0.{_addr_counter[0]}:2001",
+                    version="v25.03.0",
+                    architecture="x86_64",
+                )
+                db_sess.add(agent)
+                await db_sess.flush()
+            return agent_id
 
-        try:
-            yield agent_id
-        finally:
-            # Cleanup handled by db_with_cleanup
-            pass
+        return _create_agent
+
+    @pytest.fixture
+    async def test_agent_id(
+        self,
+        create_agent: Callable[..., Coroutine[Any, Any, AgentId]],
+    ) -> AgentId:
+        """Create test ALIVE agent and return agent ID"""
+        return await create_agent()
 
     @pytest.fixture
     def mock_config_provider(self) -> MagicMock:
@@ -899,3 +911,61 @@ class TestCheckPresetsOccupiedSlots:
         assert sg_data.remaining["mem"] == Decimal("26624")
         assert sg_data.using["cpu"] == Decimal("3")
         assert sg_data.using["mem"] == Decimal("6144")
+
+    async def test_non_alive_agents_excluded_from_remaining_calculation(
+        self,
+        repository: ResourcePresetRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_scaling_group_name: str,
+        test_resource_policy_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_keypair_access_key: AccessKey,
+        create_agent: Callable[..., Coroutine[Any, Any, AgentId]],
+    ) -> None:
+        """
+        Test that non-ALIVE agents (LOST, TERMINATED, RESTARTING) are excluded
+        from remaining resource calculation. Only ALIVE agents should contribute.
+        """
+        # Create ALIVE agents (should be counted)
+        await create_agent()  # 16 CPU, 32GB
+        await create_agent()  # 16 CPU, 32GB
+
+        # Create non-ALIVE agents (should be excluded)
+        non_alive_slots = ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("204800")})
+        await create_agent(status=AgentStatus.LOST, available_slots=non_alive_slots)
+        await create_agent(status=AgentStatus.TERMINATED, available_slots=non_alive_slots)
+        await create_agent(status=AgentStatus.RESTARTING, available_slots=non_alive_slots)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            group_result = await db_sess.execute(
+                sa.select(GroupRow.name).where(GroupRow.id == test_group_id)
+            )
+            group_name = group_result.scalar_one()
+
+            kp_policy_result = await db_sess.execute(
+                sa.select(KeyPairResourcePolicyRow).where(
+                    KeyPairResourcePolicyRow.name == test_resource_policy_name
+                )
+            )
+            kp_policy = kp_policy_result.scalar_one()
+            resource_policy_dict = {
+                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
+                "default_for_unspecified": str(kp_policy.default_for_unspecified),
+            }
+
+        result: CheckPresetsResult = await repository.check_presets(
+            access_key=test_keypair_access_key,
+            user_id=test_user_uuid,
+            group_name=group_name,
+            domain_name=test_domain_name,
+            resource_policy=resource_policy_dict,
+            scaling_group=test_scaling_group_name,
+        )
+
+        # Verify: Only ALIVE agents (2 x 16 CPU, 2 x 32GB) should be counted
+        # Non-ALIVE agents (3 x 100 CPU) should be excluded
+        sg_data = result.scaling_groups[test_scaling_group_name]
+        assert sg_data.remaining["cpu"] == Decimal("32")
+        assert sg_data.remaining["mem"] == Decimal("65536")
