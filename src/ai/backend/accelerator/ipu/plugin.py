@@ -501,7 +501,7 @@ class IPUPlugin(AbstractComputePlugin):
             "slot_name": "ipu.device",
             "description": "IPU",
             "human_readable_name": "IPU Device",
-            "display_unit": "Core",
+            "display_unit": "IPU",
             "number_format": {"binary": False, "round_length": 0},
             "display_icon": "ipu",
         }
