@@ -60,12 +60,12 @@ jobs:
         sort -u dist/checksum.txt -o dist/checksum.txt
         rm dist/*.sha256
     - name: Upload scies
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: scies-${{ matrix.os }}
         path: dist/*
     - name: Upload pants log
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: pants-${{ matrix.os }}.build-scies.log
         path: .pants.d/workdir/pants.log
