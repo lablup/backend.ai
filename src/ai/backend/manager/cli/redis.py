@@ -46,8 +46,7 @@ def ping(cli_ctx: CLIContext) -> None:
     """
 
     async def _impl():
-        # TODO: Check if this is working as intended
-        enforce_debug_logging(["ai.backend.common.clients.valkey_client"])
+        enforce_debug_logging(["glide", "ai.backend.common.clients.valkey_client"])
         async with redis_ctx(cli_ctx) as redis_conn_set:
             await _ping(redis_conn_set.live)
             await _ping(redis_conn_set.stat)
