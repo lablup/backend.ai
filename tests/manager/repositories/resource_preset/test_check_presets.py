@@ -11,6 +11,7 @@ import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
 from decimal import Decimal
+from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -333,43 +334,120 @@ class TestCheckPresetsOccupiedSlots:
             # Cleanup handled by db_with_cleanup
             pass
 
+    async def _create_agent(
+        self,
+        db: ExtendedAsyncSAEngine,
+        scaling_group_name: str,
+        addr: str,
+        *,
+        status: AgentStatus = AgentStatus.ALIVE,
+        available_slots: Optional[ResourceSlot] = None,
+        occupied_slots: Optional[ResourceSlot] = None,
+        schedulable: bool = True,
+    ) -> AgentId:
+        """Helper method to create an agent with specified status and resources."""
+        agent_id = AgentId(f"agent-{status.name.lower()}-{uuid.uuid4().hex[:8]}")
+        async with db.begin_session() as db_sess:
+            agent = AgentRow(
+                id=agent_id,
+                status=status,
+                status_changed=datetime.now(tzutc()),
+                region="test-region",
+                scaling_group=scaling_group_name,
+                schedulable=schedulable,
+                available_slots=available_slots
+                or ResourceSlot({"cpu": Decimal("16"), "mem": Decimal("32768")}),
+                occupied_slots=occupied_slots
+                or ResourceSlot({"cpu": Decimal("0"), "mem": Decimal("0")}),
+                addr=addr,
+                version="v25.03.0",
+                architecture="x86_64",
+            )
+            db_sess.add(agent)
+            await db_sess.flush()
+        return agent_id
+
     @pytest.fixture
     async def test_agent_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
-    ) -> AsyncGenerator[AgentId, None]:
-        """Create test agent and return agent ID"""
-        agent_id = AgentId(f"agent-{uuid.uuid4().hex[:8]}")
+    ) -> AgentId:
+        """Create test ALIVE agent and return agent ID"""
+        return await self._create_agent(
+            db_with_cleanup,
+            test_scaling_group_name,
+            "10.0.0.1:2001",
+        )
 
-        async with db_with_cleanup.begin_session() as db_sess:
-            agent = AgentRow(
-                id=agent_id,
-                status=AgentStatus.ALIVE,
-                status_changed=datetime.now(tzutc()),
-                region="test-region",
-                scaling_group=test_scaling_group_name,
-                schedulable=True,
-                available_slots=ResourceSlot({
-                    "cpu": Decimal("16"),
-                    "mem": Decimal("32768"),  # 32GB
-                }),
-                occupied_slots=ResourceSlot({  # Cached value - should be ignored
-                    "cpu": Decimal("0"),
-                    "mem": Decimal("0"),
-                }),
-                addr="10.0.0.1:2001",
-                version="v25.03.0",  # Required NOT NULL field
-                architecture="x86_64",
+    @pytest.fixture
+    async def alive_and_non_alive_agents(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group_name: str,
+    ) -> list[AgentId]:
+        """Given: ALIVE and non-ALIVE agents exist in the scaling group."""
+        non_alive_slots = ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("204800")})
+
+        agent_ids: list[AgentId] = []
+
+        # Create ALIVE agents (should be counted): 2 x 16 CPU, 32GB
+        agent_ids.append(
+            await self._create_agent(db_with_cleanup, test_scaling_group_name, "10.0.0.1:2001")
+        )
+        agent_ids.append(
+            await self._create_agent(db_with_cleanup, test_scaling_group_name, "10.0.0.2:2001")
+        )
+
+        # Create non-ALIVE agents (should be excluded): 3 x 100 CPU, 200GB
+        agent_ids.append(
+            await self._create_agent(
+                db_with_cleanup,
+                test_scaling_group_name,
+                "10.0.0.3:2001",
+                status=AgentStatus.LOST,
+                available_slots=non_alive_slots,
             )
-            db_sess.add(agent)
-            await db_sess.flush()
+        )
+        agent_ids.append(
+            await self._create_agent(
+                db_with_cleanup,
+                test_scaling_group_name,
+                "10.0.0.4:2001",
+                status=AgentStatus.TERMINATED,
+                available_slots=non_alive_slots,
+            )
+        )
+        agent_ids.append(
+            await self._create_agent(
+                db_with_cleanup,
+                test_scaling_group_name,
+                "10.0.0.5:2001",
+                status=AgentStatus.RESTARTING,
+                available_slots=non_alive_slots,
+            )
+        )
 
-        try:
-            yield agent_id
-        finally:
-            # Cleanup handled by db_with_cleanup
-            pass
+        return agent_ids
+
+    @pytest.fixture
+    async def test_resource_policy_dict(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_resource_policy_name: str,
+    ) -> dict[str, str]:
+        """Get resource policy dict for check_presets API"""
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            kp_policy_result = await db_sess.execute(
+                sa.select(KeyPairResourcePolicyRow).where(
+                    KeyPairResourcePolicyRow.name == test_resource_policy_name
+                )
+            )
+            kp_policy = kp_policy_result.scalar_one()
+            return {
+                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
+                "default_for_unspecified": str(kp_policy.default_for_unspecified),
+            }
 
     @pytest.fixture
     def mock_config_provider(self) -> MagicMock:
@@ -899,3 +977,33 @@ class TestCheckPresetsOccupiedSlots:
         assert sg_data.remaining["mem"] == Decimal("26624")
         assert sg_data.using["cpu"] == Decimal("3")
         assert sg_data.using["mem"] == Decimal("6144")
+
+    async def test_non_alive_agents_excluded_from_remaining_calculation(
+        self,
+        repository: ResourcePresetRepository,
+        test_domain_name: str,
+        test_scaling_group_name: str,
+        test_group_name: str,
+        test_user_uuid: uuid.UUID,
+        test_keypair_access_key: AccessKey,
+        test_resource_policy_dict: dict[str, str],
+        alive_and_non_alive_agents: list[AgentId],
+    ) -> None:
+        """
+        Test that non-ALIVE agents (LOST, TERMINATED, RESTARTING) are excluded
+        from remaining resource calculation. Only ALIVE agents should contribute.
+        """
+        result: CheckPresetsResult = await repository.check_presets(
+            access_key=test_keypair_access_key,
+            user_id=test_user_uuid,
+            group_name=test_group_name,
+            domain_name=test_domain_name,
+            resource_policy=test_resource_policy_dict,
+            scaling_group=test_scaling_group_name,
+        )
+
+        # Verify: Only ALIVE agents (2 x 16 CPU, 2 x 32GB) should be counted
+        # Non-ALIVE agents (3 x 100 CPU) should be excluded
+        sg_data = result.scaling_groups[test_scaling_group_name]
+        assert sg_data.remaining["cpu"] == Decimal("32")
+        assert sg_data.remaining["mem"] == Decimal("65536")

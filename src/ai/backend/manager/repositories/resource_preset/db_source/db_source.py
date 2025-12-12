@@ -20,6 +20,7 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.resource import (
@@ -354,6 +355,7 @@ class ResourcePresetDBSource:
                 AgentRow.scaling_group.in_(sgroup_names),
                 AgentRow.available_slots.isnot(None),
                 AgentRow.schedulable == sa.true(),
+                AgentRow.status == AgentStatus.ALIVE,
             )
         )
 
