@@ -16,6 +16,14 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.6.17 (2025-12-12)
+
+### Fixes
+* fix Pure Storage client to properly handle authentication tokens. Previously, tokens were incorrectly stored in context variables, which could cause the client to lose access to authentication credentials ([#6913](https://github.com/lablup/backend.ai/issues/6913))
+* `is_active` is not applied to `groups` GQL resolver when client role is `USER` ([#7116](https://github.com/lablup/backend.ai/issues/7116))
+* remove unnecessary shmem pre-deduction from Memory cgroup ([#7222](https://github.com/lablup/backend.ai/issues/7222))
+
+
 ## 25.6.16 (2025-11-23)
 
 ### Features
