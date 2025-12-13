@@ -6,6 +6,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action import BaseAction, BaseActionTriggerMeta, ProcessResult
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.types import MonitorTag
 from ai.backend.manager.models.audit_log import AuditLogRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -46,4 +47,6 @@ class AuditLogMonitor(ActionMonitor):
 
     @override
     async def done(self, action: BaseAction, result: ProcessResult) -> None:
+        if MonitorTag.SKIP_AUDIT_LOG in action.monitor_tags():
+            return
         await self._generate_log(action, result)

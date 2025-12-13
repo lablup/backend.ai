@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional, TypeVar
 
 from ai.backend.common.exception import ErrorCode
-from ai.backend.manager.actions.types import ActionSpec, OperationStatus
+from ai.backend.manager.actions.types import ActionSpec, MonitorTag, OperationStatus
 
 
 class BaseAction(ABC):
@@ -15,6 +15,14 @@ class BaseAction(ABC):
         This returns `None` by default because subclasses may not always need to specify an entity ID.
         """
         return None
+
+    @classmethod
+    def monitor_tags(cls) -> frozenset[MonitorTag]:
+        """
+        Return tags for filtering/categorization purposes.
+        Override in subclasses to add relevant tags.
+        """
+        return frozenset()
 
     @classmethod
     @abstractmethod
