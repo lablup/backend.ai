@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, override
 from uuid import UUID
 
 from ai.backend.common.types import (
@@ -17,6 +17,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.types import Creator
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.session.types import SchedulingResult
@@ -268,8 +269,9 @@ class KernelSchedulingHistoryData:
     kernel_id: KernelId
     session_id: SessionId
 
-    from_phase: Optional[KernelSchedulingPhase]
-    to_phase: Optional[KernelSchedulingPhase]
+    phase: str  # ScheduleType value
+    from_status: Optional[KernelSchedulingPhase]
+    to_status: Optional[KernelSchedulingPhase]
 
     result: SchedulingResult
     error_code: Optional[str]
@@ -278,3 +280,41 @@ class KernelSchedulingHistoryData:
     attempts: int
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass
+class KernelSchedulingHistoryCreator(Creator):
+    """Creator for kernel scheduling history."""
+
+    kernel_id: KernelId
+    session_id: SessionId
+    phase: str  # ScheduleType value
+    result: SchedulingResult
+    message: str
+    from_status: Optional[KernelSchedulingPhase] = None
+    to_status: Optional[KernelSchedulingPhase] = None
+    error_code: Optional[str] = None
+
+    @override
+    def fields_to_store(self) -> dict[str, Any]:
+        return {
+            "kernel_id": self.kernel_id,
+            "session_id": self.session_id,
+            "phase": self.phase,
+            "from_status": str(self.from_status) if self.from_status else None,
+            "to_status": str(self.to_status) if self.to_status else None,
+            "result": str(self.result),
+            "error_code": self.error_code,
+            "message": self.message,
+            "attempts": 1,
+        }
+
+
+@dataclass
+class KernelSchedulingHistoryListResult:
+    """Search result with pagination for kernel scheduling history."""
+
+    items: list[KernelSchedulingHistoryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
