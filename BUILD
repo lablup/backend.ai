@@ -27,6 +27,7 @@ python_requirements(
         "etcd-client-py": ["etcd_client"],
         "ruamel.yaml": ["ruamel.yaml"],
         "valkey-glide": ["glide"],
+        "tt-smi": ["tt_smi", "tt_tools"],
     },
     type_stubs_module_mapping={
         "types-aiofiles": ["aiofiles"],
