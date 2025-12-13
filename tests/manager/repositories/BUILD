@@ -28,3 +28,11 @@ python_tests(
         "src/ai/backend/manager:src",
     ],
 )
+
+python_tests(
+    name="test_purger",
+    sources=["test_purger.py"],
+    dependencies=[
+        "src/ai/backend/manager:src",
+    ],
+)
