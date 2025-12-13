@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Optional
+
 import sqlalchemy as sa
+from pydantic import BaseModel
 from sqlalchemy.dialects.postgresql import JSONB
 
 from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
@@ -23,11 +27,44 @@ from ai.backend.manager.data.session.types import (
 from .base import GUID, Base, IDColumn
 
 __all__ = (
+    "SubStepResultModel",
     "SessionSchedulingHistoryRow",
     "KernelSchedulingHistoryRow",
     "DeploymentHistoryRow",
     "RouteHistoryRow",
 )
+
+
+class SubStepResultModel(BaseModel):
+    """Pydantic model for SubStepResult JSONB serialization/deserialization."""
+
+    phase: str
+    name: str
+    result: SchedulingResult
+    error_code: Optional[str] = None
+    message: Optional[str] = None
+    executed_at: datetime
+
+    def to_data(self) -> SubStepResult:
+        return SubStepResult(
+            phase=self.phase,
+            name=self.name,
+            result=self.result,
+            error_code=self.error_code,
+            message=self.message,
+            executed_at=self.executed_at,
+        )
+
+    @classmethod
+    def from_data(cls, data: SubStepResult) -> SubStepResultModel:
+        return cls(
+            phase=data.phase,
+            name=data.name,
+            result=data.result,
+            error_code=data.error_code,
+            message=data.message,
+            executed_at=data.executed_at,
+        )
 
 
 class SessionSchedulingHistoryRow(Base):
@@ -63,17 +100,7 @@ class SessionSchedulingHistoryRow(Base):
     def to_data(self) -> SessionSchedulingHistoryData:
         sub_steps: list[SubStepResult] | None = None
         if self.sub_steps:
-            sub_steps = [
-                SubStepResult(
-                    phase=s["phase"],
-                    name=s["name"],
-                    result=SchedulingResult(s["result"]),
-                    error_code=s.get("error_code"),
-                    message=s.get("message"),
-                    executed_at=s["executed_at"],
-                )
-                for s in self.sub_steps
-            ]
+            sub_steps = [SubStepResultModel.model_validate(s).to_data() for s in self.sub_steps]
         return SessionSchedulingHistoryData(
             id=self.id,
             session_id=self.session_id,
