@@ -7,7 +7,7 @@ from datetime import datetime
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, override
 from uuid import UUID
 
 import yarl
@@ -35,6 +35,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.types import Creator
 
 
 class ImageEnvironment(BaseModel):
@@ -473,6 +474,7 @@ class DeploymentHistoryData:
     id: UUID
     deployment_id: UUID
 
+    phase: str  # DeploymentLifecycleType value
     from_status: Optional[ModelDeploymentStatus]
     to_status: Optional[ModelDeploymentStatus]
 
@@ -493,6 +495,7 @@ class RouteHistoryData:
     route_id: UUID
     deployment_id: UUID
 
+    phase: str  # RouteLifecycleType value
     from_status: Optional[RouteStatus]
     to_status: Optional[RouteStatus]
 
@@ -503,3 +506,77 @@ class RouteHistoryData:
     attempts: int
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass
+class DeploymentHistoryCreator(Creator):
+    """Creator for deployment history."""
+
+    deployment_id: UUID
+    phase: str  # DeploymentLifecycleType value
+    result: SchedulingResult
+    message: str
+    from_status: Optional[ModelDeploymentStatus] = None
+    to_status: Optional[ModelDeploymentStatus] = None
+    error_code: Optional[str] = None
+
+    @override
+    def fields_to_store(self) -> dict[str, Any]:
+        return {
+            "deployment_id": self.deployment_id,
+            "phase": self.phase,
+            "from_status": str(self.from_status) if self.from_status else None,
+            "to_status": str(self.to_status) if self.to_status else None,
+            "result": str(self.result),
+            "error_code": self.error_code,
+            "message": self.message,
+            "attempts": 1,
+        }
+
+
+@dataclass
+class DeploymentHistoryListResult:
+    """Search result with pagination for deployment history."""
+
+    items: list[DeploymentHistoryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class RouteHistoryCreator(Creator):
+    """Creator for route history."""
+
+    route_id: UUID
+    deployment_id: UUID
+    phase: str  # RouteLifecycleType value
+    result: SchedulingResult
+    message: str
+    from_status: Optional[RouteStatus] = None
+    to_status: Optional[RouteStatus] = None
+    error_code: Optional[str] = None
+
+    @override
+    def fields_to_store(self) -> dict[str, Any]:
+        return {
+            "route_id": self.route_id,
+            "deployment_id": self.deployment_id,
+            "phase": self.phase,
+            "from_status": str(self.from_status.value) if self.from_status else None,
+            "to_status": str(self.to_status.value) if self.to_status else None,
+            "result": str(self.result),
+            "error_code": self.error_code,
+            "message": self.message,
+            "attempts": 1,
+        }
+
+
+@dataclass
+class RouteHistoryListResult:
+    """Search result with pagination for route history."""
+
+    items: list[RouteHistoryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool

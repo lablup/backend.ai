@@ -5,8 +5,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, override
 from uuid import UUID
+
+from pydantic import BaseModel
 
 from ai.backend.common.data.vfolder.types import VFolderMountData
 from ai.backend.common.types import (
@@ -19,6 +21,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.types import Creator
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.network import NetworkType
@@ -263,16 +266,13 @@ class SchedulingResult(StrEnum):
     SKIPPED = "SKIPPED"
 
 
-@dataclass(frozen=True)
-class SubStepResult:
+class SubStepResult(BaseModel):
     """Sub-step result for scheduling history."""
 
-    phase: str  # e.g., "provisioner.validator", "provisioner.selector"
-    name: str  # e.g., "check_quota", "select_agent"
+    step: str
     result: SchedulingResult
-    error_code: Optional[str]
-    message: Optional[str]
-    executed_at: datetime
+    error_code: Optional[str] = None
+    message: Optional[str] = None
 
 
 @dataclass
@@ -282,6 +282,7 @@ class SessionSchedulingHistoryData:
     id: UUID
     session_id: SessionId
 
+    phase: str  # ScheduleType value
     from_status: Optional[SessionStatus]
     to_status: Optional[SessionStatus]
 
@@ -294,3 +295,44 @@ class SessionSchedulingHistoryData:
     attempts: int
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass
+class SessionSchedulingHistoryCreator(Creator):
+    """Creator for session scheduling history."""
+
+    session_id: SessionId
+    phase: str  # ScheduleType value
+    result: SchedulingResult
+    message: str
+    from_status: Optional[SessionStatus] = None
+    to_status: Optional[SessionStatus] = None
+    error_code: Optional[str] = None
+    sub_steps: Optional[list[SubStepResult]] = None
+
+    @override
+    def fields_to_store(self) -> dict[str, Any]:
+        sub_steps_json: list[dict[str, Any]] | None = None
+        if self.sub_steps:
+            sub_steps_json = [s.model_dump(mode="json") for s in self.sub_steps]
+        return {
+            "session_id": self.session_id,
+            "phase": self.phase,
+            "from_status": str(self.from_status) if self.from_status else None,
+            "to_status": str(self.to_status) if self.to_status else None,
+            "result": str(self.result),
+            "error_code": self.error_code,
+            "message": self.message,
+            "sub_steps": sub_steps_json,
+            "attempts": 1,
+        }
+
+
+@dataclass
+class SessionSchedulingHistoryListResult:
+    """Search result with pagination for session scheduling history."""
+
+    items: list[SessionSchedulingHistoryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool

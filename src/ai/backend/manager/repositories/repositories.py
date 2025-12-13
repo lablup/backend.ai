@@ -35,6 +35,9 @@ from ai.backend.manager.repositories.resource_preset.repositories import Resourc
 from ai.backend.manager.repositories.scaling_group.repositories import ScalingGroupRepositories
 from ai.backend.manager.repositories.schedule.repositories import ScheduleRepositories
 from ai.backend.manager.repositories.scheduler.repositories import SchedulerRepositories
+from ai.backend.manager.repositories.scheduling_history.repositories import (
+    SchedulingHistoryRepositories,
+)
 from ai.backend.manager.repositories.session.repositories import SessionRepositories
 from ai.backend.manager.repositories.storage_namespace.repositories import (
     StorageNamespaceRepositories,
@@ -68,6 +71,7 @@ class Repositories:
     scaling_group: ScalingGroupRepositories
     schedule: ScheduleRepositories
     scheduler: SchedulerRepositories
+    scheduling_history: SchedulingHistoryRepositories
     session: SessionRepositories
     user: UserRepositories
     user_resource_policy: UserResourcePolicyRepositories
@@ -99,6 +103,7 @@ class Repositories:
         scaling_group_repositories = ScalingGroupRepositories.create(args)
         schedule_repositories = ScheduleRepositories.create(args)
         scheduler_repositories = SchedulerRepositories.create(args)
+        scheduling_history_repositories = SchedulingHistoryRepositories.create(args)
         session_repositories = SessionRepositories.create(args)
         user_repositories = UserRepositories.create(args)
         user_resource_policy_repositories = UserResourcePolicyRepositories.create(args)
@@ -129,6 +134,7 @@ class Repositories:
             scaling_group=scaling_group_repositories,
             schedule=schedule_repositories,
             scheduler=scheduler_repositories,
+            scheduling_history=scheduling_history_repositories,
             session=session_repositories,
             user=user_repositories,
             user_resource_policy=user_resource_policy_repositories,
