@@ -74,11 +74,13 @@ class SchedulingHistoryDBSource:
         ):
             last_row.attempts += 1
             await db_sess.flush()
+            await db_sess.refresh(last_row)
             return last_row
 
         new_row = SessionSchedulingHistoryRow(**creator.fields_to_store())
         db_sess.add(new_row)
         await db_sess.flush()
+        await db_sess.refresh(new_row)
         return new_row
 
     async def _get_last_session_history(
@@ -141,11 +143,13 @@ class SchedulingHistoryDBSource:
         ):
             last_row.attempts += 1
             await db_sess.flush()
+            await db_sess.refresh(last_row)
             return last_row
 
         new_row = KernelSchedulingHistoryRow(**creator.fields_to_store())
         db_sess.add(new_row)
         await db_sess.flush()
+        await db_sess.refresh(new_row)
         return new_row
 
     async def _get_last_kernel_history(
@@ -208,11 +212,13 @@ class SchedulingHistoryDBSource:
         ):
             last_row.attempts += 1
             await db_sess.flush()
+            await db_sess.refresh(last_row)
             return last_row
 
         new_row = DeploymentHistoryRow(**creator.fields_to_store())
         db_sess.add(new_row)
         await db_sess.flush()
+        await db_sess.refresh(new_row)
         return new_row
 
     async def _get_last_deployment_history(
@@ -275,11 +281,13 @@ class SchedulingHistoryDBSource:
         ):
             last_row.attempts += 1
             await db_sess.flush()
+            await db_sess.refresh(last_row)
             return last_row
 
         new_row = RouteHistoryRow(**creator.fields_to_store())
         db_sess.add(new_row)
         await db_sess.flush()
+        await db_sess.refresh(new_row)
         return new_row
 
     async def _get_last_route_history(
