@@ -1,4 +1,4 @@
-from tt_tools_common.utils_common.tools_utils import PciChip
+from tt_tools_common.utils_common.tools_utils import PciChip  # pants: no-infer-dep
 
 from ai.backend.agent.resources import AbstractComputeDevice
 from ai.backend.common.types import DeviceId, DeviceName
