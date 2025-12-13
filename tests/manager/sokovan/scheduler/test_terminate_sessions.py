@@ -25,6 +25,10 @@ from ai.backend.manager.repositories.schedule.repository import (
     TerminatingKernelData,
     TerminatingSessionData,
 )
+from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
+    SessionProvisioner,
+    SessionProvisionerArgs,
+)
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler, SchedulerArgs
 
@@ -62,14 +66,23 @@ def mock_repository():
 @pytest.fixture
 def scheduler(mock_repository, mock_agent_pool):
     """Create Scheduler instance with mocked dependencies."""
+    mock_config_provider = MagicMock()
+    provisioner = SessionProvisioner(
+        SessionProvisionerArgs(
+            validator=MagicMock(),
+            default_sequencer=MagicMock(),
+            default_agent_selector=MagicMock(),
+            allocator=MagicMock(),
+            repository=mock_repository,
+            config_provider=mock_config_provider,
+            valkey_schedule=MagicMock(),
+        )
+    )
     args = SchedulerArgs(
-        validator=MagicMock(),
-        sequencer=MagicMock(),
-        agent_selector=MagicMock(),
-        allocator=MagicMock(),
+        provisioner=provisioner,
         repository=mock_repository,
         deployment_repository=MagicMock(),
-        config_provider=MagicMock(),
+        config_provider=mock_config_provider,
         lock_factory=MagicMock(),
         agent_pool=mock_agent_pool,
         network_plugin_ctx=MagicMock(),

@@ -10,6 +10,10 @@ from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.provisioner.allocators.repository_allocator import (
     RepositoryAllocator,
 )
+from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
+    SessionProvisioner,
+    SessionProvisionerArgs,
+)
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
     ConcentratedAgentSelector,
 )
@@ -78,6 +82,7 @@ def create_default_scheduler(
     Returns:
         A configured Scheduler instance
     """
+    # Create provisioner components
     sequencer = FIFOSequencer()
     validator = SchedulingValidator([
         ConcurrencyValidator(),
@@ -93,12 +98,23 @@ def create_default_scheduler(
     resource_priority = config_provider.config.manager.agent_selection_resource_priority
     agent_selector = AgentSelector(ConcentratedAgentSelector(resource_priority))
     allocator = RepositoryAllocator(repository)
+
+    # Create provisioner
+    provisioner = SessionProvisioner(
+        SessionProvisionerArgs(
+            validator=validator,
+            default_sequencer=sequencer,
+            default_agent_selector=agent_selector,
+            allocator=allocator,
+            repository=repository,
+            config_provider=config_provider,
+            valkey_schedule=valkey_schedule,
+        )
+    )
+
     return Scheduler(
         SchedulerArgs(
-            validator=validator,
-            sequencer=sequencer,
-            agent_selector=agent_selector,
-            allocator=allocator,
+            provisioner=provisioner,
             repository=repository,
             deployment_repository=deployment_repository,
             config_provider=config_provider,
