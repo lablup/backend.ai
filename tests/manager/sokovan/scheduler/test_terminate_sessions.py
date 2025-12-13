@@ -25,6 +25,10 @@ from ai.backend.manager.repositories.schedule.repository import (
     TerminatingKernelData,
     TerminatingSessionData,
 )
+from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
+    SessionLauncher,
+    SessionLauncherArgs,
+)
 from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
     SessionProvisioner,
     SessionProvisionerArgs,
@@ -67,6 +71,7 @@ def mock_repository():
 def scheduler(mock_repository, mock_agent_pool):
     """Create Scheduler instance with mocked dependencies."""
     mock_config_provider = MagicMock()
+    mock_valkey_schedule = MagicMock()
     provisioner = SessionProvisioner(
         SessionProvisionerArgs(
             validator=MagicMock(),
@@ -75,11 +80,21 @@ def scheduler(mock_repository, mock_agent_pool):
             allocator=MagicMock(),
             repository=mock_repository,
             config_provider=mock_config_provider,
-            valkey_schedule=MagicMock(),
+            valkey_schedule=mock_valkey_schedule,
+        )
+    )
+    launcher = SessionLauncher(
+        SessionLauncherArgs(
+            repository=mock_repository,
+            agent_pool=mock_agent_pool,
+            network_plugin_ctx=MagicMock(),
+            config_provider=mock_config_provider,
+            valkey_schedule=mock_valkey_schedule,
         )
     )
     args = SchedulerArgs(
         provisioner=provisioner,
+        launcher=launcher,
         repository=mock_repository,
         deployment_repository=MagicMock(),
         config_provider=mock_config_provider,
@@ -87,7 +102,7 @@ def scheduler(mock_repository, mock_agent_pool):
         agent_pool=mock_agent_pool,
         network_plugin_ctx=MagicMock(),
         event_producer=MagicMock(),
-        valkey_schedule=MagicMock(),
+        valkey_schedule=mock_valkey_schedule,
     )
     return Scheduler(args)
 
