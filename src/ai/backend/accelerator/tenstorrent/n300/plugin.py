@@ -27,8 +27,8 @@ try:
 except ImportError:
     from ai.backend.agent.docker.resources import get_resource_spec_from_container
 
-from tt_smi.tt_smi_backend import TTSMIBackend
-from tt_tools_common.utils_common.tools_utils import (
+from tt_smi.tt_smi_backend import TTSMIBackend  # pants: no-infer-dep
+from tt_tools_common.utils_common.tools_utils import (  # pants: no-infer-dep
     PciChip,
     detect_chips_with_callback,
 )
