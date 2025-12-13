@@ -12,7 +12,7 @@ from ai.backend.manager.repositories.base import (
     CursorBackwardPagination,
     CursorForwardPagination,
     OffsetPagination,
-    _PageInfoResult,
+    PageInfoResult,
 )
 
 
@@ -52,7 +52,7 @@ class TestOffsetPagination:
 
         result = pagination.compute_page_info(rows, total_count=30)
 
-        assert isinstance(result, _PageInfoResult)
+        assert isinstance(result, PageInfoResult)
         assert result.rows == rows
         assert result.has_previous_page is True  # offset > 0
         assert result.has_next_page is True  # 10 + 10 < 30
