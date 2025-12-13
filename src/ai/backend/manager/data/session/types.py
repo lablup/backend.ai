@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from functools import lru_cache
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
 from ai.backend.common.data.vfolder.types import VFolderMountData
@@ -17,7 +19,9 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.models.network import NetworkType
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.network import NetworkType
 
 
 class SessionStatus(CIStrEnum):
