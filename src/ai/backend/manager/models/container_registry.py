@@ -161,6 +161,26 @@ class ContainerRegistryRow(Base):
         self.extra = extra
 
     @classmethod
+    def from_creator(cls, creator) -> Self:
+        """Create ContainerRegistryRow from ContainerRegistryCreator."""
+        from ai.backend.manager.data.container_registry.types import ContainerRegistryCreator
+
+        if not isinstance(creator, ContainerRegistryCreator):
+            raise TypeError(f"Expected ContainerRegistryCreator, got {type(creator)}")
+
+        return cls(
+            url=creator.url,
+            registry_name=creator.registry_name,
+            type=creator.type,
+            project=creator.project,
+            username=creator.username,
+            password=creator.password,
+            ssl_verify=creator.ssl_verify,
+            is_global=creator.is_global,
+            extra=creator.extra,
+        )
+
+    @classmethod
     async def get(
         cls,
         session: AsyncSession,
