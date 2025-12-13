@@ -18,9 +18,11 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactData,
     ArtifactDataWithRevisions,
     ArtifactFilterOptions,
+    ArtifactListResult,
     ArtifactOrderingOptions,
     ArtifactRemoteStatus,
     ArtifactRevisionData,
+    ArtifactRevisionListResult,
     ArtifactStatus,
     ArtifactType,
 )
@@ -44,6 +46,7 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactRevisionOrderingOptions,
     ArtifactStatusFilterType,
 )
+from ai.backend.manager.repositories.base import Querier, execute_querier
 from ai.backend.manager.repositories.types import (
     BaseFilterApplier,
     BaseOrderingApplier,
@@ -1050,6 +1053,103 @@ class ArtifactDBSource:
                 rows, querybuild_result.pagination_order
             )
             return data_objects, total_count
+
+    async def search_artifacts(
+        self,
+        querier: Querier,
+    ) -> ArtifactListResult:
+        """Search artifacts with querier pattern.
+
+        Args:
+            querier: Querier for filtering, ordering, and pagination
+
+        Returns:
+            ArtifactListResult with items, total count, and pagination info
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ArtifactRow)
+
+            result = await execute_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.ArtifactRow.to_dataclass() for row in result.rows]
+
+            return ArtifactListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_artifact_revisions(
+        self,
+        querier: Querier,
+    ) -> ArtifactRevisionListResult:
+        """Search artifact revisions with querier pattern.
+
+        Args:
+            querier: Querier for filtering, ordering, and pagination
+
+        Returns:
+            ArtifactRevisionListResult with items, total count, and pagination info
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ArtifactRevisionRow)
+
+            result = await execute_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.ArtifactRevisionRow.to_dataclass() for row in result.rows]
+
+            return ArtifactRevisionListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_artifacts_with_revisions(
+        self,
+        querier: Querier,
+    ) -> tuple[list[ArtifactDataWithRevisions], int]:
+        """Search artifacts with their revisions using querier pattern.
+
+        Args:
+            querier: Querier for filtering, ordering, and pagination
+
+        Returns:
+            Tuple of (artifacts with revisions list, total count)
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            # Build query with eager loading of revisions
+            query = sa.select(ArtifactRow).options(selectinload(ArtifactRow.revision_rows))
+
+            result = await execute_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            # Convert to ArtifactDataWithRevisions objects
+            data_objects: list[ArtifactDataWithRevisions] = []
+            for row in result.rows:
+                artifact_data = row.ArtifactRow.to_dataclass()
+                revisions_data = [
+                    revision.to_dataclass() for revision in row.ArtifactRow.revision_rows
+                ]
+                data_objects.append(
+                    ArtifactDataWithRevisions.from_dataclasses(
+                        artifact_data=artifact_data, revisions=revisions_data
+                    )
+                )
+
+            return data_objects, result.total_count
 
     @actxmgr
     async def _begin_session_read_committed(self) -> AsyncIterator[SASession]:
