@@ -2,8 +2,9 @@ import strawberry
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
-from .agent_stats import (
+from .agent import (
     agent_stats,
+    agents_v2,
 )
 from .app_config import (
     delete_domain_app_config,
@@ -117,6 +118,8 @@ from .vfs_storage import (
 
 @strawberry.type
 class Query:
+    agent_stats = agent_stats
+    agents_v2 = agents_v2
     artifact = artifact
     artifacts = artifacts
     artifact_revision = artifact_revision
@@ -146,7 +149,6 @@ class Query:
     scaling_groups_v2 = scaling_groups_v2
     all_scaling_groups_v2 = all_scaling_groups_v2
     default_artifact_registry = default_artifact_registry
-    agent_stats = agent_stats
     inference_runtime_configs = inference_runtime_configs
     inference_runtime_config = inference_runtime_config
 
