@@ -7,6 +7,10 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
+from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
+    SessionLauncher,
+    SessionLauncherArgs,
+)
 from ai.backend.manager.sokovan.scheduler.provisioner.allocators.repository_allocator import (
     RepositoryAllocator,
 )
@@ -112,9 +116,21 @@ def create_default_scheduler(
         )
     )
 
+    # Create launcher
+    launcher = SessionLauncher(
+        SessionLauncherArgs(
+            repository=repository,
+            agent_pool=agent_pool,
+            network_plugin_ctx=network_plugin_ctx,
+            config_provider=config_provider,
+            valkey_schedule=valkey_schedule,
+        )
+    )
+
     return Scheduler(
         SchedulerArgs(
             provisioner=provisioner,
+            launcher=launcher,
             repository=repository,
             deployment_repository=deployment_repository,
             config_provider=config_provider,
