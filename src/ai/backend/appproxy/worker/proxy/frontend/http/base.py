@@ -1,3 +1,4 @@
+import ipaddress
 import logging
 import time
 from typing import Generic
@@ -10,6 +11,11 @@ from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
 from ai.backend.appproxy.common.errors import InvalidCredentials
 from ai.backend.appproxy.common.types import RouteInfo, WebRequestHandler
 from ai.backend.appproxy.common.utils import ensure_json_serializable, is_permit_valid, mime_match
+from ai.backend.appproxy.worker.errors import (
+    ClientIPNotAllowedError,
+    ClientIPNotAvailableError,
+    InvalidClientIPFormatError,
+)
 from ai.backend.appproxy.worker.proxy.backend.http import HTTPBackend
 from ai.backend.appproxy.worker.types import (
     Circuit,
@@ -26,10 +32,70 @@ from ..base import BaseFrontend
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
+def get_client_ip(request: web.Request) -> str | None:
+    """
+    Extract the client IP address from the request.
+
+    Checks in order:
+    1. X-Forwarded-For header (for proxied requests)
+    2. Transport peername (direct connection info)
+    3. request.remote fallback
+    """
+    client_ip = request.headers.get("X-Forwarded-For")
+    if client_ip:
+        # X-Forwarded-For may contain multiple IPs; take the first (original client)
+        client_ip = client_ip.split(",")[0].strip()
+    if not client_ip and request.transport:
+        peername = request.transport.get_extra_info("peername")
+        if peername:
+            client_ip = peername[0]
+    if not client_ip:
+        client_ip = request.remote
+    return client_ip
+
+
 class BaseHTTPFrontend(Generic[TCircuitKey], BaseFrontend[HTTPBackend, TCircuitKey]):
     root_context: RootContext
 
+    def _ensure_allowed_client_ip(
+        self, request: web.Request, allowed_client_ips: list[str]
+    ) -> None:
+        """
+        Validate that the client IP is within the allowed CIDR list.
+
+        Args:
+            request: The incoming HTTP request.
+            allowed_client_ips: List of allowed CIDRs (e.g., ["10.0.0.0/8", "192.168.1.0/24"])
+        """
+        client_ip = get_client_ip(request)
+        if not client_ip:
+            raise ClientIPNotAvailableError
+
+        try:
+            client_addr = ipaddress.ip_address(client_ip)
+        except ValueError:
+            raise InvalidClientIPFormatError(f"Invalid client IP format: {client_ip}")
+
+        allowed_networks = [
+            ipaddress.ip_network(cidr.strip(), strict=False)
+            for cidr in allowed_client_ips
+            if cidr.strip()
+        ]
+
+        for network in allowed_networks:
+            if client_addr in network:
+                return  # IP is in the allowed list
+
+        raise ClientIPNotAllowedError(f"Client IP {client_ip} not in allowed list")
+
     def ensure_credential(self, request: web.Request, circuit: Circuit) -> None:
+        # IP validation is always performed regardless of open_to_public
+        if circuit.allowed_client_ips:
+            allowed_ips = [
+                cidr.strip() for cidr in circuit.allowed_client_ips.split(",") if cidr.strip()
+            ]
+            self._ensure_allowed_client_ip(request, allowed_ips)
+
         if circuit.open_to_public or request.method == "OPTIONS":
             return
 

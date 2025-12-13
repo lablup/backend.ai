@@ -2,6 +2,11 @@
 App Proxy Worker error classes.
 """
 
+from .auth import (
+    ClientIPNotAllowedError,
+    ClientIPNotAvailableError,
+    InvalidClientIPFormatError,
+)
 from .circuit import (
     InvalidAppInfoTypeError,
     InvalidCircuitDataError,
@@ -21,6 +26,10 @@ from .process import (
 )
 
 __all__ = [
+    # auth
+    "ClientIPNotAllowedError",
+    "ClientIPNotAvailableError",
+    "InvalidClientIPFormatError",
     # circuit
     "InvalidAppInfoTypeError",
     "InvalidCircuitDataError",
