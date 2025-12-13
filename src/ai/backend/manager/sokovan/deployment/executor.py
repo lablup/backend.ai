@@ -146,6 +146,31 @@ class DeploymentExecutor:
             errors=errors,
         )
 
+    async def check_ready_deployments_that_need_scaling(
+        self, deployments: Sequence[DeploymentInfo]
+    ) -> DeploymentExecutionResult:
+        endpoint_ids = {deployment.id for deployment in deployments}
+        route_map = await self._deployment_repo.fetch_active_routes_by_endpoint_ids(endpoint_ids)
+        successes: list[DeploymentInfo] = []
+        skipped: list[DeploymentInfo] = []
+
+        for deployment in deployments:
+            routes = route_map[deployment.id]
+            if len(routes) != deployment.replica_spec.target_replica_count:
+                log.info(
+                    "Deployment {} has mismatched active routes: expected {}, found {}",
+                    deployment.id,
+                    deployment.replica_spec.target_replica_count,
+                    len(routes),
+                )
+                successes.append(deployment)
+            else:
+                skipped.append(deployment)
+        return DeploymentExecutionResult(
+            successes=successes,
+            skipped=skipped,
+        )
+
     async def scale_deployment(
         self, deployments: Sequence[DeploymentInfo]
     ) -> DeploymentExecutionResult:
