@@ -7,7 +7,7 @@ from datetime import datetime
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import PurePosixPath
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
 import yarl
@@ -21,6 +21,10 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
     ReadinessStatus,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.data.session.types import SchedulingResult
+
 from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
@@ -457,3 +461,45 @@ class ReplicaOrderField(enum.StrEnum):
 
 class AccessTokenOrderField(enum.StrEnum):
     CREATED_AT = "CREATED_AT"
+
+
+# ========== Scheduling History Types ==========
+
+
+@dataclass
+class DeploymentHistoryData:
+    """Domain model for deployment history."""
+
+    id: UUID
+    deployment_id: UUID
+
+    from_status: Optional[ModelDeploymentStatus]
+    to_status: Optional[ModelDeploymentStatus]
+
+    result: SchedulingResult
+    error_code: Optional[str]
+    message: str
+
+    attempts: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class RouteHistoryData:
+    """Domain model for route history."""
+
+    id: UUID
+    route_id: UUID
+    deployment_id: UUID
+
+    from_status: Optional[RouteStatus]
+    to_status: Optional[RouteStatus]
+
+    result: SchedulingResult
+    error_code: Optional[str]
+    message: str
+
+    attempts: int
+    created_at: datetime
+    updated_at: datetime

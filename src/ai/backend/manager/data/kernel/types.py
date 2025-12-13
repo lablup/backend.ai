@@ -1,17 +1,25 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 from functools import lru_cache
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
 from ai.backend.common.types import (
     CIStrEnum,
+    KernelId,
     ResourceSlot,
+    SessionId,
     SessionResult,
     SessionTypes,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
+
+if TYPE_CHECKING:
+    from ai.backend.manager.data.session.types import SchedulingResult
 
 
 class KernelStatus(CIStrEnum):
@@ -237,3 +245,36 @@ class KernelInfo:
     lifecycle: LifecycleStatus
     metrics: Metrics
     metadata: Metadata
+
+
+# ========== Scheduling History Types ==========
+
+
+class KernelSchedulingPhase(StrEnum):
+    PREPARING = "PREPARING"
+    PULLING = "PULLING"
+    PREPARED = "PREPARED"
+    CREATING = "CREATING"
+    RUNNING = "RUNNING"
+    TERMINATING = "TERMINATING"
+    TERMINATED = "TERMINATED"
+
+
+@dataclass
+class KernelSchedulingHistoryData:
+    """Domain model for kernel scheduling history."""
+
+    id: UUID
+    kernel_id: KernelId
+    session_id: SessionId
+
+    from_phase: Optional[KernelSchedulingPhase]
+    to_phase: Optional[KernelSchedulingPhase]
+
+    result: SchedulingResult
+    error_code: Optional[str]
+    message: str
+
+    attempts: int
+    created_at: datetime
+    updated_at: datetime

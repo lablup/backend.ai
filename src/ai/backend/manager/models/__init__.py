@@ -30,6 +30,7 @@ from . import resource_preset as _rpreset
 from . import resource_usage as _rusage
 from . import routing as _routing
 from . import scaling_group as _sgroup
+from . import scheduling_history as _scheduling_history
 from . import session as _session
 from . import session_template as _sessiontemplate
 from . import storage as _storage
@@ -75,6 +76,7 @@ __all__ = (
     *_rpreset.__all__,
     *_routing.__all__,
     *_sgroup.__all__,
+    *_scheduling_history.__all__,
     *_session.__all__,
     *_sessiontemplate.__all__,
     *_storage.__all__,
@@ -116,6 +118,7 @@ from .resource_preset import *  # noqa
 from .resource_usage import *  # noqa
 from .routing import *  # noqa
 from .scaling_group import *  # noqa
+from .scheduling_history import *  # noqa
 from .huggingface_registry import *  # noqa
 from .session import *  # noqa
 from .session_template import *  # noqa
