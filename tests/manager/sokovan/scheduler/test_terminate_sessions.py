@@ -35,6 +35,10 @@ from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
 )
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler, SchedulerArgs
+from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
+    SessionTerminator,
+    SessionTerminatorArgs,
+)
 
 
 @pytest.fixture
@@ -92,9 +96,17 @@ def scheduler(mock_repository, mock_agent_pool):
             valkey_schedule=mock_valkey_schedule,
         )
     )
+    terminator = SessionTerminator(
+        SessionTerminatorArgs(
+            repository=mock_repository,
+            agent_pool=mock_agent_pool,
+            valkey_schedule=mock_valkey_schedule,
+        )
+    )
     args = SchedulerArgs(
         provisioner=provisioner,
         launcher=launcher,
+        terminator=terminator,
         repository=mock_repository,
         deployment_repository=MagicMock(),
         config_provider=mock_config_provider,
