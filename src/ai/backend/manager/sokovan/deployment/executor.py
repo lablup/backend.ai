@@ -152,23 +152,29 @@ class DeploymentExecutor:
         endpoint_ids = {deployment.id for deployment in deployments}
         route_map = await self._deployment_repo.fetch_active_routes_by_endpoint_ids(endpoint_ids)
         successes: list[DeploymentInfo] = []
-        skipped: list[DeploymentInfo] = []
+        errors: list[DeploymentExecutionError] = []
 
         for deployment in deployments:
             routes = route_map[deployment.id]
             if len(routes) != deployment.replica_spec.target_replica_count:
-                log.info(
+                log.warning(
                     "Deployment {} has mismatched active routes: expected {}, found {}",
                     deployment.id,
                     deployment.replica_spec.target_replica_count,
                     len(routes),
                 )
-                successes.append(deployment)
+                errors.append(
+                    DeploymentExecutionError(
+                        deployment_info=deployment,
+                        reason="Mismatched active routes",
+                        error_detail=f"Expected {deployment.replica_spec.target_replica_count}, found {len(routes)}",
+                    )
+                )
             else:
-                skipped.append(deployment)
+                successes.append(deployment)
         return DeploymentExecutionResult(
             successes=successes,
-            skipped=skipped,
+            errors=errors,
         )
 
     async def scale_deployment(

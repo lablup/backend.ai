@@ -113,7 +113,6 @@ class LockID(enum.IntEnum):
     LOCKID_DEPLOYMENT_CHECK_PENDING = 226  # For operations checking PENDING sessions
     LOCKID_DEPLOYMENT_CHECK_REPLICA = 227  # For operations checking REPLICA sessions
     LOCKID_DEPLOYMENT_DESTROYING = 228  # For operations destroying deployments
-    LOCKID_DEPLOYMENT_RECONCILE = 229  # For operations reconciling deployments
     # Sokovan target status locks (prevent concurrent operations on same status)
     LOCKID_SOKOVAN_TARGET_PENDING = 230  # For operations targeting PENDING sessions
     LOCKID_SOKOVAN_TARGET_PREPARING = 231  # For operations targeting PREPARING/PULLING sessions

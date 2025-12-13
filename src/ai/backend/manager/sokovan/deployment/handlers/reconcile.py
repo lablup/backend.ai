@@ -1,4 +1,4 @@
-"""Handler for checking and managing deployment replicas."""
+"""Handler for reconciling ready deployments with mismatched replica counts."""
 
 import logging
 from collections.abc import Sequence
@@ -38,8 +38,11 @@ class ReconcileDeploymentHandler(DeploymentHandler):
 
     @property
     def lock_id(self) -> Optional[LockID]:
-        """Lock for reconciling deployments."""
-        return LockID.LOCKID_DEPLOYMENT_RECONCILE
+        """
+        Lock for reconciling deployments.
+        Returns None because this operation does not run in short intervals.
+        """
+        return None
 
     @classmethod
     def target_statuses(cls) -> list[EndpointLifecycle]:
@@ -49,15 +52,15 @@ class ReconcileDeploymentHandler(DeploymentHandler):
     @classmethod
     def next_status(cls) -> Optional[EndpointLifecycle]:
         """Get the next deployment status after this handler's operation."""
-        return EndpointLifecycle.SCALING
+        return None
 
     @classmethod
     def failure_status(cls) -> Optional[EndpointLifecycle]:
-        return None
+        return EndpointLifecycle.SCALING
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
         """Check ready deployments."""
-        log.debug("Checking deployment replicas")
+        log.debug("Checking ready deployments for replica-route mismatches")
 
         return await self._deployment_executor.check_ready_deployments_that_need_scaling(
             deployments
@@ -66,5 +69,5 @@ class ReconcileDeploymentHandler(DeploymentHandler):
     async def post_process(self, result: DeploymentExecutionResult) -> None:
         """Handle post-processing after checking ready deployments."""
         log.debug("Post-processing after checking ready deployments")
-        if result.successes:
+        if result.errors:
             await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.SCALING)
