@@ -10,6 +10,7 @@ class DeploymentLifecycleType(StrEnum):
     CHECK_PENDING = "check_pending"
     CHECK_REPLICA = "check_replica"
     SCALING = "scaling"
+    RECONCILE = "reconcile"
     DESTROYING = "destroying"
 
 
