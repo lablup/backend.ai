@@ -57,6 +57,10 @@ from ai.backend.manager.sokovan.scheduler.scheduler import (
     Scheduler,
     SchedulerArgs,
 )
+from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
+    SessionTerminator,
+    SessionTerminatorArgs,
+)
 from ai.backend.manager.types import DistributedLockFactory
 
 
@@ -127,10 +131,20 @@ def create_default_scheduler(
         )
     )
 
+    # Create terminator
+    terminator = SessionTerminator(
+        SessionTerminatorArgs(
+            repository=repository,
+            agent_pool=agent_pool,
+            valkey_schedule=valkey_schedule,
+        )
+    )
+
     return Scheduler(
         SchedulerArgs(
             provisioner=provisioner,
             launcher=launcher,
+            terminator=terminator,
             repository=repository,
             deployment_repository=deployment_repository,
             config_provider=config_provider,

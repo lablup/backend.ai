@@ -39,6 +39,10 @@ from ai.backend.manager.sokovan.scheduler.scheduler import (
     Scheduler,
     SchedulerArgs,
 )
+from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
+    SessionTerminator,
+    SessionTerminatorArgs,
+)
 from ai.backend.manager.sokovan.scheduler.types import (
     KernelWorkload,
     SchedulingConfig,
@@ -272,9 +276,17 @@ class TestSchedulerAllocation:
                 valkey_schedule=mock_valkey_schedule,
             )
         )
+        terminator = SessionTerminator(
+            SessionTerminatorArgs(
+                repository=mock_repository,
+                agent_pool=mock_agent_pool,
+                valkey_schedule=mock_valkey_schedule,
+            )
+        )
         args = SchedulerArgs(
             provisioner=provisioner,
             launcher=launcher,
+            terminator=terminator,
             repository=mock_repository,
             deployment_repository=MagicMock(),
             config_provider=mock_config_provider,
