@@ -3,7 +3,6 @@ python_sources(
     sources=["**/*.py"],
     dependencies=[
         ":resources",
-        ":platform-requirements",
     ],
     tags=["accelerator"],
 )
@@ -26,28 +25,6 @@ python_distribution(
     },
     generate_setup=True,
     tags=["wheel"],
-)
-
-platform_resources(
-    name="platform-requirements",
-    dependency_map={
-        "linux_x86_64": ":tt-smi-supported",
-        "linux_arm64": ":tt-smi-unsupported",
-        "macos_x86_64": ":tt-smi-unsupported",
-        "macos_arm64": ":tt-smi-unsupported",
-    },
-)
-
-python_requirement(
-    name="tt-smi-supported",
-    requirements=[
-        "tt-smi~=3.0.36",
-    ],
-)
-
-python_requirement(
-    name="tt-smi-unsupported",
-    requirements=[],  # empty
 )
 
 resource(name="version", source="VERSION")
