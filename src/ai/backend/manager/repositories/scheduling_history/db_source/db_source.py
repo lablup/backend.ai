@@ -32,7 +32,7 @@ from ai.backend.manager.models.scheduling_history import (
     RouteHistoryRow,
     SessionSchedulingHistoryRow,
 )
-from ai.backend.manager.repositories.base import Querier, execute_querier
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -99,13 +99,13 @@ class SchedulingHistoryDBSource:
 
     async def search_session_history(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> SessionSchedulingHistoryListResult:
         """Search session scheduling history with pagination."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(SessionSchedulingHistoryRow)
 
-            result = await execute_querier(
+            result = await execute_batch_querier(
                 db_sess,
                 query,
                 querier,
@@ -168,13 +168,13 @@ class SchedulingHistoryDBSource:
 
     async def search_kernel_history(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> KernelSchedulingHistoryListResult:
         """Search kernel scheduling history with pagination."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(KernelSchedulingHistoryRow)
 
-            result = await execute_querier(
+            result = await execute_batch_querier(
                 db_sess,
                 query,
                 querier,
@@ -237,13 +237,13 @@ class SchedulingHistoryDBSource:
 
     async def search_deployment_history(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> DeploymentHistoryListResult:
         """Search deployment history with pagination."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(DeploymentHistoryRow)
 
-            result = await execute_querier(
+            result = await execute_batch_querier(
                 db_sess,
                 query,
                 querier,
@@ -306,13 +306,13 @@ class SchedulingHistoryDBSource:
 
     async def search_route_history(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> RouteHistoryListResult:
         """Search route history with pagination."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(RouteHistoryRow)
 
-            result = await execute_querier(
+            result = await execute_batch_querier(
                 db_sess,
                 query,
                 querier,

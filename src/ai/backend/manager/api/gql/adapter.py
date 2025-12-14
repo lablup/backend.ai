@@ -10,11 +10,11 @@ from ai.backend.manager.api.gql.base import decode_cursor
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.errors.api import InvalidGraphQLParameters
 from ai.backend.manager.repositories.base import (
+    BatchQuerier,
     CursorBackwardPagination,
     CursorConditionFactory,
     CursorForwardPagination,
     OffsetPagination,
-    Querier,
     QueryCondition,
     QueryOrder,
     QueryPagination,
@@ -134,8 +134,8 @@ class BaseGQLAdapter:
         pagination_spec: PaginationSpec,
         filter: Optional[GQLFilter] = None,
         order_by: Optional[Sequence[GQLOrderBy]] = None,
-    ) -> Querier:
-        """Build Querier from GraphQL arguments with domain configuration.
+    ) -> BatchQuerier:
+        """Build BatchQuerier from GraphQL arguments with domain configuration.
 
         Args:
             pagination_options: Pagination parameters (first/after/last/before/limit/offset)
@@ -144,7 +144,7 @@ class BaseGQLAdapter:
             order_by: Optional sequence of order specifications with to_query_order() method
 
         Returns:
-            A Querier instance with conditions, orders, and pagination configured.
+            A BatchQuerier instance with conditions, orders, and pagination configured.
 
         Raises:
             InvalidGraphQLParameters: If order_by is used with cursor pagination.
@@ -176,4 +176,4 @@ class BaseGQLAdapter:
             spec=pagination_spec,
         )
 
-        return Querier(conditions=conditions, orders=orders, pagination=pagination)
+        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)

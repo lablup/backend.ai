@@ -10,12 +10,12 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.manager.repositories.base import (
+    BatchQuerier,
     CursorBackwardPagination,
     CursorForwardPagination,
     OffsetPagination,
-    Querier,
     QueryCondition,
-    execute_querier,
+    execute_batch_querier,
 )
 
 if TYPE_CHECKING:
@@ -61,7 +61,7 @@ async def pagination_test_db(
 
 
 def _make_base_query(table: sa.Table) -> sa.sql.Select:
-    """Create base query without window function (added by execute_querier)."""
+    """Create base query without window function (added by execute_batch_querier)."""
     return sa.select(
         table.c.id,
         table.c.name,
@@ -113,10 +113,10 @@ class TestOffsetPagination:
         conn, test_items = pagination_test_db
 
         query = _make_base_query(test_items).order_by(test_items.c.id.asc())
-        querier = Querier(pagination=OffsetPagination(limit=limit, offset=offset))
+        querier = BatchQuerier(pagination=OffsetPagination(limit=limit, offset=offset))
 
         # Use connection as session-like object
-        result = await execute_querier(conn, query, querier)  # type: ignore[arg-type]
+        result = await execute_batch_querier(conn, query, querier)  # type: ignore[arg-type]
 
         actual_ids = [row.id for row in result.rows]
         assert actual_ids == expected_ids
@@ -168,9 +168,9 @@ class TestCursorForwardPagination:
             cursor_order=test_items.c.id.asc(),
             cursor_condition=cursor_condition,
         )
-        querier = Querier(pagination=pagination)
+        querier = BatchQuerier(pagination=pagination)
 
-        result = await execute_querier(conn, query, querier)  # type: ignore[arg-type]
+        result = await execute_batch_querier(conn, query, querier)  # type: ignore[arg-type]
 
         actual_ids = [row.id for row in result.rows]
         assert actual_ids == expected_ids
@@ -215,9 +215,9 @@ class TestCursorBackwardPagination:
             cursor_order=test_items.c.id.desc(),
             cursor_condition=cursor_condition,
         )
-        querier = Querier(pagination=pagination)
+        querier = BatchQuerier(pagination=pagination)
 
-        result = await execute_querier(conn, query, querier)  # type: ignore[arg-type]
+        result = await execute_batch_querier(conn, query, querier)  # type: ignore[arg-type]
 
         actual_ids = [row.id for row in result.rows]
         assert actual_ids == expected_ids
@@ -241,12 +241,12 @@ class TestPaginationWithFilter:
             return test_items.c.id > 50
 
         query = _make_base_query(test_items).order_by(test_items.c.id.asc())
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[filter_condition],
         )
 
-        result = await execute_querier(conn, query, querier)  # type: ignore[arg-type]
+        result = await execute_batch_querier(conn, query, querier)  # type: ignore[arg-type]
 
         actual_ids = [row.id for row in result.rows]
         assert actual_ids == list(range(51, 61))
@@ -275,12 +275,12 @@ class TestPaginationWithFilter:
             cursor_order=test_items.c.id.asc(),
             cursor_condition=None,  # Start from beginning of filtered set
         )
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=pagination,
             conditions=[filter_condition],
         )
 
-        result = await execute_querier(conn, query, querier)  # type: ignore[arg-type]
+        result = await execute_batch_querier(conn, query, querier)  # type: ignore[arg-type]
 
         actual_ids = [row.id for row in result.rows]
         assert actual_ids == list(range(51, 61))
@@ -316,8 +316,8 @@ class TestEdgeCases:
                 ).select_from(empty_table)
 
                 # Test offset pagination
-                querier = Querier(pagination=OffsetPagination(limit=10, offset=0))
-                result = await execute_querier(conn, query, querier)  # type: ignore[arg-type]
+                querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
+                result = await execute_batch_querier(conn, query, querier)  # type: ignore[arg-type]
 
                 assert result.rows == []
                 assert result.total_count == 0
@@ -325,14 +325,14 @@ class TestEdgeCases:
                 assert result.has_next_page is False
 
                 # Test cursor forward pagination
-                querier = Querier(
+                querier = BatchQuerier(
                     pagination=CursorForwardPagination(
                         first=10,
                         cursor_order=empty_table.c.id.asc(),
                         cursor_condition=None,
                     )
                 )
-                result = await execute_querier(conn, query, querier)  # type: ignore[arg-type]
+                result = await execute_batch_querier(conn, query, querier)  # type: ignore[arg-type]
 
                 assert result.rows == []
                 assert result.total_count == 0
@@ -366,8 +366,8 @@ class TestEdgeCases:
                 ).select_from(single_table)
 
                 # Test offset pagination
-                querier = Querier(pagination=OffsetPagination(limit=10, offset=0))
-                result = await execute_querier(conn, query, querier)  # type: ignore[arg-type]
+                querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
+                result = await execute_batch_querier(conn, query, querier)  # type: ignore[arg-type]
 
                 assert len(result.rows) == 1
                 assert result.rows[0].id == 1
@@ -376,14 +376,14 @@ class TestEdgeCases:
                 assert result.has_next_page is False
 
                 # Test cursor forward pagination
-                querier = Querier(
+                querier = BatchQuerier(
                     pagination=CursorForwardPagination(
                         first=10,
                         cursor_order=single_table.c.id.asc(),
                         cursor_condition=None,
                     )
                 )
-                result = await execute_querier(conn, query, querier)  # type: ignore[arg-type]
+                result = await execute_batch_querier(conn, query, querier)  # type: ignore[arg-type]
 
                 assert len(result.rows) == 1
                 assert result.total_count == 1
@@ -401,9 +401,9 @@ class TestEdgeCases:
         conn, test_items = pagination_test_db
 
         query = _make_base_query(test_items).order_by(test_items.c.id.asc())
-        querier = Querier(pagination=OffsetPagination(limit=100, offset=0))
+        querier = BatchQuerier(pagination=OffsetPagination(limit=100, offset=0))
 
-        result = await execute_querier(conn, query, querier)  # type: ignore[arg-type]
+        result = await execute_batch_querier(conn, query, querier)  # type: ignore[arg-type]
 
         assert len(result.rows) == 100
         assert result.total_count == 100

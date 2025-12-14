@@ -23,7 +23,7 @@ from ai.backend.manager.data.notification import (
     NotificationRuleModifier,
     NotificationRuleType,
 )
-from ai.backend.manager.repositories.base import Querier
+from ai.backend.manager.repositories.base import BatchQuerier
 
 from .db_source import NotificationDBSource
 
@@ -131,7 +131,7 @@ class NotificationRepository:
     @notification_repository_resilience.apply()
     async def search_channels(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> NotificationChannelListResult:
         """Searches notification channels with total count."""
         return await self._db_source.search_channels(querier=querier)
@@ -139,7 +139,7 @@ class NotificationRepository:
     @notification_repository_resilience.apply()
     async def search_rules(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> NotificationRuleListResult:
         """Searches notification rules with total count."""
         return await self._db_source.search_rules(querier=querier)

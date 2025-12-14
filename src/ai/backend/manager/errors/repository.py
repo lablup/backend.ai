@@ -35,7 +35,21 @@ class UpsertEmptyResultError(RepositoryError):
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
+            domain=ErrorDomain.DATABASE,
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class UnsupportedCompositePrimaryKeyError(RepositoryError):
+    """Raised when an operation requires a single-column primary key but the table has a composite key."""
+
+    error_type = "https://api.backend.ai/probs/unsupported-composite-pk"
+    error_title = "Unsupported composite primary key."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DATABASE,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
