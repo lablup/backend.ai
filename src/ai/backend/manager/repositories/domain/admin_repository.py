@@ -2,6 +2,7 @@ from typing import Optional
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.exception import BackendAIError, DomainNotFound, InvalidAPIParameters
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -15,14 +16,10 @@ from ai.backend.manager.data.domain.types import (
     UserInfo,
 )
 from ai.backend.manager.errors.resource import (
-    DataTransformationFailed,
-    DomainCreationFailed,
-    DomainDataProcessingError,
     DomainDeletionFailed,
     DomainHasActiveKernels,
     DomainHasGroups,
     DomainHasUsers,
-    DomainNodeCreationFailed,
 )
 from ai.backend.manager.models import groups
 from ai.backend.manager.models.domain import DomainRow, domains, row_to_data
@@ -67,31 +64,21 @@ class AdminDomainRepository:
         Creates a new domain with model-store group without permission checks.
         For superadmin use only.
         """
-        async with self._db.begin() as conn:
+        async with self._db.begin_session() as db_session:
             check_query = sa.select(DomainRow).where(DomainRow.name == creator.name)
-            existing_domain = await conn.scalar(check_query)
+            existing_domain = await db_session.scalar(check_query)
             if existing_domain is not None:
                 raise InvalidAPIParameters(f"Domain with name '{creator.name}' already exists")
 
-            data = creator.fields_to_store()
-            insert_query = sa.insert(domains).values(data).returning(domains)
-            result = await conn.execute(insert_query)
-            row = result.first()
+            domain_row = creator.build_row()
+            db_session.add(domain_row)
+            await db_session.flush()
+            await db_session.refresh(domain_row)
 
             # Create model-store group for the domain
-            await self._create_model_store_group(conn, creator.name)
+            await self._create_model_store_group_session(db_session, creator.name)
 
-            if result.rowcount != 1 or row is None:
-                raise DomainCreationFailed(
-                    f"No domain created. rowcount: {result.rowcount}, data: {data}"
-                )
-
-        if row is None:
-            raise DomainDataProcessingError("Domain row is unexpectedly None after creation")
-        result = row_to_data(row)
-        if result is None:
-            raise DataTransformationFailed("Failed to transform domain row to data")
-        return result
+            return domain_row.to_data()
 
     @domain_repository_resilience.apply()
     async def modify_domain_force(self, domain_name: str, modifier: DomainModifier) -> DomainData:
@@ -195,18 +182,15 @@ class AdminDomainRepository:
         For superadmin use only.
         """
         async with self._db.begin_session() as session:
-            data = creator.fields_to_store()
             check_query = sa.select(DomainRow).where(DomainRow.name == creator.name)
             existing_domain = await session.scalar(check_query)
             if existing_domain is not None:
                 raise InvalidAPIParameters(f"Domain with name '{creator.name}' already exists")
 
-            insert_and_returning = sa.select(DomainRow).from_statement(
-                sa.insert(DomainRow).values(data).returning(DomainRow)
-            )
-            domain_row = await session.scalar(insert_and_returning)
-            if domain_row is None:
-                raise DomainNodeCreationFailed(f"Failed to create domain node: {creator.name}")
+            domain_row = creator.build_row()
+            session.add(domain_row)
+            await session.flush()
+            await session.refresh(domain_row)
 
             if scaling_groups is not None:
                 await session.execute(
@@ -218,10 +202,7 @@ class AdminDomainRepository:
                 )
 
             await session.commit()
-            result = row_to_data(domain_row)
-            if result is None:
-                raise DataTransformationFailed("Failed to transform domain row to data")
-            return result
+            return domain_row.to_data()
 
     async def _create_model_store_group(self, conn: SAConnection, domain_name: str) -> None:
         """
@@ -239,6 +220,25 @@ class AdminDomainRepository:
             "type": ProjectType.MODEL_STORE,
         })
         await conn.execute(model_store_insert_query)
+
+    async def _create_model_store_group_session(
+        self, db_session: SASession, domain_name: str
+    ) -> None:
+        """
+        Private method to create model-store group for a domain using SASession.
+        """
+        model_store_insert_query = sa.insert(groups).values({
+            "name": "model-store",
+            "description": "Model Store",
+            "is_active": True,
+            "domain_name": domain_name,
+            "total_resource_slots": {},
+            "allowed_vfolder_hosts": {},
+            "integration_id": None,
+            "resource_policy": "default",
+            "type": ProjectType.MODEL_STORE,
+        })
+        await db_session.execute(model_store_insert_query)
 
     async def _delete_kernels(self, conn: SAConnection, domain_name: str) -> int:
         """

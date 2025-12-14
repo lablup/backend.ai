@@ -112,7 +112,7 @@ class GroupRepository:
                 )
 
             # Create the group
-            row = GroupRow.from_creator(creator)
+            row = creator.build_row()
             db_session.add(row)
             await db_session.flush()
             await db_session.refresh(row)

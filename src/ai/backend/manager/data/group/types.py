@@ -5,7 +5,7 @@ import uuid
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, override
+from typing import TYPE_CHECKING, Any, Optional, override
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.permission.id import ScopeId
@@ -15,7 +15,11 @@ from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.errors.resource import DataTransformationFailed
-from ai.backend.manager.types import Creator, OptionalState, PartialModifier, TriState
+from ai.backend.manager.repositories.base.creator import CreatorSpec
+from ai.backend.manager.types import OptionalState, PartialModifier, TriState
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.group import GroupRow
 
 
 class ProjectType(enum.StrEnum):
@@ -37,7 +41,7 @@ class ProjectType(enum.StrEnum):
 
 
 @dataclass
-class GroupCreator(Creator):
+class GroupCreator(CreatorSpec["GroupRow"]):
     name: str
     domain_name: str
     type: Optional[ProjectType] = None
@@ -50,20 +54,23 @@ class GroupCreator(Creator):
     container_registry: Optional[dict[str, str]] = None
     dotfiles: Optional[bytes] = None
 
-    def fields_to_store(self) -> dict[str, Any]:
-        return {
-            "name": self.name,
-            "domain_name": self.domain_name,
-            "type": self.type,
-            "description": self.description,
-            "is_active": self.is_active,
-            "total_resource_slots": self.total_resource_slots,
-            "allowed_vfolder_hosts": self.allowed_vfolder_hosts,
-            "integration_id": self.integration_id,
-            "resource_policy": self.resource_policy,
-            "container_registry": self.container_registry,
-            "dotfiles": self.dotfiles,
-        }
+    @override
+    def build_row(self) -> GroupRow:
+        from ai.backend.manager.models.group import GroupRow
+
+        return GroupRow(
+            name=self.name,
+            domain_name=self.domain_name,
+            type=self.type or ProjectType.GENERAL,
+            description=self.description,
+            is_active=self.is_active if self.is_active is not None else True,
+            total_resource_slots=self.total_resource_slots or {},
+            allowed_vfolder_hosts=self.allowed_vfolder_hosts or {},
+            integration_id=self.integration_id,
+            resource_policy=self.resource_policy,
+            dotfiles=self.dotfiles,
+            container_registry=self.container_registry,
+        )
 
 
 @dataclass

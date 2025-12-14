@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import uuid
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, override
+from typing import TYPE_CHECKING, Any, Optional, override
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.permission.id import ScopeId
@@ -12,7 +14,11 @@ from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.data.user.types import UserRole
-from ai.backend.manager.types import Creator, OptionalState, PartialModifier, TriState
+from ai.backend.manager.repositories.base.creator import CreatorSpec
+from ai.backend.manager.types import OptionalState, PartialModifier, TriState
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.domain import DomainRow
 
 
 @dataclass
@@ -52,7 +58,7 @@ class DomainData:
 
 
 @dataclass
-class DomainCreator(Creator):
+class DomainCreator(CreatorSpec["DomainRow"]):
     name: str
     description: Optional[str] = None
     is_active: Optional[bool] = None
@@ -63,23 +69,21 @@ class DomainCreator(Creator):
     dotfiles: Optional[bytes] = None
 
     @override
-    def fields_to_store(self) -> dict[str, Any]:
-        to_store: dict[str, Any] = {"name": self.name}
-        if self.description is not None:
-            to_store["description"] = self.description
-        if self.is_active is not None:
-            to_store["is_active"] = self.is_active
-        if self.total_resource_slots is not None:
-            to_store["total_resource_slots"] = self.total_resource_slots
-        if self.allowed_vfolder_hosts is not None:
-            to_store["allowed_vfolder_hosts"] = self.allowed_vfolder_hosts
-        if self.allowed_docker_registries is not None:
-            to_store["allowed_docker_registries"] = self.allowed_docker_registries
-        if self.integration_id is not None:
-            to_store["integration_id"] = self.integration_id
-        if self.dotfiles is not None:
-            to_store["dotfiles"] = self.dotfiles
-        return to_store
+    def build_row(self) -> DomainRow:
+        from ai.backend.manager.models.domain import DomainRow
+
+        return DomainRow(
+            name=self.name,
+            description=self.description,
+            is_active=self.is_active if self.is_active is not None else True,
+            total_resource_slots=self.total_resource_slots if self.total_resource_slots else {},
+            allowed_vfolder_hosts=self.allowed_vfolder_hosts if self.allowed_vfolder_hosts else {},
+            allowed_docker_registries=self.allowed_docker_registries
+            if self.allowed_docker_registries
+            else [],
+            integration_id=self.integration_id,
+            dotfiles=self.dotfiles if self.dotfiles else b"\x90",
+        )
 
 
 @dataclass

@@ -16,7 +16,6 @@ from ai.backend.manager.data.domain.types import (
     UserInfo,
 )
 from ai.backend.manager.errors.resource import (
-    DomainDataProcessingError,
     DomainDeletionFailed,
     DomainHasActiveKernels,
     DomainHasGroups,
@@ -75,7 +74,7 @@ class DomainRepository:
             if existing_domain is not None:
                 raise InvalidAPIParameters(f"Domain with name '{creator.name}' already exists")
 
-            domain = DomainRow.from_input(creator)
+            domain = creator.build_row()
             db_session.add(domain)
             await db_session.flush()
             await db_session.refresh(domain)
@@ -174,11 +173,10 @@ class DomainRepository:
             if existing_domain is not None:
                 raise InvalidAPIParameters(f"Domain with name '{creator.name}' already exists")
 
-            data = creator.fields_to_store()
-            insert_and_returning = sa.select(DomainRow).from_statement(
-                sa.insert(DomainRow).values(data).returning(DomainRow)
-            )
-            domain_row: Optional[DomainRow] = await session.scalar(insert_and_returning)
+            domain_row = creator.build_row()
+            session.add(domain_row)
+            await session.flush()
+            await session.refresh(domain_row)
 
             if scaling_groups is not None:
                 await session.execute(
@@ -190,16 +188,7 @@ class DomainRepository:
                 )
 
             await session.commit()
-            if domain_row is None:
-                raise DomainDataProcessingError(
-                    f"Failed to retrieve created domain node: {creator.name}"
-                )
-            result = domain_row.to_data()
-            if result is None:
-                raise DomainDataProcessingError(
-                    f"Failed to convert domain node row to DomainData: {creator.name}"
-                )
-            return result
+            return domain_row.to_data()
 
     @domain_repository_resilience.apply()
     async def modify_domain_node_validated(
