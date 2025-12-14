@@ -33,8 +33,14 @@ from .types import (
     QueryOrder,
 )
 from .updater import (
+    BatchUpdater,
+    BatchUpdaterResult,
+    BatchUpdaterSpec,
     Updater,
+    UpdaterResult,
     UpdaterSpec,
+    execute_batch_updater,
+    execute_updater,
 )
 from .upserter import (
     Upserter,
@@ -70,6 +76,13 @@ __all__ = [
     # Updater
     "UpdaterSpec",
     "Updater",
+    "UpdaterResult",
+    "execute_updater",
+    # BatchUpdater
+    "BatchUpdaterSpec",
+    "BatchUpdater",
+    "BatchUpdaterResult",
+    "execute_batch_updater",
     # Upserter
     "UpserterSpec",
     "Upserter",
