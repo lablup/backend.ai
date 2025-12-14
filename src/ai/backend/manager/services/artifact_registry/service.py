@@ -88,7 +88,7 @@ class ArtifactRegistryService:
         """
         Create a new huggingface registry.
         """
-        log.info("Creating huggingface registry with data: {}", action.creator.fields_to_store())
+        log.info("Creating huggingface registry with data: {}", action.creator)
         registry_data = await self._huggingface_registry_repository.create(
             action.creator, action.meta
         )
@@ -156,7 +156,7 @@ class ArtifactRegistryService:
         """
         Create a new reservoir.
         """
-        log.info("Creating reservoir with data: {}", action.creator.fields_to_store())
+        log.info("Creating reservoir with data: {}", action.creator)
         reservoir_data = await self._reservoir_repository.create(action.creator, action.meta)
         return CreateReservoirActionResult(result=reservoir_data)
 

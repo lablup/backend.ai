@@ -5,10 +5,10 @@ import sqlalchemy as sa
 from ai.backend.common.exception import (
     StorageNamespaceNotFoundError,
 )
-from ai.backend.manager.data.storage_namespace.creator import StorageNamespaceCreator
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.storage_namespace.creators import StorageNamespaceCreatorSpec
 
 
 class StorageNamespaceDBSource:
@@ -54,17 +54,16 @@ class StorageNamespaceDBSource:
                 )
             return row.to_dataclass()
 
-    async def register(self, creator: StorageNamespaceCreator) -> StorageNamespaceData:
+    async def register(self, spec: StorageNamespaceCreatorSpec) -> StorageNamespaceData:
         """
         Register a new namespace for the specified storage.
         """
         async with self._db.begin_session() as db_session:
-            storage_namespace_data = creator.fields_to_store()
-            storage_namespace_row = StorageNamespaceRow(**storage_namespace_data)
-            db_session.add(storage_namespace_row)
+            new_row = spec.build_row()
+            db_session.add(new_row)
             await db_session.flush()
-            await db_session.refresh(storage_namespace_row)
-            return storage_namespace_row.to_dataclass()
+            await db_session.refresh(new_row)
+            return new_row.to_dataclass()
 
     async def unregister(self, storage_id: uuid.UUID, namespace: str) -> uuid.UUID:
         """

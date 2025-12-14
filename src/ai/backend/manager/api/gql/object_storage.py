@@ -19,9 +19,9 @@ from ai.backend.manager.services.storage_namespace.actions.get_multi import (
     GetNamespacesAction,
 )
 
-from ...data.object_storage.creator import ObjectStorageCreator
 from ...data.object_storage.modifier import ObjectStorageModifier
 from ...data.object_storage.types import ObjectStorageData
+from ...repositories.object_storage import ObjectStorageCreatorSpec
 from ...services.object_storage.actions.create import CreateObjectStorageAction
 from ...services.object_storage.actions.delete import DeleteObjectStorageAction
 from ...services.object_storage.actions.get import GetObjectStorageAction
@@ -150,8 +150,8 @@ class CreateObjectStorageInput:
     endpoint: str
     region: str
 
-    def to_creator(self) -> ObjectStorageCreator:
-        return ObjectStorageCreator(
+    def to_creator(self) -> ObjectStorageCreatorSpec:
+        return ObjectStorageCreatorSpec(
             name=self.name,
             host=self.host,
             access_key=self.access_key,

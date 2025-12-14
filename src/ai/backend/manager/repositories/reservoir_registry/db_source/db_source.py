@@ -8,7 +8,6 @@ from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
 )
-from ai.backend.manager.data.reservoir_registry.creator import ReservoirRegistryCreator
 from ai.backend.manager.data.reservoir_registry.modifier import ReservoirRegistryModifier
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.errors.artifact import ArtifactNotFoundError
@@ -17,6 +16,9 @@ from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.reservoir_registry.creators import (
+    ReservoirRegistryCreatorSpec,
+)
 
 
 class ReservoirDBSource:
@@ -91,35 +93,32 @@ class ReservoirDBSource:
             return row.reservoir_registry.to_dataclass()
 
     async def create(
-        self, creator: ReservoirRegistryCreator, meta: ArtifactRegistryCreatorMeta
+        self, spec: ReservoirRegistryCreatorSpec, meta: ArtifactRegistryCreatorMeta
     ) -> ReservoirRegistryData:
         """
         Create a new Reservoir entry.
         """
         async with self._db.begin_session() as db:
-            reservoir_insert = (
-                sa.insert(ReservoirRegistryRow)
-                .values(**creator.fields_to_store())
-                .returning(ReservoirRegistryRow.id)
-            )
-            reservoir_id = (await db.execute(reservoir_insert)).scalar_one()
+            new_row = spec.build_row()
+            db.add(new_row)
+            await db.flush()
 
             reg_insert = sa.insert(ArtifactRegistryRow).values(
                 name=meta.name,
-                registry_id=reservoir_id,
+                registry_id=new_row.id,
                 type=ArtifactRegistryType.RESERVOIR,
             )
             await db.execute(reg_insert)
 
             stmt = (
                 sa.select(ReservoirRegistryRow)
-                .where(ReservoirRegistryRow.id == reservoir_id)
+                .where(ReservoirRegistryRow.id == new_row.id)
                 .options(selectinload(ReservoirRegistryRow.meta))
             )
 
             row: ReservoirRegistryRow | None = (await db.execute(stmt)).scalar_one_or_none()
             if row is None:
-                raise ArtifactRegistryNotFoundError(f"Registry with ID {reservoir_id} not found")
+                raise ArtifactRegistryNotFoundError(f"Registry with ID {new_row.id} not found")
 
             return row.to_dataclass()
 

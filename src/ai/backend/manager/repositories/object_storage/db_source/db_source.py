@@ -3,7 +3,6 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
-from ai.backend.manager.data.object_storage.creator import ObjectStorageCreator
 from ai.backend.manager.data.object_storage.modifier import ObjectStorageModifier
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.errors.object_storage import (
@@ -12,6 +11,7 @@ from ai.backend.manager.errors.object_storage import (
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.object_storage.creators import ObjectStorageCreatorSpec
 
 
 class ObjectStorageDBSource:
@@ -66,17 +66,16 @@ class ObjectStorageDBSource:
                 )
             return row.object_storage_row.to_dataclass()
 
-    async def create(self, creator: ObjectStorageCreator) -> ObjectStorageData:
+    async def create(self, spec: ObjectStorageCreatorSpec) -> ObjectStorageData:
         """
         Create a new object storage configuration in the database.
         """
         async with self._db.begin_session() as db_session:
-            object_storage_data = creator.fields_to_store()
-            object_storage_row = ObjectStorageRow(**object_storage_data)
-            db_session.add(object_storage_row)
+            new_row = spec.build_row()
+            db_session.add(new_row)
             await db_session.flush()
-            await db_session.refresh(object_storage_row)
-            return object_storage_row.to_dataclass()
+            await db_session.refresh(new_row)
+            return new_row.to_dataclass()
 
     async def update(
         self, storage_id: uuid.UUID, modifier: ObjectStorageModifier

@@ -8,8 +8,8 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.storage_namespace.creator import StorageNamespaceCreator
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
+from ai.backend.manager.repositories.storage_namespace import StorageNamespaceCreatorSpec
 from ai.backend.manager.services.storage_namespace.actions.register import (
     RegisterNamespaceAction,
 )
@@ -73,8 +73,8 @@ class RegisterStorageNamespaceInput:
     storage_id: uuid.UUID
     namespace: str
 
-    def to_creator(self) -> StorageNamespaceCreator:
-        return StorageNamespaceCreator(
+    def to_creator(self) -> StorageNamespaceCreatorSpec:
+        return StorageNamespaceCreatorSpec(
             storage_id=self.storage_id,
             bucket=self.namespace,
         )

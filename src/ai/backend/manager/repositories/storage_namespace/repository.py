@@ -7,9 +7,9 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.storage_namespace.creator import StorageNamespaceCreator
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.storage_namespace.creators import StorageNamespaceCreatorSpec
 from ai.backend.manager.repositories.storage_namespace.db_source.db_source import (
     StorageNamespaceDBSource,
 )
@@ -50,8 +50,8 @@ class StorageNamespaceRepository:
         return await self._db_source.get_by_id(storage_namespace_id)
 
     @storage_namespace_repository_resilience.apply()
-    async def register(self, creator: StorageNamespaceCreator) -> StorageNamespaceData:
-        return await self._db_source.register(creator)
+    async def register(self, spec: StorageNamespaceCreatorSpec) -> StorageNamespaceData:
+        return await self._db_source.register(spec)
 
     @storage_namespace_repository_resilience.apply()
     async def unregister(self, storage_id: uuid.UUID, namespace: str) -> uuid.UUID:

@@ -3,14 +3,14 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryCreatorMeta
-from ai.backend.manager.data.huggingface_registry.creator import HuggingFaceRegistryCreator
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
+from ai.backend.manager.repositories.huggingface_registry import HuggingFaceRegistryCreatorSpec
 from ai.backend.manager.services.artifact_registry.actions.base import ArtifactRegistryAction
 
 
 @dataclass
 class CreateHuggingFaceRegistryAction(ArtifactRegistryAction):
-    creator: HuggingFaceRegistryCreator
+    creator: HuggingFaceRegistryCreatorSpec
     meta: ArtifactRegistryCreatorMeta
 
     @override

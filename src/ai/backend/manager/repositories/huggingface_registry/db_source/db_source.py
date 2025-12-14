@@ -8,7 +8,6 @@ from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
 )
-from ai.backend.manager.data.huggingface_registry.creator import HuggingFaceRegistryCreator
 from ai.backend.manager.data.huggingface_registry.modifier import HuggingFaceRegistryModifier
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.errors.artifact import ArtifactNotFoundError
@@ -17,6 +16,9 @@ from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.huggingface_registry.creators import (
+    HuggingFaceRegistryCreatorSpec,
+)
 
 
 class HuggingFaceDBSource:
@@ -74,34 +76,31 @@ class HuggingFaceDBSource:
             return row.huggingface_registry.to_dataclass()
 
     async def create(
-        self, creator: HuggingFaceRegistryCreator, meta: ArtifactRegistryCreatorMeta
+        self, spec: HuggingFaceRegistryCreatorSpec, meta: ArtifactRegistryCreatorMeta
     ) -> HuggingFaceRegistryData:
         """
         Create a new Hugging Face registry entry.
         """
         async with self._db.begin_session() as db:
-            hf_insert = (
-                sa.insert(HuggingFaceRegistryRow)
-                .values(**creator.fields_to_store())
-                .returning(HuggingFaceRegistryRow.id)
-            )
-            hf_id = (await db.execute(hf_insert)).scalar_one()
+            new_row = spec.build_row()
+            db.add(new_row)
+            await db.flush()
 
             reg_insert = sa.insert(ArtifactRegistryRow).values(
                 name=meta.name,
-                registry_id=hf_id,
+                registry_id=new_row.id,
                 type=ArtifactRegistryType.HUGGINGFACE,
             )
             await db.execute(reg_insert)
 
             stmt = (
                 sa.select(HuggingFaceRegistryRow)
-                .where(HuggingFaceRegistryRow.id == hf_id)
+                .where(HuggingFaceRegistryRow.id == new_row.id)
                 .options(selectinload(HuggingFaceRegistryRow.meta))
             )
             row: HuggingFaceRegistryRow | None = (await db.execute(stmt)).scalar_one_or_none()
             if row is None:
-                raise ArtifactRegistryNotFoundError(f"Registry with ID {hf_id} not found")
+                raise ArtifactRegistryNotFoundError(f"Registry with ID {new_row.id} not found")
 
             return row.to_dataclass()
 

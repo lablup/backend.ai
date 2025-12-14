@@ -13,9 +13,9 @@ from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
 )
-from ai.backend.manager.data.huggingface_registry.creator import HuggingFaceRegistryCreator
 from ai.backend.manager.data.huggingface_registry.modifier import HuggingFaceRegistryModifier
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
+from ai.backend.manager.repositories.huggingface_registry import HuggingFaceRegistryCreatorSpec
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
 )
@@ -136,8 +136,8 @@ class CreateHuggingFaceRegistryInput:
     name: str
     token: Optional[str] = None
 
-    def to_creator(self) -> HuggingFaceRegistryCreator:
-        return HuggingFaceRegistryCreator(url=self.url, token=self.token)
+    def to_creator(self) -> HuggingFaceRegistryCreatorSpec:
+        return HuggingFaceRegistryCreatorSpec(url=self.url, token=self.token)
 
     def to_creator_meta(self) -> ArtifactRegistryCreatorMeta:
         return ArtifactRegistryCreatorMeta(name=self.name)

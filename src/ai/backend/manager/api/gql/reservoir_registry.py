@@ -12,10 +12,10 @@ from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
 )
-from ai.backend.manager.data.reservoir_registry.creator import ReservoirRegistryCreator
 from ai.backend.manager.data.reservoir_registry.modifier import ReservoirRegistryModifier
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.errors.api import NotImplementedAPI
+from ai.backend.manager.repositories.reservoir_registry import ReservoirRegistryCreatorSpec
 from ai.backend.manager.services.artifact_registry.actions.reservoir.create import (
     CreateReservoirRegistryAction,
 )
@@ -147,8 +147,8 @@ class CreateReservoirRegistryInput:
     secret_key: str
     api_version: str
 
-    def to_creator(self) -> ReservoirRegistryCreator:
-        return ReservoirRegistryCreator(
+    def to_creator(self) -> ReservoirRegistryCreatorSpec:
+        return ReservoirRegistryCreatorSpec(
             endpoint=self.endpoint,
             access_key=self.access_key,
             secret_key=self.secret_key,

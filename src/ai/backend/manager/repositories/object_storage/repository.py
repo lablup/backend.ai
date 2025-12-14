@@ -7,10 +7,10 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.object_storage.creator import ObjectStorageCreator
 from ai.backend.manager.data.object_storage.modifier import ObjectStorageModifier
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.object_storage.creators import ObjectStorageCreatorSpec
 from ai.backend.manager.repositories.object_storage.db_source.db_source import ObjectStorageDBSource
 
 object_storage_repository_resilience = Resilience(
@@ -51,8 +51,8 @@ class ObjectStorageRepository:
         return await self._db_source.get_by_namespace_id(storage_namespace_id)
 
     @object_storage_repository_resilience.apply()
-    async def create(self, creator: ObjectStorageCreator) -> ObjectStorageData:
-        return await self._db_source.create(creator)
+    async def create(self, spec: ObjectStorageCreatorSpec) -> ObjectStorageData:
+        return await self._db_source.create(spec)
 
     @object_storage_repository_resilience.apply()
     async def update(

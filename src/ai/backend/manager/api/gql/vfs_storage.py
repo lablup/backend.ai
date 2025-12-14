@@ -9,9 +9,9 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import to_global_id
 
-from ...data.vfs_storage.creator import VFSStorageCreator
 from ...data.vfs_storage.modifier import VFSStorageModifier
 from ...data.vfs_storage.types import VFSStorageData
+from ...repositories.vfs_storage import VFSStorageCreatorSpec
 from ...services.vfs_storage.actions.create import CreateVFSStorageAction
 from ...services.vfs_storage.actions.delete import DeleteVFSStorageAction
 from ...services.vfs_storage.actions.get import GetVFSStorageAction
@@ -93,8 +93,8 @@ class CreateVFSStorageInput:
     host: str
     base_path: str
 
-    def to_creator(self) -> VFSStorageCreator:
-        return VFSStorageCreator(
+    def to_creator(self) -> VFSStorageCreatorSpec:
+        return VFSStorageCreatorSpec(
             name=self.name,
             host=self.host,
             base_path=self.base_path,
