@@ -6,7 +6,6 @@ import pytest
 import yarl
 
 from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
-from ai.backend.manager.data.model_serving.creator import EndpointCreator
 from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
@@ -20,6 +19,8 @@ from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.model_serving import EndpointCreatorSpec
 from ai.backend.manager.repositories.model_serving.admin_repository import (
     AdminModelServingRepository,
 )
@@ -174,8 +175,8 @@ def sample_vfolder():
 
 
 @pytest.fixture
-def sample_endpoint_creator(sample_user, sample_image, sample_vfolder) -> EndpointCreator:
-    return EndpointCreator(
+def sample_endpoint_creator_spec(sample_user, sample_image, sample_vfolder) -> EndpointCreatorSpec:
+    return EndpointCreatorSpec(
         name="test-endpoint",
         model=sample_vfolder.id,
         model_mount_destination="/models",
@@ -202,11 +203,19 @@ def sample_endpoint_creator(sample_user, sample_image, sample_vfolder) -> Endpoi
 
 
 @pytest.fixture
+def sample_endpoint_creator(
+    sample_endpoint_creator_spec: EndpointCreatorSpec,
+) -> Creator[EndpointRow]:
+    """Create a Creator wrapper for endpoint creation."""
+    return Creator(spec=sample_endpoint_creator_spec)
+
+
+@pytest.fixture
 def sample_endpoint(
-    sample_endpoint_creator: EndpointCreator, sample_user, sample_image
+    sample_endpoint_creator_spec: EndpointCreatorSpec, sample_user, sample_image
 ) -> EndpointRow:
     """Create a sample endpoint for testing."""
-    endpoint = EndpointRow.from_creator(sample_endpoint_creator)
+    endpoint = sample_endpoint_creator_spec.build_row()
     # Set attributes that are normally set by the database
     endpoint.id = uuid.uuid4()
     endpoint.created_at = datetime.now(timezone.utc)

@@ -66,7 +66,6 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.session.types import SessionStatus
 
 from ..config.loader.legacy_etcd_loader import LegacyEtcdLoader
-from ..data.model_serving.creator import EndpointCreator
 from ..data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointData,
@@ -591,37 +590,6 @@ class EndpointRow(Base):
             runtime_variant=self.runtime_variant,
             extra_mounts=self.extra_mounts,
             routings=[routing.to_data() for routing in self.routings] if self.routings else None,
-        )
-
-    @classmethod
-    def from_creator(cls, creator: EndpointCreator) -> Self:
-        """
-        Create an EndpointRow instance from an EndpointCreator instance.
-        """
-        return cls(
-            name=creator.name,
-            model_definition_path=creator.model_definition_path,
-            created_user=creator.created_user,
-            session_owner=creator.session_owner,
-            replicas=creator.replicas,
-            image=creator.image,
-            model=creator.model,
-            domain=creator.domain,
-            project=creator.project,
-            resource_group=creator.resource_group,
-            resource_slots=creator.resource_slots,
-            cluster_mode=creator.cluster_mode,
-            cluster_size=creator.cluster_size,
-            extra_mounts=creator.extra_mounts,
-            runtime_variant=creator.runtime_variant,
-            model_mount_destination=creator.model_mount_destination,
-            tag=creator.tag,
-            startup_command=creator.startup_command,
-            bootstrap_script=creator.bootstrap_script,
-            callback_url=creator.callback_url,
-            environ=creator.environ,
-            resource_opts=creator.resource_opts,
-            open_to_public=creator.open_to_public,
         )
 
     @classmethod

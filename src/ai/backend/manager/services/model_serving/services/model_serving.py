@@ -35,7 +35,6 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import ModelServiceDefinition
 from ai.backend.manager.data.image.types import ImageIdentifier
-from ai.backend.manager.data.model_serving.creator import EndpointCreator
 from ai.backend.manager.data.model_serving.types import (
     CompactServiceInfo,
     ErrorInfo,
@@ -62,6 +61,8 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import VFolderOwnershipType, VFolderRow
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.model_serving import EndpointCreatorSpec
 from ai.backend.manager.repositories.model_serving.admin_repository import (
     AdminModelServingRepository,
 )
@@ -305,8 +306,8 @@ class ModelServingService:
         if project_id is None:
             raise InvalidAPIParameters(f"Invalid group name {action.creator.group_name}")
 
-        endpoint = EndpointCreator(
-            action.creator.service_name,
+        endpoint_spec = EndpointCreatorSpec(
+            name=action.creator.service_name,
             model_definition_path=service_prepare_ctx.model_definition_path,
             created_user=action.request_user_id,
             session_owner=service_prepare_ctx.owner_uuid,
@@ -332,21 +333,22 @@ class ModelServingService:
             open_to_public=action.creator.open_to_public,
             runtime_variant=action.creator.runtime_variant,
         )
+        endpoint_creator = Creator(spec=endpoint_spec)
 
         endpoint_data = await self._repository.create_endpoint_validated(
-            endpoint, self._agent_registry
+            endpoint_creator, self._agent_registry
         )
         endpoint_id = endpoint_data.id
 
         return CreateModelServiceActionResult(
             ServiceInfo(
                 endpoint_id=endpoint_id,
-                model_id=endpoint.model,
-                extra_mounts=[m.vfid.folder_id for m in endpoint.extra_mounts],
+                model_id=endpoint_spec.model,
+                extra_mounts=[m.vfid.folder_id for m in endpoint_spec.extra_mounts],
                 name=action.creator.service_name,
                 model_definition_path=service_prepare_ctx.model_definition_path,
-                replicas=endpoint.replicas,
-                desired_session_count=endpoint.replicas,
+                replicas=endpoint_spec.replicas,
+                desired_session_count=endpoint_spec.replicas,
                 active_routes=[],
                 service_endpoint=None,
                 is_public=action.creator.open_to_public,
