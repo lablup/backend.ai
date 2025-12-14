@@ -9,11 +9,9 @@ import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
 from ai.backend.manager.data.notification import (
-    NotificationChannelCreator,
     NotificationChannelData,
     NotificationChannelListResult,
     NotificationChannelModifier,
-    NotificationRuleCreator,
     NotificationRuleData,
     NotificationRuleListResult,
     NotificationRuleModifier,
@@ -27,7 +25,12 @@ from ai.backend.manager.models.notification import (
     NotificationChannelRow,
     NotificationRuleRow,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+    execute_batch_querier,
+    execute_creator,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -90,15 +93,12 @@ class NotificationDBSource:
 
     async def create_channel(
         self,
-        creator: NotificationChannelCreator,
+        creator: Creator[NotificationChannelRow],
     ) -> NotificationChannelData:
         """Creates a new notification channel."""
         async with self._db.begin_session() as db_sess:
-            channel_row = NotificationChannelRow(**creator.fields_to_store())
-            db_sess.add(channel_row)
-            await db_sess.flush()
-            await db_sess.refresh(channel_row)
-            return channel_row.to_data()
+            result = await execute_creator(db_sess, creator)
+            return result.row.to_data()
 
     async def update_channel(
         self,
@@ -137,22 +137,19 @@ class NotificationDBSource:
 
     async def create_rule(
         self,
-        creator: NotificationRuleCreator,
+        creator: Creator[NotificationRuleRow],
     ) -> NotificationRuleData:
         """Creates a new notification rule."""
         async with self._db.begin_session() as db_sess:
-            rule_row = NotificationRuleRow(**creator.fields_to_store())
-            db_sess.add(rule_row)
-            await db_sess.flush()
-            # Explicitly load the channel relationship
-            await db_sess.refresh(rule_row)
+            result = await execute_creator(db_sess, creator)
+            # Explicitly load the channel relationship for to_data()
             stmt = (
                 sa.select(NotificationRuleRow)
-                .where(NotificationRuleRow.id == rule_row.id)
+                .where(NotificationRuleRow.id == result.row.id)
                 .options(selectinload(NotificationRuleRow.channel))
             )
-            result = await db_sess.execute(stmt)
-            row = result.scalar_one()
+            query_result = await db_sess.execute(stmt)
+            row = query_result.scalar_one()
             return row.to_data()
 
     async def update_rule(

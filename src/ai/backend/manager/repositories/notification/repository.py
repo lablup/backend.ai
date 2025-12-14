@@ -13,21 +13,20 @@ from ai.backend.common.resilience import (
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.notification import (
-    NotificationChannelCreator,
     NotificationChannelData,
     NotificationChannelListResult,
     NotificationChannelModifier,
-    NotificationRuleCreator,
     NotificationRuleData,
     NotificationRuleListResult,
     NotificationRuleModifier,
     NotificationRuleType,
 )
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base import BatchQuerier, Creator
 
 from .db_source import NotificationDBSource
 
 if TYPE_CHECKING:
+    from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 __all__ = ("NotificationRepository",)
@@ -71,7 +70,7 @@ class NotificationRepository:
     @notification_repository_resilience.apply()
     async def create_channel(
         self,
-        creator: NotificationChannelCreator,
+        creator: Creator[NotificationChannelRow],
     ) -> NotificationChannelData:
         """Creates a new notification channel."""
         return await self._db_source.create_channel(creator)
@@ -96,7 +95,7 @@ class NotificationRepository:
     @notification_repository_resilience.apply()
     async def create_rule(
         self,
-        creator: NotificationRuleCreator,
+        creator: Creator[NotificationRuleRow],
     ) -> NotificationRuleData:
         """Creates a new notification rule."""
         return await self._db_source.create_rule(creator)

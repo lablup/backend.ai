@@ -1,10 +1,8 @@
 from .types import (
-    NotificationChannelCreator,
     NotificationChannelData,
     NotificationChannelListResult,
     NotificationChannelModifier,
     NotificationChannelType,
-    NotificationRuleCreator,
     NotificationRuleData,
     NotificationRuleListResult,
     NotificationRuleModifier,
@@ -13,12 +11,10 @@ from .types import (
 )
 
 __all__ = (
-    "NotificationChannelCreator",
     "NotificationChannelData",
     "NotificationChannelListResult",
     "NotificationChannelModifier",
     "NotificationChannelType",
-    "NotificationRuleCreator",
     "NotificationRuleData",
     "NotificationRuleListResult",
     "NotificationRuleModifier",

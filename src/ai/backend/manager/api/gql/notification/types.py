@@ -19,18 +19,22 @@ from ai.backend.common.data.notification import (
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.data.notification import (
-    NotificationChannelCreator,
     NotificationChannelData,
     NotificationChannelModifier,
-    NotificationRuleCreator,
     NotificationRuleData,
     NotificationRuleModifier,
 )
+from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.repositories.base import (
+    Creator,
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
+)
+from ai.backend.manager.repositories.notification.creators import (
+    NotificationChannelCreatorSpec,
+    NotificationRuleCreatorSpec,
 )
 from ai.backend.manager.repositories.notification.options import (
     NotificationChannelConditions,
@@ -349,14 +353,16 @@ class CreateNotificationChannelInput:
     config: WebhookConfigInput = strawberry.field()
     enabled: bool = True
 
-    def to_creator(self, created_by: uuid.UUID) -> NotificationChannelCreator:
-        return NotificationChannelCreator(
-            name=self.name,
-            description=self.description,
-            channel_type=self.channel_type.to_internal(),
-            config=self.config.to_dataclass(),
-            enabled=self.enabled,
-            created_by=created_by,
+    def to_creator(self, created_by: uuid.UUID) -> Creator[NotificationChannelRow]:
+        return Creator(
+            spec=NotificationChannelCreatorSpec(
+                name=self.name,
+                description=self.description,
+                channel_type=self.channel_type.to_internal(),
+                config=self.config.to_dataclass(),
+                enabled=self.enabled,
+                created_by=created_by,
+            )
         )
 
 
@@ -398,15 +404,17 @@ class CreateNotificationRuleInput:
     message_template: str
     enabled: bool = True
 
-    def to_creator(self, created_by: uuid.UUID) -> NotificationRuleCreator:
-        return NotificationRuleCreator(
-            name=self.name,
-            description=self.description,
-            rule_type=self.rule_type.to_internal(),
-            channel_id=uuid.UUID(self.channel_id),
-            message_template=self.message_template,
-            enabled=self.enabled,
-            created_by=created_by,
+    def to_creator(self, created_by: uuid.UUID) -> Creator[NotificationRuleRow]:
+        return Creator(
+            spec=NotificationRuleCreatorSpec(
+                name=self.name,
+                description=self.description,
+                rule_type=self.rule_type.to_internal(),
+                channel_id=uuid.UUID(self.channel_id),
+                message_template=self.message_template,
+                enabled=self.enabled,
+                created_by=created_by,
+            )
         )
 
 

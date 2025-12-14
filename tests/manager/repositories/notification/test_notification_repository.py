@@ -12,9 +12,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.types import BinarySize
 from ai.backend.manager.data.notification import (
-    NotificationChannelCreator,
     NotificationChannelModifier,
-    NotificationRuleCreator,
     NotificationRuleModifier,
     NotificationRuleType,
 )
@@ -38,8 +36,12 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
 from ai.backend.manager.repositories.notification import NotificationRepository
+from ai.backend.manager.repositories.notification.creators import (
+    NotificationChannelCreatorSpec,
+    NotificationRuleCreatorSpec,
+)
 from ai.backend.manager.repositories.notification.options import (
     NotificationChannelConditions,
     NotificationChannelOrders,
@@ -358,13 +360,15 @@ class TestNotificationRepository:
             success_status_codes=[200, 201, 202],
         )
 
-        creator = NotificationChannelCreator(
-            name="Test Webhook",
-            channel_type=NotificationChannelType.WEBHOOK,
-            config=config,
-            created_by=test_user,
-            description="Test webhook channel",
-            enabled=True,
+        creator = Creator(
+            spec=NotificationChannelCreatorSpec(
+                name="Test Webhook",
+                channel_type=NotificationChannelType.WEBHOOK,
+                config=config,
+                created_by=test_user,
+                description="Test webhook channel",
+                enabled=True,
+            )
         )
 
         channel = await notification_repository.create_channel(creator)
@@ -500,23 +504,27 @@ class TestNotificationRepository:
         """Test creating notification rule"""
         config = WebhookConfig(url="https://example.com/webhook")
 
-        channel_creator = NotificationChannelCreator(
-            name="Test Channel",
-            channel_type=NotificationChannelType.WEBHOOK,
-            config=config,
-            created_by=test_user,
+        channel_creator = Creator(
+            spec=NotificationChannelCreatorSpec(
+                name="Test Channel",
+                channel_type=NotificationChannelType.WEBHOOK,
+                config=config,
+                created_by=test_user,
+            )
         )
 
         channel = await notification_repository.create_channel(channel_creator)
 
-        rule_creator = NotificationRuleCreator(
-            name="Session Started Rule",
-            rule_type=NotificationRuleType.SESSION_STARTED,
-            channel_id=channel.id,
-            message_template="Session {{ session_id }} started",
-            created_by=test_user,
-            description="Notify when session starts",
-            enabled=True,
+        rule_creator = Creator(
+            spec=NotificationRuleCreatorSpec(
+                name="Session Started Rule",
+                rule_type=NotificationRuleType.SESSION_STARTED,
+                channel_id=channel.id,
+                message_template="Session {{ session_id }} started",
+                created_by=test_user,
+                description="Notify when session starts",
+                enabled=True,
+            )
         )
 
         rule = await notification_repository.create_rule(rule_creator)
