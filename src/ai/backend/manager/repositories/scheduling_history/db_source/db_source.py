@@ -2,27 +2,23 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, cast
 from uuid import UUID
 
 import sqlalchemy as sa
 
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
-    DeploymentHistoryCreator,
     DeploymentHistoryData,
     DeploymentHistoryListResult,
-    RouteHistoryCreator,
     RouteHistoryData,
     RouteHistoryListResult,
 )
 from ai.backend.manager.data.kernel.types import (
-    KernelSchedulingHistoryCreator,
     KernelSchedulingHistoryData,
     KernelSchedulingHistoryListResult,
 )
 from ai.backend.manager.data.session.types import (
-    SessionSchedulingHistoryCreator,
     SessionSchedulingHistoryData,
     SessionSchedulingHistoryListResult,
 )
@@ -32,7 +28,18 @@ from ai.backend.manager.models.scheduling_history import (
     RouteHistoryRow,
     SessionSchedulingHistoryRow,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+    execute_batch_querier,
+    execute_creator,
+)
+from ai.backend.manager.repositories.scheduling_history.creators import (
+    DeploymentHistoryCreatorSpec,
+    KernelSchedulingHistoryCreatorSpec,
+    RouteHistoryCreatorSpec,
+    SessionSchedulingHistoryCreatorSpec,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -55,7 +62,7 @@ class SchedulingHistoryDBSource:
 
     async def record_session_history(
         self,
-        creator: SessionSchedulingHistoryCreator,
+        creator: Creator[SessionSchedulingHistoryRow],
     ) -> SessionSchedulingHistoryData:
         """Record session scheduling history with merge logic."""
         async with self._db.begin_session_read_committed() as db_sess:
@@ -65,23 +72,21 @@ class SchedulingHistoryDBSource:
     async def _record_session_history(
         self,
         db_sess: SASession,
-        creator: SessionSchedulingHistoryCreator,
+        creator: Creator[SessionSchedulingHistoryRow],
     ) -> SessionSchedulingHistoryRow:
-        last_row = await self._get_last_session_history(db_sess, creator.session_id)
+        spec = cast(SessionSchedulingHistoryCreatorSpec, creator.spec)
+        last_row = await self._get_last_session_history(db_sess, spec.session_id)
 
         if last_row is not None and last_row.should_merge_with(
-            creator.phase, creator.result, creator.error_code
+            spec.phase, spec.result, spec.error_code
         ):
             last_row.attempts += 1
             await db_sess.flush()
             await db_sess.refresh(last_row)
             return last_row
 
-        new_row = SessionSchedulingHistoryRow(**creator.fields_to_store())
-        db_sess.add(new_row)
-        await db_sess.flush()
-        await db_sess.refresh(new_row)
-        return new_row
+        result = await execute_creator(db_sess, creator)
+        return result.row
 
     async def _get_last_session_history(
         self,
@@ -124,7 +129,7 @@ class SchedulingHistoryDBSource:
 
     async def record_kernel_history(
         self,
-        creator: KernelSchedulingHistoryCreator,
+        creator: Creator[KernelSchedulingHistoryRow],
     ) -> KernelSchedulingHistoryData:
         """Record kernel scheduling history with merge logic."""
         async with self._db.begin_session_read_committed() as db_sess:
@@ -134,23 +139,21 @@ class SchedulingHistoryDBSource:
     async def _record_kernel_history(
         self,
         db_sess: SASession,
-        creator: KernelSchedulingHistoryCreator,
+        creator: Creator[KernelSchedulingHistoryRow],
     ) -> KernelSchedulingHistoryRow:
-        last_row = await self._get_last_kernel_history(db_sess, creator.kernel_id)
+        spec = cast(KernelSchedulingHistoryCreatorSpec, creator.spec)
+        last_row = await self._get_last_kernel_history(db_sess, spec.kernel_id)
 
         if last_row is not None and last_row.should_merge_with(
-            creator.phase, creator.result, creator.error_code
+            spec.phase, spec.result, spec.error_code
         ):
             last_row.attempts += 1
             await db_sess.flush()
             await db_sess.refresh(last_row)
             return last_row
 
-        new_row = KernelSchedulingHistoryRow(**creator.fields_to_store())
-        db_sess.add(new_row)
-        await db_sess.flush()
-        await db_sess.refresh(new_row)
-        return new_row
+        result = await execute_creator(db_sess, creator)
+        return result.row
 
     async def _get_last_kernel_history(
         self,
@@ -193,7 +196,7 @@ class SchedulingHistoryDBSource:
 
     async def record_deployment_history(
         self,
-        creator: DeploymentHistoryCreator,
+        creator: Creator[DeploymentHistoryRow],
     ) -> DeploymentHistoryData:
         """Record deployment history with merge logic."""
         async with self._db.begin_session_read_committed() as db_sess:
@@ -203,23 +206,21 @@ class SchedulingHistoryDBSource:
     async def _record_deployment_history(
         self,
         db_sess: SASession,
-        creator: DeploymentHistoryCreator,
+        creator: Creator[DeploymentHistoryRow],
     ) -> DeploymentHistoryRow:
-        last_row = await self._get_last_deployment_history(db_sess, creator.deployment_id)
+        spec = cast(DeploymentHistoryCreatorSpec, creator.spec)
+        last_row = await self._get_last_deployment_history(db_sess, spec.deployment_id)
 
         if last_row is not None and last_row.should_merge_with(
-            creator.phase, creator.result, creator.error_code
+            spec.phase, spec.result, spec.error_code
         ):
             last_row.attempts += 1
             await db_sess.flush()
             await db_sess.refresh(last_row)
             return last_row
 
-        new_row = DeploymentHistoryRow(**creator.fields_to_store())
-        db_sess.add(new_row)
-        await db_sess.flush()
-        await db_sess.refresh(new_row)
-        return new_row
+        result = await execute_creator(db_sess, creator)
+        return result.row
 
     async def _get_last_deployment_history(
         self,
@@ -262,7 +263,7 @@ class SchedulingHistoryDBSource:
 
     async def record_route_history(
         self,
-        creator: RouteHistoryCreator,
+        creator: Creator[RouteHistoryRow],
     ) -> RouteHistoryData:
         """Record route history with merge logic."""
         async with self._db.begin_session_read_committed() as db_sess:
@@ -272,23 +273,21 @@ class SchedulingHistoryDBSource:
     async def _record_route_history(
         self,
         db_sess: SASession,
-        creator: RouteHistoryCreator,
+        creator: Creator[RouteHistoryRow],
     ) -> RouteHistoryRow:
-        last_row = await self._get_last_route_history(db_sess, creator.route_id)
+        spec = cast(RouteHistoryCreatorSpec, creator.spec)
+        last_row = await self._get_last_route_history(db_sess, spec.route_id)
 
         if last_row is not None and last_row.should_merge_with(
-            creator.phase, creator.result, creator.error_code
+            spec.phase, spec.result, spec.error_code
         ):
             last_row.attempts += 1
             await db_sess.flush()
             await db_sess.refresh(last_row)
             return last_row
 
-        new_row = RouteHistoryRow(**creator.fields_to_store())
-        db_sess.add(new_row)
-        await db_sess.flush()
-        await db_sess.refresh(new_row)
-        return new_row
+        result = await execute_creator(db_sess, creator)
+        return result.row
 
     async def _get_last_route_history(
         self,
