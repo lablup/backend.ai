@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 
 import sqlalchemy as sa
@@ -16,9 +18,7 @@ from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.reservoir_registry.creators import (
-    ReservoirRegistryCreatorSpec,
-)
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 
 
 class ReservoirDBSource:
@@ -93,15 +93,14 @@ class ReservoirDBSource:
             return row.reservoir_registry.to_dataclass()
 
     async def create(
-        self, spec: ReservoirRegistryCreatorSpec, meta: ArtifactRegistryCreatorMeta
+        self, creator: Creator[ReservoirRegistryRow], meta: ArtifactRegistryCreatorMeta
     ) -> ReservoirRegistryData:
         """
         Create a new Reservoir entry.
         """
         async with self._db.begin_session() as db:
-            new_row = spec.build_row()
-            db.add(new_row)
-            await db.flush()
+            creator_result = await execute_creator(db, creator)
+            new_row = creator_result.row
 
             reg_insert = sa.insert(ArtifactRegistryRow).values(
                 name=meta.name,

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Optional
 
 import sqlalchemy as sa
@@ -10,10 +12,10 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
     KeyPairResourcePolicyModifier,
 )
-from ai.backend.manager.services.keypair_resource_policy.types import KeyPairResourcePolicyCreator
 
 keypair_resource_policy_db_source_resilience = Resilience(
     policies=[
@@ -43,13 +45,10 @@ class KeypairResourcePolicyDBSource:
         self._db = db
 
     @keypair_resource_policy_db_source_resilience.apply()
-    async def insert(self, creator: KeyPairResourcePolicyCreator) -> KeyPairResourcePolicyData:
+    async def insert(self, creator: Creator[KeyPairResourcePolicyRow]) -> KeyPairResourcePolicyData:
         async with self._db.begin_session() as db_sess:
-            db_row = KeyPairResourcePolicyRow.from_creator(creator)
-            db_sess.add(db_row)
-            await db_sess.flush()
-            # Refresh the object to ensure all attributes are loaded
-            await db_sess.refresh(db_row)
+            creator_result = await execute_creator(db_sess, creator)
+            db_row = creator_result.row
             return db_row.to_dataclass()
 
     @keypair_resource_policy_db_source_resilience.apply()

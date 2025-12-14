@@ -4,7 +4,9 @@ import uuid
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Optional, override
+from typing import Any, Optional
+
+from typing_extensions import override
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.permission.id import ScopeId
@@ -14,11 +16,7 @@ from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.data.user.types import UserRole
-from ai.backend.manager.repositories.base.creator import CreatorSpec
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.domain import DomainRow
 
 
 @dataclass
@@ -55,35 +53,6 @@ class DomainData:
             entity: OperationType.admin_operations()
             for entity in EntityType.admin_accessible_entity_types_in_domain()
         }
-
-
-@dataclass
-class DomainCreator(CreatorSpec["DomainRow"]):
-    name: str
-    description: Optional[str] = None
-    is_active: Optional[bool] = None
-    total_resource_slots: Optional[ResourceSlot] = None
-    allowed_vfolder_hosts: Optional[dict[str, list[str]]] = None
-    allowed_docker_registries: Optional[list[str]] = None
-    integration_id: Optional[str] = None
-    dotfiles: Optional[bytes] = None
-
-    @override
-    def build_row(self) -> DomainRow:
-        from ai.backend.manager.models.domain import DomainRow
-
-        return DomainRow(
-            name=self.name,
-            description=self.description,
-            is_active=self.is_active if self.is_active is not None else True,
-            total_resource_slots=self.total_resource_slots if self.total_resource_slots else {},
-            allowed_vfolder_hosts=self.allowed_vfolder_hosts if self.allowed_vfolder_hosts else {},
-            allowed_docker_registries=self.allowed_docker_registries
-            if self.allowed_docker_registries
-            else [],
-            integration_id=self.integration_id,
-            dotfiles=self.dotfiles if self.dotfiles else b"\x90",
-        )
 
 
 @dataclass

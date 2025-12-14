@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class ObjectStorageCreatorSpec(CreatorSpec["ObjectStorageRow"]):
+class ObjectStorageCreatorSpec(CreatorSpec[ObjectStorageRow]):
     """CreatorSpec for object storage creation."""
 
     name: str

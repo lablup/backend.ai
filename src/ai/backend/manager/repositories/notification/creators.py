@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class NotificationChannelCreatorSpec(CreatorSpec["NotificationChannelRow"]):
+class NotificationChannelCreatorSpec(CreatorSpec[NotificationChannelRow]):
     """CreatorSpec for notification channel."""
 
     name: str
@@ -45,7 +45,7 @@ class NotificationChannelCreatorSpec(CreatorSpec["NotificationChannelRow"]):
 
 
 @dataclass
-class NotificationRuleCreatorSpec(CreatorSpec["NotificationRuleRow"]):
+class NotificationRuleCreatorSpec(CreatorSpec[NotificationRuleRow]):
     """CreatorSpec for notification rule."""
 
     name: str

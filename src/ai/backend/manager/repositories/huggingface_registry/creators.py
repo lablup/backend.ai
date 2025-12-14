@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class HuggingFaceRegistryCreatorSpec(CreatorSpec["HuggingFaceRegistryRow"]):
+class HuggingFaceRegistryCreatorSpec(CreatorSpec[HuggingFaceRegistryRow]):
     """CreatorSpec for HuggingFace registry creation."""
 
     url: str

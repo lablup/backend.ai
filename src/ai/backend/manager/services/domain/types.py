@@ -4,7 +4,6 @@ Deprecated: use `ai.backend.manager.data.domain.types` instead.
 """
 
 from ai.backend.manager.data.domain.types import (
-    DomainCreator,
     DomainData,
     DomainModifier,
     DomainNodeModifier,
@@ -13,7 +12,6 @@ from ai.backend.manager.data.domain.types import (
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 __all__ = [
-    "DomainCreator",
     "DomainData",
     "DomainModifier",
     "DomainNodeModifier",

@@ -1,4 +1,6 @@
-from typing import Optional
+from __future__ import annotations
+
+from typing import Optional, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -10,7 +12,6 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.domain.types import (
-    DomainCreator,
     DomainData,
     DomainModifier,
     UserInfo,
@@ -31,6 +32,8 @@ from ai.backend.manager.models.kernel import (
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
 
 domain_repository_resilience = Resilience(
     policies=[
@@ -59,24 +62,23 @@ class AdminDomainRepository:
         self._db = db
 
     @domain_repository_resilience.apply()
-    async def create_domain_force(self, creator: DomainCreator) -> DomainData:
+    async def create_domain_force(self, creator: Creator[DomainRow]) -> DomainData:
         """
         Creates a new domain with model-store group without permission checks.
         For superadmin use only.
         """
+        spec = cast(DomainCreatorSpec, creator.spec)
         async with self._db.begin_session() as db_session:
-            check_query = sa.select(DomainRow).where(DomainRow.name == creator.name)
+            check_query = sa.select(DomainRow).where(DomainRow.name == spec.name)
             existing_domain = await db_session.scalar(check_query)
             if existing_domain is not None:
-                raise InvalidAPIParameters(f"Domain with name '{creator.name}' already exists")
+                raise InvalidAPIParameters(f"Domain with name '{spec.name}' already exists")
 
-            domain_row = creator.build_row()
-            db_session.add(domain_row)
-            await db_session.flush()
-            await db_session.refresh(domain_row)
+            creator_result = await execute_creator(db_session, creator)
+            domain_row = creator_result.row
 
             # Create model-store group for the domain
-            await self._create_model_store_group_session(db_session, creator.name)
+            await self._create_model_store_group_session(db_session, spec.name)
 
             return domain_row.to_data()
 
@@ -175,28 +177,27 @@ class AdminDomainRepository:
 
     @domain_repository_resilience.apply()
     async def create_domain_node_force(
-        self, creator: DomainCreator, scaling_groups: Optional[list[str]] = None
+        self, creator: Creator[DomainRow], scaling_groups: Optional[list[str]] = None
     ) -> DomainData:
         """
         Creates a domain node with scaling groups without permission checks.
         For superadmin use only.
         """
+        spec = cast(DomainCreatorSpec, creator.spec)
         async with self._db.begin_session() as session:
-            check_query = sa.select(DomainRow).where(DomainRow.name == creator.name)
+            check_query = sa.select(DomainRow).where(DomainRow.name == spec.name)
             existing_domain = await session.scalar(check_query)
             if existing_domain is not None:
-                raise InvalidAPIParameters(f"Domain with name '{creator.name}' already exists")
+                raise InvalidAPIParameters(f"Domain with name '{spec.name}' already exists")
 
-            domain_row = creator.build_row()
-            session.add(domain_row)
-            await session.flush()
-            await session.refresh(domain_row)
+            creator_result = await execute_creator(session, creator)
+            domain_row = creator_result.row
 
             if scaling_groups is not None:
                 await session.execute(
                     sa.insert(ScalingGroupForDomainRow),
                     [
-                        {"scaling_group": sgroup_name, "domain": creator.name}
+                        {"scaling_group": sgroup_name, "domain": spec.name}
                         for sgroup_name in scaling_groups
                     ],
                 )
@@ -251,7 +252,7 @@ class AdminDomainRepository:
     @domain_repository_resilience.apply()
     async def create_domain_node_with_permissions_force(
         self,
-        creator: DomainCreator,
+        creator: Creator[DomainRow],
         user_info: UserInfo,
         scaling_groups: Optional[list[str]] = None,
     ) -> DomainData:

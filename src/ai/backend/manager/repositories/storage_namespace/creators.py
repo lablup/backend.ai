@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class StorageNamespaceCreatorSpec(CreatorSpec["StorageNamespaceRow"]):
+class StorageNamespaceCreatorSpec(CreatorSpec[StorageNamespaceRow]):
     """CreatorSpec for storage namespace registration."""
 
     storage_id: uuid.UUID

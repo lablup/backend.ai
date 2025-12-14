@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class ReservoirRegistryCreatorSpec(CreatorSpec["ReservoirRegistryRow"]):
+class ReservoirRegistryCreatorSpec(CreatorSpec[ReservoirRegistryRow]):
     """CreatorSpec for Reservoir registry creation."""
 
     endpoint: str

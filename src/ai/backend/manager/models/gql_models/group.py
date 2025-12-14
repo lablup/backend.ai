@@ -24,9 +24,11 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
+from ai.backend.manager.data.group.types import GroupData, GroupModifier
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 from ai.backend.manager.services.group.actions.create_group import CreateGroupAction
 from ai.backend.manager.services.group.actions.delete_group import (
     DeleteGroupAction,
@@ -570,17 +572,19 @@ class GroupInput(graphene.InputObjectType):
         container_registry_val = value_or_none(self.container_registry)
 
         return CreateGroupAction(
-            input=GroupCreator(
-                name=name,
-                domain_name=self.domain_name,
-                type=type_val,
-                description=description_val,
-                is_active=is_active_val,
-                total_resource_slots=total_resource_slots_val,
-                allowed_vfolder_hosts=allowed_vfolder_hosts_val,
-                integration_id=integration_id_val,
-                resource_policy=resource_policy_val,
-                container_registry=container_registry_val,
+            creator=Creator(
+                spec=GroupCreatorSpec(
+                    name=name,
+                    domain_name=self.domain_name,
+                    type=type_val,
+                    description=description_val,
+                    is_active=is_active_val,
+                    total_resource_slots=total_resource_slots_val,
+                    allowed_vfolder_hosts=allowed_vfolder_hosts_val,
+                    integration_id=integration_id_val,
+                    resource_policy=resource_policy_val,
+                    container_registry=container_registry_val,
+                )
             ),
         )
 

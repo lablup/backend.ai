@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class EndpointCreatorSpec(CreatorSpec["EndpointRow"]):
+class EndpointCreatorSpec(CreatorSpec[EndpointRow]):
     """CreatorSpec for endpoint creation."""
 
     name: str

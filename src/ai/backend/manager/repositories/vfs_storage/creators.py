@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class VFSStorageCreatorSpec(CreatorSpec["VFSStorageRow"]):
+class VFSStorageCreatorSpec(CreatorSpec[VFSStorageRow]):
     """CreatorSpec for VFS storage creation."""
 
     name: str

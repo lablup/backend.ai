@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, Sequence
@@ -69,7 +71,7 @@ class GroupService:
         self._admin_group_repository = group_repositories.admin_repository
 
     async def create_group(self, action: CreateGroupAction) -> CreateGroupActionResult:
-        group_data = await self._group_repository.create(action.input)
+        group_data = await self._group_repository.create(action.creator)
         return CreateGroupActionResult(data=group_data)
 
     async def modify_group(self, action: ModifyGroupAction) -> ModifyGroupActionResult:

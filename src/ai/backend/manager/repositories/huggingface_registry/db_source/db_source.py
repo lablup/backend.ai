@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 
 import sqlalchemy as sa
@@ -16,9 +18,7 @@ from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.huggingface_registry.creators import (
-    HuggingFaceRegistryCreatorSpec,
-)
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 
 
 class HuggingFaceDBSource:
@@ -76,15 +76,14 @@ class HuggingFaceDBSource:
             return row.huggingface_registry.to_dataclass()
 
     async def create(
-        self, spec: HuggingFaceRegistryCreatorSpec, meta: ArtifactRegistryCreatorMeta
+        self, creator: Creator[HuggingFaceRegistryRow], meta: ArtifactRegistryCreatorMeta
     ) -> HuggingFaceRegistryData:
         """
         Create a new Hugging Face registry entry.
         """
         async with self._db.begin_session() as db:
-            new_row = spec.build_row()
-            db.add(new_row)
-            await db.flush()
+            creator_result = await execute_creator(db, creator)
+            new_row = creator_result.row
 
             reg_insert = sa.insert(ArtifactRegistryRow).values(
                 name=meta.name,
