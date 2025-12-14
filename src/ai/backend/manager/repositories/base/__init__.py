@@ -3,6 +3,12 @@
 Re-exports all public APIs for backward compatibility.
 """
 
+from .creator import (
+    Creator,
+    CreatorResult,
+    CreatorSpec,
+    execute_creator,
+)
 from .pagination import (
     CursorBackwardPagination,
     CursorForwardPagination,
@@ -26,6 +32,16 @@ from .types import (
     QueryCondition,
     QueryOrder,
 )
+from .updater import (
+    Updater,
+    UpdaterSpec,
+)
+from .upserter import (
+    Upserter,
+    UpserterResult,
+    UpserterSpec,
+    execute_upserter,
+)
 from .utils import (
     combine_conditions_or,
     negate_conditions,
@@ -46,6 +62,19 @@ __all__ = [
     "Querier",
     "QuerierResult",
     "execute_querier",
+    # Creator
+    "CreatorSpec",
+    "Creator",
+    "CreatorResult",
+    "execute_creator",
+    # Updater
+    "UpdaterSpec",
+    "Updater",
+    # Upserter
+    "UpserterSpec",
+    "Upserter",
+    "UpserterResult",
+    "execute_upserter",
     # Purger
     "PurgeTarget",
     "Purger",
