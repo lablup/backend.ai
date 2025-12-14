@@ -17,14 +17,20 @@ from .pagination import (
     QueryPagination,
 )
 from .purger import (
+    BatchPurger,
+    BatchPurgerResult,
+    BatchPurgerSpec,
     Purger,
     PurgerResult,
-    PurgeTarget,
+    execute_batch_purger,
     execute_purger,
 )
 from .querier import (
+    BatchQuerier,
+    BatchQuerierResult,
     Querier,
     QuerierResult,
+    execute_batch_querier,
     execute_querier,
 )
 from .types import (
@@ -68,6 +74,10 @@ __all__ = [
     "Querier",
     "QuerierResult",
     "execute_querier",
+    # BatchQuerier
+    "BatchQuerier",
+    "BatchQuerierResult",
+    "execute_batch_querier",
     # Creator
     "CreatorSpec",
     "Creator",
@@ -89,10 +99,14 @@ __all__ = [
     "UpserterResult",
     "execute_upserter",
     # Purger
-    "PurgeTarget",
     "Purger",
     "PurgerResult",
     "execute_purger",
+    # BatchPurger
+    "BatchPurgerSpec",
+    "BatchPurger",
+    "BatchPurgerResult",
+    "execute_batch_purger",
     # Utils
     "combine_conditions_or",
     "negate_conditions",

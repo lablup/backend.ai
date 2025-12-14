@@ -27,7 +27,7 @@ from ai.backend.manager.models.notification import (
     NotificationChannelRow,
     NotificationRuleRow,
 )
-from ai.backend.manager.repositories.base import Querier, execute_querier
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -216,13 +216,13 @@ class NotificationDBSource:
 
     async def search_channels(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> NotificationChannelListResult:
         """Searches notification channels with total count."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(NotificationChannelRow)
 
-            result = await execute_querier(
+            result = await execute_batch_querier(
                 db_sess,
                 query,
                 querier,
@@ -239,7 +239,7 @@ class NotificationDBSource:
 
     async def search_rules(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> NotificationRuleListResult:
         """Searches notification rules with total count."""
         async with self._db.begin_readonly_session() as db_sess:
@@ -247,7 +247,7 @@ class NotificationDBSource:
                 selectinload(NotificationRuleRow.channel)
             )
 
-            result = await execute_querier(
+            result = await execute_batch_querier(
                 db_sess,
                 query,
                 querier,

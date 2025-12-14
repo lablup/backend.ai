@@ -26,7 +26,7 @@ from ai.backend.manager.data.notification import (
     NotificationRuleType,
     WebhookConfig,
 )
-from ai.backend.manager.repositories.base import Querier
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.notification import NotificationRepository
 from ai.backend.manager.services.notification.actions import (
     CreateChannelAction,
@@ -633,7 +633,7 @@ class TestNotificationService:
         from ai.backend.manager.data.notification import NotificationChannelListResult
         from ai.backend.manager.repositories.base import OffsetPagination
 
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
@@ -665,7 +665,7 @@ class TestNotificationService:
         from ai.backend.manager.data.notification import NotificationRuleListResult
         from ai.backend.manager.repositories.base import OffsetPagination
 
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],

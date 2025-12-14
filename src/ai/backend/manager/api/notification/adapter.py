@@ -1,5 +1,5 @@
 """
-Adapters to convert notification DTOs to repository Querier objects.
+Adapters to convert notification DTOs to repository BatchQuerier objects.
 Handles conversion of filter, order, and pagination parameters.
 Also provides data-to-DTO conversion functions.
 """
@@ -31,8 +31,8 @@ from ai.backend.manager.data.notification import (
 )
 from ai.backend.manager.errors.notification import InvalidNotificationConfig
 from ai.backend.manager.repositories.base import (
+    BatchQuerier,
     OffsetPagination,
-    Querier,
     QueryCondition,
     QueryOrder,
 )
@@ -89,21 +89,21 @@ class NotificationChannelAdapter(BaseFilterAdapter):
             modifier.enabled = OptionalState.update(request.enabled)
         return modifier
 
-    def build_querier(self, request: SearchNotificationChannelsRequest) -> Querier:
+    def build_querier(self, request: SearchNotificationChannelsRequest) -> BatchQuerier:
         """
-        Build a Querier for notification channels from search request.
+        Build a BatchQuerier for notification channels from search request.
 
         Args:
             request: Search request containing filter, order, and pagination
 
         Returns:
-            Querier object with converted conditions, orders, and pagination
+            BatchQuerier object with converted conditions, orders, and pagination
         """
         conditions = self._convert_filter(request.filter) if request.filter else []
         orders = [self._convert_order(request.order)] if request.order else []
         pagination = self._build_pagination(request.limit, request.offset)
 
-        return Querier(conditions=conditions, orders=orders, pagination=pagination)
+        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
     def _convert_filter(self, filter: NotificationChannelFilter) -> list[QueryCondition]:
         """Convert channel filter to list of query conditions."""
@@ -179,21 +179,21 @@ class NotificationRuleAdapter(BaseFilterAdapter):
             modifier.enabled = OptionalState.update(request.enabled)
         return modifier
 
-    def build_querier(self, request: SearchNotificationRulesRequest) -> Querier:
+    def build_querier(self, request: SearchNotificationRulesRequest) -> BatchQuerier:
         """
-        Build a Querier for notification rules from search request.
+        Build a BatchQuerier for notification rules from search request.
 
         Args:
             request: Search request containing filter, order, and pagination
 
         Returns:
-            Querier object with converted conditions, orders, and pagination
+            BatchQuerier object with converted conditions, orders, and pagination
         """
         conditions = self._convert_filter(request.filter) if request.filter else []
         orders = [self._convert_order(request.order)] if request.order else []
         pagination = self._build_pagination(request.limit, request.offset)
 
-        return Querier(conditions=conditions, orders=orders, pagination=pagination)
+        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
     def _convert_filter(self, filter: NotificationRuleFilter) -> list[QueryCondition]:
         """Convert rule filter to list of query conditions."""

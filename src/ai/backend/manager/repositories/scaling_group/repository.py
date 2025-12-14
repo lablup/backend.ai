@@ -12,7 +12,7 @@ from ai.backend.common.resilience import (
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.scaling_group.types import ScalingGroupListResult
-from ai.backend.manager.repositories.base import Querier
+from ai.backend.manager.repositories.base import BatchQuerier
 
 from .db_source import ScalingGroupDBSource
 
@@ -49,7 +49,7 @@ class ScalingGroupRepository:
     @scaling_group_repository_resilience.apply()
     async def search_scaling_groups(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> ScalingGroupListResult:
         """Searches scaling groups with total count."""
         return await self._db_source.search_scaling_groups(querier=querier)

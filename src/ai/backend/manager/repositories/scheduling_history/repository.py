@@ -29,7 +29,7 @@ from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryData,
     SessionSchedulingHistoryListResult,
 )
-from ai.backend.manager.repositories.base import Querier
+from ai.backend.manager.repositories.base import BatchQuerier
 
 from .db_source import SchedulingHistoryDBSource
 
@@ -76,7 +76,7 @@ class SchedulingHistoryRepository:
     @scheduling_history_repository_resilience.apply()
     async def search_session_history(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> SessionSchedulingHistoryListResult:
         """Search session scheduling history with pagination."""
         return await self._db_source.search_session_history(querier)
@@ -94,7 +94,7 @@ class SchedulingHistoryRepository:
     @scheduling_history_repository_resilience.apply()
     async def search_kernel_history(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> KernelSchedulingHistoryListResult:
         """Search kernel scheduling history with pagination."""
         return await self._db_source.search_kernel_history(querier)
@@ -112,7 +112,7 @@ class SchedulingHistoryRepository:
     @scheduling_history_repository_resilience.apply()
     async def search_deployment_history(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> DeploymentHistoryListResult:
         """Search deployment history with pagination."""
         return await self._db_source.search_deployment_history(querier)
@@ -130,7 +130,7 @@ class SchedulingHistoryRepository:
     @scheduling_history_repository_resilience.apply()
     async def search_route_history(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> RouteHistoryListResult:
         """Search route history with pagination."""
         return await self._db_source.search_route_history(querier)

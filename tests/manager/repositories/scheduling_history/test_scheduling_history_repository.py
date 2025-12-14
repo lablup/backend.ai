@@ -32,7 +32,7 @@ from ai.backend.manager.models.scheduling_history import (
     SessionSchedulingHistoryRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import OffsetPagination, Querier
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
 from ai.backend.manager.repositories.scheduling_history.options import (
     DeploymentHistoryConditions,
@@ -315,7 +315,7 @@ class TestSchedulingHistoryRepository:
             await scheduling_history_repository.record_session_history(creator)
 
         # Search with pagination
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=2, offset=0),
             conditions=[SessionSchedulingHistoryConditions.by_session_id(session_id)],
             orders=[],
@@ -357,7 +357,7 @@ class TestSchedulingHistoryRepository:
             await scheduling_history_repository.record_session_history(creator)
 
         # Search for session 1 only
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[SessionSchedulingHistoryConditions.by_session_id(session_id_1)],
             orders=[],
@@ -588,7 +588,7 @@ class TestSchedulingHistoryRepository:
             await scheduling_history_repository.record_kernel_history(creator)
 
         # Search with pagination
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=2, offset=0),
             conditions=[KernelSchedulingHistoryConditions.by_kernel_id(kernel_id)],
             orders=[],
@@ -798,7 +798,7 @@ class TestSchedulingHistoryRepository:
             await scheduling_history_repository.record_deployment_history(creator)
 
         # Search with pagination
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=2, offset=0),
             conditions=[DeploymentHistoryConditions.by_deployment_id(deployment_id)],
             orders=[],
@@ -1033,7 +1033,7 @@ class TestSchedulingHistoryRepository:
             await scheduling_history_repository.record_route_history(creator)
 
         # Search with pagination
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=2, offset=0),
             conditions=[RouteHistoryConditions.by_route_id(route_id)],
             orders=[],

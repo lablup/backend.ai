@@ -20,7 +20,7 @@ from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupStatus,
     SchedulerType,
 )
-from ai.backend.manager.repositories.base import OffsetPagination, Querier
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
@@ -99,7 +99,7 @@ class TestScalingGroupService:
             )
         )
 
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
             orders=[],
@@ -121,7 +121,7 @@ class TestScalingGroupService:
         """Test searching scaling groups with querier"""
         from ai.backend.manager.repositories.base import OffsetPagination
 
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
@@ -199,7 +199,7 @@ class TestScalingGroupService:
             )
         )
 
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
             orders=[],
@@ -227,7 +227,7 @@ class TestScalingGroupService:
             )
         )
 
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
             orders=[],
