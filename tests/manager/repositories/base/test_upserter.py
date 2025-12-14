@@ -54,15 +54,15 @@ class TestUpserterBasic:
     """Tests for upserter operations."""
 
     @pytest.fixture
-    async def orm_table(
+    async def upserter_row_class(
         self,
         database_engine: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[sa.Table, None]:
-        """Create ORM test table with unique constraint on name."""
+    ) -> AsyncGenerator[type[UpserterTestRow], None]:
+        """Create ORM test table with unique constraint on name and return row class."""
         async with database_engine.begin() as conn:
             await conn.run_sync(lambda c: Base.metadata.create_all(c, [UpserterTestRow.__table__]))
 
-        yield UpserterTestRow.__table__
+        yield UpserterTestRow
 
         async with database_engine.begin() as conn:
             await conn.execute(sa.text("DROP TABLE IF EXISTS test_upserter_orm CASCADE"))
@@ -70,7 +70,7 @@ class TestUpserterBasic:
     async def test_upsert_insert_new_row(
         self,
         database_engine: ExtendedAsyncSAEngine,
-        orm_table: sa.Table,
+        upserter_row_class: type[UpserterTestRow],
     ) -> None:
         """Test upserting a new row (insert case)."""
         async with database_engine.begin_session() as db_sess:
@@ -87,21 +87,21 @@ class TestUpserterBasic:
             assert result.row.name == "new-item"
             assert result.row.value == "initial-value"
 
-            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(orm_table))
+            table = upserter_row_class.__table__
+            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(table))
             assert count_result.scalar() == 1
 
     async def test_upsert_update_existing_row(
         self,
         database_engine: ExtendedAsyncSAEngine,
-        orm_table: sa.Table,
+        upserter_row_class: type[UpserterTestRow],
     ) -> None:
         """Test upserting an existing row (update case)."""
+        table = upserter_row_class.__table__
         async with database_engine.begin_session() as db_sess:
             # First insert
-            await db_sess.execute(
-                orm_table.insert().values(name="existing-item", value="old-value")
-            )
-            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(orm_table))
+            await db_sess.execute(table.insert().values(name="existing-item", value="old-value"))
+            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(table))
             assert count_result.scalar() == 1
 
             # Upsert should update
@@ -118,12 +118,12 @@ class TestUpserterBasic:
             assert result.row.value == "new-value"
 
             # Should still be 1 row (updated, not inserted)
-            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(orm_table))
+            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(table))
             assert count_result.scalar() == 1
 
             # Verify the value was actually updated
             row_result = await db_sess.execute(
-                sa.select(orm_table).where(orm_table.c.name == "existing-item")
+                sa.select(table).where(table.c.name == "existing-item")
             )
             row = row_result.fetchone()
             assert row is not None

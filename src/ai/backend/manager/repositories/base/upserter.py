@@ -57,10 +57,7 @@ class Upserter(Generic[TRow]):
     """Bundles upserter spec for upsert operations.
 
     Attributes:
-        spec: UpserterSpec implementation defining what to upsert.
-
-    Note:
-        Additional fields (e.g., RBAC context) may be added later.
+        spec: UpserterSpec implementation defining row_class and values to insert/update.
     """
 
     spec: UpserterSpec[TRow]
