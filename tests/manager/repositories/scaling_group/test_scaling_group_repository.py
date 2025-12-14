@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import OffsetPagination, Querier
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 
 
@@ -114,7 +114,7 @@ class TestScalingGroupRepositoryDB:
         sample_scaling_groups_small: list[str],
     ) -> None:
         """Test searching all scaling groups without filters"""
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[],
@@ -137,7 +137,7 @@ class TestScalingGroupRepositoryDB:
         sample_scaling_groups_small: list[str],
     ) -> None:
         """Test searching scaling groups with querier"""
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
             orders=[],
@@ -170,7 +170,7 @@ class TestScalingGroupRepositoryDB:
         description: str,
     ) -> None:
         """Test offset-based pagination scenarios"""
-        querier = Querier(
+        querier = BatchQuerier(
             conditions=[],
             orders=[],
             pagination=OffsetPagination(limit=limit, offset=offset),
@@ -200,7 +200,7 @@ class TestScalingGroupRepositoryDB:
         description: str,
     ) -> None:
         """Test pagination edge cases"""
-        querier = Querier(
+        querier = BatchQuerier(
             conditions=[],
             orders=[],
             pagination=OffsetPagination(limit=limit, offset=offset),
@@ -217,7 +217,7 @@ class TestScalingGroupRepositoryDB:
         sample_scaling_groups_medium: list[str],
     ) -> None:
         """Test searching scaling groups with large limit returns all items"""
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[],

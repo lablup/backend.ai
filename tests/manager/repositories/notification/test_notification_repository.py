@@ -38,7 +38,7 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import OffsetPagination, Querier
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.notification import NotificationRepository
 from ai.backend.manager.repositories.notification.options import (
     NotificationChannelConditions,
@@ -474,7 +474,7 @@ class TestNotificationRepository:
             db_sess.add(disabled_channel)
             await db_sess.flush()
 
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[],
@@ -483,7 +483,7 @@ class TestNotificationRepository:
         assert len(result.items) >= 2
         assert result.total_count >= 2
 
-        enabled_querier = Querier(
+        enabled_querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[NotificationChannelConditions.by_enabled(True)],
             orders=[],
@@ -692,7 +692,7 @@ class TestNotificationRepository:
         from ai.backend.manager.repositories.notification.options import NotificationRuleConditions
 
         # List all rules
-        all_querier = Querier(
+        all_querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[],
@@ -702,7 +702,7 @@ class TestNotificationRepository:
         assert all_result.total_count >= 3
 
         # List enabled rules only
-        enabled_querier = Querier(
+        enabled_querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[NotificationRuleConditions.by_enabled(True)],
             orders=[],
@@ -711,7 +711,7 @@ class TestNotificationRepository:
         assert all(r.enabled for r in enabled_result.items)
 
         # List rules by rule_type
-        started_querier = Querier(
+        started_querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
                 NotificationRuleConditions.by_rule_types([NotificationRuleType.SESSION_STARTED])
@@ -785,7 +785,7 @@ class TestNotificationRepository:
     ) -> None:
         """Test first page of offset-based pagination"""
         # sample_channels_for_pagination fixture creates 25 channels
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
@@ -802,7 +802,7 @@ class TestNotificationRepository:
     ) -> None:
         """Test second page of offset-based pagination"""
         # sample_channels_for_pagination fixture creates 25 channels
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[],
             orders=[],
@@ -819,7 +819,7 @@ class TestNotificationRepository:
     ) -> None:
         """Test last page of offset-based pagination with partial results"""
         # sample_channels_for_pagination fixture creates 25 channels
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=20),
             conditions=[],
             orders=[],
@@ -836,7 +836,7 @@ class TestNotificationRepository:
     ) -> None:
         """Test pagination when limit exceeds total count"""
         # sample_channels_small fixture creates 5 channels
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
             orders=[],
@@ -853,7 +853,7 @@ class TestNotificationRepository:
     ) -> None:
         """Test pagination when offset exceeds total count returns empty"""
         # sample_channels_small fixture creates 5 channels
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=100),
             conditions=[],
             orders=[],
@@ -870,7 +870,7 @@ class TestNotificationRepository:
     ) -> None:
         """Test pagination combined with filtering and ordering"""
         # sample_channels_mixed_enabled fixture creates 20 channels (10 enabled, 10 disabled)
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=5, offset=0),
             conditions=[NotificationChannelConditions.by_enabled(True)],
             orders=[NotificationChannelOrders.name(ascending=True)],
@@ -891,7 +891,7 @@ class TestNotificationRepository:
     ) -> None:
         """Test listing channels with large limit returns all items"""
         # sample_channels_medium fixture creates 15 channels
-        querier = Querier(
+        querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=[],
