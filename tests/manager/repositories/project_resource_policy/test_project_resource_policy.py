@@ -3,7 +3,6 @@ Tests for ProjectResourcePolicyRepository functionality.
 Tests the repository layer with mocked database operations.
 """
 
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -14,6 +13,10 @@ from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.project_resource_policy.creators import (
+    ProjectResourcePolicyCreatorSpec,
+)
 from ai.backend.manager.repositories.project_resource_policy.repository import (
     ProjectResourcePolicyRepository,
 )
@@ -53,41 +56,45 @@ class TestProjectResourcePolicyRepository:
         )
 
     @pytest.fixture
-    def new_policy_fields(self) -> dict[str, Any]:
-        """Create fields for new policy creation testing"""
-        return {
-            "name": "new-policy",
-            "max_vfolder_count": 20,
-            "max_quota_scope_size": 2147483648,  # 2GB
-            "max_network_count": 10,
-        }
+    def new_policy_creator(self) -> Creator[ProjectResourcePolicyRow]:
+        """Create Creator for new policy creation testing"""
+        spec = ProjectResourcePolicyCreatorSpec(
+            name="new-policy",
+            max_vfolder_count=20,
+            max_quota_scope_size=2147483648,  # 2GB
+            max_network_count=10,
+        )
+        return Creator(spec=spec)
 
     @pytest.mark.asyncio
     async def test_create_success(
-        self, project_resource_policy_repository, mock_db_engine, new_policy_fields
+        self, project_resource_policy_repository, mock_db_engine, new_policy_creator
     ) -> None:
         """Test successful project resource policy creation"""
         # Mock database session
         mock_session = AsyncMock(spec=AsyncSession)
         mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
 
-        # Create expected policy data matching the new fields
-        expected_policy_data = ProjectResourcePolicyData(**new_policy_fields)
+        # Create expected policy data
+        expected_policy_data = ProjectResourcePolicyData(
+            name="new-policy",
+            max_vfolder_count=20,
+            max_quota_scope_size=2147483648,  # 2GB
+            max_network_count=10,
+        )
 
         # Mock the to_dataclass method
         mock_policy_row = MagicMock()
         mock_policy_row.to_dataclass.return_value = expected_policy_data
 
-        # Mock session.add and flush
+        # Mock session.add, flush, and refresh
         mock_session.add = MagicMock()
         mock_session.flush = AsyncMock()
+        mock_session.refresh = AsyncMock()
 
-        # Patch the class at the location where it's used in the repository
-        with patch(
-            "ai.backend.manager.repositories.project_resource_policy.repository.ProjectResourcePolicyRow"
-        ) as mock_policy_class:
-            mock_policy_class.return_value = mock_policy_row
-            result = await project_resource_policy_repository.create(new_policy_fields)
+        # Patch build_row to return our mock
+        with patch.object(new_policy_creator.spec, "build_row", return_value=mock_policy_row):
+            result = await project_resource_policy_repository.create(new_policy_creator)
 
             assert result == expected_policy_data
             assert result.name == "new-policy"
@@ -95,15 +102,13 @@ class TestProjectResourcePolicyRepository:
             assert result.max_quota_scope_size == 2147483648
             assert result.max_network_count == 10
 
-            # Verify the class was instantiated with correct fields
-            mock_policy_class.assert_called_once_with(**new_policy_fields)
             mock_session.add.assert_called_once()
             # Check that the mock_policy_row was added
             assert mock_session.add.call_args[0][0] == mock_policy_row
 
     @pytest.mark.asyncio
     async def test_create_duplicate_name(
-        self, project_resource_policy_repository, mock_db_engine, new_policy_fields
+        self, project_resource_policy_repository, mock_db_engine, new_policy_creator
     ) -> None:
         """Test project resource policy creation with duplicate name"""
         # Mock database session
@@ -115,7 +120,7 @@ class TestProjectResourcePolicyRepository:
         mock_session.flush = AsyncMock(side_effect=IntegrityError("duplicate key", None, None))
 
         with pytest.raises(IntegrityError):
-            await project_resource_policy_repository.create(new_policy_fields)
+            await project_resource_policy_repository.create(new_policy_creator)
 
     @pytest.mark.asyncio
     async def test_get_by_name_success(
@@ -318,12 +323,14 @@ class TestProjectResourcePolicyRepository:
         max_vfolder_count = 50
         max_quota_scope_size = 5368709120  # 5GB
         max_network_count = 20
-        all_fields = {
-            "name": name,
-            "max_vfolder_count": max_vfolder_count,
-            "max_quota_scope_size": max_quota_scope_size,
-            "max_network_count": max_network_count,
-        }
+
+        spec = ProjectResourcePolicyCreatorSpec(
+            name=name,
+            max_vfolder_count=max_vfolder_count,
+            max_quota_scope_size=max_quota_scope_size,
+            max_network_count=max_network_count,
+        )
+        creator = Creator(spec=spec)
 
         mock_policy_data = ProjectResourcePolicyData(
             name=name,
@@ -336,20 +343,15 @@ class TestProjectResourcePolicyRepository:
 
         mock_session.add = MagicMock()
         mock_session.flush = AsyncMock()
+        mock_session.refresh = AsyncMock()
 
-        with patch(
-            "ai.backend.manager.repositories.project_resource_policy.repository.ProjectResourcePolicyRow"
-        ) as mock_policy_class:
-            mock_policy_class.return_value = mock_policy_row
-            result = await project_resource_policy_repository.create(all_fields)
+        with patch.object(spec, "build_row", return_value=mock_policy_row):
+            result = await project_resource_policy_repository.create(creator)
 
             assert result.name == "comprehensive-policy"
             assert result.max_vfolder_count == 50
             assert result.max_quota_scope_size == 5368709120
             assert result.max_network_count == 20
-
-            # Verify the class was instantiated with correct fields
-            mock_policy_class.assert_called_once_with(**all_fields)
 
     @pytest.mark.asyncio
     async def test_repository_with_transaction_rollback(
@@ -364,15 +366,16 @@ class TestProjectResourcePolicyRepository:
         mock_session.add = MagicMock()
         mock_session.flush = AsyncMock(side_effect=Exception("Database error"))
 
-        # Provide all required fields
-        policy_fields = {
-            "name": "fail-policy",
-            "max_vfolder_count": 10,
-            "max_quota_scope_size": 1073741824,
-            "max_network_count": 5,
-        }
+        # Create creator with all required fields
+        spec = ProjectResourcePolicyCreatorSpec(
+            name="fail-policy",
+            max_vfolder_count=10,
+            max_quota_scope_size=1073741824,
+            max_network_count=5,
+        )
+        creator = Creator(spec=spec)
 
         with pytest.raises(Exception) as exc_info:
-            await project_resource_policy_repository.create(policy_fields)
+            await project_resource_policy_repository.create(creator)
 
         assert "Database error" in str(exc_info.value)

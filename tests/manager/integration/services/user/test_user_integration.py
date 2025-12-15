@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.user.types import UserCreator, UserInfoContext
+from ai.backend.manager.data.user.types import UserInfoContext
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow, ProjectType
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -22,6 +22,8 @@ from ai.backend.manager.models.keypair import (
 )
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
     AdminMonthStatsActionResult,
@@ -159,17 +161,19 @@ class TestCreateUserIntegration:
             salt_size=32,
         )
         action = CreateUserAction(
-            creator=UserCreator(
-                email="testnewuser@example.com",
-                password=password_info,
-                username="testnewuser",
-                full_name="New User",
-                role=UserRole.USER,
-                domain_name="default",
-                need_password_change=False,
-                resource_policy="default",
-                status=UserStatus.ACTIVE,
-                sudo_session_enabled=False,
+            creator=Creator(
+                spec=UserCreatorSpec(
+                    email="testnewuser@example.com",
+                    password=password_info,
+                    username="testnewuser",
+                    full_name="New User",
+                    role=UserRole.USER,
+                    domain_name="default",
+                    need_password_change=False,
+                    resource_policy="default",
+                    status=UserStatus.ACTIVE,
+                    sudo_session_enabled=False,
+                )
             ),
         )
 
@@ -196,16 +200,18 @@ class TestCreateUserIntegration:
             salt_size=32,
         )
         action = CreateUserAction(
-            creator=UserCreator(
-                email="testadmin@example.com",
-                password=password_info,
-                username="testadmin",
-                full_name="Admin User",
-                role=UserRole.ADMIN,
-                domain_name="default",
-                need_password_change=False,
-                resource_policy="default",
-                sudo_session_enabled=True,
+            creator=Creator(
+                spec=UserCreatorSpec(
+                    email="testadmin@example.com",
+                    password=password_info,
+                    username="testadmin",
+                    full_name="Admin User",
+                    role=UserRole.ADMIN,
+                    domain_name="default",
+                    need_password_change=False,
+                    resource_policy="default",
+                    sudo_session_enabled=True,
+                )
             ),
         )
 
@@ -229,17 +235,19 @@ class TestCreateUserIntegration:
             salt_size=32,
         )
         action = CreateUserAction(
-            creator=UserCreator(
-                email="testcontainer@example.com",
-                password=password_info,
-                username="testcontaineruser",
-                need_password_change=False,
-                domain_name="default",
-                resource_policy="default",
-                sudo_session_enabled=False,
-                container_uid=2000,
-                container_main_gid=2000,
-                container_gids=[2000, 2001],
+            creator=Creator(
+                spec=UserCreatorSpec(
+                    email="testcontainer@example.com",
+                    password=password_info,
+                    username="testcontaineruser",
+                    need_password_change=False,
+                    domain_name="default",
+                    resource_policy="default",
+                    sudo_session_enabled=False,
+                    container_uid=2000,
+                    container_main_gid=2000,
+                    container_gids=[2000, 2001],
+                )
             ),
         )
 
@@ -263,15 +271,17 @@ class TestCreateUserIntegration:
             salt_size=32,
         )
         action = CreateUserAction(
-            creator=UserCreator(
-                email="testlimited@example.com",
-                password=password_info,
-                username="testlimiteduser",
-                need_password_change=False,
-                domain_name="default",
-                resource_policy="default",
-                allowed_client_ip=["192.168.1.0/24"],
-                sudo_session_enabled=False,
+            creator=Creator(
+                spec=UserCreatorSpec(
+                    email="testlimited@example.com",
+                    password=password_info,
+                    username="testlimiteduser",
+                    need_password_change=False,
+                    domain_name="default",
+                    resource_policy="default",
+                    allowed_client_ip=["192.168.1.0/24"],
+                    sudo_session_enabled=False,
+                )
             ),
         )
 

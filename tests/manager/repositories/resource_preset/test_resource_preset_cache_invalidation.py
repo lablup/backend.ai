@@ -19,8 +19,9 @@ from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
-from ai.backend.manager.services.resource_preset.types import ResourcePresetCreator
 
 
 class TestResourcePresetCacheInvalidation:
@@ -71,13 +72,15 @@ class TestResourcePresetCacheInvalidation:
     async def sample_preset_creator(
         self,
         test_scaling_group_name: str,
-    ) -> AsyncGenerator[ResourcePresetCreator, None]:
+    ) -> AsyncGenerator[Creator, None]:
         """Create sample resource preset creator for testing"""
-        creator = ResourcePresetCreator(
-            name=f"test-preset-{uuid.uuid4().hex[:8]}",
-            resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
-            shared_memory="1 GiB",
-            scaling_group_name=test_scaling_group_name,
+        creator = Creator(
+            spec=ResourcePresetCreatorSpec(
+                name=f"test-preset-{uuid.uuid4().hex[:8]}",
+                resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
+                shared_memory="1 GiB",
+                scaling_group_name=test_scaling_group_name,
+            )
         )
         yield creator
 
@@ -131,7 +134,7 @@ class TestResourcePresetCacheInvalidation:
     async def test_create_preset_invalidates_cache(
         self,
         resource_preset_repository: ResourcePresetRepository,
-        sample_preset_creator: ResourcePresetCreator,
+        sample_preset_creator: Creator,
     ) -> None:
         """Test that creating a preset invalidates all preset caches"""
         # Get reference to cache source and valkey stat
