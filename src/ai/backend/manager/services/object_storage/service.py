@@ -80,8 +80,8 @@ class ObjectStorageService:
         """
         Update an existing object storage.
         """
-        log.info("Updating object storage with data: {}", action.modifier.fields_to_update())
-        storage_data = await self._object_storage_repository.update(action.id, action.modifier)
+        log.info("Updating object storage with id: {}", action.updater.pk_value)
+        storage_data = await self._object_storage_repository.update(action.updater)
         return UpdateObjectStorageActionResult(result=storage_data)
 
     async def delete(self, action: DeleteObjectStorageAction) -> DeleteObjectStorageActionResult:

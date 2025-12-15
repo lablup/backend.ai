@@ -5,7 +5,6 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
-from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
     ArtifactFilterOptions,
     ArtifactOrderingOptions,
@@ -13,6 +12,9 @@ from ai.backend.manager.data.artifact.types import (
     DelegateeTarget,
 )
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
+from ai.backend.manager.models.artifact import ArtifactRow
+from ai.backend.manager.repositories.artifact.updaters import ArtifactUpdaterSpec
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.types import PaginationOptions, TriState
 
 
@@ -136,13 +138,13 @@ class UpdateArtifactReqBodyParam(BaseRequestModel):
     )
     description: Optional[str] = Field(default=None, description="Updated description")
 
-    def to_modifier(self) -> ArtifactModifier:
-        modifier = ArtifactModifier()
+    def to_updater(self, artifact_id: uuid.UUID) -> Updater[ArtifactRow]:
+        spec = ArtifactUpdaterSpec()
         if self.readonly is not None:
-            modifier.readonly = TriState.update(self.readonly)
+            spec.readonly = TriState.update(self.readonly)
         if self.description is not None:
-            modifier.description = TriState.update(self.description)
-        return modifier
+            spec.description = TriState.update(self.description)
+        return Updater(spec=spec, pk_value=artifact_id)
 
 
 class GetDownloadProgressReqPathParam(BaseRequestModel):

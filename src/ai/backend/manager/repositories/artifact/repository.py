@@ -9,7 +9,6 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
     ArtifactDataWithRevisions,
@@ -20,12 +19,14 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactStatus,
 )
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
+from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.db_source.db_source import ArtifactDBSource
 from ai.backend.manager.repositories.artifact.types import (
     ArtifactRevisionFilterOptions,
     ArtifactRevisionOrderingOptions,
 )
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.types import PaginationOptions
 
 artifact_repository_resilience = Resilience(
@@ -70,10 +71,8 @@ class ArtifactRepository:
         return await self._db_source.get_artifact_revision(artifact_id, revision)
 
     @artifact_repository_resilience.apply()
-    async def update_artifact(
-        self, artifact_id: uuid.UUID, modifier: ArtifactModifier
-    ) -> ArtifactData:
-        return await self._db_source.update_artifact(artifact_id, modifier)
+    async def update_artifact(self, updater: Updater[ArtifactRow]) -> ArtifactData:
+        return await self._db_source.update_artifact(updater)
 
     @artifact_repository_resilience.apply()
     async def list_artifact_revisions(self, artifact_id: uuid.UUID) -> list[ArtifactRevisionData]:

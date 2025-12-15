@@ -100,9 +100,9 @@ class ArtifactRegistryService:
         """
         Update an existing huggingface registry.
         """
-        log.info("Updating huggingface registry with data: {}", action.modifier.fields_to_update())
+        log.info("Updating huggingface registry with id: {}", action.updater.pk_value)
         registry_data = await self._huggingface_registry_repository.update(
-            action.id, action.modifier, action.meta
+            action.updater, action.meta
         )
         return UpdateHuggingFaceRegistryActionResult(result=registry_data)
 
@@ -166,10 +166,8 @@ class ArtifactRegistryService:
         """
         Update an existing reservoir.
         """
-        log.info("Updating reservoir with data: {}", action.modifier.fields_to_update())
-        reservoir_data = await self._reservoir_repository.update(
-            action.id, action.modifier, action.meta
-        )
+        log.info("Updating reservoir with id: {}", action.updater.pk_value)
+        reservoir_data = await self._reservoir_repository.update(action.updater, action.meta)
         return UpdateReservoirRegistryActionResult(result=reservoir_data)
 
     async def delete_reservoir_registry(

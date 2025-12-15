@@ -9,11 +9,11 @@ from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
 )
-from ai.backend.manager.data.reservoir_registry.modifier import ReservoirRegistryModifier
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.reservoir_registry.db_source.db_source import ReservoirDBSource
 
 reservoir_registry_repository_resilience = Resilience(
@@ -72,11 +72,10 @@ class ReservoirRegistryRepository:
     @reservoir_registry_repository_resilience.apply()
     async def update(
         self,
-        reservoir_id: uuid.UUID,
-        modifier: ReservoirRegistryModifier,
+        updater: Updater[ReservoirRegistryRow],
         meta: ArtifactRegistryModifierMeta,
     ) -> ReservoirRegistryData:
-        return await self._db_source.update(reservoir_id, modifier, meta)
+        return await self._db_source.update(updater, meta)
 
     @reservoir_registry_repository_resilience.apply()
     async def delete(self, reservoir_id: uuid.UUID) -> uuid.UUID:

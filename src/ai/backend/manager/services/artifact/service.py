@@ -370,9 +370,7 @@ class ArtifactService:
         return GetArtifactRevisionsActionResult(revisions=revisions)
 
     async def update(self, action: UpdateArtifactAction) -> UpdateArtifactActionResult:
-        updated_artifact = await self._artifact_repository.update_artifact(
-            action.artifact_id, action.modifier
-        )
+        updated_artifact = await self._artifact_repository.update_artifact(action.updater)
         return UpdateArtifactActionResult(result=updated_artifact)
 
     async def upsert_artifacts_with_revisions(

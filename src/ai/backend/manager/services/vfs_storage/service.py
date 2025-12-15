@@ -48,8 +48,8 @@ class VFSStorageService:
         """
         Update an existing VFS storage.
         """
-        log.info("Updating VFS storage with data: {}", action.modifier.fields_to_update())
-        storage_data = await self._vfs_storage_repository.update(action.id, action.modifier)
+        log.info("Updating VFS storage with id: {}", action.updater.pk_value)
+        storage_data = await self._vfs_storage_repository.update(action.updater)
         return UpdateVFSStorageActionResult(result=storage_data)
 
     async def delete(self, action: DeleteVFSStorageAction) -> DeleteVFSStorageActionResult:

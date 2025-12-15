@@ -12,7 +12,6 @@ from sqlalchemy.sql import Select
 from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.data.storage.types import ArtifactStorageType
-from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
@@ -32,7 +31,6 @@ from ai.backend.manager.errors.artifact import (
     ArtifactNotVerified,
     ArtifactRevisionNotFoundError,
     ArtifactUpdateError,
-    InvalidArtifactModifierTypeError,
 )
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
@@ -44,6 +42,7 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactRevisionOrderingOptions,
     ArtifactStatusFilterType,
 )
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.types import (
     BaseFilterApplier,
     BaseOrderingApplier,
@@ -253,40 +252,24 @@ class ArtifactDBSource:
                 raise ArtifactRevisionNotFoundError(f"Revision {revision} not found")
             return row.to_dataclass()
 
-    async def update_artifact(
-        self, artifact_id: uuid.UUID, modifier: ArtifactModifier
-    ) -> ArtifactData:
+    async def update_artifact(self, updater: Updater[ArtifactRow]) -> ArtifactData:
         async with self._db.begin_session() as db_sess:
-            data = modifier.fields_to_update()
-            if not data:
-                raise InvalidArtifactModifierTypeError("No valid fields to update")
-
-            result = await db_sess.execute(
-                sa.update(ArtifactRow)
-                .where(
+            # Check if artifact exists and is not deleted
+            check_result = await db_sess.execute(
+                sa.select(ArtifactRow.id).where(
                     sa.and_(
-                        ArtifactRow.id == artifact_id,
-                        ArtifactRow.availability != ArtifactAvailability.DELETED,
-                    )
-                )
-                .values(**data)
-            )
-            if result.rowcount == 0:
-                raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
-            await db_sess.commit()
-
-            result = await db_sess.execute(
-                sa.select(ArtifactRow).where(
-                    sa.and_(
-                        ArtifactRow.id == artifact_id,
+                        ArtifactRow.id == updater.pk_value,
                         ArtifactRow.availability != ArtifactAvailability.DELETED,
                     )
                 )
             )
-            row: ArtifactRow = result.scalar_one_or_none()
-            if row is None:
-                raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
-            return row.to_dataclass()
+            if check_result.scalar_one_or_none() is None:
+                raise ArtifactNotFoundError(f"Artifact with ID {updater.pk_value} not found")
+
+            result = await execute_updater(db_sess, updater)
+            if result is None:
+                raise ArtifactNotFoundError(f"Artifact with ID {updater.pk_value} not found")
+            return result.row.to_dataclass()
 
     async def list_artifact_revisions(self, artifact_id: uuid.UUID) -> list[ArtifactRevisionData]:
         async with self._db.begin_session() as db_sess:

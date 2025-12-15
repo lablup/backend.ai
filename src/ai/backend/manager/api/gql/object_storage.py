@@ -19,11 +19,12 @@ from ai.backend.manager.services.storage_namespace.actions.get_multi import (
     GetNamespacesAction,
 )
 
-from ...data.object_storage.modifier import ObjectStorageModifier
 from ...data.object_storage.types import ObjectStorageData
 from ...models.object_storage import ObjectStorageRow
 from ...repositories.base.creator import Creator
+from ...repositories.base.updater import Updater
 from ...repositories.object_storage import ObjectStorageCreatorSpec
+from ...repositories.object_storage.updaters import ObjectStorageUpdaterSpec
 from ...services.object_storage.actions.create import CreateObjectStorageAction
 from ...services.object_storage.actions.delete import DeleteObjectStorageAction
 from ...services.object_storage.actions.get import GetObjectStorageAction
@@ -175,8 +176,8 @@ class UpdateObjectStorageInput:
     endpoint: Optional[str] = UNSET
     region: Optional[str] = UNSET
 
-    def to_modifier(self) -> ObjectStorageModifier:
-        return ObjectStorageModifier(
+    def to_updater(self) -> Updater[ObjectStorageRow]:
+        spec = ObjectStorageUpdaterSpec(
             name=OptionalState[str].from_graphql(self.name),
             host=OptionalState[str].from_graphql(self.host),
             access_key=OptionalState[str].from_graphql(self.access_key),
@@ -184,6 +185,7 @@ class UpdateObjectStorageInput:
             endpoint=OptionalState[str].from_graphql(self.endpoint),
             region=OptionalState[str].from_graphql(self.region),
         )
+        return Updater(spec=spec, pk_value=uuid.UUID(self.id))
 
 
 @strawberry.input(description="Added in 25.14.0")
@@ -255,8 +257,7 @@ async def update_object_storage(
 
     action_result = await processors.object_storage.update.wait_for_complete(
         UpdateObjectStorageAction(
-            id=uuid.UUID(input.id),
-            modifier=input.to_modifier(),
+            updater=input.to_updater(),
         )
     )
 

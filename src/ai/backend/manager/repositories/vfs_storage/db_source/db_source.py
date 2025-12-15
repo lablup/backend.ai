@@ -4,7 +4,6 @@ import uuid
 
 import sqlalchemy as sa
 
-from ai.backend.manager.data.vfs_storage.modifier import VFSStorageModifier
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.errors.vfs_storage import (
     VFSStorageNotFoundError,
@@ -12,6 +11,7 @@ from ai.backend.manager.errors.vfs_storage import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfs_storage import VFSStorageRow
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 
 class VFSStorageDBSource:
@@ -54,22 +54,15 @@ class VFSStorageDBSource:
             creator_result = await execute_creator(db_session, creator)
             return creator_result.row.to_dataclass()
 
-    async def update(self, storage_id: uuid.UUID, modifier: VFSStorageModifier) -> VFSStorageData:
+    async def update(self, updater: Updater[VFSStorageRow]) -> VFSStorageData:
         """
         Update an existing VFS storage configuration in the database.
         """
         async with self._db.begin_session() as db_session:
-            data = modifier.fields_to_update()
-            update_stmt = (
-                sa.update(VFSStorageRow)
-                .where(VFSStorageRow.id == storage_id)
-                .values(**data)
-                .returning(*sa.select(VFSStorageRow).selected_columns)
-            )
-            stmt = sa.select(VFSStorageRow).from_statement(update_stmt)
-            row: VFSStorageRow = (await db_session.execute(stmt)).scalars().one()
-
-            return row.to_dataclass()
+            result = await execute_updater(db_session, updater)
+            if result is None:
+                raise VFSStorageNotFoundError(f"VFS storage with ID {updater.pk_value} not found.")
+            return result.row.to_dataclass()
 
     async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:
         """
