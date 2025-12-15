@@ -15,10 +15,9 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
 from ai.backend.manager.models.resource_preset import ResourcePresetRow, resource_presets
-from ai.backend.manager.services.resource_preset.types import (
-    ResourcePresetCreator,
-    ResourcePresetModifier,
-)
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
+from ai.backend.manager.services.resource_preset.types import ResourcePresetModifier
 from ai.backend.manager.types import OptionalState, TriState
 
 from ..base import (
@@ -170,12 +169,14 @@ class CreateResourcePresetInput(graphene.InputObjectType):
         ),
     )
 
-    def to_creator(self, name: str) -> ResourcePresetCreator:
-        return ResourcePresetCreator(
-            name=name,
-            resource_slots=ResourceSlot.from_user_input(self.resource_slots, None),
-            shared_memory=self.shared_memory if self.shared_memory else None,
-            scaling_group_name=self.scaling_group_name if self.scaling_group_name else None,
+    def to_creator(self, name: str) -> Creator[ResourcePresetRow]:
+        return Creator(
+            spec=ResourcePresetCreatorSpec(
+                name=name,
+                resource_slots=ResourceSlot.from_user_input(self.resource_slots, None),
+                shared_memory=self.shared_memory if self.shared_memory else None,
+                scaling_group_name=self.scaling_group_name if self.scaling_group_name else None,
+            )
         )
 
 

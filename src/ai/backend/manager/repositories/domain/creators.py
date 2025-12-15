@@ -3,15 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 from typing_extensions import override
 
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.repositories.base import CreatorSpec
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.domain import DomainRow
 
 
 @dataclass
@@ -29,8 +27,6 @@ class DomainCreatorSpec(CreatorSpec[DomainRow]):
 
     @override
     def build_row(self) -> DomainRow:
-        from ai.backend.manager.models.domain import DomainRow
-
         return DomainRow(
             name=self.name,
             description=self.description,

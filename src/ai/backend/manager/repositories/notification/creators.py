@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 from uuid import UUID
 
 from typing_extensions import override
@@ -13,10 +13,8 @@ from ai.backend.common.data.notification import (
     NotificationRuleType,
     WebhookConfig,
 )
+from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.repositories.base import CreatorSpec
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 
 
 @dataclass
@@ -32,8 +30,6 @@ class NotificationChannelCreatorSpec(CreatorSpec[NotificationChannelRow]):
 
     @override
     def build_row(self) -> NotificationChannelRow:
-        from ai.backend.manager.models.notification import NotificationChannelRow
-
         return NotificationChannelRow(
             name=self.name,
             description=self.description,
@@ -58,8 +54,6 @@ class NotificationRuleCreatorSpec(CreatorSpec[NotificationRuleRow]):
 
     @override
     def build_row(self) -> NotificationRuleRow:
-        from ai.backend.manager.models.notification import NotificationRuleRow
-
         return NotificationRuleRow(
             name=self.name,
             description=self.description,

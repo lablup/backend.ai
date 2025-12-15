@@ -73,21 +73,6 @@ class MountOptionModel(BaseModel):
     ]
 
 
-class Creator(ABC):
-    """
-    Base class for all creation operations.
-    Implementations should directly map fields to storage keys instead of using reflection.
-    """
-
-    @abstractmethod
-    def fields_to_store(self) -> dict[str, Any]:
-        """
-        Returns a dictionary of data that should be stored in the database.
-        This is different from to_dict() as it specifically maps fields to their storage keys.
-        """
-        pass
-
-
 class PartialModifier(ABC):
     @abstractmethod
     def fields_to_update(self) -> dict[str, Any]:

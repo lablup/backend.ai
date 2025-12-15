@@ -22,17 +22,17 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.keypair_resource_policy.creators import (
     KeyPairResourcePolicyCreatorSpec,
 )
+from ai.backend.manager.repositories.project_resource_policy.creators import (
+    ProjectResourcePolicyCreatorSpec,
+)
+from ai.backend.manager.repositories.user_resource_policy.creators import (
+    UserResourcePolicyCreatorSpec,
+)
 from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
     KeyPairResourcePolicyModifier,
 )
-from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
-    ProjectResourcePolicyCreator,
-)
 from ai.backend.manager.services.project_resource_policy.actions.modify_project_resource_policy import (
     ProjectResourcePolicyModifier,
-)
-from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
-    UserResourcePolicyCreator,
 )
 from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
     UserResourcePolicyModifier,
@@ -163,16 +163,6 @@ class UserResourcePolicyRow(Base):
         self.max_quota_scope_size = max_quota_scope_size
         self.max_session_count_per_model_session = max_session_count_per_model_session
         self.max_customized_image_count = max_customized_image_count
-
-    @classmethod
-    def from_creator(cls, creator: UserResourcePolicyCreator) -> Self:
-        return cls(
-            name=creator.name,
-            max_vfolder_count=creator.max_vfolder_count,
-            max_quota_scope_size=creator.max_quota_scope_size,
-            max_session_count_per_model_session=creator.max_session_count_per_model_session,
-            max_customized_image_count=creator.max_customized_image_count,
-        )
 
     @classmethod
     def from_dataclass(cls, data: UserResourcePolicyData) -> Self:
@@ -704,19 +694,20 @@ class CreateUserResourcePolicyInput(graphene.InputObjectType):
         description="Added in 24.03.0. Maximum available number of customized images one can publish to."
     )
 
-    def to_creator(self, name: str) -> UserResourcePolicyCreator:
+    def to_creator(self, name: str) -> Creator[UserResourcePolicyRow]:
         def value_or_none(value):
             return value if value is not Undefined else None
 
-        return UserResourcePolicyCreator(
-            name=name,
-            max_vfolder_count=value_or_none(self.max_vfolder_count),
-            max_quota_scope_size=value_or_none(self.max_quota_scope_size),
-            max_session_count_per_model_session=value_or_none(
-                self.max_session_count_per_model_session
-            ),
-            max_vfolder_size=value_or_none(self.max_vfolder_size),
-            max_customized_image_count=value_or_none(self.max_customized_image_count),
+        return Creator(
+            spec=UserResourcePolicyCreatorSpec(
+                name=name,
+                max_vfolder_count=value_or_none(self.max_vfolder_count),
+                max_quota_scope_size=value_or_none(self.max_quota_scope_size),
+                max_session_count_per_model_session=value_or_none(
+                    self.max_session_count_per_model_session
+                ),
+                max_customized_image_count=value_or_none(self.max_customized_image_count),
+            )
         )
 
 
@@ -954,16 +945,17 @@ class CreateProjectResourcePolicyInput(graphene.InputObjectType):
         description="Added in 24.12.0. Limitation of the number of networks created on behalf of project. Set as -1 to allow creating unlimited networks."
     )
 
-    def to_creator(self, name: str) -> ProjectResourcePolicyCreator:
+    def to_creator(self, name: str) -> Creator[ProjectResourcePolicyRow]:
         def value_or_none(value):
             return value if value is not Undefined else None
 
-        return ProjectResourcePolicyCreator(
-            name=name,
-            max_vfolder_count=value_or_none(self.max_vfolder_count),
-            max_quota_scope_size=value_or_none(self.max_quota_scope_size),
-            max_vfolder_size=value_or_none(self.max_vfolder_size),
-            max_network_count=value_or_none(self.max_network_count),
+        return Creator(
+            spec=ProjectResourcePolicyCreatorSpec(
+                name=name,
+                max_vfolder_count=value_or_none(self.max_vfolder_count),
+                max_quota_scope_size=value_or_none(self.max_quota_scope_size),
+                max_network_count=value_or_none(self.max_network_count),
+            )
         )
 
 

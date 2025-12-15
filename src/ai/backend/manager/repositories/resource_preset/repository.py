@@ -17,11 +17,10 @@ from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.services.resource_preset.types import (
-    ResourcePresetCreator,
-    ResourcePresetModifier,
-)
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.services.resource_preset.types import ResourcePresetModifier
 
 from .cache_source.cache_source import ResourcePresetCacheSource
 from .db_source.db_source import ResourcePresetDBSource
@@ -66,7 +65,9 @@ class ResourcePresetRepository:
         self._config_provider = config_provider
 
     @resource_preset_repository_resilience.apply()
-    async def create_preset_validated(self, creator: ResourcePresetCreator) -> ResourcePresetData:
+    async def create_preset_validated(
+        self, creator: Creator[ResourcePresetRow]
+    ) -> ResourcePresetData:
         """
         Creates a new resource preset.
         Raises ResourcePresetConflict if a preset with the same name and scaling group already exists.

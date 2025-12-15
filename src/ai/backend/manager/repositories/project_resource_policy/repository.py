@@ -11,6 +11,7 @@ from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 
 project_resource_policy_repository_resilience = Resilience(
     policies=[
@@ -38,12 +39,10 @@ class ProjectResourcePolicyRepository:
         self._db = db
 
     @project_resource_policy_repository_resilience.apply()
-    async def create(self, fields: Mapping[str, Any]) -> ProjectResourcePolicyData:
+    async def create(self, creator: Creator[ProjectResourcePolicyRow]) -> ProjectResourcePolicyData:
         async with self._db.begin_session() as db_sess:
-            db_row = ProjectResourcePolicyRow(**fields)
-            db_sess.add(db_row)
-            await db_sess.flush()
-            return db_row.to_dataclass()
+            result = await execute_creator(db_sess, creator)
+            return result.row.to_dataclass()
 
     @project_resource_policy_repository_resilience.apply()
     async def get_by_name(self, name: str) -> ProjectResourcePolicyData:

@@ -22,7 +22,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.keypair.types import KeyPairCreator
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
-from ai.backend.manager.data.user.types import UserCreateResultData, UserCreator, UserData
+from ai.backend.manager.data.user.types import UserCreateResultData, UserData
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.errors.user import (
     KeyPairForbidden,
@@ -40,6 +40,12 @@ from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
 from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair_data, keypairs
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.permission_controller.creators import (
+    AssociationScopesEntitiesCreatorSpec,
+    UserRoleCreatorSpec,
+)
+from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.services.user.actions.modify_user import UserModifier
 
 from ..permission_controller.role_manager import RoleManager
@@ -95,14 +101,15 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def create_user_validated(
-        self, user_creator: UserCreator, group_ids: Optional[list[str]]
+        self, creator: Creator[UserRow], group_ids: Optional[list[str]]
     ) -> UserCreateResultData:
         """
         Create a new user with default keypair and group associations.
         """
-        domain_name = user_creator.domain_name
-        email = user_creator.email
-        user_name = user_creator.username
+        spec = cast(UserCreatorSpec, creator.spec)
+        domain_name = spec.domain_name
+        email = spec.email
+        user_name = spec.username
 
         async with self._db.begin_session() as db_session:
             # Check if domain exists before creating user
@@ -120,10 +127,8 @@ class UserRepository:
                 )
             try:
                 # Insert user
-                row = UserRow.from_creator(user_creator)
-                db_session.add(row)
-                await db_session.flush()
-                await db_session.refresh(row)
+                result = await execute_creator(db_session, creator)
+                row = result.row
             except sa.exc.IntegrityError as e:
                 error_msg = str(e)
                 raise UserCreationBadRequest(
@@ -159,12 +164,17 @@ class UserRepository:
             )
 
             role = await self._role_manager.create_system_role(db_session, created_user)
-            await self._role_manager.map_user_to_role(db_session, created_user.uuid, role.id)
-            await self._role_manager.map_entity_to_scope(
-                db_session,
-                ObjectId(EntityType.USER, str(created_user.uuid)),
-                ScopeId(ScopeType.DOMAIN, str(created_user.domain_name)),
+            user_role_creator = Creator(
+                spec=UserRoleCreatorSpec(user_id=created_user.uuid, role_id=role.id)
             )
+            await self._role_manager.map_user_to_role(db_session, user_role_creator)
+            entity_scope_creator = Creator(
+                spec=AssociationScopesEntitiesCreatorSpec(
+                    scope_id=ScopeId(ScopeType.DOMAIN, str(created_user.domain_name)),
+                    object_id=ObjectId(EntityType.USER, str(created_user.uuid)),
+                )
+            )
+            await self._role_manager.map_entity_to_scope(db_session, entity_scope_creator)
 
         return UserCreateResultData(created_user, kp_data)
 

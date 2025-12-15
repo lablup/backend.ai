@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import Mapping, Optional
+from typing import Mapping, Optional, cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -30,21 +30,17 @@ from ai.backend.manager.errors.resource import (
     ResourcePresetNotFound,
     ScalingGroupNotFound,
 )
-from ai.backend.manager.models import (
-    AgentRow,
-    KernelRow,
-    SessionRow,
-    association_groups_users,
-    domains,
-    groups,
-    query_allowed_sgroups,
-)
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.group import association_groups_users, groups
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.scaling_group import query_allowed_sgroups
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.services.resource_preset.types import (
-    ResourcePresetCreator,
-    ResourcePresetModifier,
-)
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
+from ai.backend.manager.services.resource_preset.types import ResourcePresetModifier
 
 from .types import (
     AccessKeyFilter,
@@ -72,18 +68,20 @@ class ResourcePresetDBSource:
     ) -> None:
         self._db = db
 
-    async def create_preset(self, creator: ResourcePresetCreator) -> ResourcePresetData:
+    async def create_preset(self, creator: Creator[ResourcePresetRow]) -> ResourcePresetData:
         """
         Creates a new resource preset.
         Raises ResourcePresetConflict if a preset with the same name and scaling group already exists.
         """
+        spec = cast(ResourcePresetCreatorSpec, creator.spec)
         async with self._db.begin_session() as session:
-            preset_row = await ResourcePresetRow.create(creator, db_session=session)
-            if preset_row is None:
+            try:
+                result = await execute_creator(session, creator)
+            except sa.exc.IntegrityError:
                 raise ResourcePresetConflict(
-                    f"Duplicate resource preset name (name:{creator.name}, scaling_group:{creator.scaling_group_name})"
+                    f"Duplicate resource preset name (name:{spec.name}, scaling_group:{spec.scaling_group_name})"
                 )
-            data = preset_row.to_dataclass()
+            data = result.row.to_dataclass()
         return data
 
     async def get_preset_by_id(self, preset_id: UUID) -> ResourcePresetData:

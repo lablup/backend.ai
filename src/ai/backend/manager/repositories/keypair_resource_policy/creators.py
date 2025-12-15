@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class KeyPairResourcePolicyCreatorSpec(CreatorSpec[KeyPairResourcePolicyRow]):
+class KeyPairResourcePolicyCreatorSpec(CreatorSpec["KeyPairResourcePolicyRow"]):
     """CreatorSpec for keypair resource policy creation."""
 
     name: Optional[str]

@@ -3,16 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 from typing_extensions import override
 
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.models.group import ProjectType
+from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.repositories.base import CreatorSpec
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.group import GroupRow
 
 
 @dataclass
@@ -33,8 +30,6 @@ class GroupCreatorSpec(CreatorSpec[GroupRow]):
 
     @override
     def build_row(self) -> GroupRow:
-        from ai.backend.manager.models.group import GroupRow
-
         return GroupRow(
             name=self.name,
             domain_name=self.domain_name,

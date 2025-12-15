@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, Optional
 
 import yarl
 from typing_extensions import override
@@ -16,10 +16,8 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
+from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base import CreatorSpec
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.endpoint import EndpointRow
 
 
 @dataclass
@@ -55,8 +53,6 @@ class EndpointCreatorSpec(CreatorSpec[EndpointRow]):
 
     @override
     def build_row(self) -> EndpointRow:
-        from ai.backend.manager.models.endpoint import EndpointRow
-
         return EndpointRow(
             name=self.name,
             model_definition_path=self.model_definition_path,
