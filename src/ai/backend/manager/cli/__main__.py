@@ -1,11 +1,7 @@
 from __future__ import annotations
 
 import pathlib
-import subprocess
-import sys
-import uuid
-from datetime import datetime
-from typing import Optional, cast
+from typing import Optional
 
 import click
 
@@ -112,6 +108,8 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
     because the dbshell command fills out them from the manager configuration.
     """
     import asyncio
+    import subprocess
+    import sys
 
     from ai.backend.cli.types import ExitCode
 
@@ -251,6 +249,9 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     invoke the PostgreSQL's vaccuum operation to clear up the actual disk space.
     """
     import asyncio
+    import uuid
+    from datetime import datetime
+    from typing import cast
 
     import sqlalchemy as sa
     from more_itertools import chunked
