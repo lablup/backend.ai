@@ -9,11 +9,11 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
-from ai.backend.manager.data.deployment.modifier import DeploymentModifier
 from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
 from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.updaters import DeploymentUpdaterSpec
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
     RevisionGeneratorRegistryArgs,
@@ -104,28 +104,28 @@ class DeploymentController:
     async def update_deployment(
         self,
         endpoint_id: uuid.UUID,
-        modifier: DeploymentModifier,
+        spec: DeploymentUpdaterSpec,
     ) -> DeploymentInfo:
         """
         Update an existing deployment with new specifications.
 
         Args:
             endpoint_id: ID of the deployment to update
-            modifier: Deployment modification specification
+            spec: Deployment updater specification
 
         Returns:
             DeploymentInfo: Information about the updated deployment
         """
         log.info("Updating deployment {}", endpoint_id)
         modified_endpoint = await self._deployment_repository.get_modified_endpoint(
-            endpoint_id=endpoint_id, modifier=modifier
+            endpoint_id=endpoint_id, spec=spec
         )
         target_revision = modified_endpoint.target_revision()
         if target_revision:
             await self._scheduling_controller.validate_session_spec(
                 SessionValidationSpec.from_revision(model_revision=target_revision)
             )
-        res = await self._deployment_repository.update_endpoint_with_modifier(endpoint_id, modifier)
+        res = await self._deployment_repository.update_endpoint_with_spec(endpoint_id, spec)
         try:
             await self.mark_lifecycle_needed(DeploymentLifecycleType.CHECK_REPLICA)
         except Exception as e:

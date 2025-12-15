@@ -3,8 +3,8 @@ from typing import Optional, override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.deployment.modifier import NewDeploymentModifier
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
+from ai.backend.manager.repositories.deployment.updaters import NewDeploymentUpdaterSpec
 from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAction
 
 
@@ -13,7 +13,7 @@ class UpdateDeploymentAction(DeploymentBaseAction):
     """Action to update an existing deployment."""
 
     deployment_id: UUID
-    modifier: NewDeploymentModifier
+    updater_spec: NewDeploymentUpdaterSpec
 
     @override
     def entity_id(self) -> Optional[str]:

@@ -43,7 +43,6 @@ from ai.backend.manager.api.gql.project import Project
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user import User
 from ai.backend.manager.data.deployment.creator import NewDeploymentCreator
-from ai.backend.manager.data.deployment.modifier import NewDeploymentModifier
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
@@ -66,6 +65,7 @@ from ai.backend.manager.repositories.deployment.types.types import (
 from ai.backend.manager.repositories.deployment.types.types import (
     DeploymentStatusFilter as RepoDeploymentStatusFilter,
 )
+from ai.backend.manager.repositories.deployment.updaters import NewDeploymentUpdaterSpec
 from ai.backend.manager.services.deployment.actions.access_token.list_access_tokens import (
     ListAccessTokensAction,
 )
@@ -552,11 +552,11 @@ class UpdateModelDeploymentInput:
     name: Optional[str] = None
     preferred_domain_name: Optional[str] = None
 
-    def to_modifier(self) -> NewDeploymentModifier:
+    def to_updater_spec(self) -> NewDeploymentUpdaterSpec:
         strategy_type = None
         if self.default_deployment_strategy is not None:
             strategy_type = CommonDeploymentStrategy(self.default_deployment_strategy.type)
-        return NewDeploymentModifier(
+        return NewDeploymentUpdaterSpec(
             open_to_public=OptionalState[bool].from_graphql(self.open_to_public),
             tags=OptionalState[list[str]].from_graphql(self.tags),
             default_deployment_strategy=OptionalState[CommonDeploymentStrategy].from_graphql(
@@ -728,7 +728,9 @@ async def update_model_deployment(
             "Model Deployment feature is unavailable. Please contact support."
         )
     action_result = await deployment_processor.update_deployment.wait_for_complete(
-        UpdateDeploymentAction(deployment_id=UUID(deployment_id), modifier=input.to_modifier())
+        UpdateDeploymentAction(
+            deployment_id=UUID(deployment_id), updater_spec=input.to_updater_spec()
+        )
     )
     return UpdateModelDeploymentPayload(
         deployment=ModelDeployment.from_dataclass(action_result.data)
