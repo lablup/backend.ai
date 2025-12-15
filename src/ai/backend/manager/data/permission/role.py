@@ -127,6 +127,23 @@ class UserRoleAssignmentData:
 
 
 @dataclass(frozen=True)
+class UserRoleRevocationInput:
+    """
+    Input to revoke a user-role association.
+    """
+
+    user_id: uuid.UUID
+    role_id: uuid.UUID
+
+
+@dataclass(frozen=True)
+class UserRoleRevocationData:
+    user_role_id: uuid.UUID
+    user_id: uuid.UUID
+    role_id: uuid.UUID
+
+
+@dataclass(frozen=True)
 class RoleListResult:
     """Result of role search with pagination info."""
 

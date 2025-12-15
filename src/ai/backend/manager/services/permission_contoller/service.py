@@ -21,6 +21,10 @@ from ai.backend.manager.services.permission_contoller.actions.get_role_detail im
     GetRoleDetailAction,
     GetRoleDetailActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.revoke_role import (
+    RevokeRoleAction,
+    RevokeRoleActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.search_roles import (
     SearchRolesAction,
     SearchRolesActionResult,
@@ -85,6 +89,14 @@ class PermissionControllerService:
         data = await self._repository.assign_role(action.input)
 
         return AssignRoleActionResult(success=True, data=data)
+
+    async def revoke_role(self, action: RevokeRoleAction) -> RevokeRoleActionResult:
+        """
+        Revokes a role from a user.
+        """
+        data = await self._repository.revoke_role(action.input)
+
+        return RevokeRoleActionResult(data=data)
 
     async def get_role_detail(self, action: GetRoleDetailAction) -> GetRoleDetailActionResult:
         """Get role with all permission details and assigned users."""

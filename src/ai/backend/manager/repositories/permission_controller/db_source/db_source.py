@@ -16,13 +16,14 @@ from ....data.permission.role import (
     RoleListResult,
     RoleUpdateInput,
     UserRoleAssignmentInput,
+    UserRoleRevocationInput,
 )
 from ....data.permission.status import (
     RoleStatus,
 )
 from ....data.permission.types import OperationType, ScopeType
 from ....errors.common import ObjectNotFound
-from ....errors.permission import RoleAlreadyAssigned, RoleNotFound
+from ....errors.permission import RoleAlreadyAssigned, RoleNotAssigned, RoleNotFound
 from ....models.rbac_models.association_scopes_entities import AssociationScopesEntitiesRow
 from ....models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ....models.rbac_models.permission.permission import PermissionRow
@@ -107,6 +108,25 @@ class PermissionDBSource:
                 raise RoleAlreadyAssigned(
                     f"Role {data.role_id} is already assigned to user {data.user_id}."
                 ) from e
+
+    async def revoke_role(self, data: UserRoleRevocationInput) -> uuid.UUID:
+        async with self._db.begin_session() as db_session:
+            stmt = (
+                sa.select(UserRoleRow)
+                .where(UserRoleRow.user_id == data.user_id)
+                .where(UserRoleRow.role_id == data.role_id)
+            )
+            user_role_row = await db_session.scalar(stmt)
+
+            if user_role_row is None:
+                raise RoleNotAssigned(
+                    f"Role {data.role_id} is not assigned to user {data.user_id}."
+                )
+
+            user_role_id = user_role_row.id
+            await db_session.delete(user_role_row)
+            await db_session.flush()
+            return user_role_id
 
     async def get_role(self, role_id: uuid.UUID) -> Optional[RoleRow]:
         async with self._db.begin_readonly_session() as db_session:
