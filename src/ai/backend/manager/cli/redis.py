@@ -35,7 +35,13 @@ def ping(cli_ctx: CLIContext) -> None:
     """
 
     async def _impl() -> None:
-        enforce_debug_logging(["glide", "ai.backend.common.clients.valkey_client"])
+        # TODO: Remove redis after migrating to Valkey completely.
+        enforce_debug_logging([
+            "redis",
+            "glide",
+            "ai.backend.common.redis_helper",
+            "ai.backend.common.clients.valkey_client",
+        ])
         async with redis_ctx(cli_ctx) as redis_conn_set:
             try:
                 await redis_conn_set.live.ping()
