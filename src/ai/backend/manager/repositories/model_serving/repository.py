@@ -57,6 +57,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.base import Creator, execute_creator
+from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
 from ai.backend.manager.services.model_serving.exceptions import InvalidAPIParameters
 from ai.backend.manager.types import MountOptionModel, UserScope
@@ -798,18 +799,17 @@ class ModelServingRepository:
                 ):
                     raise InvalidAPIParameters("Cannot update endpoint marked for removal")
 
-                fields_to_update = action.modifier.fields_to_update()
+                spec = cast(EndpointUpdaterSpec, action.updater.spec)
+                fields_to_update = spec.build_values()
                 for key, value in fields_to_update.items():
                     setattr(endpoint_row, key, value)
 
-                fields_to_update_require_none_check = (
-                    action.modifier.fields_to_update_require_none_check()
-                )
+                fields_to_update_require_none_check = spec.build_values_require_none_check()
                 for key, value in fields_to_update_require_none_check.items():
                     if value is not None:
                         setattr(endpoint_row, key, value)
 
-                image_ref = action.modifier.image.optional_value()
+                image_ref = spec.image.optional_value()
                 if image_ref is not None:
                     image_name = image_ref.name
                     arch = image_ref.architecture.value()
@@ -845,7 +845,7 @@ class ModelServingRepository:
                 )
                 if not resource_policy:
                     raise InvalidAPIParameters("Resource policy not found")
-                extra_mounts_input = action.modifier.extra_mounts.optional_value()
+                extra_mounts_input = spec.extra_mounts.optional_value()
                 if extra_mounts_input is not None:
                     extra_mounts = {
                         mount.vfolder_id.value(): MountOptionModel(

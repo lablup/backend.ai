@@ -139,7 +139,7 @@ class AutoScalingService:
     async def modify_endpoint_auto_scaling_rule(
         self, action: ModifyEndpointAutoScalingRuleAction
     ) -> ModifyEndpointAutoScalingRuleActionResult:
-        fields_to_update: dict[str, Any] = action.modifier.fields_to_update()
+        fields_to_update: dict[str, Any] = action.updater.spec.build_values()
 
         # Update auto scaling rule with access validation
         if action.requester_ctx.user_role == UserRole.SUPERADMIN:

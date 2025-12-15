@@ -3,8 +3,9 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.model_serving.modifier import EndpointModifier
 from ai.backend.manager.data.model_serving.types import EndpointData, RequesterCtx
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
 
 
@@ -12,7 +13,7 @@ from ai.backend.manager.services.model_serving.actions.base import ModelServiceA
 class ModifyEndpointAction(ModelServiceAction):
     requester_ctx: RequesterCtx
     endpoint_id: uuid.UUID
-    modifier: EndpointModifier
+    updater: Updater[EndpointRow]
 
     @override
     def entity_id(self) -> Optional[str]:

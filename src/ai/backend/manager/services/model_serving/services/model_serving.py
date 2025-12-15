@@ -2,6 +2,7 @@ import logging
 import secrets
 import uuid
 from http import HTTPStatus
+from typing import cast
 
 import aiohttp
 import tomli
@@ -67,6 +68,7 @@ from ai.backend.manager.repositories.model_serving.admin_repository import (
     AdminModelServingRepository,
 )
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
+from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionCreationSpec,
 )
@@ -831,7 +833,8 @@ class ModelServingService:
             self._config_provider.legacy_etcd_config_loader,
             self._storage_manager,
         )
-        if action.modifier.replica_count_modified():
+        spec = cast(EndpointUpdaterSpec, action.updater.spec)
+        if spec.replica_count_modified():
             # Notify appproxy to update routing info
             await self._deployment_controller.mark_lifecycle_needed(
                 DeploymentLifecycleType.CHECK_REPLICA,

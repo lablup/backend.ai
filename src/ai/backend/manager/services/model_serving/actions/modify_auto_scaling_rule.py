@@ -3,8 +3,9 @@ from typing import Optional, override
 
 from ai.backend.common.types import RuleId
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.model_serving.modifier import EndpointAutoScalingRuleModifier
 from ai.backend.manager.data.model_serving.types import EndpointAutoScalingRuleData, RequesterCtx
+from ai.backend.manager.models.endpoint import EndpointAutoScalingRuleRow
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
 
 
@@ -12,7 +13,7 @@ from ai.backend.manager.services.model_serving.actions.base import ModelServiceA
 class ModifyEndpointAutoScalingRuleAction(ModelServiceAction):
     requester_ctx: RequesterCtx
     id: RuleId
-    modifier: EndpointAutoScalingRuleModifier
+    updater: Updater[EndpointAutoScalingRuleRow]
 
     @override
     def entity_id(self) -> Optional[str]:
