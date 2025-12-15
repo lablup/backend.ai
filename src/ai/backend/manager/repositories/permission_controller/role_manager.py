@@ -1,11 +1,12 @@
 import logging
 import uuid
-from collections.abc import Iterable, Mapping
-from typing import Protocol
+from collections.abc import Collection, Iterable, Mapping
+from typing import Optional, Protocol, cast
 
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import selectinload
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.association_scopes_entities import (
@@ -14,7 +15,6 @@ from ai.backend.manager.data.permission.association_scopes_entities import (
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import (
     ObjectPermissionCreateInput,
-    ObjectPermissionData,
 )
 from ai.backend.manager.data.permission.permission import PermissionCreator, PermissionData
 from ai.backend.manager.data.permission.permission_group import (
@@ -27,6 +27,7 @@ from ai.backend.manager.data.permission.types import (
     RoleSource,
 )
 from ai.backend.manager.data.permission.user_role import UserRoleCreateInput
+from ai.backend.manager.errors.rbac import EmptyOperation, RoleNotFound, UserSystemRoleNotFound
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -38,6 +39,7 @@ from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ...data.permission.role import (
     RoleCreateInput,
     RoleData,
+    RoleDataWithPermissions,
 )
 from ...models.rbac_models.role import RoleRow
 
@@ -163,13 +165,115 @@ class RoleManager:
         db_session: SASession,
         user_id: uuid.UUID,
         entity_id: ObjectId,
-        operations: Iterable[OperationType],
-    ) -> list[ObjectPermissionData]:
-        permission_group = await db_session.scalar(
-            sa.select(PermissionGroupRow).where(PermissionGroupRow.scope_id == str(user_id))
-        )
-        role_id = permission_group.role_id
+        operations: Collection[OperationType],
+    ) -> RoleDataWithPermissions:
+        """
+        Adds object permissions to the system role mapped to the user
+        and adds permission groups for the scopes associated with the entity if not already present in the role.
 
+        Returns the updated role with permissions.
+        Raises an exception if the user does not have a system role.
+        """
+
+        role = await self._query_system_role_by_user(db_session, user_id)
+        role_id = role.id
+        entity_associated_scopes = await self._query_entity_associated_scopes(db_session, entity_id)
+        await self._add_permission_groups_to_role_if_not_exist(
+            db_session, role, entity_associated_scopes
+        )
+        await self._add_object_permissions_to_role(db_session, role_id, entity_id, operations)
+        await db_session.commit()
+        db_session.expire(role)
+        updated_role = await self._query_role_by_id(db_session, role_id)
+        return updated_role
+
+    async def _query_system_role_by_user(
+        self,
+        db_session: SASession,
+        user_id: uuid.UUID,
+    ) -> RoleRow:
+        role_row = await db_session.scalar(
+            sa.select(RoleRow)
+            .select_from(sa.join(RoleRow, UserRoleRow, RoleRow.id == UserRoleRow.role_id))
+            .where(sa.and_(UserRoleRow.user_id == user_id, RoleRow.source == RoleSource.SYSTEM))
+            .options(selectinload(RoleRow.permission_group_rows))
+        )
+        role_row = cast(Optional[RoleRow], role_row)
+        if role_row is None:
+            raise UserSystemRoleNotFound(f"System role for user {user_id} not found")
+        return role_row
+
+    async def _query_role_by_id(
+        self,
+        db_session: SASession,
+        role_id: uuid.UUID,
+    ) -> RoleDataWithPermissions:
+        role_row = await db_session.scalar(
+            sa.select(RoleRow)
+            .where(RoleRow.id == role_id)
+            .options(
+                selectinload(RoleRow.permission_group_rows).options(
+                    selectinload(PermissionGroupRow.permission_rows)
+                ),
+                selectinload(RoleRow.object_permission_rows),
+            )
+        )
+        role_row = cast(Optional[RoleRow], role_row)
+        if role_row is None:
+            raise RoleNotFound(f"Role with id {role_id} not found")
+        return role_row.to_data_with_permissions()
+
+    async def _query_entity_associated_scopes(
+        self,
+        db_session: SASession,
+        entity_id: ObjectId,
+    ) -> list[ScopeId]:
+        raw_scope_entity_rows = await db_session.scalars(
+            sa.select(AssociationScopesEntitiesRow).where(
+                sa.and_(
+                    AssociationScopesEntitiesRow.entity_type == entity_id.entity_type,
+                    AssociationScopesEntitiesRow.entity_id == entity_id.entity_id,
+                )
+            )
+        )
+        scope_entity_rows = cast(list[AssociationScopesEntitiesRow], raw_scope_entity_rows.all())
+        return [
+            ScopeId(scope_type=row.scope_type, scope_id=row.scope_id) for row in scope_entity_rows
+        ]
+
+    async def _add_permission_groups_to_role_if_not_exist(
+        self,
+        db_session: SASession,
+        role_row: RoleRow,
+        scope_ids: Collection[ScopeId],
+    ) -> None:
+        scope_ids_to_add = {scope for scope in scope_ids}
+        for permission_group in role_row.permission_group_rows:
+            scope_id = permission_group.parsed_scope_id()
+            scope_ids_to_add.discard(scope_id)
+        if not scope_ids_to_add:
+            return
+        creators = [
+            PermissionGroupCreator(
+                role_id=role_row.id,
+                scope_id=scope_id,
+            )
+            for scope_id in scope_ids_to_add
+        ]
+
+        rows = [PermissionGroupRow.from_input(creator) for creator in creators]
+        db_session.add_all(rows)
+        await db_session.flush()
+
+    async def _add_object_permissions_to_role(
+        self,
+        db_session: SASession,
+        role_id: uuid.UUID,
+        entity_id: ObjectId,
+        operations: Collection[OperationType],
+    ) -> None:
+        if not operations:
+            raise EmptyOperation("No operations provided to add object permissions.")
         creators = [
             ObjectPermissionCreateInput(
                 role_id=role_id,
@@ -183,10 +287,6 @@ class RoleManager:
         rows = [ObjectPermissionRow.from_input(creator) for creator in creators]
         db_session.add_all(rows)
         await db_session.flush()
-        for row in rows:
-            await db_session.refresh(row)
-        result = [row.to_data() for row in rows]
-        return result
 
     async def delete_object_permission_of_user(
         self,
