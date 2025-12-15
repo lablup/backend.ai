@@ -3,30 +3,41 @@ from collections.abc import Iterable
 from typing import Optional, cast
 
 import sqlalchemy as sa
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
-from ...data.permission.id import ObjectId, ScopeId
-from ...data.permission.role import (
+from ....data.permission.id import ObjectId, ScopeId
+from ....data.permission.role import (
+    AssignedUserData,
+    AssignedUserListResult,
     RoleCreateInput,
     RoleDeleteInput,
+    RoleListResult,
     RoleUpdateInput,
     UserRoleAssignmentInput,
 )
-from ...data.permission.status import (
+from ....data.permission.status import (
     RoleStatus,
 )
-from ...data.permission.types import OperationType, ScopeType
-from ...errors.common import ObjectNotFound
-from ...models.rbac_models.association_scopes_entities import AssociationScopesEntitiesRow
-from ...models.rbac_models.permission.object_permission import ObjectPermissionRow
-from ...models.rbac_models.permission.permission import PermissionRow
-from ...models.rbac_models.permission.permission_group import PermissionGroupRow
-from ...models.rbac_models.role import RoleRow
-from ...models.rbac_models.user_role import UserRoleRow
-from ...models.utils import ExtendedAsyncSAEngine
-from ...repositories.base.creator import Creator, execute_creator
-from .creators import ObjectPermissionCreatorSpec
+from ....data.permission.types import OperationType, ScopeType
+from ....errors.common import ObjectNotFound
+from ....errors.permission import RoleAlreadyAssigned, RoleNotFound
+from ....models.rbac_models.association_scopes_entities import AssociationScopesEntitiesRow
+from ....models.rbac_models.permission.object_permission import ObjectPermissionRow
+from ....models.rbac_models.permission.permission import PermissionRow
+from ....models.rbac_models.permission.permission_group import PermissionGroupRow
+from ....models.rbac_models.role import RoleRow
+from ....models.rbac_models.user_role import UserRoleRow
+from ....models.user import UserRow
+from ....models.utils import ExtendedAsyncSAEngine
+from ....repositories.base import (
+    BatchQuerier,
+    Creator,
+    execute_batch_querier,
+    execute_creator,
+)
+from ..creators import ObjectPermissionCreatorSpec
 
 
 class PermissionDBSource:
@@ -92,10 +103,15 @@ class PermissionDBSource:
     async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleRow:
         async with self._db.begin_session() as db_session:
             user_role_row = UserRoleRow.from_input(data)
-            db_session.add(user_role_row)  # type: ignore[arg-type]
-            await db_session.flush()
-            await db_session.refresh(user_role_row)
-            return user_role_row
+            try:
+                db_session.add(user_role_row)  # type: ignore[arg-type]
+                await db_session.flush()
+                await db_session.refresh(user_role_row)
+                return user_role_row
+            except IntegrityError as e:
+                raise RoleAlreadyAssigned(
+                    f"Role {data.role_id} is already assigned to user {data.user_id}."
+                ) from e
 
     async def get_role(self, role_id: uuid.UUID) -> Optional[RoleRow]:
         async with self._db.begin_readonly_session() as db_session:
@@ -311,3 +327,85 @@ class PermissionDBSource:
                             object_id = object.object_id()
                             result[object_id] = True
         return result
+
+    async def search_roles(
+        self,
+        querier: BatchQuerier,
+    ) -> RoleListResult:
+        """Searches roles with pagination and filtering."""
+        async with self._db.begin_readonly_session() as db_sess:
+            result = await execute_batch_querier(
+                db_sess,
+                sa.select(RoleRow),
+                querier,
+            )
+
+            items = [row.RoleRow.to_data() for row in result.rows]
+
+            return RoleListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def get_role_with_permissions(self, role_id: uuid.UUID) -> RoleRow:
+        """Get role with eagerly loaded permissions only (no users)."""
+        async with self._db.begin_readonly_session() as db_sess:
+            stmt = (
+                sa.select(RoleRow)
+                .where(RoleRow.id == role_id)
+                .options(
+                    selectinload(RoleRow.permission_group_rows).selectinload(
+                        PermissionGroupRow.permission_rows
+                    ),
+                    selectinload(RoleRow.object_permission_rows),
+                )
+            )
+            result = await db_sess.execute(stmt)
+            role_row = result.scalar_one_or_none()
+            if role_row is None:
+                raise RoleNotFound(f"Role with ID {role_id} does not exist.")
+            return role_row
+
+    async def search_users_assigned_to_role(
+        self,
+        role_id: uuid.UUID,
+        querier: BatchQuerier,
+    ) -> AssignedUserListResult:
+        """Searches users assigned to a specific role with pagination and filtering."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = (
+                sa.select(UserRow, UserRoleRow)
+                .select_from(
+                    sa.join(
+                        UserRow,
+                        UserRoleRow,
+                        UserRoleRow.user_id == UserRow.uuid,
+                    )
+                )
+                .where(UserRoleRow.role_id == role_id)
+            )
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [
+                AssignedUserData(
+                    user_id=row.uuid,
+                    username=row.username,
+                    email=row.email,
+                    granted_by=row.granted_by,
+                    granted_at=row.granted_at,
+                )
+                for row in result.rows
+            ]
+
+            return AssignedUserListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )

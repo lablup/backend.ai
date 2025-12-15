@@ -10,17 +10,21 @@ from ai.backend.common.resilience.resilience import Resilience
 
 from ...data.permission.id import ObjectId
 from ...data.permission.role import (
+    AssignedUserListResult,
     BatchEntityPermissionCheckInput,
     RoleCreateInput,
     RoleData,
     RoleDeleteInput,
+    RoleDetailData,
+    RoleListResult,
     RoleUpdateInput,
     ScopePermissionCheckInput,
     SingleEntityPermissionCheckInput,
     UserRoleAssignmentInput,
 )
 from ...models.utils import ExtendedAsyncSAEngine
-from .db_source import PermissionDBSource
+from ...repositories.base import BatchQuerier
+from .db_source.db_source import PermissionDBSource
 
 permission_controller_repository_resilience = Resilience(
     policies=[
@@ -115,4 +119,30 @@ class PermissionControllerRepository:
         """
         return await self._db_source.check_batch_object_permission_exist(
             data.user_id, data.target_object_ids, data.operation
+        )
+
+    @permission_controller_repository_resilience.apply()
+    async def search_roles(
+        self,
+        querier: BatchQuerier,
+    ) -> RoleListResult:
+        """Searches roles with pagination and filtering."""
+        return await self._db_source.search_roles(querier=querier)
+
+    @permission_controller_repository_resilience.apply()
+    async def get_role_with_permissions(self, role_id: uuid.UUID) -> RoleDetailData:
+        """Get role with all permission details (without users)."""
+        result = await self._db_source.get_role_with_permissions(role_id)
+        return result.to_detail_data_without_users()
+
+    @permission_controller_repository_resilience.apply()
+    async def search_users_assigned_to_role(
+        self,
+        role_id: uuid.UUID,
+        querier: BatchQuerier,
+    ) -> AssignedUserListResult:
+        """Searches users assigned to a specific role with pagination and filtering."""
+        return await self._db_source.search_users_assigned_to_role(
+            role_id=role_id,
+            querier=querier,
         )

@@ -25,6 +25,9 @@ from ai.backend.manager.repositories.metric.repositories import MetricRepositori
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.notification.repositories import NotificationRepositories
 from ai.backend.manager.repositories.object_storage.repositories import ObjectStorageRepositories
+from ai.backend.manager.repositories.permission_controller.repositories import (
+    PermissionControllerRepositories,
+)
 from ai.backend.manager.repositories.project_resource_policy.repositories import (
     ProjectResourcePolicyRepositories,
 )
@@ -65,6 +68,7 @@ class Repositories:
     metric: MetricRepositories
     model_serving: ModelServingRepositories
     notification: NotificationRepositories
+    permission_controller: PermissionControllerRepositories
     project_resource_policy: ProjectResourcePolicyRepositories
     reservoir_registry: ReservoirRegistryRepositories
     resource_preset: ResourcePresetRepositories
@@ -97,6 +101,7 @@ class Repositories:
         metric_repositories = MetricRepositories.create(args)
         model_serving_repositories = ModelServingRepositories.create(args)
         notification_repositories = NotificationRepositories.create(args)
+        permission_controller_repositories = PermissionControllerRepositories.create(args)
         project_resource_policy_repositories = ProjectResourcePolicyRepositories.create(args)
         reservoir_registry_repositories = ReservoirRegistryRepositories.create(args)
         resource_preset_repositories = ResourcePresetRepositories.create(args)
@@ -128,6 +133,7 @@ class Repositories:
             metric=metric_repositories,
             model_serving=model_serving_repositories,
             notification=notification_repositories,
+            permission_controller=permission_controller_repositories,
             project_resource_policy=project_resource_policy_repositories,
             reservoir_registry=reservoir_registry_repositories,
             resource_preset=resource_preset_repositories,
