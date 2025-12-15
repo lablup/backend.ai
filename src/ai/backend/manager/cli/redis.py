@@ -5,8 +5,7 @@ import logging
 from typing import TYPE_CHECKING
 
 import click
-from glide import ConnectionError as GlideConnectionError
-from glide import TimeoutError as GlideTimeoutError
+import glide
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.utils import enforce_debug_logging
@@ -49,7 +48,7 @@ def ping(cli_ctx: CLIContext) -> None:
                 await redis_conn_set.image.ping()
                 await redis_conn_set.stream.ping()
                 print("Redis is healthy")
-            except (GlideConnectionError, GlideTimeoutError):
+            except (glide.ConnectionError, glide.TimeoutError):
                 log.exception("ping(): Valkey ping failed")
 
     asyncio.run(_impl())
