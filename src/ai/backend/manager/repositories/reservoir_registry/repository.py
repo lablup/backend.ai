@@ -9,10 +9,11 @@ from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
 )
-from ai.backend.manager.data.reservoir_registry.creator import ReservoirRegistryCreator
 from ai.backend.manager.data.reservoir_registry.modifier import ReservoirRegistryModifier
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
+from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.reservoir_registry.db_source.db_source import ReservoirDBSource
 
 reservoir_registry_repository_resilience = Resilience(
@@ -64,7 +65,7 @@ class ReservoirRegistryRepository:
 
     @reservoir_registry_repository_resilience.apply()
     async def create(
-        self, creator: ReservoirRegistryCreator, meta: ArtifactRegistryCreatorMeta
+        self, creator: Creator[ReservoirRegistryRow], meta: ArtifactRegistryCreatorMeta
     ) -> ReservoirRegistryData:
         return await self._db_source.create(creator, meta)
 

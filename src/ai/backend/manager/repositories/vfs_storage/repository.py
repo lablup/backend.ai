@@ -5,10 +5,11 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.vfs_storage.creator import VFSStorageCreator
 from ai.backend.manager.data.vfs_storage.modifier import VFSStorageModifier
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfs_storage import VFSStorageRow
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.vfs_storage.db_source.db_source import VFSStorageDBSource
 
 vfs_storage_repository_resilience = Resilience(
@@ -45,7 +46,7 @@ class VFSStorageRepository:
         return await self._db_source.get_by_id(storage_id)
 
     @vfs_storage_repository_resilience.apply()
-    async def create(self, creator: VFSStorageCreator) -> VFSStorageData:
+    async def create(self, creator: Creator[VFSStorageRow]) -> VFSStorageData:
         return await self._db_source.create(creator)
 
     @vfs_storage_repository_resilience.apply()

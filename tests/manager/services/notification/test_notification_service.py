@@ -16,18 +16,20 @@ from ai.backend.common.data.notification import (
 )
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.manager.data.notification import (
-    NotificationChannelCreator,
     NotificationChannelData,
     NotificationChannelModifier,
     NotificationChannelType,
-    NotificationRuleCreator,
     NotificationRuleData,
     NotificationRuleModifier,
     NotificationRuleType,
     WebhookConfig,
 )
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base import BatchQuerier, Creator
 from ai.backend.manager.repositories.notification import NotificationRepository
+from ai.backend.manager.repositories.notification.creators import (
+    NotificationChannelCreatorSpec,
+    NotificationRuleCreatorSpec,
+)
 from ai.backend.manager.services.notification.actions import (
     CreateChannelAction,
     CreateRuleAction,
@@ -444,13 +446,15 @@ class TestNotificationService:
         sample_webhook_channel: NotificationChannelData,
     ) -> None:
         """Test creating a notification channel"""
-        creator = NotificationChannelCreator(
-            name=sample_webhook_channel.name,
-            description=sample_webhook_channel.description,
-            channel_type=sample_webhook_channel.channel_type,
-            config=sample_webhook_channel.config,
-            enabled=sample_webhook_channel.enabled,
-            created_by=sample_webhook_channel.created_by,
+        creator = Creator(
+            spec=NotificationChannelCreatorSpec(
+                name=sample_webhook_channel.name,
+                description=sample_webhook_channel.description,
+                channel_type=sample_webhook_channel.channel_type,
+                config=sample_webhook_channel.config,
+                enabled=sample_webhook_channel.enabled,
+                created_by=sample_webhook_channel.created_by,
+            )
         )
         mock_repository.create_channel = AsyncMock(return_value=sample_webhook_channel)
 
@@ -468,14 +472,16 @@ class TestNotificationService:
         sample_rule: NotificationRuleData,
     ) -> None:
         """Test creating a notification rule"""
-        creator = NotificationRuleCreator(
-            name=sample_rule.name,
-            description=sample_rule.description,
-            rule_type=sample_rule.rule_type,
-            channel_id=sample_rule.channel.id,
-            message_template=sample_rule.message_template,
-            enabled=sample_rule.enabled,
-            created_by=sample_rule.created_by,
+        creator = Creator(
+            spec=NotificationRuleCreatorSpec(
+                name=sample_rule.name,
+                description=sample_rule.description,
+                rule_type=sample_rule.rule_type,
+                channel_id=sample_rule.channel.id,
+                message_template=sample_rule.message_template,
+                enabled=sample_rule.enabled,
+                created_by=sample_rule.created_by,
+            )
         )
         mock_repository.create_rule = AsyncMock(return_value=sample_rule)
 

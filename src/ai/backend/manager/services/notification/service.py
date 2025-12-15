@@ -5,12 +5,13 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from ai.backend.common.data.notification import NotifiableMessage
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.notification import NotificationRuleType
 from ai.backend.manager.notification.types import ProcessRuleParams
+from ai.backend.manager.repositories.notification.creators import NotificationRuleCreatorSpec
 
 from .actions import (
     CreateChannelAction,
@@ -123,8 +124,9 @@ class NotificationService:
         action: CreateRuleAction,
     ) -> CreateRuleActionResult:
         """Creates a new notification rule."""
+        spec = cast(NotificationRuleCreatorSpec, action.creator.spec)
         # Validate message_template length
-        if len(action.creator.message_template) > 65536:
+        if len(spec.message_template) > 65536:
             raise ValueError("message_template must not exceed 65536 characters (64KB)")
 
         rule_data = await self._repository.create_rule(action.creator)

@@ -18,20 +18,21 @@ from ai.backend.manager.data.resource.types import (
     ProjectResourcePolicyData,
     UserResourcePolicyData,
 )
-from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
-    KeyPairResourcePolicyCreator,
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.keypair_resource_policy.creators import (
+    KeyPairResourcePolicyCreatorSpec,
+)
+from ai.backend.manager.repositories.project_resource_policy.creators import (
+    ProjectResourcePolicyCreatorSpec,
+)
+from ai.backend.manager.repositories.user_resource_policy.creators import (
+    UserResourcePolicyCreatorSpec,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
     KeyPairResourcePolicyModifier,
 )
-from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
-    ProjectResourcePolicyCreator,
-)
 from ai.backend.manager.services.project_resource_policy.actions.modify_project_resource_policy import (
     ProjectResourcePolicyModifier,
-)
-from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
-    UserResourcePolicyCreator,
 )
 from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
     UserResourcePolicyModifier,
@@ -132,22 +133,6 @@ class KeyPairResourcePolicyRow(Base):
             allowed_vfolder_hosts=self.allowed_vfolder_hosts,
         )
 
-    @classmethod
-    def from_creator(cls, creator: KeyPairResourcePolicyCreator) -> Self:
-        return cls(
-            name=creator.name,
-            default_for_unspecified=creator.default_for_unspecified,
-            total_resource_slots=creator.total_resource_slots,
-            max_session_lifetime=creator.max_session_lifetime,
-            max_concurrent_sessions=creator.max_concurrent_sessions,
-            max_pending_session_count=creator.max_pending_session_count,
-            max_pending_session_resource_slots=creator.max_pending_session_resource_slots,
-            max_concurrent_sftp_sessions=creator.max_concurrent_sftp_sessions,
-            max_containers_per_session=creator.max_containers_per_session,
-            idle_timeout=creator.idle_timeout,
-            allowed_vfolder_hosts=creator.allowed_vfolder_hosts,
-        )
-
 
 user_resource_policies = sa.Table(
     "user_resource_policies",
@@ -178,16 +163,6 @@ class UserResourcePolicyRow(Base):
         self.max_quota_scope_size = max_quota_scope_size
         self.max_session_count_per_model_session = max_session_count_per_model_session
         self.max_customized_image_count = max_customized_image_count
-
-    @classmethod
-    def from_creator(cls, creator: UserResourcePolicyCreator) -> Self:
-        return cls(
-            name=creator.name,
-            max_vfolder_count=creator.max_vfolder_count,
-            max_quota_scope_size=creator.max_quota_scope_size,
-            max_session_count_per_model_session=creator.max_session_count_per_model_session,
-            max_customized_image_count=creator.max_customized_image_count,
-        )
 
     @classmethod
     def from_dataclass(cls, data: UserResourcePolicyData) -> Self:
@@ -428,7 +403,7 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
     max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
-    def to_creator(self, name: str) -> KeyPairResourcePolicyCreator:
+    def to_creator(self, name: str) -> Creator[KeyPairResourcePolicyRow]:
         default_for_unspecified = DefaultForUnspecified[self.default_for_unspecified]
         total_resource_slots = ResourceSlot.from_user_input(self.total_resource_slots, None)
 
@@ -441,21 +416,25 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):
         def value_or_none(value):
             return value if value is not Undefined else None
 
-        return KeyPairResourcePolicyCreator(
-            name=name,
-            default_for_unspecified=default_for_unspecified,
-            total_resource_slots=total_resource_slots,
-            max_session_lifetime=value_or_none(self.max_session_lifetime),
-            max_concurrent_sessions=value_or_none(self.max_concurrent_sessions),
-            max_concurrent_sftp_sessions=value_or_none(self.max_concurrent_sftp_sessions),
-            max_containers_per_session=value_or_none(self.max_containers_per_session),
-            idle_timeout=value_or_none(self.idle_timeout),
-            allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
-            max_vfolder_count=value_or_none(self.max_vfolder_count),
-            max_vfolder_size=value_or_none(self.max_vfolder_size),
-            max_quota_scope_size=value_or_none(self.max_quota_scope_size),
-            max_pending_session_count=value_or_none(self.max_pending_session_count),
-            max_pending_session_resource_slots=value_or_none(max_pending_session_resource_slots),
+        return Creator(
+            spec=KeyPairResourcePolicyCreatorSpec(
+                name=name,
+                default_for_unspecified=default_for_unspecified,
+                total_resource_slots=total_resource_slots,
+                max_session_lifetime=value_or_none(self.max_session_lifetime),
+                max_concurrent_sessions=value_or_none(self.max_concurrent_sessions),
+                max_concurrent_sftp_sessions=value_or_none(self.max_concurrent_sftp_sessions),
+                max_containers_per_session=value_or_none(self.max_containers_per_session),
+                idle_timeout=value_or_none(self.idle_timeout),
+                allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
+                max_vfolder_count=value_or_none(self.max_vfolder_count),
+                max_vfolder_size=value_or_none(self.max_vfolder_size),
+                max_quota_scope_size=value_or_none(self.max_quota_scope_size),
+                max_pending_session_count=value_or_none(self.max_pending_session_count),
+                max_pending_session_resource_slots=value_or_none(
+                    max_pending_session_resource_slots
+                ),
+            )
         )
 
 
@@ -715,19 +694,20 @@ class CreateUserResourcePolicyInput(graphene.InputObjectType):
         description="Added in 24.03.0. Maximum available number of customized images one can publish to."
     )
 
-    def to_creator(self, name: str) -> UserResourcePolicyCreator:
+    def to_creator(self, name: str) -> Creator[UserResourcePolicyRow]:
         def value_or_none(value):
             return value if value is not Undefined else None
 
-        return UserResourcePolicyCreator(
-            name=name,
-            max_vfolder_count=value_or_none(self.max_vfolder_count),
-            max_quota_scope_size=value_or_none(self.max_quota_scope_size),
-            max_session_count_per_model_session=value_or_none(
-                self.max_session_count_per_model_session
-            ),
-            max_vfolder_size=value_or_none(self.max_vfolder_size),
-            max_customized_image_count=value_or_none(self.max_customized_image_count),
+        return Creator(
+            spec=UserResourcePolicyCreatorSpec(
+                name=name,
+                max_vfolder_count=value_or_none(self.max_vfolder_count),
+                max_quota_scope_size=value_or_none(self.max_quota_scope_size),
+                max_session_count_per_model_session=value_or_none(
+                    self.max_session_count_per_model_session
+                ),
+                max_customized_image_count=value_or_none(self.max_customized_image_count),
+            )
         )
 
 
@@ -965,16 +945,17 @@ class CreateProjectResourcePolicyInput(graphene.InputObjectType):
         description="Added in 24.12.0. Limitation of the number of networks created on behalf of project. Set as -1 to allow creating unlimited networks."
     )
 
-    def to_creator(self, name: str) -> ProjectResourcePolicyCreator:
+    def to_creator(self, name: str) -> Creator[ProjectResourcePolicyRow]:
         def value_or_none(value):
             return value if value is not Undefined else None
 
-        return ProjectResourcePolicyCreator(
-            name=name,
-            max_vfolder_count=value_or_none(self.max_vfolder_count),
-            max_quota_scope_size=value_or_none(self.max_quota_scope_size),
-            max_vfolder_size=value_or_none(self.max_vfolder_size),
-            max_network_count=value_or_none(self.max_network_count),
+        return Creator(
+            spec=ProjectResourcePolicyCreatorSpec(
+                name=name,
+                max_vfolder_count=value_or_none(self.max_vfolder_count),
+                max_quota_scope_size=value_or_none(self.max_quota_scope_size),
+                max_network_count=value_or_none(self.max_network_count),
+            )
         )
 
 

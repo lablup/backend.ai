@@ -14,11 +14,13 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData
-from ai.backend.manager.data.user.types import UserCreator, UserData
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.auth import UserNotFound
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.user.actions.modify_user import UserModifier
 
@@ -83,7 +85,7 @@ class TestUserRepository:
             rounds=100_000,
             salt_size=32,
         )
-        return UserCreator(
+        spec = UserCreatorSpec(
             username="newuser",
             email="newuser@example.com",
             password=password_info,
@@ -101,6 +103,7 @@ class TestUserRepository:
             container_main_gid=None,
             container_gids=None,
         )
+        return Creator(spec=spec)
 
     @pytest.mark.asyncio
     async def test_get_by_email_validated_success(
@@ -178,28 +181,29 @@ class TestUserRepository:
                 user_repository, "_check_user_exists_with_email_or_username", return_value=False
             ):
                 # Mock the created user row
+                spec = sample_user_creator.spec
                 created_user_row = MagicMock()
                 created_user_row.uuid = uuid.uuid4()
-                created_user_row.email = sample_user_creator.email
-                created_user_row.username = sample_user_creator.username
-                created_user_row.role = sample_user_creator.role
-                created_user_row.status = sample_user_creator.status
-                created_user_row.domain_name = sample_user_creator.domain_name
-                created_user_row.full_name = sample_user_creator.full_name
-                created_user_row.description = sample_user_creator.description
-                created_user_row.need_password_change = sample_user_creator.need_password_change
+                created_user_row.email = spec.email
+                created_user_row.username = spec.username
+                created_user_row.role = spec.role
+                created_user_row.status = spec.status
+                created_user_row.domain_name = spec.domain_name
+                created_user_row.full_name = spec.full_name
+                created_user_row.description = spec.description
+                created_user_row.need_password_change = spec.need_password_change
                 created_user_row.status_info = "admin-requested"
                 created_user_row.created_at = datetime.now()
                 created_user_row.modified_at = datetime.now()
-                created_user_row.resource_policy = sample_user_creator.resource_policy
-                created_user_row.allowed_client_ip = sample_user_creator.allowed_client_ip
-                created_user_row.totp_activated = sample_user_creator.totp_activated
+                created_user_row.resource_policy = spec.resource_policy
+                created_user_row.allowed_client_ip = spec.allowed_client_ip
+                created_user_row.totp_activated = spec.totp_activated
                 created_user_row.totp_activated_at = None
-                created_user_row.sudo_session_enabled = sample_user_creator.sudo_session_enabled
+                created_user_row.sudo_session_enabled = spec.sudo_session_enabled
                 created_user_row.main_access_key = "test_access_key"
-                created_user_row.container_uid = sample_user_creator.container_uid
-                created_user_row.container_main_gid = sample_user_creator.container_main_gid
-                created_user_row.container_gids = sample_user_creator.container_gids
+                created_user_row.container_uid = spec.container_uid
+                created_user_row.container_main_gid = spec.container_main_gid
+                created_user_row.container_gids = spec.container_gids
 
                 # Mock to_data method
                 def to_data():
@@ -239,10 +243,12 @@ class TestUserRepository:
                 # Mock session.refresh
                 mock_session.refresh = AsyncMock()
 
-                # Mock UserRow.from_creator to return our mocked row
+                # Mock execute_creator to return our mocked row
+                mock_creator_result = MagicMock()
+                mock_creator_result.row = created_user_row
                 with patch(
-                    "ai.backend.manager.models.user.UserRow.from_creator",
-                    return_value=created_user_row,
+                    "ai.backend.manager.repositories.user.repository.execute_creator",
+                    return_value=mock_creator_result,
                 ):
                     # Mock keypair preparation
                     with patch(
@@ -264,9 +270,9 @@ class TestUserRepository:
                             )
 
                             assert result is not None
-                            assert result.user.email == sample_user_creator.email
-                            assert result.user.username == sample_user_creator.username
-                            assert result.user.role == sample_user_creator.role
+                            assert result.user.email == spec.email
+                            assert result.user.username == spec.username
+                            assert result.user.role == spec.role
                             assert result.user.main_access_key == "test_access_key"
 
     @pytest.mark.asyncio
@@ -307,15 +313,10 @@ class TestUserRepository:
                 # Mock session.flush to raise IntegrityError
                 import sqlalchemy as sa
 
-                mock_session.flush = AsyncMock(
-                    side_effect=sa.exc.IntegrityError("statement", "params", "orig")
-                )
-
-                # Mock UserRow.from_creator
-                created_user_row = MagicMock()
+                # Mock execute_creator to raise IntegrityError
                 with patch(
-                    "ai.backend.manager.models.user.UserRow.from_creator",
-                    return_value=created_user_row,
+                    "ai.backend.manager.repositories.user.repository.execute_creator",
+                    side_effect=sa.exc.IntegrityError("statement", "params", "orig"),
                 ):
                     from ai.backend.manager.errors.user import UserCreationBadRequest
 
@@ -326,25 +327,6 @@ class TestUserRepository:
                         await user_repository.create_user_validated(
                             sample_user_creator, group_ids=[]
                         )
-
-        # Test 4: Row creation returns None (should not happen but checking for safety)
-        with patch.object(user_repository, "_check_domain_exists", return_value=True):
-            with patch.object(
-                user_repository, "_check_user_exists_with_email_or_username", return_value=False
-            ):
-                # Mock session operations
-                mock_session.add = MagicMock()
-                mock_session.flush = AsyncMock()
-                mock_session.refresh = AsyncMock()
-
-                # Mock UserRow.from_creator to return None
-                with patch(
-                    "ai.backend.manager.models.user.UserRow.from_creator", return_value=None
-                ):
-                    # Since add() doesn't check for None, we need to mock the flow differently
-                    # Actually in real code, from_creator should not return None
-                    # So this test case might not be reachable
-                    pass  # Skip this test as it's not a realistic scenario
 
     @pytest.mark.asyncio
     async def test_update_user_validated_success(

@@ -11,10 +11,10 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
     UserResourcePolicyModifier,
 )
-from ai.backend.manager.services.user_resource_policy.types import UserResourcePolicyCreator
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -48,13 +48,11 @@ class UserResourcePolicyDBSource:
         self._db = db
 
     @user_resource_policy_db_source_resilience.apply()
-    async def create(self, creator: UserResourcePolicyCreator) -> UserResourcePolicyData:
+    async def create(self, creator: Creator[UserResourcePolicyRow]) -> UserResourcePolicyData:
         """Creates a new user resource policy."""
         async with self._db.begin_session() as db_sess:
-            db_row = UserResourcePolicyRow.from_creator(creator)
-            db_sess.add(db_row)
-            await db_sess.flush()
-            return db_row.to_dataclass()
+            result = await execute_creator(db_sess, creator)
+            return result.row.to_dataclass()
 
     @user_resource_policy_db_source_resilience.apply()
     async def get_by_name(self, name: str) -> UserResourcePolicyData:

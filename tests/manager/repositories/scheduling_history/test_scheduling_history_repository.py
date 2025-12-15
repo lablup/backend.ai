@@ -10,18 +10,10 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.types import KernelId, SessionId
-from ai.backend.manager.data.deployment.types import (
-    DeploymentHistoryCreator,
-    RouteHistoryCreator,
-    RouteStatus,
-)
-from ai.backend.manager.data.kernel.types import (
-    KernelSchedulingHistoryCreator,
-    KernelSchedulingPhase,
-)
+from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.data.kernel.types import KernelSchedulingPhase
 from ai.backend.manager.data.session.types import (
     SchedulingResult,
-    SessionSchedulingHistoryCreator,
     SessionStatus,
     SubStepResult,
 )
@@ -32,8 +24,14 @@ from ai.backend.manager.models.scheduling_history import (
     SessionSchedulingHistoryRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.repositories.scheduling_history import (
+    DeploymentHistoryCreatorSpec,
+    KernelSchedulingHistoryCreatorSpec,
+    RouteHistoryCreatorSpec,
+    SchedulingHistoryRepository,
+    SessionSchedulingHistoryCreatorSpec,
+)
 from ai.backend.manager.repositories.scheduling_history.options import (
     DeploymentHistoryConditions,
     KernelSchedulingHistoryConditions,
@@ -78,13 +76,15 @@ class TestSchedulingHistoryRepository:
         """Test recording session history with SUCCESS result"""
         session_id = SessionId(uuid.uuid4())
 
-        creator = SessionSchedulingHistoryCreator(
-            session_id=session_id,
-            phase="SCHEDULE",
-            result=SchedulingResult.SUCCESS,
-            message="Session scheduled successfully",
-            from_status=SessionStatus.PENDING,
-            to_status=SessionStatus.SCHEDULED,
+        creator = Creator(
+            spec=SessionSchedulingHistoryCreatorSpec(
+                session_id=session_id,
+                phase="SCHEDULE",
+                result=SchedulingResult.SUCCESS,
+                message="Session scheduled successfully",
+                from_status=SessionStatus.PENDING,
+                to_status=SessionStatus.SCHEDULED,
+            )
         )
 
         result = await scheduling_history_repository.record_session_history(creator)
@@ -105,12 +105,14 @@ class TestSchedulingHistoryRepository:
         """Test recording session history with FAILURE result"""
         session_id = SessionId(uuid.uuid4())
 
-        creator = SessionSchedulingHistoryCreator(
-            session_id=session_id,
-            phase="SCHEDULE",
-            result=SchedulingResult.FAILURE,
-            message="No available resources",
-            error_code="RESOURCE_EXHAUSTED",
+        creator = Creator(
+            spec=SessionSchedulingHistoryCreatorSpec(
+                session_id=session_id,
+                phase="SCHEDULE",
+                result=SchedulingResult.FAILURE,
+                message="No available resources",
+                error_code="RESOURCE_EXHAUSTED",
+            )
         )
 
         result = await scheduling_history_repository.record_session_history(creator)
@@ -129,23 +131,27 @@ class TestSchedulingHistoryRepository:
         session_id = SessionId(uuid.uuid4())
 
         # First failure
-        creator1 = SessionSchedulingHistoryCreator(
-            session_id=session_id,
-            phase="SCHEDULE",
-            result=SchedulingResult.FAILURE,
-            error_code="RESOURCE_EXHAUSTED",
-            message="No resources available",
+        creator1 = Creator(
+            spec=SessionSchedulingHistoryCreatorSpec(
+                session_id=session_id,
+                phase="SCHEDULE",
+                result=SchedulingResult.FAILURE,
+                error_code="RESOURCE_EXHAUSTED",
+                message="No resources available",
+            )
         )
         result1 = await scheduling_history_repository.record_session_history(creator1)
         assert result1.attempts == 1
 
         # Second failure with same phase+error_code -> should merge
-        creator2 = SessionSchedulingHistoryCreator(
-            session_id=session_id,
-            phase="SCHEDULE",
-            result=SchedulingResult.FAILURE,
-            error_code="RESOURCE_EXHAUSTED",
-            message="Still no resources",
+        creator2 = Creator(
+            spec=SessionSchedulingHistoryCreatorSpec(
+                session_id=session_id,
+                phase="SCHEDULE",
+                result=SchedulingResult.FAILURE,
+                error_code="RESOURCE_EXHAUSTED",
+                message="Still no resources",
+            )
         )
         result2 = await scheduling_history_repository.record_session_history(creator2)
 
@@ -153,12 +159,14 @@ class TestSchedulingHistoryRepository:
         assert result2.attempts == 2  # Incremented
 
         # Third failure -> should merge again
-        creator3 = SessionSchedulingHistoryCreator(
-            session_id=session_id,
-            phase="SCHEDULE",
-            result=SchedulingResult.FAILURE,
-            error_code="RESOURCE_EXHAUSTED",
-            message="Resources still unavailable",
+        creator3 = Creator(
+            spec=SessionSchedulingHistoryCreatorSpec(
+                session_id=session_id,
+                phase="SCHEDULE",
+                result=SchedulingResult.FAILURE,
+                error_code="RESOURCE_EXHAUSTED",
+                message="Resources still unavailable",
+            )
         )
         result3 = await scheduling_history_repository.record_session_history(creator3)
 
@@ -174,22 +182,26 @@ class TestSchedulingHistoryRepository:
         session_id = SessionId(uuid.uuid4())
 
         # First success
-        creator1 = SessionSchedulingHistoryCreator(
-            session_id=session_id,
-            phase="SCHEDULE",
-            result=SchedulingResult.SUCCESS,
-            error_code=None,
-            message="Scheduled",
+        creator1 = Creator(
+            spec=SessionSchedulingHistoryCreatorSpec(
+                session_id=session_id,
+                phase="SCHEDULE",
+                result=SchedulingResult.SUCCESS,
+                error_code=None,
+                message="Scheduled",
+            )
         )
         result1 = await scheduling_history_repository.record_session_history(creator1)
 
         # Second success -> should NOT merge (new row)
-        creator2 = SessionSchedulingHistoryCreator(
-            session_id=session_id,
-            phase="SCHEDULE",
-            result=SchedulingResult.SUCCESS,
-            error_code=None,
-            message="Scheduled again",
+        creator2 = Creator(
+            spec=SessionSchedulingHistoryCreatorSpec(
+                session_id=session_id,
+                phase="SCHEDULE",
+                result=SchedulingResult.SUCCESS,
+                error_code=None,
+                message="Scheduled again",
+            )
         )
         result2 = await scheduling_history_repository.record_session_history(creator2)
 
@@ -205,22 +217,26 @@ class TestSchedulingHistoryRepository:
         session_id = SessionId(uuid.uuid4())
 
         # First failure
-        creator1 = SessionSchedulingHistoryCreator(
-            session_id=session_id,
-            phase="SCHEDULE",
-            result=SchedulingResult.FAILURE,
-            error_code="RESOURCE_EXHAUSTED",
-            message="No resources",
+        creator1 = Creator(
+            spec=SessionSchedulingHistoryCreatorSpec(
+                session_id=session_id,
+                phase="SCHEDULE",
+                result=SchedulingResult.FAILURE,
+                error_code="RESOURCE_EXHAUSTED",
+                message="No resources",
+            )
         )
         result1 = await scheduling_history_repository.record_session_history(creator1)
 
         # Second failure with different phase -> should NOT merge
-        creator2 = SessionSchedulingHistoryCreator(
-            session_id=session_id,
-            phase="PREPARE",
-            result=SchedulingResult.FAILURE,
-            error_code="RESOURCE_EXHAUSTED",
-            message="Prepare failed",
+        creator2 = Creator(
+            spec=SessionSchedulingHistoryCreatorSpec(
+                session_id=session_id,
+                phase="PREPARE",
+                result=SchedulingResult.FAILURE,
+                error_code="RESOURCE_EXHAUSTED",
+                message="Prepare failed",
+            )
         )
         result2 = await scheduling_history_repository.record_session_history(creator2)
 
@@ -235,22 +251,26 @@ class TestSchedulingHistoryRepository:
         session_id = SessionId(uuid.uuid4())
 
         # First failure
-        creator1 = SessionSchedulingHistoryCreator(
-            session_id=session_id,
-            phase="SCHEDULE",
-            result=SchedulingResult.FAILURE,
-            error_code="RESOURCE_EXHAUSTED",
-            message="No resources",
+        creator1 = Creator(
+            spec=SessionSchedulingHistoryCreatorSpec(
+                session_id=session_id,
+                phase="SCHEDULE",
+                result=SchedulingResult.FAILURE,
+                error_code="RESOURCE_EXHAUSTED",
+                message="No resources",
+            )
         )
         result1 = await scheduling_history_repository.record_session_history(creator1)
 
         # Second failure with different error_code -> should NOT merge
-        creator2 = SessionSchedulingHistoryCreator(
-            session_id=session_id,
-            phase="SCHEDULE",
-            result=SchedulingResult.FAILURE,
-            error_code="QUOTA_EXCEEDED",
-            message="Quota exceeded",
+        creator2 = Creator(
+            spec=SessionSchedulingHistoryCreatorSpec(
+                session_id=session_id,
+                phase="SCHEDULE",
+                result=SchedulingResult.FAILURE,
+                error_code="QUOTA_EXCEEDED",
+                message="Quota exceeded",
+            )
         )
         result2 = await scheduling_history_repository.record_session_history(creator2)
 
@@ -278,13 +298,15 @@ class TestSchedulingHistoryRepository:
             ),
         ]
 
-        creator = SessionSchedulingHistoryCreator(
-            session_id=session_id,
-            phase="SCHEDULE",
-            result=SchedulingResult.FAILURE,
-            error_code="NO_AGENT",
-            message="Scheduling failed",
-            sub_steps=sub_steps,
+        creator = Creator(
+            spec=SessionSchedulingHistoryCreatorSpec(
+                session_id=session_id,
+                phase="SCHEDULE",
+                result=SchedulingResult.FAILURE,
+                error_code="NO_AGENT",
+                message="Scheduling failed",
+                sub_steps=sub_steps,
+            )
         )
 
         result = await scheduling_history_repository.record_session_history(creator)
@@ -306,11 +328,13 @@ class TestSchedulingHistoryRepository:
 
         # Create multiple history entries
         for i in range(5):
-            creator = SessionSchedulingHistoryCreator(
-                session_id=session_id,
-                phase=f"PHASE_{i}",
-                result=SchedulingResult.SUCCESS,
-                message=f"Message {i}",
+            creator = Creator(
+                spec=SessionSchedulingHistoryCreatorSpec(
+                    session_id=session_id,
+                    phase=f"PHASE_{i}",
+                    result=SchedulingResult.SUCCESS,
+                    message=f"Message {i}",
+                )
             )
             await scheduling_history_repository.record_session_history(creator)
 
@@ -338,21 +362,25 @@ class TestSchedulingHistoryRepository:
 
         # Create history for session 1
         for i in range(3):
-            creator = SessionSchedulingHistoryCreator(
-                session_id=session_id_1,
-                phase=f"PHASE_{i}",
-                result=SchedulingResult.SUCCESS,
-                message=f"Session 1 - Message {i}",
+            creator = Creator(
+                spec=SessionSchedulingHistoryCreatorSpec(
+                    session_id=session_id_1,
+                    phase=f"PHASE_{i}",
+                    result=SchedulingResult.SUCCESS,
+                    message=f"Session 1 - Message {i}",
+                )
             )
             await scheduling_history_repository.record_session_history(creator)
 
         # Create history for session 2
         for i in range(2):
-            creator = SessionSchedulingHistoryCreator(
-                session_id=session_id_2,
-                phase=f"PHASE_{i}",
-                result=SchedulingResult.SUCCESS,
-                message=f"Session 2 - Message {i}",
+            creator = Creator(
+                spec=SessionSchedulingHistoryCreatorSpec(
+                    session_id=session_id_2,
+                    phase=f"PHASE_{i}",
+                    result=SchedulingResult.SUCCESS,
+                    message=f"Session 2 - Message {i}",
+                )
             )
             await scheduling_history_repository.record_session_history(creator)
 
@@ -378,14 +406,16 @@ class TestSchedulingHistoryRepository:
         kernel_id = KernelId(uuid.uuid4())
         session_id = SessionId(uuid.uuid4())
 
-        creator = KernelSchedulingHistoryCreator(
-            kernel_id=kernel_id,
-            session_id=session_id,
-            phase="PREPARING",
-            result=SchedulingResult.SUCCESS,
-            message="Kernel prepared",
-            from_status=KernelSchedulingPhase.PREPARING,
-            to_status=KernelSchedulingPhase.PREPARED,
+        creator = Creator(
+            spec=KernelSchedulingHistoryCreatorSpec(
+                kernel_id=kernel_id,
+                session_id=session_id,
+                phase="PREPARING",
+                result=SchedulingResult.SUCCESS,
+                message="Kernel prepared",
+                from_status=KernelSchedulingPhase.PREPARING,
+                to_status=KernelSchedulingPhase.PREPARED,
+            )
         )
 
         result = await scheduling_history_repository.record_kernel_history(creator)
@@ -404,13 +434,15 @@ class TestSchedulingHistoryRepository:
         kernel_id = KernelId(uuid.uuid4())
         session_id = SessionId(uuid.uuid4())
 
-        creator = KernelSchedulingHistoryCreator(
-            kernel_id=kernel_id,
-            session_id=session_id,
-            phase="PULLING",
-            result=SchedulingResult.FAILURE,
-            message="Image pull failed",
-            error_code="IMAGE_NOT_FOUND",
+        creator = Creator(
+            spec=KernelSchedulingHistoryCreatorSpec(
+                kernel_id=kernel_id,
+                session_id=session_id,
+                phase="PULLING",
+                result=SchedulingResult.FAILURE,
+                message="Image pull failed",
+                error_code="IMAGE_NOT_FOUND",
+            )
         )
 
         result = await scheduling_history_repository.record_kernel_history(creator)
@@ -430,25 +462,29 @@ class TestSchedulingHistoryRepository:
         session_id = SessionId(uuid.uuid4())
 
         # First failure
-        creator1 = KernelSchedulingHistoryCreator(
-            kernel_id=kernel_id,
-            session_id=session_id,
-            phase="PULLING",
-            result=SchedulingResult.FAILURE,
-            error_code="IMAGE_NOT_FOUND",
-            message="Image not found",
+        creator1 = Creator(
+            spec=KernelSchedulingHistoryCreatorSpec(
+                kernel_id=kernel_id,
+                session_id=session_id,
+                phase="PULLING",
+                result=SchedulingResult.FAILURE,
+                error_code="IMAGE_NOT_FOUND",
+                message="Image not found",
+            )
         )
         result1 = await scheduling_history_repository.record_kernel_history(creator1)
         assert result1.attempts == 1
 
         # Second failure with same phase+error_code -> should merge
-        creator2 = KernelSchedulingHistoryCreator(
-            kernel_id=kernel_id,
-            session_id=session_id,
-            phase="PULLING",
-            result=SchedulingResult.FAILURE,
-            error_code="IMAGE_NOT_FOUND",
-            message="Still cannot find image",
+        creator2 = Creator(
+            spec=KernelSchedulingHistoryCreatorSpec(
+                kernel_id=kernel_id,
+                session_id=session_id,
+                phase="PULLING",
+                result=SchedulingResult.FAILURE,
+                error_code="IMAGE_NOT_FOUND",
+                message="Still cannot find image",
+            )
         )
         result2 = await scheduling_history_repository.record_kernel_history(creator2)
 
@@ -456,13 +492,15 @@ class TestSchedulingHistoryRepository:
         assert result2.attempts == 2
 
         # Third failure -> should merge again
-        creator3 = KernelSchedulingHistoryCreator(
-            kernel_id=kernel_id,
-            session_id=session_id,
-            phase="PULLING",
-            result=SchedulingResult.FAILURE,
-            error_code="IMAGE_NOT_FOUND",
-            message="Image still unavailable",
+        creator3 = Creator(
+            spec=KernelSchedulingHistoryCreatorSpec(
+                kernel_id=kernel_id,
+                session_id=session_id,
+                phase="PULLING",
+                result=SchedulingResult.FAILURE,
+                error_code="IMAGE_NOT_FOUND",
+                message="Image still unavailable",
+            )
         )
         result3 = await scheduling_history_repository.record_kernel_history(creator3)
 
@@ -479,22 +517,26 @@ class TestSchedulingHistoryRepository:
         session_id = SessionId(uuid.uuid4())
 
         # First success
-        creator1 = KernelSchedulingHistoryCreator(
-            kernel_id=kernel_id,
-            session_id=session_id,
-            phase="PULLING",
-            result=SchedulingResult.SUCCESS,
-            message="Image pulled",
+        creator1 = Creator(
+            spec=KernelSchedulingHistoryCreatorSpec(
+                kernel_id=kernel_id,
+                session_id=session_id,
+                phase="PULLING",
+                result=SchedulingResult.SUCCESS,
+                message="Image pulled",
+            )
         )
         result1 = await scheduling_history_repository.record_kernel_history(creator1)
 
         # Second success -> should NOT merge (new row)
-        creator2 = KernelSchedulingHistoryCreator(
-            kernel_id=kernel_id,
-            session_id=session_id,
-            phase="PULLING",
-            result=SchedulingResult.SUCCESS,
-            message="Image pulled again",
+        creator2 = Creator(
+            spec=KernelSchedulingHistoryCreatorSpec(
+                kernel_id=kernel_id,
+                session_id=session_id,
+                phase="PULLING",
+                result=SchedulingResult.SUCCESS,
+                message="Image pulled again",
+            )
         )
         result2 = await scheduling_history_repository.record_kernel_history(creator2)
 
@@ -511,24 +553,28 @@ class TestSchedulingHistoryRepository:
         session_id = SessionId(uuid.uuid4())
 
         # First failure
-        creator1 = KernelSchedulingHistoryCreator(
-            kernel_id=kernel_id,
-            session_id=session_id,
-            phase="PULLING",
-            result=SchedulingResult.FAILURE,
-            error_code="IMAGE_NOT_FOUND",
-            message="Image not found",
+        creator1 = Creator(
+            spec=KernelSchedulingHistoryCreatorSpec(
+                kernel_id=kernel_id,
+                session_id=session_id,
+                phase="PULLING",
+                result=SchedulingResult.FAILURE,
+                error_code="IMAGE_NOT_FOUND",
+                message="Image not found",
+            )
         )
         result1 = await scheduling_history_repository.record_kernel_history(creator1)
 
         # Second failure with different phase -> should NOT merge
-        creator2 = KernelSchedulingHistoryCreator(
-            kernel_id=kernel_id,
-            session_id=session_id,
-            phase="PREPARING",
-            result=SchedulingResult.FAILURE,
-            error_code="IMAGE_NOT_FOUND",
-            message="Prepare failed",
+        creator2 = Creator(
+            spec=KernelSchedulingHistoryCreatorSpec(
+                kernel_id=kernel_id,
+                session_id=session_id,
+                phase="PREPARING",
+                result=SchedulingResult.FAILURE,
+                error_code="IMAGE_NOT_FOUND",
+                message="Prepare failed",
+            )
         )
         result2 = await scheduling_history_repository.record_kernel_history(creator2)
 
@@ -544,24 +590,28 @@ class TestSchedulingHistoryRepository:
         session_id = SessionId(uuid.uuid4())
 
         # First failure
-        creator1 = KernelSchedulingHistoryCreator(
-            kernel_id=kernel_id,
-            session_id=session_id,
-            phase="PULLING",
-            result=SchedulingResult.FAILURE,
-            error_code="IMAGE_NOT_FOUND",
-            message="Image not found",
+        creator1 = Creator(
+            spec=KernelSchedulingHistoryCreatorSpec(
+                kernel_id=kernel_id,
+                session_id=session_id,
+                phase="PULLING",
+                result=SchedulingResult.FAILURE,
+                error_code="IMAGE_NOT_FOUND",
+                message="Image not found",
+            )
         )
         result1 = await scheduling_history_repository.record_kernel_history(creator1)
 
         # Second failure with different error_code -> should NOT merge
-        creator2 = KernelSchedulingHistoryCreator(
-            kernel_id=kernel_id,
-            session_id=session_id,
-            phase="PULLING",
-            result=SchedulingResult.FAILURE,
-            error_code="REGISTRY_UNAVAILABLE",
-            message="Registry down",
+        creator2 = Creator(
+            spec=KernelSchedulingHistoryCreatorSpec(
+                kernel_id=kernel_id,
+                session_id=session_id,
+                phase="PULLING",
+                result=SchedulingResult.FAILURE,
+                error_code="REGISTRY_UNAVAILABLE",
+                message="Registry down",
+            )
         )
         result2 = await scheduling_history_repository.record_kernel_history(creator2)
 
@@ -578,12 +628,14 @@ class TestSchedulingHistoryRepository:
 
         # Create multiple history entries
         for i in range(5):
-            creator = KernelSchedulingHistoryCreator(
-                kernel_id=kernel_id,
-                session_id=session_id,
-                phase=f"PHASE_{i}",
-                result=SchedulingResult.SUCCESS,
-                message=f"Message {i}",
+            creator = Creator(
+                spec=KernelSchedulingHistoryCreatorSpec(
+                    kernel_id=kernel_id,
+                    session_id=session_id,
+                    phase=f"PHASE_{i}",
+                    result=SchedulingResult.SUCCESS,
+                    message=f"Message {i}",
+                )
             )
             await scheduling_history_repository.record_kernel_history(creator)
 
@@ -610,11 +662,13 @@ class TestSchedulingHistoryRepository:
         """Test recording deployment history with SUCCESS result"""
         deployment_id = uuid.uuid4()
 
-        creator = DeploymentHistoryCreator(
-            deployment_id=deployment_id,
-            phase="PROVISION",
-            result=SchedulingResult.SUCCESS,
-            message="Deployment provisioned",
+        creator = Creator(
+            spec=DeploymentHistoryCreatorSpec(
+                deployment_id=deployment_id,
+                phase="PROVISION",
+                result=SchedulingResult.SUCCESS,
+                message="Deployment provisioned",
+            )
         )
 
         result = await scheduling_history_repository.record_deployment_history(creator)
@@ -631,12 +685,14 @@ class TestSchedulingHistoryRepository:
         """Test recording deployment history with FAILURE result"""
         deployment_id = uuid.uuid4()
 
-        creator = DeploymentHistoryCreator(
-            deployment_id=deployment_id,
-            phase="PROVISION",
-            result=SchedulingResult.FAILURE,
-            message="Deployment provision failed",
-            error_code="RESOURCE_LIMIT",
+        creator = Creator(
+            spec=DeploymentHistoryCreatorSpec(
+                deployment_id=deployment_id,
+                phase="PROVISION",
+                result=SchedulingResult.FAILURE,
+                message="Deployment provision failed",
+                error_code="RESOURCE_LIMIT",
+            )
         )
 
         result = await scheduling_history_repository.record_deployment_history(creator)
@@ -655,22 +711,26 @@ class TestSchedulingHistoryRepository:
         deployment_id = uuid.uuid4()
 
         # First failure
-        creator1 = DeploymentHistoryCreator(
-            deployment_id=deployment_id,
-            phase="PROVISION",
-            result=SchedulingResult.FAILURE,
-            error_code="RESOURCE_LIMIT",
-            message="Resource limit reached",
+        creator1 = Creator(
+            spec=DeploymentHistoryCreatorSpec(
+                deployment_id=deployment_id,
+                phase="PROVISION",
+                result=SchedulingResult.FAILURE,
+                error_code="RESOURCE_LIMIT",
+                message="Resource limit reached",
+            )
         )
         result1 = await scheduling_history_repository.record_deployment_history(creator1)
 
         # Second failure -> should merge
-        creator2 = DeploymentHistoryCreator(
-            deployment_id=deployment_id,
-            phase="PROVISION",
-            result=SchedulingResult.FAILURE,
-            error_code="RESOURCE_LIMIT",
-            message="Still at resource limit",
+        creator2 = Creator(
+            spec=DeploymentHistoryCreatorSpec(
+                deployment_id=deployment_id,
+                phase="PROVISION",
+                result=SchedulingResult.FAILURE,
+                error_code="RESOURCE_LIMIT",
+                message="Still at resource limit",
+            )
         )
         result2 = await scheduling_history_repository.record_deployment_history(creator2)
 
@@ -678,12 +738,14 @@ class TestSchedulingHistoryRepository:
         assert result2.attempts == 2
 
         # Third failure -> should merge again
-        creator3 = DeploymentHistoryCreator(
-            deployment_id=deployment_id,
-            phase="PROVISION",
-            result=SchedulingResult.FAILURE,
-            error_code="RESOURCE_LIMIT",
-            message="Resource limit still exceeded",
+        creator3 = Creator(
+            spec=DeploymentHistoryCreatorSpec(
+                deployment_id=deployment_id,
+                phase="PROVISION",
+                result=SchedulingResult.FAILURE,
+                error_code="RESOURCE_LIMIT",
+                message="Resource limit still exceeded",
+            )
         )
         result3 = await scheduling_history_repository.record_deployment_history(creator3)
 
@@ -699,20 +761,24 @@ class TestSchedulingHistoryRepository:
         deployment_id = uuid.uuid4()
 
         # First success
-        creator1 = DeploymentHistoryCreator(
-            deployment_id=deployment_id,
-            phase="PROVISION",
-            result=SchedulingResult.SUCCESS,
-            message="Deployment provisioned",
+        creator1 = Creator(
+            spec=DeploymentHistoryCreatorSpec(
+                deployment_id=deployment_id,
+                phase="PROVISION",
+                result=SchedulingResult.SUCCESS,
+                message="Deployment provisioned",
+            )
         )
         result1 = await scheduling_history_repository.record_deployment_history(creator1)
 
         # Second success -> should NOT merge (new row)
-        creator2 = DeploymentHistoryCreator(
-            deployment_id=deployment_id,
-            phase="PROVISION",
-            result=SchedulingResult.SUCCESS,
-            message="Deployment provisioned again",
+        creator2 = Creator(
+            spec=DeploymentHistoryCreatorSpec(
+                deployment_id=deployment_id,
+                phase="PROVISION",
+                result=SchedulingResult.SUCCESS,
+                message="Deployment provisioned again",
+            )
         )
         result2 = await scheduling_history_repository.record_deployment_history(creator2)
 
@@ -728,22 +794,26 @@ class TestSchedulingHistoryRepository:
         deployment_id = uuid.uuid4()
 
         # First failure
-        creator1 = DeploymentHistoryCreator(
-            deployment_id=deployment_id,
-            phase="PROVISION",
-            result=SchedulingResult.FAILURE,
-            error_code="RESOURCE_LIMIT",
-            message="Resource limit reached",
+        creator1 = Creator(
+            spec=DeploymentHistoryCreatorSpec(
+                deployment_id=deployment_id,
+                phase="PROVISION",
+                result=SchedulingResult.FAILURE,
+                error_code="RESOURCE_LIMIT",
+                message="Resource limit reached",
+            )
         )
         result1 = await scheduling_history_repository.record_deployment_history(creator1)
 
         # Second failure with different phase -> should NOT merge
-        creator2 = DeploymentHistoryCreator(
-            deployment_id=deployment_id,
-            phase="SCALE_UP",
-            result=SchedulingResult.FAILURE,
-            error_code="RESOURCE_LIMIT",
-            message="Scale up failed",
+        creator2 = Creator(
+            spec=DeploymentHistoryCreatorSpec(
+                deployment_id=deployment_id,
+                phase="SCALE_UP",
+                result=SchedulingResult.FAILURE,
+                error_code="RESOURCE_LIMIT",
+                message="Scale up failed",
+            )
         )
         result2 = await scheduling_history_repository.record_deployment_history(creator2)
 
@@ -758,22 +828,26 @@ class TestSchedulingHistoryRepository:
         deployment_id = uuid.uuid4()
 
         # First failure
-        creator1 = DeploymentHistoryCreator(
-            deployment_id=deployment_id,
-            phase="PROVISION",
-            result=SchedulingResult.FAILURE,
-            error_code="RESOURCE_LIMIT",
-            message="Resource limit reached",
+        creator1 = Creator(
+            spec=DeploymentHistoryCreatorSpec(
+                deployment_id=deployment_id,
+                phase="PROVISION",
+                result=SchedulingResult.FAILURE,
+                error_code="RESOURCE_LIMIT",
+                message="Resource limit reached",
+            )
         )
         result1 = await scheduling_history_repository.record_deployment_history(creator1)
 
         # Second failure with different error_code -> should NOT merge
-        creator2 = DeploymentHistoryCreator(
-            deployment_id=deployment_id,
-            phase="PROVISION",
-            result=SchedulingResult.FAILURE,
-            error_code="NO_AVAILABLE_AGENT",
-            message="No agent available",
+        creator2 = Creator(
+            spec=DeploymentHistoryCreatorSpec(
+                deployment_id=deployment_id,
+                phase="PROVISION",
+                result=SchedulingResult.FAILURE,
+                error_code="NO_AVAILABLE_AGENT",
+                message="No agent available",
+            )
         )
         result2 = await scheduling_history_repository.record_deployment_history(creator2)
 
@@ -789,11 +863,13 @@ class TestSchedulingHistoryRepository:
 
         # Create multiple history entries
         for i in range(5):
-            creator = DeploymentHistoryCreator(
-                deployment_id=deployment_id,
-                phase=f"PHASE_{i}",
-                result=SchedulingResult.SUCCESS,
-                message=f"Message {i}",
+            creator = Creator(
+                spec=DeploymentHistoryCreatorSpec(
+                    deployment_id=deployment_id,
+                    phase=f"PHASE_{i}",
+                    result=SchedulingResult.SUCCESS,
+                    message=f"Message {i}",
+                )
             )
             await scheduling_history_repository.record_deployment_history(creator)
 
@@ -821,14 +897,16 @@ class TestSchedulingHistoryRepository:
         route_id = uuid.uuid4()
         deployment_id = uuid.uuid4()
 
-        creator = RouteHistoryCreator(
-            route_id=route_id,
-            deployment_id=deployment_id,
-            phase="PROVISION",
-            result=SchedulingResult.SUCCESS,
-            message="Route provisioned",
-            from_status=RouteStatus.PROVISIONING,
-            to_status=RouteStatus.HEALTHY,
+        creator = Creator(
+            spec=RouteHistoryCreatorSpec(
+                route_id=route_id,
+                deployment_id=deployment_id,
+                phase="PROVISION",
+                result=SchedulingResult.SUCCESS,
+                message="Route provisioned",
+                from_status=RouteStatus.PROVISIONING,
+                to_status=RouteStatus.HEALTHY,
+            )
         )
 
         result = await scheduling_history_repository.record_route_history(creator)
@@ -849,13 +927,15 @@ class TestSchedulingHistoryRepository:
         route_id = uuid.uuid4()
         deployment_id = uuid.uuid4()
 
-        creator = RouteHistoryCreator(
-            route_id=route_id,
-            deployment_id=deployment_id,
-            phase="HEALTH_CHECK",
-            result=SchedulingResult.FAILURE,
-            message="Health check failed",
-            error_code="HEALTH_CHECK_FAILED",
+        creator = Creator(
+            spec=RouteHistoryCreatorSpec(
+                route_id=route_id,
+                deployment_id=deployment_id,
+                phase="HEALTH_CHECK",
+                result=SchedulingResult.FAILURE,
+                message="Health check failed",
+                error_code="HEALTH_CHECK_FAILED",
+            )
         )
 
         result = await scheduling_history_repository.record_route_history(creator)
@@ -876,24 +956,28 @@ class TestSchedulingHistoryRepository:
         deployment_id = uuid.uuid4()
 
         # First failure
-        creator1 = RouteHistoryCreator(
-            route_id=route_id,
-            deployment_id=deployment_id,
-            phase="HEALTH_CHECK",
-            result=SchedulingResult.FAILURE,
-            error_code="HEALTH_CHECK_FAILED",
-            message="Health check failed",
+        creator1 = Creator(
+            spec=RouteHistoryCreatorSpec(
+                route_id=route_id,
+                deployment_id=deployment_id,
+                phase="HEALTH_CHECK",
+                result=SchedulingResult.FAILURE,
+                error_code="HEALTH_CHECK_FAILED",
+                message="Health check failed",
+            )
         )
         result1 = await scheduling_history_repository.record_route_history(creator1)
 
         # Second failure -> should merge
-        creator2 = RouteHistoryCreator(
-            route_id=route_id,
-            deployment_id=deployment_id,
-            phase="HEALTH_CHECK",
-            result=SchedulingResult.FAILURE,
-            error_code="HEALTH_CHECK_FAILED",
-            message="Health check still failing",
+        creator2 = Creator(
+            spec=RouteHistoryCreatorSpec(
+                route_id=route_id,
+                deployment_id=deployment_id,
+                phase="HEALTH_CHECK",
+                result=SchedulingResult.FAILURE,
+                error_code="HEALTH_CHECK_FAILED",
+                message="Health check still failing",
+            )
         )
         result2 = await scheduling_history_repository.record_route_history(creator2)
 
@@ -901,13 +985,15 @@ class TestSchedulingHistoryRepository:
         assert result2.attempts == 2
 
         # Third failure -> should merge again
-        creator3 = RouteHistoryCreator(
-            route_id=route_id,
-            deployment_id=deployment_id,
-            phase="HEALTH_CHECK",
-            result=SchedulingResult.FAILURE,
-            error_code="HEALTH_CHECK_FAILED",
-            message="Health check continuously failing",
+        creator3 = Creator(
+            spec=RouteHistoryCreatorSpec(
+                route_id=route_id,
+                deployment_id=deployment_id,
+                phase="HEALTH_CHECK",
+                result=SchedulingResult.FAILURE,
+                error_code="HEALTH_CHECK_FAILED",
+                message="Health check continuously failing",
+            )
         )
         result3 = await scheduling_history_repository.record_route_history(creator3)
 
@@ -924,22 +1010,26 @@ class TestSchedulingHistoryRepository:
         deployment_id = uuid.uuid4()
 
         # First success
-        creator1 = RouteHistoryCreator(
-            route_id=route_id,
-            deployment_id=deployment_id,
-            phase="HEALTH_CHECK",
-            result=SchedulingResult.SUCCESS,
-            message="Health check passed",
+        creator1 = Creator(
+            spec=RouteHistoryCreatorSpec(
+                route_id=route_id,
+                deployment_id=deployment_id,
+                phase="HEALTH_CHECK",
+                result=SchedulingResult.SUCCESS,
+                message="Health check passed",
+            )
         )
         result1 = await scheduling_history_repository.record_route_history(creator1)
 
         # Second success -> should NOT merge (new row)
-        creator2 = RouteHistoryCreator(
-            route_id=route_id,
-            deployment_id=deployment_id,
-            phase="HEALTH_CHECK",
-            result=SchedulingResult.SUCCESS,
-            message="Health check passed again",
+        creator2 = Creator(
+            spec=RouteHistoryCreatorSpec(
+                route_id=route_id,
+                deployment_id=deployment_id,
+                phase="HEALTH_CHECK",
+                result=SchedulingResult.SUCCESS,
+                message="Health check passed again",
+            )
         )
         result2 = await scheduling_history_repository.record_route_history(creator2)
 
@@ -956,24 +1046,28 @@ class TestSchedulingHistoryRepository:
         deployment_id = uuid.uuid4()
 
         # First failure
-        creator1 = RouteHistoryCreator(
-            route_id=route_id,
-            deployment_id=deployment_id,
-            phase="HEALTH_CHECK",
-            result=SchedulingResult.FAILURE,
-            error_code="HEALTH_CHECK_FAILED",
-            message="Health check failed",
+        creator1 = Creator(
+            spec=RouteHistoryCreatorSpec(
+                route_id=route_id,
+                deployment_id=deployment_id,
+                phase="HEALTH_CHECK",
+                result=SchedulingResult.FAILURE,
+                error_code="HEALTH_CHECK_FAILED",
+                message="Health check failed",
+            )
         )
         result1 = await scheduling_history_repository.record_route_history(creator1)
 
         # Second failure with different phase -> should NOT merge
-        creator2 = RouteHistoryCreator(
-            route_id=route_id,
-            deployment_id=deployment_id,
-            phase="PROVISION",
-            result=SchedulingResult.FAILURE,
-            error_code="HEALTH_CHECK_FAILED",
-            message="Provision failed",
+        creator2 = Creator(
+            spec=RouteHistoryCreatorSpec(
+                route_id=route_id,
+                deployment_id=deployment_id,
+                phase="PROVISION",
+                result=SchedulingResult.FAILURE,
+                error_code="HEALTH_CHECK_FAILED",
+                message="Provision failed",
+            )
         )
         result2 = await scheduling_history_repository.record_route_history(creator2)
 
@@ -989,24 +1083,28 @@ class TestSchedulingHistoryRepository:
         deployment_id = uuid.uuid4()
 
         # First failure
-        creator1 = RouteHistoryCreator(
-            route_id=route_id,
-            deployment_id=deployment_id,
-            phase="HEALTH_CHECK",
-            result=SchedulingResult.FAILURE,
-            error_code="HEALTH_CHECK_FAILED",
-            message="Health check failed",
+        creator1 = Creator(
+            spec=RouteHistoryCreatorSpec(
+                route_id=route_id,
+                deployment_id=deployment_id,
+                phase="HEALTH_CHECK",
+                result=SchedulingResult.FAILURE,
+                error_code="HEALTH_CHECK_FAILED",
+                message="Health check failed",
+            )
         )
         result1 = await scheduling_history_repository.record_route_history(creator1)
 
         # Second failure with different error_code -> should NOT merge
-        creator2 = RouteHistoryCreator(
-            route_id=route_id,
-            deployment_id=deployment_id,
-            phase="HEALTH_CHECK",
-            result=SchedulingResult.FAILURE,
-            error_code="TIMEOUT",
-            message="Request timed out",
+        creator2 = Creator(
+            spec=RouteHistoryCreatorSpec(
+                route_id=route_id,
+                deployment_id=deployment_id,
+                phase="HEALTH_CHECK",
+                result=SchedulingResult.FAILURE,
+                error_code="TIMEOUT",
+                message="Request timed out",
+            )
         )
         result2 = await scheduling_history_repository.record_route_history(creator2)
 
@@ -1023,12 +1121,14 @@ class TestSchedulingHistoryRepository:
 
         # Create multiple history entries
         for i in range(5):
-            creator = RouteHistoryCreator(
-                route_id=route_id,
-                deployment_id=deployment_id,
-                phase=f"PHASE_{i}",
-                result=SchedulingResult.SUCCESS,
-                message=f"Message {i}",
+            creator = Creator(
+                spec=RouteHistoryCreatorSpec(
+                    route_id=route_id,
+                    deployment_id=deployment_id,
+                    phase=f"PHASE_{i}",
+                    result=SchedulingResult.SUCCESS,
+                    message=f"Message {i}",
+                )
             )
             await scheduling_history_repository.record_route_history(creator)
 

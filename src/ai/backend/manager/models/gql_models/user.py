@@ -23,12 +23,13 @@ from sqlalchemy.engine.row import Row
 
 from ai.backend.common.exception import UserNotFound
 from ai.backend.manager.data.user.types import (
-    UserCreator,
     UserData,
     UserInfoContext,
 )
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.minilang import ExternalTableFilterSpec, ORMFieldItem
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
 )
@@ -894,24 +895,26 @@ class UserInput(graphene.InputObjectType):
         )
 
         return CreateUserAction(
-            creator=UserCreator(
-                username=str(self.username),
-                password=password_info,
-                email=email,
-                need_password_change=bool(self.need_password_change),
-                domain_name=str(self.domain_name),
-                full_name=value_or_none(self.full_name),
-                description=value_or_none(self.description),
-                is_active=value_or_none(self.is_active),
-                status=UserStatus(self.status) if self.status is not Undefined else None,
-                role=UserRole(self.role) if self.role is not Undefined else None,
-                allowed_client_ip=value_or_none(self.allowed_client_ip),
-                totp_activated=value_or_none(self.totp_activated),
-                resource_policy=value_or_none(self.resource_policy),
-                sudo_session_enabled=value_or_none(self.sudo_session_enabled),
-                container_uid=value_or_none(self.container_uid),
-                container_main_gid=value_or_none(self.container_main_gid),
-                container_gids=value_or_none(self.container_gids),
+            creator=Creator(
+                spec=UserCreatorSpec(
+                    username=str(self.username),
+                    password=password_info,
+                    email=email,
+                    need_password_change=bool(self.need_password_change),
+                    domain_name=str(self.domain_name),
+                    full_name=value_or_none(self.full_name),
+                    description=value_or_none(self.description),
+                    is_active=value_or_none(self.is_active),
+                    status=UserStatus(self.status) if self.status is not Undefined else None,
+                    role=UserRole(self.role) if self.role is not Undefined else None,
+                    allowed_client_ip=value_or_none(self.allowed_client_ip),
+                    totp_activated=value_or_none(self.totp_activated),
+                    resource_policy=value_or_none(self.resource_policy),
+                    sudo_session_enabled=value_or_none(self.sudo_session_enabled),
+                    container_uid=value_or_none(self.container_uid),
+                    container_main_gid=value_or_none(self.container_main_gid),
+                    container_gids=value_or_none(self.container_gids),
+                ),
             ),
             group_ids=value_or_none(self.group_ids),
         )

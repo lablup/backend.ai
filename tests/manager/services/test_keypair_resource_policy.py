@@ -10,6 +10,10 @@ from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.keypair_resource_policy.creators import (
+    KeyPairResourcePolicyCreatorSpec,
+)
 from ai.backend.manager.repositories.keypair_resource_policy.repository import (
     KeypairResourcePolicyRepository,
 )
@@ -30,7 +34,6 @@ from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
 from ai.backend.manager.services.keypair_resource_policy.service import KeypairResourcePolicyService
-from ai.backend.manager.services.keypair_resource_policy.types import KeyPairResourcePolicyCreator
 from ai.backend.manager.types import OptionalState, TriState
 
 from .utils import ScenarioBase
@@ -115,25 +118,27 @@ def create_keypair_resource_policy(database_engine: ExtendedAsyncSAEngine):
         ScenarioBase.success(
             "Create keypair resource policy with valid data",
             CreateKeyPairResourcePolicyAction(
-                creator=KeyPairResourcePolicyCreator(
-                    name="test-create-policy",
-                    default_for_unspecified=DefaultForUnspecified.LIMITED,
-                    total_resource_slots=ResourceSlot.from_user_input(
-                        {"cpu": "2", "mem": "4g"}, None
-                    ),
-                    max_session_lifetime=1800,
-                    max_concurrent_sessions=3,
-                    max_pending_session_count=5,
-                    max_pending_session_resource_slots=ResourceSlot.from_user_input(
-                        {"cpu": "1", "mem": "2g"}, None
-                    ),
-                    max_concurrent_sftp_sessions=2,
-                    max_containers_per_session=1,
-                    idle_timeout=900,
-                    allowed_vfolder_hosts={"local": {}},
-                    max_vfolder_count=3,  # Deprecated but still in creator
-                    max_vfolder_size=500,  # Deprecated but still in creator
-                    max_quota_scope_size=250,  # Deprecated but still in creator
+                creator=Creator(
+                    spec=KeyPairResourcePolicyCreatorSpec(
+                        name="test-create-policy",
+                        default_for_unspecified=DefaultForUnspecified.LIMITED,
+                        total_resource_slots=ResourceSlot.from_user_input(
+                            {"cpu": "2", "mem": "4g"}, None
+                        ),
+                        max_session_lifetime=1800,
+                        max_concurrent_sessions=3,
+                        max_pending_session_count=5,
+                        max_pending_session_resource_slots=ResourceSlot.from_user_input(
+                            {"cpu": "1", "mem": "2g"}, None
+                        ),
+                        max_concurrent_sftp_sessions=2,
+                        max_containers_per_session=1,
+                        idle_timeout=900,
+                        allowed_vfolder_hosts={"local": {}},
+                        max_vfolder_count=3,  # Deprecated but still in creator
+                        max_vfolder_size=500,  # Deprecated but still in creator
+                        max_quota_scope_size=250,  # Deprecated but still in creator
+                    )
                 )
             ),
             CreateKeyPairResourcePolicyActionResult(
@@ -160,23 +165,25 @@ def create_keypair_resource_policy(database_engine: ExtendedAsyncSAEngine):
         ScenarioBase.success(
             "Create keypair resource policy with minimal configuration",
             CreateKeyPairResourcePolicyAction(
-                creator=KeyPairResourcePolicyCreator(
-                    name="minimal-policy",
-                    allowed_vfolder_hosts={},
-                    default_for_unspecified=DefaultForUnspecified.LIMITED,
-                    idle_timeout=1800,
-                    max_concurrent_sessions=1,
-                    max_containers_per_session=1,
-                    max_pending_session_count=None,
-                    max_pending_session_resource_slots=None,
-                    max_quota_scope_size=None,
-                    max_vfolder_count=None,
-                    max_vfolder_size=None,
-                    max_concurrent_sftp_sessions=1,
-                    max_session_lifetime=0,
-                    total_resource_slots=ResourceSlot.from_user_input(
-                        {"cpu": "1", "mem": "1g"}, None
-                    ),
+                creator=Creator(
+                    spec=KeyPairResourcePolicyCreatorSpec(
+                        name="minimal-policy",
+                        allowed_vfolder_hosts={},
+                        default_for_unspecified=DefaultForUnspecified.LIMITED,
+                        idle_timeout=1800,
+                        max_concurrent_sessions=1,
+                        max_containers_per_session=1,
+                        max_pending_session_count=None,
+                        max_pending_session_resource_slots=None,
+                        max_quota_scope_size=None,
+                        max_vfolder_count=None,
+                        max_vfolder_size=None,
+                        max_concurrent_sftp_sessions=1,
+                        max_session_lifetime=0,
+                        total_resource_slots=ResourceSlot.from_user_input(
+                            {"cpu": "1", "mem": "1g"}, None
+                        ),
+                    )
                 )
             ),
             CreateKeyPairResourcePolicyActionResult(
@@ -213,21 +220,23 @@ async def test_create_keypair_resource_policy(
         ScenarioBase.failure(
             "Create keypair resource policy with duplicate name should raise error",
             CreateKeyPairResourcePolicyAction(
-                creator=KeyPairResourcePolicyCreator(
-                    name="existing-policy",
-                    allowed_vfolder_hosts=None,
-                    default_for_unspecified=DefaultForUnspecified.LIMITED,
-                    idle_timeout=None,
-                    max_concurrent_sessions=None,
-                    max_containers_per_session=None,
-                    max_pending_session_count=None,
-                    max_pending_session_resource_slots=None,
-                    max_quota_scope_size=None,
-                    max_vfolder_count=None,
-                    max_vfolder_size=None,
-                    max_concurrent_sftp_sessions=None,
-                    max_session_lifetime=None,
-                    total_resource_slots=None,
+                creator=Creator(
+                    spec=KeyPairResourcePolicyCreatorSpec(
+                        name="existing-policy",
+                        allowed_vfolder_hosts=None,
+                        default_for_unspecified=DefaultForUnspecified.LIMITED,
+                        idle_timeout=None,
+                        max_concurrent_sessions=None,
+                        max_containers_per_session=None,
+                        max_pending_session_count=None,
+                        max_pending_session_resource_slots=None,
+                        max_quota_scope_size=None,
+                        max_vfolder_count=None,
+                        max_vfolder_size=None,
+                        max_concurrent_sftp_sessions=None,
+                        max_session_lifetime=None,
+                        total_resource_slots=None,
+                    )
                 )
             ),
             Exception,  # Database constraint violation

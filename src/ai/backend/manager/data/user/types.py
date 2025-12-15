@@ -4,7 +4,7 @@ import enum
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Optional, Self, override
+from typing import Any, Optional, Self, override
 from uuid import UUID
 
 from sqlalchemy.engine import Row
@@ -17,12 +17,8 @@ from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.errors.resource import DataTransformationFailed
-from ai.backend.manager.types import Creator
 
 from ..keypair.types import KeyPairData
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.hasher.types import PasswordInfo
 
 
 class UserStatus(enum.StrEnum):
@@ -63,59 +59,6 @@ class UserRole(CIStrEnum):
     ADMIN = "admin"
     USER = "user"
     MONITOR = "monitor"
-
-
-@dataclass
-class UserCreator(Creator):
-    email: str
-    username: str
-    password: PasswordInfo  # Only accept PasswordInfo
-    need_password_change: bool
-    domain_name: str
-    full_name: Optional[str] = None
-    description: Optional[str] = None
-    is_active: Optional[bool] = None
-    status: Optional[UserStatus] = None
-    role: Optional[str] = None
-    allowed_client_ip: Optional[list[str]] = None
-    totp_activated: Optional[bool] = None
-    resource_policy: Optional[str] = None
-    sudo_session_enabled: Optional[bool] = None
-    container_uid: Optional[int] = None
-    container_main_gid: Optional[int] = None
-    container_gids: Optional[list[int]] = None
-
-    def fields_to_store(self) -> dict[str, Any]:
-        status = UserStatus.ACTIVE  # TODO: Need to be set in action explicitly not in service (integrate is_active and status)
-        if self.status is None and self.is_active is not None:
-            status = UserStatus.ACTIVE if self.is_active else UserStatus.INACTIVE
-        if self.status is not None:
-            status = self.status
-        user_data = {
-            "email": self.email,
-            "username": self.username,
-            "password": self.password,
-            "need_password_change": self.need_password_change,
-            "domain_name": self.domain_name,
-            "full_name": self.full_name,
-            "description": self.description,
-            "status": status,
-            "role": self.role,
-            "allowed_client_ip": self.allowed_client_ip,
-            "totp_activated": self.totp_activated,
-            "resource_policy": self.resource_policy,
-            "sudo_session_enabled": self.sudo_session_enabled,
-            "container_uid": self.container_uid,
-            "container_main_gid": self.container_main_gid,
-            "container_gids": self.container_gids,
-        }
-        if self.container_uid is not None:
-            user_data["container_uid"] = self.container_uid
-        if self.container_main_gid is not None:
-            user_data["container_main_gid"] = self.container_main_gid
-        if self.container_gids is not None:
-            user_data["container_gids"] = self.container_gids
-        return user_data
 
 
 @dataclass

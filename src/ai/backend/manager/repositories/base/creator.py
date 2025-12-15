@@ -81,4 +81,5 @@ async def execute_creator(
     row = creator.spec.build_row()
     db_sess.add(row)
     await db_sess.flush()
+    await db_sess.refresh(row)
     return CreatorResult(row=row)

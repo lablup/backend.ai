@@ -1,5 +1,4 @@
 from .types import (
-    AppConfigCreator,
     AppConfigData,
     AppConfigModifier,
     AppConfigScopeType,
@@ -9,7 +8,6 @@ from .types import (
 __all__ = (
     "AppConfigScopeType",
     "AppConfigData",
-    "AppConfigCreator",
     "AppConfigModifier",
     "MergedAppConfig",
 )

@@ -7,7 +7,6 @@ from typing import Any, Optional
 import sqlalchemy as sa
 
 from ai.backend.manager.data.app_config.types import (
-    AppConfigCreator,
     AppConfigData,
     AppConfigModifier,
     MergedAppConfig,
@@ -16,6 +15,7 @@ from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.app_config import AppConfigRow, AppConfigScopeType
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 
 
 class AppConfigDBSource:
@@ -105,14 +105,11 @@ class AppConfigDBSource:
                 merged_config=merged_config,
             )
 
-    async def create_config(self, creator: AppConfigCreator) -> AppConfigData:
+    async def create_config(self, creator: Creator[AppConfigRow]) -> AppConfigData:
         """Create a new app configuration."""
         async with self._db.begin_session() as db_sess:
-            config_row = AppConfigRow(**creator.fields_to_store())
-            db_sess.add(config_row)
-            await db_sess.flush()
-            await db_sess.refresh(config_row)
-            return config_row.to_data()
+            result = await execute_creator(db_sess, creator)
+            return result.row.to_data()
 
     async def upsert_config(
         self,

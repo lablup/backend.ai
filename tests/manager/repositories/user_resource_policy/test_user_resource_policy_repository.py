@@ -9,13 +9,16 @@ import sqlalchemy as sa
 from ai.backend.common.exception import UserResourcePolicyNotFound
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.user_resource_policy.creators import (
+    UserResourcePolicyCreatorSpec,
+)
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
 from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
     UserResourcePolicyModifier,
 )
-from ai.backend.manager.services.user_resource_policy.types import UserResourcePolicyCreator
 from ai.backend.manager.types import OptionalState
 
 if TYPE_CHECKING:
@@ -66,17 +69,16 @@ class TestUserResourcePolicyRepository:
         max_session_count_per_model_session = 5
         max_customized_image_count = 3
 
-        creator = UserResourcePolicyCreator(
+        spec = UserResourcePolicyCreatorSpec(
             name=policy_name,
             max_vfolder_count=max_vfolder_count,
             max_quota_scope_size=max_quota_scope_size,
             max_session_count_per_model_session=max_session_count_per_model_session,
-            max_vfolder_size=None,  # Deprecated
             max_customized_image_count=max_customized_image_count,
         )
 
         try:
-            result = await repository.create(creator)
+            result = await repository.create(Creator(spec=spec))
             assert isinstance(result, UserResourcePolicyData)
             assert result.name == "test-policy-create"
             assert result.max_vfolder_count == max_vfolder_count
@@ -229,13 +231,14 @@ class TestUserResourcePolicyRepository:
 
         try:
             created = await repository.create(
-                UserResourcePolicyCreator(
-                    name=policy_name,
-                    max_vfolder_count=max_vfolder_count,
-                    max_quota_scope_size=max_quota_scope_size,
-                    max_session_count_per_model_session=max_session_count_per_model_session,
-                    max_customized_image_count=max_customized_image_count,
-                    max_vfolder_size=None,  # Deprecated
+                Creator(
+                    spec=UserResourcePolicyCreatorSpec(
+                        name=policy_name,
+                        max_vfolder_count=max_vfolder_count,
+                        max_quota_scope_size=max_quota_scope_size,
+                        max_session_count_per_model_session=max_session_count_per_model_session,
+                        max_customized_image_count=max_customized_image_count,
+                    )
                 )
             )
             retrieved = await repository.get_by_name(created.name)

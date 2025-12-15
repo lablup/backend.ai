@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 from ai.backend.logging.utils import BraceStyleAdapter

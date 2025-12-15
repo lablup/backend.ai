@@ -40,7 +40,7 @@ class VFSStorageService:
         """
         Create a new VFS storage.
         """
-        log.info("Creating VFS storage with data: {}", action.creator.fields_to_store())
+        log.info("Creating VFS storage with data: {}", action.creator)
         storage_data = await self._vfs_storage_repository.create(action.creator)
         return CreateVFSStorageActionResult(result=storage_data)
 

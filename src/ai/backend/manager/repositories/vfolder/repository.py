@@ -54,6 +54,8 @@ from ai.backend.manager.models.vfolder import (
     vfolders,
 )
 
+from ..base.creator import Creator
+from ..permission_controller.creators import AssociationScopesEntitiesCreatorSpec
 from ..permission_controller.role_manager import RoleManager
 
 vfolder_repository_resilience = Resilience(
@@ -263,14 +265,16 @@ class VfolderRepository:
                     scope_id = ScopeId(ScopeType.USER, str(params.user))
                 case VFolderOwnershipType.GROUP:
                     scope_id = ScopeId(ScopeType.PROJECT, str(params.group))
-            await self._role_manager.map_entity_to_scope(
-                session,
-                entity_id=ObjectId(
-                    entity_type=EntityType.VFOLDER,
-                    entity_id=str(params.id),
-                ),
-                scope_id=scope_id,
+            entity_scope_creator = Creator(
+                spec=AssociationScopesEntitiesCreatorSpec(
+                    scope_id=scope_id,
+                    object_id=ObjectId(
+                        entity_type=EntityType.VFOLDER,
+                        entity_id=str(params.id),
+                    ),
+                )
             )
+            await self._role_manager.map_entity_to_scope(session, entity_scope_creator)
 
             # Create owner permission if requested
             if create_owner_permission and params.user:
@@ -280,14 +284,16 @@ class VfolderRepository:
                     "permission": VFolderPermission.OWNER_PERM,
                 })
                 await session.execute(permission_insert)
-                await self._role_manager.map_entity_to_scope(
-                    session,
-                    entity_id=ObjectId(
-                        entity_type=EntityType.VFOLDER,
-                        entity_id=str(params.id),
-                    ),
-                    scope_id=ScopeId(ScopeType.USER, str(params.user)),
+                owner_scope_creator = Creator(
+                    spec=AssociationScopesEntitiesCreatorSpec(
+                        scope_id=ScopeId(ScopeType.USER, str(params.user)),
+                        object_id=ObjectId(
+                            entity_type=EntityType.VFOLDER,
+                            entity_id=str(params.id),
+                        ),
+                    )
                 )
+                await self._role_manager.map_entity_to_scope(session, owner_scope_creator)
                 await self._role_manager.add_object_permission_to_user_role(
                     session,
                     user_id=params.user,
@@ -455,14 +461,16 @@ class VfolderRepository:
             query = sa.insert(VFolderPermissionRow, insert_values)
             await session.execute(query)
 
-            await self._role_manager.map_entity_to_scope(
-                session,
-                entity_id=ObjectId(
-                    entity_type=EntityType.VFOLDER,
-                    entity_id=str(vfolder_id),
-                ),
-                scope_id=ScopeId(ScopeType.USER, str(user_id)),
+            user_scope_creator = Creator(
+                spec=AssociationScopesEntitiesCreatorSpec(
+                    scope_id=ScopeId(ScopeType.USER, str(user_id)),
+                    object_id=ObjectId(
+                        entity_type=EntityType.VFOLDER,
+                        entity_id=str(vfolder_id),
+                    ),
+                )
             )
+            await self._role_manager.map_entity_to_scope(session, user_scope_creator)
             await self._role_manager.add_object_permission_to_user_role(
                 session,
                 user_id=user_id,

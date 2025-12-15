@@ -2,15 +2,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, override
+from typing import Any, Optional
 from uuid import UUID
+
+from typing_extensions import override
 
 from ai.backend.common.data.notification import (
     NotificationChannelType,
     NotificationRuleType,
     WebhookConfig,
 )
-from ai.backend.manager.types import Creator, OptionalState, PartialModifier
+from ai.backend.manager.types import OptionalState, PartialModifier
 
 
 @dataclass
@@ -45,29 +47,6 @@ class NotificationRuleData:
 
 
 @dataclass
-class NotificationChannelCreator(Creator):
-    """Creator for notification channel."""
-
-    name: str
-    channel_type: NotificationChannelType
-    config: WebhookConfig
-    created_by: UUID
-    description: Optional[str] = None
-    enabled: bool = True
-
-    @override
-    def fields_to_store(self) -> dict[str, Any]:
-        return {
-            "name": self.name,
-            "description": self.description,
-            "channel_type": self.channel_type,
-            "config": self.config.model_dump(),
-            "enabled": self.enabled,
-            "created_by": self.created_by,
-        }
-
-
-@dataclass
 class NotificationChannelModifier(PartialModifier):
     """Modifier for notification channel."""
 
@@ -88,31 +67,6 @@ class NotificationChannelModifier(PartialModifier):
             to_update["config"] = config_value.model_dump()
         self.enabled.update_dict(to_update, "enabled")
         return to_update
-
-
-@dataclass
-class NotificationRuleCreator(Creator):
-    """Creator for notification rule."""
-
-    name: str
-    rule_type: NotificationRuleType
-    channel_id: UUID
-    message_template: str
-    created_by: UUID
-    description: Optional[str] = None
-    enabled: bool = True
-
-    @override
-    def fields_to_store(self) -> dict[str, Any]:
-        return {
-            "name": self.name,
-            "description": self.description,
-            "rule_type": self.rule_type,
-            "channel_id": self.channel_id,
-            "message_template": self.message_template,
-            "enabled": self.enabled,
-            "created_by": self.created_by,
-        }
 
 
 @dataclass

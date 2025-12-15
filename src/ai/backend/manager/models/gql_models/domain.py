@@ -26,12 +26,13 @@ from ai.backend.common.exception import (
 )
 from ai.backend.common.types import ResourceSlot, Sentinel
 from ai.backend.manager.data.domain.types import (
-    DomainCreator,
     DomainData,
     DomainModifier,
     DomainNodeModifier,
     UserInfo,
 )
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.create_domain_node import (
     CreateDomainNodeAction,
@@ -373,17 +374,21 @@ class CreateDomainNodeInput(graphene.InputObjectType):
             return value if value is not graphql.Undefined else None
 
         return CreateDomainNodeAction(
-            creator=DomainCreator(
-                name=self.name,
-                description=value_or_none(self.description),
-                is_active=value_or_none(self.is_active),
-                total_resource_slots=ResourceSlot.from_user_input(self.total_resource_slots, None)
-                if self.total_resource_slots is not graphql.Undefined
-                else None,
-                allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
-                allowed_docker_registries=value_or_none(self.allowed_docker_registries),
-                integration_id=value_or_none(self.integration_id),
-                dotfiles=value_or_none(self.dotfiles),
+            creator=Creator(
+                spec=DomainCreatorSpec(
+                    name=self.name,
+                    description=value_or_none(self.description),
+                    is_active=value_or_none(self.is_active),
+                    total_resource_slots=ResourceSlot.from_user_input(
+                        self.total_resource_slots, None
+                    )
+                    if self.total_resource_slots is not graphql.Undefined
+                    else None,
+                    allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
+                    allowed_docker_registries=value_or_none(self.allowed_docker_registries),
+                    integration_id=value_or_none(self.integration_id),
+                    dotfiles=value_or_none(self.dotfiles),
+                )
             ),
             user_info=user_info,
             scaling_groups=value_or_none(self.scaling_groups),
@@ -636,14 +641,16 @@ class DomainInput(graphene.InputObjectType):
             return value if value is not Undefined else None
 
         return CreateDomainAction(
-            creator=DomainCreator(
-                name=domain_name,
-                description=value_or_none(self.description),
-                is_active=value_or_none(self.is_active),
-                total_resource_slots=value_or_none(self.total_resource_slots),
-                allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
-                allowed_docker_registries=value_or_none(self.allowed_docker_registries),
-                integration_id=value_or_none(self.integration_id),
+            creator=Creator(
+                spec=DomainCreatorSpec(
+                    name=domain_name,
+                    description=value_or_none(self.description),
+                    is_active=value_or_none(self.is_active),
+                    total_resource_slots=value_or_none(self.total_resource_slots),
+                    allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
+                    allowed_docker_registries=value_or_none(self.allowed_docker_registries),
+                    integration_id=value_or_none(self.integration_id),
+                )
             ),
             user_info=user_info,
         )

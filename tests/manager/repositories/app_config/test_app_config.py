@@ -11,10 +11,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.types import BinarySize, ValkeyTarget
-from ai.backend.manager.data.app_config.types import (
-    AppConfigCreator,
-    AppConfigModifier,
-)
+from ai.backend.manager.data.app_config.types import AppConfigModifier
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.models.app_config import AppConfigScopeType
 from ai.backend.manager.models.domain import DomainRow
@@ -23,6 +20,8 @@ from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config import AppConfigRepository
+from ai.backend.manager.repositories.app_config.creators import AppConfigCreatorSpec
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.types import OptionalState
 
 
@@ -170,10 +169,12 @@ class TestAppConfigRepository:
         test_domain_name: str,
     ) -> None:
         """Test creating domain-level configuration"""
-        creator = AppConfigCreator(
-            scope_type=AppConfigScopeType.DOMAIN,
-            scope_id=test_domain_name,
-            extra_config={"theme": "dark", "language": "en"},
+        creator = Creator(
+            spec=AppConfigCreatorSpec(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=test_domain_name,
+                extra_config={"theme": "dark", "language": "en"},
+            )
         )
 
         config = await app_config_repository.create_config(creator)
@@ -189,10 +190,12 @@ class TestAppConfigRepository:
         test_user_id: str,
     ) -> None:
         """Test creating user-level configuration"""
-        creator = AppConfigCreator(
-            scope_type=AppConfigScopeType.USER,
-            scope_id=test_user_id,
-            extra_config={"theme": "light", "notifications": True},
+        creator = Creator(
+            spec=AppConfigCreatorSpec(
+                scope_type=AppConfigScopeType.USER,
+                scope_id=test_user_id,
+                extra_config={"theme": "light", "notifications": True},
+            )
         )
 
         config = await app_config_repository.create_config(creator)
@@ -210,10 +213,12 @@ class TestAppConfigRepository:
     ) -> None:
         """Test getting merged config with only domain-level config"""
         # Create domain config
-        domain_creator = AppConfigCreator(
-            scope_type=AppConfigScopeType.DOMAIN,
-            scope_id=test_domain_name,
-            extra_config={"theme": "dark", "language": "en"},
+        domain_creator = Creator(
+            spec=AppConfigCreatorSpec(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=test_domain_name,
+                extra_config={"theme": "dark", "language": "en"},
+            )
         )
         await app_config_repository.create_config(domain_creator)
 
@@ -231,18 +236,22 @@ class TestAppConfigRepository:
     ) -> None:
         """Test getting merged config with user config overriding domain config"""
         # Create domain config
-        domain_creator = AppConfigCreator(
-            scope_type=AppConfigScopeType.DOMAIN,
-            scope_id=test_domain_name,
-            extra_config={"theme": "dark", "language": "en", "sidebar": "expanded"},
+        domain_creator = Creator(
+            spec=AppConfigCreatorSpec(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=test_domain_name,
+                extra_config={"theme": "dark", "language": "en", "sidebar": "expanded"},
+            )
         )
         await app_config_repository.create_config(domain_creator)
 
         # Create user config that overrides theme
-        user_creator = AppConfigCreator(
-            scope_type=AppConfigScopeType.USER,
-            scope_id=test_user_id,
-            extra_config={"theme": "light", "notifications": True},
+        user_creator = Creator(
+            spec=AppConfigCreatorSpec(
+                scope_type=AppConfigScopeType.USER,
+                scope_id=test_user_id,
+                extra_config={"theme": "light", "notifications": True},
+            )
         )
         await app_config_repository.create_config(user_creator)
 
@@ -282,10 +291,12 @@ class TestAppConfigRepository:
     ) -> None:
         """Test upserting config when it exists (update)"""
         # Create initial config
-        creator = AppConfigCreator(
-            scope_type=AppConfigScopeType.DOMAIN,
-            scope_id=test_domain_name,
-            extra_config={"theme": "dark", "language": "en"},
+        creator = Creator(
+            spec=AppConfigCreatorSpec(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=test_domain_name,
+                extra_config={"theme": "dark", "language": "en"},
+            )
         )
         initial_config = await app_config_repository.create_config(creator)
 
@@ -308,10 +319,12 @@ class TestAppConfigRepository:
     ) -> None:
         """Test deleting configuration"""
         # Create config
-        creator = AppConfigCreator(
-            scope_type=AppConfigScopeType.DOMAIN,
-            scope_id=test_domain_name,
-            extra_config={"theme": "dark"},
+        creator = Creator(
+            spec=AppConfigCreatorSpec(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=test_domain_name,
+                extra_config={"theme": "dark"},
+            )
         )
         await app_config_repository.create_config(creator)
 
@@ -359,10 +372,12 @@ class TestAppConfigRepository:
     ) -> None:
         """Test cache invalidation when domain config is updated"""
         # Create domain config
-        domain_creator = AppConfigCreator(
-            scope_type=AppConfigScopeType.DOMAIN,
-            scope_id=test_domain_name,
-            extra_config={"theme": "dark"},
+        domain_creator = Creator(
+            spec=AppConfigCreatorSpec(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=test_domain_name,
+                extra_config={"theme": "dark"},
+            )
         )
         await app_config_repository.create_config(domain_creator)
 

@@ -10,6 +10,10 @@ import pytest
 
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.project_resource_policy.creators import (
+    ProjectResourcePolicyCreatorSpec,
+)
 from ai.backend.manager.repositories.project_resource_policy.repository import (
     ProjectResourcePolicyRepository,
 )
@@ -25,9 +29,6 @@ from ai.backend.manager.services.project_resource_policy.actions.modify_project_
 )
 from ai.backend.manager.services.project_resource_policy.service import (
     ProjectResourcePolicyService,
-)
-from ai.backend.manager.services.project_resource_policy.types import (
-    ProjectResourcePolicyCreator,
 )
 from ai.backend.manager.types import OptionalState
 
@@ -77,12 +78,13 @@ class TestProjectResourcePolicyService:
         )
 
         action = CreateProjectResourcePolicyAction(
-            creator=ProjectResourcePolicyCreator(
-                name="test-policy",
-                max_vfolder_count=20,
-                max_quota_scope_size=2147483648,  # 2GB
-                max_vfolder_size=None,  # deprecated field
-                max_network_count=5,
+            creator=Creator(
+                spec=ProjectResourcePolicyCreatorSpec(
+                    name="test-policy",
+                    max_vfolder_count=20,
+                    max_quota_scope_size=2147483648,  # 2GB
+                    max_network_count=5,
+                )
             ),
         )
 
@@ -91,10 +93,12 @@ class TestProjectResourcePolicyService:
         # Verify the repository was called correctly
         mock_dependencies["project_resource_policy_repository"].create.assert_called_once()
         call_args = mock_dependencies["project_resource_policy_repository"].create.call_args[0][0]
-        assert call_args["name"] == "test-policy"
-        assert call_args["max_vfolder_count"] == 20
-        assert call_args["max_quota_scope_size"] == 2147483648
-        assert call_args["max_network_count"] == 5
+        assert isinstance(call_args, Creator)
+        assert isinstance(call_args.spec, ProjectResourcePolicyCreatorSpec)
+        assert call_args.spec.name == "test-policy"
+        assert call_args.spec.max_vfolder_count == 20
+        assert call_args.spec.max_quota_scope_size == 2147483648
+        assert call_args.spec.max_network_count == 5
 
         # Verify the result
         assert result.project_resource_policy.name == "test-policy"

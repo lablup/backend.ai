@@ -28,7 +28,7 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import msgpack
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.group.types import GroupCreator, GroupData, ProjectType
+from ai.backend.manager.data.group.types import GroupData, ProjectType
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
@@ -200,22 +200,6 @@ class GroupRow(Base):
         back_populates="group_row",
         primaryjoin="GroupRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)",
     )
-
-    @classmethod
-    def from_creator(cls, creator: GroupCreator) -> Self:
-        return cls(
-            name=creator.name,
-            domain_name=creator.domain_name,
-            type=creator.type or ProjectType.GENERAL,
-            description=creator.description,
-            is_active=creator.is_active if creator.is_active is not None else True,
-            total_resource_slots=creator.total_resource_slots or {},
-            allowed_vfolder_hosts=creator.allowed_vfolder_hosts or {},
-            integration_id=creator.integration_id,
-            resource_policy=creator.resource_policy,
-            dotfiles=creator.dotfiles,
-            container_registry=creator.container_registry,
-        )
 
     def to_data(self) -> GroupData:
         return GroupData(

@@ -72,7 +72,7 @@ class ObjectStorageService:
         """
         Create a new object storage.
         """
-        log.info("Creating object storage with data: {}", action.creator.fields_to_store())
+        log.info("Creating object storage with data: {}", action.creator)
         storage_data = await self._object_storage_repository.create(action.creator)
         return CreateObjectStorageActionResult(result=storage_data)
 

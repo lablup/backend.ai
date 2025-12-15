@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import uuid
 
 import sqlalchemy as sa
 
-from ai.backend.manager.data.vfs_storage.creator import VFSStorageCreator
 from ai.backend.manager.data.vfs_storage.modifier import VFSStorageModifier
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.errors.vfs_storage import (
@@ -10,6 +11,7 @@ from ai.backend.manager.errors.vfs_storage import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfs_storage import VFSStorageRow
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 
 
 class VFSStorageDBSource:
@@ -44,17 +46,13 @@ class VFSStorageDBSource:
                 raise VFSStorageNotFoundError(f"VFS storage with ID {storage_id} not found.")
             return row.to_dataclass()
 
-    async def create(self, creator: VFSStorageCreator) -> VFSStorageData:
+    async def create(self, creator: Creator[VFSStorageRow]) -> VFSStorageData:
         """
         Create a new VFS storage configuration in the database.
         """
         async with self._db.begin_session() as db_session:
-            vfs_storage_data = creator.fields_to_store()
-            vfs_storage_row = VFSStorageRow(**vfs_storage_data)
-            db_session.add(vfs_storage_row)
-            await db_session.flush()
-            await db_session.refresh(vfs_storage_row)
-            return vfs_storage_row.to_dataclass()
+            creator_result = await execute_creator(db_session, creator)
+            return creator_result.row.to_dataclass()
 
     async def update(self, storage_id: uuid.UUID, modifier: VFSStorageModifier) -> VFSStorageData:
         """

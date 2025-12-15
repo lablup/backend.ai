@@ -10,7 +10,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.user.types import UserCreator, UserInfoContext
+from ai.backend.manager.data.user.types import UserInfoContext
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.errors.user import UserConflict, UserCreationBadRequest
 from ai.backend.manager.models.group import (
@@ -28,7 +28,9 @@ from ai.backend.manager.models.keypair import (
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.user.admin_repository import AdminUserRepository
+from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.user.actions.create_user import CreateUserAction
 from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
@@ -206,24 +208,26 @@ async def test_create_user(
         salt_size=32,
     )
     action = CreateUserAction(
-        creator=UserCreator(
-            username="testuser",
-            password=password_info,
-            email="test_user@test.com",
-            need_password_change=False,
-            domain_name="default",
-            full_name="Test User",
-            description="Test user description",
-            is_active=True,
-            status=UserStatus.ACTIVE,
-            role=UserRole.USER,
-            allowed_client_ip=None,
-            totp_activated=False,
-            resource_policy="default",
-            sudo_session_enabled=False,
-            container_uid=None,
-            container_main_gid=None,
-            container_gids=None,
+        creator=Creator(
+            spec=UserCreatorSpec(
+                username="testuser",
+                password=password_info,
+                email="test_user@test.com",
+                need_password_change=False,
+                domain_name="default",
+                full_name="Test User",
+                description="Test user description",
+                is_active=True,
+                status=UserStatus.ACTIVE,
+                role=UserRole.USER,
+                allowed_client_ip=None,
+                totp_activated=False,
+                resource_policy="default",
+                sudo_session_enabled=False,
+                container_uid=None,
+                container_main_gid=None,
+                container_gids=None,
+            )
         ),
         group_ids=None,
     )
@@ -260,24 +264,26 @@ async def test_create_user_non_existing_domain(
         salt_size=32,
     )
     action = CreateUserAction(
-        creator=UserCreator(
-            username="test_user_not_existing_domain",
-            password=password_info,
-            email="test@test.com",
-            need_password_change=False,
-            domain_name="non_existing_domain",
-            full_name="Test User",
-            description="Test user description",
-            is_active=True,
-            status=UserStatus.ACTIVE,
-            role=UserRole.USER,
-            allowed_client_ip=None,
-            totp_activated=False,
-            resource_policy="default",
-            sudo_session_enabled=False,
-            container_uid=None,
-            container_main_gid=None,
-            container_gids=None,
+        creator=Creator(
+            spec=UserCreatorSpec(
+                username="test_user_not_existing_domain",
+                password=password_info,
+                email="test@test.com",
+                need_password_change=False,
+                domain_name="non_existing_domain",
+                full_name="Test User",
+                description="Test user description",
+                is_active=True,
+                status=UserStatus.ACTIVE,
+                role=UserRole.USER,
+                allowed_client_ip=None,
+                totp_activated=False,
+                resource_policy="default",
+                sudo_session_enabled=False,
+                container_uid=None,
+                container_main_gid=None,
+                container_gids=None,
+            )
         ),
         group_ids=None,
     )
@@ -302,24 +308,26 @@ async def test_create_user_duplicate_email(
             salt_size=32,
         )
         action = CreateUserAction(
-            creator=UserCreator(
-                username="new_user",
-                password=password_info,
-                email=user_email,  # Same email as existing user
-                need_password_change=False,
-                domain_name="default",
-                full_name="New User",
-                description="Test user description",
-                is_active=True,
-                status=UserStatus.ACTIVE,
-                role=UserRole.USER,
-                allowed_client_ip=None,
-                totp_activated=False,
-                resource_policy="default",
-                sudo_session_enabled=False,
-                container_uid=None,
-                container_main_gid=None,
-                container_gids=None,
+            creator=Creator(
+                spec=UserCreatorSpec(
+                    username="new_user",
+                    password=password_info,
+                    email=user_email,  # Same email as existing user
+                    need_password_change=False,
+                    domain_name="default",
+                    full_name="New User",
+                    description="Test user description",
+                    is_active=True,
+                    status=UserStatus.ACTIVE,
+                    role=UserRole.USER,
+                    allowed_client_ip=None,
+                    totp_activated=False,
+                    resource_policy="default",
+                    sudo_session_enabled=False,
+                    container_uid=None,
+                    container_main_gid=None,
+                    container_gids=None,
+                )
             ),
             group_ids=None,
         )
@@ -344,24 +352,26 @@ async def test_create_user_duplicate_username(
             salt_size=32,
         )
         action = CreateUserAction(
-            creator=UserCreator(
-                username=username,  # Same username as existing user
-                password=password_info,
-                email="new_user@test.com",
-                need_password_change=False,
-                domain_name="default",
-                full_name="New User",
-                description="Test user description",
-                is_active=True,
-                status=UserStatus.ACTIVE,
-                role=UserRole.USER,
-                allowed_client_ip=None,
-                totp_activated=False,
-                resource_policy="default",
-                sudo_session_enabled=False,
-                container_uid=None,
-                container_main_gid=None,
-                container_gids=None,
+            creator=Creator(
+                spec=UserCreatorSpec(
+                    username=username,  # Same username as existing user
+                    password=password_info,
+                    email="new_user@test.com",
+                    need_password_change=False,
+                    domain_name="default",
+                    full_name="New User",
+                    description="Test user description",
+                    is_active=True,
+                    status=UserStatus.ACTIVE,
+                    role=UserRole.USER,
+                    allowed_client_ip=None,
+                    totp_activated=False,
+                    resource_policy="default",
+                    sudo_session_enabled=False,
+                    container_uid=None,
+                    container_main_gid=None,
+                    container_gids=None,
+                )
             ),
             group_ids=None,
         )

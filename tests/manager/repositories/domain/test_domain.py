@@ -15,7 +15,6 @@ import sqlalchemy as sa
 from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.domain.types import (
-    DomainCreator,
     DomainData,
     DomainModifier,
     UserInfo,
@@ -28,6 +27,8 @@ from ai.backend.manager.models.domain import domains, row_to_data
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.user import UserRole, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.types import TriState
 
@@ -51,9 +52,9 @@ class TestDomainRepository:
         return repo
 
     @pytest.fixture
-    def sample_domain_creator(self) -> DomainCreator:
+    def sample_domain_creator(self) -> DomainCreatorSpec:
         """Create domain creator for testing"""
-        return DomainCreator(
+        return DomainCreatorSpec(
             name="test-domain",
             description="Test domain description",
             is_active=True,
@@ -134,7 +135,7 @@ class TestDomainRepository:
         database_fixture,
         database_engine: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
-        sample_domain_creator: DomainCreator,
+        sample_domain_creator: DomainCreatorSpec,
     ) -> None:
         """Test successful domain creation"""
         # Ensure domain doesn't exist
@@ -145,7 +146,9 @@ class TestDomainRepository:
             assert result.first() is None
 
         # Create domain
-        created_domain = await domain_repository.create_domain_validated(sample_domain_creator)
+        created_domain = await domain_repository.create_domain_validated(
+            Creator(spec=sample_domain_creator)
+        )
 
         try:
             assert created_domain.name == sample_domain_creator.name
@@ -188,18 +191,20 @@ class TestDomainRepository:
         database_fixture,
         database_engine: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
-        sample_domain_creator: DomainCreator,
+        sample_domain_creator: DomainCreatorSpec,
     ) -> None:
         """Test domain creation with duplicate name"""
         # Create domain first
-        await domain_repository.create_domain_validated(sample_domain_creator)
+        await domain_repository.create_domain_validated(Creator(spec=sample_domain_creator))
 
         try:
             # Try to create another domain with same name
-            duplicate_creator = DomainCreator(
-                name=sample_domain_creator.name,  # Same name
-                description="Duplicate domain",
-                is_active=True,
+            duplicate_creator = Creator(
+                spec=DomainCreatorSpec(
+                    name=sample_domain_creator.name,  # Same name
+                    description="Duplicate domain",
+                    is_active=True,
+                )
             )
 
             with pytest.raises(InvalidAPIParameters):
@@ -226,15 +231,19 @@ class TestDomainRepository:
         """Test successful domain modification"""
         # Create a test domain directly
         domain_name = "modify-test-simple"
-        domain_creator = DomainCreator(
-            name=domain_name,
-            description="Original description",
-            is_active=True,
-            total_resource_slots=ResourceSlot.from_user_input({"cpu": "10", "mem": "20g"}, None),
-            allowed_vfolder_hosts={"local": ["modify-vfolder"]},
-            allowed_docker_registries=["registry.example.com"],
-            integration_id="test-integration",
-            dotfiles=b"test dotfiles",
+        domain_creator = Creator(
+            spec=DomainCreatorSpec(
+                name=domain_name,
+                description="Original description",
+                is_active=True,
+                total_resource_slots=ResourceSlot.from_user_input(
+                    {"cpu": "10", "mem": "20g"}, None
+                ),
+                allowed_vfolder_hosts={"local": ["modify-vfolder"]},
+                allowed_docker_registries=["registry.example.com"],
+                integration_id="test-integration",
+                dotfiles=b"test dotfiles",
+            )
         )
 
         # Create domain
@@ -295,15 +304,19 @@ class TestDomainRepository:
         """Test successful domain soft deletion"""
         # Create a test domain directly
         domain_name = "delete-test-simple"
-        domain_creator = DomainCreator(
-            name=domain_name,
-            description="Test domain for deletion",
-            is_active=True,
-            total_resource_slots=ResourceSlot.from_user_input({"cpu": "10", "mem": "20g"}, None),
-            allowed_vfolder_hosts={"local": ["modify-vfolder"]},
-            allowed_docker_registries=["registry.example.com"],
-            integration_id="test-integration",
-            dotfiles=b"test dotfiles",
+        domain_creator = Creator(
+            spec=DomainCreatorSpec(
+                name=domain_name,
+                description="Test domain for deletion",
+                is_active=True,
+                total_resource_slots=ResourceSlot.from_user_input(
+                    {"cpu": "10", "mem": "20g"}, None
+                ),
+                allowed_vfolder_hosts={"local": ["modify-vfolder"]},
+                allowed_docker_registries=["registry.example.com"],
+                integration_id="test-integration",
+                dotfiles=b"test dotfiles",
+            )
         )
 
         # Create domain
@@ -483,21 +496,23 @@ class TestDomainRepository:
         domain_repository: DomainRepository,
     ) -> None:
         """Test creating domain with all possible fields"""
-        comprehensive_creator = DomainCreator(
-            name="comprehensive-domain",
-            description="Comprehensive domain with all features",
-            is_active=True,
-            total_resource_slots=ResourceSlot.from_user_input(
-                {"cpu": "100", "mem": "500g", "cuda.device": "8"}, None
-            ),
-            allowed_vfolder_hosts={
-                "local": ["modify-vfolder", "upload-file", "download-file"],
-                "shared": ["download-file"],
-                "scratch": ["modify-vfolder", "upload-file", "download-file"],
-            },
-            allowed_docker_registries=["docker.io", "registry.example.com", "private.registry"],
-            integration_id="comprehensive-integration",
-            dotfiles=b"comprehensive dotfiles configuration",
+        comprehensive_creator = Creator(
+            spec=DomainCreatorSpec(
+                name="comprehensive-domain",
+                description="Comprehensive domain with all features",
+                is_active=True,
+                total_resource_slots=ResourceSlot.from_user_input(
+                    {"cpu": "100", "mem": "500g", "cuda.device": "8"}, None
+                ),
+                allowed_vfolder_hosts={
+                    "local": ["modify-vfolder", "upload-file", "download-file"],
+                    "shared": ["download-file"],
+                    "scratch": ["modify-vfolder", "upload-file", "download-file"],
+                },
+                allowed_docker_registries=["docker.io", "registry.example.com", "private.registry"],
+                integration_id="comprehensive-integration",
+                dotfiles=b"comprehensive dotfiles configuration",
+            )
         )
 
         created_domain = await domain_repository.create_domain_validated(comprehensive_creator)

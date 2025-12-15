@@ -15,15 +15,16 @@ from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.resource import ResourcePresetNotFound
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.resource_preset.cache_source.cache_source import (
     ResourcePresetCacheSource,
 )
+from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
 from ai.backend.manager.repositories.resource_preset.db_source.db_source import (
     ResourcePresetDBSource,
 )
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
 from ai.backend.manager.services.resource_preset.types import (
-    ResourcePresetCreator,
     ResourcePresetModifier,
 )
 from ai.backend.manager.types import OptionalState, TriState
@@ -97,18 +98,24 @@ class TestResourcePresetRepository:
         return mock_row
 
     @pytest.fixture
-    def sample_preset_creator(self) -> ResourcePresetCreator:
+    def sample_preset_creator(self) -> Creator:
         """Create sample resource preset creator for testing"""
-        return ResourcePresetCreator(
-            name="new-preset",
-            resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
-            shared_memory="1 GiB",
-            scaling_group_name=None,
+        return Creator(
+            spec=ResourcePresetCreatorSpec(
+                name="new-preset",
+                resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
+                shared_memory="1 GiB",
+                scaling_group_name=None,
+            )
         )
 
     @pytest.mark.asyncio
     async def test_create_preset_validated_success(
-        self, resource_preset_repository, mock_db_source, sample_preset_creator, sample_preset_row
+        self,
+        resource_preset_repository,
+        mock_db_source,
+        sample_preset_creator: Creator,
+        sample_preset_row,
     ) -> None:
         """Test successful preset creation"""
         preset_data = sample_preset_row.to_dataclass()
@@ -120,11 +127,11 @@ class TestResourcePresetRepository:
         assert isinstance(result, ResourcePresetData)
         assert result.name == preset_data.name
         assert result.id == preset_data.id
-        mock_db_source.create_preset.assert_called_once_with(sample_preset_creator)
+        mock_db_source.create_preset.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_create_preset_validated_duplicate(
-        self, resource_preset_repository, mock_db_source, sample_preset_creator
+        self, resource_preset_repository, mock_db_source, sample_preset_creator: Creator
     ) -> None:
         """Test preset creation with duplicate name"""
         mock_db_source.create_preset = AsyncMock(

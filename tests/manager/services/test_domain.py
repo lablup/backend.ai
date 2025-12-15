@@ -10,7 +10,6 @@ import sqlalchemy as sa
 from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.domain.types import (
-    DomainCreator,
     DomainData,
     DomainModifier,
     DomainNodeModifier,
@@ -27,6 +26,8 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
 from ai.backend.manager.repositories.domain.repositories import (
     DomainRepositories,
     RepositoryArgs,
@@ -144,14 +145,16 @@ async def create_domain(
         ScenarioBase.success(
             "Create a domain node",
             CreateDomainNodeAction(
-                creator=DomainCreator(
-                    name="test-create-domain-node",
-                    description="Test domain",
-                    total_resource_slots=ResourceSlot.from_user_input({}, None),
-                    allowed_vfolder_hosts={},
-                    allowed_docker_registries=[],
-                    integration_id=None,
-                    dotfiles=b"\x90",
+                creator=Creator(
+                    spec=DomainCreatorSpec(
+                        name="test-create-domain-node",
+                        description="Test domain",
+                        total_resource_slots=ResourceSlot.from_user_input({}, None),
+                        allowed_vfolder_hosts={},
+                        allowed_docker_registries=[],
+                        integration_id=None,
+                        dotfiles=b"\x90",
+                    )
                 ),
                 user_info=UserInfo(
                     id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
@@ -178,8 +181,10 @@ async def create_domain(
         ScenarioBase.failure(
             "Create domain node with duplicated name",
             CreateDomainNodeAction(
-                creator=DomainCreator(
-                    name="default",
+                creator=Creator(
+                    spec=DomainCreatorSpec(
+                        name="default",
+                    )
                 ),
                 user_info=UserInfo(
                     id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
@@ -278,9 +283,11 @@ async def test_modify_domain_node(
         ScenarioBase.success(
             "Create a domain",
             CreateDomainAction(
-                creator=DomainCreator(
-                    name="test-create-domain",
-                    description="Test domain",
+                creator=Creator(
+                    spec=DomainCreatorSpec(
+                        name="test-create-domain",
+                        description="Test domain",
+                    )
                 ),
                 user_info=UserInfo(
                     id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
@@ -306,9 +313,11 @@ async def test_modify_domain_node(
         ScenarioBase.failure(
             "Create a domain with duplicated name, return none",
             CreateDomainAction(
-                creator=DomainCreator(
-                    name="default",
-                    description="Test domain",
+                creator=Creator(
+                    spec=DomainCreatorSpec(
+                        name="default",
+                        description="Test domain",
+                    )
                 ),
                 user_info=UserInfo(
                     id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
@@ -321,9 +330,11 @@ async def test_modify_domain_node(
         ScenarioBase.failure(
             "Create a domain with empty name, return failure",
             CreateDomainAction(
-                creator=DomainCreator(
-                    name="",
-                    description="Test domain with empty name",
+                creator=Creator(
+                    spec=DomainCreatorSpec(
+                        name="",
+                        description="Test domain with empty name",
+                    )
                 ),
                 user_info=UserInfo(
                     id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
@@ -336,17 +347,19 @@ async def test_modify_domain_node(
         ScenarioBase.success(
             "Create a domain with complex resource slots",
             CreateDomainAction(
-                creator=DomainCreator(
-                    name="test-complex-resources",
-                    description="Test domain with complex resource slots",
-                    total_resource_slots=ResourceSlot.from_user_input(
-                        {"cpu": "10", "mem": "64G", "cuda.device": "2"}, None
-                    ),
-                    allowed_vfolder_hosts={
-                        "host1": ["upload-file", "download-file", "mount-in-session"],
-                        "host2": ["download-file", "mount-in-session"],
-                    },
-                    allowed_docker_registries=["docker.io", "registry.example.com"],
+                creator=Creator(
+                    spec=DomainCreatorSpec(
+                        name="test-complex-resources",
+                        description="Test domain with complex resource slots",
+                        total_resource_slots=ResourceSlot.from_user_input(
+                            {"cpu": "10", "mem": "64G", "cuda.device": "2"}, None
+                        ),
+                        allowed_vfolder_hosts={
+                            "host1": ["upload-file", "download-file", "mount-in-session"],
+                            "host2": ["download-file", "mount-in-session"],
+                        },
+                        allowed_docker_registries=["docker.io", "registry.example.com"],
+                    )
                 ),
                 user_info=UserInfo(
                     id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
@@ -388,7 +401,9 @@ async def test_create_model_store_after_domain_created(
     processors: DomainProcessors, database_engine, admin_user
 ) -> None:
     domain_name = "test-create-domain-post-func"
-    action = CreateDomainAction(creator=DomainCreator(name=domain_name), user_info=admin_user)
+    action = CreateDomainAction(
+        creator=Creator(spec=DomainCreatorSpec(name=domain_name)), user_info=admin_user
+    )
 
     await processors.create_domain.wait_for_complete(action)
 
@@ -795,12 +810,14 @@ async def test_create_domain_with_invalid_resource_slots(
 ) -> None:
     """Test CreateDomainAction with invalid resource slot format"""
     action = CreateDomainAction(
-        creator=DomainCreator(
-            name="test-invalid-resource-slots",
-            description="Test domain with invalid resource slots",
-            total_resource_slots=ResourceSlot.from_user_input(
-                {}, None
-            ),  # Use empty instead of invalid
+        creator=Creator(
+            spec=DomainCreatorSpec(
+                name="test-invalid-resource-slots",
+                description="Test domain with invalid resource slots",
+                total_resource_slots=ResourceSlot.from_user_input(
+                    {}, None
+                ),  # Use empty instead of invalid
+            )
         ),
         user_info=UserInfo(
             id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
@@ -818,9 +835,11 @@ async def test_create_domain_node_with_permission_denied(
 ) -> None:
     """Test CreateDomainNodeAction with insufficient permissions for scaling groups"""
     action = CreateDomainNodeAction(
-        creator=DomainCreator(
-            name="test-permission-denied",
-            description="Test domain with permission denied",
+        creator=Creator(
+            spec=DomainCreatorSpec(
+                name="test-permission-denied",
+                description="Test domain with permission denied",
+            )
         ),
         user_info=regular_user,
         scaling_groups=["unauthorized-sg"],
@@ -841,9 +860,11 @@ async def test_create_domain_node_with_nonexistent_scaling_group(
 ) -> None:
     """Test CreateDomainNodeAction with non-existent scaling group"""
     action = CreateDomainNodeAction(
-        creator=DomainCreator(
-            name="test-nonexistent-sg",
-            description="Test domain with non-existent scaling group",
+        creator=Creator(
+            spec=DomainCreatorSpec(
+                name="test-nonexistent-sg",
+                description="Test domain with non-existent scaling group",
+            )
         ),
         user_info=admin_user,
         scaling_groups=["non-existent-sg"],
@@ -1032,9 +1053,11 @@ async def test_create_domain_transaction_rollback_scenario(
     # This test simulates a scenario where domain creation starts but fails
     # In a real test, you might mock the model-store group creation to fail
     action = CreateDomainAction(
-        creator=DomainCreator(
-            name="test-transaction-rollback",
-            description="Test transaction rollback",
+        creator=Creator(
+            spec=DomainCreatorSpec(
+                name="test-transaction-rollback",
+                description="Test transaction rollback",
+            )
         ),
         user_info=admin_user,
     )
@@ -1086,21 +1109,28 @@ async def test_create_domain_with_comprehensive_settings(
 ) -> None:
     """Test CreateDomainAction with comprehensive domain settings"""
     action = CreateDomainAction(
-        creator=DomainCreator(
-            name="test-comprehensive-domain",
-            description="Comprehensive test domain with all settings",
-            is_active=True,
-            total_resource_slots=ResourceSlot.from_user_input(
-                {"cpu": "100", "mem": "512G", "cuda.device": "8", "rocm.device": "4"}, None
-            ),
-            allowed_vfolder_hosts={
-                "local": ["upload-file", "download-file", "mount-in-session"],
-                "nfs": ["download-file", "mount-in-session"],
-                "s3": ["upload-file", "download-file"],
-            },
-            allowed_docker_registries=["docker.io", "registry.example.com", "quay.io", "gcr.io"],
-            integration_id="test-integration-123",
-            dotfiles=b"# Comprehensive dotfiles\nexport TEST_ENV=comprehensive\n",
+        creator=Creator(
+            spec=DomainCreatorSpec(
+                name="test-comprehensive-domain",
+                description="Comprehensive test domain with all settings",
+                is_active=True,
+                total_resource_slots=ResourceSlot.from_user_input(
+                    {"cpu": "100", "mem": "512G", "cuda.device": "8", "rocm.device": "4"}, None
+                ),
+                allowed_vfolder_hosts={
+                    "local": ["upload-file", "download-file", "mount-in-session"],
+                    "nfs": ["download-file", "mount-in-session"],
+                    "s3": ["upload-file", "download-file"],
+                },
+                allowed_docker_registries=[
+                    "docker.io",
+                    "registry.example.com",
+                    "quay.io",
+                    "gcr.io",
+                ],
+                integration_id="test-integration-123",
+                dotfiles=b"# Comprehensive dotfiles\nexport TEST_ENV=comprehensive\n",
+            )
         ),
         user_info=admin_user,
     )
@@ -1138,10 +1168,12 @@ async def test_domain_lifecycle_complete_workflow(
 
     # 1. Create domain
     create_action = CreateDomainAction(
-        creator=DomainCreator(
-            name=domain_name,
-            description="Lifecycle test domain",
-            total_resource_slots=ResourceSlot.from_user_input({"cpu": "4", "mem": "16G"}, None),
+        creator=Creator(
+            spec=DomainCreatorSpec(
+                name=domain_name,
+                description="Lifecycle test domain",
+                total_resource_slots=ResourceSlot.from_user_input({"cpu": "4", "mem": "16G"}, None),
+            )
         ),
         user_info=admin_user,
     )

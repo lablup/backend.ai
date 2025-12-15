@@ -25,6 +25,8 @@ from ...models.rbac_models.permission.permission_group import PermissionGroupRow
 from ...models.rbac_models.role import RoleRow
 from ...models.rbac_models.user_role import UserRoleRow
 from ...models.utils import ExtendedAsyncSAEngine
+from ...repositories.base.creator import Creator, execute_creator
+from .creators import ObjectPermissionCreatorSpec
 
 
 class PermissionDBSource:
@@ -49,12 +51,17 @@ class PermissionDBSource:
                     permission_group.to_input(role_id)
                 )
                 db_session.add(permission_group_row)  # type: ignore[arg-type]
-            for object_permission in data.object_permissions:
-                object_permission_row = ObjectPermissionRow.from_input(
-                    object_permission.to_input(role_id)
+            for obj_perm in data.object_permissions:
+                creator = Creator(
+                    spec=ObjectPermissionCreatorSpec(
+                        role_id=role_id,
+                        entity_type=obj_perm.entity_type,
+                        entity_id=obj_perm.entity_id,
+                        operation=obj_perm.operation,
+                        status=obj_perm.status,
+                    )
                 )
-                db_session.add(object_permission_row)  # type: ignore[arg-type]
-            await db_session.flush()
+                await execute_creator(db_session, creator)
             await db_session.refresh(role_row)
             return role_row
 

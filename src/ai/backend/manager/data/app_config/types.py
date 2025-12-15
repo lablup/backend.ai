@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
-from ai.backend.manager.types import Creator, OptionalState, PartialModifier
+from ai.backend.manager.types import OptionalState, PartialModifier
 
 
 class AppConfigScopeType(enum.StrEnum):
@@ -31,21 +31,6 @@ class AppConfigData:
     extra_config: dict[str, Any]
     created_at: datetime = field(compare=False)
     modified_at: datetime = field(compare=False)
-
-
-@dataclass
-class AppConfigCreator(Creator):
-    scope_type: AppConfigScopeType
-    scope_id: str
-    extra_config: dict[str, Any]
-
-    @override
-    def fields_to_store(self) -> dict[str, Any]:
-        return {
-            "scope_type": self.scope_type,
-            "scope_id": self.scope_id,
-            "extra_config": self.extra_config,
-        }
 
 
 @dataclass

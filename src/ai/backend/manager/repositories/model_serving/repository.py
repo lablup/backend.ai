@@ -23,7 +23,6 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
-from ai.backend.manager.data.model_serving.creator import EndpointCreator
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointData,
@@ -57,6 +56,7 @@ from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.base import Creator, execute_creator
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
 from ai.backend.manager.services.model_serving.exceptions import InvalidAPIParameters
 from ai.backend.manager.types import MountOptionModel, UserScope
@@ -168,18 +168,16 @@ class ModelServingRepository:
 
     @model_serving_repository_resilience.apply()
     async def create_endpoint_validated(
-        self, endpoint_creator: EndpointCreator, registry: AgentRegistry
+        self, creator: Creator[EndpointRow], registry: AgentRegistry
     ) -> EndpointData:
         """
         Create a new endpoint after validation.
         """
         async with self._db.begin_session() as db_sess:
-            endpoint_row = EndpointRow.from_creator(endpoint_creator)
-            db_sess.add(endpoint_row)
-            await db_sess.flush()
+            result = await execute_creator(db_sess, creator)
             endpoint_row = await EndpointRow.get(
                 db_sess,
-                endpoint_row.id,
+                result.row.id,
                 load_created_user=True,
                 load_session_owner=True,
                 load_image=True,

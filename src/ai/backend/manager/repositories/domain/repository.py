@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Iterable, Optional, cast
 
 import sqlalchemy as sa
@@ -10,13 +12,11 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.domain.types import (
-    DomainCreator,
     DomainData,
     DomainModifier,
     UserInfo,
 )
 from ai.backend.manager.errors.resource import (
-    DomainDataProcessingError,
     DomainDeletionFailed,
     DomainHasActiveKernels,
     DomainHasGroups,
@@ -37,6 +37,8 @@ from ai.backend.manager.models.rbac.permission_defs import DomainPermission, Sca
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, get_scaling_groups
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
 
 from ..permission_controller.role_manager import RoleManager
 
@@ -64,29 +66,28 @@ class DomainRepository:
         self._role_manager = RoleManager()
 
     @domain_repository_resilience.apply()
-    async def create_domain_validated(self, creator: DomainCreator) -> DomainData:
+    async def create_domain_validated(self, creator: Creator[DomainRow]) -> DomainData:
         """
         Creates a new domain with model-store group.
         Validates domain creation permissions.
         """
+        spec = cast(DomainCreatorSpec, creator.spec)
         async with self._db.begin_session() as db_session:
-            check_query = sa.select(DomainRow).where(DomainRow.name == creator.name)
+            check_query = sa.select(DomainRow).where(DomainRow.name == spec.name)
             existing_domain = await db_session.scalar(check_query)
             if existing_domain is not None:
-                raise InvalidAPIParameters(f"Domain with name '{creator.name}' already exists")
+                raise InvalidAPIParameters(f"Domain with name '{spec.name}' already exists")
 
-            domain = DomainRow.from_input(creator)
-            db_session.add(domain)
-            await db_session.flush()
-            await db_session.refresh(domain)
+            creator_result = await execute_creator(db_session, creator)
+            domain = creator_result.row
 
-            result = domain.to_data()
-            await self._role_manager.create_system_role(db_session, result)
+            data = domain.to_data()
+            await self._role_manager.create_system_role(db_session, data)
 
             # Create model-store group for the domain
-            await self._create_model_store_group(db_session, creator.name)
+            await self._create_model_store_group(db_session, spec.name)
 
-            return result
+            return data
 
     @domain_repository_resilience.apply()
     async def modify_domain_validated(
@@ -162,44 +163,33 @@ class DomainRepository:
 
     @domain_repository_resilience.apply()
     async def create_domain_node_validated(
-        self, creator: DomainCreator, scaling_groups: Optional[list[str]] = None
+        self, creator: Creator[DomainRow], scaling_groups: Optional[list[str]] = None
     ) -> DomainData:
         """
         Creates a domain node with scaling groups.
         Validates domain node creation permissions.
         """
+        spec = cast(DomainCreatorSpec, creator.spec)
         async with self._db.begin_session() as session:
-            check_query = sa.select(DomainRow).where(DomainRow.name == creator.name)
+            check_query = sa.select(DomainRow).where(DomainRow.name == spec.name)
             existing_domain = await session.scalar(check_query)
             if existing_domain is not None:
-                raise InvalidAPIParameters(f"Domain with name '{creator.name}' already exists")
+                raise InvalidAPIParameters(f"Domain with name '{spec.name}' already exists")
 
-            data = creator.fields_to_store()
-            insert_and_returning = sa.select(DomainRow).from_statement(
-                sa.insert(DomainRow).values(data).returning(DomainRow)
-            )
-            domain_row: Optional[DomainRow] = await session.scalar(insert_and_returning)
+            creator_result = await execute_creator(session, creator)
+            domain_row = creator_result.row
 
             if scaling_groups is not None:
                 await session.execute(
                     sa.insert(ScalingGroupForDomainRow),
                     [
-                        {"scaling_group": sgroup_name, "domain": creator.name}
+                        {"scaling_group": sgroup_name, "domain": spec.name}
                         for sgroup_name in scaling_groups
                     ],
                 )
 
             await session.commit()
-            if domain_row is None:
-                raise DomainDataProcessingError(
-                    f"Failed to retrieve created domain node: {creator.name}"
-                )
-            result = domain_row.to_data()
-            if result is None:
-                raise DomainDataProcessingError(
-                    f"Failed to convert domain node row to DomainData: {creator.name}"
-                )
-            return result
+            return domain_row.to_data()
 
     @domain_repository_resilience.apply()
     async def modify_domain_node_validated(
@@ -315,7 +305,7 @@ class DomainRepository:
     @domain_repository_resilience.apply()
     async def create_domain_node_with_permissions(
         self,
-        creator: DomainCreator,
+        creator: Creator[DomainRow],
         user_info: UserInfo,
         scaling_groups: Optional[list[str]] = None,
     ) -> DomainData:

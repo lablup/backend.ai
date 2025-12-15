@@ -10,11 +10,13 @@ import pytest
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.user.types import UserCreator, UserInfoContext
+from ai.backend.manager.data.user.types import UserInfoContext
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserStatus
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.user.admin_repository import AdminUserRepository
+from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.user.actions.admin_month_stats import AdminMonthStatsAction
 from ai.backend.manager.services.user.actions.create_user import CreateUserAction
@@ -89,16 +91,18 @@ class TestUserServiceCompatibility:
         )
         # Test 1.1: Normal user creation
         action = CreateUserAction(
-            creator=UserCreator(
-                email="test@example.com",
-                password=password_info,
-                username="testuser",
-                full_name="Test User",
-                role=UserRole.USER,
-                domain_name="default",
-                need_password_change=False,
-                resource_policy="default-user-policy",
-                status=UserStatus.ACTIVE,
+            creator=Creator(
+                spec=UserCreatorSpec(
+                    email="test@example.com",
+                    password=password_info,
+                    username="testuser",
+                    full_name="Test User",
+                    role=UserRole.USER,
+                    domain_name="default",
+                    need_password_change=False,
+                    resource_policy="default-user-policy",
+                    status=UserStatus.ACTIVE,
+                )
             ),
         )
 
@@ -119,15 +123,17 @@ class TestUserServiceCompatibility:
             salt_size=32,
         )
         action = CreateUserAction(
-            creator=UserCreator(
-                email="container@example.com",
-                password=password_info,
-                username="containeruser",
-                need_password_change=False,
-                domain_name="default",
-                container_uid=2000,
-                container_main_gid=2000,
-                container_gids=[2000, 2001],
+            creator=Creator(
+                spec=UserCreatorSpec(
+                    email="container@example.com",
+                    password=password_info,
+                    username="containeruser",
+                    need_password_change=False,
+                    domain_name="default",
+                    container_uid=2000,
+                    container_main_gid=2000,
+                    container_gids=[2000, 2001],
+                )
             ),
         )
 
@@ -136,9 +142,9 @@ class TestUserServiceCompatibility:
         # Verify container settings were passed to repository
         call_args = mock_dependencies["user_repository"].create_user_validated.call_args
         user_data = call_args[0][0]
-        assert user_data.container_uid == 2000
-        assert user_data.container_main_gid == 2000
-        assert user_data.container_gids == [2000, 2001]
+        assert user_data.spec.container_uid == 2000
+        assert user_data.spec.container_main_gid == 2000
+        assert user_data.spec.container_gids == [2000, 2001]
 
     @pytest.mark.asyncio
     async def test_modify_user_action_structure(self, user_service, mock_dependencies):
@@ -254,33 +260,35 @@ class TestUserServiceCompatibility:
             rounds=100_000,
             salt_size=32,
         )
-        creator = UserCreator(
-            email="test@example.com",
-            password=password_info,
-            username="testuser",
-            full_name="Test User",
-            description="Test Description",
-            need_password_change=False,
-            domain_name="default",
-            role=UserRole.USER,
-            status=UserStatus.ACTIVE,
-            allowed_client_ip=["192.168.1.0/24"],
-            totp_activated=False,
-            resource_policy="default-policy",
-            sudo_session_enabled=False,
-            # group_ids is not part of UserCreator
-            container_uid=2000,
-            container_main_gid=2000,
-            container_gids=[2000, 2001],
+        creator = Creator(
+            spec=UserCreatorSpec(
+                email="test@example.com",
+                password=password_info,
+                username="testuser",
+                full_name="Test User",
+                description="Test Description",
+                need_password_change=False,
+                domain_name="default",
+                role=UserRole.USER,
+                status=UserStatus.ACTIVE,
+                allowed_client_ip=["192.168.1.0/24"],
+                totp_activated=False,
+                resource_policy="default-policy",
+                sudo_session_enabled=False,
+                # group_ids is not part of UserCreatorSpec
+                container_uid=2000,
+                container_main_gid=2000,
+                container_gids=[2000, 2001],
+            )
         )
 
-        assert creator.email == "test@example.com"
-        assert creator.container_uid == 2000
-        assert creator.container_main_gid == 2000
-        assert creator.container_gids == [2000, 2001]
-        assert creator.allowed_client_ip == ["192.168.1.0/24"]
-        assert creator.resource_policy == "default-policy"
-        assert creator.sudo_session_enabled is False
+        assert creator.spec.email == "test@example.com"
+        assert creator.spec.container_uid == 2000
+        assert creator.spec.container_main_gid == 2000
+        assert creator.spec.container_gids == [2000, 2001]
+        assert creator.spec.allowed_client_ip == ["192.168.1.0/24"]
+        assert creator.spec.resource_policy == "default-policy"
+        assert creator.spec.sudo_session_enabled is False
 
     def test_user_modifier_fields(self):
         """Test that UserModifier supports expected modification fields."""

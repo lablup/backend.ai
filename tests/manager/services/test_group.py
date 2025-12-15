@@ -10,12 +10,14 @@ import sqlalchemy as sa
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import RedisConnectionInfo, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
+from ai.backend.manager.data.group.types import GroupData, GroupModifier
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.group.admin_repository import AdminGroupRepository
+from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.services.group.actions.create_group import (
@@ -126,14 +128,16 @@ async def create_group(
         ScenarioBase.success(
             "When trigger create group action with valid data, group creation should be successful",
             CreateGroupAction(
-                input=GroupCreator(
-                    name="test_create_group",
-                    type=ProjectType.GENERAL,
-                    description="test group description",
-                    resource_policy="default",
-                    total_resource_slots=ResourceSlot.from_user_input({}, None),
-                    domain_name="default",
-                    is_active=True,
+                creator=Creator(
+                    spec=GroupCreatorSpec(
+                        name="test_create_group",
+                        type=ProjectType.GENERAL,
+                        description="test group description",
+                        resource_policy="default",
+                        total_resource_slots=ResourceSlot.from_user_input({}, None),
+                        domain_name="default",
+                        is_active=True,
+                    )
                 ),
             ),
             CreateGroupActionResult(
@@ -158,13 +162,15 @@ async def create_group(
         ScenarioBase.failure(
             "With duplicated name, group creation should be failed",
             CreateGroupAction(
-                input=GroupCreator(
-                    name="default",
-                    type=ProjectType.GENERAL,
-                    description="duplicate group",
-                    resource_policy="default",
-                    total_resource_slots=ResourceSlot.from_user_input({}, None),
-                    domain_name="default",
+                creator=Creator(
+                    spec=GroupCreatorSpec(
+                        name="default",
+                        type=ProjectType.GENERAL,
+                        description="duplicate group",
+                        resource_policy="default",
+                        total_resource_slots=ResourceSlot.from_user_input({}, None),
+                        domain_name="default",
+                    )
                 ),
             ),
             InvalidAPIParameters,
@@ -172,13 +178,15 @@ async def create_group(
         ScenarioBase.failure(
             "When trigger create group action with invalid resource policy, group creation should be failed",
             CreateGroupAction(
-                input=GroupCreator(
-                    name="test_create_group_without_resource_policy",
-                    type=ProjectType.GENERAL,
-                    description="test group description",
-                    resource_policy="",
-                    total_resource_slots=ResourceSlot.from_user_input({}, None),
-                    domain_name="default",
+                creator=Creator(
+                    spec=GroupCreatorSpec(
+                        name="test_create_group_without_resource_policy",
+                        type=ProjectType.GENERAL,
+                        description="test group description",
+                        resource_policy="",
+                        total_resource_slots=ResourceSlot.from_user_input({}, None),
+                        domain_name="default",
+                    )
                 )
             ),
             InvalidAPIParameters,

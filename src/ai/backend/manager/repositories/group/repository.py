@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import logging
 import uuid
@@ -22,7 +24,7 @@ from ai.backend.common.types import SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
+from ai.backend.manager.data.group.types import GroupData, GroupModifier
 from ai.backend.manager.errors.resource import InvalidUserUpdateMode, ProjectNotFound
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import GroupRow, association_groups_users, groups
@@ -31,6 +33,8 @@ from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 
 from ..permission_controller.role_manager import RoleManager
 
@@ -75,47 +79,46 @@ class GroupRepository:
         return result.scalar_one_or_none()
 
     @group_repository_resilience.apply()
-    async def create(self, creator: GroupCreator) -> GroupData:
+    async def create(self, creator: Creator[GroupRow]) -> GroupData:
         """Create a new group."""
+        spec = cast(GroupCreatorSpec, creator.spec)
         async with self._db.begin_session() as db_session:
             # Validate domain exists
             domain_exists = await db_session.scalar(
-                sa.select(sa.exists().where(domains.c.name == creator.domain_name))
+                sa.select(sa.exists().where(domains.c.name == spec.domain_name))
             )
             if not domain_exists:
                 raise InvalidAPIParameters(
-                    f"Cannot create group: Domain '{creator.domain_name}' does not exist"
+                    f"Cannot create group: Domain '{spec.domain_name}' does not exist"
                 )
 
             # Validate resource policy exists
             policy_exists = await db_session.scalar(
                 sa.select(
-                    sa.exists().where(keypair_resource_policies.c.name == creator.resource_policy)
+                    sa.exists().where(keypair_resource_policies.c.name == spec.resource_policy)
                 )
             )
             if not policy_exists:
                 raise InvalidAPIParameters(
-                    f"Cannot create group: Resource policy '{creator.resource_policy}' does not exist"
+                    f"Cannot create group: Resource policy '{spec.resource_policy}' does not exist"
                 )
 
             # Check if group already exists
             check_stmt = sa.select(GroupRow).where(
                 sa.and_(
-                    GroupRow.name == creator.name,
-                    GroupRow.domain_name == creator.domain_name,
+                    GroupRow.name == spec.name,
+                    GroupRow.domain_name == spec.domain_name,
                 )
             )
             existing_group = await db_session.scalar(check_stmt)
             if existing_group is not None:
                 raise InvalidAPIParameters(
-                    f"Group with name '{creator.name}' already exists in domain '{creator.domain_name}'"
+                    f"Group with name '{spec.name}' already exists in domain '{spec.domain_name}'"
                 )
 
             # Create the group
-            row = GroupRow.from_creator(creator)
-            db_session.add(row)
-            await db_session.flush()
-            await db_session.refresh(row)
+            creator_result = await execute_creator(db_session, creator)
+            row = creator_result.row
             data = row.to_data()
             # Create RBAC role and permissions for the group
             await self._role_manager.create_system_role(db_session, data)

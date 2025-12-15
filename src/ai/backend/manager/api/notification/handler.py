@@ -51,6 +51,11 @@ from ai.backend.manager.dto.notification_request import (
     ValidateNotificationChannelPathParam,
     ValidateNotificationRulePathParam,
 )
+from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.notification.creators import (
+    NotificationChannelCreatorSpec,
+    NotificationRuleCreatorSpec,
+)
 from ai.backend.manager.services.notification.actions import (
     CreateChannelAction,
     CreateRuleAction,
@@ -66,7 +71,6 @@ from ai.backend.manager.services.notification.actions import (
     ValidateRuleAction,
 )
 
-from ...data.notification import NotificationChannelCreator, NotificationRuleCreator
 from ..auth import auth_required_for_method
 from ..types import CORSOptions, WebMiddleware
 from .adapter import NotificationChannelAdapter, NotificationRuleAdapter
@@ -99,13 +103,15 @@ class NotificationAPIHandler:
         # Convert request to creator
         # config validator in request DTO ensures this is WebhookConfig
 
-        creator = NotificationChannelCreator(
-            name=body.parsed.name,
-            description=body.parsed.description,
-            channel_type=body.parsed.channel_type,
-            config=body.parsed.config,
-            enabled=body.parsed.enabled,
-            created_by=me.user_id,
+        creator = Creator(
+            spec=NotificationChannelCreatorSpec(
+                name=body.parsed.name,
+                description=body.parsed.description,
+                channel_type=body.parsed.channel_type,
+                config=body.parsed.config,
+                enabled=body.parsed.enabled,
+                created_by=me.user_id,
+            )
         )
 
         # Call service action
@@ -335,14 +341,16 @@ class NotificationAPIHandler:
             raise web.HTTPForbidden(reason="Only superadmin can create notification rules.")
 
         # Convert request to creator
-        creator = NotificationRuleCreator(
-            name=body.parsed.name,
-            description=body.parsed.description,
-            rule_type=body.parsed.rule_type,
-            channel_id=body.parsed.channel_id,
-            message_template=body.parsed.message_template,
-            enabled=body.parsed.enabled,
-            created_by=me.user_id,
+        creator = Creator(
+            spec=NotificationRuleCreatorSpec(
+                name=body.parsed.name,
+                description=body.parsed.description,
+                rule_type=body.parsed.rule_type,
+                channel_id=body.parsed.channel_id,
+                message_template=body.parsed.message_template,
+                enabled=body.parsed.enabled,
+                created_by=me.user_id,
+            )
         )
 
         # Call service action

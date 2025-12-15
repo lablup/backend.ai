@@ -1,11 +1,12 @@
 import logging
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.resource_preset import ResourcePresetRepository
+from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
     CheckResourcePresetsActionResult,
@@ -43,8 +44,9 @@ class ResourcePresetService:
         self, action: CreateResourcePresetAction
     ) -> CreateResourcePresetActionResult:
         creator = action.creator
+        spec = cast(ResourcePresetCreatorSpec, creator.spec)
 
-        if not creator.resource_slots.has_intrinsic_slots():
+        if not spec.resource_slots.has_intrinsic_slots():
             raise InvalidAPIParameters("ResourceSlot must have all intrinsic resource slots.")
 
         preset_data = await self._resource_preset_repository.create_preset_validated(creator)

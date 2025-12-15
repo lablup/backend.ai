@@ -15,14 +15,15 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.keypair_resource_policy.creators import (
+    KeyPairResourcePolicyCreatorSpec,
+)
 from ai.backend.manager.repositories.keypair_resource_policy.repository import (
     KeypairResourcePolicyRepository,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
     KeyPairResourcePolicyModifier,
-)
-from ai.backend.manager.services.keypair_resource_policy.types import (
-    KeyPairResourcePolicyCreator,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -92,9 +93,9 @@ class TestKeypairResourcePolicyRepository:
         self,
         sample_resource_slots: ResourceSlot,
         sample_allowed_vfolder_hosts: dict[str, Any],
-    ) -> KeyPairResourcePolicyCreator:
-        """Create a sample KeyPairResourcePolicyCreator for testing"""
-        return KeyPairResourcePolicyCreator(
+    ) -> KeyPairResourcePolicyCreatorSpec:
+        """Create a sample KeyPairResourcePolicyCreatorSpec for testing"""
+        return KeyPairResourcePolicyCreatorSpec(
             name=str(uuid4()),
             default_for_unspecified=DefaultForUnspecified.LIMITED,
             total_resource_slots=sample_resource_slots,
@@ -115,11 +116,11 @@ class TestKeypairResourcePolicyRepository:
     async def sample_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_creator: KeyPairResourcePolicyCreator,
+        sample_creator: KeyPairResourcePolicyCreatorSpec,
     ) -> AsyncGenerator[str, None]:
         """Create sample keypair resource policy directly in DB and return its name"""
         async with db_with_cleanup.begin_session() as db_sess:
-            policy_row = KeyPairResourcePolicyRow.from_creator(sample_creator)
+            policy_row = sample_creator.build_row()
             db_sess.add(policy_row)
             await db_sess.flush()
 
@@ -134,10 +135,10 @@ class TestKeypairResourcePolicyRepository:
         sample_allowed_vfolder_hosts: dict[str, Any],
     ) -> AsyncGenerator[list[str], None]:
         """Create multiple sample policies for testing"""
-        policy_names = []
+        policy_names: list[str] = []
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(3):
-                creator = KeyPairResourcePolicyCreator(
+                spec = KeyPairResourcePolicyCreatorSpec(
                     name=str(uuid4()),
                     default_for_unspecified=DefaultForUnspecified.LIMITED,
                     total_resource_slots=sample_resource_slots,
@@ -153,10 +154,10 @@ class TestKeypairResourcePolicyRepository:
                     max_vfolder_count=None,
                     max_vfolder_size=None,
                 )
-                policy_row = KeyPairResourcePolicyRow.from_creator(creator)
+                policy_row = spec.build_row()
                 db_sess.add(policy_row)
-                assert creator.name is not None
-                policy_names.append(creator.name)
+                assert spec.name is not None
+                policy_names.append(spec.name)
             await db_sess.flush()
 
         yield policy_names
@@ -173,7 +174,7 @@ class TestKeypairResourcePolicyRepository:
         "policy_creator",
         [
             pytest.param(
-                KeyPairResourcePolicyCreator(
+                KeyPairResourcePolicyCreatorSpec(
                     name=f"unlimited-policy-{uuid4()}",
                     default_for_unspecified=DefaultForUnspecified.UNLIMITED,
                     total_resource_slots=ResourceSlot({"cpu": "4", "mem": "8g", "gpu": "1"}),
@@ -203,7 +204,7 @@ class TestKeypairResourcePolicyRepository:
                 id="unlimited",
             ),
             pytest.param(
-                KeyPairResourcePolicyCreator(
+                KeyPairResourcePolicyCreatorSpec(
                     name=f"complex-resource-policy-{uuid4()}",
                     default_for_unspecified=DefaultForUnspecified.LIMITED,
                     total_resource_slots=ResourceSlot({
@@ -241,7 +242,7 @@ class TestKeypairResourcePolicyRepository:
                 id="complex_resource",
             ),
             pytest.param(
-                KeyPairResourcePolicyCreator(
+                KeyPairResourcePolicyCreatorSpec(
                     name=f"minimal-policy-{uuid4()}",
                     default_for_unspecified=DefaultForUnspecified.LIMITED,
                     total_resource_slots=ResourceSlot({"cpu": "4", "mem": "8g", "gpu": "1"}),
@@ -268,10 +269,10 @@ class TestKeypairResourcePolicyRepository:
     async def test_create_keypair_resource_policy(
         self,
         repository: KeypairResourcePolicyRepository,
-        policy_creator: KeyPairResourcePolicyCreator,
+        policy_creator: KeyPairResourcePolicyCreatorSpec,
     ) -> None:
         """Test creating a new keypair resource policy with various configurations"""
-        result = await repository.create_keypair_resource_policy(policy_creator)
+        result = await repository.create_keypair_resource_policy(Creator(spec=policy_creator))
 
         assert result.name == policy_creator.name
         assert result.default_for_unspecified == policy_creator.default_for_unspecified
