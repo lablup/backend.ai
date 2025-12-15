@@ -2,13 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Optional, override
-from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.notification import (
-    NotificationChannelData,
-    NotificationChannelModifier,
-)
+from ai.backend.manager.data.notification import NotificationChannelData
+from ai.backend.manager.models.notification import NotificationChannelRow
+from ai.backend.manager.repositories.base.updater import Updater
 
 from .base import NotificationAction
 
@@ -17,8 +15,7 @@ from .base import NotificationAction
 class UpdateChannelAction(NotificationAction):
     """Action to update a notification channel."""
 
-    channel_id: UUID
-    modifier: NotificationChannelModifier
+    updater: Updater[NotificationChannelRow]
 
     @override
     @classmethod
@@ -27,7 +24,7 @@ class UpdateChannelAction(NotificationAction):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.channel_id)
+        return str(self.updater.pk_value)
 
 
 @dataclass

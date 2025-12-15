@@ -140,10 +140,7 @@ class NotificationService:
         action: UpdateChannelAction,
     ) -> UpdateChannelActionResult:
         """Updates an existing notification channel."""
-        channel_data = await self._repository.update_channel(
-            channel_id=action.channel_id,
-            modifier=action.modifier,
-        )
+        channel_data = await self._repository.update_channel(updater=action.updater)
 
         return UpdateChannelActionResult(
             channel_data=channel_data,
@@ -155,16 +152,13 @@ class NotificationService:
     ) -> UpdateRuleActionResult:
         """Updates an existing notification rule."""
         # Validate message_template length if being updated
-        fields_to_update = action.modifier.fields_to_update()
+        fields_to_update = action.updater.spec.build_values()
         if "message_template" in fields_to_update:
             message_template = fields_to_update["message_template"]
             if message_template is not None and len(message_template) > 65536:
                 raise ValueError("message_template must not exceed 65536 characters (64KB)")
 
-        rule_data = await self._repository.update_rule(
-            rule_id=action.rule_id,
-            modifier=action.modifier,
-        )
+        rule_data = await self._repository.update_rule(updater=action.updater)
 
         return UpdateRuleActionResult(
             rule_data=rule_data,

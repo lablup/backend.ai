@@ -15,13 +15,12 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationChannelListResult,
-    NotificationChannelModifier,
     NotificationRuleData,
     NotificationRuleListResult,
-    NotificationRuleModifier,
     NotificationRuleType,
 )
 from ai.backend.manager.repositories.base import BatchQuerier, Creator
+from ai.backend.manager.repositories.base.updater import Updater
 
 from .db_source import NotificationDBSource
 
@@ -78,14 +77,10 @@ class NotificationRepository:
     @notification_repository_resilience.apply()
     async def update_channel(
         self,
-        channel_id: UUID,
-        modifier: NotificationChannelModifier,
+        updater: Updater[NotificationChannelRow],
     ) -> NotificationChannelData:
         """Updates an existing notification channel."""
-        return await self._db_source.update_channel(
-            channel_id=channel_id,
-            modifier=modifier,
-        )
+        return await self._db_source.update_channel(updater=updater)
 
     @notification_repository_resilience.apply()
     async def delete_channel(self, channel_id: UUID) -> bool:
@@ -103,14 +98,10 @@ class NotificationRepository:
     @notification_repository_resilience.apply()
     async def update_rule(
         self,
-        rule_id: UUID,
-        modifier: NotificationRuleModifier,
+        updater: Updater[NotificationRuleRow],
     ) -> NotificationRuleData:
         """Updates an existing notification rule."""
-        return await self._db_source.update_rule(
-            rule_id=rule_id,
-            modifier=modifier,
-        )
+        return await self._db_source.update_rule(updater=updater)
 
     @notification_repository_resilience.apply()
     async def delete_rule(self, rule_id: UUID) -> bool:

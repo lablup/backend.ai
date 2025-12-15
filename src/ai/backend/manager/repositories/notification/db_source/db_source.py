@@ -11,10 +11,8 @@ from sqlalchemy.orm import selectinload
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationChannelListResult,
-    NotificationChannelModifier,
     NotificationRuleData,
     NotificationRuleListResult,
-    NotificationRuleModifier,
     NotificationRuleType,
 )
 from ai.backend.manager.errors.notification import (
@@ -31,6 +29,7 @@ from ai.backend.manager.repositories.base import (
     execute_batch_querier,
     execute_creator,
 )
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -102,31 +101,20 @@ class NotificationDBSource:
 
     async def update_channel(
         self,
-        channel_id: UUID,
-        modifier: NotificationChannelModifier,
+        updater: Updater[NotificationChannelRow],
     ) -> NotificationChannelData:
         """Updates an existing notification channel."""
         async with self._db.begin_session() as db_sess:
-            values = modifier.fields_to_update()
+            values = updater.spec.build_values()
             if not values:
                 raise NotificationChannelNotFound("No fields to update for notification channel")
 
-            stmt = (
-                sa.update(NotificationChannelRow)
-                .where(NotificationChannelRow.id == channel_id)
-                .values(values)
-            )
-            result = await db_sess.execute(stmt)
-            if result.rowcount == 0:
-                raise NotificationChannelNotFound(f"Notification channel {channel_id} not found")
-
-            # Fetch the updated row
-            select_stmt = sa.select(NotificationChannelRow).where(
-                NotificationChannelRow.id == channel_id
-            )
-            result = await db_sess.execute(select_stmt)
-            row = result.scalar_one()
-            return row.to_data()
+            result = await execute_updater(db_sess, updater)
+            if result is None:
+                raise NotificationChannelNotFound(
+                    f"Notification channel {updater.pk_value} not found"
+                )
+            return result.row.to_data()
 
     async def delete_channel(self, channel_id: UUID) -> bool:
         """Deletes a notification channel."""
@@ -154,32 +142,26 @@ class NotificationDBSource:
 
     async def update_rule(
         self,
-        rule_id: UUID,
-        modifier: NotificationRuleModifier,
+        updater: Updater[NotificationRuleRow],
     ) -> NotificationRuleData:
         """Updates an existing notification rule."""
         async with self._db.begin_session() as db_sess:
-            values = modifier.fields_to_update()
+            values = updater.spec.build_values()
             if not values:
                 raise NotificationRuleNotFound("No fields to update for notification rule")
 
-            stmt = (
-                sa.update(NotificationRuleRow)
-                .where(NotificationRuleRow.id == rule_id)
-                .values(values)
-            )
-            result = await db_sess.execute(stmt)
-            if result.rowcount == 0:
-                raise NotificationRuleNotFound(f"Notification rule {rule_id} not found")
+            result = await execute_updater(db_sess, updater)
+            if result is None:
+                raise NotificationRuleNotFound(f"Notification rule {updater.pk_value} not found")
 
             # Fetch the updated row with channel relationship loaded
             select_stmt = (
                 sa.select(NotificationRuleRow)
-                .where(NotificationRuleRow.id == rule_id)
+                .where(NotificationRuleRow.id == updater.pk_value)
                 .options(selectinload(NotificationRuleRow.channel))
             )
-            result = await db_sess.execute(select_stmt)
-            row = result.scalar_one()
+            fetch_result = await db_sess.execute(select_stmt)
+            row = fetch_result.scalar_one()
             return row.to_data()
 
     async def delete_rule(self, rule_id: UUID) -> bool:
