@@ -142,9 +142,9 @@ class TestUserServiceCompatibility:
         # Verify container settings were passed to repository
         call_args = mock_dependencies["user_repository"].create_user_validated.call_args
         user_data = call_args[0][0]
-        assert user_data.container_uid == 2000
-        assert user_data.container_main_gid == 2000
-        assert user_data.container_gids == [2000, 2001]
+        assert user_data.spec.container_uid == 2000
+        assert user_data.spec.container_main_gid == 2000
+        assert user_data.spec.container_gids == [2000, 2001]
 
     @pytest.mark.asyncio
     async def test_modify_user_action_structure(self, user_service, mock_dependencies):

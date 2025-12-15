@@ -93,11 +93,12 @@ class TestProjectResourcePolicyService:
         # Verify the repository was called correctly
         mock_dependencies["project_resource_policy_repository"].create.assert_called_once()
         call_args = mock_dependencies["project_resource_policy_repository"].create.call_args[0][0]
-        assert isinstance(call_args, ProjectResourcePolicyCreatorSpec)
-        assert call_args.name == "test-policy"
-        assert call_args.max_vfolder_count == 20
-        assert call_args.max_quota_scope_size == 2147483648
-        assert call_args.max_network_count == 5
+        assert isinstance(call_args, Creator)
+        assert isinstance(call_args.spec, ProjectResourcePolicyCreatorSpec)
+        assert call_args.spec.name == "test-policy"
+        assert call_args.spec.max_vfolder_count == 20
+        assert call_args.spec.max_quota_scope_size == 2147483648
+        assert call_args.spec.max_network_count == 5
 
         # Verify the result
         assert result.project_resource_policy.name == "test-policy"
