@@ -8,7 +8,6 @@ from sqlalchemy.orm import selectinload
 from ai.backend.common.exception import AgentNotFound
 from ai.backend.common.types import AgentId, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.agent.modifier import AgentStatusModifier
 from ai.backend.manager.data.agent.types import (
     AgentData,
     AgentHeartbeatUpsert,
@@ -22,6 +21,7 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -110,7 +110,7 @@ class AgentDBSource:
             return upsert_result
 
     async def update_agent_status_exit(
-        self, agent_id: AgentId, modifier: AgentStatusModifier
+        self, agent_id: AgentId, spec: AgentStatusUpdaterSpec
     ) -> None:
         async with self._db.begin_session() as session:
             fetch_query = (
@@ -123,23 +123,17 @@ class AgentDBSource:
             if prev_status in (None, AgentStatus.LOST, AgentStatus.TERMINATED):
                 return
 
-            if modifier.status == AgentStatus.LOST:
+            if spec.status == AgentStatus.LOST:
                 log.warning("agent {0} heartbeat timeout detected.", agent_id)
-            elif modifier.status == AgentStatus.TERMINATED:
+            elif spec.status == AgentStatus.TERMINATED:
                 log.info("agent {0} has terminated.", agent_id)
 
             update_query = (
-                sa.update(AgentRow)
-                .values(modifier.fields_to_update())
-                .where(AgentRow.id == agent_id)
+                sa.update(AgentRow).values(spec.build_values()).where(AgentRow.id == agent_id)
             )
             await session.execute(update_query)
 
-    async def update_agent_status(self, agent_id: AgentId, modifier: AgentStatusModifier) -> None:
+    async def update_agent_status(self, agent_id: AgentId, spec: AgentStatusUpdaterSpec) -> None:
         async with self._db.begin_session() as session:
-            query = (
-                sa.update(AgentRow)
-                .values(modifier.fields_to_update())
-                .where(AgentRow.id == agent_id)
-            )
+            query = sa.update(AgentRow).values(spec.build_values()).where(AgentRow.id == agent_id)
             await session.execute(query)

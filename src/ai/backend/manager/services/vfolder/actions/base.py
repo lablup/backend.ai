@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Optional, override
 
 from ai.backend.common.types import (
@@ -22,8 +22,9 @@ from ai.backend.manager.models.vfolder import (
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
+    VFolderRow,
 )
-from ai.backend.manager.types import OptionalState, PartialModifier
+from ai.backend.manager.repositories.base.updater import Updater
 
 from ..types import VFolderBaseInfo, VFolderOwnershipInfo, VFolderUsageInfo
 
@@ -132,25 +133,10 @@ class CreateVFolderActionResult(VFolderScopeActionResult):
 
 
 @dataclass
-class VFolderAttributeModifier(PartialModifier):
-    name: OptionalState[str] = field(default_factory=OptionalState.nop)
-    cloneable: OptionalState[bool] = field(default_factory=OptionalState.nop)
-    mount_permission: OptionalState[VFolderPermission] = field(default_factory=OptionalState.nop)
-
-    @override
-    def fields_to_update(self) -> dict[str, Any]:
-        to_update: dict[str, Any] = {}
-        self.name.update_dict(to_update, "name")
-        self.cloneable.update_dict(to_update, "cloneable")
-        self.mount_permission.update_dict(to_update, "permission")
-        return to_update
-
-
-@dataclass
 class UpdateVFolderAttributeAction(VFolderSingleEntityAction):
     user_uuid: uuid.UUID
     vfolder_uuid: uuid.UUID
-    modifier: VFolderAttributeModifier = field(default_factory=VFolderAttributeModifier)
+    updater: Updater[VFolderRow]
 
     @override
     def entity_id(self) -> Optional[str]:

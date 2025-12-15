@@ -30,6 +30,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.minilang import ExternalTableFilterSpec, ORMFieldItem
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
+from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
 )
@@ -39,7 +40,6 @@ from ai.backend.manager.services.user.actions.delete_user import (
 from ai.backend.manager.services.user.actions.modify_user import (
     ModifyUserAction,
     ModifyUserActionResult,
-    UserModifier,
 )
 from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
@@ -965,7 +965,7 @@ class ModifyUserInput(graphene.InputObjectType):
 
         return ModifyUserAction(
             email=email,
-            modifier=UserModifier(
+            updater_spec=UserUpdaterSpec(
                 username=OptionalState[str].from_graphql(
                     self.username,
                 ),

@@ -46,7 +46,7 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     UserRoleCreatorSpec,
 )
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
-from ai.backend.manager.services.user.actions.modify_user import UserModifier
+from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 
 from ..permission_controller.role_manager import RoleManager
 
@@ -182,26 +182,26 @@ class UserRepository:
     async def update_user_validated(
         self,
         email: str,
-        modifier: UserModifier,
+        updater_spec: UserUpdaterSpec,
         requester_uuid: Optional[UUID],
     ) -> UserData:
         """
         Update user with ownership validation and handle role/group changes.
         """
-        to_update = modifier.fields_to_update()
+        to_update = updater_spec.build_values()
         async with self._db.begin() as conn:
             # Get current user data for validation
             current_user = await self._get_user_by_email_with_conn(conn, email)
 
             # Handle main_access_key validation
-            main_access_key = modifier.main_access_key.optional_value()
+            main_access_key = updater_spec.main_access_key.optional_value()
             if main_access_key:
                 await self._validate_and_update_main_access_key(conn, email, main_access_key)
 
             # Update user
-            if modifier.password.optional_value():
+            if updater_spec.password.optional_value():
                 to_update["password_changed_at"] = sa.func.now()
-            status = modifier.status.optional_value()
+            status = updater_spec.status.optional_value()
             if status is not None and status != current_user.status:
                 to_update["status_info"] = "admin-requested"
             update_query = (
@@ -214,12 +214,12 @@ class UserRepository:
 
             # Handle role changes
             prev_role = current_user.role
-            role = modifier.role.optional_value()
+            role = updater_spec.role.optional_value()
             if role is not None and role != prev_role:
                 await self._sync_keypair_roles(conn, updated_user.uuid, role)
 
             # Handle group updates
-            group_ids = modifier.group_ids_value
+            group_ids = updater_spec.group_ids_value
             if prev_role != updated_user.role and group_ids is None:
                 await self._clear_user_groups(conn, updated_user.uuid)
 

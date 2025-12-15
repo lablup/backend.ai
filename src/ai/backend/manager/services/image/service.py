@@ -209,10 +209,10 @@ class ImageService:
         )
 
     async def modify_image(self, action: ModifyImageAction) -> ModifyImageActionResult:
-        props = action.modifier
+        spec = action.updater_spec
 
         try:
-            to_update = props.fields_to_update()
+            to_update = spec.build_values()
             image_data = await self._image_repository.update_image_properties(
                 action.target, action.architecture, to_update
             )
