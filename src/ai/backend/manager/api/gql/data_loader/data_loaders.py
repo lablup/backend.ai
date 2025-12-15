@@ -1,6 +1,15 @@
 from __future__ import annotations
 
+import uuid
+from functools import cached_property, partial
+from typing import Optional
+
+from strawberry.dataloader import DataLoader
+
+from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.services.processors import Processors
+
+from .notification import load_channels_by_ids, load_rules_by_ids
 
 
 class DataLoaders:
@@ -12,9 +21,19 @@ class DataLoaders:
     its own loader instances initialized here.
     """
 
+    _processors: Processors
+
     def __init__(self, processors: Processors) -> None:
-        # Domain-specific loaders will be initialized here as needed.
-        # Example:
-        # self.notification_loader = DataLoader(load_fn=processors.notification.batch_load)
-        # self.model_deployment_loader = DataLoader(load_fn=processors.model_deployment.batch_load)
-        ...
+        self._processors = processors
+
+    @cached_property
+    def notification_channel_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, Optional[NotificationChannelData]]:
+        return DataLoader(load_fn=partial(load_channels_by_ids, self._processors.notification))
+
+    @cached_property
+    def notification_rule_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, Optional[NotificationRuleData]]:
+        return DataLoader(load_fn=partial(load_rules_by_ids, self._processors.notification))
