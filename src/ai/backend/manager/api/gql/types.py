@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.api.gql.data_loader.registry import DataLoaderRegistry
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
@@ -56,5 +57,6 @@ class StrawberryGQLContext:
     config_provider: ManagerConfigProvider
     event_hub: EventHub
     event_fetcher: EventFetcher
-    dataloader_registry: DataLoaderRegistry
+    dataloader_registry: DataLoaderRegistry  # TODO: Remove this.
     gql_adapter: BaseGQLAdapter
+    data_loaders: DataLoaders
