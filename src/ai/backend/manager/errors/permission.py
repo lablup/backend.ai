@@ -10,7 +10,11 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 
-__all__ = ("RoleNotFound",)
+__all__ = (
+    "RoleNotFound",
+    "RoleAlreadyAssigned",
+    "RoleNotAssigned",
+)
 
 
 class RoleNotFound(BackendAIError, web.HTTPNotFound):
@@ -34,4 +38,16 @@ class RoleAlreadyAssigned(BackendAIError, web.HTTPConflict):
             domain=ErrorDomain.ROLE,
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.ALREADY_EXISTS,
+        )
+
+
+class RoleNotAssigned(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/role-not-assigned"
+    error_title = "The role is not assigned to the user."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ROLE,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.NOT_FOUND,
         )
