@@ -1,23 +1,23 @@
 from dataclasses import dataclass, field
 from typing import Optional, override
-from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.group.types import GroupData, GroupModifier
+from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.group.actions.base import GroupAction
 from ai.backend.manager.types import OptionalState
 
 
 @dataclass
 class ModifyGroupAction(GroupAction):
-    group_id: UUID
-    modifier: GroupModifier = field(default_factory=GroupModifier)
+    updater: Updater[GroupRow]
     user_update_mode: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     user_uuids: OptionalState[list[str]] = field(default_factory=OptionalState[list[str]].nop)
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.group_id)
+        return str(self.updater.pk_value)
 
     @override
     @classmethod

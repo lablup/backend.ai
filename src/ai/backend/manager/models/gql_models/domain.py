@@ -27,12 +27,12 @@ from ai.backend.common.exception import (
 from ai.backend.common.types import ResourceSlot, Sentinel
 from ai.backend.manager.data.domain.types import (
     DomainData,
-    DomainModifier,
-    DomainNodeModifier,
     UserInfo,
 )
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
+from ai.backend.manager.repositories.domain.updaters import DomainNodeUpdaterSpec, DomainUpdaterSpec
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.create_domain_node import (
     CreateDomainNodeAction,
@@ -459,32 +459,32 @@ class ModifyDomainNodeInput(graphene.InputObjectType):
         return field_value
 
     def to_action(self, name: str, user_info: UserInfo) -> ModifyDomainNodeAction:
-        return ModifyDomainNodeAction(
-            name=name,
-            user_info=user_info,
-            modifier=DomainNodeModifier(
-                description=TriState[str].from_graphql(
-                    self.description,
-                ),
-                is_active=OptionalState[bool].from_graphql(self.is_active),
-                total_resource_slots=TriState[ResourceSlot].from_graphql(
-                    graphql.Undefined
-                    if self.total_resource_slots is graphql.Undefined
-                    else ResourceSlot.from_user_input(self.total_resource_slots, None),
-                ),
-                allowed_vfolder_hosts=OptionalState[dict[str, list[str]]].from_graphql(
-                    self.allowed_vfolder_hosts,
-                ),
-                allowed_docker_registries=OptionalState[list[str]].from_graphql(
-                    self.allowed_vfolder_hosts,
-                ),
-                integration_id=TriState[str].from_graphql(
-                    self.integration_id,
-                ),
-                dotfiles=OptionalState[bytes].from_graphql(
-                    self.dotfiles,
-                ),
+        spec = DomainNodeUpdaterSpec(
+            description=TriState[str].from_graphql(
+                self.description,
             ),
+            is_active=OptionalState[bool].from_graphql(self.is_active),
+            total_resource_slots=TriState[ResourceSlot].from_graphql(
+                graphql.Undefined
+                if self.total_resource_slots is graphql.Undefined
+                else ResourceSlot.from_user_input(self.total_resource_slots, None),
+            ),
+            allowed_vfolder_hosts=OptionalState[dict[str, list[str]]].from_graphql(
+                self.allowed_vfolder_hosts,
+            ),
+            allowed_docker_registries=OptionalState[list[str]].from_graphql(
+                self.allowed_vfolder_hosts,
+            ),
+            integration_id=TriState[str].from_graphql(
+                self.integration_id,
+            ),
+            dotfiles=OptionalState[bytes].from_graphql(
+                self.dotfiles,
+            ),
+        )
+        return ModifyDomainNodeAction(
+            user_info=user_info,
+            updater=Updater(spec=spec, pk_value=name),
             sgroups_to_add=set(self.sgroups_to_add)
             if self.sgroups_to_add is not Undefined
             else None,
@@ -675,30 +675,30 @@ class ModifyDomainInput(graphene.InputObjectType):
         return field_value
 
     def to_action(self, domain_name: str, user_info: UserInfo) -> ModifyDomainAction:
-        return ModifyDomainAction(
-            domain_name=domain_name,
-            user_info=user_info,
-            modifier=DomainModifier(
-                name=OptionalState[str].from_graphql(self.name),
-                description=TriState[str].from_graphql(
-                    self.description,
-                ),
-                is_active=OptionalState[bool].from_graphql(
-                    self.is_active,
-                ),
-                total_resource_slots=TriState[ResourceSlot].from_graphql(
-                    Undefined
-                    if self.total_resource_slots is Undefined
-                    else ResourceSlot.from_user_input(self.total_resource_slots, None),
-                ),
-                allowed_vfolder_hosts=OptionalState[dict[str, list[str]]].from_graphql(
-                    self.allowed_vfolder_hosts,
-                ),
-                allowed_docker_registries=OptionalState[list[str]].from_graphql(
-                    self.allowed_docker_registries,
-                ),
-                integration_id=TriState[str].from_graphql(self.integration_id),
+        spec = DomainUpdaterSpec(
+            name=OptionalState[str].from_graphql(self.name),
+            description=TriState[str].from_graphql(
+                self.description,
             ),
+            is_active=OptionalState[bool].from_graphql(
+                self.is_active,
+            ),
+            total_resource_slots=TriState[ResourceSlot].from_graphql(
+                Undefined
+                if self.total_resource_slots is Undefined
+                else ResourceSlot.from_user_input(self.total_resource_slots, None),
+            ),
+            allowed_vfolder_hosts=OptionalState[dict[str, list[str]]].from_graphql(
+                self.allowed_vfolder_hosts,
+            ),
+            allowed_docker_registries=OptionalState[list[str]].from_graphql(
+                self.allowed_docker_registries,
+            ),
+            integration_id=TriState[str].from_graphql(self.integration_id),
+        )
+        return ModifyDomainAction(
+            user_info=user_info,
+            updater=Updater(spec=spec, pk_value=domain_name),
         )
 
 

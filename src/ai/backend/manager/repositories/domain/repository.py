@@ -13,7 +13,6 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.domain.types import (
     DomainData,
-    DomainModifier,
     UserInfo,
 )
 from ai.backend.manager.errors.resource import (
@@ -38,6 +37,7 @@ from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, get_scaling_groups
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
 
 from ..permission_controller.role_manager import RoleManager
@@ -90,32 +90,17 @@ class DomainRepository:
             return data
 
     @domain_repository_resilience.apply()
-    async def modify_domain_validated(
-        self, domain_name: str, modifier: DomainModifier
-    ) -> DomainData:
+    async def modify_domain_validated(self, updater: Updater[DomainRow]) -> DomainData:
         """
         Modifies an existing domain.
         Validates domain modification permissions.
         """
         async with self._db.begin_session() as db_session:
-            data = modifier.fields_to_update()
-            update_stmt = (
-                sa.update(DomainRow)
-                .values(data)
-                .where(DomainRow.name == domain_name)
-                .returning(DomainRow)
-            )
-            query_stmt = (
-                sa.select(DomainRow)
-                .from_statement(update_stmt)
-                .execution_options(populate_existing=True)
-            )
+            result = await execute_updater(db_session, updater)
 
-            row = cast(Optional[DomainRow], await db_session.scalar(query_stmt))
-
-            if row is None:
-                raise DomainNotFound(f"Domain not found: {domain_name}")
-            return row.to_data()
+            if result is None:
+                raise DomainNotFound(f"Domain not found: {updater.pk_value}")
+            return result.row.to_data()
 
     @domain_repository_resilience.apply()
     async def soft_delete_domain_validated(self, domain_name: str) -> None:
@@ -194,8 +179,7 @@ class DomainRepository:
     @domain_repository_resilience.apply()
     async def modify_domain_node_validated(
         self,
-        domain_name: str,
-        modifier_fields: dict,
+        updater: Updater[DomainRow],
         sgroups_to_add: Optional[set[str]] = None,
         sgroups_to_remove: Optional[set[str]] = None,
     ) -> DomainData:
@@ -203,6 +187,7 @@ class DomainRepository:
         Modifies a domain node with scaling group changes.
         Validates domain node modification permissions.
         """
+        domain_name = str(updater.pk_value)
         async with self._db.begin_session() as session:
             if sgroups_to_add is not None:
                 await session.execute(
@@ -221,23 +206,13 @@ class DomainRepository:
                     ),
                 )
 
-            update_stmt = (
-                sa.update(DomainRow)
-                .where(DomainRow.name == domain_name)
-                .values(modifier_fields)
-                .returning(DomainRow)
-            )
-            await session.execute(update_stmt)
+            result = await execute_updater(session, updater)
 
-            domain_row: Optional[DomainRow] = await session.scalar(
-                sa.select(DomainRow).where(DomainRow.name == domain_name)
-            )
-
-            if domain_row is None:
+            if result is None:
                 raise DomainNotFound(f"Domain not found (id:{domain_name})")
 
             await session.commit()
-            return domain_row.to_data()
+            return result.row.to_data()
 
     async def _create_model_store_group(self, db_session: SASession, domain_name: str) -> None:
         """
@@ -324,8 +299,7 @@ class DomainRepository:
     @domain_repository_resilience.apply()
     async def modify_domain_node_with_permissions(
         self,
-        domain_name: str,
-        modifier_fields: dict,
+        updater: Updater[DomainRow],
         user_info: UserInfo,
         sgroups_to_add: Optional[set[str]] = None,
         sgroups_to_remove: Optional[set[str]] = None,
@@ -334,7 +308,7 @@ class DomainRepository:
         Modifies a domain node with scaling group changes and permission checks.
         Validates domain and scaling group permissions.
         """
-
+        domain_name = str(updater.pk_value)
         async with self._db.begin_session() as db_session:
             client_ctx = ClientContext(
                 self._db, user_info.domain_name, user_info.id, user_info.role
@@ -359,8 +333,7 @@ class DomainRepository:
                 )
 
             return await self.modify_domain_node_validated(
-                domain_name,
-                modifier_fields,
+                updater,
                 sgroups_to_add,
                 sgroups_to_remove,
             )

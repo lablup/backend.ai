@@ -24,7 +24,7 @@ from ai.backend.common.types import SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.group.types import GroupData, GroupModifier
+from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.errors.resource import InvalidUserUpdateMode, ProjectNotFound
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import GroupRow, association_groups_users, groups
@@ -34,6 +34,7 @@ from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 
 from ..permission_controller.role_manager import RoleManager
@@ -128,14 +129,14 @@ class GroupRepository:
     @group_repository_resilience.apply()
     async def modify_validated(
         self,
-        group_id: uuid.UUID,
-        modifier: GroupModifier,
+        updater: Updater[GroupRow],
         user_role: UserRole,
         user_update_mode: Optional[str] = None,
         user_uuids: Optional[list[uuid.UUID]] = None,
     ) -> Optional[GroupData]:
         """Modify a group with validation."""
-        data = modifier.fields_to_update()
+        group_id = updater.pk_value
+        data = updater.spec.build_values()
 
         if user_update_mode not in (None, "add", "remove"):
             raise InvalidUserUpdateMode("invalid user_update_mode")
@@ -161,22 +162,10 @@ class GroupRepository:
 
             # Update group data if provided
             if data:
-                update_stmt = (
-                    sa.update(GroupRow)
-                    .values(data)
-                    .where(GroupRow.id == group_id)
-                    .returning(GroupRow)
-                )
-                query_stmt = (
-                    sa.select(GroupRow)
-                    .from_statement(update_stmt)
-                    .execution_options(populate_existing=True)
-                )
-                row = await session.scalar(query_stmt)
-                row = cast(Optional[GroupRow], row)
-                if row is None:
+                result = await execute_updater(session, updater)
+                if result is None:
                     raise ProjectNotFound(f"Project not found: {group_id}")
-                return row.to_data()
+                return result.row.to_data()
 
             # If only user updates were performed, return None
             return None
