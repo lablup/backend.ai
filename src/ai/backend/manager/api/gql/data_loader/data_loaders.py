@@ -12,11 +12,9 @@ class DataLoaders:
     its own loader instances initialized here.
     """
 
-    _processors: Processors
-
     def __init__(self, processors: Processors) -> None:
-        self._processors = processors
         # Domain-specific loaders will be initialized here as needed.
         # Example:
-        # self._notification_loader = NotificationLoader(processors.notification)
-        # self._model_deployment_loader = ModelDeploymentLoader(...)
+        # self.notification_loader = DataLoader(load_fn=processors.notification.batch_load)
+        # self.model_deployment_loader = DataLoader(load_fn=processors.model_deployment.batch_load)
+        ...
