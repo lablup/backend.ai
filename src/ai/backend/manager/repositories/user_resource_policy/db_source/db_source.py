@@ -12,9 +12,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
-from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
-    UserResourcePolicyModifier,
-)
+from ai.backend.manager.repositories.base.updater import Updater
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -68,7 +66,7 @@ class UserResourcePolicyDBSource:
 
     @user_resource_policy_db_source_resilience.apply()
     async def update(
-        self, name: str, modifier: UserResourcePolicyModifier
+        self, name: str, updater: Updater[UserResourcePolicyRow]
     ) -> UserResourcePolicyData:
         """Updates an existing user resource policy."""
         async with self._db.begin_session() as db_sess:
@@ -80,7 +78,7 @@ class UserResourcePolicyDBSource:
                     f"User resource policy with name {name} not found."
                 )
 
-            fields = modifier.fields_to_update()
+            fields = updater.spec.build_values()
             update_stmt = (
                 sa.update(UserResourcePolicyRow)
                 .where(UserResourcePolicyRow.name == name)

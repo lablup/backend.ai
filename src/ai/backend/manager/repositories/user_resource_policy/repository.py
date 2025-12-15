@@ -10,11 +10,9 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user_resource_policy.db_source.db_source import (
     UserResourcePolicyDBSource,
-)
-from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
-    UserResourcePolicyModifier,
 )
 
 if TYPE_CHECKING:
@@ -59,10 +57,10 @@ class UserResourcePolicyRepository:
 
     @user_resource_policy_repository_resilience.apply()
     async def update(
-        self, name: str, modifier: UserResourcePolicyModifier
+        self, name: str, updater: Updater[UserResourcePolicyRow]
     ) -> UserResourcePolicyData:
         """Updates an existing user resource policy."""
-        return await self._db_source.update(name, modifier)
+        return await self._db_source.update(name, updater)
 
     @user_resource_policy_repository_resilience.apply()
     async def delete(self, name: str) -> UserResourcePolicyData:

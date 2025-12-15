@@ -25,8 +25,10 @@ from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
+from ai.backend.manager.repositories.resource_preset.updaters import ResourcePresetUpdaterSpec
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
     CheckResourcePresetsActionResult,
@@ -46,7 +48,6 @@ from ai.backend.manager.services.resource_preset.actions.list_presets import (
 from ai.backend.manager.services.resource_preset.actions.modify_preset import (
     ModifyResourcePresetAction,
     ModifyResourcePresetActionResult,
-    ResourcePresetModifier,
 )
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
 from ai.backend.manager.types import OptionalState, TriState
@@ -237,8 +238,11 @@ class TestResourcePresetServiceCompatibility:
         action = ModifyResourcePresetAction(
             name="cpu-small",
             id=None,
-            modifier=ResourcePresetModifier(
-                resource_slots=OptionalState.update(ResourceSlot({"cpu": "4", "mem": "8G"}))
+            updater=Updater(
+                spec=ResourcePresetUpdaterSpec(
+                    resource_slots=OptionalState.update(ResourceSlot({"cpu": "4", "mem": "8G"}))
+                ),
+                pk_value="cpu-small",
             ),
         )
 
@@ -269,7 +273,10 @@ class TestResourcePresetServiceCompatibility:
         action = ModifyResourcePresetAction(
             name=None,
             id=preset_id,
-            modifier=ResourcePresetModifier(name=OptionalState.update("cpu-medium")),
+            updater=Updater(
+                spec=ResourcePresetUpdaterSpec(name=OptionalState.update("cpu-medium")),
+                pk_value=preset_id,
+            ),
         )
 
         result = await resource_preset_service.modify_preset(action)
@@ -282,7 +289,10 @@ class TestResourcePresetServiceCompatibility:
         action = ModifyResourcePresetAction(
             name=None,
             id=None,
-            modifier=ResourcePresetModifier(name=OptionalState.update("new-name")),
+            updater=Updater(
+                spec=ResourcePresetUpdaterSpec(name=OptionalState.update("new-name")),
+                pk_value="",
+            ),
         )
 
         with pytest.raises(InvalidAPIParameters):
@@ -516,8 +526,11 @@ class TestResourcePresetServiceCompatibility:
         action = ModifyResourcePresetAction(
             name="gpu-standard",
             id=None,
-            modifier=ResourcePresetModifier(
-                shared_memory=TriState.update(BinarySize(BinarySize.from_str("4G"))),
+            updater=Updater(
+                spec=ResourcePresetUpdaterSpec(
+                    shared_memory=TriState.update(BinarySize(BinarySize.from_str("4G"))),
+                ),
+                pk_value="gpu-standard",
             ),
         )
 

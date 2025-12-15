@@ -13,9 +13,7 @@ from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
-from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
-    KeyPairResourcePolicyModifier,
-)
+from ai.backend.manager.repositories.base.updater import Updater
 
 keypair_resource_policy_db_source_resilience = Resilience(
     policies=[
@@ -53,7 +51,7 @@ class KeypairResourcePolicyDBSource:
 
     @keypair_resource_policy_db_source_resilience.apply()
     async def update(
-        self, name: str, modifier: KeyPairResourcePolicyModifier
+        self, name: str, updater: Updater[KeyPairResourcePolicyRow]
     ) -> KeyPairResourcePolicyData:
         async with self._db.begin_session() as db_sess:
             check_query = sa.select(KeyPairResourcePolicyRow).where(
@@ -64,7 +62,7 @@ class KeypairResourcePolicyDBSource:
                 raise KeypairResourcePolicyNotFound(
                     f"Keypair resource policy with name {name} not found."
                 )
-            fields = modifier.fields_to_update()
+            fields = updater.spec.build_values()
             update_stmt = (
                 sa.update(KeyPairResourcePolicyRow)
                 .where(KeyPairResourcePolicyRow.name == name)

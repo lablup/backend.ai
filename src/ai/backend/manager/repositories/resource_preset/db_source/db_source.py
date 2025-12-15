@@ -39,8 +39,8 @@ from ai.backend.manager.models.scaling_group import query_allowed_sgroups
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
-from ai.backend.manager.services.resource_preset.types import ResourcePresetModifier
 
 from .types import (
     AccessKeyFilter,
@@ -136,7 +136,7 @@ class ResourcePresetDBSource:
         return preset_row
 
     async def modify_preset(
-        self, preset_id: Optional[UUID], name: Optional[str], modifier: ResourcePresetModifier
+        self, preset_id: Optional[UUID], name: Optional[str], updater: Updater[ResourcePresetRow]
     ) -> ResourcePresetData:
         """
         Modifies an existing resource preset.
@@ -144,7 +144,7 @@ class ResourcePresetDBSource:
         """
         async with self._db.begin_session() as session:
             preset_row = await self._get_preset_by_id_or_name(session, preset_id, name)
-            to_update = modifier.fields_to_update()
+            to_update = updater.spec.build_values()
             for key, value in to_update.items():
                 setattr(preset_row, key, value)
             await session.flush()

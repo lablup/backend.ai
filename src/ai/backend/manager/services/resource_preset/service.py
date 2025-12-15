@@ -7,6 +7,7 @@ from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.resource_preset import ResourcePresetRepository
 from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
+from ai.backend.manager.repositories.resource_preset.updaters import ResourcePresetUpdaterSpec
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
     CheckResourcePresetsActionResult,
@@ -57,17 +58,17 @@ class ResourcePresetService:
     ) -> ModifyResourcePresetActionResult:
         name = action.name
         preset_id = action.id
-        modifier = action.modifier
+        spec = cast(ResourcePresetUpdaterSpec, action.updater.spec)
 
         if preset_id is None and name is None:
             raise InvalidAPIParameters("One of (`id` or `name`) parameter should not be null")
 
-        if resource_slots := modifier.resource_slots.optional_value():
+        if resource_slots := spec.resource_slots.optional_value():
             if not resource_slots.has_intrinsic_slots():
                 raise InvalidAPIParameters("ResourceSlot must have all intrinsic resource slots.")
 
         preset_data = await self._resource_preset_repository.modify_preset_validated(
-            preset_id, name, modifier
+            preset_id, name, action.updater
         )
 
         return ModifyResourcePresetActionResult(resource_preset=preset_data)
