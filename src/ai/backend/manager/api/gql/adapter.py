@@ -176,4 +176,4 @@ class BaseGQLAdapter:
             spec=pagination_spec,
         )
 
-        return Querier(conditions=conditions, orders=orders, pagination=pagination)
+        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)

@@ -1,6 +1,6 @@
 import pytest
 
-from ai.backend.manager.repositories.base import OffsetPagination, Querier
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.services.artifact_revision.actions.list import (
     ListArtifactRevisionsAction,
     ListArtifactRevisionsActionResult,
@@ -21,7 +21,7 @@ from ...utils import ScenarioBase
         ScenarioBase.success(
             "Success Case - List all artifact revisions",
             ListArtifactRevisionsAction(
-                querier=Querier(
+                querier=BatchQuerier(
                     conditions=[],
                     orders=[],
                     pagination=OffsetPagination(limit=10, offset=0),
@@ -37,7 +37,7 @@ from ...utils import ScenarioBase
         ScenarioBase.success(
             "Success Case - List with ordering",
             ListArtifactRevisionsAction(
-                querier=Querier(
+                querier=BatchQuerier(
                     conditions=[],
                     orders=[],
                     pagination=OffsetPagination(limit=10, offset=0),

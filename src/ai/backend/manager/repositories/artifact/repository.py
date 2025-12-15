@@ -28,7 +28,7 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactRevisionFilterOptions,
     ArtifactRevisionOrderingOptions,
 )
-from ai.backend.manager.repositories.base import Querier
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.types import PaginationOptions
 
 artifact_repository_resilience = Resilience(
@@ -224,7 +224,7 @@ class ArtifactRepository:
     @artifact_repository_resilience.apply()
     async def search_artifacts(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> ArtifactListResult:
         """Search artifacts with querier pattern."""
 
@@ -233,7 +233,7 @@ class ArtifactRepository:
     @artifact_repository_resilience.apply()
     async def search_artifact_revisions(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> ArtifactRevisionListResult:
         """Search artifact revisions with querier pattern."""
 
@@ -242,7 +242,7 @@ class ArtifactRepository:
     @artifact_repository_resilience.apply()
     async def search_artifacts_with_revisions(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> tuple[list[ArtifactDataWithRevisions], int]:
         """Search artifacts with their revisions using querier pattern."""
 

@@ -44,7 +44,7 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactRevisionOrderingOptions,
     ArtifactStatusFilterType,
 )
-from ai.backend.manager.repositories.base import Querier, execute_querier
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.types import (
     BaseFilterApplier,
     BaseOrderingApplier,
@@ -1038,12 +1038,12 @@ class ArtifactDBSource:
 
     async def search_artifacts(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> ArtifactListResult:
         """Search artifacts with querier pattern.
 
         Args:
-            querier: Querier for filtering, ordering, and pagination
+            querier: BatchQuerier for filtering, ordering, and pagination
 
         Returns:
             ArtifactListResult with items, total count, and pagination info
@@ -1051,7 +1051,7 @@ class ArtifactDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(ArtifactRow)
 
-            result = await execute_querier(
+            result = await execute_batch_querier(
                 db_sess,
                 query,
                 querier,
@@ -1068,12 +1068,12 @@ class ArtifactDBSource:
 
     async def search_artifact_revisions(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> ArtifactRevisionListResult:
         """Search artifact revisions with querier pattern.
 
         Args:
-            querier: Querier for filtering, ordering, and pagination
+            querier: BatchQuerier for filtering, ordering, and pagination
 
         Returns:
             ArtifactRevisionListResult with items, total count, and pagination info
@@ -1081,7 +1081,7 @@ class ArtifactDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(ArtifactRevisionRow)
 
-            result = await execute_querier(
+            result = await execute_batch_querier(
                 db_sess,
                 query,
                 querier,
@@ -1098,12 +1098,12 @@ class ArtifactDBSource:
 
     async def search_artifacts_with_revisions(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> tuple[list[ArtifactDataWithRevisions], int]:
         """Search artifacts with their revisions using querier pattern.
 
         Args:
-            querier: Querier for filtering, ordering, and pagination
+            querier: BatchQuerier for filtering, ordering, and pagination
 
         Returns:
             Tuple of (artifacts with revisions list, total count)
@@ -1112,7 +1112,7 @@ class ArtifactDBSource:
             # Build query with eager loading of revisions
             query = sa.select(ArtifactRow).options(selectinload(ArtifactRow.revision_rows))
 
-            result = await execute_querier(
+            result = await execute_batch_querier(
                 db_sess,
                 query,
                 querier,

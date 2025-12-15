@@ -5,13 +5,13 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
-from ai.backend.manager.repositories.base import Querier
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.artifact_revision.actions.base import ArtifactRevisionAction
 
 
 @dataclass
 class ListArtifactRevisionsAction(ArtifactRevisionAction):
-    querier: Querier
+    querier: BatchQuerier
 
     @override
     def entity_id(self) -> Optional[str]:
