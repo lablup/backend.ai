@@ -6,13 +6,10 @@ from pathlib import Path
 from pprint import pformat
 from typing import TYPE_CHECKING, Any, AsyncIterator, Optional, Self
 
-import attrs
 import click
 
 if TYPE_CHECKING:
-    from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
     from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
     from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
     from ai.backend.common.etcd import AsyncEtcd
     from ai.backend.logging import AbstractLogger
@@ -126,14 +123,6 @@ async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerUnifiedConfig]
         yield unified_config
     finally:
         await etcd_loader.close()
-
-
-@attrs.define(auto_attribs=True, frozen=True, slots=True)
-class RedisConnectionSet:
-    live: ValkeyLiveClient
-    stat: ValkeyStatClient
-    image: ValkeyImageClient
-    stream: ValkeyStreamClient
 
 
 @contextlib.asynccontextmanager
