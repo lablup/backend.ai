@@ -1,6 +1,7 @@
 import uuid
 
 import sqlalchemy as sa
+from sqlalchemy.orm import selectinload
 
 from ai.backend.manager.data.vfs_storage.creator import VFSStorageCreator
 from ai.backend.manager.data.vfs_storage.modifier import VFSStorageModifier
@@ -25,7 +26,11 @@ class VFSStorageDBSource:
         Get an existing VFS storage configuration from the database.
         """
         async with self._db.begin_session() as db_session:
-            query = sa.select(VFSStorageRow).where(VFSStorageRow.name == storage_name)
+            query = (
+                sa.select(VFSStorageRow)
+                .where(VFSStorageRow.name == storage_name)
+                .options(selectinload(VFSStorageRow.meta))
+            )
             result = await db_session.execute(query)
             row: VFSStorageRow = result.scalar_one_or_none()
             if row is None:
@@ -37,7 +42,11 @@ class VFSStorageDBSource:
         Get an existing VFS storage configuration from the database by ID.
         """
         async with self._db.begin_session() as db_session:
-            query = sa.select(VFSStorageRow).where(VFSStorageRow.id == storage_id)
+            query = (
+                sa.select(VFSStorageRow)
+                .where(VFSStorageRow.id == storage_id)
+                .options(selectinload(VFSStorageRow.meta))
+            )
             result = await db_session.execute(query)
             row: VFSStorageRow = result.scalar_one_or_none()
             if row is None:
@@ -54,7 +63,17 @@ class VFSStorageDBSource:
             db_session.add(vfs_storage_row)
             await db_session.flush()
             await db_session.refresh(vfs_storage_row)
-            return vfs_storage_row.to_dataclass()
+
+            # Query with eager loading to get the created row with relationships
+            query = (
+                sa.select(VFSStorageRow)
+                .where(VFSStorageRow.id == vfs_storage_row.id)
+                .options(selectinload(VFSStorageRow.meta))
+            )
+            result = await db_session.execute(query)
+            row: VFSStorageRow = result.scalar_one()
+
+            return row.to_dataclass()
 
     async def update(self, storage_id: uuid.UUID, modifier: VFSStorageModifier) -> VFSStorageData:
         """
@@ -66,10 +85,18 @@ class VFSStorageDBSource:
                 sa.update(VFSStorageRow)
                 .where(VFSStorageRow.id == storage_id)
                 .values(**data)
-                .returning(*sa.select(VFSStorageRow).selected_columns)
+                .returning(VFSStorageRow.id)
             )
-            stmt = sa.select(VFSStorageRow).from_statement(update_stmt)
-            row: VFSStorageRow = (await db_session.execute(stmt)).scalars().one()
+            await db_session.execute(update_stmt)
+
+            # Query with eager loading to get the updated row
+            query = (
+                sa.select(VFSStorageRow)
+                .where(VFSStorageRow.id == storage_id)
+                .options(selectinload(VFSStorageRow.meta))
+            )
+            result = await db_session.execute(query)
+            row: VFSStorageRow = result.scalar_one()
 
             return row.to_dataclass()
 
@@ -92,7 +119,7 @@ class VFSStorageDBSource:
         List all VFS storage configurations from the database.
         """
         async with self._db.begin_session() as db_session:
-            query = sa.select(VFSStorageRow)
+            query = sa.select(VFSStorageRow).options(selectinload(VFSStorageRow.meta))
             result = await db_session.execute(query)
             rows: list[VFSStorageRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]
