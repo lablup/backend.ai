@@ -23,7 +23,7 @@ class SearchRolesAction(RoleAction):
 
 @dataclass
 class SearchRolesActionResult(BaseActionResult):
-    roles: list[RoleData]
+    items: list[RoleData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
