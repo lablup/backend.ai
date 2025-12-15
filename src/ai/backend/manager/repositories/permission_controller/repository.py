@@ -14,12 +14,13 @@ from ...data.permission.role import (
     RoleCreateInput,
     RoleData,
     RoleDeleteInput,
-    RoleUpdateInput,
     ScopePermissionCheckInput,
     SingleEntityPermissionCheckInput,
     UserRoleAssignmentInput,
 )
+from ...models.rbac_models.role import RoleRow
 from ...models.utils import ExtendedAsyncSAEngine
+from ...repositories.base.updater import Updater
 from .db_source import PermissionDBSource
 
 permission_controller_repository_resilience = Resilience(
@@ -58,8 +59,8 @@ class PermissionControllerRepository:
         return role_row.to_data()
 
     @permission_controller_repository_resilience.apply()
-    async def update_role(self, data: RoleUpdateInput) -> RoleData:
-        result = await self._db_source.update_role(data)
+    async def update_role(self, updater: Updater[RoleRow]) -> RoleData:
+        result = await self._db_source.update_role(updater)
         return result.to_data()
 
     @permission_controller_repository_resilience.apply()
