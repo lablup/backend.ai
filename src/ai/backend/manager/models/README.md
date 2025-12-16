@@ -23,10 +23,10 @@ Query-related methods (`get_by_id`, `list_by_condition`, etc.) should be impleme
 - Use `IDColumn()` recommended
 - Domain-specific ID types ensure type safety: `SessionIDColumn()`, `KernelIDColumn()`, `EndpointIDColumn()`
 
-### Foreign Key
+### Reference Columns
 
-- Use `ForeignKeyIDColumn()`
-- All Foreign Keys must be ID(UUID) based
+- Use ID(UUID) columns without DB-level Foreign Key constraints
+- Relationships are defined via SQLAlchemy `relationship()` with `primaryjoin`
 
 ### Enum
 
@@ -72,7 +72,7 @@ Sets default at Python level. Applied only when creating via ORM.
 ### When Not to Use Default Values
 
 - Required input fields: Columns that must be explicitly specified on creation (`name`, `user_uuid`, etc.)
-- Foreign Key: Reference target must be explicitly specified
+- Reference columns: Reference target must be explicitly specified
 - When `nullable=True` and NULL itself is a meaningful default state: `terminated_at`, `deleted_at`
 
 ### Usage with nullable
@@ -92,7 +92,7 @@ Consider indexes for the following columns:
 
 - **WHERE clause**: Frequently filtered columns like `status`, `domain_name`, `scaling_group_name`
 - **ORDER BY clause**: Columns used for sorting like `created_at`, `priority`
-- **Foreign Key**: Improves relationship query performance
+- **Reference columns**: Improves relationship query performance
 - **Compound conditions**: Column combinations frequently used together
 
 Index types:
@@ -116,7 +116,7 @@ Implement `to_data()` method to convert ORM Row to dataclass.
 | Table name | Plural snake_case | `sessions`, `scaling_groups` |
 | Column name | snake_case | `created_at`, `user_uuid` |
 | Boolean column | Adjective or past participle | `schedulable`, `deleted`, `enabled` |
-| Foreign Key | `{referenced_table}_id` | `group_id`, `user_uuid` |
+| Reference column | `{referenced_table}_id` | `group_id`, `user_uuid` |
 | Index | `ix_{table}_{columns}` | `ix_sessions_status_priority` |
 | Unique constraint | `uq_{table}_{columns}` | `uq_sessions_name_domain` |
 | Row class | `{Entity}Row` | `SessionRow`, `KernelRow` |
@@ -127,7 +127,7 @@ When adding a new model:
 
 - [ ] Inherit `Base`, define `__tablename__`
 - [ ] Primary Key: `IDColumn()` or domain-specific ID
-- [ ] Foreign Key: Use `ForeignKeyIDColumn()`
+- [ ] Reference columns: ID(UUID) based, no DB-level FK constraints
 - [ ] Explicitly specify `nullable`
 - [ ] Set `server_default` or `default` (only one)
 - [ ] Include `created_at` column (cursor pagination)
