@@ -14,7 +14,6 @@ from ....data.permission.role import (
     RoleCreateInput,
     RoleDeleteInput,
     RoleListResult,
-    RoleUpdateInput,
     UserRoleAssignmentInput,
     UserRoleRevocationInput,
 )
@@ -32,6 +31,7 @@ from ....models.rbac_models.role import RoleRow
 from ....models.rbac_models.user_role import UserRoleRow
 from ....models.user import UserRow
 from ....models.utils import ExtendedAsyncSAEngine
+from ....repositories.base.creator import Creator, execute_creator
 from ....repositories.base.querier import BatchQuerier, execute_batch_querier
 from ....repositories.base.updater import Updater, execute_updater
 from ..creators import ObjectPermissionCreatorSpec
