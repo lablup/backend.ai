@@ -2,28 +2,31 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.permission.role import RoleCreateInput, RoleData
+from ai.backend.manager.data.permission.role import (
+    UserRoleRevocationData,
+    UserRoleRevocationInput,
+)
 from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
 
 
 @dataclass
-class CreateRoleAction(RoleAction):
-    input: RoleCreateInput
+class RevokeRoleAction(RoleAction):
+    input: UserRoleRevocationInput
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.input.user_id)
 
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "create"
+        return "revoke"
 
 
 @dataclass
-class CreateRoleActionResult(BaseActionResult):
-    data: RoleData
+class RevokeRoleActionResult(BaseActionResult):
+    data: UserRoleRevocationData
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.data.id) if self.data else None
+        return None

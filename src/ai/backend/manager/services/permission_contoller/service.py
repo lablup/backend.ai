@@ -17,6 +17,22 @@ from ai.backend.manager.services.permission_contoller.actions.delete_role import
     DeleteRoleAction,
     DeleteRoleActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
+    GetRoleDetailAction,
+    GetRoleDetailActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.revoke_role import (
+    RevokeRoleAction,
+    RevokeRoleActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_roles import (
+    SearchRolesAction,
+    SearchRolesActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
+    SearchUsersAssignedToRoleAction,
+    SearchUsersAssignedToRoleActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.update_role import (
     UpdateRoleAction,
     UpdateRoleActionResult,
@@ -38,7 +54,6 @@ class PermissionControllerService:
         result = await self._repository.create_role(action.input)
         return CreateRoleActionResult(
             data=result,
-            success=True,
         )
 
     async def update_role(self, action: UpdateRoleAction) -> UpdateRoleActionResult:
@@ -72,4 +87,41 @@ class PermissionControllerService:
         """
         data = await self._repository.assign_role(action.input)
 
-        return AssignRoleActionResult(success=True, data=data)
+        return AssignRoleActionResult(data=data)
+
+    async def revoke_role(self, action: RevokeRoleAction) -> RevokeRoleActionResult:
+        """
+        Revokes a role from a user.
+        """
+        data = await self._repository.revoke_role(action.input)
+
+        return RevokeRoleActionResult(data=data)
+
+    async def get_role_detail(self, action: GetRoleDetailAction) -> GetRoleDetailActionResult:
+        """Get role with all permission details and assigned users."""
+        role_data = await self._repository.get_role_with_permissions(action.role_id)
+        return GetRoleDetailActionResult(role=role_data)
+
+    async def search_roles(self, action: SearchRolesAction) -> SearchRolesActionResult:
+        """Search roles with pagination and filtering."""
+        result = await self._repository.search_roles(action.querier)
+        return SearchRolesActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_users_assigned_to_role(
+        self, action: SearchUsersAssignedToRoleAction
+    ) -> SearchUsersAssignedToRoleActionResult:
+        """Search users assigned to a specific role with pagination and filtering."""
+        result = await self._repository.search_users_assigned_to_role(
+            querier=action.querier,
+        )
+        return SearchUsersAssignedToRoleActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
