@@ -37,6 +37,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentInfoWithAutoScalingRules,
     EndpointLifecycle,
+    ModelDeploymentListResult,
     RouteInfo,
     RouteStatus,
     ScaleOutDecision,
@@ -51,6 +52,7 @@ from ai.backend.manager.models.kernel import KernelStatistics
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
 from .db_source import DeploymentDBSource
@@ -889,3 +891,11 @@ class DeploymentRepository:
         Returns None if no active agents exist.
         """
         return await self._db_source.get_default_architecture_from_scaling_group(scaling_group_name)
+
+    @deployment_repository_resilience.apply()
+    async def search_deployments(
+        self,
+        querier: BatchQuerier,
+    ) -> ModelDeploymentListResult:
+        """Search model deployments with pagination using BatchQuerier."""
+        return await self._db_source.search_deployments(querier)

@@ -30,6 +30,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentInfoWithAutoScalingRules,
     EndpointLifecycle,
+    ModelDeploymentListResult,
     RouteInfo,
     RouteStatus,
     ScaleOutDecision,
@@ -65,6 +66,7 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ContainerUserContext,
     DeploymentContext,
@@ -1439,3 +1441,25 @@ class DeploymentDBSource:
             architecture_counts = Counter(architectures)
             most_common_architecture, _ = architecture_counts.most_common(1)[0]
             return most_common_architecture
+
+    async def search_deployments(
+        self,
+        querier: BatchQuerier,
+    ) -> ModelDeploymentListResult:
+        """Search model deployments with pagination using BatchQuerier."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(EndpointRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.EndpointRow.to_model_deployment_data() for row in result.rows]
+            return ModelDeploymentListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )

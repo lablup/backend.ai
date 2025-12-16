@@ -31,6 +31,10 @@ from sqlalchemy.orm import contains_eager, foreign, relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.config import model_definition_iv
+from ai.backend.common.data.model_deployment.types import (
+    DeploymentStrategy,
+    ModelDeploymentStatus,
+)
 from ai.backend.common.types import (
     AccessKey,
     AutoScalingMetricComparator,
@@ -57,9 +61,12 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     DeploymentState,
     ExecutionSpec,
+    ModelDeploymentData,
+    ModelDeploymentMetadataInfo,
     ModelRevisionSpec,
     MountMetadata,
     ReplicaSpec,
+    ReplicaStateData,
     ResourceSpec,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
@@ -712,6 +719,50 @@ class EndpointRow(Base):
                     ),
                 ),
             ],
+        )
+
+    # TODO: Make this method to return correct data mapping
+    def to_model_deployment_data(self) -> ModelDeploymentData:
+        """
+        Convert EndpointRow to ModelDeploymentData dataclass.
+
+        Note: This creates a basic ModelDeploymentData without loading related entities
+        (scaling rules, revision history, etc.). For full data, additional queries are needed.
+        """
+        # Map lifecycle_stage to ModelDeploymentStatus
+        status_mapping: dict[EndpointLifecycle, ModelDeploymentStatus] = {
+            EndpointLifecycle.PENDING: ModelDeploymentStatus.PENDING,
+            EndpointLifecycle.CREATED: ModelDeploymentStatus.READY,
+            EndpointLifecycle.DESTROYING: ModelDeploymentStatus.STOPPING,
+            EndpointLifecycle.DESTROYED: ModelDeploymentStatus.STOPPED,
+        }
+        status = status_mapping.get(self.lifecycle_stage, ModelDeploymentStatus.PENDING)
+
+        return ModelDeploymentData(
+            id=self.id,
+            metadata=ModelDeploymentMetadataInfo(
+                name=self.name,
+                status=status,
+                tags=[self.tag] if self.tag else [],
+                project_id=self.project,
+                domain_name=self.domain,
+                created_at=self.created_at,
+                updated_at=self.created_at,  # EndpointRow doesn't have updated_at
+            ),
+            network_access=DeploymentNetworkSpec(
+                open_to_public=self.open_to_public,
+                url=self.url,
+            ),
+            revision=None,  # Revision data requires additional query
+            revision_history_ids=[],  # Requires additional query
+            scaling_rule_ids=[],  # Requires additional query to load relationships
+            replica_state=ReplicaStateData(
+                desired_replica_count=self.desired_replicas or self.replicas,
+                replica_ids=[],  # Requires additional query
+            ),
+            default_deployment_strategy=DeploymentStrategy.ROLLING,
+            created_user_id=self.created_user,
+            access_token_ids=None,  # Requires additional query
         )
 
 
