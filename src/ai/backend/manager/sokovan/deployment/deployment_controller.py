@@ -11,7 +11,9 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
 from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
 from ai.backend.manager.data.deployment.types import DeploymentInfo
+from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.updaters import DeploymentUpdaterSpec
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
@@ -125,7 +127,8 @@ class DeploymentController:
             await self._scheduling_controller.validate_session_spec(
                 SessionValidationSpec.from_revision(model_revision=target_revision)
             )
-        res = await self._deployment_repository.update_endpoint_with_spec(endpoint_id, spec)
+        updater = Updater[EndpointRow](spec=spec, pk_value=endpoint_id)
+        res = await self._deployment_repository.update_endpoint_with_spec(updater)
         try:
             await self.mark_lifecycle_needed(DeploymentLifecycleType.CHECK_REPLICA)
         except Exception as e:

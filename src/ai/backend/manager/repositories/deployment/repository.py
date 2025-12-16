@@ -45,11 +45,12 @@ from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.deployment import DefinitionFileNotFound
 from ai.backend.manager.errors.service import EndpointNotFound
-from ai.backend.manager.models.endpoint import EndpointStatistics
+from ai.backend.manager.models.endpoint import EndpointRow, EndpointStatistics
 from ai.backend.manager.models.kernel import KernelStatistics
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment.updaters import DeploymentUpdaterSpec
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
@@ -143,14 +144,12 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def update_endpoint_with_spec(
         self,
-        endpoint_id: uuid.UUID,
-        spec: DeploymentUpdaterSpec,
+        updater: Updater[EndpointRow],
     ) -> DeploymentInfo:
-        """Update endpoint using a deployment updater spec.
+        """Update endpoint using an Updater.
 
         Args:
-            endpoint_id: ID of the endpoint to update
-            spec: Deployment updater spec containing partial updates
+            updater: Updater containing spec and endpoint_id
 
         Returns:
             DeploymentInfo: Updated deployment information
@@ -159,7 +158,7 @@ class DeploymentRepository:
             NoUpdatesToApply: If there are no updates to apply
             EndpointNotFound: If the endpoint does not exist
         """
-        return await self._db_source.update_endpoint_with_spec(endpoint_id, spec)
+        return await self._db_source.update_endpoint_with_spec(updater)
 
     @deployment_repository_resilience.apply()
     async def update_endpoint_lifecycle_bulk(

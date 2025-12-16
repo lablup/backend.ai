@@ -64,6 +64,7 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.deployment.updaters import DeploymentUpdaterSpec
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ContainerUserContext,
@@ -387,14 +388,12 @@ class DeploymentDBSource:
 
     async def update_endpoint_with_spec(
         self,
-        endpoint_id: uuid.UUID,
-        spec: DeploymentUpdaterSpec,
+        updater: Updater[EndpointRow],
     ) -> DeploymentInfo:
-        """Update endpoint using a deployment updater spec.
+        """Update endpoint using an Updater.
 
         Args:
-            endpoint_id: ID of the endpoint to update
-            spec: Deployment updater spec containing partial updates
+            updater: Updater containing spec and endpoint_id
 
         Returns:
             DeploymentInfo: Updated deployment information
@@ -403,27 +402,16 @@ class DeploymentDBSource:
             NoUpdatesToApply: If there are no updates to apply
             EndpointNotFound: If the endpoint does not exist
         """
-        # Extract updates from the spec
-        updates = spec.build_values()
-
+        # Check for empty updates before executing
+        updates = updater.spec.build_values()
         if not updates:
-            raise NoUpdatesToApply(f"No updates to apply for endpoint {endpoint_id}")
+            raise NoUpdatesToApply(f"No updates to apply for endpoint {updater.pk_value}")
 
         async with self._begin_session_read_committed() as db_sess:
-            # Directly use the updates since build_values returns column-ready values
-            query = (
-                sa.update(EndpointRow)
-                .where(EndpointRow.id == endpoint_id)
-                .values(**updates)
-                .returning(EndpointRow)
-            )
-            result = await db_sess.execute(query)
-            updated_row = result.scalar_one_or_none()
-
-            if not updated_row:
-                raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
-
-            return updated_row.to_deployment_info()
+            result = await execute_updater(db_sess, updater)
+            if result is None:
+                raise EndpointNotFound(f"Endpoint {updater.pk_value} not found")
+            return result.row.to_deployment_info()
 
     async def update_endpoint_lifecycle_bulk(
         self,

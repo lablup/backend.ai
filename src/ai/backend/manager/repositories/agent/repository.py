@@ -33,6 +33,7 @@ from ai.backend.manager.repositories.agent.stateful_source.stateful_source impor
     AgentStatefulSource,
 )
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
 
 from .query import QueryCondition, QueryOrder
@@ -120,7 +121,8 @@ class AgentRepository:
         ):
             await self._cache_source.remove_agent_last_seen(agent_id)
 
-        await self._db_source.update_agent_status_exit(agent_id, spec)
+        updater = Updater[AgentRow](spec=spec, pk_value=agent_id)
+        await self._db_source.update_agent_status_exit(updater)
 
         with suppress_with_log(
             [Exception], message=f"Failed to remove agent: {agent_id} from all images"
@@ -129,7 +131,8 @@ class AgentRepository:
 
     @agent_repository_resilience.apply()
     async def update_agent_status(self, agent_id: AgentId, spec: AgentStatusUpdaterSpec) -> None:
-        await self._db_source.update_agent_status(agent_id, spec)
+        updater = Updater[AgentRow](spec=spec, pk_value=agent_id)
+        await self._db_source.update_agent_status(updater)
 
     # For compatibility with redis key made with image canonical strings
     # Use remove_agent_from_images instead of this if possible
