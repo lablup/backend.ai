@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.18.1 (2025-12-16)
+
+### Features
+* Fix autoscaling issue where deployments in ready state would not scale when their desired replica count is different from the number of their routes. Deployments now properly transition to scaling state and adjust their replicas as expected. ([#7254](https://github.com/lablup/backend.ai/issues/7254))
+
+
 ## 25.18.0 (2025-12-12)
 
 ### Features
