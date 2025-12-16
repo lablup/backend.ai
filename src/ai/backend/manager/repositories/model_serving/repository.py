@@ -804,11 +804,6 @@ class ModelServingRepository:
                 for key, value in fields_to_update.items():
                     setattr(endpoint_row, key, value)
 
-                fields_to_update_require_none_check = spec.build_values_require_none_check()
-                for key, value in fields_to_update_require_none_check.items():
-                    if value is not None:
-                        setattr(endpoint_row, key, value)
-
                 image_ref = spec.image.optional_value()
                 if image_ref is not None:
                     image_name = image_ref.name

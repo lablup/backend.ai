@@ -13,7 +13,7 @@ from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 keypair_resource_policy_db_source_resilience = Resilience(
     policies=[
@@ -50,36 +50,14 @@ class KeypairResourcePolicyDBSource:
             return db_row.to_dataclass()
 
     @keypair_resource_policy_db_source_resilience.apply()
-    async def update(
-        self, name: str, updater: Updater[KeyPairResourcePolicyRow]
-    ) -> KeyPairResourcePolicyData:
+    async def update(self, updater: Updater[KeyPairResourcePolicyRow]) -> KeyPairResourcePolicyData:
         async with self._db.begin_session() as db_sess:
-            check_query = sa.select(KeyPairResourcePolicyRow).where(
-                KeyPairResourcePolicyRow.name == name
-            )
-            existing_row = await db_sess.scalar(check_query)
-            if existing_row is None:
+            result = await execute_updater(db_sess, updater)
+            if result is None:
                 raise KeypairResourcePolicyNotFound(
-                    f"Keypair resource policy with name {name} not found."
+                    f"Keypair resource policy with name {updater.pk_value} not found."
                 )
-            fields = updater.spec.build_values()
-            update_stmt = (
-                sa.update(KeyPairResourcePolicyRow)
-                .where(KeyPairResourcePolicyRow.name == name)
-                .values(**fields)
-                .returning(KeyPairResourcePolicyRow)
-            )
-            query_stmt = (
-                sa.select(KeyPairResourcePolicyRow)
-                .from_statement(update_stmt)
-                .execution_options(populate_existing=True)
-            )
-            updated_row: Optional[KeyPairResourcePolicyRow] = await db_sess.scalar(query_stmt)
-            if updated_row is None:
-                raise KeypairResourcePolicyNotFound(
-                    f"Keypair resource policy with name {name} not found after update."
-                )
-            return updated_row.to_dataclass()
+            return result.row.to_dataclass()
 
     @keypair_resource_policy_db_source_resilience.apply()
     async def delete(self, name: str) -> KeyPairResourcePolicyData:

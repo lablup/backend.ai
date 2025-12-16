@@ -59,13 +59,6 @@ class EndpointUpdaterSpec(UpdaterSpec[EndpointRow]):
         self.model_definition_path.update_dict(to_update, "model_definition_path")
         self.runtime_variant.update_dict(to_update, "runtime_variant")
         self.resource_group.update_dict(to_update, "resource_group")
-        return to_update
-
-    def build_values_require_none_check(self) -> dict[str, Any]:
-        """Build values that require a check for None values before update."""
-        to_update: dict[str, Any] = {}
-        # The order of replicas and desired_session_count is important
-        # as desired_session_count is legacy field and value of replicas need to override it
         self.desired_session_count.update_dict(to_update, "desired_session_count")
         self.replicas.update_dict(to_update, "replicas")
         self.environ.update_dict(to_update, "environ")

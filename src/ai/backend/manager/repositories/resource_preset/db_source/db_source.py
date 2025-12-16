@@ -39,7 +39,7 @@ from ai.backend.manager.models.scaling_group import query_allowed_sgroups
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
 
 from .types import (
@@ -135,21 +135,18 @@ class ResourcePresetDBSource:
             raise ResourcePresetNotFound()
         return preset_row
 
-    async def modify_preset(
-        self, preset_id: Optional[UUID], name: Optional[str], updater: Updater[ResourcePresetRow]
-    ) -> ResourcePresetData:
+    async def modify_preset(self, updater: Updater[ResourcePresetRow]) -> ResourcePresetData:
         """
         Modifies an existing resource preset.
         Raises ResourcePresetNotFound if the preset doesn't exist.
         """
         async with self._db.begin_session() as session:
-            preset_row = await self._get_preset_by_id_or_name(session, preset_id, name)
-            to_update = updater.spec.build_values()
-            for key, value in to_update.items():
-                setattr(preset_row, key, value)
-            await session.flush()
-            data = preset_row.to_dataclass()
-        return data
+            result = await execute_updater(session, updater)
+            if result is None:
+                raise ResourcePresetNotFound(
+                    f"Resource preset with ID {updater.pk_value} not found."
+                )
+            return result.row.to_dataclass()
 
     async def delete_preset(
         self, preset_id: Optional[UUID], name: Optional[str]

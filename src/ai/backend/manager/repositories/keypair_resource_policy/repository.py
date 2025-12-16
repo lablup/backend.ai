@@ -47,9 +47,9 @@ class KeypairResourcePolicyRepository:
 
     @keypair_resource_policy_repository_resilience.apply()
     async def update_keypair_resource_policy(
-        self, name: str, updater: Updater[KeyPairResourcePolicyRow]
+        self, updater: Updater[KeyPairResourcePolicyRow]
     ) -> KeyPairResourcePolicyData:
-        return await self._db_source.update(name, updater)
+        return await self._db_source.update(updater)
 
     @keypair_resource_policy_repository_resilience.apply()
     async def remove_keypair_resource_policy(self, name: str) -> KeyPairResourcePolicyData:

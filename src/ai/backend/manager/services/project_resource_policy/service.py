@@ -38,8 +38,7 @@ class ProjectResourcePolicyService:
     async def modify_project_resource_policy(
         self, action: ModifyProjectResourcePolicyAction
     ) -> ModifyProjectResourcePolicyActionResult:
-        name = action.name
-        result = await self._project_resource_policy_repository.update(name, action.updater)
+        result = await self._project_resource_policy_repository.update(action.updater)
         return ModifyProjectResourcePolicyActionResult(project_resource_policy=result)
 
     async def delete_project_resource_policy(

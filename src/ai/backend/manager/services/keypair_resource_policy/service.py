@@ -43,7 +43,7 @@ class KeypairResourcePolicyService:
         self, action: ModifyKeyPairResourcePolicyAction
     ) -> ModifyKeyPairResourcePolicyActionResult:
         result = await self._keypair_resource_policy_repository.update_keypair_resource_policy(
-            action.name, action.updater
+            action.updater
         )
         return ModifyKeyPairResourcePolicyActionResult(keypair_resource_policy=result)
 

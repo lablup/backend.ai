@@ -56,11 +56,9 @@ class UserResourcePolicyRepository:
         return await self._db_source.get_by_name(name)
 
     @user_resource_policy_repository_resilience.apply()
-    async def update(
-        self, name: str, updater: Updater[UserResourcePolicyRow]
-    ) -> UserResourcePolicyData:
+    async def update(self, updater: Updater[UserResourcePolicyRow]) -> UserResourcePolicyData:
         """Updates an existing user resource policy."""
-        return await self._db_source.update(name, updater)
+        return await self._db_source.update(updater)
 
     @user_resource_policy_repository_resilience.apply()
     async def delete(self, name: str) -> UserResourcePolicyData:
