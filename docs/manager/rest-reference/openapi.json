@@ -10229,6 +10229,26 @@
         ],
         "description": "Validate a notification rule by rendering its template with test data.\n\n**Preconditions:**\n* User privilege required.\n"
       }
+    },
+    "/rbac/roles": {
+      "post": {
+        "operationId": "rbac.create_role",
+        "tags": [
+          "rbac"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Create a new role.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
     }
   }
 }
