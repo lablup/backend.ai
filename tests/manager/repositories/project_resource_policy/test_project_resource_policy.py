@@ -14,12 +14,17 @@ from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.project_resource_policy.creators import (
     ProjectResourcePolicyCreatorSpec,
 )
 from ai.backend.manager.repositories.project_resource_policy.repository import (
     ProjectResourcePolicyRepository,
 )
+from ai.backend.manager.repositories.project_resource_policy.updaters import (
+    ProjectResourcePolicyUpdaterSpec,
+)
+from ai.backend.manager.types import OptionalState
 
 
 class TestProjectResourcePolicyRepository:
@@ -182,29 +187,29 @@ class TestProjectResourcePolicyRepository:
         mock_session = AsyncMock(spec=AsyncSession)
         mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
 
-        # Mock query result
+        # Mock query result (execute_updater uses from_statement which returns the row directly)
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = sample_policy_row
         mock_session.execute = AsyncMock(return_value=mock_result)
-        mock_session.flush = AsyncMock()
 
         # Mock to_dataclass method
         sample_policy_row.to_dataclass = MagicMock(return_value=sample_policy_data)
 
-        update_fields = {
-            "max_vfolder_count": 30,
-            "max_quota_scope_size": 3221225472,  # 3GB
-        }
+        # Create updater with the new pattern
+        spec = ProjectResourcePolicyUpdaterSpec(
+            max_vfolder_count=OptionalState.update(30),
+            max_quota_scope_size=OptionalState.update(3221225472),  # 3GB
+        )
+        updater = Updater(spec=spec, pk_value="test-policy")
 
-        result = await project_resource_policy_repository.update("test-policy", update_fields)
+        result = await project_resource_policy_repository.update(updater)
 
         assert result == sample_policy_data
         mock_session.execute.assert_called_once()
-        mock_session.flush.assert_called_once()
 
-        # Verify fields were updated
-        for key, value in update_fields.items():
-            assert hasattr(sample_policy_row, key)
+        # Verify fields exist on the row
+        assert hasattr(sample_policy_row, "max_vfolder_count")
+        assert hasattr(sample_policy_row, "max_quota_scope_size")
 
     @pytest.mark.asyncio
     async def test_update_not_found(
@@ -220,10 +225,13 @@ class TestProjectResourcePolicyRepository:
         mock_result.scalar_one_or_none.return_value = None
         mock_session.execute = AsyncMock(return_value=mock_result)
 
+        spec = ProjectResourcePolicyUpdaterSpec(
+            max_vfolder_count=OptionalState.update(30),
+        )
+        updater = Updater(spec=spec, pk_value="nonexistent-policy")
+
         with pytest.raises(ObjectNotFound) as exc_info:
-            await project_resource_policy_repository.update(
-                "nonexistent-policy", {"max_vfolder_count": 30}
-            )
+            await project_resource_policy_repository.update(updater)
 
         assert "Project resource policy with name nonexistent-policy not found" in str(
             exc_info.value
@@ -251,10 +259,13 @@ class TestProjectResourcePolicyRepository:
         # Mock to_dataclass method
         sample_policy_row.to_dataclass = MagicMock(return_value=sample_policy_data)
 
-        # Update only one field
-        update_fields = {"max_vfolder_count": 25}
+        # Update only one field using Updater pattern
+        spec = ProjectResourcePolicyUpdaterSpec(
+            max_vfolder_count=OptionalState.update(25),
+        )
+        updater = Updater(spec=spec, pk_value="test-policy")
 
-        result = await project_resource_policy_repository.update("test-policy", update_fields)
+        result = await project_resource_policy_repository.update(updater)
 
         assert result == sample_policy_data
 

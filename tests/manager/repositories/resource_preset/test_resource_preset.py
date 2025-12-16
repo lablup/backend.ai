@@ -277,10 +277,10 @@ class TestResourcePresetRepository:
         mock_db_source.modify_preset = AsyncMock(return_value=preset_data)
         mock_cache_source.invalidate_preset = AsyncMock()
 
-        result = await resource_preset_repository.modify_preset_validated(preset_id, None, updater)
+        result = await resource_preset_repository.modify_preset_validated(updater)
 
         assert result is not None
-        mock_db_source.modify_preset.assert_called_once_with(preset_id, None, updater)
+        mock_db_source.modify_preset.assert_called_once_with(updater)
         mock_cache_source.invalidate_preset.assert_called_once_with(preset_id, None)
 
     @pytest.mark.asyncio
@@ -300,7 +300,7 @@ class TestResourcePresetRepository:
         mock_db_source.modify_preset = AsyncMock(side_effect=ResourcePresetNotFound())
 
         with pytest.raises(ResourcePresetNotFound):
-            await resource_preset_repository.modify_preset_validated(preset_id, None, updater)
+            await resource_preset_repository.modify_preset_validated(updater)
 
     @pytest.mark.asyncio
     async def test_modify_preset_validated_no_params(
@@ -318,7 +318,7 @@ class TestResourcePresetRepository:
         )
 
         with pytest.raises(ValueError):
-            await resource_preset_repository.modify_preset_validated(None, None, updater)
+            await resource_preset_repository.modify_preset_validated(updater)
 
     @pytest.mark.asyncio
     async def test_delete_preset_validated_success(

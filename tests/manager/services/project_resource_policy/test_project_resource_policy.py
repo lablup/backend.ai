@@ -138,13 +138,16 @@ class TestProjectResourcePolicyService:
 
         result = await project_resource_policy_service.modify_project_resource_policy(action)
 
-        # Verify the repository was called correctly
+        # Verify the repository was called correctly with the Updater
         mock_dependencies["project_resource_policy_repository"].update.assert_called_once()
-        call_args = mock_dependencies["project_resource_policy_repository"].update.call_args[0]
-        assert call_args[0] == "modify-test-policy"
-        assert call_args[1]["max_vfolder_count"] == 30
-        assert call_args[1]["max_quota_scope_size"] == 3221225472
-        assert call_args[1]["max_network_count"] == 10
+        call_args = mock_dependencies["project_resource_policy_repository"].update.call_args[0][0]
+        assert isinstance(call_args, Updater)
+        assert call_args.pk_value == "modify-test-policy"
+        # Verify the spec values
+        values = call_args.spec.build_values()
+        assert values["max_vfolder_count"] == 30
+        assert values["max_quota_scope_size"] == 3221225472
+        assert values["max_network_count"] == 10
 
         # Verify the result
         assert result.project_resource_policy.name == "modify-test-policy"
@@ -258,16 +261,18 @@ class TestProjectResourcePolicyService:
 
         result = await project_resource_policy_service.modify_project_resource_policy(action)
 
-        # Verify the repository was called correctly
+        # Verify the repository was called correctly with the Updater
         mock_dependencies["project_resource_policy_repository"].update.assert_called_once()
-        call_args = mock_dependencies["project_resource_policy_repository"].update.call_args[0]
-        assert call_args[0] == "partial-update-policy"
+        call_args = mock_dependencies["project_resource_policy_repository"].update.call_args[0][0]
+        assert isinstance(call_args, Updater)
+        assert call_args.pk_value == "partial-update-policy"
         # Check that only max_vfolder_count was in the update fields
-        assert call_args[1]["max_vfolder_count"] == 25
+        values = call_args.spec.build_values()
+        assert values["max_vfolder_count"] == 25
         assert (
-            "max_quota_scope_size" not in call_args[1]
+            "max_quota_scope_size" not in values
         )  # Should not be included in partial update
-        assert "max_network_count" not in call_args[1]  # Should not be included in partial update
+        assert "max_network_count" not in values  # Should not be included in partial update
 
         # Verify the result
         assert result.project_resource_policy.name == "partial-update-policy"

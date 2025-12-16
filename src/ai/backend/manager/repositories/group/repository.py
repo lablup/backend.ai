@@ -141,6 +141,13 @@ class GroupRepository:
             raise InvalidUserUpdateMode("invalid user_update_mode")
 
         async with self._db.begin_session() as session:
+            # First verify the group exists
+            existing_group = await session.scalar(
+                sa.select(groups.c.id).where(groups.c.id == group_id)
+            )
+            if existing_group is None:
+                raise ProjectNotFound(f"Group not found: {group_id}")
+
             # Handle user addition/removal
             if user_uuids and user_update_mode:
                 if user_update_mode == "add":

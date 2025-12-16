@@ -168,20 +168,22 @@ async def execute_updater(
     if len(pk_columns) != 1:
         raise ValueError("Updater only supports single-column primary keys")
 
-    stmt = (
+    update_stmt = (
         sa.update(table)
         .values(values)
         .where(pk_columns[0] == updater.pk_value)
         .returning(*table.columns)
     )
 
-    result = await db_sess.execute(stmt)
-    row_data = result.fetchone()
+    # Use from_statement to properly construct ORM objects
+    # This allows SQLAlchemy to handle column mapping correctly
+    select_stmt = sa.select(row_class).from_statement(update_stmt)
+    result = await db_sess.execute(select_stmt)
+    updated_row = result.scalar_one_or_none()
 
-    if row_data is None:
+    if updated_row is None:
         return None
 
-    updated_row: TRow = row_class(**dict(row_data._mapping))
     return UpdaterResult(row=updated_row)
 
 

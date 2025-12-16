@@ -87,7 +87,7 @@ from ...utils import ScenarioBase
                             SlotName("cuda.device"): {"max": None, "min": "1"},
                         }
                     ),
-                    config_digest="sha256:1234567890abcdef",
+                    config_digest="sha256:1234567890abcdef".ljust(72, " "),
                 )
             ),
         ),
