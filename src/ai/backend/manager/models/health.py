@@ -6,7 +6,7 @@ import os
 import socket
 from typing import TYPE_CHECKING, Optional, cast
 
-import redis.exceptions
+import glide
 from pydantic import (
     BaseModel,
     Field,
@@ -134,7 +134,7 @@ async def get_manager_db_cxn_status(root_ctx: RootContext) -> list[ConnectionInf
                 f"{MANAGER_STATUS_KEY}*",
             ),
         )
-    except (asyncio.TimeoutError, redis.exceptions.ConnectionError):
+    except (asyncio.TimeoutError, glide.ConnectionError, glide.TimeoutError):
         # Cannot get data from redis. Return process's own info.
         cxn_infos = [(await _get_connnection_info(root_ctx))]
     else:

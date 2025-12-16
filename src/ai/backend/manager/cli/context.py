@@ -125,9 +125,10 @@ async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerUnifiedConfig]
 
 @contextlib.asynccontextmanager
 async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
-    from ai.backend.common import redis_helper
     from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
+    from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+    from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
     from ai.backend.common.defs import (
         REDIS_IMAGE_DB,
         REDIS_LIVE_DB,
@@ -149,33 +150,33 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
     redis_config = RedisConfig(**raw_redis_config)
     redis_profile_target = redis_config.to_redis_profile_target()
 
-    redis_live = redis_helper.get_redis_object(
-        redis_profile_target.profile_target(RedisRole.LIVE),
-        name="mgr_cli.live",
-        db=REDIS_LIVE_DB,
+    valkey_live_client = await ValkeyLiveClient.create(
+        redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target(),
+        db_id=REDIS_LIVE_DB,
+        human_readable_name="mgr_cli.live",
     )
     valkey_stat_client = await ValkeyStatClient.create(
         redis_profile_target.profile_target(RedisRole.STATISTICS).to_valkey_target(),
         db_id=REDIS_STATISTICS_DB,
         human_readable_name="mgr_cli.stat",
     )
-    redis_image = await ValkeyImageClient.create(
+    valkey_image_client = await ValkeyImageClient.create(
         redis_profile_target.profile_target(RedisRole.IMAGE).to_valkey_target(),
         db_id=REDIS_IMAGE_DB,
         human_readable_name="mgr_cli.image",
     )
-    redis_stream = redis_helper.get_redis_object(
-        redis_profile_target.profile_target(RedisRole.STREAM),
-        name="mgr_cli.stream",
-        db=REDIS_STREAM_DB,
+    valkey_stream_client = await ValkeyStreamClient.create(
+        redis_profile_target.profile_target(RedisRole.STREAM).to_valkey_target(),
+        db_id=REDIS_STREAM_DB,
+        human_readable_name="mgr_cli.stream",
     )
     yield RedisConnectionSet(
-        live=redis_live,
+        live=valkey_live_client,
         stat=valkey_stat_client,
-        image=redis_image,
-        stream=redis_stream,
+        image=valkey_image_client,
+        stream=valkey_stream_client,
     )
-    await redis_stream.close()
-    await redis_image.close()
+    await valkey_stream_client.close()
+    await valkey_image_client.close()
     await valkey_stat_client.close()
-    await redis_live.close()
+    await valkey_live_client.close()

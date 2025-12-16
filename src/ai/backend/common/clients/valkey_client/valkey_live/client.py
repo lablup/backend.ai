@@ -1,6 +1,6 @@
 import json
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import (
     Any,
     Final,
@@ -594,3 +594,13 @@ class ValkeyLiveClient:
         :return: The value for active app connections.
         """
         return f"{kernel_id}:{service}:{stream_id}"
+
+    @valkey_live_resilience.apply()
+    async def exists(self, keys: Sequence[str]) -> int:
+        """
+        Check if keys exist.
+
+        :param keys: List of keys to check.
+        :return: Number of keys that exist.
+        """
+        return await self._client.client.exists(cast(list[str | bytes], list(keys)))
