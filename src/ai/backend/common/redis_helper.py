@@ -74,13 +74,12 @@ _default_conn_opts: Mapping[str, Any] = {
 }
 _default_conn_pool_opts: Mapping[str, Any] = {
     "max_connections": 16,
-    # "timeout": 20.0,  # for redis-py 5.0+
+    "timeout": 20.0,
 }
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-# Leaving it as is since the CLI is still using redis-py version 4.x
 async def execute(
     redis_obj: RedisConnectionInfo,
     func: Callable[[Union[Redis, Any]], Awaitable[Any]],
@@ -124,39 +123,40 @@ async def execute(
 
     while True:
         try:
-            async with redis_client:
-                aw_or_pipe = func(redis_client)
-                if isinstance(aw_or_pipe, Pipeline):
-                    async with aw_or_pipe:
-                        result = await aw_or_pipe.execute()
-                elif inspect.isawaitable(aw_or_pipe):
-                    result = await aw_or_pipe
-                else:
-                    raise ValueError(
-                        "The redis execute's return value must be an awaitable"
-                        " or redis.asyncio.client.Pipeline object"
-                    )
-                if isinstance(result, Pipeline):
-                    # This happens when func is an async function that returns a pipeline.
-                    async with result:
-                        result = await result.execute()
-                if encoding:
-                    if isinstance(result, bytes):
-                        return result.decode(encoding)
-                    elif isinstance(result, dict):
-                        newdict = {}
-                        for k, v in result.items():
-                            newdict[k.decode(encoding)] = v.decode(encoding)
-                        return newdict
-                else:
-                    return result
+            # In redis-py 5.x, we no longer need `async with redis_client:` as connection
+            # pooling is handled automatically. The context manager in 5.x closes the pool
+            # on exit, which is not desired for reuse.
+            aw_or_pipe = func(redis_client)
+            if isinstance(aw_or_pipe, Pipeline):
+                async with aw_or_pipe:
+                    result = await aw_or_pipe.execute()
+            elif inspect.isawaitable(aw_or_pipe):
+                result = await aw_or_pipe
+            else:
+                raise ValueError(
+                    "The redis execute's return value must be an awaitable"
+                    " or redis.asyncio.client.Pipeline object"
+                )
+            if isinstance(result, Pipeline):
+                # This happens when func is an async function that returns a pipeline.
+                async with result:
+                    result = await result.execute()
+            if encoding:
+                if isinstance(result, bytes):
+                    return result.decode(encoding)
+                elif isinstance(result, dict):
+                    newdict = {}
+                    for k, v in result.items():
+                        newdict[k.decode(encoding)] = v.decode(encoding)
+                    return newdict
+            else:
+                return result
         except (
             MasterNotFoundError,
             SlaveNotFoundError,
             redis.exceptions.ReadOnlyError,
             redis.exceptions.ConnectionError,
             ConnectionResetError,
-            TypeError,  # 4.5.5 version of redis.py raises a TypeError when the Connection is closed.
         ) as e:
             warn_on_first_attempt = True
             if (
@@ -223,8 +223,8 @@ def get_redis_object(
     conn_opts = {
         **_default_conn_opts,
         **kwargs,
-        # "lib_name": None,  # disable implicit "CLIENT SETINFO" (for redis-py 5.0+)
-        # "lib_version": None,  # disable implicit "CLIENT SETINFO" (for redis-py 5.0+)
+        "lib_name": None,  # disable implicit "CLIENT SETINFO"
+        "lib_version": None,  # disable implicit "CLIENT SETINFO"
     }
     conn_pool_opts = {
         **_default_conn_pool_opts,
@@ -235,9 +235,8 @@ def get_redis_object(
         conn_opts["socket_connect_timeout"] = float(socket_connect_timeout)
     if max_connections := redis_helper_config.get("max_connections"):
         conn_pool_opts["max_connections"] = int(max_connections)
-    # for redis-py 5.0+
-    # if connection_ready_timeout := redis_helper_config.get("connection_ready_timeout"):
-    #     conn_pool_opts["timeout"] = float(connection_ready_timeout)
+    if connection_ready_timeout := redis_helper_config.get("connection_ready_timeout"):
+        conn_pool_opts["timeout"] = float(connection_ready_timeout)
     if _sentinel_addresses := redis_target.get("sentinel"):
         sentinel_addresses: Any = None
         if isinstance(_sentinel_addresses, str):
@@ -284,19 +283,13 @@ def get_redis_object(
             raise ValueError("Redis URL is not provided in the configuration.")
 
         url = _parse_redis_url(redis_target, db)
+        connection_pool: ConnectionPool = ConnectionPool.from_url(
+            str(url),
+            **conn_pool_opts,
+            **conn_opts,
+        )
         return RedisConnectionInfo(
-            # In redis-py 5.0.1+, we should migrate to `Redis.from_pool()` API
-            client=Redis(
-                connection_pool=ConnectionPool.from_url(
-                    str(url),
-                    **conn_pool_opts,
-                    **conn_opts,
-                ),
-                **conn_opts,
-                auto_close_connection_pool=True,
-                ssl=redis_target.use_tls,
-                ssl_cert_reqs=SSL_CERT_NONE if redis_target.tls_skip_verify else SSL_CERT_REQUIRED,
-            ),
+            client=Redis.from_pool(connection_pool),  # type: ignore[attr-defined]
             sentinel=None,
             name=name,
             service_name=None,
