@@ -159,3 +159,4 @@ docs/manager/rest-reference/openapi.json
 backup.*.json
 /DIST-INFO
 /INSTALL-INFO
+.serena/
