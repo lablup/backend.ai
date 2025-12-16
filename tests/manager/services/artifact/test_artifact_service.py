@@ -1,6 +1,7 @@
 """
 Tests for ArtifactService functionality.
 Tests the service layer with mocked repository operations.
+Only artifact-related tests. Revision tests are in artifact_revision/test_artifact_revision_service.py
 """
 
 from __future__ import annotations
@@ -16,10 +17,7 @@ from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
-    ArtifactDataWithRevisions,
     ArtifactListResult,
-    ArtifactRevisionData,
-    ArtifactStatus,
     ArtifactType,
 )
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
@@ -37,9 +35,6 @@ from ai.backend.manager.services.artifact.actions.delete_multi import (
 from ai.backend.manager.services.artifact.actions.get import (
     GetArtifactAction,
 )
-from ai.backend.manager.services.artifact.actions.get_revisions import (
-    GetArtifactRevisionsAction,
-)
 from ai.backend.manager.services.artifact.actions.restore_multi import (
     RestoreArtifactsAction,
 )
@@ -54,7 +49,7 @@ from ai.backend.manager.types import TriState
 
 
 class TestArtifactService:
-    """Test cases for ArtifactService"""
+    """Test cases for ArtifactService (artifact-only operations)"""
 
     @pytest.fixture
     def mock_artifact_repository(self) -> MagicMock:
@@ -139,24 +134,6 @@ class TestArtifactService:
             updated_at=now,
             readonly=True,
             extra=None,
-        )
-
-    @pytest.fixture
-    def sample_artifact_revision(self, sample_artifact_data: ArtifactData) -> ArtifactRevisionData:
-        """Create sample artifact revision data"""
-        now = datetime.now(timezone.utc)
-        return ArtifactRevisionData(
-            id=uuid4(),
-            artifact_id=sample_artifact_data.id,
-            version="main",
-            readme="# DialoGPT-medium\n\nA conversational AI model.",
-            size=1024000,
-            status=ArtifactStatus.AVAILABLE,
-            remote_status=None,
-            created_at=now,
-            updated_at=now,
-            digest=None,
-            verification_result=None,
         )
 
     async def test_get_artifact(
@@ -258,26 +235,6 @@ class TestArtifactService:
         assert result.has_next_page is True
         assert result.has_previous_page is True
 
-    async def test_get_artifact_revisions(
-        self,
-        artifact_service: ArtifactService,
-        mock_artifact_repository: MagicMock,
-        sample_artifact_data: ArtifactData,
-        sample_artifact_revision: ArtifactRevisionData,
-    ) -> None:
-        """Test getting artifact revisions"""
-        mock_artifact_repository.list_artifact_revisions = AsyncMock(
-            return_value=[sample_artifact_revision]
-        )
-
-        action = GetArtifactRevisionsAction(artifact_id=sample_artifact_data.id)
-        result = await artifact_service.get_revisions(action)
-
-        assert result.revisions == [sample_artifact_revision]
-        mock_artifact_repository.list_artifact_revisions.assert_called_once_with(
-            sample_artifact_data.id
-        )
-
     async def test_update_artifact(
         self,
         artifact_service: ArtifactService,
@@ -364,45 +321,3 @@ class TestArtifactService:
         mock_artifact_repository.restore_artifacts.assert_called_once_with([
             sample_artifact_data.id
         ])
-
-    async def test_upsert_artifacts_with_revisions(
-        self,
-        artifact_service: ArtifactService,
-        mock_artifact_repository: MagicMock,
-        sample_artifact_data: ArtifactData,
-        sample_artifact_revision: ArtifactRevisionData,
-    ) -> None:
-        """Test upserting artifacts with revisions"""
-        artifact_with_revisions = ArtifactDataWithRevisions(
-            id=sample_artifact_data.id,
-            name=sample_artifact_data.name,
-            type=sample_artifact_data.type,
-            description=sample_artifact_data.description,
-            registry_id=sample_artifact_data.registry_id,
-            source_registry_id=sample_artifact_data.source_registry_id,
-            registry_type=sample_artifact_data.registry_type,
-            source_registry_type=sample_artifact_data.source_registry_type,
-            availability=sample_artifact_data.availability,
-            scanned_at=sample_artifact_data.scanned_at,
-            updated_at=sample_artifact_data.updated_at,
-            readonly=sample_artifact_data.readonly,
-            extra=sample_artifact_data.extra,
-            revisions=[sample_artifact_revision],
-        )
-
-        mock_artifact_repository.upsert_artifacts = AsyncMock(return_value=[sample_artifact_data])
-        mock_artifact_repository.upsert_artifact_revisions = AsyncMock(
-            return_value=[sample_artifact_revision]
-        )
-
-        from ai.backend.manager.services.artifact.actions.upsert_multi import (
-            UpsertArtifactsAction,
-        )
-
-        action = UpsertArtifactsAction(data=[artifact_with_revisions])
-        result = await artifact_service.upsert_artifacts_with_revisions(action)
-
-        assert len(result.result) == 1
-        assert result.result[0].revisions == [sample_artifact_revision]
-        mock_artifact_repository.upsert_artifacts.assert_called_once()
-        mock_artifact_repository.upsert_artifact_revisions.assert_called_once()

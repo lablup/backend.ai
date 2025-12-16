@@ -1,6 +1,7 @@
 """
 Tests for ArtifactRepository functionality.
 Tests the repository layer with real database operations.
+Only artifact-related tests. Revision tests are in artifact_revision/test_artifact_revision_repository.py
 """
 
 from __future__ import annotations
@@ -16,7 +17,6 @@ from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
-    ArtifactStatus,
     ArtifactType,
 )
 from ai.backend.manager.errors.artifact import (
@@ -31,7 +31,7 @@ from ai.backend.manager.types import TriState
 
 
 class TestArtifactRepository:
-    """Test cases for ArtifactRepository"""
+    """Test cases for ArtifactRepository (artifact-only operations)"""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -80,32 +80,6 @@ class TestArtifactRepository:
             await db_sess.flush()
 
         yield artifact_id
-
-    @pytest.fixture
-    async def sample_revision_id(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_artifact_id: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
-        """Create sample artifact revision directly in DB and return its ID"""
-        revision_id = uuid.uuid4()
-        now = datetime.now(timezone.utc)
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            revision = ArtifactRevisionRow(
-                id=revision_id,
-                artifact_id=sample_artifact_id,
-                version="main",
-                readme="# DialoGPT-medium\n\nA conversational AI model.",
-                size=1024000,
-                status=ArtifactStatus.AVAILABLE.value,
-                created_at=now,
-                updated_at=now,
-            )
-            db_sess.add(revision)
-            await db_sess.flush()
-
-        yield revision_id
 
     @pytest.fixture
     async def sample_artifacts_for_pagination(
@@ -186,31 +160,6 @@ class TestArtifactRepository:
 
         assert updated_artifact is not None
         assert updated_artifact.description == "Updated description"
-
-    async def test_list_artifact_revisions(
-        self,
-        artifact_repository: ArtifactRepository,
-        sample_artifact_id: uuid.UUID,
-        sample_revision_id: uuid.UUID,
-    ) -> None:
-        """Test listing artifact revisions"""
-        revisions = await artifact_repository.list_artifact_revisions(sample_artifact_id)
-
-        assert len(revisions) >= 1
-        revision_ids = [r.id for r in revisions]
-        assert sample_revision_id in revision_ids
-
-    async def test_get_artifact_revision_by_id(
-        self,
-        artifact_repository: ArtifactRepository,
-        sample_revision_id: uuid.UUID,
-    ) -> None:
-        """Test retrieving artifact revision by ID"""
-        revision = await artifact_repository.get_artifact_revision_by_id(sample_revision_id)
-
-        assert revision is not None
-        assert revision.id == sample_revision_id
-        assert revision.version == "main"
 
     async def test_delete_artifacts(
         self,
@@ -311,126 +260,3 @@ class TestArtifactRepository:
 
         assert len(result.items) == 5
         assert result.total_count == 25
-
-    async def test_update_artifact_revision_status(
-        self,
-        artifact_repository: ArtifactRepository,
-        sample_revision_id: uuid.UUID,
-    ) -> None:
-        """Test updating artifact revision status"""
-        updated_revision_id = await artifact_repository.update_artifact_revision_status(
-            sample_revision_id, ArtifactStatus.VERIFYING
-        )
-
-        assert updated_revision_id == sample_revision_id
-
-        # Verify status was updated
-        revision = await artifact_repository.get_artifact_revision_by_id(sample_revision_id)
-        assert revision.status == ArtifactStatus.VERIFYING
-
-    async def test_update_artifact_revision_bytesize(
-        self,
-        artifact_repository: ArtifactRepository,
-        sample_revision_id: uuid.UUID,
-    ) -> None:
-        """Test updating artifact revision byte size"""
-        new_size = 2048000
-
-        updated_revision_id = await artifact_repository.update_artifact_revision_bytesize(
-            sample_revision_id, new_size
-        )
-
-        assert updated_revision_id == sample_revision_id
-
-        # Verify size was updated
-        revision = await artifact_repository.get_artifact_revision_by_id(sample_revision_id)
-        assert revision.size == new_size
-
-    async def test_approve_artifact(
-        self,
-        artifact_repository: ArtifactRepository,
-        sample_artifact_id: uuid.UUID,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> None:
-        """Test approving artifact (changing status to AVAILABLE)"""
-        # First create a revision with NEEDS_APPROVAL status
-        revision_id = uuid.uuid4()
-        now = datetime.now(timezone.utc)
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            revision = ArtifactRevisionRow(
-                id=revision_id,
-                artifact_id=sample_artifact_id,
-                version="v1.0",
-                readme="# Test model",
-                size=512000,
-                status=ArtifactStatus.NEEDS_APPROVAL.value,
-                created_at=now,
-                updated_at=now,
-            )
-            db_sess.add(revision)
-            await db_sess.flush()
-
-        # Approve the artifact
-        approved_revision = await artifact_repository.approve_artifact(revision_id)
-
-        assert approved_revision.status == ArtifactStatus.AVAILABLE
-
-    async def test_reject_artifact(
-        self,
-        artifact_repository: ArtifactRepository,
-        sample_artifact_id: uuid.UUID,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> None:
-        """Test rejecting artifact (changing status to REJECTED)"""
-        # First create a revision with NEEDS_APPROVAL status
-        revision_id = uuid.uuid4()
-        now = datetime.now(timezone.utc)
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            revision = ArtifactRevisionRow(
-                id=revision_id,
-                artifact_id=sample_artifact_id,
-                version="v2.0",
-                readme="# Test model",
-                size=512000,
-                status=ArtifactStatus.NEEDS_APPROVAL.value,
-                created_at=now,
-                updated_at=now,
-            )
-            db_sess.add(revision)
-            await db_sess.flush()
-
-        # Reject the artifact
-        rejected_revision = await artifact_repository.reject_artifact(revision_id)
-
-        assert rejected_revision.status == ArtifactStatus.REJECTED
-
-    async def test_get_artifact_revision_readme(
-        self,
-        artifact_repository: ArtifactRepository,
-        sample_revision_id: uuid.UUID,
-    ) -> None:
-        """Test getting artifact revision readme"""
-        readme = await artifact_repository.get_artifact_revision_readme(sample_revision_id)
-
-        assert readme is not None
-        assert "DialoGPT-medium" in readme
-
-    async def test_update_artifact_revision_readme(
-        self,
-        artifact_repository: ArtifactRepository,
-        sample_revision_id: uuid.UUID,
-    ) -> None:
-        """Test updating artifact revision readme"""
-        new_readme = "# Updated Readme\n\nThis is updated content."
-
-        updated_revision_id = await artifact_repository.update_artifact_revision_readme(
-            sample_revision_id, new_readme
-        )
-
-        assert updated_revision_id == sample_revision_id
-
-        # Verify readme was updated
-        readme = await artifact_repository.get_artifact_revision_readme(sample_revision_id)
-        assert readme == new_readme
