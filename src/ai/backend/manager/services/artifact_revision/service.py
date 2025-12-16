@@ -106,13 +106,13 @@ from ai.backend.manager.services.artifact_revision.actions.import_revision impor
     ImportArtifactRevisionAction,
     ImportArtifactRevisionActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.list import (
-    ListArtifactRevisionsAction,
-    ListArtifactRevisionsActionResult,
-)
 from ai.backend.manager.services.artifact_revision.actions.reject import (
     RejectArtifactRevisionAction,
     RejectArtifactRevisionActionResult,
+)
+from ai.backend.manager.services.artifact_revision.actions.search import (
+    SearchArtifactRevisionsAction,
+    SearchArtifactRevisionsActionResult,
 )
 
 _REMOTE_ARTIFACT_STATUS_POLL_INTERVAL: Final[int] = 30  # seconds
@@ -331,18 +331,18 @@ class ArtifactRevisionService:
 
         return GetDownloadProgressActionResult(download_progress=combined_progress)
 
-    async def list_revision(
-        self, action: ListArtifactRevisionsAction
-    ) -> ListArtifactRevisionsActionResult:
-        (
-            artifacts_data,
-            total_count,
-        ) = await self._artifact_repository.list_artifact_revisions_paginated(
-            pagination=action.pagination,
-            ordering=action.ordering,
-            filters=action.filters,
+    async def search_revision(
+        self, action: SearchArtifactRevisionsAction
+    ) -> SearchArtifactRevisionsActionResult:
+        result = await self._artifact_repository.search_artifact_revisions(
+            querier=action.querier,
         )
-        return ListArtifactRevisionsActionResult(data=artifacts_data, total_count=total_count)
+        return SearchArtifactRevisionsActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def approve(
         self, action: ApproveArtifactRevisionAction

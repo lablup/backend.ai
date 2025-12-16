@@ -248,3 +248,33 @@ class ArtifactFilterOptions:
     AND: Optional[list["ArtifactFilterOptions"]] = None
     OR: Optional[list["ArtifactFilterOptions"]] = None
     NOT: Optional[list["ArtifactFilterOptions"]] = None
+
+
+@dataclass
+class ArtifactListResult:
+    """Search result with total count and pagination info for artifacts."""
+
+    items: list[ArtifactData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class ArtifactRevisionListResult:
+    """Search result with total count and pagination info for artifact revisions."""
+
+    items: list[ArtifactRevisionData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class ArtifactWithRevisionsListResult:
+    """Search result with total count and pagination info for artifacts with revisions."""
+
+    items: list[ArtifactDataWithRevisions]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool

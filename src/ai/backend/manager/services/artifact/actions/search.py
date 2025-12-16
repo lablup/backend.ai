@@ -5,19 +5,13 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact.types import ArtifactData
-from ai.backend.manager.repositories.artifact.repository import (
-    ArtifactFilterOptions,
-    ArtifactOrderingOptions,
-    PaginationOptions,
-)
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 
 @dataclass
-class ListArtifactsAction(ArtifactAction):
-    pagination: PaginationOptions
-    ordering: Optional[ArtifactOrderingOptions] = None
-    filters: Optional[ArtifactFilterOptions] = None
+class SearchArtifactsAction(ArtifactAction):
+    querier: BatchQuerier
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -26,14 +20,15 @@ class ListArtifactsAction(ArtifactAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "list"
+        return "search"
 
 
 @dataclass
-class ListArtifactsActionResult(BaseActionResult):
+class SearchArtifactsActionResult(BaseActionResult):
     data: list[ArtifactData]
-    # Note: Total number of artifacts, this is not equals to len(data)
     total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
     @override
     def entity_id(self) -> Optional[str]:
