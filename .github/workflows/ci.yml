@@ -338,7 +338,12 @@ jobs:
         else
           BASE_REF="HEAD~1"
         fi
-        pants test --changed-since=$BASE_REF --changed-dependents=transitive -- -v
+        # Use --changed-dependents=transitive only for merge_group to run broader tests
+        DEPENDENTS_OPT=""
+        if [ "$GITHUB_EVENT_NAME" == "merge_group" ]; then
+          DEPENDENTS_OPT="--changed-dependents=transitive"
+        fi
+        pants test --changed-since=$BASE_REF $DEPENDENTS_OPT -- -v
     - name: Upload pants log
       uses: actions/upload-artifact@v5
       with:
