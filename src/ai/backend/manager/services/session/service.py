@@ -1384,9 +1384,7 @@ class SessionService:
         spec = cast(SessionUpdaterSpec, action.updater.spec)
         session_name = spec.name.optional_value()
 
-        session_row = await self._session_repository.modify_session(
-            str(session_id), spec.build_values(), session_name
-        )
+        session_row = await self._session_repository.modify_session(action.updater, session_name)
         if session_row is None:
             raise ValueError(f"Session not found (id:{session_id})")
         session_owner_data = await self._session_repository.get_session_owner(str(session_id))

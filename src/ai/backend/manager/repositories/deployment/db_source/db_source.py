@@ -65,7 +65,6 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
-from ai.backend.manager.repositories.deployment.updaters import DeploymentUpdaterSpec
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ContainerUserContext,
     DeploymentContext,
@@ -353,13 +352,13 @@ class DeploymentDBSource:
     async def get_modified_endpoint(
         self,
         endpoint_id: uuid.UUID,
-        spec: DeploymentUpdaterSpec,
+        updater: Updater[EndpointRow],
     ) -> DeploymentInfo:
         """Get modified endpoint without applying changes.
 
         Args:
             endpoint_id: ID of the endpoint to modify
-            spec: Deployment updater spec containing partial updates
+            updater: Updater containing spec with partial updates
 
         Returns:
             DeploymentInfo: Modified deployment information
@@ -381,9 +380,7 @@ class DeploymentDBSource:
                 raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
 
             # Apply spec to get updated values
-            updates = spec.build_values()
-            for field, value in updates.items():
-                setattr(existing_row, field, value)
+            updater.spec.apply_to_row(existing_row)
             return existing_row.to_deployment_info()
 
     async def update_endpoint_with_spec(
@@ -399,14 +396,8 @@ class DeploymentDBSource:
             DeploymentInfo: Updated deployment information
 
         Raises:
-            NoUpdatesToApply: If there are no updates to apply
             EndpointNotFound: If the endpoint does not exist
         """
-        # Check for empty updates before executing
-        updates = updater.spec.build_values()
-        if not updates:
-            raise NoUpdatesToApply(f"No updates to apply for endpoint {updater.pk_value}")
-
         async with self._begin_session_read_committed() as db_sess:
             result = await execute_updater(db_sess, updater)
             if result is None:

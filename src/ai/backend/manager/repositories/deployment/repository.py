@@ -51,7 +51,6 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.deployment.updaters import DeploymentUpdaterSpec
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
 from .db_source import DeploymentDBSource
@@ -125,13 +124,13 @@ class DeploymentRepository:
     async def get_modified_endpoint(
         self,
         endpoint_id: uuid.UUID,
-        spec: DeploymentUpdaterSpec,
+        updater: Updater[EndpointRow],
     ) -> DeploymentInfo:
         """Get modified endpoint without applying changes.
 
         Args:
             endpoint_id: ID of the endpoint to modify
-            spec: Deployment updater spec containing partial updates
+            updater: Updater containing spec with partial updates
 
         Returns:
             DeploymentInfo: Modified deployment information
@@ -139,7 +138,7 @@ class DeploymentRepository:
         Raises:
             EndpointNotFound: If the endpoint does not exist
         """
-        return await self._db_source.get_modified_endpoint(endpoint_id, spec)
+        return await self._db_source.get_modified_endpoint(endpoint_id, updater)
 
     @deployment_repository_resilience.apply()
     async def update_endpoint_with_spec(

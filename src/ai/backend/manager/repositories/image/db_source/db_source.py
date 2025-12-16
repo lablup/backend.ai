@@ -37,6 +37,7 @@ from ai.backend.manager.models.image import (
     scan_single_image,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -308,22 +309,13 @@ class ImageDBSource:
             data = image_row.to_dataclass()
         return data
 
-    async def modify_image_properties(
-        self, target: str, architecture: str, properties_to_update: dict
-    ) -> ImageData:
+    async def modify_image_properties(self, updater: Updater[ImageRow]) -> ImageData:
         try:
             async with self._db.begin_session() as session:
-                image_row = await ImageRow.resolve(
-                    session,
-                    [
-                        ImageIdentifier(target, architecture),
-                        ImageAlias(target),
-                    ],
-                )
-                for key, value in properties_to_update.items():
-                    setattr(image_row, key, value)
-                data = image_row.to_dataclass()
-            return data
+                result = await execute_updater(session, updater)
+                if result is None:
+                    raise ImageNotFound(f"Image not found (id:{updater.pk_value})")
+                return result.row.to_dataclass()
         except (ValueError, DBAPIError):
             raise ModifyImageActionValueError
 

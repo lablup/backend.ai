@@ -105,10 +105,6 @@ class NotificationDBSource:
     ) -> NotificationChannelData:
         """Updates an existing notification channel."""
         async with self._db.begin_session() as db_sess:
-            values = updater.spec.build_values()
-            if not values:
-                raise NotificationChannelNotFound("No fields to update for notification channel")
-
             result = await execute_updater(db_sess, updater)
             if result is None:
                 raise NotificationChannelNotFound(
@@ -146,10 +142,6 @@ class NotificationDBSource:
     ) -> NotificationRuleData:
         """Updates an existing notification rule."""
         async with self._db.begin_session() as db_sess:
-            values = updater.spec.build_values()
-            if not values:
-                raise NotificationRuleNotFound("No fields to update for notification rule")
-
             result = await execute_updater(db_sess, updater)
             if result is None:
                 raise NotificationRuleNotFound(f"Notification rule {updater.pk_value} not found")

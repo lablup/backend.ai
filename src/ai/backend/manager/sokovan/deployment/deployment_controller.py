@@ -119,15 +119,15 @@ class DeploymentController:
             DeploymentInfo: Information about the updated deployment
         """
         log.info("Updating deployment {}", endpoint_id)
+        updater = Updater[EndpointRow](spec=spec, pk_value=endpoint_id)
         modified_endpoint = await self._deployment_repository.get_modified_endpoint(
-            endpoint_id=endpoint_id, spec=spec
+            endpoint_id=endpoint_id, updater=updater
         )
         target_revision = modified_endpoint.target_revision()
         if target_revision:
             await self._scheduling_controller.validate_session_spec(
                 SessionValidationSpec.from_revision(model_revision=target_revision)
             )
-        updater = Updater[EndpointRow](spec=spec, pk_value=endpoint_id)
         res = await self._deployment_repository.update_endpoint_with_spec(updater)
         try:
             await self.mark_lifecycle_needed(DeploymentLifecycleType.CHECK_REPLICA)

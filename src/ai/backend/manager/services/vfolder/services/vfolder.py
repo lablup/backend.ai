@@ -349,8 +349,7 @@ class VFolderService:
                     )
 
         # Update the vfolder using repository
-        to_update = spec.build_values()
-        await self._vfolder_repository.update_vfolder_attribute(action.vfolder_uuid, to_update)
+        await self._vfolder_repository.update_vfolder_attribute(action.updater)
 
         return UpdateVFolderAttributeActionResult(vfolder_uuid=action.vfolder_uuid)
 

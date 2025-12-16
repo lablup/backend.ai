@@ -136,13 +136,9 @@ class GroupRepository:
     ) -> Optional[GroupData]:
         """Modify a group with validation."""
         group_id = updater.pk_value
-        data = updater.spec.build_values()
 
         if user_update_mode not in (None, "add", "remove"):
             raise InvalidUserUpdateMode("invalid user_update_mode")
-
-        if not data and user_update_mode is None:
-            return None
 
         async with self._db.begin_session() as session:
             # Handle user addition/removal
@@ -160,14 +156,12 @@ class GroupRepository:
                         ),
                     )
 
-            # Update group data if provided
-            if data:
-                result = await execute_updater(session, updater)
-                if result is None:
-                    raise ProjectNotFound(f"Project not found: {group_id}")
+            # Update group data (execute_updater returns None if no values to update)
+            result = await execute_updater(session, updater)
+            if result is not None:
                 return result.row.to_data()
 
-            # If only user updates were performed, return None
+            # No group updates or only user updates were performed
             return None
 
     @group_repository_resilience.apply()

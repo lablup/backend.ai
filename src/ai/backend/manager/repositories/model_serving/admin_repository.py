@@ -28,6 +28,7 @@ from ai.backend.manager.models.endpoint import (
 )
 from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 model_serving_repository_resilience = Resilience(
     policies=[
@@ -333,14 +334,17 @@ class AdminModelServingRepository:
 
     @model_serving_repository_resilience.apply()
     async def update_auto_scaling_rule_force(
-        self, rule_id: uuid.UUID, fields_to_update: dict[str, Any]
+        self, updater: Updater[EndpointAutoScalingRuleRow]
     ) -> Optional[EndpointAutoScalingRuleData]:
         """
         Update auto scaling rule without access validation.
         Returns the updated rule if successful, None if not found.
         """
+        rule_id = uuid.UUID(str(updater.pk_value))
+
         async with self._db.begin_session() as session:
             try:
+                # Validate lifecycle stage before update
                 rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
                 if not rule:
                     return None
@@ -348,10 +352,12 @@ class AdminModelServingRepository:
                 if rule.endpoint_row.lifecycle_stage in EndpointLifecycle.inactive_states():
                     return None
 
-                for key, value in fields_to_update.items():
-                    setattr(rule, key, value)
+                # Use execute_updater to apply changes
+                result = await execute_updater(session, updater)
+                if result is None:
+                    return None
 
-                return rule.to_data()
+                return result.row.to_data()
             except ObjectNotFound:
                 return None
 

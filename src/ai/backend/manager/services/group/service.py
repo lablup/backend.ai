@@ -89,7 +89,7 @@ class GroupService:
             action.user_update_mode.optional_value(),
             user_uuids_converted,
         )
-        # If no group data is returned, it means only user updates were performed
+        # If no group data is returned, it means only user updates were performed or no updates at all
         return ModifyGroupActionResult(data=group_data)
 
     async def delete_group(self, action: DeleteGroupAction) -> DeleteGroupActionResult:

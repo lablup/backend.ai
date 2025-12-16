@@ -29,6 +29,7 @@ from ai.backend.manager.data.user.types import (
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.minilang import ExternalTableFilterSpec, ORMFieldItem
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.user.actions.create_user import (
@@ -963,66 +964,66 @@ class ModifyUserInput(graphene.InputObjectType):
             )
             password_state = OptionalState[PasswordInfo].from_graphql(password_info)
 
+        spec = UserUpdaterSpec(
+            username=OptionalState[str].from_graphql(
+                self.username,
+            ),
+            password=password_state,
+            need_password_change=OptionalState[bool].from_graphql(
+                self.need_password_change,
+            ),
+            full_name=OptionalState[str].from_graphql(
+                self.full_name,
+            ),
+            description=OptionalState[str].from_graphql(
+                self.description,
+            ),
+            is_active=OptionalState[bool].from_graphql(
+                self.is_active,
+            ),
+            status=OptionalState[UserStatus].from_graphql(
+                self.status
+                if (self.status is Undefined or self.status is None)
+                else UserStatus(self.status),
+            ),
+            domain_name=OptionalState[str].from_graphql(
+                self.domain_name,
+            ),
+            role=OptionalState[UserRole].from_graphql(
+                self.role if (self.role is Undefined or self.role is None) else UserRole(self.role),
+            ),
+            allowed_client_ip=TriState[list[str]].from_graphql(
+                self.allowed_client_ip,
+            ),
+            totp_activated=OptionalState[bool].from_graphql(
+                self.totp_activated,
+            ),
+            resource_policy=OptionalState[str].from_graphql(
+                self.resource_policy,
+            ),
+            sudo_session_enabled=OptionalState[bool].from_graphql(
+                self.sudo_session_enabled,
+            ),
+            main_access_key=TriState[str].from_graphql(
+                self.main_access_key,
+            ),
+            container_uid=TriState[int].from_graphql(
+                self.container_uid,
+            ),
+            container_main_gid=TriState[int].from_graphql(
+                self.container_main_gid,
+            ),
+            container_gids=TriState[list[int]].from_graphql(
+                self.container_gids,
+            ),
+            group_ids=OptionalState[list[str]].from_graphql(
+                self.group_ids,
+            ),
+        )
+        # Note: User update uses email for lookup, pk_value is not used
         return ModifyUserAction(
             email=email,
-            updater_spec=UserUpdaterSpec(
-                username=OptionalState[str].from_graphql(
-                    self.username,
-                ),
-                password=password_state,
-                need_password_change=OptionalState[bool].from_graphql(
-                    self.need_password_change,
-                ),
-                full_name=OptionalState[str].from_graphql(
-                    self.full_name,
-                ),
-                description=OptionalState[str].from_graphql(
-                    self.description,
-                ),
-                is_active=OptionalState[bool].from_graphql(
-                    self.is_active,
-                ),
-                status=OptionalState[UserStatus].from_graphql(
-                    self.status
-                    if (self.status is Undefined or self.status is None)
-                    else UserStatus(self.status),
-                ),
-                domain_name=OptionalState[str].from_graphql(
-                    self.domain_name,
-                ),
-                role=OptionalState[UserRole].from_graphql(
-                    self.role
-                    if (self.role is Undefined or self.role is None)
-                    else UserRole(self.role),
-                ),
-                allowed_client_ip=TriState[list[str]].from_graphql(
-                    self.allowed_client_ip,
-                ),
-                totp_activated=OptionalState[bool].from_graphql(
-                    self.totp_activated,
-                ),
-                resource_policy=OptionalState[str].from_graphql(
-                    self.resource_policy,
-                ),
-                sudo_session_enabled=OptionalState[bool].from_graphql(
-                    self.sudo_session_enabled,
-                ),
-                main_access_key=TriState[str].from_graphql(
-                    self.main_access_key,
-                ),
-                container_uid=TriState[int].from_graphql(
-                    self.container_uid,
-                ),
-                container_main_gid=TriState[int].from_graphql(
-                    self.container_main_gid,
-                ),
-                container_gids=TriState[list[int]].from_graphql(
-                    self.container_gids,
-                ),
-                group_ids=OptionalState[list[str]].from_graphql(
-                    self.group_ids,
-                ),
-            ),
+            updater=Updater(spec=spec, pk_value=email),
         )
 
 

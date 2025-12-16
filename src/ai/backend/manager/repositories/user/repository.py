@@ -41,6 +41,7 @@ from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair_data,
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import (
     AssociationScopesEntitiesCreatorSpec,
     UserRoleCreatorSpec,
@@ -182,12 +183,13 @@ class UserRepository:
     async def update_user_validated(
         self,
         email: str,
-        updater_spec: UserUpdaterSpec,
+        updater: Updater[UserRow],
         requester_uuid: Optional[UUID],
     ) -> UserData:
         """
         Update user with ownership validation and handle role/group changes.
         """
+        updater_spec = cast(UserUpdaterSpec, updater.spec)
         to_update = updater_spec.build_values()
         async with self._db.begin() as conn:
             # Get current user data for validation

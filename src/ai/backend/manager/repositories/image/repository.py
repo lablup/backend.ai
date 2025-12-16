@@ -22,8 +22,10 @@ from ai.backend.manager.data.image.types import (
 )
 from ai.backend.manager.models.image import (
     ImageIdentifier,
+    ImageRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
 from ai.backend.manager.repositories.image.stateful_source.stateful_source import (
     ImageStatefulSource,
@@ -260,12 +262,8 @@ class ImageRepository:
         return await self._db_source.remove_tag_from_registry(image_id)
 
     @image_repository_resilience.apply()
-    async def update_image_properties(
-        self, target: str, architecture: str, properties_to_update: dict
-    ) -> ImageData:
-        return await self._db_source.modify_image_properties(
-            target, architecture, properties_to_update
-        )
+    async def update_image_properties(self, updater: Updater[ImageRow]) -> ImageData:
+        return await self._db_source.modify_image_properties(updater)
 
     @image_repository_resilience.apply()
     async def clear_image_custom_resource_limit(

@@ -35,7 +35,6 @@ from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
 )
-from ai.backend.manager.services.user.types import NoUserUpdateError
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -77,16 +76,9 @@ class UserService:
         )
 
     async def modify_user(self, action: ModifyUserAction) -> ModifyUserActionResult:
-        email = action.email
-        spec = action.updater_spec
-        data = spec.build_values()
-
-        if not data and spec.group_ids_value is None:
-            raise NoUserUpdateError("No fields to update for user {email}.")
-
         user_data_result = await self._user_repository.update_user_validated(
-            email=email,
-            updater_spec=spec,
+            email=action.email,
+            updater=action.updater,
             requester_uuid=None,  # No user context available in ModifyUserAction
         )
         return ModifyUserActionResult(

@@ -8,9 +8,11 @@ from ai.backend.manager.data.image.types import ImageWithAgentInstallStatus
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.models.image import (
     ImageIdentifier,
+    ImageRow,
 )
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.image.admin_repository import AdminImageRepository
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.image.actions.alias_image import (
@@ -209,17 +211,20 @@ class ImageService:
         )
 
     async def modify_image(self, action: ModifyImageAction) -> ModifyImageActionResult:
-        spec = action.updater_spec
-
         try:
-            to_update = spec.build_values()
-            image_data = await self._image_repository.update_image_properties(
-                action.target, action.architecture, to_update
-            )
+            # Resolve image first to get its ID
+            image_data = await self._image_repository.resolve_image([
+                ImageIdentifier(action.target, action.architecture),
+                ImageAlias(action.target),
+            ])
+            # Create Updater with resolved image ID
+            updater: Updater[ImageRow] = Updater(spec=action.updater_spec, pk_value=image_data.id)
+            # Pass Updater to repository
+            updated_image_data = await self._image_repository.update_image_properties(updater)
         except UnknownImageReference:
             raise ModifyImageActionUnknownImageReferenceError
 
-        return ModifyImageActionResult(image=image_data)
+        return ModifyImageActionResult(image=updated_image_data)
 
     async def preload_image(self, action: PreloadImageAction) -> PreloadImageActionResult:
         raise NotImplementedError
