@@ -28,7 +28,7 @@ from ai.backend.manager.services.permission_contoller.actions import (
 
 from ..auth import auth_required_for_method
 from ..types import CORSOptions, WebMiddleware
-from .adapter import RoleAdapter
+from .role_adapter import RoleAdapter
 
 __all__ = ("create_app",)
 
