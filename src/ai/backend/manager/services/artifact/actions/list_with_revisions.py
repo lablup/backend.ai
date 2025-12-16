@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, override
-
-if TYPE_CHECKING:
-    from ai.backend.manager.repositories.base import BatchQuerier
+from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact.types import (
@@ -18,9 +15,8 @@ from ai.backend.manager.types import PaginationOptions
 
 @dataclass
 class ListArtifactsWithRevisionsAction(ArtifactAction):
-    # Support both new BatchQuerier pattern (for GraphQL) and old style (for REST API)
-    querier: Optional[BatchQuerier] = None
-    # Old-style parameters (deprecated, kept for REST API compatibility)
+    """Action to list artifacts with revisions using old-style pagination (REST API)."""
+
     pagination: Optional[PaginationOptions] = None
     ordering: Optional[ArtifactOrderingOptions] = None
     filters: Optional[ArtifactFilterOptions] = None

@@ -67,10 +67,6 @@ from ai.backend.manager.services.artifact.actions.get_revisions import (
     GetArtifactRevisionsAction,
     GetArtifactRevisionsActionResult,
 )
-from ai.backend.manager.services.artifact.actions.list import (
-    ListArtifactsAction,
-    ListArtifactsActionResult,
-)
 from ai.backend.manager.services.artifact.actions.list_with_revisions import (
     ListArtifactsWithRevisionsAction,
     ListArtifactsWithRevisionsActionResult,
@@ -90,6 +86,14 @@ from ai.backend.manager.services.artifact.actions.retrieve_model_multi import (
 from ai.backend.manager.services.artifact.actions.scan import (
     ScanArtifactsAction,
     ScanArtifactsActionResult,
+)
+from ai.backend.manager.services.artifact.actions.search import (
+    SearchArtifactsAction,
+    SearchArtifactsActionResult,
+)
+from ai.backend.manager.services.artifact.actions.search_with_revisions import (
+    SearchArtifactsWithRevisionsAction,
+    SearchArtifactsWithRevisionsActionResult,
 )
 from ai.backend.manager.services.artifact.actions.update import (
     UpdateArtifactAction,
@@ -342,11 +346,11 @@ class ArtifactService:
         artifact = await self._artifact_repository.get_artifact_by_id(action.artifact_id)
         return GetArtifactActionResult(result=artifact)
 
-    async def list(self, action: ListArtifactsAction) -> ListArtifactsActionResult:
+    async def list(self, action: SearchArtifactsAction) -> SearchArtifactsActionResult:
         result = await self._artifact_repository.search_artifacts(
             querier=action.querier,
         )
-        return ListArtifactsActionResult(
+        return SearchArtifactsActionResult(
             data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
@@ -356,26 +360,30 @@ class ArtifactService:
     async def list_with_revisions(
         self, action: ListArtifactsWithRevisionsAction
     ) -> ListArtifactsWithRevisionsActionResult:
-        # Support both new Querier pattern (for GraphQL) and old style (for REST API)
-        if action.querier is not None:
-            # New Querier pattern (GraphQL)
-            (
-                artifacts_data,
-                total_count,
-            ) = await self._artifact_repository.search_artifacts_with_revisions(
-                querier=action.querier,
-            )
-        else:
-            # Old-style (REST API compatibility)
-            (
-                artifacts_data,
-                total_count,
-            ) = await self._artifact_repository.list_artifacts_with_revisions_paginated(
-                pagination=action.pagination,
-                ordering=action.ordering,
-                filters=action.filters,
-            )
+        # Old-style pagination for REST API compatibility
+        (
+            artifacts_data,
+            total_count,
+        ) = await self._artifact_repository.list_artifacts_with_revisions_paginated(
+            pagination=action.pagination,
+            ordering=action.ordering,
+            filters=action.filters,
+        )
         return ListArtifactsWithRevisionsActionResult(data=artifacts_data, total_count=total_count)
+
+    async def search_with_revisions(
+        self, action: SearchArtifactsWithRevisionsAction
+    ) -> SearchArtifactsWithRevisionsActionResult:
+        """Search artifacts with their revisions using BatchQuerier pattern."""
+        result = await self._artifact_repository.search_artifacts_with_revisions(
+            querier=action.querier,
+        )
+        return SearchArtifactsWithRevisionsActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def get_revisions(
         self, action: GetArtifactRevisionsAction

@@ -24,6 +24,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactRevisionListResult,
     ArtifactStatus,
     ArtifactType,
+    ArtifactWithRevisionsListResult,
 )
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
 from ai.backend.manager.errors.artifact import (
@@ -1099,14 +1100,14 @@ class ArtifactDBSource:
     async def search_artifacts_with_revisions(
         self,
         querier: BatchQuerier,
-    ) -> tuple[list[ArtifactDataWithRevisions], int]:
+    ) -> ArtifactWithRevisionsListResult:
         """Search artifacts with their revisions using querier pattern.
 
         Args:
             querier: BatchQuerier for filtering, ordering, and pagination
 
         Returns:
-            Tuple of (artifacts with revisions list, total count)
+            ArtifactWithRevisionsListResult with items, total count, and pagination info
         """
         async with self._db.begin_readonly_session() as db_sess:
             # Build query with eager loading of revisions
@@ -1119,19 +1120,24 @@ class ArtifactDBSource:
             )
 
             # Convert to ArtifactDataWithRevisions objects
-            data_objects: list[ArtifactDataWithRevisions] = []
+            items: list[ArtifactDataWithRevisions] = []
             for row in result.rows:
                 artifact_data = row.ArtifactRow.to_dataclass()
                 revisions_data = [
                     revision.to_dataclass() for revision in row.ArtifactRow.revision_rows
                 ]
-                data_objects.append(
+                items.append(
                     ArtifactDataWithRevisions.from_dataclasses(
                         artifact_data=artifact_data, revisions=revisions_data
                     )
                 )
 
-            return data_objects, result.total_count
+            return ArtifactWithRevisionsListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
 
     @actxmgr
     async def _begin_session_read_committed(self) -> AsyncIterator[SASession]:

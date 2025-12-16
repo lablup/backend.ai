@@ -28,10 +28,10 @@ from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.services.artifact.actions.delegate_scan import DelegateScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.delete_multi import DeleteArtifactsAction
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
-from ai.backend.manager.services.artifact.actions.list import ListArtifactsAction
 from ai.backend.manager.services.artifact.actions.restore_multi import RestoreArtifactsAction
 from ai.backend.manager.services.artifact.actions.retrieve_model_multi import RetrieveModelsAction
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
+from ai.backend.manager.services.artifact.actions.search import SearchArtifactsAction
 from ai.backend.manager.services.artifact.actions.update import UpdateArtifactAction
 from ai.backend.manager.services.artifact_revision.actions.approve import (
     ApproveArtifactRevisionAction,
@@ -163,7 +163,7 @@ async def artifacts(
 
     # Get artifacts using list action
     action_result = await info.context.processors.artifact.list_artifacts.wait_for_complete(
-        ListArtifactsAction(querier=querier)
+        SearchArtifactsAction(querier=querier)
     )
 
     registry_meta_loader = DataLoader(

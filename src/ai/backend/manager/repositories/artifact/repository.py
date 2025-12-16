@@ -19,6 +19,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactRevisionData,
     ArtifactRevisionListResult,
     ArtifactStatus,
+    ArtifactWithRevisionsListResult,
 )
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
 from ai.backend.manager.models.artifact import ArtifactRow
@@ -243,7 +244,7 @@ class ArtifactRepository:
     async def search_artifacts_with_revisions(
         self,
         querier: BatchQuerier,
-    ) -> tuple[list[ArtifactDataWithRevisions], int]:
+    ) -> ArtifactWithRevisionsListResult:
         """Search artifacts with their revisions using querier pattern."""
 
         return await self._db_source.search_artifacts_with_revisions(querier=querier)
