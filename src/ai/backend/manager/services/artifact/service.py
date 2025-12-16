@@ -346,7 +346,7 @@ class ArtifactService:
         artifact = await self._artifact_repository.get_artifact_by_id(action.artifact_id)
         return GetArtifactActionResult(result=artifact)
 
-    async def list(self, action: SearchArtifactsAction) -> SearchArtifactsActionResult:
+    async def search(self, action: SearchArtifactsAction) -> SearchArtifactsActionResult:
         result = await self._artifact_repository.search_artifacts(
             querier=action.querier,
         )

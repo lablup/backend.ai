@@ -47,9 +47,11 @@ from ai.backend.manager.services.artifact_revision.actions.get import GetArtifac
 from ai.backend.manager.services.artifact_revision.actions.import_revision import (
     ImportArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.list import ListArtifactRevisionsAction
 from ai.backend.manager.services.artifact_revision.actions.reject import (
     RejectArtifactRevisionAction,
+)
+from ai.backend.manager.services.artifact_revision.actions.search import (
+    SearchArtifactRevisionsAction,
 )
 from ai.backend.manager.types import TriState
 
@@ -162,7 +164,7 @@ async def artifacts(
     )
 
     # Get artifacts using list action
-    action_result = await info.context.processors.artifact.list_artifacts.wait_for_complete(
+    action_result = await info.context.processors.artifact.search_artifacts.wait_for_complete(
         SearchArtifactsAction(querier=querier)
     )
 
@@ -264,8 +266,10 @@ async def artifact_revisions(
     )
 
     # Get artifact revisions using list action
-    action_result = await info.context.processors.artifact_revision.list_revision.wait_for_complete(
-        ListArtifactRevisionsAction(querier=querier)
+    action_result = (
+        await info.context.processors.artifact_revision.search_revision.wait_for_complete(
+            SearchArtifactRevisionsAction(querier=querier)
+        )
     )
 
     # Build GraphQL connection response

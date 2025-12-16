@@ -10,7 +10,7 @@ from ai.backend.manager.services.artifact_revision.actions.base import ArtifactR
 
 
 @dataclass
-class ListArtifactRevisionsAction(ArtifactRevisionAction):
+class SearchArtifactRevisionsAction(ArtifactRevisionAction):
     querier: BatchQuerier
 
     @override
@@ -20,11 +20,11 @@ class ListArtifactRevisionsAction(ArtifactRevisionAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "list_revisions"
+        return "search_revisions"
 
 
 @dataclass
-class ListArtifactRevisionsActionResult(BaseActionResult):
+class SearchArtifactRevisionsActionResult(BaseActionResult):
     data: list[ArtifactRevisionData]
     total_count: int
     has_next_page: bool

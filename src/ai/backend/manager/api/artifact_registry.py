@@ -186,7 +186,7 @@ class APIHandler:
         filters = body.parsed.filters
         ordering = body.parsed.ordering
 
-        action_result = await processors.artifact.list_artifacts_with_revisions.wait_for_complete(
+        action_result = await processors.artifact.search_artifacts_with_revisions.wait_for_complete(
             ListArtifactsWithRevisionsAction(
                 pagination=pagination,
                 ordering=ordering,

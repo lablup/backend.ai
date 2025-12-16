@@ -62,7 +62,7 @@ from .service import ArtifactService
 class ArtifactProcessors(AbstractProcessorPackage):
     scan: ActionProcessor[ScanArtifactsAction, ScanArtifactsActionResult]
     get: ActionProcessor[GetArtifactAction, GetArtifactActionResult]
-    list_artifacts: ActionProcessor[SearchArtifactsAction, SearchArtifactsActionResult]
+    search_artifacts: ActionProcessor[SearchArtifactsAction, SearchArtifactsActionResult]
     list_artifacts_with_revisions: ActionProcessor[
         ListArtifactsWithRevisionsAction, ListArtifactsWithRevisionsActionResult
     ]
@@ -85,12 +85,12 @@ class ArtifactProcessors(AbstractProcessorPackage):
         # TODO: Move scan action to ArtifactRegistryService
         self.scan = ActionProcessor(service.scan, action_monitors)
         self.get = ActionProcessor(service.get, action_monitors)
-        self.list_artifacts = ActionProcessor(service.list, action_monitors)
-        self.list_artifacts_with_revisions = ActionProcessor(
-            service.list_with_revisions, action_monitors
-        )
+        self.search_artifacts = ActionProcessor(service.search, action_monitors)
         self.search_artifacts_with_revisions = ActionProcessor(
             service.search_with_revisions, action_monitors
+        )
+        self.list_artifacts_with_revisions = ActionProcessor(
+            service.list_with_revisions, action_monitors
         )
         self.get_revisions = ActionProcessor(service.get_revisions, action_monitors)
         self.update = ActionProcessor(service.update, action_monitors)
