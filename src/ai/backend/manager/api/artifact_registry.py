@@ -169,7 +169,7 @@ class APIHandler:
 
     @auth_required_for_method
     @api_handler
-    async def list_artifacts(
+    async def search_artifacts(
         self,
         body: BodyParam[SearchArtifactsReq],
         processors_ctx: ProcessorsCtx,
@@ -277,7 +277,7 @@ def create_app(
     cors.add(
         app.router.add_route("POST", "/delegation/import", api_handler.delegate_import_artifacts)
     )
-    cors.add(app.router.add_route("POST", "/search", api_handler.list_artifacts))
+    cors.add(app.router.add_route("POST", "/search", api_handler.search_artifacts))
 
     cors.add(app.router.add_route("GET", "/model/{model_id}", api_handler.scan_single_model))
     cors.add(app.router.add_route("POST", "/models/batch", api_handler.scan_models))
