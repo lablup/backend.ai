@@ -9,8 +9,6 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, Optional, Self
 import click
 
 if TYPE_CHECKING:
-    from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-    from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
     from ai.backend.common.etcd import AsyncEtcd
     from ai.backend.logging import AbstractLogger
     from ai.backend.logging.types import LogLevel
@@ -129,6 +127,8 @@ async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerUnifiedConfig]
 async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
     from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+    from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+    from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
     from ai.backend.common.defs import (
         REDIS_IMAGE_DB,
         REDIS_LIVE_DB,
