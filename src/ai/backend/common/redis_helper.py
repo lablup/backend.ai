@@ -28,7 +28,7 @@ from glide import (
     ServerCredentials,
     TlsAdvancedConfiguration,
 )
-from redis.asyncio import ConnectionPool, Redis
+from redis.asyncio import BlockingConnectionPool, ConnectionPool, Redis
 from redis.asyncio.client import Pipeline
 from redis.asyncio.sentinel import MasterNotFoundError, Sentinel, SlaveNotFoundError
 from redis.backoff import ExponentialBackoff
@@ -74,7 +74,6 @@ _default_conn_opts: Mapping[str, Any] = {
 }
 _default_conn_pool_opts: Mapping[str, Any] = {
     "max_connections": 16,
-    "timeout": 20.0,
 }
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -235,7 +234,11 @@ def get_redis_object(
         conn_opts["socket_connect_timeout"] = float(socket_connect_timeout)
     if max_connections := redis_helper_config.get("max_connections"):
         conn_pool_opts["max_connections"] = int(max_connections)
-    if connection_ready_timeout := redis_helper_config.get("connection_ready_timeout"):
+    # NOTE: timeout is only supported in BlockingConnectionPool, not ConnectionPool.
+    # BlockingConnectionPool waits for an available connection up to `timeout` seconds,
+    # while ConnectionPool creates a new connection immediately when none are available.
+    connection_ready_timeout = redis_helper_config.get("connection_ready_timeout")
+    if connection_ready_timeout is not None:
         conn_pool_opts["timeout"] = float(connection_ready_timeout)
     if _sentinel_addresses := redis_target.get("sentinel"):
         sentinel_addresses: Any = None
@@ -283,7 +286,12 @@ def get_redis_object(
             raise ValueError("Redis URL is not provided in the configuration.")
 
         url = _parse_redis_url(redis_target, db)
-        connection_pool: ConnectionPool = ConnectionPool.from_url(
+        # Use BlockingConnectionPool if connection_ready_timeout is set,
+        # otherwise use regular ConnectionPool.
+        pool_class: type[ConnectionPool] = (
+            BlockingConnectionPool if connection_ready_timeout is not None else ConnectionPool
+        )
+        connection_pool: ConnectionPool = pool_class.from_url(
             str(url),
             **conn_pool_opts,
             **conn_opts,
