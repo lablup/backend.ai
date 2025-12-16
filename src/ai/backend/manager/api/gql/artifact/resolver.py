@@ -17,11 +17,7 @@ from ai.backend.manager.api.gql.base import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
-from ai.backend.manager.data.artifact.types import (
-    ArtifactAvailability,
-    ArtifactData,
-    ArtifactRevisionData,
-)
+from ai.backend.manager.data.artifact.types import ArtifactAvailability
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
 from ai.backend.manager.errors.artifact import (
     ArtifactImportDelegationError,
@@ -124,66 +120,6 @@ def _get_artifact_revision_pagination_spec() -> PaginationSpec:
     )
 
 
-async def _build_artifact_connection(
-    registry_meta_loader: DataLoader,
-    artifacts: list[ArtifactData],
-    total_count: int,
-    has_next_page: bool,
-    has_previous_page: bool,
-) -> ArtifactConnection:
-    """Build GraphQL connection from artifacts data"""
-    edges = []
-
-    for artifact_data in artifacts:
-        registry_meta = await registry_meta_loader.load(artifact_data.registry_id)
-        source_registry_meta = await registry_meta_loader.load(artifact_data.source_registry_id)
-        artifact = Artifact.from_dataclass(
-            artifact_data, registry_url=registry_meta.url, source_url=source_registry_meta.url
-        )
-        cursor = to_global_id(Artifact, artifact_data.id)
-        edges.append(ArtifactEdge(node=artifact, cursor=cursor))
-
-    page_info = strawberry.relay.PageInfo(
-        has_next_page=has_next_page,
-        has_previous_page=has_previous_page,
-        start_cursor=edges[0].cursor if edges else None,
-        end_cursor=edges[-1].cursor if edges else None,
-    )
-
-    return ArtifactConnection(
-        count=total_count,
-        edges=edges,
-        page_info=page_info,
-    )
-
-
-def _build_artifact_revision_connection(
-    artifact_revisions: list[ArtifactRevisionData],
-    total_count: int,
-    has_next_page: bool,
-    has_previous_page: bool,
-) -> ArtifactRevisionConnection:
-    """Build GraphQL connection from artifact revision data"""
-    edges = []
-    for revision_data in artifact_revisions:
-        revision = ArtifactRevision.from_dataclass(revision_data)
-        cursor = to_global_id(ArtifactRevision, revision_data.id)
-        edges.append(ArtifactRevisionEdge(node=revision, cursor=cursor))
-
-    page_info = strawberry.relay.PageInfo(
-        has_next_page=has_next_page,
-        has_previous_page=has_previous_page,
-        start_cursor=edges[0].cursor if edges else None,
-        end_cursor=edges[-1].cursor if edges else None,
-    )
-
-    return ArtifactRevisionConnection(
-        count=total_count,
-        edges=edges,
-        page_info=page_info,
-    )
-
-
 # Query Fields
 @strawberry.field(
     description=dedent_strip("""
@@ -235,12 +171,27 @@ async def artifacts(
     )
 
     # Build GraphQL connection response
-    return await _build_artifact_connection(
-        registry_meta_loader,
-        artifacts=action_result.data,
-        total_count=action_result.total_count,
+    edges = []
+    for artifact_data in action_result.data:
+        registry_meta = await registry_meta_loader.load(artifact_data.registry_id)
+        source_registry_meta = await registry_meta_loader.load(artifact_data.source_registry_id)
+        artifact = Artifact.from_dataclass(
+            artifact_data, registry_url=registry_meta.url, source_url=source_registry_meta.url
+        )
+        cursor = to_global_id(Artifact, artifact_data.id)
+        edges.append(ArtifactEdge(node=artifact, cursor=cursor))
+
+    page_info = strawberry.relay.PageInfo(
         has_next_page=action_result.has_next_page,
         has_previous_page=action_result.has_previous_page,
+        start_cursor=edges[0].cursor if edges else None,
+        end_cursor=edges[-1].cursor if edges else None,
+    )
+
+    return ArtifactConnection(
+        count=action_result.total_count,
+        edges=edges,
+        page_info=page_info,
     )
 
 
@@ -318,11 +269,23 @@ async def artifact_revisions(
     )
 
     # Build GraphQL connection response
-    return _build_artifact_revision_connection(
-        artifact_revisions=action_result.data,
-        total_count=action_result.total_count,
+    edges = []
+    for revision_data in action_result.data:
+        revision = ArtifactRevision.from_dataclass(revision_data)
+        cursor = to_global_id(ArtifactRevision, revision_data.id)
+        edges.append(ArtifactRevisionEdge(node=revision, cursor=cursor))
+
+    page_info = strawberry.relay.PageInfo(
         has_next_page=action_result.has_next_page,
         has_previous_page=action_result.has_previous_page,
+        start_cursor=edges[0].cursor if edges else None,
+        end_cursor=edges[-1].cursor if edges else None,
+    )
+
+    return ArtifactRevisionConnection(
+        count=action_result.total_count,
+        edges=edges,
+        page_info=page_info,
     )
 
 
