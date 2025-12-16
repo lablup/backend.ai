@@ -110,6 +110,10 @@ from ai.backend.manager.services.deployment.actions.model_revision.list_revision
     ListRevisionsAction,
     ListRevisionsActionResult,
 )
+from ai.backend.manager.services.deployment.actions.search_deployments import (
+    SearchDeploymentsAction,
+    SearchDeploymentsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.sync_replicas import (
     SyncReplicaAction,
     SyncReplicaActionResult,
@@ -438,6 +442,18 @@ class DeploymentService:
         self, action: CreateModelRevisionAction
     ) -> CreateModelRevisionActionResult:
         return CreateModelRevisionActionResult(revision=mock_revision_data_2)
+
+    async def search_deployments(
+        self, action: SearchDeploymentsAction
+    ) -> SearchDeploymentsActionResult:
+        """Search model deployments using BatchQuerier."""
+        result = await self._deployment_controller.search_deployments(action.querier)
+        return SearchDeploymentsActionResult(
+            deployments=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
 
 mock_revision_data_1 = ModelRevisionData(

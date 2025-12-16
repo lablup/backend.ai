@@ -11,8 +11,9 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
 from ai.backend.manager.data.deployment.modifier import DeploymentModifier
 from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
-from ai.backend.manager.data.deployment.types import DeploymentInfo
+from ai.backend.manager.data.deployment.types import DeploymentInfo, ModelDeploymentListResult
 from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
@@ -184,3 +185,18 @@ class DeploymentController:
         """
         await self._valkey_schedule.mark_deployment_needed(lifecycle_type.value)
         log.debug("Marked deployment lifecycle needed for type: {}", lifecycle_type.value)
+
+    async def search_deployments(
+        self,
+        querier: BatchQuerier,
+    ) -> ModelDeploymentListResult:
+        """
+        Search model deployments using BatchQuerier.
+
+        Args:
+            querier: BatchQuerier with pagination, filtering, and ordering
+
+        Returns:
+            ModelDeploymentListResult: Search results with pagination info
+        """
+        return await self._deployment_repository.search_deployments(querier)
