@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.rbac import (
 )
 from ai.backend.manager.api.adapter import BaseFilterAdapter
 from ai.backend.manager.data.permission.role import RoleData, RoleDetailData
+from ai.backend.manager.errors.permission import InvalidOrderField
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
@@ -97,7 +98,7 @@ class RoleAdapter(BaseFilterAdapter):
         elif order.field == RoleOrderField.UPDATED_AT:
             return RoleOrders.updated_at(ascending=ascending)
         else:
-            raise ValueError(f"Unknown order field: {order.field}")
+            raise InvalidOrderField(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""

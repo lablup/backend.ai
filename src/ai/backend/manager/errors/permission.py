@@ -14,6 +14,8 @@ __all__ = (
     "RoleNotFound",
     "RoleAlreadyAssigned",
     "RoleNotAssigned",
+    "InsufficientPermission",
+    "InvalidOrderField",
 )
 
 
@@ -50,4 +52,28 @@ class RoleNotAssigned(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.ROLE,
             operation=ErrorOperation.HARD_DELETE,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class InsufficientPermission(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/insufficient-permission"
+    error_title = "Insufficient permission to perform this operation."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ROLE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
+class InvalidOrderField(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-order-field"
+    error_title = "Invalid order field specified."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ROLE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )

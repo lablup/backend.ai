@@ -21,6 +21,7 @@ from ai.backend.common.dto.manager.rbac import (
 )
 from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.dto.rbac_request import GetRolePathParam
+from ai.backend.manager.errors.permission import InsufficientPermission
 from ai.backend.manager.services.permission_contoller.actions import (
     GetRoleDetailAction,
     SearchRolesAction,
@@ -52,7 +53,7 @@ class RBACAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can search roles.")
+            raise InsufficientPermission("Only superadmin can search roles.")
 
         # Build querier using adapter
         querier = self.role_adapter.build_querier(body.parsed)
@@ -84,7 +85,7 @@ class RBACAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can get roles.")
+            raise InsufficientPermission("Only superadmin can get roles.")
 
         action_result = await processors.permission_controller.get_role_detail.wait_for_complete(
             GetRoleDetailAction(role_id=path.parsed.role_id)
