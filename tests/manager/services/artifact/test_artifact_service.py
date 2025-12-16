@@ -13,16 +13,18 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
     ArtifactListResult,
     ArtifactType,
 )
+from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
+from ai.backend.manager.repositories.artifact.updaters import ArtifactUpdaterSpec
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.manager.repositories.reservoir_registry.repository import (
@@ -242,8 +244,12 @@ class TestArtifactService:
         sample_artifact_data: ArtifactData,
     ) -> None:
         """Test updating an artifact"""
-        modifier = ArtifactModifier(
+        updater_spec = ArtifactUpdaterSpec(
             description=TriState.update("Updated description"),
+        )
+        updater = Updater[ArtifactRow](
+            spec=updater_spec,
+            pk_value=sample_artifact_data.id,
         )
         updated_artifact = ArtifactData(
             id=sample_artifact_data.id,
@@ -262,16 +268,11 @@ class TestArtifactService:
         )
         mock_artifact_repository.update_artifact = AsyncMock(return_value=updated_artifact)
 
-        action = UpdateArtifactAction(
-            artifact_id=sample_artifact_data.id,
-            modifier=modifier,
-        )
+        action = UpdateArtifactAction(updater=updater)
         result = await artifact_service.update(action)
 
         assert result.result.description == "Updated description"
-        mock_artifact_repository.update_artifact.assert_called_once_with(
-            sample_artifact_data.id, modifier
-        )
+        mock_artifact_repository.update_artifact.assert_called_once_with(updater)
 
     async def test_delete_artifacts(
         self,

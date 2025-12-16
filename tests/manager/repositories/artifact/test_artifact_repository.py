@@ -14,7 +14,6 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactType,
@@ -26,7 +25,9 @@ from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
+from ai.backend.manager.repositories.artifact.updaters import ArtifactUpdaterSpec
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.types import TriState
 
 
@@ -149,14 +150,14 @@ class TestArtifactRepository:
         sample_artifact_id: uuid.UUID,
     ) -> None:
         """Test updating artifact"""
-        modifier = ArtifactModifier(
-            description=TriState.update("Updated description"),
+        updater = Updater[ArtifactRow](
+            spec=ArtifactUpdaterSpec(
+                description=TriState.update("Updated description"),
+            ),
+            pk_value=sample_artifact_id,
         )
 
-        updated_artifact = await artifact_repository.update_artifact(
-            artifact_id=sample_artifact_id,
-            modifier=modifier,
-        )
+        updated_artifact = await artifact_repository.update_artifact(updater)
 
         assert updated_artifact is not None
         assert updated_artifact.description == "Updated description"

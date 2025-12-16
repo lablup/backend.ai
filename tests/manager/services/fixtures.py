@@ -1,7 +1,6 @@
 import dataclasses
 import uuid
-
-from dateutil.parser import isoparse
+from datetime import datetime, timezone
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
