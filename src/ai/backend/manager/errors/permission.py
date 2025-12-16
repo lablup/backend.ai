@@ -11,10 +11,23 @@ from ai.backend.common.exception import (
 )
 
 __all__ = (
+    "InsufficientPermission",
     "RoleNotFound",
     "RoleAlreadyAssigned",
     "RoleNotAssigned",
 )
+
+
+class InsufficientPermission(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/insufficient-permission"
+    error_title = "Insufficient permission to perform this operation."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ROLE,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
 
 
 class RoleNotFound(BackendAIError, web.HTTPNotFound):
