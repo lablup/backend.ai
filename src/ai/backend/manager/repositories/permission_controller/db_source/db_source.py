@@ -29,7 +29,6 @@ from ....models.rbac_models.permission.permission import PermissionRow
 from ....models.rbac_models.permission.permission_group import PermissionGroupRow
 from ....models.rbac_models.role import RoleRow
 from ....models.rbac_models.user_role import UserRoleRow
-from ....models.user import UserRow
 from ....models.utils import ExtendedAsyncSAEngine
 from ....repositories.base.creator import Creator, execute_creator
 from ....repositories.base.querier import BatchQuerier, execute_batch_querier
@@ -390,17 +389,7 @@ class PermissionDBSource:
     ) -> AssignedUserListResult:
         """Searches users assigned to a specific role with pagination and filtering."""
         async with self._db.begin_readonly_session() as db_sess:
-            query = (
-                sa.select(UserRow, UserRoleRow)
-                .select_from(
-                    sa.join(
-                        UserRow,
-                        UserRoleRow,
-                        UserRoleRow.user_id == UserRow.uuid,
-                    )
-                )
-                .where(UserRoleRow.role_id == role_id)
-            )
+            query = sa.select(UserRoleRow).where(UserRoleRow.role_id == role_id)
             result = await execute_batch_querier(
                 db_sess,
                 query,
@@ -409,11 +398,9 @@ class PermissionDBSource:
 
             items = [
                 AssignedUserData(
-                    user_id=row.UserRow.uuid,
-                    username=row.UserRow.username,
-                    email=row.UserRow.email,
-                    granted_by=row.UserRoleRow.granted_by,
-                    granted_at=row.UserRoleRow.granted_at,
+                    user_id=row.user_id,
+                    granted_by=row.granted_by,
+                    granted_at=row.granted_at,
                 )
                 for row in result.rows
             ]

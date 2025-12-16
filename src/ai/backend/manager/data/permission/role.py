@@ -59,8 +59,6 @@ class AssignedUserData:
     """Information about a user assigned to a role."""
 
     user_id: uuid.UUID
-    username: str
-    email: str
     granted_by: Optional[uuid.UUID]
     granted_at: datetime
 
