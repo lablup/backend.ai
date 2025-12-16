@@ -269,9 +269,7 @@ class TestProjectResourcePolicyService:
         # Check that only max_vfolder_count was in the update fields
         values = call_args.spec.build_values()
         assert values["max_vfolder_count"] == 25
-        assert (
-            "max_quota_scope_size" not in values
-        )  # Should not be included in partial update
+        assert "max_quota_scope_size" not in values  # Should not be included in partial update
         assert "max_network_count" not in values  # Should not be included in partial update
 
         # Verify the result

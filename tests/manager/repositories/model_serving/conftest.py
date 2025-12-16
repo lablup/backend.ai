@@ -379,7 +379,9 @@ def setup_mock_query_result(
     if scalars_all_result is not None:
         mock_session.execute.return_value.scalars.return_value.all.return_value = scalars_all_result
     if scalar_one_or_none_result is not None:
-        mock_session.execute.return_value.scalar_one_or_none.return_value = scalar_one_or_none_result
+        mock_session.execute.return_value.scalar_one_or_none.return_value = (
+            scalar_one_or_none_result
+        )
     return mock_session
 
 

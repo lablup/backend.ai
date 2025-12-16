@@ -20,9 +20,7 @@ from ai.backend.manager.types import OptionalState, TriState
 from .conftest import setup_mock_query_result
 
 
-def create_updater_from_fields(
-    rule_id: uuid.UUID, fields: dict
-) -> Updater:
+def create_updater_from_fields(rule_id: uuid.UUID, fields: dict) -> Updater:
     """Helper function to create an Updater from a dict of fields."""
     spec = EndpointAutoScalingRuleUpdaterSpec(
         metric_source=OptionalState.update(fields["metric_source"])
