@@ -16,7 +16,6 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import ArtifactAvailability
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
 from ai.backend.manager.errors.artifact import (
@@ -25,6 +24,8 @@ from ai.backend.manager.errors.artifact import (
 )
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
+from ai.backend.manager.repositories.artifact.updaters import ArtifactUpdaterSpec
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.artifact.actions.delegate_scan import DelegateScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.delete_multi import DeleteArtifactsAction
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
@@ -551,10 +552,12 @@ async def update_artifact(
 ) -> UpdateArtifactPayload:
     action_result = await info.context.processors.artifact.update.wait_for_complete(
         UpdateArtifactAction(
-            artifact_id=uuid.UUID(input.artifact_id),
-            modifier=ArtifactModifier(
-                readonly=TriState.from_graphql(input.readonly),
-                description=TriState.from_graphql(input.description),
+            updater=Updater(
+                spec=ArtifactUpdaterSpec(
+                    readonly=TriState.from_graphql(input.readonly),
+                    description=TriState.from_graphql(input.description),
+                ),
+                pk_value=uuid.UUID(input.artifact_id),
             ),
         )
     )

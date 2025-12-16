@@ -30,6 +30,7 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactRevisionOrderingOptions,
 )
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.types import PaginationOptions
 
 artifact_repository_resilience = Resilience(

@@ -46,6 +46,7 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactStatusFilterType,
 )
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.types import (
     BaseFilterApplier,
     BaseOrderingApplier,
