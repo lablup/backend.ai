@@ -17,18 +17,21 @@ from ai.backend.common.data.notification import (
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
-    NotificationChannelModifier,
     NotificationChannelType,
     NotificationRuleData,
-    NotificationRuleModifier,
     NotificationRuleType,
     WebhookConfig,
 )
 from ai.backend.manager.repositories.base import BatchQuerier, Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.notification import NotificationRepository
 from ai.backend.manager.repositories.notification.creators import (
     NotificationChannelCreatorSpec,
     NotificationRuleCreatorSpec,
+)
+from ai.backend.manager.repositories.notification.updaters import (
+    NotificationChannelUpdaterSpec,
+    NotificationRuleUpdaterSpec,
 )
 from ai.backend.manager.services.notification.actions import (
     CreateChannelAction,
@@ -531,9 +534,13 @@ class TestNotificationService:
         sample_webhook_channel: NotificationChannelData,
     ) -> None:
         """Test updating a notification channel"""
-        modifier = NotificationChannelModifier(
+        updater_spec = NotificationChannelUpdaterSpec(
             name=OptionalState.update("Updated Channel"),
             enabled=OptionalState.update(False),
+        )
+        updater = Updater(
+            spec=updater_spec,
+            pk_value=sample_webhook_channel.id,
         )
         updated_channel = NotificationChannelData(
             id=sample_webhook_channel.id,
@@ -548,16 +555,11 @@ class TestNotificationService:
         )
         mock_repository.update_channel = AsyncMock(return_value=updated_channel)
 
-        action = UpdateChannelAction(
-            channel_id=sample_webhook_channel.id,
-            modifier=modifier,
-        )
+        action = UpdateChannelAction(updater=updater)
         result = await notification_service.update_channel(action)
 
         assert result.channel_data == updated_channel
-        mock_repository.update_channel.assert_called_once_with(
-            channel_id=sample_webhook_channel.id, modifier=modifier
-        )
+        mock_repository.update_channel.assert_called_once_with(updater=updater)
 
     @pytest.mark.asyncio
     async def test_update_rule(
@@ -567,9 +569,13 @@ class TestNotificationService:
         sample_rule: NotificationRuleData,
     ) -> None:
         """Test updating a notification rule"""
-        modifier = NotificationRuleModifier(
+        updater_spec = NotificationRuleUpdaterSpec(
             name=OptionalState.update("Updated Rule"),
             enabled=OptionalState.update(False),
+        )
+        updater = Updater(
+            spec=updater_spec,
+            pk_value=sample_rule.id,
         )
         updated_rule = NotificationRuleData(
             id=sample_rule.id,
@@ -585,16 +591,11 @@ class TestNotificationService:
         )
         mock_repository.update_rule = AsyncMock(return_value=updated_rule)
 
-        action = UpdateRuleAction(
-            rule_id=sample_rule.id,
-            modifier=modifier,
-        )
+        action = UpdateRuleAction(updater=updater)
         result = await notification_service.update_rule(action)
 
         assert result.rule_data == updated_rule
-        mock_repository.update_rule.assert_called_once_with(
-            rule_id=sample_rule.id, modifier=modifier
-        )
+        mock_repository.update_rule.assert_called_once_with(updater=updater)
 
     @pytest.mark.asyncio
     async def test_delete_channel(

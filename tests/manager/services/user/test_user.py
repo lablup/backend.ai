@@ -15,13 +15,15 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.admin_repository import AdminUserRepository
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.user.actions.admin_month_stats import AdminMonthStatsAction
 from ai.backend.manager.services.user.actions.create_user import CreateUserAction
 from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
-from ai.backend.manager.services.user.actions.modify_user import ModifyUserAction, UserModifier
+from ai.backend.manager.services.user.actions.modify_user import ModifyUserAction
 from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
 from ai.backend.manager.services.user.actions.user_month_stats import UserMonthStatsAction
 from ai.backend.manager.services.user.processors import UserProcessors
@@ -160,9 +162,12 @@ class TestUserServiceCompatibility:
         # Test 2.1: Basic information modification
         action = ModifyUserAction(
             email="user@example.com",
-            modifier=UserModifier(
-                full_name=OptionalState.update("Updated Name"),
-                description=OptionalState.update("Senior Developer"),
+            updater=Updater(
+                spec=UserUpdaterSpec(
+                    full_name=OptionalState.update("Updated Name"),
+                    description=OptionalState.update("Senior Developer"),
+                ),
+                pk_value="user@example.com",
             ),
         )
 
@@ -290,9 +295,9 @@ class TestUserServiceCompatibility:
         assert creator.spec.resource_policy == "default-policy"
         assert creator.spec.sudo_session_enabled is False
 
-    def test_user_modifier_fields(self):
-        """Test that UserModifier supports expected modification fields."""
-        modifier = UserModifier(
+    def test_user_updater_spec_fields(self):
+        """Test that UserUpdaterSpec supports expected modification fields."""
+        spec = UserUpdaterSpec(
             full_name=OptionalState.update("Updated Name"),
             description=OptionalState.update("Updated Description"),
             role=OptionalState.update(UserRole.ADMIN),
@@ -303,10 +308,10 @@ class TestUserServiceCompatibility:
         )
 
         # Test that all fields are properly set
-        assert modifier.full_name.optional_value() == "Updated Name"
-        assert modifier.description.optional_value() == "Updated Description"
-        assert modifier.role.optional_value() == UserRole.ADMIN
-        assert modifier.status.optional_value() == UserStatus.INACTIVE
-        assert modifier.totp_activated.optional_value() is True
-        assert modifier.need_password_change.optional_value() is True
-        assert modifier.sudo_session_enabled.optional_value() is True
+        assert spec.full_name.optional_value() == "Updated Name"
+        assert spec.description.optional_value() == "Updated Description"
+        assert spec.role.optional_value() == UserRole.ADMIN
+        assert spec.status.optional_value() == UserStatus.INACTIVE
+        assert spec.totp_activated.optional_value() is True
+        assert spec.need_password_change.optional_value() is True
+        assert spec.sudo_session_enabled.optional_value() is True

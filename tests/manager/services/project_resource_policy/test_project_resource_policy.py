@@ -11,11 +11,15 @@ import pytest
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.project_resource_policy.creators import (
     ProjectResourcePolicyCreatorSpec,
 )
 from ai.backend.manager.repositories.project_resource_policy.repository import (
     ProjectResourcePolicyRepository,
+)
+from ai.backend.manager.repositories.project_resource_policy.updaters import (
+    ProjectResourcePolicyUpdaterSpec,
 )
 from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
     CreateProjectResourcePolicyAction,
@@ -25,7 +29,6 @@ from ai.backend.manager.services.project_resource_policy.actions.delete_project_
 )
 from ai.backend.manager.services.project_resource_policy.actions.modify_project_resource_policy import (
     ModifyProjectResourcePolicyAction,
-    ProjectResourcePolicyModifier,
 )
 from ai.backend.manager.services.project_resource_policy.service import (
     ProjectResourcePolicyService,
@@ -123,13 +126,14 @@ class TestProjectResourcePolicyService:
             return_value=mock_modified_policy
         )
 
+        spec = ProjectResourcePolicyUpdaterSpec(
+            max_vfolder_count=OptionalState.update(30),
+            max_quota_scope_size=OptionalState.update(3221225472),  # 3GB
+            max_network_count=OptionalState.update(10),
+        )
         action = ModifyProjectResourcePolicyAction(
             name="modify-test-policy",
-            modifier=ProjectResourcePolicyModifier(
-                max_vfolder_count=OptionalState.update(30),
-                max_quota_scope_size=OptionalState.update(3221225472),  # 3GB
-                max_network_count=OptionalState.update(10),
-            ),
+            updater=Updater(spec=spec, pk_value="modify-test-policy"),
         )
 
         result = await project_resource_policy_service.modify_project_resource_policy(action)
@@ -160,11 +164,12 @@ class TestProjectResourcePolicyService:
             )
         )
 
+        spec = ProjectResourcePolicyUpdaterSpec(
+            max_vfolder_count=OptionalState.update(30),
+        )
         action = ModifyProjectResourcePolicyAction(
             name="non-existent-policy",
-            modifier=ProjectResourcePolicyModifier(
-                max_vfolder_count=OptionalState.update(30),
-            ),
+            updater=Updater(spec=spec, pk_value="non-existent-policy"),
         )
 
         with pytest.raises(ObjectNotFound) as exc_info:
@@ -242,12 +247,13 @@ class TestProjectResourcePolicyService:
         )
 
         # Update only max_vfolder_count, leave others unchanged
+        spec = ProjectResourcePolicyUpdaterSpec(
+            max_vfolder_count=OptionalState.update(25),
+            # Other fields remain OptionalState.nop() by default
+        )
         action = ModifyProjectResourcePolicyAction(
             name="partial-update-policy",
-            modifier=ProjectResourcePolicyModifier(
-                max_vfolder_count=OptionalState.update(25),
-                # Other fields remain OptionalState.nop() by default
-            ),
+            updater=Updater(spec=spec, pk_value="partial-update-policy"),
         )
 
         result = await project_resource_policy_service.modify_project_resource_policy(action)

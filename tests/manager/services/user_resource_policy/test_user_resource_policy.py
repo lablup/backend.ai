@@ -11,11 +11,15 @@ from ai.backend.common.exception import UserResourcePolicyNotFound
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user_resource_policy.creators import (
     UserResourcePolicyCreatorSpec,
 )
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
+)
+from ai.backend.manager.repositories.user_resource_policy.updaters import (
+    UserResourcePolicyUpdaterSpec,
 )
 from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
     CreateUserResourcePolicyAction,
@@ -25,7 +29,6 @@ from ai.backend.manager.services.user_resource_policy.actions.delete_user_resour
 )
 from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
     ModifyUserResourcePolicyAction,
-    UserResourcePolicyModifier,
 )
 from ai.backend.manager.services.user_resource_policy.processors import UserResourcePolicyProcessors
 from ai.backend.manager.services.user_resource_policy.service import UserResourcePolicyService
@@ -102,16 +105,16 @@ def test_user_resource_policy_creator_build_row_with_none_values() -> None:
     assert row.max_customized_image_count is None
 
 
-def test_user_resource_policy_modifier_fields_to_update() -> None:
-    """Test that UserResourcePolicyModifier properly serializes fields to update"""
-    modifier = UserResourcePolicyModifier(
+def test_user_resource_policy_updater_spec_build_values() -> None:
+    """Test that UserResourcePolicyUpdaterSpec properly serializes fields to update"""
+    spec = UserResourcePolicyUpdaterSpec(
         max_vfolder_count=OptionalState.update(20),
         max_quota_scope_size=OptionalState.update(2000000),
         max_session_count_per_model_session=OptionalState.nop(),
         max_customized_image_count=OptionalState.nop(),
     )
 
-    fields = modifier.fields_to_update()
+    fields = spec.build_values()
 
     # Check that updated fields are present
     assert fields["max_vfolder_count"] == 20
@@ -142,17 +145,18 @@ def test_create_user_resource_policy_action() -> None:
 
 def test_modify_user_resource_policy_action() -> None:
     """Test ModifyUserResourcePolicyAction structure"""
-    modifier = UserResourcePolicyModifier(
+    spec = UserResourcePolicyUpdaterSpec(
         max_vfolder_count=OptionalState.update(20),
     )
+    updater = Updater(spec=spec, pk_value="test-policy")
 
     action = ModifyUserResourcePolicyAction(
         name="test-policy",
-        modifier=modifier,
+        updater=updater,
     )
 
     assert action.name == "test-policy"
-    assert action.modifier == modifier
+    assert action.updater == updater
     assert action.entity_id() is None
     assert action.operation_type() == "modify"
 
@@ -221,15 +225,16 @@ async def test_modify_user_resource_policy_service(service, mock_repository) -> 
     mock_repository.update.return_value = expected_data
 
     # Create action
-    modifier = UserResourcePolicyModifier(
+    spec = UserResourcePolicyUpdaterSpec(
         max_vfolder_count=OptionalState.update(20),
         max_quota_scope_size=OptionalState.update(2000000),
         max_session_count_per_model_session=OptionalState.nop(),
         max_customized_image_count=OptionalState.update(5),
     )
+    updater = Updater(spec=spec, pk_value="test-policy")
     action = ModifyUserResourcePolicyAction(
         name="test-policy",
-        modifier=modifier,
+        updater=updater,
     )
 
     # Execute service method
@@ -238,21 +243,21 @@ async def test_modify_user_resource_policy_service(service, mock_repository) -> 
     # Verify result
     assert result.user_resource_policy == expected_data
 
-    # Verify repository was called with correct modifier object
+    # Verify repository was called with correct updater object
     mock_repository.update.assert_called_once()
     call_args = mock_repository.update.call_args[0]
-    assert call_args[0] == "test-policy"
-    assert isinstance(call_args[1], UserResourcePolicyModifier)
+    assert isinstance(call_args[0], Updater)
+    assert isinstance(call_args[0].spec, UserResourcePolicyUpdaterSpec)
 
-    # Verify modifier contains correct fields
-    modifier_arg = call_args[1]
-    assert modifier_arg.max_vfolder_count.value() == 20
-    assert modifier_arg.max_quota_scope_size.value() == 2000000
-    assert modifier_arg.max_customized_image_count.value() == 5
+    # Verify spec contains correct fields
+    spec_arg = call_args[0].spec
+    assert spec_arg.max_vfolder_count.value() == 20
+    assert spec_arg.max_quota_scope_size.value() == 2000000
+    assert spec_arg.max_customized_image_count.value() == 5
 
-    # Verify fields_to_update only contains updated fields
-    fields_to_update = modifier_arg.fields_to_update()
-    assert fields_to_update == {
+    # Verify build_values only contains updated fields
+    build_values = spec_arg.build_values()
+    assert build_values == {
         "max_vfolder_count": 20,
         "max_quota_scope_size": 2000000,
         "max_customized_image_count": 5,
@@ -292,12 +297,13 @@ async def test_modify_non_existing_policy_raises_exception(service, mock_reposit
     mock_repository.update.side_effect = UserResourcePolicyNotFound("Policy not found")
 
     # Create action
-    modifier = UserResourcePolicyModifier(
+    spec = UserResourcePolicyUpdaterSpec(
         max_vfolder_count=OptionalState.update(20),
     )
+    updater = Updater(spec=spec, pk_value="non-existing-policy")
     action = ModifyUserResourcePolicyAction(
         name="non-existing-policy",
-        modifier=modifier,
+        updater=updater,
     )
 
     # Execute and verify exception is raised

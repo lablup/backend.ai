@@ -20,9 +20,10 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
-from ai.backend.manager.services.user.actions.modify_user import UserModifier
+from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 
 
 def create_test_password_info(password: str = "test_password") -> PasswordInfo:
@@ -350,14 +351,15 @@ class TestUserRepository:
 
                     from ai.backend.manager.types import OptionalState
 
-                    modifier = UserModifier(
+                    updater_spec = UserUpdaterSpec(
                         full_name=OptionalState.update("Updated Name"),
                         description=OptionalState.update("Updated Description"),
                     )
+                    updater = Updater(spec=updater_spec, pk_value="test@example.com")
 
                     result = await user_repository.update_user_validated(
                         email="test@example.com",
-                        modifier=modifier,
+                        updater=updater,
                         requester_uuid=None,
                     )
 
@@ -382,12 +384,13 @@ class TestUserRepository:
             with pytest.raises(UserNotFound):
                 from ai.backend.manager.types import OptionalState
 
-                modifier = UserModifier(
+                updater_spec = UserUpdaterSpec(
                     full_name=OptionalState.update("Updated Name"),
                 )
+                updater = Updater(spec=updater_spec, pk_value="nonexistent@example.com")
                 await user_repository.update_user_validated(
                     email="nonexistent@example.com",
-                    modifier=modifier,
+                    updater=updater,
                     requester_uuid=None,
                 )
 

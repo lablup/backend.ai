@@ -11,11 +11,15 @@ from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair_resource_policy.creators import (
     KeyPairResourcePolicyCreatorSpec,
 )
 from ai.backend.manager.repositories.keypair_resource_policy.repository import (
     KeypairResourcePolicyRepository,
+)
+from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
+    KeyPairResourcePolicyUpdaterSpec,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
@@ -26,7 +30,6 @@ from ai.backend.manager.services.keypair_resource_policy.actions.delete_keypair_
     DeleteKeyPairResourcePolicyActionResult,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
-    KeyPairResourcePolicyModifier,
     ModifyKeyPairResourcePolicyAction,
     ModifyKeyPairResourcePolicyActionResult,
 )
@@ -257,12 +260,15 @@ async def test_create_keypair_resource_policy_failure(
             "Modify keypair resource policy with valid data",
             ModifyKeyPairResourcePolicyAction(
                 name="test-modify-policy",
-                modifier=KeyPairResourcePolicyModifier(
-                    max_concurrent_sessions=OptionalState.update(10),
-                    idle_timeout=OptionalState.update(3600),
-                    max_containers_per_session=OptionalState.update(3),
-                    max_pending_session_count=TriState.update(20),
-                    allowed_vfolder_hosts=OptionalState.update({"shared": set()}),
+                updater=Updater(
+                    spec=KeyPairResourcePolicyUpdaterSpec(
+                        max_concurrent_sessions=OptionalState.update(10),
+                        idle_timeout=OptionalState.update(3600),
+                        max_containers_per_session=OptionalState.update(3),
+                        max_pending_session_count=TriState.update(20),
+                        allowed_vfolder_hosts=OptionalState.update({"shared": set()}),
+                    ),
+                    pk_value="test-modify-policy",
                 ),
             ),
             ModifyKeyPairResourcePolicyActionResult(
@@ -288,9 +294,12 @@ async def test_create_keypair_resource_policy_failure(
             "Modify keypair resource policy with tristate nullify",
             ModifyKeyPairResourcePolicyAction(
                 name="test-nullify-policy",
-                modifier=KeyPairResourcePolicyModifier(
-                    max_pending_session_count=TriState.nullify(),
-                    max_pending_session_resource_slots=TriState.nullify(),
+                updater=Updater(
+                    spec=KeyPairResourcePolicyUpdaterSpec(
+                        max_pending_session_count=TriState.nullify(),
+                        max_pending_session_resource_slots=TriState.nullify(),
+                    ),
+                    pk_value="test-nullify-policy",
                 ),
             ),
             ModifyKeyPairResourcePolicyActionResult(
@@ -316,12 +325,15 @@ async def test_create_keypair_resource_policy_failure(
             "Modify keypair resource policy with complete resource slots replacement",
             ModifyKeyPairResourcePolicyAction(
                 name="test-resource-replacement-policy",
-                modifier=KeyPairResourcePolicyModifier(
-                    total_resource_slots=OptionalState.update(
-                        ResourceSlot.from_user_input(
-                            {"cpu": "100", "mem": "512g", "gpu": "8"}, None
-                        )
+                updater=Updater(
+                    spec=KeyPairResourcePolicyUpdaterSpec(
+                        total_resource_slots=OptionalState.update(
+                            ResourceSlot.from_user_input(
+                                {"cpu": "100", "mem": "512g", "gpu": "8"}, None
+                            )
+                        ),
                     ),
+                    pk_value="test-resource-replacement-policy",
                 ),
             ),
             ModifyKeyPairResourcePolicyActionResult(
@@ -364,8 +376,11 @@ async def test_modify_keypair_resource_policy(
             "Modify non-existent keypair resource policy should raise KeypairResourcePolicyNotFound",
             ModifyKeyPairResourcePolicyAction(
                 name="non-existent-policy",
-                modifier=KeyPairResourcePolicyModifier(
-                    max_concurrent_sessions=OptionalState.update(5),
+                updater=Updater(
+                    spec=KeyPairResourcePolicyUpdaterSpec(
+                        max_concurrent_sessions=OptionalState.update(5),
+                    ),
+                    pk_value="non-existent-policy",
                 ),
             ),
             KeypairResourcePolicyNotFound,

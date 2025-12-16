@@ -12,8 +12,6 @@ import sqlalchemy as sa
 
 from ai.backend.common.types import BinarySize
 from ai.backend.manager.data.notification import (
-    NotificationChannelModifier,
-    NotificationRuleModifier,
     NotificationRuleType,
 )
 from ai.backend.manager.errors.notification import (
@@ -37,6 +35,7 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.notification import NotificationRepository
 from ai.backend.manager.repositories.notification.creators import (
     NotificationChannelCreatorSpec,
@@ -45,6 +44,10 @@ from ai.backend.manager.repositories.notification.creators import (
 from ai.backend.manager.repositories.notification.options import (
     NotificationChannelConditions,
     NotificationChannelOrders,
+)
+from ai.backend.manager.repositories.notification.updaters import (
+    NotificationChannelUpdaterSpec,
+    NotificationRuleUpdaterSpec,
 )
 
 
@@ -408,16 +411,14 @@ class TestNotificationRepository:
             method="GET",
         )
 
-        modifier = NotificationChannelModifier(
+        updater_spec = NotificationChannelUpdaterSpec(
             name=OptionalState.update("Updated Name"),
             config=OptionalState.update(new_config),
             enabled=OptionalState.update(False),
         )
+        updater = Updater(spec=updater_spec, pk_value=sample_channel_id)
 
-        updated_channel = await notification_repository.update_channel(
-            channel_id=sample_channel_id,
-            modifier=modifier,
-        )
+        updated_channel = await notification_repository.update_channel(updater=updater)
 
         assert updated_channel is not None
         assert updated_channel.name == "Updated Name"
@@ -611,16 +612,14 @@ class TestNotificationRepository:
         """Test updating notification rule"""
         from ai.backend.manager.types import OptionalState
 
-        modifier = NotificationRuleModifier(
+        updater_spec = NotificationRuleUpdaterSpec(
             name=OptionalState.update("Updated Rule"),
             message_template=OptionalState.update("Updated template: {{ session_id }}"),
             enabled=OptionalState.update(False),
         )
+        updater = Updater(spec=updater_spec, pk_value=sample_rule_id)
 
-        updated_rule = await notification_repository.update_rule(
-            rule_id=sample_rule_id,
-            modifier=modifier,
-        )
+        updated_rule = await notification_repository.update_rule(updater=updater)
 
         assert updated_rule is not None
         assert updated_rule.name == "Updated Rule"

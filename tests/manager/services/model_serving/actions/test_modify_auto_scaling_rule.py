@@ -10,9 +10,12 @@ from ai.backend.common.types import (
     AutoScalingMetricSource,
     RuleId,
 )
-from ai.backend.manager.data.model_serving.modifier import EndpointAutoScalingRuleModifier
 from ai.backend.manager.data.model_serving.types import RequesterCtx
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.model_serving.updaters import (
+    EndpointAutoScalingRuleUpdaterSpec,
+)
 from ai.backend.manager.services.model_serving.actions.modify_auto_scaling_rule import (
     ModifyEndpointAutoScalingRuleAction,
     ModifyEndpointAutoScalingRuleActionResult,
@@ -83,8 +86,11 @@ class TestModifyAutoScalingRule:
                         domain_name="default",
                     ),
                     id=RuleId(uuid.UUID("88888888-8888-8888-8888-888888888888")),
-                    modifier=EndpointAutoScalingRuleModifier(
-                        threshold=OptionalState.update(Decimal("85.0")),
+                    updater=Updater(
+                        spec=EndpointAutoScalingRuleUpdaterSpec(
+                            threshold=OptionalState.update(Decimal("85.0")),
+                        ),
+                        pk_value=uuid.UUID("88888888-8888-8888-8888-888888888888"),
                     ),
                 ),
                 ModifyEndpointAutoScalingRuleActionResult(
@@ -102,9 +108,12 @@ class TestModifyAutoScalingRule:
                         domain_name="default",
                     ),
                     id=RuleId(uuid.UUID("99999999-9999-9999-9999-999999999999")),
-                    modifier=EndpointAutoScalingRuleModifier(
-                        min_replicas=TriState.update(5),
-                        max_replicas=TriState.update(25),
+                    updater=Updater(
+                        spec=EndpointAutoScalingRuleUpdaterSpec(
+                            min_replicas=TriState.update(5),
+                            max_replicas=TriState.update(25),
+                        ),
+                        pk_value=uuid.UUID("99999999-9999-9999-9999-999999999999"),
                     ),
                 ),
                 ModifyEndpointAutoScalingRuleActionResult(
@@ -122,7 +131,10 @@ class TestModifyAutoScalingRule:
                         domain_name="default",
                     ),
                     id=RuleId(uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
-                    modifier=EndpointAutoScalingRuleModifier(),
+                    updater=Updater(
+                        spec=EndpointAutoScalingRuleUpdaterSpec(),
+                        pk_value=uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                    ),
                 ),
                 ModifyEndpointAutoScalingRuleActionResult(
                     success=True,
@@ -139,8 +151,11 @@ class TestModifyAutoScalingRule:
                         domain_name="default",
                     ),
                     id=RuleId(uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")),
-                    modifier=EndpointAutoScalingRuleModifier(
-                        threshold=OptionalState.update(Decimal("90.0")),
+                    updater=Updater(
+                        spec=EndpointAutoScalingRuleUpdaterSpec(
+                            threshold=OptionalState.update(Decimal("90.0")),
+                        ),
+                        pk_value=uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
                     ),
                 ),
                 EndpointAutoScalingRuleNotFound,
@@ -155,12 +170,15 @@ class TestModifyAutoScalingRule:
                         domain_name="default",
                     ),
                     id=RuleId(uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")),
-                    modifier=EndpointAutoScalingRuleModifier(
-                        threshold=OptionalState.update(Decimal("75.0")),
-                        min_replicas=TriState.update(3),
-                        max_replicas=TriState.update(30),
-                        step_size=OptionalState.update(3),
-                        cooldown_seconds=OptionalState.update(180),
+                    updater=Updater(
+                        spec=EndpointAutoScalingRuleUpdaterSpec(
+                            threshold=OptionalState.update(Decimal("75.0")),
+                            min_replicas=TriState.update(3),
+                            max_replicas=TriState.update(30),
+                            step_size=OptionalState.update(3),
+                            cooldown_seconds=OptionalState.update(180),
+                        ),
+                        pk_value=uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc"),
                     ),
                 ),
                 ModifyEndpointAutoScalingRuleActionResult(

@@ -347,7 +347,7 @@ class TestKeypairResourcePolicyRepository:
     ) -> None:
         """Test updating an existing keypair resource policy with various updaters"""
         updater = Updater(spec=update_spec, pk_value=sample_policy_name)
-        result = await repository.update_keypair_resource_policy(sample_policy_name, updater)
+        result = await repository.update_keypair_resource_policy(updater)
 
         assert result.name == sample_policy_name
 
@@ -371,7 +371,7 @@ class TestKeypairResourcePolicyRepository:
         )
 
         with pytest.raises(KeypairResourcePolicyNotFound):
-            await repository.update_keypair_resource_policy("nonexistent-policy", updater)
+            await repository.update_keypair_resource_policy(updater)
 
     @pytest.mark.asyncio
     async def test_remove_keypair_resource_policy(
@@ -422,5 +422,5 @@ class TestKeypairResourcePolicyRepository:
     ) -> None:
         """Test updating allowed_vfolder_hosts configuration"""
         updater = Updater(spec=allowed_vfolder_updater_spec, pk_value=sample_policy_name)
-        result = await repository.update_keypair_resource_policy(sample_policy_name, updater)
+        result = await repository.update_keypair_resource_policy(updater)
         assert result.allowed_vfolder_hosts == sample_allowed_vfolder_hosts

@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
-from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
+if TYPE_CHECKING:
+    from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
+
 
 @dataclass
-class KeyPairResourcePolicyUpdaterSpec(UpdaterSpec[KeyPairResourcePolicyRow]):
+class KeyPairResourcePolicyUpdaterSpec(UpdaterSpec["KeyPairResourcePolicyRow"]):
     """UpdaterSpec for keypair resource policy updates."""
 
     allowed_vfolder_hosts: OptionalState[dict[str, Any]] = field(default_factory=OptionalState.nop)
@@ -36,6 +38,8 @@ class KeyPairResourcePolicyUpdaterSpec(UpdaterSpec[KeyPairResourcePolicyRow]):
     @property
     @override
     def row_class(self) -> type[KeyPairResourcePolicyRow]:
+        from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
+
         return KeyPairResourcePolicyRow
 
     @override

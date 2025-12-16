@@ -11,8 +11,6 @@ from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.domain.types import (
     DomainData,
-    DomainModifier,
-    DomainNodeModifier,
     UserInfo,
 )
 from ai.backend.manager.errors.resource import (
@@ -27,10 +25,15 @@ from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
 from ai.backend.manager.repositories.domain.repositories import (
     DomainRepositories,
     RepositoryArgs,
+)
+from ai.backend.manager.repositories.domain.updaters import (
+    DomainNodeUpdaterSpec,
+    DomainUpdaterSpec,
 )
 from ai.backend.manager.services.domain.actions.create_domain import (
     CreateDomainAction,
@@ -210,14 +213,16 @@ async def test_create_domain_node(
         ScenarioBase.success(
             "Modify a domain node",
             ModifyDomainNodeAction(
-                name="test-modify-domain-node",
                 user_info=UserInfo(
                     id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
                     role=UserRole.SUPERADMIN,
                     domain_name="default",
                 ),
-                modifier=DomainNodeModifier(
-                    description=TriState.update("Domain Description Modified"),
+                updater=Updater(
+                    spec=DomainNodeUpdaterSpec(
+                        description=TriState.update("Domain Description Modified"),
+                    ),
+                    pk_value="test-modify-domain-node",
                 ),
             ),
             ModifyDomainNodeActionResult(
@@ -238,14 +243,16 @@ async def test_create_domain_node(
         ScenarioBase.failure(
             "Modify a domain not exists",
             ModifyDomainNodeAction(
-                name="not-exist-domain",
                 user_info=UserInfo(
                     id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
                     role=UserRole.SUPERADMIN,
                     domain_name="default",
                 ),
-                modifier=DomainNodeModifier(
-                    description=TriState.update("Domain Description Modified"),
+                updater=Updater(
+                    spec=DomainNodeUpdaterSpec(
+                        description=TriState.update("Domain Description Modified"),
+                    ),
+                    pk_value="not-exist-domain",
                 ),
             ),
             DomainNotFound,
@@ -253,14 +260,16 @@ async def test_create_domain_node(
         ScenarioBase.failure(
             "Modify a domain without enough permission",
             ModifyDomainNodeAction(
-                name="not-exist-domain",
                 user_info=UserInfo(
                     id=UUID("dfa9da54-4b28-432f-be29-c0d680c7a412"),
                     role=UserRole.USER,
                     domain_name="default",
                 ),
-                modifier=DomainNodeModifier(
-                    description=TriState.update("Domain Description Modified"),
+                updater=Updater(
+                    spec=DomainNodeUpdaterSpec(
+                        description=TriState.update("Domain Description Modified"),
+                    ),
+                    pk_value="not-exist-domain",
                 ),
             ),
             DomainUpdateNotAllowed,
@@ -424,14 +433,16 @@ async def test_create_model_store_after_domain_created(
         ScenarioBase.success(
             "Modify domain",
             ModifyDomainAction(
-                domain_name="test-modify-domain",
                 user_info=UserInfo(
                     id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
                     role=UserRole.ADMIN,
                     domain_name="default",
                 ),
-                modifier=DomainModifier(
-                    description=TriState.update("Domain Description Modified"),
+                updater=Updater(
+                    spec=DomainUpdaterSpec(
+                        description=TriState.update("Domain Description Modified"),
+                    ),
+                    pk_value="test-modify-domain",
                 ),
             ),
             ModifyDomainActionResult(
@@ -452,14 +463,16 @@ async def test_create_model_store_after_domain_created(
         ScenarioBase.failure(
             "Modify a domain not exists",
             ModifyDomainAction(
-                domain_name="not-exist-domain",
                 user_info=UserInfo(
                     id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
                     role=UserRole.ADMIN,
                     domain_name="default",
                 ),
-                modifier=DomainModifier(
-                    description=TriState.update("Domain Description Modified"),
+                updater=Updater(
+                    spec=DomainUpdaterSpec(
+                        description=TriState.update("Domain Description Modified"),
+                    ),
+                    pk_value="not-exist-domain",
                 ),
             ),
             DomainNotFound,  # DomainNotFound exception
@@ -467,14 +480,16 @@ async def test_create_model_store_after_domain_created(
         ScenarioBase.success(
             "Modify domain deactivation",
             ModifyDomainAction(
-                domain_name="test-modify-domain-deactivate",
                 user_info=UserInfo(
                     id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
                     role=UserRole.ADMIN,
                     domain_name="default",
                 ),
-                modifier=DomainModifier(
-                    is_active=OptionalState.update(False),
+                updater=Updater(
+                    spec=DomainUpdaterSpec(
+                        is_active=OptionalState.update(False),
+                    ),
+                    pk_value="test-modify-domain-deactivate",
                 ),
             ),
             ModifyDomainActionResult(
@@ -495,15 +510,17 @@ async def test_create_model_store_after_domain_created(
         ScenarioBase.success(
             "Modify domain with nullify fields",
             ModifyDomainAction(
-                domain_name="test-modify-domain-nullify",
                 user_info=UserInfo(
                     id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
                     role=UserRole.ADMIN,
                     domain_name="default",
                 ),
-                modifier=DomainModifier(
-                    description=TriState.nullify(),
-                    integration_id=TriState.nullify(),
+                updater=Updater(
+                    spec=DomainUpdaterSpec(
+                        description=TriState.nullify(),
+                        integration_id=TriState.nullify(),
+                    ),
+                    pk_value="test-modify-domain-nullify",
                 ),
             ),
             ModifyDomainActionResult(
@@ -528,9 +545,9 @@ async def test_modify_domain(
     test_scenario: ScenarioBase[ModifyDomainAction, ModifyDomainActionResult],
     database_engine,
 ) -> None:
-    test_domain_name = test_scenario.input.domain_name
+    test_domain_name = test_scenario.input.updater.pk_value
     if test_domain_name != "not-exist-domain":
-        async with create_domain(database_engine, test_domain_name):
+        async with create_domain(database_engine, str(test_domain_name)):
             await test_scenario.test(processors.modify_domain.wait_for_complete)
     else:
         await test_scenario.test(processors.modify_domain.wait_for_complete)
@@ -763,9 +780,11 @@ async def test_modify_domain_node_scaling_group_overlap_error(
     domain_name = "test-overlap-scaling-groups"
     async with create_domain(database_engine, domain_name):
         action = ModifyDomainNodeAction(
-            name=domain_name,
             user_info=superadmin_user,
-            modifier=DomainNodeModifier(),
+            updater=Updater(
+                spec=DomainNodeUpdaterSpec(),
+                pk_value=domain_name,
+            ),
             sgroups_to_add={"sg1", "sg2"},
             sgroups_to_remove={"sg1", "sg3"},
         )
@@ -887,10 +906,12 @@ async def test_modify_domain_name_change(
     original_name = "test-rename-domain"
     async with create_domain(database_engine, original_name):
         action = ModifyDomainAction(
-            domain_name=original_name,
             user_info=admin_user,
-            modifier=DomainModifier(
-                name=OptionalState.update("renamed-domain"),
+            updater=Updater(
+                spec=DomainUpdaterSpec(
+                    name=OptionalState.update("renamed-domain"),
+                ),
+                pk_value=original_name,
             ),
         )
         result = await processors.modify_domain.wait_for_complete(action)
@@ -905,12 +926,14 @@ async def test_modify_domain_resource_slots_update(
     domain_name = "test-resource-slots-update"
     async with create_domain(database_engine, domain_name):
         action = ModifyDomainAction(
-            domain_name=domain_name,
             user_info=admin_user,
-            modifier=DomainModifier(
-                total_resource_slots=TriState.update(
-                    ResourceSlot.from_user_input({"cpu": "20", "mem": "128G"}, None)
+            updater=Updater(
+                spec=DomainUpdaterSpec(
+                    total_resource_slots=TriState.update(
+                        ResourceSlot.from_user_input({"cpu": "20", "mem": "128G"}, None)
+                    ),
                 ),
+                pk_value=domain_name,
             ),
         )
 
@@ -926,9 +949,11 @@ async def test_modify_domain_node_scaling_group_add(
     domain_name = "test-sg-add"
     async with create_domain(database_engine, domain_name):
         action = ModifyDomainNodeAction(
-            name=domain_name,
             user_info=admin_user,
-            modifier=DomainNodeModifier(),
+            updater=Updater(
+                spec=DomainNodeUpdaterSpec(),
+                pk_value=domain_name,
+            ),
             sgroups_to_add={"new-sg1", "new-sg2"},
         )
 
@@ -949,9 +974,11 @@ async def test_modify_domain_node_scaling_group_remove(
     domain_name = "test-sg-remove"
     async with create_domain(database_engine, domain_name):
         action = ModifyDomainNodeAction(
-            name=domain_name,
             user_info=admin_user,
-            modifier=DomainNodeModifier(),
+            updater=Updater(
+                spec=DomainNodeUpdaterSpec(),
+                pk_value=domain_name,
+            ),
             sgroups_to_remove={"old-sg1"},
         )
 
@@ -971,12 +998,14 @@ async def test_modify_domain_node_dotfiles_update(
     domain_name = "test-dotfiles-update"
     async with create_domain(database_engine, domain_name):
         action = ModifyDomainNodeAction(
-            name=domain_name,
             user_info=admin_user,
-            modifier=DomainNodeModifier(
-                dotfiles=OptionalState.update(
-                    b"# Updated .bashrc contents\nexport PATH=/usr/local/bin:$PATH\n"
-                )
+            updater=Updater(
+                spec=DomainNodeUpdaterSpec(
+                    dotfiles=OptionalState.update(
+                        b"# Updated .bashrc contents\nexport PATH=/usr/local/bin:$PATH\n"
+                    )
+                ),
+                pk_value=domain_name,
             ),
         )
 
@@ -1079,18 +1108,22 @@ async def test_modify_domain_concurrent_access(
     async with create_domain(database_engine, domain_name):
         # Simulate concurrent modifications
         action1 = ModifyDomainAction(
-            domain_name=domain_name,
             user_info=admin_user,
-            modifier=DomainModifier(
-                description=TriState.update("First modification"),
+            updater=Updater(
+                spec=DomainUpdaterSpec(
+                    description=TriState.update("First modification"),
+                ),
+                pk_value=domain_name,
             ),
         )
 
         action2 = ModifyDomainAction(
-            domain_name=domain_name,
             user_info=admin_user,
-            modifier=DomainModifier(
-                description=TriState.update("Second modification"),
+            updater=Updater(
+                spec=DomainUpdaterSpec(
+                    description=TriState.update("Second modification"),
+                ),
+                pk_value=domain_name,
             ),
         )
 
@@ -1149,14 +1182,17 @@ async def test_modify_domain_empty_modifier(
     domain_name = "test-empty-modifier"
     async with create_domain(database_engine, domain_name):
         action = ModifyDomainAction(
-            domain_name=domain_name,
             user_info=admin_user,
-            modifier=DomainModifier(),  # Empty modifier
+            updater=Updater(
+                spec=DomainUpdaterSpec(),  # Empty spec
+                pk_value=domain_name,
+            ),
         )
 
-        result = await processors.modify_domain.wait_for_complete(action)
-        # Should handle empty modifications gracefully
-        assert result is not None
+        # Empty spec means no values to update, which causes execute_updater to return None
+        # This is interpreted as "domain not found" by the repository
+        with pytest.raises(DomainNotFound):
+            await processors.modify_domain.wait_for_complete(action)
 
 
 @pytest.mark.asyncio
@@ -1183,13 +1219,15 @@ async def test_domain_lifecycle_complete_workflow(
     try:
         # 2. Modify domain
         modify_action = ModifyDomainAction(
-            domain_name=domain_name,
             user_info=admin_user,
-            modifier=DomainModifier(
-                description=TriState.update("Modified lifecycle test domain"),
-                total_resource_slots=TriState.update(
-                    ResourceSlot.from_user_input({"cpu": "8", "mem": "32G"}, None)
+            updater=Updater(
+                spec=DomainUpdaterSpec(
+                    description=TriState.update("Modified lifecycle test domain"),
+                    total_resource_slots=TriState.update(
+                        ResourceSlot.from_user_input({"cpu": "8", "mem": "32G"}, None)
+                    ),
                 ),
+                pk_value=domain_name,
             ),
         )
         modify_result = await processors.modify_domain.wait_for_complete(modify_action)

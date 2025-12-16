@@ -23,7 +23,9 @@ from ai.backend.manager.models.keypair import (
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
+from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
     AdminMonthStatsActionResult,
@@ -36,7 +38,6 @@ from ai.backend.manager.services.user.actions.delete_user import (
 )
 from ai.backend.manager.services.user.actions.modify_user import (
     ModifyUserAction,
-    UserModifier,
 )
 from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
@@ -311,9 +312,12 @@ class TestModifyUserIntegration:
 
         action = ModifyUserAction(
             email=user_email,
-            modifier=UserModifier(
-                full_name=OptionalState.update("Updated Name"),
-                description=OptionalState.update("Senior Developer"),
+            updater=Updater(
+                spec=UserUpdaterSpec(
+                    full_name=OptionalState.update("Updated Name"),
+                    description=OptionalState.update("Senior Developer"),
+                ),
+                pk_value=user_email,
             ),
         )
 
@@ -338,8 +342,11 @@ class TestModifyUserIntegration:
 
         action = ModifyUserAction(
             email=user_email,
-            modifier=UserModifier(
-                role=OptionalState.update(UserRole.ADMIN),
+            updater=Updater(
+                spec=UserUpdaterSpec(
+                    role=OptionalState.update(UserRole.ADMIN),
+                ),
+                pk_value=user_email,
             ),
         )
 
@@ -404,9 +411,12 @@ class TestModifyUserIntegration:
         # Modify user to change domain and set groups
         action = ModifyUserAction(
             email=user_email,
-            modifier=UserModifier(
-                domain_name=OptionalState.update("test-domain"),
-                group_ids=OptionalState.update([str(new_team_id), str(research_team_id)]),
+            updater=Updater(
+                spec=UserUpdaterSpec(
+                    domain_name=OptionalState.update("test-domain"),
+                    group_ids=OptionalState.update([str(new_team_id), str(research_team_id)]),
+                ),
+                pk_value=user_email,
             ),
         )
 

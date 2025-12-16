@@ -20,24 +20,6 @@ from ai.backend.manager.data.resource.types import (
 )
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.keypair_resource_policy.creators import (
-    KeyPairResourcePolicyCreatorSpec,
-)
-from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
-    KeyPairResourcePolicyUpdaterSpec,
-)
-from ai.backend.manager.repositories.project_resource_policy.creators import (
-    ProjectResourcePolicyCreatorSpec,
-)
-from ai.backend.manager.repositories.project_resource_policy.updaters import (
-    ProjectResourcePolicyUpdaterSpec,
-)
-from ai.backend.manager.repositories.user_resource_policy.creators import (
-    UserResourcePolicyCreatorSpec,
-)
-from ai.backend.manager.repositories.user_resource_policy.updaters import (
-    UserResourcePolicyUpdaterSpec,
-)
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import (
@@ -53,7 +35,75 @@ from .keypair import keypairs
 from .user import UserRole
 
 if TYPE_CHECKING:
+    from ai.backend.manager.repositories.keypair_resource_policy.creators import (
+        KeyPairResourcePolicyCreatorSpec,
+    )
+    from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
+        KeyPairResourcePolicyUpdaterSpec,
+    )
+    from ai.backend.manager.repositories.project_resource_policy.creators import (
+        ProjectResourcePolicyCreatorSpec,
+    )
+    from ai.backend.manager.repositories.project_resource_policy.updaters import (
+        ProjectResourcePolicyUpdaterSpec,
+    )
+    from ai.backend.manager.repositories.user_resource_policy.creators import (
+        UserResourcePolicyCreatorSpec,
+    )
+    from ai.backend.manager.repositories.user_resource_policy.updaters import (
+        UserResourcePolicyUpdaterSpec,
+    )
+
     from .gql import GraphQueryContext
+
+
+def _get_keypair_resource_policy_creator_spec() -> type[KeyPairResourcePolicyCreatorSpec]:
+    from ai.backend.manager.repositories.keypair_resource_policy.creators import (
+        KeyPairResourcePolicyCreatorSpec,
+    )
+
+    return KeyPairResourcePolicyCreatorSpec
+
+
+def _get_keypair_resource_policy_updater_spec() -> type[KeyPairResourcePolicyUpdaterSpec]:
+    from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
+        KeyPairResourcePolicyUpdaterSpec,
+    )
+
+    return KeyPairResourcePolicyUpdaterSpec
+
+
+def _get_project_resource_policy_creator_spec() -> type[ProjectResourcePolicyCreatorSpec]:
+    from ai.backend.manager.repositories.project_resource_policy.creators import (
+        ProjectResourcePolicyCreatorSpec,
+    )
+
+    return ProjectResourcePolicyCreatorSpec
+
+
+def _get_project_resource_policy_updater_spec() -> type[ProjectResourcePolicyUpdaterSpec]:
+    from ai.backend.manager.repositories.project_resource_policy.updaters import (
+        ProjectResourcePolicyUpdaterSpec,
+    )
+
+    return ProjectResourcePolicyUpdaterSpec
+
+
+def _get_user_resource_policy_creator_spec() -> type[UserResourcePolicyCreatorSpec]:
+    from ai.backend.manager.repositories.user_resource_policy.creators import (
+        UserResourcePolicyCreatorSpec,
+    )
+
+    return UserResourcePolicyCreatorSpec
+
+
+def _get_user_resource_policy_updater_spec() -> type[UserResourcePolicyUpdaterSpec]:
+    from ai.backend.manager.repositories.user_resource_policy.updaters import (
+        UserResourcePolicyUpdaterSpec,
+    )
+
+    return UserResourcePolicyUpdaterSpec
+
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models"))
 
@@ -417,8 +467,9 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):
         def value_or_none(value):
             return value if value is not Undefined else None
 
+        CreatorSpec = _get_keypair_resource_policy_creator_spec()
         return Creator(
-            spec=KeyPairResourcePolicyCreatorSpec(
+            spec=CreatorSpec(
                 name=name,
                 default_for_unspecified=default_for_unspecified,
                 total_resource_slots=total_resource_slots,
@@ -467,8 +518,9 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
             else Undefined
         )
 
+        UpdaterSpec = _get_keypair_resource_policy_updater_spec()
         return Updater(
-            spec=KeyPairResourcePolicyUpdaterSpec(
+            spec=UpdaterSpec(
                 default_for_unspecified=OptionalState[DefaultForUnspecified].from_graphql(
                     default_for_unspecified
                 ),
@@ -706,8 +758,9 @@ class CreateUserResourcePolicyInput(graphene.InputObjectType):
         def value_or_none(value):
             return value if value is not Undefined else None
 
+        CreatorSpec = _get_user_resource_policy_creator_spec()
         return Creator(
-            spec=UserResourcePolicyCreatorSpec(
+            spec=CreatorSpec(
                 name=name,
                 max_vfolder_count=value_or_none(self.max_vfolder_count),
                 max_quota_scope_size=value_or_none(self.max_quota_scope_size),
@@ -734,8 +787,9 @@ class ModifyUserResourcePolicyInput(graphene.InputObjectType):
     )
 
     def to_updater(self, name: str) -> Updater[UserResourcePolicyRow]:
+        UpdaterSpec = _get_user_resource_policy_updater_spec()
         return Updater(
-            spec=UserResourcePolicyUpdaterSpec(
+            spec=UpdaterSpec(
                 max_vfolder_count=OptionalState[int].from_graphql(self.max_vfolder_count),
                 max_quota_scope_size=OptionalState[int].from_graphql(self.max_quota_scope_size),
                 max_session_count_per_model_session=OptionalState[int].from_graphql(
@@ -960,8 +1014,9 @@ class CreateProjectResourcePolicyInput(graphene.InputObjectType):
         def value_or_none(value):
             return value if value is not Undefined else None
 
+        CreatorSpec = _get_project_resource_policy_creator_spec()
         return Creator(
-            spec=ProjectResourcePolicyCreatorSpec(
+            spec=CreatorSpec(
                 name=name,
                 max_vfolder_count=value_or_none(self.max_vfolder_count),
                 max_quota_scope_size=value_or_none(self.max_quota_scope_size),
@@ -983,8 +1038,9 @@ class ModifyProjectResourcePolicyInput(graphene.InputObjectType):
     )
 
     def to_updater(self, name: str) -> Updater[ProjectResourcePolicyRow]:
+        UpdaterSpec = _get_project_resource_policy_updater_spec()
         return Updater(
-            spec=ProjectResourcePolicyUpdaterSpec(
+            spec=UpdaterSpec(
                 max_vfolder_count=OptionalState[int].from_graphql(self.max_vfolder_count),
                 max_quota_scope_size=OptionalState[int].from_graphql(self.max_quota_scope_size),
                 max_vfolder_size=OptionalState[int].from_graphql(self.max_vfolder_size),

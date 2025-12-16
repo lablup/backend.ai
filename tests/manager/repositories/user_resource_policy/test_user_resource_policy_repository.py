@@ -183,7 +183,7 @@ class TestUserResourcePolicyRepository:
     ) -> None:
         """Test updating a policy successfully with various field combinations"""
         updater = Updater(spec=updater_spec, pk_value=sample_policy.name)
-        result = await repository.update(sample_policy.name, updater)
+        result = await repository.update(updater)
 
         assert isinstance(result, UserResourcePolicyData)
         assert result.name == sample_policy.name
@@ -203,7 +203,7 @@ class TestUserResourcePolicyRepository:
             pk_value="non-existing",
         )
         with pytest.raises(UserResourcePolicyNotFound):
-            await repository.update("non-existing", updater)
+            await repository.update(updater)
 
     @pytest.mark.asyncio
     async def test_delete_policy_success(
