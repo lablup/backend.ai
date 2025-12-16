@@ -1,9 +1,9 @@
 import pytest
 
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.services.artifact_revision.actions.list import (
-    ListArtifactRevisionsAction,
-    ListArtifactRevisionsActionResult,
+from ai.backend.manager.services.artifact_revision.actions.search import (
+    SearchArtifactRevisionsAction,
+    SearchArtifactRevisionsActionResult,
 )
 from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
 
@@ -19,15 +19,15 @@ from ...utils import ScenarioBase
     "test_scenario",
     [
         ScenarioBase.success(
-            "Success Case - List all artifact revisions",
-            ListArtifactRevisionsAction(
+            "Success Case - Search all artifact revisions",
+            SearchArtifactRevisionsAction(
                 querier=BatchQuerier(
                     conditions=[],
                     orders=[],
                     pagination=OffsetPagination(limit=10, offset=0),
                 ),
             ),
-            ListArtifactRevisionsActionResult(
+            SearchArtifactRevisionsActionResult(
                 data=[ARTIFACT_REVISION_FIXTURE_DATA],
                 total_count=1,
                 has_next_page=False,
@@ -35,15 +35,15 @@ from ...utils import ScenarioBase
             ),
         ),
         ScenarioBase.success(
-            "Success Case - List with ordering",
-            ListArtifactRevisionsAction(
+            "Success Case - Search with ordering",
+            SearchArtifactRevisionsAction(
                 querier=BatchQuerier(
                     conditions=[],
                     orders=[],
                     pagination=OffsetPagination(limit=10, offset=0),
                 ),
             ),
-            ListArtifactRevisionsActionResult(
+            SearchArtifactRevisionsActionResult(
                 data=[ARTIFACT_REVISION_FIXTURE_DATA],
                 total_count=1,
                 has_next_page=False,
@@ -61,8 +61,8 @@ from ...utils import ScenarioBase
         }
     ],
 )
-async def test_list_artifact_revisions(
+async def test_search_artifact_revisions(
     processors: ArtifactRevisionProcessors,
-    test_scenario: ScenarioBase[ListArtifactRevisionsAction, ListArtifactRevisionsActionResult],
+    test_scenario: ScenarioBase[SearchArtifactRevisionsAction, SearchArtifactRevisionsActionResult],
 ):
-    await test_scenario.test(processors.list_revision.wait_for_complete)
+    await test_scenario.test(processors.search_revision.wait_for_complete)

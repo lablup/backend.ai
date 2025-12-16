@@ -1,9 +1,9 @@
 import pytest
 
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.services.artifact.actions.list import (
-    ListArtifactsAction,
-    ListArtifactsActionResult,
+from ai.backend.manager.services.artifact.actions.search import (
+    SearchArtifactsAction,
+    SearchArtifactsActionResult,
 )
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 
@@ -18,15 +18,15 @@ from ...utils import ScenarioBase
     "test_scenario",
     [
         ScenarioBase.success(
-            "Success Case - List all artifacts",
-            ListArtifactsAction(
+            "Success Case - Search all artifacts",
+            SearchArtifactsAction(
                 querier=BatchQuerier(
                     conditions=[],
                     orders=[],
                     pagination=OffsetPagination(limit=10, offset=0),
                 ),
             ),
-            ListArtifactsActionResult(
+            SearchArtifactsActionResult(
                 data=[ARTIFACT_FIXTURE_DATA],
                 total_count=1,
                 has_next_page=False,
@@ -34,15 +34,15 @@ from ...utils import ScenarioBase
             ),
         ),
         ScenarioBase.success(
-            "Success Case - List with ordering",
-            ListArtifactsAction(
+            "Success Case - Search with ordering",
+            SearchArtifactsAction(
                 querier=BatchQuerier(
                     conditions=[],
                     orders=[],
                     pagination=OffsetPagination(limit=10, offset=0),
                 ),
             ),
-            ListArtifactsActionResult(
+            SearchArtifactsActionResult(
                 data=[ARTIFACT_FIXTURE_DATA],
                 total_count=1,
                 has_next_page=False,
@@ -59,8 +59,8 @@ from ...utils import ScenarioBase
         }
     ],
 )
-async def test_list_artifacts(
+async def test_search_artifacts(
     processors: ArtifactProcessors,
-    test_scenario: ScenarioBase[ListArtifactsAction, ListArtifactsActionResult],
+    test_scenario: ScenarioBase[SearchArtifactsAction, SearchArtifactsActionResult],
 ):
-    await test_scenario.test(processors.list_artifacts.wait_for_complete)
+    await test_scenario.test(processors.search_artifacts.wait_for_complete)
