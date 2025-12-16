@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from functools import lru_cache
 from typing import AsyncGenerator, Optional
 
 import strawberry
@@ -9,11 +10,7 @@ from strawberry import ID, Info
 from strawberry.dataloader import DataLoader
 
 from ai.backend.common.data.storage.registries.types import ModelSortKey
-from ai.backend.manager.api.gql.adapter import PaginationOptions
-from ai.backend.manager.api.gql.artifact.adapter import (
-    get_artifact_pagination_spec,
-    get_artifact_revision_pagination_spec,
-)
+from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import (
     to_global_id,
 )
@@ -30,6 +27,8 @@ from ai.backend.manager.errors.artifact import (
     ArtifactImportDelegationError,
     ArtifactScanLimitExceededError,
 )
+from ai.backend.manager.models.artifact import ArtifactRow
+from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.services.artifact.actions.delegate_scan import DelegateScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.delete_multi import DeleteArtifactsAction
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
@@ -99,6 +98,30 @@ from .types import (
     UpdateArtifactInput,
     UpdateArtifactPayload,
 )
+
+
+@lru_cache(maxsize=1)
+def _get_artifact_pagination_spec() -> PaginationSpec:
+    """Get pagination spec for Artifact queries."""
+    return PaginationSpec(
+        forward_order=ArtifactRow.id.asc(),
+        backward_order=ArtifactRow.id.desc(),
+        forward_condition_factory=lambda cursor_value: lambda: ArtifactRow.id > cursor_value,
+        backward_condition_factory=lambda cursor_value: lambda: ArtifactRow.id < cursor_value,
+    )
+
+
+@lru_cache(maxsize=1)
+def _get_artifact_revision_pagination_spec() -> PaginationSpec:
+    """Get pagination spec for ArtifactRevision queries."""
+    return PaginationSpec(
+        forward_order=ArtifactRevisionRow.id.asc(),
+        backward_order=ArtifactRevisionRow.id.desc(),
+        forward_condition_factory=lambda cursor_value: lambda: ArtifactRevisionRow.id
+        > cursor_value,
+        backward_condition_factory=lambda cursor_value: lambda: ArtifactRevisionRow.id
+        < cursor_value,
+    )
 
 
 async def _build_artifact_connection(
@@ -197,7 +220,7 @@ async def artifacts(
             limit=limit,
             offset=offset,
         ),
-        get_artifact_pagination_spec(),
+        _get_artifact_pagination_spec(),
         filter=filter,
         order_by=order_by,
     )
@@ -284,7 +307,7 @@ async def artifact_revisions(
             limit=limit,
             offset=offset,
         ),
-        get_artifact_revision_pagination_spec(),
+        _get_artifact_revision_pagination_spec(),
         filter=filter,
         order_by=order_by,
     )
