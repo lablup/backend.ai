@@ -63,11 +63,11 @@ class ArtifactProcessors(AbstractProcessorPackage):
     scan: ActionProcessor[ScanArtifactsAction, ScanArtifactsActionResult]
     get: ActionProcessor[GetArtifactAction, GetArtifactActionResult]
     search_artifacts: ActionProcessor[SearchArtifactsAction, SearchArtifactsActionResult]
-    list_artifacts_with_revisions: ActionProcessor[
-        ListArtifactsWithRevisionsAction, ListArtifactsWithRevisionsActionResult
-    ]
     search_artifacts_with_revisions: ActionProcessor[
         SearchArtifactsWithRevisionsAction, SearchArtifactsWithRevisionsActionResult
+    ]
+    list_artifacts_with_revisions: ActionProcessor[
+        ListArtifactsWithRevisionsAction, ListArtifactsWithRevisionsActionResult
     ]
     get_revisions: ActionProcessor[GetArtifactRevisionsAction, GetArtifactRevisionsActionResult]
     update: ActionProcessor[UpdateArtifactAction, UpdateArtifactActionResult]
@@ -110,8 +110,8 @@ class ArtifactProcessors(AbstractProcessorPackage):
             DelegateScanArtifactsAction.spec(),
             GetArtifactAction.spec(),
             SearchArtifactsAction.spec(),
-            ListArtifactsWithRevisionsAction.spec(),
             SearchArtifactsWithRevisionsAction.spec(),
+            ListArtifactsWithRevisionsAction.spec(),
             GetArtifactRevisionsAction.spec(),
             UpdateArtifactAction.spec(),
             UpsertArtifactsAction.spec(),
