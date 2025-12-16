@@ -14,6 +14,7 @@ __all__ = (
     "RoleNotFound",
     "RoleAlreadyAssigned",
     "RoleNotAssigned",
+    "InsufficientPermission",
 )
 
 
@@ -50,4 +51,16 @@ class RoleNotAssigned(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.ROLE,
             operation=ErrorOperation.HARD_DELETE,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class InsufficientPermission(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/insufficient-permission"
+    error_title = "Insufficient permission to perform this operation."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ROLE,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.FORBIDDEN,
         )
