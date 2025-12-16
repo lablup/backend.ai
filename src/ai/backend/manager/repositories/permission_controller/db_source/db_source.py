@@ -414,11 +414,11 @@ class PermissionDBSource:
 
             items = [
                 AssignedUserData(
-                    user_id=row.uuid,
-                    username=row.username,
-                    email=row.email,
-                    granted_by=row.granted_by,
-                    granted_at=row.granted_at,
+                    user_id=row.UserRow.uuid,
+                    username=row.UserRow.username,
+                    email=row.UserRow.email,
+                    granted_by=row.UserRoleRow.granted_by,
+                    granted_at=row.UserRoleRow.granted_at,
                 )
                 for row in result.rows
             ]

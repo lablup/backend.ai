@@ -54,7 +54,6 @@ class PermissionControllerService:
         result = await self._repository.create_role(action.input)
         return CreateRoleActionResult(
             data=result,
-            success=True,
         )
 
     async def update_role(self, action: UpdateRoleAction) -> UpdateRoleActionResult:
@@ -88,7 +87,7 @@ class PermissionControllerService:
         """
         data = await self._repository.assign_role(action.input)
 
-        return AssignRoleActionResult(success=True, data=data)
+        return AssignRoleActionResult(data=data)
 
     async def revoke_role(self, action: RevokeRoleAction) -> RevokeRoleActionResult:
         """

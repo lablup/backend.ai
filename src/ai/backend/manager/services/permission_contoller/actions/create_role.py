@@ -22,8 +22,7 @@ class CreateRoleAction(RoleAction):
 
 @dataclass
 class CreateRoleActionResult(BaseActionResult):
-    data: Optional[RoleData]
-    success: bool
+    data: RoleData
 
     @override
     def entity_id(self) -> Optional[str]:
