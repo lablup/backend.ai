@@ -62,7 +62,6 @@ lang_map = {
     "cpp": "ai.backend.kernel.cpp.Runner",
     "golang": "ai.backend.kernel.golang.Runner",
     "rust": "ai.backend.kernel.rust.Runner",
-    "java": "ai.backend.kernel.java.Runner",
     "haskell": "ai.backend.kernel.haskell.Runner",
     "julia": "ai.backend.kernel.julia.Runner",
     "lua": "ai.backend.kernel.lua.Runner",
