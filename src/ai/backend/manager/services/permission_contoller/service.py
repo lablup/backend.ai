@@ -117,7 +117,6 @@ class PermissionControllerService:
     ) -> SearchUsersAssignedToRoleActionResult:
         """Search users assigned to a specific role with pagination and filtering."""
         result = await self._repository.search_users_assigned_to_role(
-            role_id=action.role_id,
             querier=action.querier,
         )
         return SearchUsersAssignedToRoleActionResult(

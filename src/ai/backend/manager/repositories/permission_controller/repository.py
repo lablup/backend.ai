@@ -148,11 +148,9 @@ class PermissionControllerRepository:
     @permission_controller_repository_resilience.apply()
     async def search_users_assigned_to_role(
         self,
-        role_id: uuid.UUID,
         querier: BatchQuerier,
     ) -> AssignedUserListResult:
         """Searches users assigned to a specific role with pagination and filtering."""
         return await self._db_source.search_users_assigned_to_role(
-            role_id=role_id,
             querier=querier,
         )

@@ -384,12 +384,11 @@ class PermissionDBSource:
 
     async def search_users_assigned_to_role(
         self,
-        role_id: uuid.UUID,
         querier: BatchQuerier,
     ) -> AssignedUserListResult:
         """Searches users assigned to a specific role with pagination and filtering."""
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(UserRoleRow).where(UserRoleRow.role_id == role_id)
+            query = sa.select(UserRoleRow)
             result = await execute_batch_querier(
                 db_sess,
                 query,
