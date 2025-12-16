@@ -16,7 +16,6 @@ from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.domain.types import (
     DomainData,
-    DomainModifier,
     UserInfo,
 )
 from ai.backend.manager.errors.resource import (
@@ -28,8 +27,10 @@ from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.user import UserRole, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
 from ai.backend.manager.repositories.domain.repository import DomainRepository
+from ai.backend.manager.repositories.domain.updaters import DomainUpdaterSpec
 from ai.backend.manager.types import TriState
 
 
@@ -250,16 +251,17 @@ class TestDomainRepository:
         await domain_repository.create_domain_validated(domain_creator)
 
         try:
-            # Create modifier
-            modifier = DomainModifier(
+            # Create updater
+            updater_spec = DomainUpdaterSpec(
                 description=TriState.update("Updated description"),
                 total_resource_slots=TriState.update(
                     ResourceSlot.from_user_input({"cpu": "20", "mem": "40g"}, None)
                 ),
             )
+            updater = Updater(spec=updater_spec, pk_value=domain_name)
 
             # Modify domain
-            modified_domain = await domain_repository.modify_domain_validated(domain_name, modifier)
+            modified_domain = await domain_repository.modify_domain_validated(updater)
 
             assert modified_domain is not None
             assert modified_domain.name == domain_name
@@ -287,12 +289,13 @@ class TestDomainRepository:
         domain_repository: DomainRepository,
     ) -> None:
         """Test domain modification when domain not found"""
-        modifier = DomainModifier(
+        updater_spec = DomainUpdaterSpec(
             description=TriState.update("Updated description"),
         )
+        updater = Updater(spec=updater_spec, pk_value="nonexistent-domain")
 
         with pytest.raises(DomainNotFound):
-            await domain_repository.modify_domain_validated("nonexistent-domain", modifier)
+            await domain_repository.modify_domain_validated(updater)
 
     @pytest.mark.asyncio
     async def test_soft_delete_domain_validated_success(

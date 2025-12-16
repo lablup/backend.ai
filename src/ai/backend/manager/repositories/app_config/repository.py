@@ -7,12 +7,10 @@ from typing import Any, Optional
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.manager.clients.valkey_client.valkey_cache import ValkeyCache
-from ai.backend.manager.data.app_config.types import (
-    AppConfigData,
-    AppConfigModifier,
-)
+from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.models.app_config import AppConfigRow, AppConfigScopeType
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
 from ai.backend.manager.repositories.base.creator import Creator
 
 from .cache_source import AppConfigCacheSource
@@ -87,14 +85,14 @@ class AppConfigRepository:
         self,
         scope_type: AppConfigScopeType,
         scope_id: str,
-        modifier: AppConfigModifier,
+        spec: AppConfigUpdaterSpec,
     ) -> AppConfigData:
         """
         Create or update app configuration.
 
         Invalidates cache after update.
         """
-        result = await self._db_source.upsert_config(scope_type, scope_id, modifier)
+        result = await self._db_source.upsert_config(scope_type, scope_id, spec)
         await self._cache_source.invalidate_config(scope_type, scope_id)
 
         return result

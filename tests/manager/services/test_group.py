@@ -10,16 +10,18 @@ import sqlalchemy as sa
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import RedisConnectionInfo, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.data.group.types import GroupData, GroupModifier
+from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.group.admin_repository import AdminGroupRepository
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
 from ai.backend.manager.services.group.actions.create_group import (
     CreateGroupAction,
     CreateGroupActionResult,
@@ -209,11 +211,13 @@ async def test_modify_group(
         database_engine=database_engine, domain_name="default", name="test_modfiy_group"
     ) as group_id:
         action = ModifyGroupAction(
-            group_id=group_id,
-            modifier=GroupModifier(
-                name=OptionalState.update("modified_name"),
-                description=TriState.update("modified description"),
-                is_active=OptionalState.update(False),
+            updater=Updater(
+                spec=GroupUpdaterSpec(
+                    name=OptionalState.update("modified_name"),
+                    description=TriState.update("modified description"),
+                    is_active=OptionalState.update(False),
+                ),
+                pk_value=group_id,
             ),
         )
         result: ModifyGroupActionResult = await processors.modify_group.wait_for_complete(action)
@@ -229,11 +233,13 @@ async def test_modify_group_with_invalid_group_id(
     processors: GroupProcessors,
 ) -> None:
     action = ModifyGroupAction(
-        group_id=uuid.UUID("00000000-0000-0000-0000-000000000000"),
-        modifier=GroupModifier(
-            name=OptionalState.update("modified_name"),
-            description=TriState.update("modified description"),
-            is_active=OptionalState.update(False),
+        updater=Updater(
+            spec=GroupUpdaterSpec(
+                name=OptionalState.update("modified_name"),
+                description=TriState.update("modified description"),
+                is_active=OptionalState.update(False),
+            ),
+            pk_value=uuid.UUID("00000000-0000-0000-0000-000000000000"),
         ),
     )
     with pytest.raises(ProjectNotFound):

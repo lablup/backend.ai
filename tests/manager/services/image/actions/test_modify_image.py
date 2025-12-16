@@ -6,8 +6,8 @@ from ai.backend.common.types import SlotName
 from ai.backend.manager.data.image.types import ImageLabelsData, ImageResourcesData
 from ai.backend.manager.errors.image import ImageNotFound, ModifyImageActionValueError
 from ai.backend.manager.models.image import ImageType
+from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
 from ai.backend.manager.services.image.actions.modify_image import (
-    ImageModifier,
     ModifyImageAction,
     ModifyImageActionResult,
 )
@@ -32,7 +32,7 @@ from ...utils import ScenarioBase
             ModifyImageAction(
                 target=IMAGE_ROW_FIXTURE.name,
                 architecture=IMAGE_ROW_FIXTURE.architecture,
-                modifier=ImageModifier(
+                updater_spec=ImageUpdaterSpec(
                     registry=OptionalState.update("cr.backend.ai2"),
                 ),
             ),
@@ -43,7 +43,7 @@ from ...utils import ScenarioBase
             ModifyImageAction(
                 target=IMAGE_ROW_FIXTURE.name,
                 architecture=IMAGE_ROW_FIXTURE.architecture,
-                modifier=ImageModifier(
+                updater_spec=ImageUpdaterSpec(
                     accelerators=TriState.nullify(),
                 ),
             ),
@@ -54,8 +54,8 @@ from ...utils import ScenarioBase
             ModifyImageAction(
                 target=IMAGE_ROW_FIXTURE.name,
                 architecture=IMAGE_ROW_FIXTURE.architecture,
-                modifier=ImageModifier(
-                    type=OptionalState.update(ImageType.SERVICE),
+                updater_spec=ImageUpdaterSpec(
+                    image_type=OptionalState.update(ImageType.SERVICE),
                     registry=OptionalState.update("cr.backend.ai2"),
                     accelerators=TriState.update(value="cuda,rocm"),
                     is_local=OptionalState.update(True),
@@ -87,7 +87,7 @@ from ...utils import ScenarioBase
                             SlotName("cuda.device"): {"max": None, "min": "1"},
                         }
                     ),
-                    config_digest="sha256:1234567890abcdef",
+                    config_digest="sha256:1234567890abcdef".ljust(72, " "),
                 )
             ),
         ),
@@ -96,7 +96,7 @@ from ...utils import ScenarioBase
             ModifyImageAction(
                 target=IMAGE_ALIAS_ROW_FIXTURE.alias,
                 architecture=IMAGE_ROW_FIXTURE.architecture,
-                modifier=ImageModifier(
+                updater_spec=ImageUpdaterSpec(
                     registry=OptionalState.update("cr.backend.ai2"),
                 ),
             ),
@@ -107,7 +107,7 @@ from ...utils import ScenarioBase
             ModifyImageAction(
                 target="wrong-image",
                 architecture=IMAGE_ROW_FIXTURE.architecture,
-                modifier=ImageModifier(
+                updater_spec=ImageUpdaterSpec(
                     registry=OptionalState.update("cr.backend.ai2"),
                 ),
             ),
@@ -118,7 +118,7 @@ from ...utils import ScenarioBase
             ModifyImageAction(
                 target=IMAGE_ROW_FIXTURE.name,
                 architecture=IMAGE_ROW_FIXTURE.architecture,
-                modifier=ImageModifier(
+                updater_spec=ImageUpdaterSpec(
                     config_digest=OptionalState.update(
                         "a" * 73
                     ),  # config_digest column is sa.CHAR(length=72)

@@ -16,14 +16,15 @@ from ai.backend.common.types import (
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair_resource_policy.creators import (
     KeyPairResourcePolicyCreatorSpec,
 )
 from ai.backend.manager.repositories.keypair_resource_policy.repository import (
     KeypairResourcePolicyRepository,
 )
-from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
-    KeyPairResourcePolicyModifier,
+from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
+    KeyPairResourcePolicyUpdaterSpec,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -290,10 +291,10 @@ class TestKeypairResourcePolicyRepository:
         )
 
     @pytest.mark.parametrize(
-        "update_modifier,expected_values",
+        "update_spec,expected_values",
         [
             pytest.param(
-                KeyPairResourcePolicyModifier(
+                KeyPairResourcePolicyUpdaterSpec(
                     default_for_unspecified=OptionalState.update(DefaultForUnspecified.UNLIMITED),
                     total_resource_slots=OptionalState.update(
                         ResourceSlot({"cpu": "8", "mem": "16g", "gpu": "2"})
@@ -310,14 +311,14 @@ class TestKeypairResourcePolicyRepository:
                 id="full_update",
             ),
             pytest.param(
-                KeyPairResourcePolicyModifier(
+                KeyPairResourcePolicyUpdaterSpec(
                     max_concurrent_sessions=OptionalState.update(15),
                 ),
                 {"max_concurrent_sessions": 15},
                 id="partial_update",
             ),
             pytest.param(
-                KeyPairResourcePolicyModifier(
+                KeyPairResourcePolicyUpdaterSpec(
                     max_pending_session_count=TriState.nullify(),
                     max_pending_session_resource_slots=TriState.nullify(),
                 ),
@@ -328,7 +329,7 @@ class TestKeypairResourcePolicyRepository:
                 id="nullify",
             ),
             pytest.param(
-                KeyPairResourcePolicyModifier(
+                KeyPairResourcePolicyUpdaterSpec(
                     max_pending_session_count=TriState.update(15),
                 ),
                 {"max_pending_session_count": 15},
@@ -341,13 +342,12 @@ class TestKeypairResourcePolicyRepository:
         self,
         repository: KeypairResourcePolicyRepository,
         sample_policy_name: str,
-        update_modifier: KeyPairResourcePolicyModifier,
+        update_spec: KeyPairResourcePolicyUpdaterSpec,
         expected_values: dict[str, Any],
     ) -> None:
-        """Test updating an existing keypair resource policy with various modifiers"""
-        result = await repository.update_keypair_resource_policy(
-            sample_policy_name, update_modifier
-        )
+        """Test updating an existing keypair resource policy with various updaters"""
+        updater = Updater(spec=update_spec, pk_value=sample_policy_name)
+        result = await repository.update_keypair_resource_policy(updater)
 
         assert result.name == sample_policy_name
 
@@ -363,12 +363,15 @@ class TestKeypairResourcePolicyRepository:
         repository: KeypairResourcePolicyRepository,
     ) -> None:
         """Test that updating a non-existent policy raises KeypairResourcePolicyNotFound"""
-        modifier = KeyPairResourcePolicyModifier(
-            max_concurrent_sessions=OptionalState.update(99),
+        updater = Updater(
+            spec=KeyPairResourcePolicyUpdaterSpec(
+                max_concurrent_sessions=OptionalState.update(99),
+            ),
+            pk_value="nonexistent-policy",
         )
 
         with pytest.raises(KeypairResourcePolicyNotFound):
-            await repository.update_keypair_resource_policy("nonexistent-policy", modifier)
+            await repository.update_keypair_resource_policy(updater)
 
     @pytest.mark.asyncio
     async def test_remove_keypair_resource_policy(
@@ -400,12 +403,12 @@ class TestKeypairResourcePolicyRepository:
             await repository.remove_keypair_resource_policy("nonexistent-policy")
 
     @pytest.fixture
-    async def allowed_vfolder_modifier(
+    async def allowed_vfolder_updater_spec(
         self,
         sample_allowed_vfolder_hosts: dict[str, Any],
-    ) -> KeyPairResourcePolicyModifier:
-        """Fixture for allowed_vfolder_hosts modifier"""
-        return KeyPairResourcePolicyModifier(
+    ) -> KeyPairResourcePolicyUpdaterSpec:
+        """Fixture for allowed_vfolder_hosts updater spec"""
+        return KeyPairResourcePolicyUpdaterSpec(
             allowed_vfolder_hosts=OptionalState.update(sample_allowed_vfolder_hosts),
         )
 
@@ -414,11 +417,10 @@ class TestKeypairResourcePolicyRepository:
         self,
         repository: KeypairResourcePolicyRepository,
         sample_policy_name: str,
-        allowed_vfolder_modifier: KeyPairResourcePolicyModifier,
+        allowed_vfolder_updater_spec: KeyPairResourcePolicyUpdaterSpec,
         sample_allowed_vfolder_hosts: dict[str, Any],
     ) -> None:
         """Test updating allowed_vfolder_hosts configuration"""
-        result = await repository.update_keypair_resource_policy(
-            sample_policy_name, allowed_vfolder_modifier
-        )
+        updater = Updater(spec=allowed_vfolder_updater_spec, pk_value=sample_policy_name)
+        result = await repository.update_keypair_resource_policy(updater)
         assert result.allowed_vfolder_hosts == sample_allowed_vfolder_hosts

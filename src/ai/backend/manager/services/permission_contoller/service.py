@@ -47,7 +47,7 @@ class PermissionControllerService:
         If the role does not exist, it returns a result indicating failure.
         """
         try:
-            result = await self._repository.update_role(action.input)
+            result = await self._repository.update_role(action.updater)
         except ObjectNotFound:
             return UpdateRoleActionResult(data=None, success=False)
         return UpdateRoleActionResult(

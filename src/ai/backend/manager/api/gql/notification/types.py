@@ -20,9 +20,7 @@ from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
-    NotificationChannelModifier,
     NotificationRuleData,
-    NotificationRuleModifier,
 )
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.repositories.base import (
@@ -32,6 +30,7 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.notification.creators import (
     NotificationChannelCreatorSpec,
     NotificationRuleCreatorSpec,
@@ -41,6 +40,10 @@ from ai.backend.manager.repositories.notification.options import (
     NotificationChannelOrders,
     NotificationRuleConditions,
     NotificationRuleOrders,
+)
+from ai.backend.manager.repositories.notification.updaters import (
+    NotificationChannelUpdaterSpec,
+    NotificationRuleUpdaterSpec,
 )
 from ai.backend.manager.types import OptionalState
 
@@ -374,7 +377,7 @@ class UpdateNotificationChannelInput:
     config: Optional[WebhookConfigInput] = UNSET
     enabled: Optional[bool] = UNSET
 
-    def to_modifier(self) -> NotificationChannelModifier:
+    def to_updater(self, channel_id: uuid.UUID) -> Updater[NotificationChannelRow]:
         config_state = OptionalState[WebhookConfig].nop()
         if self.config is not UNSET:
             if self.config is None:
@@ -382,12 +385,13 @@ class UpdateNotificationChannelInput:
             else:
                 config_state = OptionalState[WebhookConfig].update(self.config.to_dataclass())
 
-        return NotificationChannelModifier(
+        spec = NotificationChannelUpdaterSpec(
             name=OptionalState[str].from_graphql(self.name),
             description=OptionalState[Optional[str]].from_graphql(self.description),
             config=config_state,
             enabled=OptionalState[bool].from_graphql(self.enabled),
         )
+        return Updater(spec=spec, pk_value=channel_id)
 
 
 @strawberry.input(description="Input for deleting a notification channel")
@@ -426,13 +430,14 @@ class UpdateNotificationRuleInput:
     message_template: Optional[str] = UNSET
     enabled: Optional[bool] = UNSET
 
-    def to_modifier(self) -> NotificationRuleModifier:
-        return NotificationRuleModifier(
+    def to_updater(self, rule_id: uuid.UUID) -> Updater[NotificationRuleRow]:
+        spec = NotificationRuleUpdaterSpec(
             name=OptionalState[str].from_graphql(self.name),
             description=OptionalState[Optional[str]].from_graphql(self.description),
             message_template=OptionalState[str].from_graphql(self.message_template),
             enabled=OptionalState[bool].from_graphql(self.enabled),
         )
+        return Updater(spec=spec, pk_value=rule_id)
 
 
 @strawberry.input(description="Input for deleting a notification rule")

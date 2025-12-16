@@ -3,9 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, override
-
-from ai.backend.manager.types import OptionalState, PartialModifier, TriState
+from typing import Optional
 
 from .id import ObjectId, ScopeId
 from .object_permission import (
@@ -31,24 +29,6 @@ class RoleCreateInput:
     object_permissions: list[ObjectPermissionCreateInputBeforeRoleCreation] = field(
         default_factory=list
     )
-
-
-@dataclass(frozen=True)
-class RoleUpdateInput(PartialModifier):
-    id: uuid.UUID
-    name: OptionalState[str]
-    source: OptionalState[RoleSource]
-    status: OptionalState[RoleStatus]
-    description: TriState[str]
-
-    @override
-    def fields_to_update(self) -> dict[str, Any]:
-        to_update: dict[str, Any] = {}
-        self.name.update_dict(to_update, "name")
-        self.source.update_dict(to_update, "source")
-        self.status.update_dict(to_update, "status")
-        self.description.update_dict(to_update, "description")
-        return to_update
 
 
 @dataclass(frozen=True)

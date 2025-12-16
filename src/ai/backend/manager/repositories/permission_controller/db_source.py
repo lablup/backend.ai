@@ -10,7 +10,6 @@ from ...data.permission.id import ObjectId, ScopeId
 from ...data.permission.role import (
     RoleCreateInput,
     RoleDeleteInput,
-    RoleUpdateInput,
     UserRoleAssignmentInput,
 )
 from ...data.permission.status import (
@@ -26,6 +25,7 @@ from ...models.rbac_models.role import RoleRow
 from ...models.rbac_models.user_role import UserRoleRow
 from ...models.utils import ExtendedAsyncSAEngine
 from ...repositories.base.creator import Creator, execute_creator
+from ...repositories.base.updater import Updater, execute_updater
 from .creators import ObjectPermissionCreatorSpec
 
 
@@ -73,13 +73,12 @@ class PermissionDBSource:
             raise ObjectNotFound(f"Role with ID {role_id} does not exist.")
         return result
 
-    async def update_role(self, data: RoleUpdateInput) -> RoleRow:
-        to_update = data.fields_to_update()
+    async def update_role(self, updater: Updater[RoleRow]) -> RoleRow:
         async with self._db.begin_session() as db_session:
-            stmt = sa.update(RoleRow).where(RoleRow.id == data.id).values(**to_update)
-            await db_session.execute(stmt)
-            role_row = await self._get_role(db_session, data.id)
-            return role_row
+            result = await execute_updater(db_session, updater)
+            if result is None:
+                raise ObjectNotFound(f"Role with ID {updater.pk_value} does not exist.")
+            return result.row
 
     async def delete_role(self, data: RoleDeleteInput) -> RoleRow:
         async with self._db.begin_session() as db_session:

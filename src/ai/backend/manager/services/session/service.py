@@ -74,6 +74,7 @@ from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.session.admin_repository import AdminSessionRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
+from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
     CheckAndTransitStatusActionResult,
@@ -1380,12 +1381,10 @@ class SessionService:
 
     async def modify_session(self, action: ModifySessionAction) -> ModifySessionActionResult:
         session_id = action.session_id
-        props = action.modifier
-        session_name = action.modifier.name.optional_value()
+        spec = cast(SessionUpdaterSpec, action.updater.spec)
+        session_name = spec.name.optional_value()
 
-        session_row = await self._session_repository.modify_session(
-            str(session_id), props.fields_to_update(), session_name
-        )
+        session_row = await self._session_repository.modify_session(action.updater, session_name)
         if session_row is None:
             raise ValueError(f"Session not found (id:{session_id})")
         session_owner_data = await self._session_repository.get_session_owner(str(session_id))

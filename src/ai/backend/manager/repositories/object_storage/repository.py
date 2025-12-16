@@ -7,11 +7,11 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.object_storage.modifier import ObjectStorageModifier
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.object_storage.db_source.db_source import ObjectStorageDBSource
 
 object_storage_repository_resilience = Resilience(
@@ -56,10 +56,8 @@ class ObjectStorageRepository:
         return await self._db_source.create(creator)
 
     @object_storage_repository_resilience.apply()
-    async def update(
-        self, storage_id: uuid.UUID, modifier: ObjectStorageModifier
-    ) -> ObjectStorageData:
-        return await self._db_source.update(storage_id, modifier)
+    async def update(self, updater: Updater[ObjectStorageRow]) -> ObjectStorageData:
+        return await self._db_source.update(updater)
 
     @object_storage_repository_resilience.apply()
     async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:

@@ -37,10 +37,25 @@ class UpdaterSpec(ABC, Generic[TRow]):
     def build_values(self) -> dict[str, Any]:
         """Build column name to value mapping for update.
 
+        Note: This method should only be called internally by execute_updater
+        or apply_to_row. External code should use apply_to_row() instead.
+
         Returns:
             Dict mapping column names to values
         """
         raise NotImplementedError
+
+    def apply_to_row(self, row: TRow) -> None:
+        """Apply update values to a row object via setattr.
+
+        This method encapsulates the build_values() call and applies
+        updates to the row without exposing the internal dict structure.
+
+        Args:
+            row: The ORM row object to apply updates to
+        """
+        for field, value in self.build_values().items():
+            setattr(row, field, value)
 
 
 class BatchUpdaterSpec(ABC, Generic[TRow]):
@@ -119,6 +134,7 @@ async def execute_updater(
 
     Returns:
         UpdaterResult containing the updated row, or None if no row matched
+        or if there are no values to update
 
     Example:
         class SessionStatusUpdaterSpec(UpdaterSpec[SessionRow]):
@@ -145,23 +161,29 @@ async def execute_updater(
     pk_columns = list(table.primary_key.columns)
     values = updater.spec.build_values()
 
+    # Return None if there are no values to update
+    if not values:
+        return None
+
     if len(pk_columns) != 1:
         raise ValueError("Updater only supports single-column primary keys")
 
-    stmt = (
+    update_stmt = (
         sa.update(table)
         .values(values)
         .where(pk_columns[0] == updater.pk_value)
         .returning(*table.columns)
     )
 
-    result = await db_sess.execute(stmt)
-    row_data = result.fetchone()
+    # Use from_statement to properly construct ORM objects
+    # This allows SQLAlchemy to handle column mapping correctly
+    select_stmt = sa.select(row_class).from_statement(update_stmt)
+    result = await db_sess.execute(select_stmt)
+    updated_row = result.scalar_one_or_none()
 
-    if row_data is None:
+    if updated_row is None:
         return None
 
-    updated_row: TRow = row_class(**dict(row_data._mapping))
     return UpdaterResult(row=updated_row)
 
 

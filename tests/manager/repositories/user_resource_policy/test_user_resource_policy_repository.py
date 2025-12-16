@@ -10,14 +10,15 @@ from ai.backend.common.exception import UserResourcePolicyNotFound
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user_resource_policy.creators import (
     UserResourcePolicyCreatorSpec,
 )
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
-from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
-    UserResourcePolicyModifier,
+from ai.backend.manager.repositories.user_resource_policy.updaters import (
+    UserResourcePolicyUpdaterSpec,
 )
 from ai.backend.manager.types import OptionalState
 
@@ -109,10 +110,10 @@ class TestUserResourcePolicyRepository:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "modifier,expected_updates",
+        "updater_spec,expected_updates",
         [
             (
-                UserResourcePolicyModifier(
+                UserResourcePolicyUpdaterSpec(
                     max_vfolder_count=OptionalState.update(20),
                     max_quota_scope_size=OptionalState.nop(),
                     max_session_count_per_model_session=OptionalState.nop(),
@@ -127,7 +128,7 @@ class TestUserResourcePolicyRepository:
                 ),
             ),
             (
-                UserResourcePolicyModifier(
+                UserResourcePolicyUpdaterSpec(
                     max_vfolder_count=OptionalState.update(20),
                     max_quota_scope_size=OptionalState.update(2000000),
                     max_session_count_per_model_session=OptionalState.nop(),
@@ -142,7 +143,7 @@ class TestUserResourcePolicyRepository:
                 ),
             ),
             (
-                UserResourcePolicyModifier(
+                UserResourcePolicyUpdaterSpec(
                     max_vfolder_count=OptionalState.update(25),
                     max_quota_scope_size=OptionalState.update(3000000),
                     max_session_count_per_model_session=OptionalState.update(10),
@@ -157,7 +158,7 @@ class TestUserResourcePolicyRepository:
                 ),
             ),
             (
-                UserResourcePolicyModifier(
+                UserResourcePolicyUpdaterSpec(
                     max_vfolder_count=OptionalState.update(15),
                     max_quota_scope_size=OptionalState.nop(),
                     max_session_count_per_model_session=OptionalState.update(8),
@@ -177,11 +178,12 @@ class TestUserResourcePolicyRepository:
         self,
         repository: UserResourcePolicyRepository,
         sample_policy: UserResourcePolicyData,
-        modifier: UserResourcePolicyModifier,
+        updater_spec: UserResourcePolicyUpdaterSpec,
         expected_updates: UserResourcePolicyData,
     ) -> None:
         """Test updating a policy successfully with various field combinations"""
-        result = await repository.update(sample_policy.name, modifier)
+        updater = Updater(spec=updater_spec, pk_value=sample_policy.name)
+        result = await repository.update(updater)
 
         assert isinstance(result, UserResourcePolicyData)
         assert result.name == sample_policy.name
@@ -196,9 +198,12 @@ class TestUserResourcePolicyRepository:
     @pytest.mark.asyncio
     async def test_update_policy_not_found(self, repository: UserResourcePolicyRepository) -> None:
         """Test updating a policy that doesn't exist"""
-        modifier = UserResourcePolicyModifier(max_vfolder_count=OptionalState.update(20))
+        updater = Updater(
+            spec=UserResourcePolicyUpdaterSpec(max_vfolder_count=OptionalState.update(20)),
+            pk_value="non-existing",
+        )
         with pytest.raises(UserResourcePolicyNotFound):
-            await repository.update("non-existing", modifier)
+            await repository.update(updater)
 
     @pytest.mark.asyncio
     async def test_delete_policy_success(

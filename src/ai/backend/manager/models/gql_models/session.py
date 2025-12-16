@@ -41,13 +41,12 @@ from ai.backend.manager.idle import ReportInfo
 from ai.backend.manager.models.gql_models.user import UserNode
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.utils import agg_to_array
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
 )
-from ai.backend.manager.services.session.actions.modify_session import (
-    ModifySessionAction,
-    SessionModifier,
-)
+from ai.backend.manager.services.session.actions.modify_session import ModifySessionAction
 from ai.backend.manager.types import OptionalState
 
 from ...errors.resource import DataTransformationFailed
@@ -856,9 +855,12 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         result = await graph_ctx.processors.session.modify_session.wait_for_complete(
             ModifySessionAction(
                 session_id=session_id,
-                modifier=SessionModifier(
-                    name=OptionalState[str].from_graphql(name),
-                    priority=OptionalState[int].from_graphql(priority),
+                updater=Updater(
+                    spec=SessionUpdaterSpec(
+                        name=OptionalState[str].from_graphql(name),
+                        priority=OptionalState[int].from_graphql(priority),
+                    ),
+                    pk_value=session_id,
                 ),
             )
         )

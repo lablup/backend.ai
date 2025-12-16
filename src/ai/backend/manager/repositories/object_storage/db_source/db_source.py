@@ -5,7 +5,6 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
-from ai.backend.manager.data.object_storage.modifier import ObjectStorageModifier
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.errors.object_storage import (
     ObjectStorageNotFoundError,
@@ -14,6 +13,7 @@ from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 
 class ObjectStorageDBSource:
@@ -76,24 +76,17 @@ class ObjectStorageDBSource:
             creator_result = await execute_creator(db_session, creator)
             return creator_result.row.to_dataclass()
 
-    async def update(
-        self, storage_id: uuid.UUID, modifier: ObjectStorageModifier
-    ) -> ObjectStorageData:
+    async def update(self, updater: Updater[ObjectStorageRow]) -> ObjectStorageData:
         """
         Update an existing object storage configuration in the database.
         """
         async with self._db.begin_session() as db_session:
-            data = modifier.fields_to_update()
-            update_stmt = (
-                sa.update(ObjectStorageRow)
-                .where(ObjectStorageRow.id == storage_id)
-                .values(**data)
-                .returning(*sa.select(ObjectStorageRow).selected_columns)
-            )
-            stmt = sa.select(ObjectStorageRow).from_statement(update_stmt)
-            row: ObjectStorageRow = (await db_session.execute(stmt)).scalars().one()
-
-            return row.to_dataclass()
+            result = await execute_updater(db_session, updater)
+            if result is None:
+                raise ObjectStorageNotFoundError(
+                    f"Object storage with ID {updater.pk_value} not found."
+                )
+            return result.row.to_dataclass()
 
     async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:
         """

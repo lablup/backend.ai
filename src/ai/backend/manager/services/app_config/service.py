@@ -58,7 +58,7 @@ class AppConfigService:
         config_data = await self._app_config_repository.upsert_config(
             AppConfigScopeType.DOMAIN,
             action.domain_name,
-            action.modifier,
+            action.updater_spec,
         )
         return UpsertDomainConfigActionResult(result=config_data)
 
@@ -95,7 +95,7 @@ class AppConfigService:
         config_data = await self._app_config_repository.upsert_config(
             AppConfigScopeType.USER,
             action.user_id,
-            action.modifier,
+            action.updater_spec,
         )
         return UpsertUserConfigActionResult(result=config_data)
 

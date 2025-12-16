@@ -112,6 +112,8 @@ from ..models.vfolder import (
     is_unmanaged,
 )
 from ..models.vfolder import VFolderRow as VFolderDBRow
+from ..repositories.base.updater import Updater
+from ..repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
 from ..services.vfolder.actions.base import (
     CloneVFolderAction,
     CreateVFolderAction,
@@ -122,7 +124,6 @@ from ..services.vfolder.actions.base import (
     MoveToTrashVFolderAction,
     RestoreVFolderFromTrashAction,
     UpdateVFolderAttributeAction,
-    VFolderAttributeModifier,
 )
 from ..services.vfolder.actions.file import (
     CreateDownloadSessionAction,
@@ -976,8 +977,8 @@ class RenameRequestModel(LegacyBaseRequestModel):
         description="Name of the vfolder",
     )
 
-    def to_modifier(self) -> VFolderAttributeModifier:
-        return VFolderAttributeModifier(
+    def to_updater_spec(self) -> VFolderAttributeUpdaterSpec:
+        return VFolderAttributeUpdaterSpec(
             name=OptionalState[str].update(self.new_name),
         )
 
@@ -1007,7 +1008,10 @@ async def rename_vfolder(
         UpdateVFolderAttributeAction(
             user_uuid=request["user"]["uuid"],
             vfolder_uuid=row["id"],
-            modifier=params.to_modifier(),
+            updater=Updater(
+                spec=params.to_updater_spec(),
+                pk_value=row["id"],
+            ),
         )
     )
     return web.Response(status=HTTPStatus.CREATED)
@@ -1048,9 +1052,12 @@ async def update_vfolder_options(
         UpdateVFolderAttributeAction(
             user_uuid=request["user"]["uuid"],
             vfolder_uuid=row["id"],
-            modifier=VFolderAttributeModifier(
-                cloneable=cloneable,
-                mount_permission=mount_permission,
+            updater=Updater(
+                spec=VFolderAttributeUpdaterSpec(
+                    cloneable=cloneable,
+                    mount_permission=mount_permission,
+                ),
+                pk_value=row["id"],
             ),
         )
     )

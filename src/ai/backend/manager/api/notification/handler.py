@@ -196,11 +196,9 @@ class NotificationAPIHandler:
             raise web.HTTPForbidden(reason="Only superadmin can update notification channels.")
 
         # Call service action
+        channel_id = path.parsed.channel_id
         action_result = await processors.notification.update_channel.wait_for_complete(
-            UpdateChannelAction(
-                channel_id=path.parsed.channel_id,
-                modifier=self.channel_adapter.build_modifier(body.parsed),
-            )
+            UpdateChannelAction(updater=self.channel_adapter.build_updater(body.parsed, channel_id))
         )
 
         # Build response
@@ -435,11 +433,9 @@ class NotificationAPIHandler:
             raise web.HTTPForbidden(reason="Only superadmin can update notification rules.")
 
         # Call service action
+        rule_id = path.parsed.rule_id
         action_result = await processors.notification.update_rule.wait_for_complete(
-            UpdateRuleAction(
-                rule_id=path.parsed.rule_id,
-                modifier=self.rule_adapter.build_modifier(body.parsed),
-            )
+            UpdateRuleAction(updater=self.rule_adapter.build_updater(body.parsed, rule_id))
         )
 
         # Build response

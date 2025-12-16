@@ -243,8 +243,7 @@ class APIHandler:
         processors = processors_ctx.processors
         action_result = await processors.artifact.update.wait_for_complete(
             UpdateArtifactAction(
-                artifact_id=path.parsed.artifact_id,
-                modifier=body.parsed.to_modifier(),
+                updater=body.parsed.to_updater(path.parsed.artifact_id),
             )
         )
 

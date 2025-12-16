@@ -20,7 +20,7 @@ from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.services.resource_preset.types import ResourcePresetModifier
+from ai.backend.manager.repositories.base.updater import Updater
 
 from .cache_source.cache_source import ResourcePresetCacheSource
 from .db_source.db_source import ResourcePresetDBSource
@@ -128,17 +128,20 @@ class ResourcePresetRepository:
 
     @resource_preset_repository_resilience.apply()
     async def modify_preset_validated(
-        self, preset_id: Optional[UUID], name: Optional[str], modifier: ResourcePresetModifier
+        self, updater: Updater[ResourcePresetRow]
     ) -> ResourcePresetData:
         """
         Modifies an existing resource preset.
         Raises ResourcePresetNotFound if the preset doesn't exist.
         """
-        preset = await self._db_source.modify_preset(preset_id, name, modifier)
+        preset = await self._db_source.modify_preset(updater)
         with suppress_with_log(
             [Exception], message="Failed to invalidate cache after preset modification"
         ):
-            await self._cache_source.invalidate_preset(preset_id, name)
+            await self._cache_source.invalidate_preset(
+                updater.pk_value if isinstance(updater.pk_value, UUID) else None,
+                None,
+            )
         return preset
 
     @resource_preset_repository_resilience.apply()

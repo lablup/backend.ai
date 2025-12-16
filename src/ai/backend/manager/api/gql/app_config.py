@@ -9,8 +9,8 @@ from strawberry import ID, Info
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.app_config.types import AppConfigModifier
 from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
 from ai.backend.manager.services.app_config.actions import (
     DeleteDomainConfigAction,
     DeleteUserConfigAction,
@@ -49,8 +49,8 @@ class UpsertDomainConfigInput:
     domain_name: str
     extra_config: strawberry.scalars.JSON
 
-    def to_modifier(self) -> AppConfigModifier:
-        return AppConfigModifier(extra_config=OptionalState.update(self.extra_config))
+    def to_updater_spec(self) -> AppConfigUpdaterSpec:
+        return AppConfigUpdaterSpec(extra_config=OptionalState.update(self.extra_config))
 
 
 @strawberry.input(
@@ -71,8 +71,8 @@ class UpsertUserConfigInput:
     extra_config: strawberry.scalars.JSON
     user_id: Optional[ID] = None
 
-    def to_modifier(self) -> AppConfigModifier:
-        return AppConfigModifier(extra_config=OptionalState.update(self.extra_config))
+    def to_updater_spec(self) -> AppConfigUpdaterSpec:
+        return AppConfigUpdaterSpec(extra_config=OptionalState.update(self.extra_config))
 
 
 @strawberry.input(description="Added in 25.16.0. Input for deleting domain-level app configuration")
@@ -285,7 +285,7 @@ async def upsert_domain_app_config(
     action_result = await processors.app_config.upsert_domain_config.wait_for_complete(
         UpsertDomainConfigAction(
             domain_name=input.domain_name,
-            modifier=input.to_modifier(),
+            updater_spec=input.to_updater_spec(),
         )
     )
 
@@ -327,7 +327,7 @@ async def upsert_user_app_config(
     action_result = await processors.app_config.upsert_user_config.wait_for_complete(
         UpsertUserConfigAction(
             user_id=target_user_id,
-            modifier=input.to_modifier(),
+            updater_spec=input.to_updater_spec(),
         )
     )
 

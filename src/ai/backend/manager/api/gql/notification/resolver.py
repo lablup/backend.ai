@@ -282,11 +282,9 @@ async def update_notification_channel(
 ) -> UpdateNotificationChannelPayload:
     processors = info.context.processors
 
+    channel_id = uuid.UUID(input.id)
     action_result = await processors.notification.update_channel.wait_for_complete(
-        UpdateChannelAction(
-            channel_id=uuid.UUID(input.id),
-            modifier=input.to_modifier(),
-        )
+        UpdateChannelAction(updater=input.to_updater(channel_id))
     )
 
     return UpdateNotificationChannelPayload(
@@ -331,11 +329,9 @@ async def update_notification_rule(
 ) -> UpdateNotificationRulePayload:
     processors = info.context.processors
 
+    rule_id = uuid.UUID(input.id)
     action_result = await processors.notification.update_rule.wait_for_complete(
-        UpdateRuleAction(
-            rule_id=uuid.UUID(input.id),
-            modifier=input.to_modifier(),
-        )
+        UpdateRuleAction(updater=input.to_updater(rule_id))
     )
 
     return UpdateNotificationRulePayload(

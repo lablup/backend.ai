@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Optional, override
-from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.notification import NotificationRuleData, NotificationRuleModifier
+from ai.backend.manager.data.notification import NotificationRuleData
+from ai.backend.manager.models.notification import NotificationRuleRow
+from ai.backend.manager.repositories.base.updater import Updater
 
 from .base import NotificationAction
 
@@ -14,8 +15,7 @@ from .base import NotificationAction
 class UpdateRuleAction(NotificationAction):
     """Action to update a notification rule."""
 
-    rule_id: UUID
-    modifier: NotificationRuleModifier
+    updater: Updater[NotificationRuleRow]
 
     @override
     @classmethod
@@ -24,7 +24,7 @@ class UpdateRuleAction(NotificationAction):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.rule_id)
+        return str(self.updater.pk_value)
 
 
 @dataclass

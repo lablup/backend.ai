@@ -13,7 +13,6 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.domain.types import (
     DomainData,
-    DomainModifier,
     UserInfo,
 )
 from ai.backend.manager.errors.resource import (
@@ -33,6 +32,7 @@ from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
 
 domain_repository_resilience = Resilience(
@@ -83,25 +83,17 @@ class AdminDomainRepository:
             return domain_row.to_data()
 
     @domain_repository_resilience.apply()
-    async def modify_domain_force(self, domain_name: str, modifier: DomainModifier) -> DomainData:
+    async def modify_domain_force(self, updater: Updater[DomainRow]) -> DomainData:
         """
         Modifies an existing domain without permission checks.
         For superadmin use only.
         """
-        async with self._db.begin() as conn:
-            data = modifier.fields_to_update()
-            update_query = (
-                sa.update(domains)
-                .values(data)
-                .where(domains.c.name == domain_name)
-                .returning(domains)
-            )
-            result = await conn.execute(update_query)
-            row = result.first()
+        async with self._db.begin_session() as db_session:
+            result = await execute_updater(db_session, updater)
 
-            if result.rowcount == 0:
-                raise DomainNotFound(f"Domain not found: {domain_name}")
-            return row_to_data(row)
+            if result is None:
+                raise DomainNotFound(f"Domain not found: {updater.pk_value}")
+            return row_to_data(result.row)
 
     @domain_repository_resilience.apply()
     async def soft_delete_domain_force(self, domain_name: str) -> None:
@@ -266,8 +258,7 @@ class AdminDomainRepository:
     @domain_repository_resilience.apply()
     async def modify_domain_node_with_permissions_force(
         self,
-        domain_name: str,
-        modifier_fields: dict,
+        updater: Updater[DomainRow],
         user_info: UserInfo,
         sgroups_to_add: Optional[set[str]] = None,
         sgroups_to_remove: Optional[set[str]] = None,
@@ -276,6 +267,7 @@ class AdminDomainRepository:
         Modifies a domain node with scaling group changes without permission checks.
         For superadmin use only.
         """
+        domain_name = str(updater.pk_value)
         async with self._db.begin_session() as session:
             if sgroups_to_add is not None:
                 await session.execute(
@@ -294,19 +286,9 @@ class AdminDomainRepository:
                     ),
                 )
 
-            update_stmt = (
-                sa.update(DomainRow)
-                .where(DomainRow.name == domain_name)
-                .values(modifier_fields)
-                .returning(DomainRow)
-            )
-            await session.execute(update_stmt)
-
-            domain_row = await session.scalar(
-                sa.select(DomainRow).where(DomainRow.name == domain_name)
-            )
+            result = await execute_updater(session, updater)
 
             await session.commit()
-            if domain_row is None:
+            if result is None:
                 raise DomainNotFound(f"Domain not found (id:{domain_name})")
-            return row_to_data(domain_row)
+            return row_to_data(result.row)

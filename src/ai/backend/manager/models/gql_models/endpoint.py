@@ -33,8 +33,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.model_serving.creator import EndpointAutoScalingRuleCreator
 from ai.backend.manager.data.model_serving.modifier import (
-    EndpointAutoScalingRuleModifier,
-    EndpointModifier,
     ExtraMount,
     ImageRef,
 )
@@ -50,6 +48,11 @@ from ai.backend.manager.models.gql_models.vfolder import VirtualFolderNode
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.routing import RouteStatus, Routing
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.model_serving.updaters import (
+    EndpointAutoScalingRuleUpdaterSpec,
+    EndpointUpdaterSpec,
+)
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
 )
@@ -376,39 +379,40 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
             except decimal.InvalidOperation:
                 raise InvalidAPIParameters(f"Cannot convert {value} to Decimal")
 
+        spec = EndpointAutoScalingRuleUpdaterSpec(
+            metric_source=OptionalState.from_graphql(
+                AutoScalingMetricSource(self.metric_source)
+                if self.metric_source is not Undefined
+                else Undefined,
+            ),
+            metric_name=OptionalState.from_graphql(
+                self.metric_name,
+            ),
+            threshold=OptionalState.from_graphql(
+                convert_to_decimal(self.threshold),
+            ),
+            comparator=OptionalState.from_graphql(
+                AutoScalingMetricComparator(self.comparator)
+                if self.comparator is not Undefined
+                else Undefined,
+            ),
+            step_size=OptionalState.from_graphql(
+                self.step_size,
+            ),
+            cooldown_seconds=OptionalState.from_graphql(
+                self.cooldown_seconds,
+            ),
+            min_replicas=TriState.from_graphql(
+                self.min_replicas,
+            ),
+            max_replicas=TriState.from_graphql(
+                self.max_replicas,
+            ),
+        )
         return ModifyEndpointAutoScalingRuleAction(
             requester_ctx=requester_ctx,
             id=id,
-            modifier=EndpointAutoScalingRuleModifier(
-                metric_source=OptionalState.from_graphql(
-                    AutoScalingMetricSource(self.metric_source)
-                    if self.metric_source is not Undefined
-                    else Undefined,
-                ),
-                metric_name=OptionalState.from_graphql(
-                    self.metric_name,
-                ),
-                threshold=OptionalState.from_graphql(
-                    convert_to_decimal(self.threshold),
-                ),
-                comparator=OptionalState.from_graphql(
-                    AutoScalingMetricComparator(self.comparator)
-                    if self.comparator is not Undefined
-                    else Undefined,
-                ),
-                step_size=OptionalState.from_graphql(
-                    self.step_size,
-                ),
-                cooldown_seconds=OptionalState.from_graphql(
-                    self.cooldown_seconds,
-                ),
-                min_replicas=TriState.from_graphql(
-                    self.min_replicas,
-                ),
-                max_replicas=TriState.from_graphql(
-                    self.max_replicas,
-                ),
-            ),
+            updater=Updater(spec=spec, pk_value=id),
         )
 
 
@@ -1082,47 +1086,46 @@ class ModifyEndpointInput(graphene.InputObjectType):
 
             return [extra_mount.to_action_field(info) for extra_mount in extra_mounts_gql]
 
+        spec = EndpointUpdaterSpec(
+            resource_slots=OptionalState.from_graphql(
+                self.resource_slots
+                if (self.resource_slots is Undefined or self.resource_slots is None)
+                else ResourceSlot.from_user_input(self.resource_slots, None)
+            ),
+            resource_opts=TriState.from_graphql(self.resource_opts),
+            cluster_mode=OptionalState.from_graphql(
+                self.cluster_mode
+                if (self.cluster_mode is Undefined or self.cluster_mode is None)
+                else ClusterMode(self.cluster_mode)
+            ),
+            cluster_size=OptionalState.from_graphql(self.cluster_size),
+            replicas=OptionalState.from_graphql(self.replicas),
+            desired_session_count=OptionalState.from_graphql(self.desired_session_count),
+            image=TriState.from_graphql(
+                create_image_ref_from_input(self.image) if self.image is not Undefined else None,
+            ),
+            name=OptionalState.from_graphql(self.name),
+            resource_group=OptionalState.from_graphql(self.resource_group),
+            model_definition_path=TriState.from_graphql(self.model_definition_path),
+            open_to_public=OptionalState.from_graphql(
+                self.open_to_public,
+            ),
+            extra_mounts=OptionalState.from_graphql(
+                self.extra_mounts
+                if (self.extra_mounts is Undefined or self.extra_mounts is None)
+                else convert_extra_mounts(self.extra_mounts),
+            ),
+            environ=TriState.from_graphql(
+                self.environ,
+            ),
+            runtime_variant=OptionalState.from_graphql(
+                convert_runtime_variant(self.runtime_variant),
+            ),
+        )
         return ModifyEndpointAction(
             requester_ctx=requester_ctx,
             endpoint_id=endpoint_id,
-            modifier=EndpointModifier(
-                resource_slots=OptionalState.from_graphql(
-                    self.resource_slots
-                    if (self.resource_slots is Undefined or self.resource_slots is None)
-                    else ResourceSlot.from_user_input(self.resource_slots, None)
-                ),
-                resource_opts=TriState.from_graphql(self.resource_opts),
-                cluster_mode=OptionalState.from_graphql(
-                    self.cluster_mode
-                    if (self.cluster_mode is Undefined or self.cluster_mode is None)
-                    else ClusterMode(self.cluster_mode)
-                ),
-                cluster_size=OptionalState.from_graphql(self.cluster_size),
-                replicas=OptionalState.from_graphql(self.replicas),
-                desired_session_count=OptionalState.from_graphql(self.desired_session_count),
-                image=TriState.from_graphql(
-                    create_image_ref_from_input(self.image)
-                    if self.image is not Undefined
-                    else None,
-                ),
-                name=OptionalState.from_graphql(self.name),
-                resource_group=OptionalState.from_graphql(self.resource_group),
-                model_definition_path=TriState.from_graphql(self.model_definition_path),
-                open_to_public=OptionalState.from_graphql(
-                    self.open_to_public,
-                ),
-                extra_mounts=OptionalState.from_graphql(
-                    self.extra_mounts
-                    if (self.extra_mounts is Undefined or self.extra_mounts is None)
-                    else convert_extra_mounts(self.extra_mounts),
-                ),
-                environ=TriState.from_graphql(
-                    self.environ,
-                ),
-                runtime_variant=OptionalState.from_graphql(
-                    convert_runtime_variant(self.runtime_variant),
-                ),
-            ),
+            updater=Updater(spec=spec, pk_value=endpoint_id),
         )
 
 

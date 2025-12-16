@@ -13,11 +13,14 @@ from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
 )
-from ai.backend.manager.data.huggingface_registry.modifier import HuggingFaceRegistryModifier
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.huggingface_registry import HuggingFaceRegistryCreatorSpec
+from ai.backend.manager.repositories.huggingface_registry.updaters import (
+    HuggingFaceRegistryUpdaterSpec,
+)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
 )
@@ -152,11 +155,12 @@ class UpdateHuggingFaceRegistryInput:
     name: Optional[str] = UNSET
     token: Optional[str] = UNSET
 
-    def to_modifier(self) -> HuggingFaceRegistryModifier:
-        return HuggingFaceRegistryModifier(
+    def to_updater(self) -> Updater[HuggingFaceRegistryRow]:
+        spec = HuggingFaceRegistryUpdaterSpec(
             url=OptionalState[str].from_graphql(self.url),
             token=OptionalState[str].from_graphql(self.token),
         )
+        return Updater(spec=spec, pk_value=uuid.UUID(self.id))
 
     def to_modifier_meta(self) -> ArtifactRegistryModifierMeta:
         return ArtifactRegistryModifierMeta(
@@ -213,7 +217,7 @@ async def update_huggingface_registry(
     action_result = (
         await processors.artifact_registry.update_huggingface_registry.wait_for_complete(
             UpdateHuggingFaceRegistryAction(
-                id=uuid.UUID(input.id), modifier=input.to_modifier(), meta=input.to_modifier_meta()
+                updater=input.to_updater(), meta=input.to_modifier_meta()
             )
         )
     )

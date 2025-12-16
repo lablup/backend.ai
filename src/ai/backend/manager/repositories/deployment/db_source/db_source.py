@@ -23,7 +23,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.deployment.creator import DeploymentCreator
-from ai.backend.manager.data.deployment.modifier import DeploymentModifier
 from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
 from ai.backend.manager.data.deployment.scale_modifier import AutoScalingRuleModifier
 from ai.backend.manager.data.deployment.types import (
@@ -65,6 +64,7 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ContainerUserContext,
     DeploymentContext,
@@ -352,13 +352,13 @@ class DeploymentDBSource:
     async def get_modified_endpoint(
         self,
         endpoint_id: uuid.UUID,
-        modifier: DeploymentModifier,
+        updater: Updater[EndpointRow],
     ) -> DeploymentInfo:
         """Get modified endpoint without applying changes.
 
         Args:
             endpoint_id: ID of the endpoint to modify
-            modifier: Deployment modifier containing partial updates
+            updater: Updater containing spec with partial updates
 
         Returns:
             DeploymentInfo: Modified deployment information
@@ -379,51 +379,30 @@ class DeploymentDBSource:
             if not existing_row:
                 raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
 
-            # Apply modifier to get updated values
-            updates = modifier.fields_to_update()
-            for field, value in updates.items():
-                setattr(existing_row, field, value)
+            # Apply spec to get updated values
+            updater.spec.apply_to_row(existing_row)
             return existing_row.to_deployment_info()
 
-    async def update_endpoint_with_modifier(
+    async def update_endpoint_with_spec(
         self,
-        endpoint_id: uuid.UUID,
-        modifier: DeploymentModifier,
+        updater: Updater[EndpointRow],
     ) -> DeploymentInfo:
-        """Update endpoint using a deployment modifier.
+        """Update endpoint using an Updater.
 
         Args:
-            endpoint_id: ID of the endpoint to update
-            modifier: Deployment modifier containing partial updates
+            updater: Updater containing spec and endpoint_id
 
         Returns:
             DeploymentInfo: Updated deployment information
 
         Raises:
-            NoUpdatesToApply: If there are no updates to apply
             EndpointNotFound: If the endpoint does not exist
         """
-        # Extract updates from the modifier
-        updates = modifier.fields_to_update()
-
-        if not updates:
-            raise NoUpdatesToApply(f"No updates to apply for endpoint {endpoint_id}")
-
         async with self._begin_session_read_committed() as db_sess:
-            # Directly use the updates since fields_to_update returns column-ready values
-            query = (
-                sa.update(EndpointRow)
-                .where(EndpointRow.id == endpoint_id)
-                .values(**updates)
-                .returning(EndpointRow)
-            )
-            result = await db_sess.execute(query)
-            updated_row = result.scalar_one_or_none()
-
-            if not updated_row:
-                raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
-
-            return updated_row.to_deployment_info()
+            result = await execute_updater(db_sess, updater)
+            if result is None:
+                raise EndpointNotFound(f"Endpoint {updater.pk_value} not found")
+            return result.row.to_deployment_info()
 
     async def update_endpoint_lifecycle_bulk(
         self,

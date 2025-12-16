@@ -55,6 +55,7 @@ from ai.backend.manager.models.vfolder import (
 )
 
 from ..base.creator import Creator
+from ..base.updater import Updater, execute_updater
 from ..permission_controller.creators import AssociationScopesEntitiesCreatorSpec
 from ..permission_controller.role_manager import RoleManager
 
@@ -311,24 +312,16 @@ class VfolderRepository:
             return self._vfolder_row_to_data(created_vfolder)
 
     @vfolder_repository_resilience.apply()
-    async def update_vfolder_attribute(
-        self, vfolder_id: uuid.UUID, field_updates: dict[str, Any]
-    ) -> VFolderData:
+    async def update_vfolder_attribute(self, updater: Updater[VFolderRow]) -> VFolderData:
         """
         Update VFolder attributes.
         Returns updated VFolderData.
         """
         async with self._db.begin_session() as session:
-            vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
-            if not vfolder_row:
+            result = await execute_updater(session, updater)
+            if result is None:
                 raise VFolderNotFound()
-
-            for key, value in field_updates.items():
-                if hasattr(vfolder_row, key):
-                    setattr(vfolder_row, key, value)
-
-            await session.flush()
-            return self._vfolder_row_to_data(vfolder_row)
+            return self._vfolder_row_to_data(result.row)
 
     @vfolder_repository_resilience.apply()
     async def move_vfolders_to_trash(self, vfolder_ids: list[uuid.UUID]) -> list[VFolderData]:

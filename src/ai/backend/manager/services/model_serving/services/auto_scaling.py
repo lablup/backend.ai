@@ -1,6 +1,5 @@
 import decimal
 import logging
-from typing import Any
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.model_serving.types import RequesterCtx
@@ -139,17 +138,14 @@ class AutoScalingService:
     async def modify_endpoint_auto_scaling_rule(
         self, action: ModifyEndpointAutoScalingRuleAction
     ) -> ModifyEndpointAutoScalingRuleActionResult:
-        fields_to_update: dict[str, Any] = action.modifier.fields_to_update()
-
         # Update auto scaling rule with access validation
         if action.requester_ctx.user_role == UserRole.SUPERADMIN:
             updated_rule = await self._admin_repository.update_auto_scaling_rule_force(
-                action.id, fields_to_update
+                action.updater
             )
         else:
             updated_rule = await self._repository.update_auto_scaling_rule_validated(
-                action.id,
-                fields_to_update,
+                action.updater,
                 action.requester_ctx.user_id,
                 action.requester_ctx.user_role,
                 action.requester_ctx.domain_name,

@@ -17,7 +17,6 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AgentId, ImageCanonical, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.agent.modifier import AgentStatusModifier
 from ai.backend.manager.data.agent.types import (
     AgentData,
     AgentHeartbeatUpsert,
@@ -33,6 +32,8 @@ from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSou
 from ai.backend.manager.repositories.agent.stateful_source.stateful_source import (
     AgentStatefulSource,
 )
+from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
 
 from .query import QueryCondition, QueryOrder
@@ -114,13 +115,14 @@ class AgentRepository:
         return upsert_result
 
     @agent_repository_resilience.apply()
-    async def cleanup_agent_on_exit(self, agent_id: AgentId, modifier: AgentStatusModifier) -> None:
+    async def cleanup_agent_on_exit(self, agent_id: AgentId, spec: AgentStatusUpdaterSpec) -> None:
         with suppress_with_log(
             [Exception], message=f"Failed to remove last seen for agent: {agent_id}"
         ):
             await self._cache_source.remove_agent_last_seen(agent_id)
 
-        await self._db_source.update_agent_status_exit(agent_id, modifier)
+        updater = Updater[AgentRow](spec=spec, pk_value=agent_id)
+        await self._db_source.update_agent_status_exit(updater)
 
         with suppress_with_log(
             [Exception], message=f"Failed to remove agent: {agent_id} from all images"
@@ -128,8 +130,9 @@ class AgentRepository:
             await self._cache_source.remove_agent_from_all_images(agent_id)
 
     @agent_repository_resilience.apply()
-    async def update_agent_status(self, agent_id: AgentId, modifier: AgentStatusModifier) -> None:
-        await self._db_source.update_agent_status(agent_id, modifier)
+    async def update_agent_status(self, agent_id: AgentId, spec: AgentStatusUpdaterSpec) -> None:
+        updater = Updater[AgentRow](spec=spec, pk_value=agent_id)
+        await self._db_source.update_agent_status(updater)
 
     # For compatibility with redis key made with image canonical strings
     # Use remove_agent_from_images instead of this if possible

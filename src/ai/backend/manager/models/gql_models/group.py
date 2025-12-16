@@ -24,11 +24,13 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.group.types import GroupData, GroupModifier
+from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
+from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
 from ai.backend.manager.services.group.actions.create_group import CreateGroupAction
 from ai.backend.manager.services.group.actions.delete_group import (
     DeleteGroupAction,
@@ -605,39 +607,39 @@ class ModifyGroupInput(graphene.InputObjectType):
     )
 
     def to_action(self, group_id: uuid.UUID) -> ModifyGroupAction:
-        return ModifyGroupAction(
-            group_id=group_id,
-            modifier=GroupModifier(
-                name=OptionalState[str].from_graphql(
-                    self.name,
-                ),
-                domain_name=OptionalState[str].from_graphql(
-                    self.domain_name,
-                ),
-                description=TriState[str].from_graphql(
-                    self.description,
-                ),
-                is_active=OptionalState[bool].from_graphql(
-                    self.is_active,
-                ),
-                total_resource_slots=OptionalState[ResourceSlot].from_graphql(
-                    self.total_resource_slots
-                    if (self.total_resource_slots is Undefined or self.total_resource_slots is None)
-                    else ResourceSlot.from_user_input(self.total_resource_slots, None),
-                ),
-                allowed_vfolder_hosts=OptionalState[dict[str, str]].from_graphql(
-                    self.allowed_vfolder_hosts,
-                ),
-                integration_id=OptionalState[str].from_graphql(
-                    self.integration_id,
-                ),
-                resource_policy=OptionalState[str].from_graphql(
-                    self.resource_policy,
-                ),
-                container_registry=TriState[dict[str, str]].from_graphql(
-                    self.container_registry,
-                ),
+        spec = GroupUpdaterSpec(
+            name=OptionalState[str].from_graphql(
+                self.name,
             ),
+            domain_name=OptionalState[str].from_graphql(
+                self.domain_name,
+            ),
+            description=TriState[str].from_graphql(
+                self.description,
+            ),
+            is_active=OptionalState[bool].from_graphql(
+                self.is_active,
+            ),
+            total_resource_slots=OptionalState[ResourceSlot].from_graphql(
+                self.total_resource_slots
+                if (self.total_resource_slots is Undefined or self.total_resource_slots is None)
+                else ResourceSlot.from_user_input(self.total_resource_slots, None),
+            ),
+            allowed_vfolder_hosts=OptionalState[dict[str, str]].from_graphql(
+                self.allowed_vfolder_hosts,
+            ),
+            integration_id=OptionalState[str].from_graphql(
+                self.integration_id,
+            ),
+            resource_policy=OptionalState[str].from_graphql(
+                self.resource_policy,
+            ),
+            container_registry=TriState[dict[str, str]].from_graphql(
+                self.container_registry,
+            ),
+        )
+        return ModifyGroupAction(
+            updater=Updater[GroupRow](spec=spec, pk_value=group_id),
             user_update_mode=OptionalState[str].from_graphql(
                 self.user_update_mode,
             ),

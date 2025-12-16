@@ -1,6 +1,5 @@
 from .types import (
     AppConfigData,
-    AppConfigModifier,
     AppConfigScopeType,
     MergedAppConfig,
 )
@@ -8,6 +7,5 @@ from .types import (
 __all__ = (
     "AppConfigScopeType",
     "AppConfigData",
-    "AppConfigModifier",
     "MergedAppConfig",
 )

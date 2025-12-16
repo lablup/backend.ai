@@ -3,6 +3,7 @@ import uuid
 from pathlib import PurePosixPath
 from typing import (
     Optional,
+    cast,
 )
 
 import aiohttp
@@ -52,6 +53,7 @@ from ai.backend.manager.models.vfolder import (
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
 
 from ..actions.base import (
     CloneVFolderAction,
@@ -312,7 +314,7 @@ class VFolderService:
     async def update_attribute(
         self, action: UpdateVFolderAttributeAction
     ) -> UpdateVFolderAttributeActionResult:
-        modifier = action.modifier
+        spec = cast(VFolderAttributeUpdaterSpec, action.updater.spec)
         allowed_vfolder_types = (
             await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
@@ -336,7 +338,7 @@ class VFolderService:
 
         # Check for name conflicts if name is being updated
         try:
-            new_name = modifier.name.value()
+            new_name = spec.name.value()
         except ValueError:
             pass
         else:
@@ -347,8 +349,7 @@ class VFolderService:
                     )
 
         # Update the vfolder using repository
-        to_update = modifier.fields_to_update()
-        await self._vfolder_repository.update_vfolder_attribute(action.vfolder_uuid, to_update)
+        await self._vfolder_repository.update_vfolder_attribute(action.updater)
 
         return UpdateVFolderAttributeActionResult(vfolder_uuid=action.vfolder_uuid)
 

@@ -65,13 +65,9 @@ class DomainService:
 
     async def modify_domain(self, action: ModifyDomainAction) -> ModifyDomainActionResult:
         if action.user_info.role == UserRole.SUPERADMIN:
-            domain_data = await self._admin_repository.modify_domain_force(
-                action.domain_name, action.modifier
-            )
+            domain_data = await self._admin_repository.modify_domain_force(action.updater)
         else:
-            domain_data = await self._repository.modify_domain_validated(
-                action.domain_name, action.modifier
-            )
+            domain_data = await self._repository.modify_domain_validated(action.updater)
         return ModifyDomainActionResult(
             domain_data=domain_data,
         )
@@ -121,8 +117,6 @@ class DomainService:
     async def modify_domain_node(
         self, action: ModifyDomainNodeAction
     ) -> ModifyDomainNodeActionResult:
-        domain_name = action.name
-
         if action.sgroups_to_add is not None and action.sgroups_to_remove is not None:
             if union := action.sgroups_to_add | action.sgroups_to_remove:
                 raise InvalidAPIParameters(
@@ -132,16 +126,14 @@ class DomainService:
 
         if action.user_info.role == UserRole.SUPERADMIN:
             domain_data = await self._admin_repository.modify_domain_node_with_permissions_force(
-                domain_name,
-                action.modifier.fields_to_update(),
+                action.updater,
                 action.user_info,
                 action.sgroups_to_add,
                 action.sgroups_to_remove,
             )
         else:
             domain_data = await self._repository.modify_domain_node_with_permissions(
-                domain_name,
-                action.modifier.fields_to_update(),
+                action.updater,
                 action.user_info,
                 action.sgroups_to_add,
                 action.sgroups_to_remove,

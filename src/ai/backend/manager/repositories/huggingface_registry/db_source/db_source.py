@@ -10,7 +10,6 @@ from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
 )
-from ai.backend.manager.data.huggingface_registry.modifier import HuggingFaceRegistryModifier
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.errors.artifact import ArtifactNotFoundError
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
@@ -19,6 +18,7 @@ from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 
 class HuggingFaceDBSource:
@@ -105,30 +105,24 @@ class HuggingFaceDBSource:
 
     async def update(
         self,
-        registry_id: uuid.UUID,
-        modifier: HuggingFaceRegistryModifier,
+        updater: Updater[HuggingFaceRegistryRow],
         meta: ArtifactRegistryModifierMeta,
     ) -> HuggingFaceRegistryData:
         """
         Update an existing Hugging Face registry entry in the database.
         """
         async with self._db.begin_session() as db_session:
-            data = modifier.fields_to_update()
-
-            update_stmt = (
-                sa.update(HuggingFaceRegistryRow)
-                .where(HuggingFaceRegistryRow.id == registry_id)
-                .values(**data)
-                .returning(HuggingFaceRegistryRow.id)
-            )
-
-            result = await db_session.execute(update_stmt)
-            inserted_row_id = result.scalar()
+            result = await execute_updater(db_session, updater)
+            if result is None:
+                raise ArtifactRegistryNotFoundError(
+                    f"HuggingFace registry with ID {updater.pk_value} not found"
+                )
+            updated_row_id = result.row.id
 
             if (name := meta.name.optional_value()) is not None:
                 await db_session.execute(
                     sa.update(ArtifactRegistryRow)
-                    .where(ArtifactRegistryRow.registry_id == inserted_row_id)
+                    .where(ArtifactRegistryRow.registry_id == updated_row_id)
                     .values(name=name)
                 )
 
@@ -136,7 +130,7 @@ class HuggingFaceDBSource:
             row = (
                 await db_session.execute(
                     sa.select(HuggingFaceRegistryRow)
-                    .where(HuggingFaceRegistryRow.id == inserted_row_id)
+                    .where(HuggingFaceRegistryRow.id == updated_row_id)
                     .options(selectinload(HuggingFaceRegistryRow.meta))
                 )
             ).scalar_one()

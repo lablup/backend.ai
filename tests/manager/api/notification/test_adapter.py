@@ -6,6 +6,7 @@ Tests conversion from DTO objects to repository Querier objects.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import cast
 from uuid import uuid4
 
 from ai.backend.common.data.notification import NotificationChannelType, NotificationRuleType
@@ -38,6 +39,10 @@ from ai.backend.manager.data.notification import (
     NotificationRuleData,
 )
 from ai.backend.manager.repositories.base import OffsetPagination
+from ai.backend.manager.repositories.notification.updaters import (
+    NotificationChannelUpdaterSpec,
+    NotificationRuleUpdaterSpec,
+)
 
 
 class TestNotificationChannelAdapter:
@@ -563,8 +568,9 @@ class TestNotificationChannelAdapterConversion:
         assert dto.created_at == now
         assert dto.updated_at == now
 
-    def test_build_modifier_with_all_fields(self) -> None:
-        """Test building modifier with all fields updated"""
+    def test_build_updater_with_all_fields(self) -> None:
+        """Test building updater with all fields updated"""
+        channel_id = uuid4()
         request = UpdateNotificationChannelRequest(
             name="Updated Name",
             description="Updated description",
@@ -573,27 +579,32 @@ class TestNotificationChannelAdapterConversion:
         )
 
         adapter = NotificationChannelAdapter()
-        modifier = adapter.build_modifier(request)
+        updater = adapter.build_updater(request, channel_id)
+        spec = cast(NotificationChannelUpdaterSpec, updater.spec)
 
-        assert modifier.name.value() == "Updated Name"
-        assert modifier.description.value() == "Updated description"
-        assert modifier.config.value().url == "https://new-url.com"
-        assert modifier.enabled.value() is False
+        assert spec.name.value() == "Updated Name"
+        assert spec.description.value() == "Updated description"
+        assert spec.config.value().url == "https://new-url.com"
+        assert spec.enabled.value() is False
+        assert updater.pk_value == channel_id
 
-    def test_build_modifier_with_partial_fields(self) -> None:
-        """Test building modifier with only some fields updated"""
+    def test_build_updater_with_partial_fields(self) -> None:
+        """Test building updater with only some fields updated"""
+        channel_id = uuid4()
         request = UpdateNotificationChannelRequest(
             name="Updated Name",
             enabled=False,
         )
 
         adapter = NotificationChannelAdapter()
-        modifier = adapter.build_modifier(request)
+        updater = adapter.build_updater(request, channel_id)
+        spec = cast(NotificationChannelUpdaterSpec, updater.spec)
 
-        assert modifier.name.value() == "Updated Name"
-        assert modifier.description.optional_value() is None
-        assert modifier.config.optional_value() is None
-        assert modifier.enabled.value() is False
+        assert spec.name.value() == "Updated Name"
+        assert spec.description.optional_value() is None
+        assert spec.config.optional_value() is None
+        assert spec.enabled.value() is False
+        assert updater.pk_value == channel_id
 
 
 class TestNotificationRuleAdapterConversion:
@@ -648,8 +659,9 @@ class TestNotificationRuleAdapterConversion:
         assert dto.created_at == now
         assert dto.updated_at == now
 
-    def test_build_modifier_with_all_fields(self) -> None:
-        """Test building modifier with all fields updated"""
+    def test_build_updater_with_all_fields(self) -> None:
+        """Test building updater with all fields updated"""
+        rule_id = uuid4()
         request = UpdateNotificationRuleRequest(
             name="Updated Rule",
             description="Updated description",
@@ -658,24 +670,29 @@ class TestNotificationRuleAdapterConversion:
         )
 
         adapter = NotificationRuleAdapter()
-        modifier = adapter.build_modifier(request)
+        updater = adapter.build_updater(request, rule_id)
+        spec = cast(NotificationRuleUpdaterSpec, updater.spec)
 
-        assert modifier.name.value() == "Updated Rule"
-        assert modifier.description.value() == "Updated description"
-        assert modifier.message_template.value() == "New template {{ data }}"
-        assert modifier.enabled.value() is False
+        assert spec.name.value() == "Updated Rule"
+        assert spec.description.value() == "Updated description"
+        assert spec.message_template.value() == "New template {{ data }}"
+        assert spec.enabled.value() is False
+        assert updater.pk_value == rule_id
 
-    def test_build_modifier_with_partial_fields(self) -> None:
-        """Test building modifier with only some fields updated"""
+    def test_build_updater_with_partial_fields(self) -> None:
+        """Test building updater with only some fields updated"""
+        rule_id = uuid4()
         request = UpdateNotificationRuleRequest(
             name="Updated Rule",
             enabled=False,
         )
 
         adapter = NotificationRuleAdapter()
-        modifier = adapter.build_modifier(request)
+        updater = adapter.build_updater(request, rule_id)
+        spec = cast(NotificationRuleUpdaterSpec, updater.spec)
 
-        assert modifier.name.value() == "Updated Rule"
-        assert modifier.description.optional_value() is None
-        assert modifier.message_template.optional_value() is None
-        assert modifier.enabled.value() is False
+        assert spec.name.value() == "Updated Rule"
+        assert spec.description.optional_value() is None
+        assert spec.message_template.optional_value() is None
+        assert spec.enabled.value() is False
+        assert updater.pk_value == rule_id

@@ -38,7 +38,7 @@ class UserResourcePolicyService:
     async def modify_user_resource_policy(
         self, action: ModifyUserResourcePolicyAction
     ) -> ModifyUserResourcePolicyActionResult:
-        result = await self._user_resource_policy_repository.update(action.name, action.modifier)
+        result = await self._user_resource_policy_repository.update(action.updater)
         return ModifyUserResourcePolicyActionResult(user_resource_policy=result)
 
     async def delete_user_resource_policy(

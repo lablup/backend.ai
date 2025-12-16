@@ -29,12 +29,14 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.admin_repository import AdminUserRepository
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.user.actions.create_user import CreateUserAction
 from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
-from ai.backend.manager.services.user.actions.modify_user import ModifyUserAction, UserModifier
+from ai.backend.manager.services.user.actions.modify_user import ModifyUserAction
 from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
@@ -436,14 +438,15 @@ async def test_modify_user(
         full_name="Modify User",
         password="password123",
     ) as _:
+        spec = UserUpdaterSpec(
+            username=OptionalState.update("modify_user"),
+            full_name=OptionalState.update("Modified User"),
+            totp_activated=OptionalState.update(True),
+            status=OptionalState.update(UserStatus.INACTIVE),
+        )
         action = ModifyUserAction(
             email=user_email,
-            modifier=UserModifier(
-                username=OptionalState.update("modify_user"),
-                full_name=OptionalState.update("Modified User"),
-                totp_activated=OptionalState.update(True),
-                status=OptionalState.update(UserStatus.INACTIVE),
-            ),
+            updater=Updater(spec=spec, pk_value=user_email),
         )
 
         result = await processors.modify_user.wait_for_complete(action)
@@ -472,11 +475,12 @@ async def test_modify_user_role_to_admin(
         domain_name="default",
         role=UserRole.USER,
     ) as user_id:
+        spec = UserUpdaterSpec(
+            role=OptionalState.update(UserRole.ADMIN),
+        )
         action = ModifyUserAction(
             email=user_email,
-            modifier=UserModifier(
-                role=OptionalState.update(UserRole.ADMIN),
-            ),
+            updater=Updater(spec=spec, pk_value=user_email),
         )
         result = await processors.modify_user.wait_for_complete(action)
 
@@ -506,11 +510,12 @@ async def test_modify_admin_user_to_normal_user(
         domain_name="default",
         role=UserRole.SUPERADMIN,
     ) as user_id:
+        spec = UserUpdaterSpec(
+            role=OptionalState.update(UserRole.USER),
+        )
         action = ModifyUserAction(
             email=user_email,
-            modifier=UserModifier(
-                role=OptionalState.update(UserRole.USER),
-            ),
+            updater=Updater(spec=spec, pk_value=user_email),
         )
         result = await processors.modify_user.wait_for_complete(action)
 

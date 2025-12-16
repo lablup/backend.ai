@@ -10,7 +10,6 @@ from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
 )
-from ai.backend.manager.data.reservoir_registry.modifier import ReservoirRegistryModifier
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.errors.artifact import ArtifactNotFoundError
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
@@ -19,6 +18,7 @@ from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 
 class ReservoirDBSource:
@@ -123,29 +123,24 @@ class ReservoirDBSource:
 
     async def update(
         self,
-        reservoir_id: uuid.UUID,
-        modifier: ReservoirRegistryModifier,
+        updater: Updater[ReservoirRegistryRow],
         meta: ArtifactRegistryModifierMeta,
     ) -> ReservoirRegistryData:
         """
         Update an existing Reservoir entry in the database.
         """
         async with self._db.begin_session() as db_session:
-            data = modifier.fields_to_update()
-
-            update_stmt = (
-                sa.update(ReservoirRegistryRow)
-                .where(ReservoirRegistryRow.id == reservoir_id)
-                .values(**data)
-                .returning(ReservoirRegistryRow.id)
-            )
-            result = await db_session.execute(update_stmt)
-            inserted_row_id = result.scalar()
+            result = await execute_updater(db_session, updater)
+            if result is None:
+                raise ArtifactRegistryNotFoundError(
+                    f"Reservoir registry with ID {updater.pk_value} not found"
+                )
+            updated_row_id = result.row.id
 
             if (name := meta.name.optional_value()) is not None:
                 await db_session.execute(
                     sa.update(ArtifactRegistryRow)
-                    .where(ArtifactRegistryRow.registry_id == inserted_row_id)
+                    .where(ArtifactRegistryRow.registry_id == updated_row_id)
                     .values(name=name)
                 )
 
@@ -153,7 +148,7 @@ class ReservoirDBSource:
             row = (
                 await db_session.execute(
                     sa.select(ReservoirRegistryRow)
-                    .where(ReservoirRegistryRow.id == inserted_row_id)
+                    .where(ReservoirRegistryRow.id == updated_row_id)
                     .options(selectinload(ReservoirRegistryRow.meta))
                 )
             ).scalar_one()

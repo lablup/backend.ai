@@ -57,7 +57,7 @@ IMAGE_ROW_FIXTURE = ImageRow(
     status=ImageStatus.ALIVE,
 )
 IMAGE_ROW_FIXTURE.id = uuid.uuid4()
-IMAGE_ROW_FIXTURE.created_at = isoparse("2023-10-01T00:00:00+09:00")
+IMAGE_ROW_FIXTURE.created_at = datetime(2023, 9, 30, 15, 0, 0, tzinfo=timezone.utc)
 
 IMAGE_FIXTURE_DATA = IMAGE_ROW_FIXTURE.to_dataclass()
 

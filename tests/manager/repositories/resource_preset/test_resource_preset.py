@@ -16,6 +16,7 @@ from ai.backend.manager.errors.resource import ResourcePresetNotFound
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_preset.cache_source.cache_source import (
     ResourcePresetCacheSource,
 )
@@ -24,9 +25,7 @@ from ai.backend.manager.repositories.resource_preset.db_source.db_source import 
     ResourcePresetDBSource,
 )
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
-from ai.backend.manager.services.resource_preset.types import (
-    ResourcePresetModifier,
-)
+from ai.backend.manager.repositories.resource_preset.updaters import ResourcePresetUpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -264,21 +263,24 @@ class TestResourcePresetRepository:
         """Test successful preset modification"""
         preset_id = sample_preset_row.id
         preset_data = sample_preset_row.to_dataclass()
-        modifier = ResourcePresetModifier(
-            name=OptionalState.update("modified-preset"),
-            resource_slots=OptionalState.update(ResourceSlot({"cpu": "8", "mem": "16G"})),
-            shared_memory=TriState.nullify(),
-            scaling_group_name=TriState.update("new-group"),
+        updater = Updater(
+            spec=ResourcePresetUpdaterSpec(
+                name=OptionalState.update("modified-preset"),
+                resource_slots=OptionalState.update(ResourceSlot({"cpu": "8", "mem": "16G"})),
+                shared_memory=TriState.nullify(),
+                scaling_group_name=TriState.update("new-group"),
+            ),
+            pk_value=preset_id,
         )
 
         # Mock modify operation
         mock_db_source.modify_preset = AsyncMock(return_value=preset_data)
         mock_cache_source.invalidate_preset = AsyncMock()
 
-        result = await resource_preset_repository.modify_preset_validated(preset_id, None, modifier)
+        result = await resource_preset_repository.modify_preset_validated(updater)
 
         assert result is not None
-        mock_db_source.modify_preset.assert_called_once_with(preset_id, None, modifier)
+        mock_db_source.modify_preset.assert_called_once_with(updater)
         mock_cache_source.invalidate_preset.assert_called_once_with(preset_id, None)
 
     @pytest.mark.asyncio
@@ -287,22 +289,28 @@ class TestResourcePresetRepository:
     ) -> None:
         """Test preset modification when preset not found"""
         preset_id = uuid.uuid4()
-        modifier = ResourcePresetModifier(
-            name=OptionalState.update("modified-preset"),
+        updater = Updater(
+            spec=ResourcePresetUpdaterSpec(
+                name=OptionalState.update("modified-preset"),
+            ),
+            pk_value=preset_id,
         )
 
         # Mock modify to raise exception
         mock_db_source.modify_preset = AsyncMock(side_effect=ResourcePresetNotFound())
 
         with pytest.raises(ResourcePresetNotFound):
-            await resource_preset_repository.modify_preset_validated(preset_id, None, modifier)
+            await resource_preset_repository.modify_preset_validated(updater)
 
     @pytest.mark.asyncio
     async def test_modify_preset_validated_no_params(
         self, resource_preset_repository, mock_db_source
     ) -> None:
         """Test preset modification with no preset ID"""
-        modifier = ResourcePresetModifier()
+        updater = Updater(
+            spec=ResourcePresetUpdaterSpec(),
+            pk_value="",
+        )
 
         # Mock db_source to raise ValueError
         mock_db_source.modify_preset = AsyncMock(
@@ -310,7 +318,7 @@ class TestResourcePresetRepository:
         )
 
         with pytest.raises(ValueError):
-            await resource_preset_repository.modify_preset_validated(None, None, modifier)
+            await resource_preset_repository.modify_preset_validated(updater)
 
     @pytest.mark.asyncio
     async def test_delete_preset_validated_success(

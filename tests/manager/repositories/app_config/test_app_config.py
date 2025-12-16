@@ -11,7 +11,6 @@ import sqlalchemy as sa
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.types import BinarySize, ValkeyTarget
-from ai.backend.manager.data.app_config.types import AppConfigModifier
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.models.app_config import AppConfigScopeType
 from ai.backend.manager.models.domain import DomainRow
@@ -21,6 +20,7 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config import AppConfigRepository
 from ai.backend.manager.repositories.app_config.creators import AppConfigCreatorSpec
+from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.types import OptionalState
 
@@ -271,12 +271,12 @@ class TestAppConfigRepository:
         test_domain_name: str,
     ) -> None:
         """Test upserting config when it doesn't exist (create)"""
-        modifier = AppConfigModifier(
+        spec = AppConfigUpdaterSpec(
             extra_config=OptionalState.update({"theme": "dark", "language": "en"})
         )
 
         config = await app_config_repository.upsert_config(
-            AppConfigScopeType.DOMAIN, test_domain_name, modifier
+            AppConfigScopeType.DOMAIN, test_domain_name, spec
         )
 
         assert config.scope_type == AppConfigScopeType.DOMAIN
@@ -301,11 +301,11 @@ class TestAppConfigRepository:
         initial_config = await app_config_repository.create_config(creator)
 
         # Update config
-        modifier = AppConfigModifier(
+        spec = AppConfigUpdaterSpec(
             extra_config=OptionalState.update({"theme": "light", "language": "ko"})
         )
         updated_config = await app_config_repository.upsert_config(
-            AppConfigScopeType.DOMAIN, test_domain_name, modifier
+            AppConfigScopeType.DOMAIN, test_domain_name, spec
         )
 
         assert updated_config.id == initial_config.id
@@ -390,10 +390,8 @@ class TestAppConfigRepository:
         assert merged_config2 == {"theme": "dark"}
 
         # Update domain config - should invalidate cache
-        modifier = AppConfigModifier(extra_config=OptionalState.update({"theme": "light"}))
-        await app_config_repository.upsert_config(
-            AppConfigScopeType.DOMAIN, test_domain_name, modifier
-        )
+        spec = AppConfigUpdaterSpec(extra_config=OptionalState.update({"theme": "light"}))
+        await app_config_repository.upsert_config(AppConfigScopeType.DOMAIN, test_domain_name, spec)
 
         # Cache should be invalidated, get updated config
         merged_config3 = await app_config_repository.get_merged_config(test_user_id)

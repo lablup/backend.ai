@@ -8,13 +8,13 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.app_config.types import (
     AppConfigData,
-    AppConfigModifier,
     MergedAppConfig,
 )
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.app_config import AppConfigRow, AppConfigScopeType
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 
 
@@ -115,14 +115,14 @@ class AppConfigDBSource:
         self,
         scope_type: AppConfigScopeType,
         scope_id: str,
-        modifier: AppConfigModifier,
+        spec: AppConfigUpdaterSpec,
     ) -> AppConfigData:
         """
         Create or update app configuration.
         If exists, update; otherwise, create new.
         """
         async with self._db.begin_session() as db_sess:
-            fields_to_update = modifier.fields_to_update()
+            fields_to_update = spec.build_values()
             if not fields_to_update:
                 # No fields to update, just fetch existing
                 result = await db_sess.execute(
@@ -173,7 +173,7 @@ class AppConfigDBSource:
                 row = fetch_result.scalar_one()
                 return row.to_data()
 
-            # If not exists, create new with the modifier's values
+            # If not exists, create new with the spec's values
             extra_config = fields_to_update.get("extra_config", {})
             config_row = AppConfigRow(
                 scope_type=scope_type,

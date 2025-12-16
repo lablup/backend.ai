@@ -9,11 +9,11 @@ from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
 )
-from ai.backend.manager.data.huggingface_registry.modifier import HuggingFaceRegistryModifier
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.huggingface_registry.db_source.db_source import (
     HuggingFaceDBSource,
 )
@@ -68,11 +68,10 @@ class HuggingFaceRepository:
     @huggingface_registry_repository_resilience.apply()
     async def update(
         self,
-        registry_id: uuid.UUID,
-        modifier: HuggingFaceRegistryModifier,
+        updater: Updater[HuggingFaceRegistryRow],
         meta: ArtifactRegistryModifierMeta,
     ) -> HuggingFaceRegistryData:
-        return await self._db_source.update(registry_id, modifier, meta)
+        return await self._db_source.update(updater, meta)
 
     @huggingface_registry_repository_resilience.apply()
     async def delete(self, registry_id: uuid.UUID) -> uuid.UUID:

@@ -1,14 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, override
+from typing import Any
+
+from typing_extensions import override
 
 from ai.backend.common.types import BinarySize, ResourceSlot
-from ai.backend.manager.types import OptionalState, PartialModifier, TriState
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.repositories.base.updater import UpdaterSpec
+from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
-class ResourcePresetModifier(PartialModifier):
+class ResourcePresetUpdaterSpec(UpdaterSpec[ResourcePresetRow]):
+    """UpdaterSpec for resource preset updates."""
+
     resource_slots: OptionalState[ResourceSlot] = field(
         default_factory=OptionalState[ResourceSlot].nop
     )
@@ -16,8 +22,13 @@ class ResourcePresetModifier(PartialModifier):
     shared_memory: TriState[BinarySize] = field(default_factory=TriState[BinarySize].nop)
     scaling_group_name: TriState[str] = field(default_factory=TriState[str].nop)
 
+    @property
     @override
-    def fields_to_update(self) -> dict[str, Any]:
+    def row_class(self) -> type[ResourcePresetRow]:
+        return ResourcePresetRow
+
+    @override
+    def build_values(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
         self.resource_slots.update_dict(to_update, "resource_slots")
         self.name.update_dict(to_update, "name")

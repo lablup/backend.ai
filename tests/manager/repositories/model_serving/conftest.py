@@ -282,9 +282,10 @@ def mock_session():
     session.refresh = AsyncMock()
     session.connection = AsyncMock()
 
-    # Set up execute to return a mock result that has scalar method
+    # Set up execute to return a mock result that has scalar methods
     mock_result = AsyncMock()
     mock_result.scalar = MagicMock()
+    mock_result.scalar_one_or_none = MagicMock()
     mock_result.scalars = MagicMock()
     mock_result.first = MagicMock()
     session.execute.return_value = mock_result
@@ -369,12 +370,18 @@ def setup_db_session_mock(mock_db_engine, mock_session):
     return mock_session
 
 
-def setup_mock_query_result(mock_session, scalar_result=None, scalars_all_result=None):
+def setup_mock_query_result(
+    mock_session, scalar_result=None, scalars_all_result=None, scalar_one_or_none_result=None
+):
     """Helper function to set up common query result patterns."""
     if scalar_result is not None:
         mock_session.execute.return_value.scalar.return_value = scalar_result
     if scalars_all_result is not None:
         mock_session.execute.return_value.scalars.return_value.all.return_value = scalars_all_result
+    if scalar_one_or_none_result is not None:
+        mock_session.execute.return_value.scalar_one_or_none.return_value = (
+            scalar_one_or_none_result
+        )
     return mock_session
 
 

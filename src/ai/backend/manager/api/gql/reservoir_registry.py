@@ -12,12 +12,13 @@ from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
 )
-from ai.backend.manager.data.reservoir_registry.modifier import ReservoirRegistryModifier
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.reservoir_registry import ReservoirRegistryCreatorSpec
+from ai.backend.manager.repositories.reservoir_registry.updaters import ReservoirRegistryUpdaterSpec
 from ai.backend.manager.services.artifact_registry.actions.reservoir.create import (
     CreateReservoirRegistryAction,
 )
@@ -172,13 +173,14 @@ class UpdateReservoirRegistryInput:
     secret_key: Optional[str] = UNSET
     api_version: Optional[str] = UNSET
 
-    def to_modifier(self) -> ReservoirRegistryModifier:
-        return ReservoirRegistryModifier(
+    def to_updater(self) -> Updater[ReservoirRegistryRow]:
+        spec = ReservoirRegistryUpdaterSpec(
             endpoint=OptionalState[str].from_graphql(self.endpoint),
             access_key=OptionalState[str].from_graphql(self.access_key),
             secret_key=OptionalState[str].from_graphql(self.secret_key),
             api_version=OptionalState[str].from_graphql(self.api_version),
         )
+        return Updater(spec=spec, pk_value=uuid.UUID(self.id))
 
     def to_modifier_meta(self) -> ArtifactRegistryModifierMeta:
         return ArtifactRegistryModifierMeta(
@@ -231,9 +233,7 @@ async def update_reservoir_registry(
     processors = info.context.processors
 
     action_result = await processors.artifact_registry.update_reservoir_registry.wait_for_complete(
-        UpdateReservoirRegistryAction(
-            id=uuid.UUID(input.id), modifier=input.to_modifier(), meta=input.to_modifier_meta()
-        )
+        UpdateReservoirRegistryAction(updater=input.to_updater(), meta=input.to_modifier_meta())
     )
 
     return UpdateReservoirRegistryPayload(

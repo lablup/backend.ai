@@ -29,7 +29,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.deployment.creator import DeploymentCreator
-from ai.backend.manager.data.deployment.modifier import DeploymentModifier
 from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
 from ai.backend.manager.data.deployment.scale_modifier import AutoScalingRuleModifier
 from ai.backend.manager.data.deployment.types import (
@@ -46,11 +45,12 @@ from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.deployment import DefinitionFileNotFound
 from ai.backend.manager.errors.service import EndpointNotFound
-from ai.backend.manager.models.endpoint import EndpointStatistics
+from ai.backend.manager.models.endpoint import EndpointRow, EndpointStatistics
 from ai.backend.manager.models.kernel import KernelStatistics
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
 from .db_source import DeploymentDBSource
@@ -124,13 +124,13 @@ class DeploymentRepository:
     async def get_modified_endpoint(
         self,
         endpoint_id: uuid.UUID,
-        modifier: DeploymentModifier,
+        updater: Updater[EndpointRow],
     ) -> DeploymentInfo:
         """Get modified endpoint without applying changes.
 
         Args:
             endpoint_id: ID of the endpoint to modify
-            modifier: Deployment modifier containing partial updates
+            updater: Updater containing spec with partial updates
 
         Returns:
             DeploymentInfo: Modified deployment information
@@ -138,19 +138,17 @@ class DeploymentRepository:
         Raises:
             EndpointNotFound: If the endpoint does not exist
         """
-        return await self._db_source.get_modified_endpoint(endpoint_id, modifier)
+        return await self._db_source.get_modified_endpoint(endpoint_id, updater)
 
     @deployment_repository_resilience.apply()
-    async def update_endpoint_with_modifier(
+    async def update_endpoint_with_spec(
         self,
-        endpoint_id: uuid.UUID,
-        modifier: DeploymentModifier,
+        updater: Updater[EndpointRow],
     ) -> DeploymentInfo:
-        """Update endpoint using a deployment modifier.
+        """Update endpoint using an Updater.
 
         Args:
-            endpoint_id: ID of the endpoint to update
-            modifier: Deployment modifier containing partial updates
+            updater: Updater containing spec and endpoint_id
 
         Returns:
             DeploymentInfo: Updated deployment information
@@ -159,7 +157,7 @@ class DeploymentRepository:
             NoUpdatesToApply: If there are no updates to apply
             EndpointNotFound: If the endpoint does not exist
         """
-        return await self._db_source.update_endpoint_with_modifier(endpoint_id, modifier)
+        return await self._db_source.update_endpoint_with_spec(updater)
 
     @deployment_repository_resilience.apply()
     async def update_endpoint_lifecycle_bulk(

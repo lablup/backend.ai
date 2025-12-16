@@ -44,6 +44,7 @@ from ai.backend.manager.models.minilang.queryfilter import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
+from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
 from ai.backend.manager.services.container_registry.actions.clear_images import ClearImagesAction
 from ai.backend.manager.services.container_registry.actions.load_all_container_registries import (
     LoadAllContainerRegistriesAction,
@@ -73,7 +74,6 @@ from ai.backend.manager.services.image.actions.get_images_by_canonicals import (
     GetImagesByCanonicalsAction,
 )
 from ai.backend.manager.services.image.actions.modify_image import (
-    ImageModifier,
     ModifyImageAction,
 )
 from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
@@ -1125,7 +1125,7 @@ class ModifyImageInput(graphene.InputObjectType):
     supported_accelerators = graphene.List(graphene.String, required=False)
     resource_limits = graphene.List(lambda: ResourceLimitInput, required=False)
 
-    def to_modifier(self) -> ImageModifier:
+    def to_updater_spec(self) -> ImageUpdaterSpec:
         resources_data: dict[str, Any] | UndefinedType = Undefined
         if self.resource_limits is not Undefined:
             resources_data = {}
@@ -1142,7 +1142,7 @@ class ModifyImageInput(graphene.InputObjectType):
         )
         labels = {label.key: label.value for label in self.labels} if self.labels else Undefined
 
-        return ImageModifier(
+        return ImageUpdaterSpec(
             name=OptionalState[str].from_graphql(self.name),
             registry=OptionalState[str].from_graphql(self.registry),
             image=OptionalState[str].from_graphql(self.image),
@@ -1150,7 +1150,7 @@ class ModifyImageInput(graphene.InputObjectType):
             architecture=OptionalState[str].from_graphql(self.architecture),
             is_local=OptionalState[bool].from_graphql(self.is_local),
             size_bytes=OptionalState[int].from_graphql(self.size_bytes),
-            type=OptionalState[ImageType].from_graphql(self.type),
+            image_type=OptionalState[ImageType].from_graphql(self.type),
             config_digest=OptionalState[str].from_graphql(self.digest),
             labels=OptionalState[dict[str, Any]].from_graphql(labels),
             accelerators=TriState[str].from_graphql(
@@ -1188,7 +1188,7 @@ class ModifyImage(graphene.Mutation):
             ModifyImageAction(
                 target=target,
                 architecture=architecture,
-                modifier=props.to_modifier(),
+                updater_spec=props.to_updater_spec(),
             )
         )
 
