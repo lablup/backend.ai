@@ -1,3 +1,4 @@
+import enum
 import functools
 import inspect
 import json
@@ -35,6 +36,15 @@ from .exception import (
     MiddlewareParamParsingFailed,
     ParameterNotParsedError,
 )
+
+
+class Sentinel(enum.Enum):
+    """A sentinel value to represent an unset value."""
+
+    TOKEN = enum.auto()
+
+
+SENTINEL = Sentinel.TOKEN
 
 
 class BaseRequestModel(BaseModel):
