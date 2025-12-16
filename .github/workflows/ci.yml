@@ -323,22 +323,34 @@ jobs:
         cache-lmdb-store: 'true'
     - name: Test
       timeout-minutes: 15
+      env:
+        IS_RELEASE: ${{ needs.optimize-ci.outputs.release }}
       run: |
         # configure redis sentinel cluster hostnames for testing
         grep -q "127.0.0.1 node01" /etc/hosts || echo "127.0.0.1 node01" | sudo tee -a /etc/hosts
         grep -q "127.0.0.1 node02" /etc/hosts || echo "127.0.0.1 node02" | sudo tee -a /etc/hosts
         grep -q "127.0.0.1 node03" /etc/hosts || echo "127.0.0.1 node03" | sudo tee -a /etc/hosts
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
-          BASE_REF="origin/${BASE_REF_SHORT}"
-          git remote set-branches origin "$BASE_REF_SHORT"
-          BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
-          BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
-          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
+        # Run full tests for release, otherwise run changed tests only
+        if [ "$IS_RELEASE" == "true" ]; then
+          pants test :: -- -v
         else
-          BASE_REF="HEAD~1"
+          if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+            [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
+            BASE_REF="origin/${BASE_REF_SHORT}"
+            git remote set-branches origin "$BASE_REF_SHORT"
+            BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
+            BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
+            git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
+          else
+            BASE_REF="HEAD~1"
+          fi
+          # Use --changed-dependents=transitive only for merge_group to run broader tests
+          DEPENDENTS_OPT=""
+          if [ "$GITHUB_EVENT_NAME" == "merge_group" ]; then
+            DEPENDENTS_OPT="--changed-dependents=transitive"
+          fi
+          pants test --changed-since=$BASE_REF $DEPENDENTS_OPT -- -v
         fi
-        pants test --changed-since=$BASE_REF --changed-dependents=transitive -- -v
     - name: Upload pants log
       uses: actions/upload-artifact@v5
       with:
