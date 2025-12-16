@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Collection
 
 import sqlalchemy as sa
 
@@ -11,6 +12,13 @@ from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 class NotificationChannelConditions:
     """Query conditions for notification channels."""
+
+    @staticmethod
+    def by_ids(channel_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return NotificationChannelRow.id.in_(channel_ids)
+
+        return inner
 
     @staticmethod
     def by_name_contains(name: str, case_insensitive: bool = False) -> QueryCondition:
@@ -110,6 +118,13 @@ class NotificationChannelOrders:
 
 class NotificationRuleConditions:
     """Query conditions for notification rules."""
+
+    @staticmethod
+    def by_ids(rule_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return NotificationRuleRow.id.in_(rule_ids)
+
+        return inner
 
     @staticmethod
     def by_name_contains(name: str, case_insensitive: bool = False) -> QueryCondition:
