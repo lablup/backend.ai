@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Any, Mapping, Type, cast
+from typing import Any, Mapping, Optional, Type, cast
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -43,91 +43,132 @@ def get_checker_from_host(
         )
 
 
-def remaining_time_calculation() -> None:
-    # test 1
-    # now + 10.0 == idle_baseline + timeout_period
-    now = datetime(2020, 3, 1, 12, 30, second=20)
-    idle_baseline = datetime(2020, 3, 1, 12, 30, second=0)
-    timeout_period = timedelta(seconds=30)
-    grace_period_end = None
-    remaining = calculate_remaining_time(now, idle_baseline, timeout_period, grace_period_end)
-    expect = 10.0
-    assert expect == remaining
-
-    # test 2
-    # now + 40.0 == max(grace_period_end, idle_baseline) + timeout_period
-    now = datetime(2020, 3, 1, 12, 30, second=20)
-    idle_baseline = datetime(2020, 3, 1, 12, 30, second=0)
-    timeout_period = timedelta(seconds=30)
-    grace_period_end = datetime(2020, 3, 1, 12, 30, second=30)
-    remaining = calculate_remaining_time(now, idle_baseline, timeout_period, grace_period_end)
-    expect = 40.0
-    assert expect == remaining
-
-    now = datetime(2020, 3, 1, 12, 30, second=20)
-    idle_baseline = datetime(2020, 3, 1, 12, 30, second=30)
-    timeout_period = timedelta(seconds=30)
-    grace_period_end = datetime(2020, 3, 1, 12, 30, second=20)
-    remaining = calculate_remaining_time(now, idle_baseline, timeout_period, grace_period_end)
-    expect = 40.0
-    assert expect == remaining
-
-    # test 3
-    # now - 30.0 == max(grace_period_end, idle_baseline) + timeout_period
-    now = datetime(2020, 3, 1, 12, 30, second=50)
-    idle_baseline = datetime(2020, 3, 1, 12, 30, second=0)
-    timeout_period = timedelta(seconds=10)
-    grace_period_end = datetime(2020, 3, 1, 12, 30, second=10)
-    remaining = calculate_remaining_time(now, idle_baseline, timeout_period, grace_period_end)
-    expect = -30.0
-    assert expect == remaining
+@dataclass
+class _RemainingTimeCalculationTestConfig:
+    now: datetime
+    idle_baseline: datetime
+    timeout_period: timedelta
+    grace_period_end: Optional[datetime]
+    expected_remaining: float
 
 
+@pytest.mark.parametrize(
+    "remaining_time_config",
+    [
+        # Test 1: No grace period
+        # remaining = (idle_baseline - now) + timeout_period
+        # = (12:30:00 - 12:30:20) + 30s = -20s + 30s = 10s
+        _RemainingTimeCalculationTestConfig(
+            now=datetime(2020, 3, 1, 12, 30, second=20),
+            idle_baseline=datetime(2020, 3, 1, 12, 30, second=0),
+            timeout_period=timedelta(seconds=30),
+            grace_period_end=None,
+            expected_remaining=10.0,
+        ),
+        # Test 2: Grace period takes precedence (grace_period_end > idle_baseline)
+        # baseline = max(idle_baseline, grace_period_end) = max(12:30:00, 12:30:30) = 12:30:30
+        # remaining = (baseline - now) + timeout_period
+        # = (12:30:30 - 12:30:20) + 30s = 10s + 30s = 40s
+        _RemainingTimeCalculationTestConfig(
+            now=datetime(2020, 3, 1, 12, 30, second=20),
+            idle_baseline=datetime(2020, 3, 1, 12, 30, second=0),
+            timeout_period=timedelta(seconds=30),
+            grace_period_end=datetime(2020, 3, 1, 12, 30, second=30),
+            expected_remaining=40.0,
+        ),
+        # Test 3: idle_baseline takes precedence (idle_baseline > grace_period_end)
+        # baseline = max(idle_baseline, grace_period_end) = max(12:30:30, 12:30:20) = 12:30:30
+        # remaining = (baseline - now) + timeout_period
+        # = (12:30:30 - 12:30:20) + 30s = 10s + 30s = 40s
+        _RemainingTimeCalculationTestConfig(
+            now=datetime(2020, 3, 1, 12, 30, second=20),
+            idle_baseline=datetime(2020, 3, 1, 12, 30, second=30),
+            timeout_period=timedelta(seconds=30),
+            grace_period_end=datetime(2020, 3, 1, 12, 30, second=20),
+            expected_remaining=40.0,
+        ),
+        # Test 4: Timeout exceeded (negative remaining time)
+        # baseline = max(idle_baseline, grace_period_end) = max(12:30:00, 12:30:10) = 12:30:10
+        # remaining = (baseline - now) + timeout_period
+        # = (12:30:10 - 12:30:50) + 10s = -40s + 10s = -30s
+        _RemainingTimeCalculationTestConfig(
+            now=datetime(2020, 3, 1, 12, 30, second=50),
+            idle_baseline=datetime(2020, 3, 1, 12, 30, second=0),
+            timeout_period=timedelta(seconds=10),
+            grace_period_end=datetime(2020, 3, 1, 12, 30, second=10),
+            expected_remaining=-30.0,
+        ),
+    ],
+)
 @pytest.mark.asyncio
-async def new_user_grace_period_checker(
-    etcd_fixture,
-    database_fixture,
-    create_app_and_client,
+async def test_remaining_time_calculation(
+    remaining_time_config: _RemainingTimeCalculationTestConfig,
 ) -> None:
-    test_app, _ = await create_app_and_client(
-        [
-            config_provider_ctx,
-            redis_ctx,
-            event_dispatcher_ctx,
-            background_task_ctx,
-            database_ctx,
-            distributed_lock_ctx,
-        ],
-        [".etcd"],
+    remaining = calculate_remaining_time(
+        remaining_time_config.now,
+        remaining_time_config.idle_baseline,
+        remaining_time_config.timeout_period,
+        remaining_time_config.grace_period_end,
     )
-    root_ctx: RootContext = test_app["_root.context"]
 
-    # test config
-    grace_period = 30
-    user_created_at = datetime(2020, 3, 1, 12, 30, second=0)
-    expected = datetime(2020, 3, 1, 12, 30, second=30)
-    idle_value: Mapping[str, Any] = {
-        "checkers": {
-            "user_grace_period": {"user_initial_grace_period": str(grace_period)},
-        },
-        "enabled": "",
-    }
-    kernel = {"user_created_at": user_created_at}
+    assert remaining == remaining_time_config.expected_remaining
 
-    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
-    checker_host = await init_idle_checkers(
-        root_ctx.db,
-        root_ctx.config_provider,
-        root_ctx.event_producer,
-        root_ctx.distributed_lock_factory,
-    )
-    try:
-        await checker_host.start()
-        grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(kernel)
-    finally:
-        await checker_host.shutdown()
 
-    assert grace_period_end == expected
+class TestNewUserGracePeriodChecker:
+    @pytest.fixture
+    def base_time(self) -> datetime:
+        """Reference time for all tests. All other times are calculated as offsets from this."""
+        return datetime.now(timezone.utc).replace(microsecond=0)
+
+    @pytest.fixture
+    async def valkey_live(self) -> AsyncMock:
+        """Mock ValkeyLiveClient - configure return values in scenario fixtures"""
+        mock_client = AsyncMock()
+        # Configure default return values
+        mock_client.count_active_connections.return_value = 0
+        mock_client.get_live_data.return_value = None
+        mock_client.get_server_time.return_value = 0.0
+        # store_live_data should not raise errors
+        mock_client.store_live_data.return_value = None
+        return mock_client
+
+    @pytest.fixture
+    async def user_initial_grace_period_policy(self) -> dict[str, Any]:
+        """Policy with user initial grace period"""
+        return {"user_initial_grace_period": "100"}
+
+    @pytest.fixture
+    async def grace_period_checker(
+        self, valkey_live: AsyncMock, user_initial_grace_period_policy: dict[str, Any]
+    ) -> NewUserGracePeriodChecker:
+        """Create and configure NewUserGracePeriodChecker"""
+        checker = NewUserGracePeriodChecker(valkey_live)
+        await checker.populate_config(user_initial_grace_period_policy)
+        return checker
+
+    @pytest.fixture
+    def kernel_user_joined_data(self, base_time: datetime) -> dict[str, datetime]:
+        """Mock kernel table - user table joined data as dict"""
+        return {
+            "user_created_at": base_time,
+        }
+
+    @pytest.mark.asyncio
+    async def test_new_user_grace_period(
+        self,
+        grace_period_checker: NewUserGracePeriodChecker,
+        kernel_user_joined_data: dict[str, datetime],
+        user_initial_grace_period_policy: dict[str, Any],
+    ) -> None:
+        """Test new user grace period calculation"""
+        # When
+        grace_period_end = await grace_period_checker.get_grace_period_end(kernel_user_joined_data)
+
+        # Then
+        expected_grace_period_end = kernel_user_joined_data["user_created_at"] + timedelta(
+            seconds=float(user_initial_grace_period_policy["user_initial_grace_period"])
+        )
+        assert grace_period_end == expected_grace_period_end
 
 
 @dataclass
