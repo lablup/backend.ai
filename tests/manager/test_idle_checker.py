@@ -12,6 +12,7 @@ from ai.backend.common.types import KernelId, SessionId, SessionTypes
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.idle import (
     BaseIdleChecker,
+    IdleCheckerArgs,
     IdleCheckerHost,
     NetworkTimeoutIdleChecker,
     NewUserGracePeriodChecker,
