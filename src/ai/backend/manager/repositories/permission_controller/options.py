@@ -6,8 +6,12 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import EntityType, RoleSource, ScopeType
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
-from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
+from ai.backend.manager.models.rbac_models.permission.object_permission import (
+    ObjectPermissionRow,
+)
+from ai.backend.manager.models.rbac_models.permission.permission_group import (
+    PermissionGroupRow,
+)
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRow
