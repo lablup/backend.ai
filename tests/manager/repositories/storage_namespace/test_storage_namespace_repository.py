@@ -157,6 +157,7 @@ class TestStorageNamespaceRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: StorageNamespaceRow.storage_id == target_storage_id,
             ],
             orders=[],
@@ -177,6 +178,7 @@ class TestStorageNamespaceRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: StorageNamespaceRow.namespace.like("alpha%"),
             ],
             orders=[],
@@ -301,6 +303,7 @@ class TestStorageNamespaceRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=5, offset=2),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: StorageNamespaceRow.storage_id == test_storage_id,
             ],
             orders=[StorageNamespaceRow.namespace.asc()],
