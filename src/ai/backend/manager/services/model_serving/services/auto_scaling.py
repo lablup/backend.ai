@@ -1,8 +1,11 @@
 import decimal
 import logging
 
+import sqlalchemy as sa
+
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.model_serving.types import RequesterCtx
+from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.model_serving.admin_repository import (
     AdminModelServingRepository,
@@ -195,11 +198,25 @@ class AutoScalingService:
                 querier=action.querier,
             )
         else:
+            user_id = action.requester_ctx.user_id
+            user_role = action.requester_ctx.user_role
+            domain_name = action.requester_ctx.domain_name
+
+            # TODO: Refactor this after creating condition type
+            match user_role:
+                case UserRole.ADMIN:
+                    def domain_condition() -> sa.sql.expression.ColumnElement[bool]:
+                        return EndpointRow.domain == domain_name
+
+                    action.querier.conditions.append(domain_condition)
+                case UserRole.USER | UserRole.MONITOR:
+                    def user_condition() -> sa.sql.expression.ColumnElement[bool]:
+                        return EndpointRow.session_owner == user_id
+
+                    action.querier.conditions.append(user_condition)
+
             result = await self._repository.search_auto_scaling_rules_validated(
                 querier=action.querier,
-                user_id=action.requester_ctx.user_id,
-                user_role=action.requester_ctx.user_role,
-                domain_name=action.requester_ctx.domain_name,
             )
 
         return SearchAutoScalingRulesActionResult(

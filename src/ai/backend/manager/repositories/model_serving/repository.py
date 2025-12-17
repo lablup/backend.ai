@@ -977,26 +977,15 @@ class ModelServingRepository:
     async def search_auto_scaling_rules_validated(
         self,
         querier: BatchQuerier,
-        user_id: uuid.UUID,
-        user_role: UserRole,
-        domain_name: str,
     ) -> EndpointAutoScalingRuleListResult:
         """
         Search auto scaling rules with access validation.
-        Filters rules based on user's access to their associated endpoints.
+        Access control conditions should be injected into querier.conditions by the caller.
         """
         async with self._db.begin_readonly_session() as session:
-            # Build base query with endpoint join for access validation
             query = sa.select(EndpointAutoScalingRuleRow).join(
                 EndpointRow, EndpointAutoScalingRuleRow.endpoint == EndpointRow.id
             )
-
-            # Apply access control filters based on user role
-            match user_role:
-                case UserRole.ADMIN:
-                    query = query.where(EndpointRow.domain == domain_name)
-                case UserRole.USER | UserRole.MONITOR:
-                    query = query.where(EndpointRow.session_owner == user_id)
 
             result = await execute_batch_querier(session, query, querier)
 
