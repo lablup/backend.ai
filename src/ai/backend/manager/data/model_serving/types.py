@@ -32,6 +32,7 @@ __all__ = [
     "RoutingData",
     "EndpointTokenData",
     "EndpointAutoScalingRuleData",
+    "EndpointAutoScalingRuleListResult",
 ]
 
 
@@ -107,6 +108,16 @@ class EndpointAutoScalingRuleData:
     created_at: datetime
     last_triggered_at: datetime
     endpoint: uuid.UUID
+
+
+@dataclass
+class EndpointAutoScalingRuleListResult:
+    """Search result with total count for endpoint auto scaling rules."""
+
+    items: list[EndpointAutoScalingRuleData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
 
 @dataclass

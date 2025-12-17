@@ -24,6 +24,10 @@ from ai.backend.manager.services.model_serving.actions.scale_service_replicas im
     ScaleServiceReplicasAction,
     ScaleServiceReplicasActionResult,
 )
+from ai.backend.manager.services.model_serving.actions.search_auto_scaling_rules import (
+    SearchAutoScalingRulesAction,
+    SearchAutoScalingRulesActionResult,
+)
 from ai.backend.manager.services.model_serving.exceptions import (
     EndpointAutoScalingRuleNotFound,
     EndpointNotFound,
@@ -178,4 +182,29 @@ class AutoScalingService:
 
         return DeleteEndpointAutoScalingRuleActionResult(
             success=True,
+        )
+
+    async def search_auto_scaling_rules(
+        self, action: SearchAutoScalingRulesAction
+    ) -> SearchAutoScalingRulesActionResult:
+        """Searches endpoint auto scaling rules."""
+        await self.check_requester_access(action.requester_ctx)
+
+        if action.requester_ctx.user_role == UserRole.SUPERADMIN:
+            result = await self._admin_repository.search_auto_scaling_rules_force(
+                querier=action.querier,
+            )
+        else:
+            result = await self._repository.search_auto_scaling_rules_validated(
+                querier=action.querier,
+                user_id=action.requester_ctx.user_id,
+                user_role=action.requester_ctx.user_role,
+                domain_name=action.requester_ctx.domain_name,
+            )
+
+        return SearchAutoScalingRulesActionResult(
+            rules=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )

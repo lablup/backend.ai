@@ -25,6 +25,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
+    EndpointAutoScalingRuleListResult,
     EndpointData,
     EndpointTokenData,
     MutationResult,
@@ -56,7 +57,14 @@ from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.base import Creator, Updater, execute_creator, execute_updater
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+    Updater,
+    execute_batch_querier,
+    execute_creator,
+    execute_updater,
+)
 from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
 from ai.backend.manager.services.model_serving.exceptions import InvalidAPIParameters
@@ -964,3 +972,39 @@ class ModelServingRepository:
             raise
         except Exception:
             raise
+
+    @model_serving_repository_resilience.apply()
+    async def search_auto_scaling_rules_validated(
+        self,
+        querier: BatchQuerier,
+        user_id: uuid.UUID,
+        user_role: UserRole,
+        domain_name: str,
+    ) -> EndpointAutoScalingRuleListResult:
+        """
+        Search auto scaling rules with access validation.
+        Filters rules based on user's access to their associated endpoints.
+        """
+        async with self._db.begin_readonly_session() as session:
+            # Build base query with endpoint join for access validation
+            query = sa.select(EndpointAutoScalingRuleRow).join(
+                EndpointRow, EndpointAutoScalingRuleRow.endpoint == EndpointRow.id
+            )
+
+            # Apply access control filters based on user role
+            match user_role:
+                case UserRole.ADMIN:
+                    query = query.where(EndpointRow.domain == domain_name)
+                case UserRole.USER | UserRole.MONITOR:
+                    query = query.where(EndpointRow.session_owner == user_id)
+
+            result = await execute_batch_querier(session, query, querier)
+
+            items = [row.EndpointAutoScalingRuleRow.to_data() for row in result.rows]
+
+            return EndpointAutoScalingRuleListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )

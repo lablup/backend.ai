@@ -13,6 +13,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
+    EndpointAutoScalingRuleListResult,
     EndpointData,
     EndpointTokenData,
     RoutingData,
@@ -28,6 +29,7 @@ from ai.backend.manager.models.endpoint import (
 )
 from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 model_serving_repository_resilience = Resilience(
@@ -377,3 +379,26 @@ class AdminModelServingRepository:
                 return True
             except NoResultFound:
                 return False
+
+    @model_serving_repository_resilience.apply()
+    async def search_auto_scaling_rules_force(
+        self,
+        querier: BatchQuerier,
+    ) -> EndpointAutoScalingRuleListResult:
+        """
+        Search auto scaling rules without access validation.
+        Returns all matching rules regardless of ownership.
+        """
+        async with self._db.begin_readonly_session() as session:
+            query = sa.select(EndpointAutoScalingRuleRow)
+
+            result = await execute_batch_querier(session, query, querier)
+
+            items = [row.EndpointAutoScalingRuleRow.to_data() for row in result.rows]
+
+            return EndpointAutoScalingRuleListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
