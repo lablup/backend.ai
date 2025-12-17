@@ -39,6 +39,10 @@ from ai.backend.manager.services.object_storage.actions.list import (
     ListObjectStorageAction,
     ListObjectStorageActionResult,
 )
+from ai.backend.manager.services.object_storage.actions.search import (
+    SearchObjectStoragesAction,
+    SearchObjectStoragesActionResult,
+)
 from ai.backend.manager.services.object_storage.actions.update import (
     UpdateObjectStorageAction,
     UpdateObjectStorageActionResult,
@@ -108,6 +112,18 @@ class ObjectStorageService:
         log.info("Listing object storages")
         storage_data_list = await self._object_storage_repository.list_object_storages()
         return ListObjectStorageActionResult(data=storage_data_list)
+
+    async def search(self, action: SearchObjectStoragesAction) -> SearchObjectStoragesActionResult:
+        """Searches Object storages."""
+        result = await self._object_storage_repository.search(
+            querier=action.querier,
+        )
+        return SearchObjectStoragesActionResult(
+            storages=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def get_presigned_download_url(
         self, action: GetDownloadPresignedURLAction

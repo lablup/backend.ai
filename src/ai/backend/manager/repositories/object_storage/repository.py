@@ -7,9 +7,10 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.data.object_storage.types import ObjectStorageData, ObjectStorageListResult
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.object_storage.db_source.db_source import ObjectStorageDBSource
@@ -66,3 +67,10 @@ class ObjectStorageRepository:
     @object_storage_repository_resilience.apply()
     async def list_object_storages(self) -> list[ObjectStorageData]:
         return await self._db_source.list_object_storages()
+
+    @object_storage_repository_resilience.apply()
+    async def search(
+        self,
+        querier: BatchQuerier,
+    ) -> ObjectStorageListResult:
+        return await self._db_source.search(querier)
