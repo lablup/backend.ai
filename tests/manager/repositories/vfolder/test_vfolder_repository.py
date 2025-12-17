@@ -51,36 +51,36 @@ class _CleanupTracker:
     project_policy_names: list[str] = field(default_factory=list)
 
 
-def _make_vfolder_create_params(
-    *,
-    folder_id: uuid.UUID,
-    domain_name: str,
-    group_id: uuid.UUID,
-    user_id: uuid.UUID,
-    permission: VFolderMountPermission = VFolderMountPermission.READ_ONLY,
-    usage_mode: VFolderUsageMode = VFolderUsageMode.MODEL,
-) -> VFolderCreateParams:
-    """Create VFolderCreateParams for testing."""
-    return VFolderCreateParams(
-        id=folder_id,
-        name=f"test-model-{folder_id.hex[:8]}",
-        domain_name=domain_name,
-        quota_scope_id=f"project:{group_id}",
-        usage_mode=usage_mode,
-        permission=permission,
-        host="local",
-        creator=f"test-{user_id.hex[:8]}@example.com",
-        ownership_type=VFolderOwnershipType.GROUP,
-        user=user_id,
-        group=group_id,
-        unmanaged_path=None,
-        cloneable=False,
-        status=VFolderOperationStatus.READY,
-    )
-
-
 class TestVfolderRepository:
     """Test cases for VfolderRepository"""
+
+    def _make_vfolder_create_params(
+        self,
+        *,
+        folder_id: uuid.UUID,
+        domain_name: str,
+        group_id: uuid.UUID,
+        user_id: uuid.UUID,
+        permission: VFolderMountPermission = VFolderMountPermission.READ_ONLY,
+        usage_mode: VFolderUsageMode = VFolderUsageMode.MODEL,
+    ) -> VFolderCreateParams:
+        """Create VFolderCreateParams for testing."""
+        return VFolderCreateParams(
+            id=folder_id,
+            name=f"test-model-{folder_id.hex[:8]}",
+            domain_name=domain_name,
+            quota_scope_id=f"project:{group_id}",
+            usage_mode=usage_mode,
+            permission=permission,
+            host="local",
+            creator=f"test-{user_id.hex[:8]}@example.com",
+            ownership_type=VFolderOwnershipType.GROUP,
+            user=user_id,
+            group=group_id,
+            unmanaged_path=None,
+            cloneable=False,
+            status=VFolderOperationStatus.READY,
+        )
 
     @pytest.fixture
     def cleanup_tracker(self) -> _CleanupTracker:
@@ -303,7 +303,7 @@ class TestVfolderRepository:
         correctly stores the READ_ONLY permission received from the service layer.
         """
         folder_id = uuid.uuid4()
-        params = _make_vfolder_create_params(
+        params = self._make_vfolder_create_params(
             folder_id=folder_id,
             domain_name=test_domain_name,
             group_id=test_model_store_group,
