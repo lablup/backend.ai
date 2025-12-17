@@ -1,15 +1,13 @@
 import decimal
 import logging
 
-import sqlalchemy as sa
-
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.model_serving.types import RequesterCtx
-from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.model_serving.admin_repository import (
     AdminModelServingRepository,
 )
+from ai.backend.manager.repositories.model_serving.options import EndpointConditions
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
@@ -202,20 +200,11 @@ class AutoScalingService:
             user_role = action.requester_ctx.user_role
             domain_name = action.requester_ctx.domain_name
 
-            # TODO: Refactor this after creating condition type
             match user_role:
                 case UserRole.ADMIN:
-
-                    def domain_condition() -> sa.sql.expression.ColumnElement[bool]:
-                        return EndpointRow.domain == domain_name
-
-                    action.querier.conditions.append(domain_condition)
+                    action.querier.conditions.append(EndpointConditions.by_domain(domain_name))
                 case UserRole.USER | UserRole.MONITOR:
-
-                    def user_condition() -> sa.sql.expression.ColumnElement[bool]:
-                        return EndpointRow.session_owner == user_id
-
-                    action.querier.conditions.append(user_condition)
+                    action.querier.conditions.append(EndpointConditions.by_session_owner(user_id))
 
             result = await self._repository.search_auto_scaling_rules_validated(
                 querier=action.querier,
