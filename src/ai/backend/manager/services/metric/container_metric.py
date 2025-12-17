@@ -90,7 +90,7 @@ class ContainerUtilizationMetricService:
 
     @property
     def _range_vector_timewindow(self) -> str:
-        # 1m by default
+        # 5m by default
         return self._config_provider.config.metric.timewindow
 
     async def _query_label_values(self, label_name: str) -> LabelValueResponse:
