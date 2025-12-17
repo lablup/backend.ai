@@ -4,12 +4,13 @@ import uuid
 
 import sqlalchemy as sa
 
-from ai.backend.manager.data.vfs_storage.types import VFSStorageData
+from ai.backend.manager.data.vfs_storage.types import VFSStorageData, VFSStorageListResult
 from ai.backend.manager.errors.vfs_storage import (
     VFSStorageNotFoundError,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfs_storage import VFSStorageRow
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
@@ -87,3 +88,26 @@ class VFSStorageDBSource:
             result = await db_session.execute(query)
             rows: list[VFSStorageRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]
+
+    async def search(
+        self,
+        querier: BatchQuerier,
+    ) -> VFSStorageListResult:
+        """Searches VFS storages with total count."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(VFSStorageRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.VFSStorageRow.to_dataclass() for row in result.rows]
+
+            return VFSStorageListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
