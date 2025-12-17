@@ -413,219 +413,217 @@ class TestNetworkTimeoutIdleChecker:
         assert remaining == scenario.expected_remaining
 
 
-@pytest.mark.asyncio
-async def session_lifetime_checker(
-    etcd_fixture,
-    database_fixture,
-    create_app_and_client,
-    mocker,
-) -> None:
-    test_app, _ = await create_app_and_client(
+@dataclass
+class _SessionLifetimeTestConfig:
+    """Configuration for session lifetime test cases"""
+
+    elapsed_seconds: int  # Time elapsed since session creation
+    max_lifetime_seconds: int  # Max session lifetime policy
+    expected_remaining: float  # Expected remaining time (-1 if timeout)
+    expected_alive: bool  # Expected should_alive result
+    user_initial_grace_period: int = 0  # User initial grace period (default: 0)
+
+
+class TestSessionLifetimeChecker:
+    @pytest.fixture
+    def base_time(self) -> datetime:
+        """Reference time: All sessions and users created at this time"""
+        return datetime.now(timezone.utc).replace(microsecond=0)
+
+    @pytest.fixture
+    async def valkey_live(self) -> AsyncMock:
+        """Mock ValkeyLiveClient - configure return values in scenario fixtures"""
+        mock_client = AsyncMock()
+        mock_client.count_active_connections.return_value = 0
+        mock_client.get_live_data.return_value = None
+        mock_client.get_server_time.return_value = 0.0
+        mock_client.store_live_data.return_value = None
+        return mock_client
+
+    @pytest.fixture
+    async def valkey_stat(self) -> AsyncMock:
+        """Mock ValkeyStatClient"""
+        return AsyncMock()
+
+    @pytest.fixture
+    async def event_producer(self) -> AsyncMock:
+        """Mock EventProducer"""
+        return AsyncMock()
+
+    @pytest.fixture
+    async def db_connection(self) -> AsyncMock:
+        """Mock database connection"""
+        return AsyncMock()
+
+    @pytest.fixture
+    def session_id(self) -> SessionId:
+        """Session ID for tests"""
+        return SessionId(uuid4())
+
+    @pytest.fixture
+    def kernel_user_joined_data(self, base_time: datetime) -> dict[str, datetime]:
+        """Kernel user joined data with user created at base_time"""
+        return {"user_created_at": base_time}
+
+    @pytest.fixture
+    async def grace_period_checker(
+        self,
+        valkey_live: AsyncMock,
+        test_config: _SessionLifetimeTestConfig,
+    ) -> NewUserGracePeriodChecker:
+        """NewUserGracePeriodChecker with 30s grace period"""
+        checker = NewUserGracePeriodChecker(valkey_live)
+        await checker.populate_config({
+            "user_initial_grace_period": test_config.user_initial_grace_period
+        })
+        return checker
+
+    @pytest.fixture
+    def session_kernel_row(self, session_id: SessionId, base_time: datetime) -> dict[str, Any]:
+        """Kernel row with session created at base_time"""
+        return {
+            "session_id": session_id,
+            "created_at": base_time,
+        }
+
+    @pytest.fixture
+    def session_lifetime_policy(self, test_config: _SessionLifetimeTestConfig) -> dict[str, Any]:
+        """Policy with max_session_lifetime from test_config"""
+        return {"max_session_lifetime": test_config.max_lifetime_seconds}
+
+    @pytest.fixture
+    async def session_lifetime_checker(
+        self,
+        test_config: _SessionLifetimeTestConfig,
+        base_time: datetime,
+        valkey_live: AsyncMock,
+        valkey_stat: AsyncMock,
+        event_producer: AsyncMock,
+        mocker,
+    ) -> SessionLifetimeChecker:
+        """SessionLifetimeChecker with time configured based on test_config"""
+        # Setup time: session created at base_time, current time = base_time + elapsed
+        now = base_time + timedelta(seconds=test_config.elapsed_seconds)
+        valkey_live.get_server_time.return_value = now.timestamp()
+        mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
+
+        # Create and configure checker
+        checker = SessionLifetimeChecker(
+            IdleCheckerArgs(
+                event_producer=event_producer,
+                redis_live=valkey_live,
+                valkey_stat_client=valkey_stat,
+            )
+        )
+        await checker.populate_config({})
+        return checker
+
+    @pytest.mark.parametrize(
+        "test_config",
         [
-            config_provider_ctx,
-            redis_ctx,
-            event_dispatcher_ctx,
-            background_task_ctx,
-            database_ctx,
-            distributed_lock_ctx,
+            # Remaining = max_lifetime - elapsed = 30 - 10 = 20s
+            _SessionLifetimeTestConfig(
+                elapsed_seconds=10,
+                max_lifetime_seconds=30,
+                expected_remaining=20.0,
+                expected_alive=True,
+            ),
+            # Timeout exceeded: elapsed (50s) > max_lifetime (30s)
+            _SessionLifetimeTestConfig(
+                elapsed_seconds=50,
+                max_lifetime_seconds=30,
+                expected_remaining=-1,
+                expected_alive=False,
+            ),
         ],
-        [".etcd"],
+        ids=["positive_20s_remaining", "negative_timeout_exceeded"],
     )
-    root_ctx: RootContext = test_app["_root.context"]
-
-    # test 1
-    # remaining time is positive and no grace period
-    session_id = SessionId(uuid4())
-    kernel_created_at = datetime(2020, 3, 1, 12, 30, second=0)
-    max_session_lifetime = 30
-    now = datetime(2020, 3, 1, 12, 30, second=10)
-    mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
-    expected = timedelta(seconds=20).total_seconds()
-    idle_value = {
-        "checkers": {},
-        "enabled": "",
-    }
-    kernel = {
-        "session_id": session_id,
-        "created_at": kernel_created_at,
-    }
-    policy = {
-        "max_session_lifetime": max_session_lifetime,
-    }
-
-    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
-    checker_host = await init_idle_checkers(
-        root_ctx.db,
-        root_ctx.config_provider,
-        root_ctx.event_producer,
-        root_ctx.distributed_lock_factory,
-    )
-    try:
-        await checker_host.start()
-        session_lifetime_checker = get_checker_from_host(checker_host, SessionLifetimeChecker)
-
+    @pytest.mark.asyncio
+    async def test_session_lifetime_without_grace(
+        self,
+        test_config: _SessionLifetimeTestConfig,
+        session_id: SessionId,
+        valkey_live: AsyncMock,
+        db_connection: AsyncMock,
+        session_lifetime_checker: SessionLifetimeChecker,
+        session_kernel_row: dict[str, Any],
+        session_lifetime_policy: dict[str, Any],
+    ) -> None:
+        """Test session lifetime without grace period"""
+        # When - check_idleness runs and stores remaining time
         should_alive = await session_lifetime_checker.check_idleness(
-            kernel,
-            checker_host._db,
-            policy,
+            session_kernel_row,
+            db_connection,
+            session_lifetime_policy,
         )
+
+        # Mock: get_checker_result will read the stored result
+        valkey_live.get_live_data.return_value = msgpack.packb(test_config.expected_remaining)
         remaining = await session_lifetime_checker.get_checker_result(
-            checker_host._valkey_live, session_id
+            session_lifetime_checker._redis_live, session_id
         )
-    finally:
-        await checker_host.shutdown()
 
-    assert should_alive
-    assert remaining == expected
+        # Then
+        assert should_alive is test_config.expected_alive
+        assert remaining == test_config.expected_remaining
 
-    # test 2
-    # remaining time is negative and no grace period
-    session_id = SessionId(uuid4())
-    kernel_created_at = datetime(2020, 3, 1, 12, 30, second=0)
-    max_session_lifetime = 30
-    now = datetime(2020, 3, 1, 12, 30, second=50)
-    mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
-    expected = -1
-    idle_value = {
-        "checkers": {},
-        "enabled": "",
-    }
-    kernel = {
-        "session_id": session_id,
-        "created_at": kernel_created_at,
-    }
-    policy = {
-        "max_session_lifetime": max_session_lifetime,
-    }
-
-    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
-    checker_host = await init_idle_checkers(
-        root_ctx.db,
-        root_ctx.config_provider,
-        root_ctx.event_producer,
-        root_ctx.distributed_lock_factory,
+    @pytest.mark.parametrize(
+        "test_config",
+        [
+            # Grace period (30s) not exceeded
+            # remaining = (grace_end + max_lifetime) - now = (30+10) - 25 = 15s
+            _SessionLifetimeTestConfig(
+                elapsed_seconds=25,
+                max_lifetime_seconds=10,
+                expected_remaining=15.0,
+                expected_alive=True,
+                user_initial_grace_period=30,
+            ),
+            # Grace period + max_lifetime exceeded
+            # timeout_deadline = grace_end + max_lifetime = 30 + 10 = 40s, now = 45s
+            _SessionLifetimeTestConfig(
+                elapsed_seconds=45,
+                max_lifetime_seconds=10,
+                expected_remaining=-1,
+                expected_alive=False,
+                user_initial_grace_period=30,
+            ),
+        ],
+        ids=["grace_positive_15s_remaining", "grace_negative_exceeded"],
     )
-    try:
-        await checker_host.start()
-        session_lifetime_checker = get_checker_from_host(checker_host, SessionLifetimeChecker)
+    @pytest.mark.asyncio
+    async def test_session_lifetime_with_grace(
+        self,
+        test_config: _SessionLifetimeTestConfig,
+        session_id: SessionId,
+        valkey_live: AsyncMock,
+        db_connection: AsyncMock,
+        session_lifetime_checker: SessionLifetimeChecker,
+        session_kernel_row: dict[str, Any],
+        session_lifetime_policy: dict[str, Any],
+        grace_period_checker: NewUserGracePeriodChecker,
+        kernel_user_joined_data: dict[str, datetime],
+    ) -> None:
+        # Get grace period end (user_created_at = base_time, grace from test_config)
+        grace_period_end = await grace_period_checker.get_grace_period_end(kernel_user_joined_data)
 
+        # When - check_idleness runs with grace_period_end
         should_alive = await session_lifetime_checker.check_idleness(
-            kernel,
-            checker_host._db,
-            policy,
-        )
-        remaining = await session_lifetime_checker.get_checker_result(
-            checker_host._valkey_live, session_id
-        )
-    finally:
-        await checker_host.shutdown()
-
-    assert not should_alive
-    assert remaining == expected
-
-    # test 3
-    # remaining time is positive with new user grace period
-    session_id = SessionId(uuid4())
-    kernel_created_at = datetime(2020, 3, 1, 12, 30, second=10)
-    user_created_at = datetime(2020, 3, 1, 12, 30, second=0)
-    max_session_lifetime = 10
-    now = datetime(2020, 3, 1, 12, 30, second=25)
-    mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
-    grace_period = 30
-    expected = timedelta(seconds=15).total_seconds()
-    idle_value = {
-        "checkers": {
-            "user_grace_period": {"user_initial_grace_period": str(grace_period)},
-        },
-        "enabled": "",
-    }
-    kernel = {
-        "session_id": session_id,
-        "created_at": kernel_created_at,
-        "user_created_at": user_created_at,
-    }
-    policy = {
-        "max_session_lifetime": max_session_lifetime,
-    }
-
-    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
-    checker_host = await init_idle_checkers(
-        root_ctx.db,
-        root_ctx.config_provider,
-        root_ctx.event_producer,
-        root_ctx.distributed_lock_factory,
-    )
-    try:
-        await checker_host.start()
-        session_lifetime_checker = get_checker_from_host(checker_host, SessionLifetimeChecker)
-        grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(kernel)
-
-        should_alive = await session_lifetime_checker.check_idleness(
-            kernel,
-            checker_host._db,
-            policy,
+            session_kernel_row,
+            db_connection,
+            session_lifetime_policy,
             grace_period_end=grace_period_end,
         )
+
+        # Mock: get_checker_result will read the stored result
+        valkey_live.get_live_data.return_value = msgpack.packb(test_config.expected_remaining)
         remaining = await session_lifetime_checker.get_checker_result(
-            checker_host._valkey_live, session_id
+            session_lifetime_checker._redis_live, session_id
         )
-    finally:
-        await checker_host.shutdown()
 
-    assert should_alive
-    assert remaining == expected
-
-    # test 4
-    # remaining time is negative with new user grace period
-    session_id = SessionId(uuid4())
-    kernel_created_at = datetime(2020, 3, 1, 12, 30, second=40)
-    user_created_at = datetime(2020, 3, 1, 12, 30, second=0)
-    max_session_lifetime = 10
-    now = datetime(2020, 3, 1, 12, 30, second=55)
-    mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
-    grace_period = 30
-    expected = -1
-    idle_value = {
-        "checkers": {
-            "user_grace_period": {"user_initial_grace_period": str(grace_period)},
-        },
-        "enabled": "",
-    }
-    kernel = {
-        "session_id": session_id,
-        "created_at": kernel_created_at,
-        "user_created_at": user_created_at,
-    }
-    policy = {
-        "max_session_lifetime": max_session_lifetime,
-    }
-
-    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
-    checker_host = await init_idle_checkers(
-        root_ctx.db,
-        root_ctx.config_provider,
-        root_ctx.event_producer,
-        root_ctx.distributed_lock_factory,
-    )
-    try:
-        await checker_host.start()
-        session_lifetime_checker = get_checker_from_host(checker_host, SessionLifetimeChecker)
-        grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(kernel)
-
-        should_alive = await session_lifetime_checker.check_idleness(
-            kernel,
-            checker_host._db,
-            policy,
-            grace_period_end=grace_period_end,
-        )
-        remaining = await session_lifetime_checker.get_checker_result(
-            checker_host._valkey_live, session_id
-        )
-    finally:
-        await checker_host.shutdown()
-
-    assert not should_alive
-    assert remaining == expected
+        # Then
+        assert should_alive is test_config.expected_alive
+        assert remaining == test_config.expected_remaining
 
 
 @pytest.mark.asyncio
