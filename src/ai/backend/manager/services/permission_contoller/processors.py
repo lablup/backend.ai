@@ -22,6 +22,8 @@ from .actions import (
     SearchUsersAssignedToRoleActionResult,
     UpdateRoleAction,
     UpdateRoleActionResult,
+    UpdateRolePermissionsAction,
+    UpdateRolePermissionsActionResult,
 )
 from .service import PermissionControllerService
 
@@ -39,6 +41,9 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     search_users_assigned_to_role: ActionProcessor[
         SearchUsersAssignedToRoleAction, SearchUsersAssignedToRoleActionResult
     ]
+    update_role_permissions: ActionProcessor[
+        UpdateRolePermissionsAction, UpdateRolePermissionsActionResult
+    ]
 
     def __init__(
         self, service: PermissionControllerService, action_monitors: list[ActionMonitor]
@@ -54,6 +59,9 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
         self.search_users_assigned_to_role = ActionProcessor(
             service.search_users_assigned_to_role, action_monitors
         )
+        self.update_role_permissions = ActionProcessor(
+            service.update_role_permissions, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -67,4 +75,5 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             GetRoleDetailAction.spec(),
             SearchRolesAction.spec(),
             SearchUsersAssignedToRoleAction.spec(),
+            UpdateRolePermissionsAction.spec(),
         ]

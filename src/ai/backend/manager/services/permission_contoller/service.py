@@ -55,6 +55,10 @@ from ai.backend.manager.services.permission_contoller.actions.update_role import
     UpdateRoleAction,
     UpdateRoleActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.update_role_permissions import (
+    UpdateRolePermissionsAction,
+    UpdateRolePermissionsActionResult,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -183,3 +187,12 @@ class PermissionControllerService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    async def update_role_permissions(
+        self, action: UpdateRolePermissionsAction
+    ) -> UpdateRolePermissionsActionResult:
+        """Update role permissions using batch update."""
+        result = await self._repository._db_source.update_role_permissions(
+            input_data=action.input_data,
+        )
+        return UpdateRolePermissionsActionResult(role=result.to_detail_data_without_users())
