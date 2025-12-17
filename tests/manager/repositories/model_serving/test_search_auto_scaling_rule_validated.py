@@ -1,35 +1,51 @@
 """
 Tests for search_auto_scaling_rules_validated functionality.
-Tests the repository layer for searching auto scaling rules with BatchQuerier.
+Tests the repository layer for searching auto scaling rules with real database.
 """
 
 from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock
+from decimal import Decimal
+from typing import AsyncGenerator
 
 import pytest
+import sqlalchemy as sa
 
+from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleListResult,
+    EndpointLifecycle,
 )
+from ai.backend.manager.models import (
+    DomainRow,
+    GroupRow,
+    ImageRow,
+    ProjectResourcePolicyRow,
+    ScalingGroupRow,
+    UserResourcePolicyRow,
+    UserRow,
+)
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     EndpointAutoScalingRuleRow,
+    EndpointRow,
 )
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.models.user import UserRole, UserStatus
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-
-if TYPE_CHECKING:
-    from ai.backend.manager.repositories.model_serving.admin_repository import (
-        AdminModelServingRepository,
-    )
-    from ai.backend.manager.repositories.model_serving.repository import (
-        ModelServingRepository,
-    )
+from ai.backend.manager.repositories.model_serving.admin_repository import (
+    AdminModelServingRepository,
+)
+from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 
 
 class TestSearchAutoScalingRulesValidated:
@@ -40,79 +56,385 @@ class TestSearchAutoScalingRulesValidated:
     # =========================================================================
 
     @pytest.fixture
-    def sample_auto_scaling_rules(self, sample_endpoint) -> list[EndpointAutoScalingRuleRow]:
-        """Create multiple sample auto scaling rules for testing."""
-        rules = []
-        metric_names = ["cpu_util", "memory_util", "gpu_util", "request_rate", "latency"]
-
-        for i, metric_name in enumerate(metric_names):
-            rule = EndpointAutoScalingRuleRow(
-                id=uuid.uuid4(),
-                endpoint=sample_endpoint.id,
-                metric_source=AutoScalingMetricSource.KERNEL,
-                metric_name=metric_name,
-                threshold=50.0 + i * 10,
-                comparator=AutoScalingMetricComparator.GREATER_THAN,
-                step_size=1 + i,
-                cooldown_seconds=300 + i * 60,
-                min_replicas=1,
-                max_replicas=10 + i,
-                created_at=datetime.now(timezone.utc),
-                endpoint_row=sample_endpoint,
-            )
-            rules.append(rule)
-
-        return rules
+    def test_domain_name(self) -> str:
+        """Return a unique test domain name"""
+        return f"test-domain-{uuid.uuid4().hex[:8]}"
 
     @pytest.fixture
-    def sample_rules_for_pagination(self, sample_endpoint) -> list[EndpointAutoScalingRuleRow]:
-        """Create 25 sample auto scaling rules for pagination testing."""
-        rules = []
+    def test_group_name(self) -> str:
+        """Return a unique test group name"""
+        return f"test-group-{uuid.uuid4().hex[:8]}"
 
-        for i in range(25):
-            rule = EndpointAutoScalingRuleRow(
-                id=uuid.uuid4(),
-                endpoint=sample_endpoint.id,
-                metric_source=AutoScalingMetricSource.KERNEL,
-                metric_name=f"metric_{i:02d}",
-                threshold=50.0 + i,
-                comparator=AutoScalingMetricComparator.GREATER_THAN,
-                step_size=1,
-                cooldown_seconds=300,
-                min_replicas=1,
-                max_replicas=10,
-                created_at=datetime.now(timezone.utc),
-                endpoint_row=sample_endpoint,
-            )
-            rules.append(rule)
+    @pytest.fixture
+    def test_resource_policy_name(self) -> str:
+        """Return a unique test resource policy name"""
+        return f"test-policy-{uuid.uuid4().hex[:8]}"
 
-        return rules
+    @pytest.fixture
+    def test_scaling_group_name(self) -> str:
+        """Return a unique test scaling group name"""
+        return f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
-    # =========================================================================
-    # Helper Methods
-    # =========================================================================
+    @pytest.fixture
+    def test_user_email(self) -> str:
+        """Return a unique test user email"""
+        return f"test-{uuid.uuid4().hex[:8]}@test.com"
 
-    def _create_mock_batch_result(
+    @pytest.fixture
+    def test_username(self) -> str:
+        """Return a unique test username"""
+        return f"testuser-{uuid.uuid4().hex[:8]}"
+
+    @pytest.fixture
+    async def test_scaling_group(
         self,
-        rules: list[EndpointAutoScalingRuleRow],
-        total_count: int | None = None,
-        has_next_page: bool = False,
-        has_previous_page: bool = False,
-    ) -> MagicMock:
-        """Create a mock result for execute_batch_querier."""
-        mock_rows = []
-        for rule in rules:
-            mock_row = MagicMock()
-            mock_row.EndpointAutoScalingRuleRow = rule
-            mock_rows.append(mock_row)
+        database_engine: ExtendedAsyncSAEngine,
+        test_scaling_group_name: str,
+    ) -> AsyncGenerator[str, None]:
+        """Create a scaling group for testing"""
+        async with database_engine.begin_session() as db_sess:
+            scaling_group = ScalingGroupRow(
+                name=test_scaling_group_name,
+                driver="static",
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            db_sess.add(scaling_group)
+            await db_sess.flush()
 
-        mock_result = MagicMock()
-        mock_result.rows = mock_rows
-        mock_result.total_count = total_count if total_count is not None else len(rules)
-        mock_result.has_next_page = has_next_page
-        mock_result.has_previous_page = has_previous_page
+        yield test_scaling_group_name
 
-        return mock_result
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.delete(ScalingGroupRow).where(ScalingGroupRow.name == test_scaling_group_name)
+            )
+
+    @pytest.fixture
+    async def test_domain(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+    ) -> AsyncGenerator[str, None]:
+        """Create a domain for testing"""
+        async with database_engine.begin_session() as db_sess:
+            domain = DomainRow(name=test_domain_name, total_resource_slots={})
+            db_sess.add(domain)
+            await db_sess.flush()
+
+        yield test_domain_name
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == test_domain_name))
+
+    @pytest.fixture
+    async def test_user_resource_policy(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+        test_resource_policy_name: str,
+    ) -> AsyncGenerator[str, None]:
+        """Create a user resource policy for testing"""
+        async with database_engine.begin_session() as db_sess:
+            user_resource_policy = UserResourcePolicyRow(
+                name=test_resource_policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=10,
+                max_customized_image_count=10,
+            )
+            db_sess.add(user_resource_policy)
+            await db_sess.flush()
+
+        yield test_resource_policy_name
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.delete(UserResourcePolicyRow).where(
+                    UserResourcePolicyRow.name == test_resource_policy_name
+                )
+            )
+
+    @pytest.fixture
+    async def test_project_resource_policy(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+        test_resource_policy_name: str,
+    ) -> AsyncGenerator[str, None]:
+        """Create a project resource policy for testing"""
+        async with database_engine.begin_session() as db_sess:
+            project_resource_policy = ProjectResourcePolicyRow(
+                name=test_resource_policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_network_count=3,
+            )
+            db_sess.add(project_resource_policy)
+            await db_sess.flush()
+
+        yield test_resource_policy_name
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.delete(ProjectResourcePolicyRow).where(
+                    ProjectResourcePolicyRow.name == test_resource_policy_name
+                )
+            )
+
+    @pytest.fixture
+    async def test_group_id(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+        test_domain: str,
+        test_project_resource_policy: str,
+        test_group_name: str,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create a group for testing and return its ID"""
+        group_id = uuid.uuid4()
+
+        async with database_engine.begin_session() as db_sess:
+            group = GroupRow(
+                id=group_id,
+                name=test_group_name,
+                domain_name=test_domain,
+                total_resource_slots={},
+                resource_policy=test_project_resource_policy,
+            )
+            db_sess.add(group)
+            await db_sess.flush()
+
+        yield group_id
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(sa.delete(GroupRow).where(GroupRow.id == group_id))
+
+    @pytest.fixture
+    async def test_user_id(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+        test_domain: str,
+        test_user_resource_policy: str,
+        test_user_email: str,
+        test_username: str,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create a user for testing and return its ID"""
+        user_id = uuid.uuid4()
+
+        async with database_engine.begin_session() as db_sess:
+            password_info = PasswordInfo(
+                password="test_password",
+                algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                rounds=1,
+                salt_size=16,
+            )
+            user = UserRow(
+                uuid=user_id,
+                email=test_user_email,
+                username=test_username,
+                password=password_info,
+                domain_name=test_domain,
+                resource_policy=test_user_resource_policy,
+                role=UserRole.USER,
+                status=UserStatus.ACTIVE,
+            )
+            db_sess.add(user)
+            await db_sess.flush()
+
+        yield user_id
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_id))
+
+    @pytest.fixture
+    async def test_container_registry_id(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create a container registry for testing and return its ID"""
+        registry_id = uuid.uuid4()
+
+        async with database_engine.begin_session() as db_sess:
+            registry = ContainerRegistryRow(
+                url="http://test-registry.local",
+                registry_name=f"test-registry-{uuid.uuid4().hex[:8]}",
+                type=ContainerRegistryType.DOCKER,
+            )
+            registry.id = registry_id
+            db_sess.add(registry)
+            await db_sess.flush()
+
+        yield registry_id
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.id == registry_id)
+            )
+
+    @pytest.fixture
+    async def test_image_id(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+        test_container_registry_id: uuid.UUID,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create an image for testing and return its ID"""
+        image_id = uuid.uuid4()
+
+        async with database_engine.begin_session() as db_sess:
+            image = ImageRow(
+                name=f"test-image-{uuid.uuid4().hex[:8]}",
+                project=None,
+                image=f"test-image-{uuid.uuid4().hex[:8]}",
+                tag="latest",
+                registry=f"test-registry-{uuid.uuid4().hex[:8]}",
+                registry_id=test_container_registry_id,
+                architecture="x86_64",
+                config_digest="sha256:" + "a" * 64,
+                size_bytes=1024,
+                type=ImageType.COMPUTE,
+                labels={},
+                resources={"cpu": {"min": "1"}, "mem": {"min": "1g"}},
+            )
+            image.id = image_id
+            db_sess.add(image)
+            await db_sess.flush()
+
+        yield image_id
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(sa.delete(ImageRow).where(ImageRow.id == image_id))
+
+    @pytest.fixture
+    async def sample_endpoint_id(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+        test_user_id: uuid.UUID,
+        test_domain: str,
+        test_group_id: uuid.UUID,
+        test_scaling_group: str,
+        test_image_id: uuid.UUID,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create a sample endpoint directly in DB and return its ID"""
+        endpoint_id = uuid.uuid4()
+
+        async with database_engine.begin_session() as db_sess:
+            endpoint = EndpointRow(
+                id=endpoint_id,
+                name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
+                created_user=test_user_id,
+                session_owner=test_user_id,
+                domain=test_domain,
+                project=test_group_id,
+                resource_group=test_scaling_group,
+                image=test_image_id,
+                model=None,
+                model_mount_destination="/models",
+                runtime_variant=RuntimeVariant.CUSTOM,
+                lifecycle_stage=EndpointLifecycle.CREATED,
+                replicas=1,
+                resource_slots=ResourceSlot({"cpu": "1", "mem": "1g"}),
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+            )
+            db_sess.add(endpoint)
+            await db_sess.flush()
+
+        yield endpoint_id
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(sa.delete(EndpointRow).where(EndpointRow.id == endpoint_id))
+
+    @pytest.fixture
+    async def sample_auto_scaling_rules(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+        sample_endpoint_id: uuid.UUID,
+    ) -> AsyncGenerator[list[uuid.UUID], None]:
+        """Create multiple sample auto scaling rules for testing"""
+        rule_ids: list[uuid.UUID] = []
+        metric_names = ["cpu_util", "memory_util", "gpu_util", "request_rate", "latency"]
+
+        async with database_engine.begin_session() as db_sess:
+            for i, metric_name in enumerate(metric_names):
+                rule_id = uuid.uuid4()
+                rule = EndpointAutoScalingRuleRow(
+                    id=rule_id,
+                    endpoint=sample_endpoint_id,
+                    metric_source=AutoScalingMetricSource.KERNEL,
+                    metric_name=metric_name,
+                    threshold=Decimal(str(50.0 + i * 10)),
+                    comparator=AutoScalingMetricComparator.GREATER_THAN,
+                    step_size=1 + i,
+                    cooldown_seconds=300 + i * 60,
+                    min_replicas=1,
+                    max_replicas=10 + i,
+                    created_at=datetime.now(timezone.utc),
+                )
+                db_sess.add(rule)
+                rule_ids.append(rule_id)
+            await db_sess.flush()
+
+        yield rule_ids
+
+        async with database_engine.begin_session() as db_sess:
+            for rule_id in rule_ids:
+                await db_sess.execute(
+                    sa.delete(EndpointAutoScalingRuleRow).where(
+                        EndpointAutoScalingRuleRow.id == rule_id
+                    )
+                )
+
+    @pytest.fixture
+    async def sample_rules_for_pagination(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+        sample_endpoint_id: uuid.UUID,
+    ) -> AsyncGenerator[list[uuid.UUID], None]:
+        """Create 25 sample auto scaling rules for pagination testing"""
+        rule_ids: list[uuid.UUID] = []
+
+        async with database_engine.begin_session() as db_sess:
+            for i in range(25):
+                rule_id = uuid.uuid4()
+                rule = EndpointAutoScalingRuleRow(
+                    id=rule_id,
+                    endpoint=sample_endpoint_id,
+                    metric_source=AutoScalingMetricSource.KERNEL,
+                    metric_name=f"metric_{i:02d}",
+                    threshold=Decimal(str(50.0 + i)),
+                    comparator=AutoScalingMetricComparator.GREATER_THAN,
+                    step_size=1,
+                    cooldown_seconds=300,
+                    min_replicas=1,
+                    max_replicas=10,
+                    created_at=datetime.now(timezone.utc),
+                )
+                db_sess.add(rule)
+                rule_ids.append(rule_id)
+            await db_sess.flush()
+
+        yield rule_ids
+
+        async with database_engine.begin_session() as db_sess:
+            for rule_id in rule_ids:
+                await db_sess.execute(
+                    sa.delete(EndpointAutoScalingRuleRow).where(
+                        EndpointAutoScalingRuleRow.id == rule_id
+                    )
+                )
+
+    @pytest.fixture
+    async def model_serving_repository(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+    ) -> ModelServingRepository:
+        """Create ModelServingRepository instance with real database"""
+        return ModelServingRepository(db=database_engine)
+
+    @pytest.fixture
+    async def admin_model_serving_repository(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+    ) -> AdminModelServingRepository:
+        """Create AdminModelServingRepository instance with real database"""
+        return AdminModelServingRepository(db=database_engine)
 
     # =========================================================================
     # Tests - Basic Search
@@ -122,71 +444,51 @@ class TestSearchAutoScalingRulesValidated:
     async def test_search_success(
         self,
         model_serving_repository: ModelServingRepository,
-        setup_readonly_session,
-        sample_auto_scaling_rules: list[EndpointAutoScalingRuleRow],
-        sample_user,
-        mocker,
+        test_user_id: uuid.UUID,
+        test_domain: str,
+        sample_auto_scaling_rules: list[uuid.UUID],
     ) -> None:
         """Test successful search of auto scaling rules with access validation."""
-        # Arrange
-        mock_execute_batch = mocker.patch(
-            "ai.backend.manager.repositories.model_serving.repository.execute_batch_querier",
-            new_callable=AsyncMock,
-        )
-        mock_execute_batch.return_value = self._create_mock_batch_result(sample_auto_scaling_rules)
-
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        # Act
         result = await model_serving_repository.search_auto_scaling_rules_validated(
             querier=querier,
-            user_id=sample_user.uuid,
+            user_id=test_user_id,
             user_role=UserRole.USER,
-            domain_name="default",
+            domain_name=test_domain,
         )
 
-        # Assert
         assert result is not None
         assert isinstance(result, EndpointAutoScalingRuleListResult)
         assert len(result.items) == len(sample_auto_scaling_rules)
         assert result.total_count == len(sample_auto_scaling_rules)
-        mock_execute_batch.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_search_empty_result(
         self,
         model_serving_repository: ModelServingRepository,
-        setup_readonly_session,
-        sample_user,
-        mocker,
+        test_user_id: uuid.UUID,
+        test_domain: str,
+        sample_endpoint_id: uuid.UUID,
     ) -> None:
-        """Test search returns empty result when no rules match."""
-        # Arrange
-        mock_execute_batch = mocker.patch(
-            "ai.backend.manager.repositories.model_serving.repository.execute_batch_querier",
-            new_callable=AsyncMock,
-        )
-        mock_execute_batch.return_value = self._create_mock_batch_result([], total_count=0)
-
+        """Test search returns empty result when no rules exist."""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        # Act
         result = await model_serving_repository.search_auto_scaling_rules_validated(
             querier=querier,
-            user_id=sample_user.uuid,
+            user_id=test_user_id,
             user_role=UserRole.USER,
-            domain_name="default",
+            domain_name=test_domain,
         )
 
-        # Assert
         assert result is not None
         assert len(result.items) == 0
         assert result.total_count == 0
@@ -195,18 +497,11 @@ class TestSearchAutoScalingRulesValidated:
     async def test_search_admin_access(
         self,
         model_serving_repository: ModelServingRepository,
-        setup_readonly_session,
-        sample_auto_scaling_rules: list[EndpointAutoScalingRuleRow],
-        sample_admin_user,
-        mocker,
+        test_domain: str,
+        sample_auto_scaling_rules: list[uuid.UUID],
     ) -> None:
         """Test search with ADMIN role filters by domain."""
-        # Arrange
-        mock_execute_batch = mocker.patch(
-            "ai.backend.manager.repositories.model_serving.repository.execute_batch_querier",
-            new_callable=AsyncMock,
-        )
-        mock_execute_batch.return_value = self._create_mock_batch_result(sample_auto_scaling_rules)
+        admin_user_id = uuid.uuid4()
 
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
@@ -214,18 +509,42 @@ class TestSearchAutoScalingRulesValidated:
             orders=[],
         )
 
-        # Act
         result = await model_serving_repository.search_auto_scaling_rules_validated(
             querier=querier,
-            user_id=sample_admin_user.uuid,
+            user_id=admin_user_id,
             user_role=UserRole.ADMIN,
-            domain_name="default",
+            domain_name=test_domain,
         )
 
-        # Assert
         assert result is not None
         assert isinstance(result, EndpointAutoScalingRuleListResult)
-        mock_execute_batch.assert_called_once()
+        assert len(result.items) == len(sample_auto_scaling_rules)
+
+    @pytest.mark.asyncio
+    async def test_search_different_user_no_access(
+        self,
+        model_serving_repository: ModelServingRepository,
+        test_domain: str,
+        sample_auto_scaling_rules: list[uuid.UUID],
+    ) -> None:
+        """Test that a different user cannot see another user's rules."""
+        different_user_id = uuid.uuid4()
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await model_serving_repository.search_auto_scaling_rules_validated(
+            querier=querier,
+            user_id=different_user_id,
+            user_role=UserRole.USER,
+            domain_name=test_domain,
+        )
+
+        assert result is not None
+        assert len(result.items) == 0
 
     # =========================================================================
     # Tests - Pagination
@@ -235,40 +554,24 @@ class TestSearchAutoScalingRulesValidated:
     async def test_pagination_first_page(
         self,
         model_serving_repository: ModelServingRepository,
-        setup_readonly_session,
-        sample_rules_for_pagination: list[EndpointAutoScalingRuleRow],
-        sample_user,
-        mocker,
+        test_user_id: uuid.UUID,
+        test_domain: str,
+        sample_rules_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test first page of offset-based pagination."""
-        # Arrange
-        first_page_rules = sample_rules_for_pagination[:10]
-        mock_execute_batch = mocker.patch(
-            "ai.backend.manager.repositories.model_serving.repository.execute_batch_querier",
-            new_callable=AsyncMock,
-        )
-        mock_execute_batch.return_value = self._create_mock_batch_result(
-            first_page_rules,
-            total_count=25,
-            has_next_page=True,
-            has_previous_page=False,
-        )
-
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        # Act
         result = await model_serving_repository.search_auto_scaling_rules_validated(
             querier=querier,
-            user_id=sample_user.uuid,
+            user_id=test_user_id,
             user_role=UserRole.USER,
-            domain_name="default",
+            domain_name=test_domain,
         )
 
-        # Assert
         assert len(result.items) == 10
         assert result.total_count == 25
         assert result.has_next_page is True
@@ -278,40 +581,24 @@ class TestSearchAutoScalingRulesValidated:
     async def test_pagination_second_page(
         self,
         model_serving_repository: ModelServingRepository,
-        setup_readonly_session,
-        sample_rules_for_pagination: list[EndpointAutoScalingRuleRow],
-        sample_user,
-        mocker,
+        test_user_id: uuid.UUID,
+        test_domain: str,
+        sample_rules_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test second page of offset-based pagination."""
-        # Arrange
-        second_page_rules = sample_rules_for_pagination[10:20]
-        mock_execute_batch = mocker.patch(
-            "ai.backend.manager.repositories.model_serving.repository.execute_batch_querier",
-            new_callable=AsyncMock,
-        )
-        mock_execute_batch.return_value = self._create_mock_batch_result(
-            second_page_rules,
-            total_count=25,
-            has_next_page=True,
-            has_previous_page=True,
-        )
-
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[],
             orders=[],
         )
 
-        # Act
         result = await model_serving_repository.search_auto_scaling_rules_validated(
             querier=querier,
-            user_id=sample_user.uuid,
+            user_id=test_user_id,
             user_role=UserRole.USER,
-            domain_name="default",
+            domain_name=test_domain,
         )
 
-        # Assert
         assert len(result.items) == 10
         assert result.total_count == 25
         assert result.has_next_page is True
@@ -321,40 +608,24 @@ class TestSearchAutoScalingRulesValidated:
     async def test_pagination_last_page(
         self,
         model_serving_repository: ModelServingRepository,
-        setup_readonly_session,
-        sample_rules_for_pagination: list[EndpointAutoScalingRuleRow],
-        sample_user,
-        mocker,
+        test_user_id: uuid.UUID,
+        test_domain: str,
+        sample_rules_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test last page of offset-based pagination with partial results."""
-        # Arrange
-        last_page_rules = sample_rules_for_pagination[20:25]
-        mock_execute_batch = mocker.patch(
-            "ai.backend.manager.repositories.model_serving.repository.execute_batch_querier",
-            new_callable=AsyncMock,
-        )
-        mock_execute_batch.return_value = self._create_mock_batch_result(
-            last_page_rules,
-            total_count=25,
-            has_next_page=False,
-            has_previous_page=True,
-        )
-
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=20),
             conditions=[],
             orders=[],
         )
 
-        # Act
         result = await model_serving_repository.search_auto_scaling_rules_validated(
             querier=querier,
-            user_id=sample_user.uuid,
+            user_id=test_user_id,
             user_role=UserRole.USER,
-            domain_name="default",
+            domain_name=test_domain,
         )
 
-        # Assert
         assert len(result.items) == 5
         assert result.total_count == 25
         assert result.has_next_page is False
@@ -368,20 +639,11 @@ class TestSearchAutoScalingRulesValidated:
     async def test_filter_by_condition(
         self,
         model_serving_repository: ModelServingRepository,
-        setup_readonly_session,
-        sample_auto_scaling_rules: list[EndpointAutoScalingRuleRow],
-        sample_user,
-        mocker,
+        test_user_id: uuid.UUID,
+        test_domain: str,
+        sample_auto_scaling_rules: list[uuid.UUID],
     ) -> None:
         """Test search with filter condition."""
-        # Arrange: Filter only rules with metric_name containing 'cpu'
-        filtered_rules = [r for r in sample_auto_scaling_rules if "cpu" in r.metric_name]
-        mock_execute_batch = mocker.patch(
-            "ai.backend.manager.repositories.model_serving.repository.execute_batch_querier",
-            new_callable=AsyncMock,
-        )
-        mock_execute_batch.return_value = self._create_mock_batch_result(filtered_rules)
-
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
@@ -390,17 +652,15 @@ class TestSearchAutoScalingRulesValidated:
             orders=[],
         )
 
-        # Act
         result = await model_serving_repository.search_auto_scaling_rules_validated(
             querier=querier,
-            user_id=sample_user.uuid,
+            user_id=test_user_id,
             user_role=UserRole.USER,
-            domain_name="default",
+            domain_name=test_domain,
         )
 
-        # Assert
         assert result is not None
-        assert len(result.items) == len(filtered_rules)
+        assert len(result.items) == 1
         for item in result.items:
             assert "cpu" in item.metric_name
 
@@ -412,35 +672,24 @@ class TestSearchAutoScalingRulesValidated:
     async def test_order_by_threshold_ascending(
         self,
         model_serving_repository: ModelServingRepository,
-        setup_readonly_session,
-        sample_auto_scaling_rules: list[EndpointAutoScalingRuleRow],
-        sample_user,
-        mocker,
+        test_user_id: uuid.UUID,
+        test_domain: str,
+        sample_auto_scaling_rules: list[uuid.UUID],
     ) -> None:
         """Test search with ascending order by threshold."""
-        # Arrange: Sort rules by threshold ascending
-        sorted_rules = sorted(sample_auto_scaling_rules, key=lambda r: float(r.threshold))
-        mock_execute_batch = mocker.patch(
-            "ai.backend.manager.repositories.model_serving.repository.execute_batch_querier",
-            new_callable=AsyncMock,
-        )
-        mock_execute_batch.return_value = self._create_mock_batch_result(sorted_rules)
-
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[EndpointAutoScalingRuleRow.threshold.asc()],
         )
 
-        # Act
         result = await model_serving_repository.search_auto_scaling_rules_validated(
             querier=querier,
-            user_id=sample_user.uuid,
+            user_id=test_user_id,
             user_role=UserRole.USER,
-            domain_name="default",
+            domain_name=test_domain,
         )
 
-        # Assert
         assert result is not None
         thresholds = [float(item.threshold) for item in result.items]
         assert thresholds == sorted(thresholds)
@@ -449,35 +698,24 @@ class TestSearchAutoScalingRulesValidated:
     async def test_order_by_metric_name_descending(
         self,
         model_serving_repository: ModelServingRepository,
-        setup_readonly_session,
-        sample_auto_scaling_rules: list[EndpointAutoScalingRuleRow],
-        sample_user,
-        mocker,
+        test_user_id: uuid.UUID,
+        test_domain: str,
+        sample_auto_scaling_rules: list[uuid.UUID],
     ) -> None:
         """Test search with descending order by metric_name."""
-        # Arrange: Sort rules by metric_name descending
-        sorted_rules = sorted(sample_auto_scaling_rules, key=lambda r: r.metric_name, reverse=True)
-        mock_execute_batch = mocker.patch(
-            "ai.backend.manager.repositories.model_serving.repository.execute_batch_querier",
-            new_callable=AsyncMock,
-        )
-        mock_execute_batch.return_value = self._create_mock_batch_result(sorted_rules)
-
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[EndpointAutoScalingRuleRow.metric_name.desc()],
         )
 
-        # Act
         result = await model_serving_repository.search_auto_scaling_rules_validated(
             querier=querier,
-            user_id=sample_user.uuid,
+            user_id=test_user_id,
             user_role=UserRole.USER,
-            domain_name="default",
+            domain_name=test_domain,
         )
 
-        # Assert
         assert result is not None
         metric_names = [item.metric_name for item in result.items]
         assert metric_names == sorted(metric_names, reverse=True)
@@ -490,30 +728,11 @@ class TestSearchAutoScalingRulesValidated:
     async def test_combined_pagination_filter_order(
         self,
         model_serving_repository: ModelServingRepository,
-        setup_readonly_session,
-        sample_auto_scaling_rules: list[EndpointAutoScalingRuleRow],
-        sample_user,
-        mocker,
+        test_user_id: uuid.UUID,
+        test_domain: str,
+        sample_auto_scaling_rules: list[uuid.UUID],
     ) -> None:
         """Test search with pagination, filter, and ordering combined."""
-        # Arrange: Filter rules with threshold > 60, sorted by threshold desc, limit 2
-        filtered_sorted_rules = sorted(
-            [r for r in sample_auto_scaling_rules if float(r.threshold) > 60],
-            key=lambda r: float(r.threshold),
-            reverse=True,
-        )[:2]
-
-        mock_execute_batch = mocker.patch(
-            "ai.backend.manager.repositories.model_serving.repository.execute_batch_querier",
-            new_callable=AsyncMock,
-        )
-        mock_execute_batch.return_value = self._create_mock_batch_result(
-            filtered_sorted_rules,
-            total_count=3,
-            has_next_page=True,
-            has_previous_page=False,
-        )
-
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=2, offset=0),
             conditions=[
@@ -522,25 +741,21 @@ class TestSearchAutoScalingRulesValidated:
             orders=[EndpointAutoScalingRuleRow.threshold.desc()],
         )
 
-        # Act
         result = await model_serving_repository.search_auto_scaling_rules_validated(
             querier=querier,
-            user_id=sample_user.uuid,
+            user_id=test_user_id,
             user_role=UserRole.USER,
-            domain_name="default",
+            domain_name=test_domain,
         )
 
-        # Assert
         assert result is not None
-        assert len(result.items) == 2
         assert result.total_count == 3
+        assert len(result.items) == 2
         assert result.has_next_page is True
 
-        # Verify ordering is descending
         thresholds = [float(item.threshold) for item in result.items]
         assert thresholds == sorted(thresholds, reverse=True)
 
-        # Verify all returned items have threshold > 60
         for item in result.items:
             assert float(item.threshold) > 60
 
@@ -553,79 +768,377 @@ class TestSearchAutoScalingRulesForce:
     # =========================================================================
 
     @pytest.fixture
-    def sample_auto_scaling_rules(self, sample_endpoint) -> list[EndpointAutoScalingRuleRow]:
-        """Create multiple sample auto scaling rules for testing."""
-        rules = []
-        metric_names = ["cpu_util", "memory_util", "gpu_util", "request_rate", "latency"]
-
-        for i, metric_name in enumerate(metric_names):
-            rule = EndpointAutoScalingRuleRow(
-                id=uuid.uuid4(),
-                endpoint=sample_endpoint.id,
-                metric_source=AutoScalingMetricSource.KERNEL,
-                metric_name=metric_name,
-                threshold=50.0 + i * 10,
-                comparator=AutoScalingMetricComparator.GREATER_THAN,
-                step_size=1 + i,
-                cooldown_seconds=300 + i * 60,
-                min_replicas=1,
-                max_replicas=10 + i,
-                created_at=datetime.now(timezone.utc),
-                endpoint_row=sample_endpoint,
-            )
-            rules.append(rule)
-
-        return rules
+    def test_domain_name(self) -> str:
+        """Return a unique test domain name"""
+        return f"test-domain-{uuid.uuid4().hex[:8]}"
 
     @pytest.fixture
-    def sample_rules_for_pagination(self, sample_endpoint) -> list[EndpointAutoScalingRuleRow]:
-        """Create 25 sample auto scaling rules for pagination testing."""
-        rules = []
+    def test_group_name(self) -> str:
+        """Return a unique test group name"""
+        return f"test-group-{uuid.uuid4().hex[:8]}"
 
-        for i in range(25):
-            rule = EndpointAutoScalingRuleRow(
-                id=uuid.uuid4(),
-                endpoint=sample_endpoint.id,
-                metric_source=AutoScalingMetricSource.KERNEL,
-                metric_name=f"metric_{i:02d}",
-                threshold=50.0 + i,
-                comparator=AutoScalingMetricComparator.GREATER_THAN,
-                step_size=1,
-                cooldown_seconds=300,
-                min_replicas=1,
-                max_replicas=10,
-                created_at=datetime.now(timezone.utc),
-                endpoint_row=sample_endpoint,
-            )
-            rules.append(rule)
+    @pytest.fixture
+    def test_resource_policy_name(self) -> str:
+        """Return a unique test resource policy name"""
+        return f"test-policy-{uuid.uuid4().hex[:8]}"
 
-        return rules
+    @pytest.fixture
+    def test_scaling_group_name(self) -> str:
+        """Return a unique test scaling group name"""
+        return f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
-    # =========================================================================
-    # Helper Methods
-    # =========================================================================
+    @pytest.fixture
+    def test_user_email(self) -> str:
+        """Return a unique test user email"""
+        return f"test-{uuid.uuid4().hex[:8]}@test.com"
 
-    def _create_mock_batch_result(
+    @pytest.fixture
+    def test_username(self) -> str:
+        """Return a unique test username"""
+        return f"testuser-{uuid.uuid4().hex[:8]}"
+
+    @pytest.fixture
+    async def test_scaling_group(
         self,
-        rules: list[EndpointAutoScalingRuleRow],
-        total_count: int | None = None,
-        has_next_page: bool = False,
-        has_previous_page: bool = False,
-    ) -> MagicMock:
-        """Create a mock result for execute_batch_querier."""
-        mock_rows = []
-        for rule in rules:
-            mock_row = MagicMock()
-            mock_row.EndpointAutoScalingRuleRow = rule
-            mock_rows.append(mock_row)
+        database_engine: ExtendedAsyncSAEngine,
+        test_scaling_group_name: str,
+    ) -> AsyncGenerator[str, None]:
+        """Create a scaling group for testing"""
+        async with database_engine.begin_session() as db_sess:
+            scaling_group = ScalingGroupRow(
+                name=test_scaling_group_name,
+                driver="static",
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            db_sess.add(scaling_group)
+            await db_sess.flush()
 
-        mock_result = MagicMock()
-        mock_result.rows = mock_rows
-        mock_result.total_count = total_count if total_count is not None else len(rules)
-        mock_result.has_next_page = has_next_page
-        mock_result.has_previous_page = has_previous_page
+        yield test_scaling_group_name
 
-        return mock_result
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.delete(ScalingGroupRow).where(ScalingGroupRow.name == test_scaling_group_name)
+            )
+
+    @pytest.fixture
+    async def test_domain(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+    ) -> AsyncGenerator[str, None]:
+        """Create a domain for testing"""
+        async with database_engine.begin_session() as db_sess:
+            domain = DomainRow(name=test_domain_name, total_resource_slots={})
+            db_sess.add(domain)
+            await db_sess.flush()
+
+        yield test_domain_name
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == test_domain_name))
+
+    @pytest.fixture
+    async def test_user_resource_policy(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+        test_resource_policy_name: str,
+    ) -> AsyncGenerator[str, None]:
+        """Create a user resource policy for testing"""
+        async with database_engine.begin_session() as db_sess:
+            user_resource_policy = UserResourcePolicyRow(
+                name=test_resource_policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=10,
+                max_customized_image_count=10,
+            )
+            db_sess.add(user_resource_policy)
+            await db_sess.flush()
+
+        yield test_resource_policy_name
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.delete(UserResourcePolicyRow).where(
+                    UserResourcePolicyRow.name == test_resource_policy_name
+                )
+            )
+
+    @pytest.fixture
+    async def test_project_resource_policy(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+        test_resource_policy_name: str,
+    ) -> AsyncGenerator[str, None]:
+        """Create a project resource policy for testing"""
+        async with database_engine.begin_session() as db_sess:
+            project_resource_policy = ProjectResourcePolicyRow(
+                name=test_resource_policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_network_count=3,
+            )
+            db_sess.add(project_resource_policy)
+            await db_sess.flush()
+
+        yield test_resource_policy_name
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.delete(ProjectResourcePolicyRow).where(
+                    ProjectResourcePolicyRow.name == test_resource_policy_name
+                )
+            )
+
+    @pytest.fixture
+    async def test_group_id(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+        test_domain: str,
+        test_project_resource_policy: str,
+        test_group_name: str,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create a group for testing and return its ID"""
+        group_id = uuid.uuid4()
+
+        async with database_engine.begin_session() as db_sess:
+            group = GroupRow(
+                id=group_id,
+                name=test_group_name,
+                domain_name=test_domain,
+                total_resource_slots={},
+                resource_policy=test_project_resource_policy,
+            )
+            db_sess.add(group)
+            await db_sess.flush()
+
+        yield group_id
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(sa.delete(GroupRow).where(GroupRow.id == group_id))
+
+    @pytest.fixture
+    async def test_user_id(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+        test_domain: str,
+        test_user_resource_policy: str,
+        test_user_email: str,
+        test_username: str,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create a user for testing and return its ID"""
+        user_id = uuid.uuid4()
+
+        async with database_engine.begin_session() as db_sess:
+            password_info = PasswordInfo(
+                password="test_password",
+                algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                rounds=1,
+                salt_size=16,
+            )
+            user = UserRow(
+                uuid=user_id,
+                email=test_user_email,
+                username=test_username,
+                password=password_info,
+                domain_name=test_domain,
+                resource_policy=test_user_resource_policy,
+                role=UserRole.USER,
+                status=UserStatus.ACTIVE,
+            )
+            db_sess.add(user)
+            await db_sess.flush()
+
+        yield user_id
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_id))
+
+    @pytest.fixture
+    async def test_container_registry_id(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create a container registry for testing and return its ID"""
+        registry_id = uuid.uuid4()
+
+        async with database_engine.begin_session() as db_sess:
+            registry = ContainerRegistryRow(
+                url="http://test-registry.local",
+                registry_name=f"test-registry-{uuid.uuid4().hex[:8]}",
+                type=ContainerRegistryType.DOCKER,
+            )
+            registry.id = registry_id
+            db_sess.add(registry)
+            await db_sess.flush()
+
+        yield registry_id
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.id == registry_id)
+            )
+
+    @pytest.fixture
+    async def test_image_id(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+        test_container_registry_id: uuid.UUID,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create an image for testing and return its ID"""
+        image_id = uuid.uuid4()
+
+        async with database_engine.begin_session() as db_sess:
+            image = ImageRow(
+                name=f"test-image-{uuid.uuid4().hex[:8]}",
+                project=None,
+                image=f"test-image-{uuid.uuid4().hex[:8]}",
+                tag="latest",
+                registry=f"test-registry-{uuid.uuid4().hex[:8]}",
+                registry_id=test_container_registry_id,
+                architecture="x86_64",
+                config_digest="sha256:" + "a" * 64,
+                size_bytes=1024,
+                type=ImageType.COMPUTE,
+                labels={},
+                resources={"cpu": {"min": "1"}, "mem": {"min": "1g"}},
+            )
+            image.id = image_id
+            db_sess.add(image)
+            await db_sess.flush()
+
+        yield image_id
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(sa.delete(ImageRow).where(ImageRow.id == image_id))
+
+    @pytest.fixture
+    async def sample_endpoint_id(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+        test_user_id: uuid.UUID,
+        test_domain: str,
+        test_group_id: uuid.UUID,
+        test_scaling_group: str,
+        test_image_id: uuid.UUID,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create a sample endpoint directly in DB and return its ID"""
+        endpoint_id = uuid.uuid4()
+
+        async with database_engine.begin_session() as db_sess:
+            endpoint = EndpointRow(
+                id=endpoint_id,
+                name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
+                created_user=test_user_id,
+                session_owner=test_user_id,
+                domain=test_domain,
+                project=test_group_id,
+                resource_group=test_scaling_group,
+                image=test_image_id,
+                model=None,
+                model_mount_destination="/models",
+                runtime_variant=RuntimeVariant.CUSTOM,
+                lifecycle_stage=EndpointLifecycle.CREATED,
+                replicas=1,
+                resource_slots=ResourceSlot({"cpu": "1", "mem": "1g"}),
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+            )
+            db_sess.add(endpoint)
+            await db_sess.flush()
+
+        yield endpoint_id
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(sa.delete(EndpointRow).where(EndpointRow.id == endpoint_id))
+
+    @pytest.fixture
+    async def sample_auto_scaling_rules(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+        sample_endpoint_id: uuid.UUID,
+    ) -> AsyncGenerator[list[uuid.UUID], None]:
+        """Create multiple sample auto scaling rules for testing."""
+        rule_ids: list[uuid.UUID] = []
+        metric_names = ["cpu_util", "memory_util", "gpu_util", "request_rate", "latency"]
+
+        async with database_engine.begin_session() as db_sess:
+            for i, metric_name in enumerate(metric_names):
+                rule_id = uuid.uuid4()
+                rule = EndpointAutoScalingRuleRow(
+                    id=rule_id,
+                    endpoint=sample_endpoint_id,
+                    metric_source=AutoScalingMetricSource.KERNEL,
+                    metric_name=metric_name,
+                    threshold=Decimal(str(50.0 + i * 10)),
+                    comparator=AutoScalingMetricComparator.GREATER_THAN,
+                    step_size=1 + i,
+                    cooldown_seconds=300 + i * 60,
+                    min_replicas=1,
+                    max_replicas=10 + i,
+                    created_at=datetime.now(timezone.utc),
+                )
+                db_sess.add(rule)
+                rule_ids.append(rule_id)
+            await db_sess.flush()
+
+        yield rule_ids
+
+        async with database_engine.begin_session() as db_sess:
+            for rule_id in rule_ids:
+                await db_sess.execute(
+                    sa.delete(EndpointAutoScalingRuleRow).where(
+                        EndpointAutoScalingRuleRow.id == rule_id
+                    )
+                )
+
+    @pytest.fixture
+    async def sample_rules_for_pagination(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+        sample_endpoint_id: uuid.UUID,
+    ) -> AsyncGenerator[list[uuid.UUID], None]:
+        """Create 25 sample auto scaling rules for pagination testing."""
+        rule_ids: list[uuid.UUID] = []
+
+        async with database_engine.begin_session() as db_sess:
+            for i in range(25):
+                rule_id = uuid.uuid4()
+                rule = EndpointAutoScalingRuleRow(
+                    id=rule_id,
+                    endpoint=sample_endpoint_id,
+                    metric_source=AutoScalingMetricSource.KERNEL,
+                    metric_name=f"metric_{i:02d}",
+                    threshold=Decimal(str(50.0 + i)),
+                    comparator=AutoScalingMetricComparator.GREATER_THAN,
+                    step_size=1,
+                    cooldown_seconds=300,
+                    min_replicas=1,
+                    max_replicas=10,
+                    created_at=datetime.now(timezone.utc),
+                )
+                db_sess.add(rule)
+                rule_ids.append(rule_id)
+            await db_sess.flush()
+
+        yield rule_ids
+
+        async with database_engine.begin_session() as db_sess:
+            for rule_id in rule_ids:
+                await db_sess.execute(
+                    sa.delete(EndpointAutoScalingRuleRow).where(
+                        EndpointAutoScalingRuleRow.id == rule_id
+                    )
+                )
+
+    @pytest.fixture
+    async def admin_model_serving_repository(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+    ) -> AdminModelServingRepository:
+        """Create AdminModelServingRepository instance with real database"""
+        return AdminModelServingRepository(db=database_engine)
 
     # =========================================================================
     # Tests - Basic Search
@@ -635,62 +1148,40 @@ class TestSearchAutoScalingRulesForce:
     async def test_search_force_success(
         self,
         admin_model_serving_repository: AdminModelServingRepository,
-        setup_readonly_session,
-        sample_auto_scaling_rules: list[EndpointAutoScalingRuleRow],
-        mocker,
+        sample_auto_scaling_rules: list[uuid.UUID],
     ) -> None:
         """Test search without access validation (force)."""
-        # Arrange
-        mock_execute_batch = mocker.patch(
-            "ai.backend.manager.repositories.model_serving.admin_repository.execute_batch_querier",
-            new_callable=AsyncMock,
-        )
-        mock_execute_batch.return_value = self._create_mock_batch_result(sample_auto_scaling_rules)
-
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        # Act
         result = await admin_model_serving_repository.search_auto_scaling_rules_force(
             querier=querier,
         )
 
-        # Assert
         assert result is not None
         assert isinstance(result, EndpointAutoScalingRuleListResult)
         assert len(result.items) == len(sample_auto_scaling_rules)
-        mock_execute_batch.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_search_force_empty_result(
         self,
         admin_model_serving_repository: AdminModelServingRepository,
-        setup_readonly_session,
-        mocker,
+        sample_endpoint_id: uuid.UUID,
     ) -> None:
         """Test force search returns empty result when no rules exist."""
-        # Arrange
-        mock_execute_batch = mocker.patch(
-            "ai.backend.manager.repositories.model_serving.admin_repository.execute_batch_querier",
-            new_callable=AsyncMock,
-        )
-        mock_execute_batch.return_value = self._create_mock_batch_result([], total_count=0)
-
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        # Act
         result = await admin_model_serving_repository.search_auto_scaling_rules_force(
             querier=querier,
         )
 
-        # Assert
         assert result is not None
         assert len(result.items) == 0
         assert result.total_count == 0
@@ -703,35 +1194,19 @@ class TestSearchAutoScalingRulesForce:
     async def test_search_force_with_pagination(
         self,
         admin_model_serving_repository: AdminModelServingRepository,
-        setup_readonly_session,
-        sample_rules_for_pagination: list[EndpointAutoScalingRuleRow],
-        mocker,
+        sample_rules_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test force search with pagination."""
-        # Arrange
-        first_page_rules = sample_rules_for_pagination[:10]
-        mock_execute_batch = mocker.patch(
-            "ai.backend.manager.repositories.model_serving.admin_repository.execute_batch_querier",
-            new_callable=AsyncMock,
-        )
-        mock_execute_batch.return_value = self._create_mock_batch_result(
-            first_page_rules,
-            total_count=25,
-            has_next_page=True,
-        )
-
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        # Act
         result = await admin_model_serving_repository.search_auto_scaling_rules_force(
             querier=querier,
         )
 
-        # Assert
         assert len(result.items) == 10
         assert result.total_count == 25
         assert result.has_next_page is True
@@ -744,31 +1219,19 @@ class TestSearchAutoScalingRulesForce:
     async def test_search_force_with_ordering(
         self,
         admin_model_serving_repository: AdminModelServingRepository,
-        setup_readonly_session,
-        sample_auto_scaling_rules: list[EndpointAutoScalingRuleRow],
-        mocker,
+        sample_auto_scaling_rules: list[uuid.UUID],
     ) -> None:
         """Test force search with ordering."""
-        # Arrange: Sort rules by metric_name ascending
-        sorted_rules = sorted(sample_auto_scaling_rules, key=lambda r: r.metric_name)
-        mock_execute_batch = mocker.patch(
-            "ai.backend.manager.repositories.model_serving.admin_repository.execute_batch_querier",
-            new_callable=AsyncMock,
-        )
-        mock_execute_batch.return_value = self._create_mock_batch_result(sorted_rules)
-
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[EndpointAutoScalingRuleRow.metric_name.asc()],
         )
 
-        # Act
         result = await admin_model_serving_repository.search_auto_scaling_rules_force(
             querier=querier,
         )
 
-        # Assert
         assert result is not None
         metric_names = [item.metric_name for item in result.items]
         assert metric_names == sorted(metric_names)
