@@ -67,6 +67,10 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.list import
     ListReservoirRegistriesAction,
     ListReservoirRegistriesActionResult,
 )
+from ai.backend.manager.services.artifact_registry.actions.reservoir.search import (
+    SearchReservoirRegistriesAction,
+    SearchReservoirRegistriesActionResult,
+)
 from ai.backend.manager.services.artifact_registry.actions.reservoir.update import (
     UpdateReservoirRegistryAction,
     UpdateReservoirRegistryActionResult,
@@ -236,6 +240,20 @@ class ArtifactRegistryService:
         log.info("Listing reservoirs")
         reservoir_data_list = await self._reservoir_repository.list_reservoir_registries()
         return ListReservoirRegistriesActionResult(data=reservoir_data_list)
+
+    async def search_reservoir_registries(
+        self, action: SearchReservoirRegistriesAction
+    ) -> SearchReservoirRegistriesActionResult:
+        """Searches Reservoir registries."""
+        result = await self._reservoir_repository.search_registries(
+            querier=action.querier,
+        )
+        return SearchReservoirRegistriesActionResult(
+            registries=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def get_registry_meta(
         self, action: GetArtifactRegistryMetaAction
