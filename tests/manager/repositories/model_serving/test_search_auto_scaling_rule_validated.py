@@ -56,45 +56,15 @@ class TestSearchAutoScalingRulesValidated:
     # =========================================================================
 
     @pytest.fixture
-    def test_domain_name(self) -> str:
-        """Return a unique test domain name"""
-        return f"test-domain-{uuid.uuid4().hex[:8]}"
-
-    @pytest.fixture
-    def test_group_name(self) -> str:
-        """Return a unique test group name"""
-        return f"test-group-{uuid.uuid4().hex[:8]}"
-
-    @pytest.fixture
-    def test_resource_policy_name(self) -> str:
-        """Return a unique test resource policy name"""
-        return f"test-policy-{uuid.uuid4().hex[:8]}"
-
-    @pytest.fixture
-    def test_scaling_group_name(self) -> str:
-        """Return a unique test scaling group name"""
-        return f"test-sgroup-{uuid.uuid4().hex[:8]}"
-
-    @pytest.fixture
-    def test_user_email(self) -> str:
-        """Return a unique test user email"""
-        return f"test-{uuid.uuid4().hex[:8]}@test.com"
-
-    @pytest.fixture
-    def test_username(self) -> str:
-        """Return a unique test username"""
-        return f"testuser-{uuid.uuid4().hex[:8]}"
-
-    @pytest.fixture
     async def test_scaling_group(
         self,
         database_engine: ExtendedAsyncSAEngine,
-        test_scaling_group_name: str,
     ) -> AsyncGenerator[str, None]:
         """Create a scaling group for testing"""
+        name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with database_engine.begin_session() as db_sess:
             scaling_group = ScalingGroupRow(
-                name=test_scaling_group_name,
+                name=name,
                 driver="static",
                 scheduler="fifo",
                 scheduler_opts=ScalingGroupOpts(),
@@ -102,40 +72,38 @@ class TestSearchAutoScalingRulesValidated:
             db_sess.add(scaling_group)
             await db_sess.flush()
 
-        yield test_scaling_group_name
+        yield name
 
         async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(
-                sa.delete(ScalingGroupRow).where(ScalingGroupRow.name == test_scaling_group_name)
-            )
+            await db_sess.execute(sa.delete(ScalingGroupRow).where(ScalingGroupRow.name == name))
 
     @pytest.fixture
     async def test_domain(
         self,
         database_engine: ExtendedAsyncSAEngine,
-        test_domain_name: str,
     ) -> AsyncGenerator[str, None]:
         """Create a domain for testing"""
+        name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with database_engine.begin_session() as db_sess:
-            domain = DomainRow(name=test_domain_name, total_resource_slots={})
+            domain = DomainRow(name=name, total_resource_slots={})
             db_sess.add(domain)
             await db_sess.flush()
 
-        yield test_domain_name
+        yield name
 
         async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == test_domain_name))
+            await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == name))
 
     @pytest.fixture
     async def test_user_resource_policy(
         self,
         database_engine: ExtendedAsyncSAEngine,
-        test_resource_policy_name: str,
     ) -> AsyncGenerator[str, None]:
         """Create a user resource policy for testing"""
+        name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
         async with database_engine.begin_session() as db_sess:
             user_resource_policy = UserResourcePolicyRow(
-                name=test_resource_policy_name,
+                name=name,
                 max_vfolder_count=0,
                 max_quota_scope_size=-1,
                 max_session_count_per_model_session=10,
@@ -144,25 +112,23 @@ class TestSearchAutoScalingRulesValidated:
             db_sess.add(user_resource_policy)
             await db_sess.flush()
 
-        yield test_resource_policy_name
+        yield name
 
         async with database_engine.begin_session() as db_sess:
             await db_sess.execute(
-                sa.delete(UserResourcePolicyRow).where(
-                    UserResourcePolicyRow.name == test_resource_policy_name
-                )
+                sa.delete(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
             )
 
     @pytest.fixture
     async def test_project_resource_policy(
         self,
         database_engine: ExtendedAsyncSAEngine,
-        test_resource_policy_name: str,
     ) -> AsyncGenerator[str, None]:
         """Create a project resource policy for testing"""
+        name = f"test-project-policy-{uuid.uuid4().hex[:8]}"
         async with database_engine.begin_session() as db_sess:
             project_resource_policy = ProjectResourcePolicyRow(
-                name=test_resource_policy_name,
+                name=name,
                 max_vfolder_count=0,
                 max_quota_scope_size=-1,
                 max_network_count=3,
@@ -170,13 +136,11 @@ class TestSearchAutoScalingRulesValidated:
             db_sess.add(project_resource_policy)
             await db_sess.flush()
 
-        yield test_resource_policy_name
+        yield name
 
         async with database_engine.begin_session() as db_sess:
             await db_sess.execute(
-                sa.delete(ProjectResourcePolicyRow).where(
-                    ProjectResourcePolicyRow.name == test_resource_policy_name
-                )
+                sa.delete(ProjectResourcePolicyRow).where(ProjectResourcePolicyRow.name == name)
             )
 
     @pytest.fixture
@@ -185,15 +149,15 @@ class TestSearchAutoScalingRulesValidated:
         database_engine: ExtendedAsyncSAEngine,
         test_domain: str,
         test_project_resource_policy: str,
-        test_group_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create a group for testing and return its ID"""
         group_id = uuid.uuid4()
+        name = f"test-group-{uuid.uuid4().hex[:8]}"
 
         async with database_engine.begin_session() as db_sess:
             group = GroupRow(
                 id=group_id,
-                name=test_group_name,
+                name=name,
                 domain_name=test_domain,
                 total_resource_slots={},
                 resource_policy=test_project_resource_policy,
@@ -212,11 +176,11 @@ class TestSearchAutoScalingRulesValidated:
         database_engine: ExtendedAsyncSAEngine,
         test_domain: str,
         test_user_resource_policy: str,
-        test_user_email: str,
-        test_username: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create a user for testing and return its ID"""
         user_id = uuid.uuid4()
+        email = f"test-{uuid.uuid4().hex[:8]}@test.com"
+        username = f"testuser-{uuid.uuid4().hex[:8]}"
 
         async with database_engine.begin_session() as db_sess:
             password_info = PasswordInfo(
@@ -227,8 +191,8 @@ class TestSearchAutoScalingRulesValidated:
             )
             user = UserRow(
                 uuid=user_id,
-                email=test_user_email,
-                username=test_username,
+                email=email,
+                username=username,
                 password=password_info,
                 domain_name=test_domain,
                 resource_policy=test_user_resource_policy,
@@ -765,557 +729,6 @@ class TestSearchAutoScalingRulesValidated:
             user_id=test_user_id,
             user_role=UserRole.USER,
             domain_name=test_domain,
-        )
-
-        assert result.total_count == 3
-        assert len(result.items) == 2
-        thresholds = [float(item.threshold) for item in result.items]
-        assert thresholds == sorted(thresholds, reverse=True)
-
-
-class TestSearchAutoScalingRulesForce:
-    """Test cases for search_auto_scaling_rules_force in AdminModelServingRepository."""
-
-    # =========================================================================
-    # Fixtures
-    # =========================================================================
-
-    @pytest.fixture
-    def test_domain_name(self) -> str:
-        """Return a unique test domain name"""
-        return f"test-domain-{uuid.uuid4().hex[:8]}"
-
-    @pytest.fixture
-    def test_group_name(self) -> str:
-        """Return a unique test group name"""
-        return f"test-group-{uuid.uuid4().hex[:8]}"
-
-    @pytest.fixture
-    def test_resource_policy_name(self) -> str:
-        """Return a unique test resource policy name"""
-        return f"test-policy-{uuid.uuid4().hex[:8]}"
-
-    @pytest.fixture
-    def test_scaling_group_name(self) -> str:
-        """Return a unique test scaling group name"""
-        return f"test-sgroup-{uuid.uuid4().hex[:8]}"
-
-    @pytest.fixture
-    def test_user_email(self) -> str:
-        """Return a unique test user email"""
-        return f"test-{uuid.uuid4().hex[:8]}@test.com"
-
-    @pytest.fixture
-    def test_username(self) -> str:
-        """Return a unique test username"""
-        return f"testuser-{uuid.uuid4().hex[:8]}"
-
-    @pytest.fixture
-    async def test_scaling_group(
-        self,
-        database_engine: ExtendedAsyncSAEngine,
-        test_scaling_group_name: str,
-    ) -> AsyncGenerator[str, None]:
-        """Create a scaling group for testing"""
-        async with database_engine.begin_session() as db_sess:
-            scaling_group = ScalingGroupRow(
-                name=test_scaling_group_name,
-                driver="static",
-                scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
-            )
-            db_sess.add(scaling_group)
-            await db_sess.flush()
-
-        yield test_scaling_group_name
-
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(
-                sa.delete(ScalingGroupRow).where(ScalingGroupRow.name == test_scaling_group_name)
-            )
-
-    @pytest.fixture
-    async def test_domain(
-        self,
-        database_engine: ExtendedAsyncSAEngine,
-        test_domain_name: str,
-    ) -> AsyncGenerator[str, None]:
-        """Create a domain for testing"""
-        async with database_engine.begin_session() as db_sess:
-            domain = DomainRow(name=test_domain_name, total_resource_slots={})
-            db_sess.add(domain)
-            await db_sess.flush()
-
-        yield test_domain_name
-
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == test_domain_name))
-
-    @pytest.fixture
-    async def test_user_resource_policy(
-        self,
-        database_engine: ExtendedAsyncSAEngine,
-        test_resource_policy_name: str,
-    ) -> AsyncGenerator[str, None]:
-        """Create a user resource policy for testing"""
-        async with database_engine.begin_session() as db_sess:
-            user_resource_policy = UserResourcePolicyRow(
-                name=test_resource_policy_name,
-                max_vfolder_count=0,
-                max_quota_scope_size=-1,
-                max_session_count_per_model_session=10,
-                max_customized_image_count=10,
-            )
-            db_sess.add(user_resource_policy)
-            await db_sess.flush()
-
-        yield test_resource_policy_name
-
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(
-                sa.delete(UserResourcePolicyRow).where(
-                    UserResourcePolicyRow.name == test_resource_policy_name
-                )
-            )
-
-    @pytest.fixture
-    async def test_project_resource_policy(
-        self,
-        database_engine: ExtendedAsyncSAEngine,
-        test_resource_policy_name: str,
-    ) -> AsyncGenerator[str, None]:
-        """Create a project resource policy for testing"""
-        async with database_engine.begin_session() as db_sess:
-            project_resource_policy = ProjectResourcePolicyRow(
-                name=test_resource_policy_name,
-                max_vfolder_count=0,
-                max_quota_scope_size=-1,
-                max_network_count=3,
-            )
-            db_sess.add(project_resource_policy)
-            await db_sess.flush()
-
-        yield test_resource_policy_name
-
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(
-                sa.delete(ProjectResourcePolicyRow).where(
-                    ProjectResourcePolicyRow.name == test_resource_policy_name
-                )
-            )
-
-    @pytest.fixture
-    async def test_group_id(
-        self,
-        database_engine: ExtendedAsyncSAEngine,
-        test_domain: str,
-        test_project_resource_policy: str,
-        test_group_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
-        """Create a group for testing and return its ID"""
-        group_id = uuid.uuid4()
-
-        async with database_engine.begin_session() as db_sess:
-            group = GroupRow(
-                id=group_id,
-                name=test_group_name,
-                domain_name=test_domain,
-                total_resource_slots={},
-                resource_policy=test_project_resource_policy,
-            )
-            db_sess.add(group)
-            await db_sess.flush()
-
-        yield group_id
-
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(GroupRow).where(GroupRow.id == group_id))
-
-    @pytest.fixture
-    async def test_user_id(
-        self,
-        database_engine: ExtendedAsyncSAEngine,
-        test_domain: str,
-        test_user_resource_policy: str,
-        test_user_email: str,
-        test_username: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
-        """Create a user for testing and return its ID"""
-        user_id = uuid.uuid4()
-
-        async with database_engine.begin_session() as db_sess:
-            password_info = PasswordInfo(
-                password="test_password",
-                algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
-                rounds=1,
-                salt_size=16,
-            )
-            user = UserRow(
-                uuid=user_id,
-                email=test_user_email,
-                username=test_username,
-                password=password_info,
-                domain_name=test_domain,
-                resource_policy=test_user_resource_policy,
-                role=UserRole.USER,
-                status=UserStatus.ACTIVE,
-            )
-            db_sess.add(user)
-            await db_sess.flush()
-
-        yield user_id
-
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_id))
-
-    @pytest.fixture
-    async def test_container_registry_id(
-        self,
-        database_engine: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[uuid.UUID, None]:
-        """Create a container registry for testing and return its ID"""
-        registry_id = uuid.uuid4()
-
-        async with database_engine.begin_session() as db_sess:
-            registry = ContainerRegistryRow(
-                url="http://test-registry.local",
-                registry_name=f"test-registry-{uuid.uuid4().hex[:8]}",
-                type=ContainerRegistryType.DOCKER,
-            )
-            registry.id = registry_id
-            db_sess.add(registry)
-            await db_sess.flush()
-
-        yield registry_id
-
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(
-                sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.id == registry_id)
-            )
-
-    @pytest.fixture
-    async def test_image_id(
-        self,
-        database_engine: ExtendedAsyncSAEngine,
-        test_container_registry_id: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
-        """Create an image for testing and return its ID"""
-        image_id = uuid.uuid4()
-
-        async with database_engine.begin_session() as db_sess:
-            image = ImageRow(
-                name=f"test-image-{uuid.uuid4().hex[:8]}",
-                project=None,
-                image=f"test-image-{uuid.uuid4().hex[:8]}",
-                tag="latest",
-                registry=f"test-registry-{uuid.uuid4().hex[:8]}",
-                registry_id=test_container_registry_id,
-                architecture="x86_64",
-                config_digest="sha256:" + "a" * 64,
-                size_bytes=1024,
-                type=ImageType.COMPUTE,
-                labels={},
-                resources={"cpu": {"min": "1"}, "mem": {"min": "1g"}},
-            )
-            image.id = image_id
-            db_sess.add(image)
-            await db_sess.flush()
-
-        yield image_id
-
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(ImageRow).where(ImageRow.id == image_id))
-
-    @pytest.fixture
-    async def sample_endpoint_id(
-        self,
-        database_engine: ExtendedAsyncSAEngine,
-        test_user_id: uuid.UUID,
-        test_domain: str,
-        test_group_id: uuid.UUID,
-        test_scaling_group: str,
-        test_image_id: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
-        """Create a sample endpoint directly in DB and return its ID"""
-        endpoint_id = uuid.uuid4()
-
-        async with database_engine.begin_session() as db_sess:
-            endpoint = EndpointRow(
-                id=endpoint_id,
-                name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
-                created_user=test_user_id,
-                session_owner=test_user_id,
-                domain=test_domain,
-                project=test_group_id,
-                resource_group=test_scaling_group,
-                image=test_image_id,
-                model=None,
-                model_mount_destination="/models",
-                runtime_variant=RuntimeVariant.CUSTOM,
-                lifecycle_stage=EndpointLifecycle.CREATED,
-                replicas=1,
-                resource_slots=ResourceSlot({"cpu": "1", "mem": "1g"}),
-                cluster_mode=ClusterMode.SINGLE_NODE,
-                cluster_size=1,
-            )
-            db_sess.add(endpoint)
-            await db_sess.flush()
-
-        yield endpoint_id
-
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(EndpointRow).where(EndpointRow.id == endpoint_id))
-
-    @pytest.fixture
-    async def sample_auto_scaling_rules(
-        self,
-        database_engine: ExtendedAsyncSAEngine,
-        sample_endpoint_id: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
-        """Create multiple sample auto scaling rules for testing."""
-        rule_ids: list[uuid.UUID] = []
-        metric_names = ["cpu_util", "memory_util", "gpu_util", "request_rate", "latency"]
-
-        async with database_engine.begin_session() as db_sess:
-            for i, metric_name in enumerate(metric_names):
-                rule_id = uuid.uuid4()
-                rule = EndpointAutoScalingRuleRow(
-                    id=rule_id,
-                    endpoint=sample_endpoint_id,
-                    metric_source=AutoScalingMetricSource.KERNEL,
-                    metric_name=metric_name,
-                    threshold=Decimal(str(50.0 + i * 10)),
-                    comparator=AutoScalingMetricComparator.GREATER_THAN,
-                    step_size=1 + i,
-                    cooldown_seconds=300 + i * 60,
-                    min_replicas=1,
-                    max_replicas=10 + i,
-                    created_at=datetime.now(timezone.utc),
-                )
-                db_sess.add(rule)
-                rule_ids.append(rule_id)
-            await db_sess.flush()
-
-        yield rule_ids
-
-        async with database_engine.begin_session() as db_sess:
-            for rule_id in rule_ids:
-                await db_sess.execute(
-                    sa.delete(EndpointAutoScalingRuleRow).where(
-                        EndpointAutoScalingRuleRow.id == rule_id
-                    )
-                )
-
-    @pytest.fixture
-    async def sample_rules_for_pagination(
-        self,
-        database_engine: ExtendedAsyncSAEngine,
-        sample_endpoint_id: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
-        """Create 25 sample auto scaling rules for pagination testing."""
-        rule_ids: list[uuid.UUID] = []
-
-        async with database_engine.begin_session() as db_sess:
-            for i in range(25):
-                rule_id = uuid.uuid4()
-                rule = EndpointAutoScalingRuleRow(
-                    id=rule_id,
-                    endpoint=sample_endpoint_id,
-                    metric_source=AutoScalingMetricSource.KERNEL,
-                    metric_name=f"metric_{i:02d}",
-                    threshold=Decimal(str(50.0 + i)),
-                    comparator=AutoScalingMetricComparator.GREATER_THAN,
-                    step_size=1,
-                    cooldown_seconds=300,
-                    min_replicas=1,
-                    max_replicas=10,
-                    created_at=datetime.now(timezone.utc),
-                )
-                db_sess.add(rule)
-                rule_ids.append(rule_id)
-            await db_sess.flush()
-
-        yield rule_ids
-
-        async with database_engine.begin_session() as db_sess:
-            for rule_id in rule_ids:
-                await db_sess.execute(
-                    sa.delete(EndpointAutoScalingRuleRow).where(
-                        EndpointAutoScalingRuleRow.id == rule_id
-                    )
-                )
-
-    @pytest.fixture
-    async def admin_model_serving_repository(
-        self,
-        database_engine: ExtendedAsyncSAEngine,
-    ) -> AdminModelServingRepository:
-        """Create AdminModelServingRepository instance with real database"""
-        return AdminModelServingRepository(db=database_engine)
-
-    # =========================================================================
-    # Tests - Basic Search
-    # =========================================================================
-
-    @pytest.mark.asyncio
-    async def test_search_force_success(
-        self,
-        admin_model_serving_repository: AdminModelServingRepository,
-        sample_auto_scaling_rules: list[uuid.UUID],
-    ) -> None:
-        """Test search without access validation (force)."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-
-        result = await admin_model_serving_repository.search_auto_scaling_rules_force(
-            querier=querier,
-        )
-
-        assert result is not None
-        assert isinstance(result, EndpointAutoScalingRuleListResult)
-        assert len(result.items) == len(sample_auto_scaling_rules)
-
-    @pytest.mark.asyncio
-    async def test_search_force_empty_result(
-        self,
-        admin_model_serving_repository: AdminModelServingRepository,
-        sample_endpoint_id: uuid.UUID,
-    ) -> None:
-        """Test force search returns empty result when no rules exist."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-
-        result = await admin_model_serving_repository.search_auto_scaling_rules_force(
-            querier=querier,
-        )
-
-        assert result is not None
-        assert len(result.items) == 0
-        assert result.total_count == 0
-
-    # =========================================================================
-    # Tests - Pagination
-    # =========================================================================
-
-    @pytest.mark.asyncio
-    async def test_search_force_with_pagination(
-        self,
-        admin_model_serving_repository: AdminModelServingRepository,
-        sample_rules_for_pagination: list[uuid.UUID],
-    ) -> None:
-        """Test force search with pagination."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-
-        result = await admin_model_serving_repository.search_auto_scaling_rules_force(
-            querier=querier,
-        )
-
-        assert len(result.items) == 10
-        assert result.total_count == 25
-        assert result.has_next_page is True
-
-    # =========================================================================
-    # Tests - Ordering
-    # =========================================================================
-
-    @pytest.mark.asyncio
-    async def test_search_force_with_ordering(
-        self,
-        admin_model_serving_repository: AdminModelServingRepository,
-        sample_auto_scaling_rules: list[uuid.UUID],
-    ) -> None:
-        """Test force search with ordering."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[EndpointAutoScalingRuleRow.metric_name.asc()],
-        )
-
-        result = await admin_model_serving_repository.search_auto_scaling_rules_force(
-            querier=querier,
-        )
-
-        assert result is not None
-        metric_names = [item.metric_name for item in result.items]
-        assert metric_names == sorted(metric_names)
-
-    # =========================================================================
-    # Tests - Filtering
-    # =========================================================================
-
-    async def test_search_force_filter_by_metric_name(
-        self,
-        admin_model_serving_repository: AdminModelServingRepository,
-        sample_auto_scaling_rules: list[uuid.UUID],
-    ) -> None:
-        """Test force search filtered by metric_name."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                lambda: EndpointAutoScalingRuleRow.metric_name.contains("cpu"),
-            ],
-            orders=[],
-        )
-
-        result = await admin_model_serving_repository.search_auto_scaling_rules_force(
-            querier=querier,
-        )
-
-        assert len(result.items) == 1
-        assert "cpu" in result.items[0].metric_name
-
-    async def test_search_force_filter_by_threshold(
-        self,
-        admin_model_serving_repository: AdminModelServingRepository,
-        sample_auto_scaling_rules: list[uuid.UUID],
-    ) -> None:
-        """Test force search filtered by threshold."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                lambda: EndpointAutoScalingRuleRow.threshold > 60,
-            ],
-            orders=[],
-        )
-
-        result = await admin_model_serving_repository.search_auto_scaling_rules_force(
-            querier=querier,
-        )
-
-        assert len(result.items) == 3
-        for item in result.items:
-            assert float(item.threshold) > 60
-
-    # =========================================================================
-    # Tests - Combined Query (Pagination + Filter + Order)
-    # =========================================================================
-
-    async def test_search_force_combined_pagination_filter_order(
-        self,
-        admin_model_serving_repository: AdminModelServingRepository,
-        sample_auto_scaling_rules: list[uuid.UUID],
-    ) -> None:
-        """Test force search with pagination, filter, and ordering combined."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=2, offset=0),
-            conditions=[
-                lambda: EndpointAutoScalingRuleRow.threshold > 60,
-            ],
-            orders=[EndpointAutoScalingRuleRow.threshold.desc()],
-        )
-
-        result = await admin_model_serving_repository.search_auto_scaling_rules_force(
-            querier=querier,
         )
 
         assert result.total_count == 3
