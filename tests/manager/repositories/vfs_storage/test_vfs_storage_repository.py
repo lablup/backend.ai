@@ -148,6 +148,7 @@ class TestVFSStorageRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: VFSStorageRow.host == "host-a",
             ],
             orders=[],
@@ -168,6 +169,7 @@ class TestVFSStorageRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: VFSStorageRow.name.like("alpha%"),
             ],
             orders=[],
@@ -291,6 +293,7 @@ class TestVFSStorageRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=5, offset=2),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: VFSStorageRow.host == "localhost",
             ],
             orders=[VFSStorageRow.name.asc()],
