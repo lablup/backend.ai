@@ -200,10 +200,6 @@ class VFolderService:
             )
 
         if group_type == ProjectType.MODEL_STORE:
-            if action.mount_permission != VFolderPermission.READ_WRITE:
-                raise VFolderInvalidParameter(
-                    "Setting custom permission is not supported for model store vfolder"
-                )
             if action.usage_mode != VFolderUsageMode.MODEL:
                 raise VFolderInvalidParameter(
                     "Only Model VFolder can be created under the model store project"
