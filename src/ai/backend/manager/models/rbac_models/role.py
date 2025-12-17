@@ -5,7 +5,6 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Optional,
-    Self,
 )
 
 import sqlalchemy as sa
@@ -14,7 +13,6 @@ from sqlalchemy.orm import (
 )
 
 from ai.backend.manager.data.permission.role import (
-    RoleCreateInput,
     RoleData,
     RoleDetailData,
 )
@@ -107,12 +105,4 @@ class RoleRow(Base):
             description=self.description,
             permission_groups=[pg_row.to_extended_data() for pg_row in self.permission_group_rows],
             object_permissions=[op_row.to_data() for op_row in self.object_permission_rows],
-        )
-
-    @classmethod
-    def from_input(cls, data: RoleCreateInput) -> Self:
-        return cls(
-            name=data.name,
-            status=data.status,
-            description=data.description,
         )

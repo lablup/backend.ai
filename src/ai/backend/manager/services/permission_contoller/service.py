@@ -1,7 +1,6 @@
 import logging
 
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -20,6 +19,18 @@ from ai.backend.manager.services.permission_contoller.actions.delete_role import
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
     GetRoleDetailActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.object_permission import (
+    CreateObjectPermissionAction,
+    CreateObjectPermissionActionResult,
+    DeleteObjectPermissionAction,
+    DeleteObjectPermissionActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.permission import (
+    CreatePermissionAction,
+    CreatePermissionActionResult,
+    DeletePermissionAction,
+    DeletePermissionActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.revoke_role import (
     RevokeRoleAction,
@@ -51,24 +62,58 @@ class PermissionControllerService:
         """
         Creates a new role in the repository.
         """
-        result = await self._repository.create_role(action.input)
+        result = await self._repository.create_role(
+            action.creator,
+            action.permission_groups,
+            action.object_permissions,
+        )
         return CreateRoleActionResult(
             data=result,
         )
+
+    async def create_permission(
+        self, action: CreatePermissionAction
+    ) -> CreatePermissionActionResult:
+        """
+        Creates a new permission in the repository.
+        """
+        result = await self._repository.create_permission(action.creator)
+        return CreatePermissionActionResult(data=result)
+
+    async def delete_permission(
+        self, action: DeletePermissionAction
+    ) -> DeletePermissionActionResult:
+        """
+        Deletes a permission from the repository.
+        """
+        result = await self._repository.delete_permission(action.purger)
+        return DeletePermissionActionResult(data=result)
+
+    async def create_object_permission(
+        self, action: CreateObjectPermissionAction
+    ) -> CreateObjectPermissionActionResult:
+        """
+        Creates a new object permission in the repository.
+        """
+        result = await self._repository.create_object_permission(action.creator)
+        return CreateObjectPermissionActionResult(data=result)
+
+    async def delete_object_permission(
+        self, action: DeleteObjectPermissionAction
+    ) -> DeleteObjectPermissionActionResult:
+        """
+        Deletes an object permission from the repository.
+        """
+        result = await self._repository.delete_object_permission(action.purger)
+        return DeleteObjectPermissionActionResult(data=result)
 
     async def update_role(self, action: UpdateRoleAction) -> UpdateRoleActionResult:
         """
         Updates an existing role in the repository.
         If the role does not exist, it returns a result indicating failure.
         """
-        try:
-            result = await self._repository.update_role(action.updater)
-        except ObjectNotFound:
-            return UpdateRoleActionResult(data=None, success=False)
-        return UpdateRoleActionResult(
-            data=result,
-            success=True,
-        )
+        result = await self._repository.update_role(action.updater)
+        return UpdateRoleActionResult(data=result)
 
     async def delete_role(self, action: DeleteRoleAction) -> DeleteRoleActionResult:
         """
