@@ -431,7 +431,7 @@ class TestSessionLifetimeChecker:
         return datetime.now(timezone.utc).replace(microsecond=0)
 
     @pytest.fixture
-    async def test_valkey_live(self) -> AsyncMock:
+    async def valkey_live(self) -> AsyncMock:
         """Mock ValkeyLiveClient - configure return values in scenario fixtures"""
         mock_client = AsyncMock()
         mock_client.count_active_connections.return_value = 0
@@ -441,17 +441,17 @@ class TestSessionLifetimeChecker:
         return mock_client
 
     @pytest.fixture
-    async def test_valkey_stat(self) -> AsyncMock:
+    async def valkey_stat(self) -> AsyncMock:
         """Mock ValkeyStatClient"""
         return AsyncMock()
 
     @pytest.fixture
-    async def mock_event_producer(self) -> AsyncMock:
+    async def event_producer(self) -> AsyncMock:
         """Mock EventProducer"""
         return AsyncMock()
 
     @pytest.fixture
-    async def mock_db_connection(self) -> AsyncMock:
+    async def db_connection(self) -> AsyncMock:
         """Mock database connection"""
         return AsyncMock()
 
@@ -468,11 +468,11 @@ class TestSessionLifetimeChecker:
     @pytest.fixture
     async def grace_period_checker(
         self,
-        test_valkey_live: AsyncMock,
+        valkey_live: AsyncMock,
         test_config: _SessionLifetimeTestConfig,
     ) -> NewUserGracePeriodChecker:
         """NewUserGracePeriodChecker with 30s grace period"""
-        checker = NewUserGracePeriodChecker(test_valkey_live)
+        checker = NewUserGracePeriodChecker(valkey_live)
         await checker.populate_config({
             "user_initial_grace_period": test_config.user_initial_grace_period
         })
@@ -496,23 +496,23 @@ class TestSessionLifetimeChecker:
         self,
         test_config: _SessionLifetimeTestConfig,
         base_time: datetime,
-        test_valkey_live: AsyncMock,
-        test_valkey_stat: AsyncMock,
-        mock_event_producer: AsyncMock,
+        valkey_live: AsyncMock,
+        valkey_stat: AsyncMock,
+        event_producer: AsyncMock,
         mocker,
     ) -> SessionLifetimeChecker:
         """SessionLifetimeChecker with time configured based on test_config"""
         # Setup time: session created at base_time, current time = base_time + elapsed
         now = base_time + timedelta(seconds=test_config.elapsed_seconds)
-        test_valkey_live.get_server_time.return_value = now.timestamp()
+        valkey_live.get_server_time.return_value = now.timestamp()
         mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
 
         # Create and configure checker
         checker = SessionLifetimeChecker(
             IdleCheckerArgs(
-                event_producer=mock_event_producer,
-                redis_live=test_valkey_live,
-                valkey_stat_client=test_valkey_stat,
+                event_producer=event_producer,
+                redis_live=valkey_live,
+                valkey_stat_client=valkey_stat,
             )
         )
         await checker.populate_config({})
@@ -543,8 +543,8 @@ class TestSessionLifetimeChecker:
         self,
         test_config: _SessionLifetimeTestConfig,
         session_id: SessionId,
-        test_valkey_live: AsyncMock,
-        mock_db_connection: AsyncMock,
+        valkey_live: AsyncMock,
+        db_connection: AsyncMock,
         session_lifetime_checker: SessionLifetimeChecker,
         session_kernel_row: dict[str, Any],
         session_lifetime_policy: dict[str, Any],
@@ -553,12 +553,12 @@ class TestSessionLifetimeChecker:
         # When - check_idleness runs and stores remaining time
         should_alive = await session_lifetime_checker.check_idleness(
             session_kernel_row,
-            mock_db_connection,
+            db_connection,
             session_lifetime_policy,
         )
 
         # Mock: get_checker_result will read the stored result
-        test_valkey_live.get_live_data.return_value = msgpack.packb(test_config.expected_remaining)
+        valkey_live.get_live_data.return_value = msgpack.packb(test_config.expected_remaining)
         remaining = await session_lifetime_checker.get_checker_result(
             session_lifetime_checker._redis_live, session_id
         )
@@ -596,8 +596,8 @@ class TestSessionLifetimeChecker:
         self,
         test_config: _SessionLifetimeTestConfig,
         session_id: SessionId,
-        test_valkey_live: AsyncMock,
-        mock_db_connection: AsyncMock,
+        valkey_live: AsyncMock,
+        db_connection: AsyncMock,
         session_lifetime_checker: SessionLifetimeChecker,
         session_kernel_row: dict[str, Any],
         session_lifetime_policy: dict[str, Any],
@@ -610,13 +610,13 @@ class TestSessionLifetimeChecker:
         # When - check_idleness runs with grace_period_end
         should_alive = await session_lifetime_checker.check_idleness(
             session_kernel_row,
-            mock_db_connection,
+            db_connection,
             session_lifetime_policy,
             grace_period_end=grace_period_end,
         )
 
         # Mock: get_checker_result will read the stored result
-        test_valkey_live.get_live_data.return_value = msgpack.packb(test_config.expected_remaining)
+        valkey_live.get_live_data.return_value = msgpack.packb(test_config.expected_remaining)
         remaining = await session_lifetime_checker.get_checker_result(
             session_lifetime_checker._redis_live, session_id
         )
