@@ -72,6 +72,9 @@ jobs:
       - name: Get target branches
         id: milestones
         if: ${{ steps.commit.outputs.pr_number }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_MESSAGE: ${{ steps.commit.outputs.commit_message }}
         run: |
           target_milestone=$(gh pr view ${{ steps.commit.outputs.pr_number }} --json milestone --jq .milestone.title)
 
@@ -108,7 +111,7 @@ jobs:
             if [ -n "$branch" ]; then
               result=$(echo "$result" | jq --arg commit "${{ steps.commit.outputs.target_commit }}" \
                 --arg branch "$branch" \
-                --arg message "${{ steps.commit.outputs.commit_message }}" \
+                --arg message "$COMMIT_MESSAGE" \
                 --arg pr "${{ steps.commit.outputs.pr_number }}" \
                 --arg release "${{ steps.commit.outputs.latest_release }}" \
                 --arg author "${{ steps.commit.outputs.author }}" \
@@ -127,8 +130,6 @@ jobs:
             fi
           done
           echo "result=$result" >> $GITHUB_OUTPUT
-        env:
-          GH_TOKEN: ${{ github.token }}
       - name: Save result to file
         if: ${{ steps.commit.outputs.pr_number }}
         run: |
