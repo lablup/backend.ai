@@ -40,3 +40,13 @@ class HuggingFaceRegistryData:
             url=self.url,
             token=self.token,
         )
+
+
+@dataclass
+class HuggingFaceRegistryListResult:
+    """Search result with total count for HuggingFace registries."""
+
+    items: list[HuggingFaceRegistryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
