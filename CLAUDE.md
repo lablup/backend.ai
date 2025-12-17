@@ -2,6 +2,49 @@
 
 This file provides guidance to AI coding agents when working with code in this repository.
 
+## About This Document
+
+**This document is for AI coding agents, NOT for human developers.**
+
+This file serves as a context store for AI coding agents (like Claude) to work efficiently on this codebase. Human developers should refer to README files and other standard documentation instead.
+
+### Writing Principles for This Document
+
+When updating this file, follow these principles:
+
+1. **Optimize for Quick Scanning**
+   - Use bullet points, checklists, and tables over paragraphs
+   - Front-load the most important information
+   - Keep sections short and focused
+
+2. **Enable Fast Decision-Making**
+   - Provide clear YES/NO decision criteria
+   - Use checkboxes for quick pattern matching
+   - Include inline code examples for immediate reference
+
+3. **Minimize Token Usage**
+   - Be concise and direct
+   - Avoid redundant explanations
+   - Remove detailed descriptions that can be found elsewhere
+
+4. **Support Autonomous Work**
+   - Include decision trees and flowcharts (text-based)
+   - Provide "Quick Decision Rules" for common scenarios
+   - Link to detailed READMEs for deep dives
+
+5. **Structure for Retrieval**
+   - Use clear section headers for easy navigation
+   - Group related information together
+   - Provide examples with ✓/✗ markers for clarity
+
+**Bad Example (verbose):**
+> "When you need to create a Data Transfer Object, you should carefully consider whether the DTO will be used within a single component or across multiple components. If it's going to be used across components, then you should place it in the common/dto directory..."
+
+**Good Example (scannable):**
+> **DTO Placement:** Will other components use this?
+> - **YES** → `common/dto/{component}/`
+> - **NO** → `{package}/data/{domain}/`
+
 
 ## Project Overview
 
@@ -108,18 +151,31 @@ BEP documents define architectural decisions, API designs, and implementation st
 
 ### Python Specifics
 
-* **Latest Syntax and Patterns**: No need to add branches or fallbacks for Python 3.11 or older
-  - Use the pattern matching syntax when there are self-repeating if-elif statements
+* **Latest Syntax**: Use Python 3.12+ features
+  - Pattern matching for self-repeating if-elif statements
 * **Async-first**: All I/O operations use async/await
-* **Type Hints**: Comprehensive type annotations required
-  - Put `from __future__ import annotations` if not exists and do not stringify type annotations
-  - Use `typing.TYPE_CHECKING` to import annotation-only references to avoid circular imports and break deep dependency chains between Python modules
-  - Use `typing.cast()` sparingly but explicitly specify the types in the LHS of assignments when the RHS expression is `Any` or has unknown types
-  - DO NOT forget adding return type annotations of all functions and methods
-  - Use `collections.abc` when referring to generic collection/container types such as `Mapping`, `Sequence`, `Iterable`, `Awaitable`, etc.
-* **Structured Logging**: Use `ai.backend.logging.BraceStyleAdapter` for consistent logging
-* **Configuration**: Use Pydantic models for validation and serilization for configurations and DTOs
-* **Error Handling**: Comprehensive exception handling with proper logging
+* **Imports**: Always at the top of files
+  - Use `from __future__ import annotations`
+  - Use `typing.TYPE_CHECKING` for annotation-only imports to avoid circular imports
+  - Never move imports into functions
+* **Type Hints**: Required for all functions/methods
+  - Parameters and return types must be annotated
+  - Use `collections.abc` for generic types (`Sequence`, `Mapping`, `Iterable`, etc.)
+  - **Postel's Law**: Accept abstract types (`Sequence`), return concrete types (`list`)
+    ```python
+    def process(items: Sequence[str]) -> list[str]:  # ✓
+    ```
+* **None Checking**: Use explicit identity checks
+  ```python
+  if value is not None:  # ✓ CORRECT
+  if value:              # ✗ INCORRECT
+  ```
+* **DTOs**:
+  - External (REST API): Pydantic `BaseModel`
+  - Internal: `@dataclass(frozen=True)`
+  - Use `tuple[T, ...]` not `list[T]` for immutability
+* **Logging**: Use `ai.backend.logging.BraceStyleAdapter`
+* **Error Handling**: Comprehensive exception handling with logging
 
 ### Directory Conventions
 
@@ -135,6 +191,58 @@ BEP documents define architectural decisions, API designs, and implementation st
 - Integration tests in `src/ai/backend/test`
 - Reusable helper utilities for testing in `src/ai/backend/testutils`
 
+### DTO Module Organization
+
+**Quick Decision Rule:**
+
+When creating or modifying a DTO, ask: "Will any other component or external client use this?"
+- **YES** → Put in `src/ai/backend/common/dto/{component}/`
+- **NO** → Put in `src/ai/backend/{package}/data/{domain}/`
+
+**Placement:**
+
+```
+Component-Internal:              Shared (Inter-Component):
+manager/data/{domain}/           common/dto/manager/
+storage/dto/                     common/dto/storage/
+agent/data/ (if needed)          common/dto/agent/
+                                 common/dto/internal/
+```
+
+**Type Selection:**
+
+```python
+# Component-Internal: Use dataclass
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class InternalConfig:
+    field: tuple[str, ...]  # Use tuple, not list
+
+# Shared (External API): Use Pydantic
+from pydantic import BaseModel
+
+class ApiRequest(BaseModel):
+    field: list[str]  # Pydantic handles this
+
+# Shared (Internal RPC): Use dataclass
+@dataclass(frozen=True)
+class RpcMessage:
+    field: tuple[str, ...]
+```
+
+**Decision Checklist:**
+
+Use `common/dto/{component}/` if ANY of these are true:
+- [ ] Used in RPC calls between components (Manager→Agent, Manager→Storage)
+- [ ] Exposed through REST/GraphQL API to external clients
+- [ ] Sent through message queue to other components
+- [ ] Referenced by more than one component
+
+Otherwise use `{package}/data/{domain}/`
+
+**See detailed guidelines:** `src/ai/backend/common/dto/README.md`
+
 ### Python Module Conventions
 
 - `types.py`: Reusable type definitions such as pydantic models, dataclasses, enums, and constants annotated with `typing.Final`.
@@ -142,6 +250,44 @@ BEP documents define architectural decisions, API designs, and implementation st
 - `base.py`: Base classes providing shared, partial, reusable implementation for subclasses
 - `utils.py`: Reusable helper functions that are out of scope of the core logic or minor details
 - If the types or utilities could be shared with other `ai.backend` namespace packages, put them in the `ai.backend.common` package.
+
+### Domain Architecture Patterns
+
+Manager implements two patterns for organizing domain logic. Choose based on complexity:
+
+**Pattern 1: Self-Contained Domain** (Simple)
+- All logic in one directory: `manager/{domain}/`
+- Single service coordinator + plugin pattern
+- Example: `manager/notification/`
+
+**Pattern 2: Layered Architecture** (Complex)
+- Distributed across layers:
+  - API: `api/gql/{domain}/`
+  - Service: `services/{domain}/actions/` (one class per operation)
+  - Repository: `repositories/{domain}/`
+  - Data: `data/{domain}/`
+  - Orchestration: `sokovan/{domain}/` (if needed)
+  - Models: `models/{domain}*.py`
+  - Errors: `errors/{domain}.py`
+- Example: `deployment` domain
+
+**Quick Decision:**
+
+Use **Self-Contained** when:
+- [ ] Single data source
+- [ ] Straightforward business logic
+- [ ] Plugin interface sufficient
+
+Use **Layered** when ANY of:
+- [ ] Multiple data sources (DB + Storage)
+- [ ] Complex workflows/state machines
+- [ ] Needs orchestration layer
+- [ ] Large API surface (10+ operations)
+
+**When implementing new domains:**
+1. Start with Self-Contained pattern
+2. Migrate to Layered incrementally when complexity grows
+3. Study existing domains: `notification/` (simple) or `deployment/` (complex)
 
 ### Writing Tests
 
