@@ -757,6 +757,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
                     created_user=request["user"]["uuid"],
                     session_owner=validation_result.owner_uuid,
                     created_at=None,  # Will be set by controller
+                    revision_history_limit=10,
                     tag=params.tag,
                 ),
                 replica_spec=ReplicaSpec(

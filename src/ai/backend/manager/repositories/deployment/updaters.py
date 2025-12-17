@@ -177,6 +177,7 @@ class NewDeploymentUpdaterSpec(UpdaterSpec[EndpointRow]):
     active_revision_id: OptionalState[UUID] = field(
         default_factory=OptionalState[UUID].nop
     )  # TODO: Check if TriState is more appropriate
+    revision_history_limit: OptionalState[int] = field(default_factory=OptionalState[int].nop)
 
     @property
     @override
@@ -195,6 +196,7 @@ class NewDeploymentUpdaterSpec(UpdaterSpec[EndpointRow]):
         self.preferred_domain_name.update_dict(to_update, "preferred_domain_name")
         self.default_deployment_strategy.update_dict(to_update, "default_deployment_strategy")
         self.active_revision_id.update_dict(to_update, "current_revision_id")
+        self.revision_history_limit.update_dict(to_update, "revision_history_limit")
         return to_update
 
 

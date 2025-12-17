@@ -236,6 +236,12 @@ class EndpointRow(Base):
     # Revision management columns
     current_revision = sa.Column("current_revision", GUID, nullable=True)
     deploying_revision = sa.Column("deploying_revision", GUID, nullable=True)
+    revision_history_limit = sa.Column(
+        "revision_history_limit",
+        sa.Integer,
+        nullable=False,
+        server_default=sa.text("10"),
+    )
 
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     tokens = relationship(
@@ -674,6 +680,7 @@ class EndpointRow(Base):
             # Fields not in creator - use defaults
             lifecycle_stage=EndpointLifecycle.PENDING,
             retries=0,
+            revision_history_limit=creator.metadata.revision_history_limit,
         )
 
     def to_deployment_info(self) -> DeploymentInfo:
@@ -698,6 +705,7 @@ class EndpointRow(Base):
                 created_user=self.created_user,
                 session_owner=self.session_owner,
                 created_at=self.created_at,
+                revision_history_limit=self.revision_history_limit,
                 tag=self.tag,
             ),
             state=DeploymentState(
