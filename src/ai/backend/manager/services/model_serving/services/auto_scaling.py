@@ -205,11 +205,13 @@ class AutoScalingService:
             # TODO: Refactor this after creating condition type
             match user_role:
                 case UserRole.ADMIN:
+
                     def domain_condition() -> sa.sql.expression.ColumnElement[bool]:
                         return EndpointRow.domain == domain_name
 
                     action.querier.conditions.append(domain_condition)
                 case UserRole.USER | UserRole.MONITOR:
+
                     def user_condition() -> sa.sql.expression.ColumnElement[bool]:
                         return EndpointRow.session_owner == user_id
 
