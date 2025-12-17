@@ -1,5 +1,5 @@
 """
-Tests for ArtifactRegistryService functionality.
+Tests for ReservoirRegistryService functionality.
 Tests the service layer with mocked repository operations.
 """
 
@@ -27,13 +27,8 @@ from ai.backend.manager.services.artifact_registry.actions.common.search import 
 from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
 
 
-class TestArtifactRegistryService:
-    """Test cases for ArtifactRegistryService"""
-
-    @pytest.fixture
-    def mock_huggingface_repository(self) -> MagicMock:
-        """Create mocked HuggingFaceRepository"""
-        return MagicMock(spec=HuggingFaceRepository)
+class TestReservoirRegistryService:
+    """Test cases for Reservoir Registry Service"""
 
     @pytest.fixture
     def mock_reservoir_repository(self) -> MagicMock:
@@ -41,22 +36,15 @@ class TestArtifactRegistryService:
         return MagicMock(spec=ReservoirRegistryRepository)
 
     @pytest.fixture
-    def mock_artifact_registry_repository(self) -> MagicMock:
-        """Create mocked ArtifactRegistryRepository"""
-        return MagicMock(spec=ArtifactRegistryRepository)
-
-    @pytest.fixture
     def artifact_registry_service(
         self,
-        mock_huggingface_repository: MagicMock,
         mock_reservoir_repository: MagicMock,
-        mock_artifact_registry_repository: MagicMock,
     ) -> ArtifactRegistryService:
         """Create ArtifactRegistryService instance with mocked repositories"""
         return ArtifactRegistryService(
-            huggingface_registry_repository=mock_huggingface_repository,
+            huggingface_registry_repository=MagicMock(spec=HuggingFaceRepository),
             reservoir_repository=mock_reservoir_repository,
-            artifact_registry_repository=mock_artifact_registry_repository,
+            artifact_registry_repository=MagicMock(spec=ArtifactRegistryRepository),
         )
 
     @pytest.fixture
