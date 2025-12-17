@@ -1,6 +1,8 @@
-from datetime import datetime, timedelta
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Mapping, Type, cast
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -10,8 +12,10 @@ from ai.backend.common.types import KernelId, SessionId, SessionTypes
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.idle import (
     BaseIdleChecker,
+    IdleCheckerArgs,
     IdleCheckerHost,
     NetworkTimeoutIdleChecker,
+    NewUserGracePeriodChecker,
     SessionLifetimeChecker,
     UtilizationIdleChecker,
     calculate_remaining_time,
@@ -126,249 +130,246 @@ async def new_user_grace_period_checker(
     assert grace_period_end == expected
 
 
-@pytest.mark.asyncio
-async def network_timeout_idle_checker(
-    etcd_fixture,
-    database_fixture,
-    create_app_and_client,
-    mocker,
-) -> None:
-    test_app, _ = await create_app_and_client(
+@dataclass
+class _NetworkTimeoutScenario:
+    """Test scenario for network timeout without grace period"""
+
+    elapsed_seconds: int
+    expected_remaining: float
+    idle_timeout: int
+    should_alive: bool
+
+
+@dataclass
+class _NetworkTimeoutWithGraceScenario:
+    """Test scenario for network timeout with grace period"""
+
+    elapsed_seconds: int
+    grace_period_seconds: int
+    idle_timeout: int
+    expected_remaining: float
+    should_alive: bool
+
+
+class TestNetworkTimeoutIdleChecker:
+    @pytest.fixture
+    def base_time(self) -> datetime:
+        """Reference time for all tests. All other times are calculated as offsets from this."""
+        return datetime.now(timezone.utc).replace(microsecond=0)
+
+    @pytest.fixture
+    async def test_valkey_live(self) -> AsyncMock:
+        """Mock ValkeyLiveClient"""
+        mock_client = AsyncMock()
+        mock_client.count_active_connections.return_value = 0
+        mock_client.get_live_data.return_value = None
+        mock_client.get_server_time.return_value = 0.0
+        mock_client.store_live_data.return_value = None
+        return mock_client
+
+    @pytest.fixture
+    async def test_valkey_stat(self) -> AsyncMock:
+        """Mock ValkeyStatClient"""
+        return AsyncMock()
+
+    @pytest.fixture
+    async def mock_event_producer(self) -> AsyncMock:
+        """Mock EventProducer"""
+        return AsyncMock()
+
+    @pytest.fixture
+    async def mock_db_connection(self) -> AsyncMock:
+        """Mock database connection"""
+        return AsyncMock()
+
+    @pytest.fixture
+    def session_id(self) -> SessionId:
+        """Session ID for tests"""
+        return SessionId(uuid4())
+
+    @pytest.fixture
+    def kernel_row(self, session_id: SessionId) -> dict[str, Any]:
+        """Kernel row data"""
+        return {
+            "session_id": session_id,
+            "session_type": SessionTypes.INTERACTIVE,
+        }
+
+    @pytest.fixture
+    def kernel_user_joined_data(self, base_time: datetime) -> dict[str, datetime]:
+        """Mock kernel-user joined data"""
+        return {
+            "user_created_at": base_time,
+        }
+
+    @pytest.fixture
+    async def network_timeout_checker(
+        self,
+        scenario: _NetworkTimeoutScenario,
+        base_time: datetime,
+        test_valkey_live: AsyncMock,
+        mock_event_producer: AsyncMock,
+        test_valkey_stat: AsyncMock,
+        mocker,
+    ) -> NetworkTimeoutIdleChecker:
+        """Create NetworkTimeoutIdleChecker based on scenario"""
+        # Setup time
+        now = base_time + timedelta(seconds=scenario.elapsed_seconds)
+        test_valkey_live.get_server_time.return_value = now.timestamp()
+        mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
+
+        # Create and configure checker
+        checker = NetworkTimeoutIdleChecker(
+            IdleCheckerArgs(
+                event_producer=mock_event_producer,
+                redis_live=test_valkey_live,
+                valkey_stat_client=test_valkey_stat,
+            )
+        )
+        await checker.populate_config({"threshold": "10"})
+        return checker
+
+    @pytest.mark.parametrize(
+        "scenario",
         [
-            config_provider_ctx,
-            redis_ctx,
-            event_dispatcher_ctx,
-            background_task_ctx,
-            database_ctx,
-            distributed_lock_ctx,
+            _NetworkTimeoutScenario(
+                elapsed_seconds=5, expected_remaining=5.0, idle_timeout=10, should_alive=True
+            ),
+            _NetworkTimeoutScenario(
+                elapsed_seconds=50, expected_remaining=-1, idle_timeout=10, should_alive=False
+            ),
         ],
-        [".etcd"],
+        ids=["positive", "negative"],
     )
-    root_ctx: RootContext = test_app["_root.context"]
+    @pytest.mark.asyncio
+    async def test_network_timeout_without_grace(
+        self,
+        scenario: _NetworkTimeoutScenario,
+        network_timeout_checker: NetworkTimeoutIdleChecker,
+        kernel_row: dict[str, Any],
+        session_id: SessionId,
+        base_time: datetime,
+        test_valkey_live: AsyncMock,
+        mock_db_connection: AsyncMock,
+    ) -> None:
+        """Test network timeout without grace period"""
+        # Given
+        last_access = base_time
+        test_valkey_live.get_live_data.return_value = str(last_access.timestamp()).encode()
 
-    # test 1
-    # remaining time is positive and no grace period
-    session_id = SessionId(uuid4())
-    threshold = 10
-    last_access = datetime(2020, 3, 1, 12, 30, second=0).timestamp()
-    now = datetime(2020, 3, 1, 12, 30, second=5).timestamp()
-    mocker.patch("ai.backend.manager.idle.get_redis_now", return_value=now)
-    expected = timedelta(seconds=5).total_seconds()
-    idle_value = {
-        "checkers": {
-            "network_timeout": {
-                "threshold": str(threshold),
-            }
-        },
-        "enabled": "network_timeout,",
-    }
-    kernel = {
-        "session_id": session_id,
-        "session_type": SessionTypes.INTERACTIVE,
-    }
-    policy = {
-        "idle_timeout": threshold,
-    }
+        # When
+        should_alive = await network_timeout_checker.check_idleness(
+            kernel_row,
+            mock_db_connection,
+            {"idle_timeout": scenario.idle_timeout},
+        )
 
-    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
-    checker_host = await init_idle_checkers(
-        root_ctx.db,
-        root_ctx.config_provider,
-        root_ctx.event_producer,
-        root_ctx.distributed_lock_factory,
+        test_valkey_live.get_live_data.return_value = msgpack.packb(scenario.expected_remaining)
+        remaining = await network_timeout_checker.get_checker_result(
+            network_timeout_checker._redis_live,
+            session_id,
+        )
+
+        # Then
+        assert should_alive is scenario.should_alive
+        assert remaining == scenario.expected_remaining
+
+    @pytest.fixture
+    async def network_timeout_checker_with_grace(
+        self,
+        scenario: _NetworkTimeoutWithGraceScenario,
+        base_time: datetime,
+        test_valkey_live: AsyncMock,
+        mock_event_producer: AsyncMock,
+        test_valkey_stat: AsyncMock,
+        mocker,
+    ) -> NetworkTimeoutIdleChecker:
+        """Create NetworkTimeoutIdleChecker based on scenario"""
+        # Setup time
+        now = base_time + timedelta(seconds=scenario.elapsed_seconds)
+        test_valkey_live.get_server_time.return_value = now.timestamp()
+        mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
+
+        # Create checker
+        checker = NetworkTimeoutIdleChecker(
+            IdleCheckerArgs(
+                event_producer=mock_event_producer,
+                redis_live=test_valkey_live,
+                valkey_stat_client=test_valkey_stat,
+            )
+        )
+        await checker.populate_config({"threshold": "10"})
+        return checker
+
+    @pytest.fixture
+    async def grace_period_checker(
+        self,
+        scenario: _NetworkTimeoutWithGraceScenario,
+        test_valkey_live: AsyncMock,
+    ) -> NewUserGracePeriodChecker:
+        """Create grace period checker based on scenario"""
+        checker = NewUserGracePeriodChecker(test_valkey_live)
+        await checker.populate_config({
+            "user_initial_grace_period": str(scenario.grace_period_seconds)
+        })
+        return checker
+
+    @pytest.mark.parametrize(
+        "scenario",
+        [
+            _NetworkTimeoutWithGraceScenario(
+                elapsed_seconds=5,
+                grace_period_seconds=30,
+                idle_timeout=10,
+                expected_remaining=35.0,  # Remaining time = (grace_period_end: 30 - now: 5) + idle_timeout(10)
+                should_alive=True,
+            ),
+            _NetworkTimeoutWithGraceScenario(
+                elapsed_seconds=50,
+                grace_period_seconds=30,
+                idle_timeout=10,
+                expected_remaining=-1,
+                should_alive=False,
+            ),
+        ],
+        ids=["positive", "negative"],
     )
-    try:
-        await checker_host.start()
-        network_idle_checker = get_checker_from_host(checker_host, NetworkTimeoutIdleChecker)
+    @pytest.mark.asyncio
+    async def test_network_timeout_with_grace(
+        self,
+        scenario: _NetworkTimeoutWithGraceScenario,
+        network_timeout_checker_with_grace: NetworkTimeoutIdleChecker,
+        grace_period_checker: NewUserGracePeriodChecker,
+        kernel_user_joined_data: dict[str, datetime],
+        kernel_row: dict[str, Any],
+        session_id: SessionId,
+        base_time: datetime,
+        test_valkey_live: AsyncMock,
+        mock_db_connection: AsyncMock,
+    ) -> None:
+        """Test network timeout with grace period"""
+        # Given
+        last_access = base_time
+        test_valkey_live.get_live_data.return_value = str(last_access.timestamp()).encode()
+        grace_period_end = await grace_period_checker.get_grace_period_end(kernel_user_joined_data)
 
-        await checker_host._valkey_live.store_live_data(
-            f"session.{session_id}.last_access", str(last_access)
-        )
-
-        should_alive = await network_idle_checker.check_idleness(
-            kernel,
-            checker_host._db,
-            policy,
-        )
-        remaining = await network_idle_checker.get_checker_result(
-            checker_host._valkey_live, session_id
-        )
-    finally:
-        await checker_host.shutdown()
-
-    assert should_alive
-    assert remaining == expected
-
-    # test 2
-    # remaining time is negative and no grace period
-    session_id = SessionId(uuid4())
-    threshold = 10
-    last_access = datetime(2020, 3, 1, 12, 30, second=0).timestamp()
-    now = datetime(2020, 3, 1, 12, 30, second=30).timestamp()
-    mocker.patch("ai.backend.manager.idle.get_redis_now", return_value=now)
-    expected = -1
-    idle_value = {
-        "checkers": {
-            "network_timeout": {
-                "threshold": str(threshold),
-            }
-        },
-        "enabled": "network_timeout,",
-    }
-    kernel = {
-        "session_id": session_id,
-        "session_type": SessionTypes.INTERACTIVE,
-    }
-    policy = {
-        "idle_timeout": threshold,
-    }
-
-    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
-    checker_host = await init_idle_checkers(
-        root_ctx.db,
-        root_ctx.config_provider,
-        root_ctx.event_producer,
-        root_ctx.distributed_lock_factory,
-    )
-    try:
-        await checker_host.start()
-        network_idle_checker = get_checker_from_host(checker_host, NetworkTimeoutIdleChecker)
-
-        await checker_host._valkey_live.store_live_data(
-            f"session.{session_id}.last_access", str(last_access)
-        )
-
-        should_alive = await network_idle_checker.check_idleness(
-            kernel,
-            checker_host._db,
-            policy,
-        )
-        remaining = await network_idle_checker.get_checker_result(
-            checker_host._valkey_live, session_id
-        )
-    finally:
-        await checker_host.shutdown()
-
-    assert not should_alive
-    assert remaining == expected
-
-    # test 3
-    # remaining time is positive with new user grace period
-    session_id = SessionId(uuid4())
-    threshold = 10
-    last_access = datetime(2020, 3, 1, 12, 30, second=0).timestamp()
-    now = datetime(2020, 3, 1, 12, 30, second=5).timestamp()
-    user_created_at = datetime(2020, 3, 1, 12, 30, second=0)
-    grace_period = 30
-    mocker.patch("ai.backend.manager.idle.get_redis_now", return_value=now)
-    expected = timedelta(seconds=35).total_seconds()
-    idle_value = {
-        "checkers": {
-            "user_grace_period": {"user_initial_grace_period": str(grace_period)},
-            "network_timeout": {
-                "threshold": str(threshold),
-            },
-        },
-        "enabled": "network_timeout,",
-    }
-    kernel = {
-        "session_id": session_id,
-        "session_type": SessionTypes.INTERACTIVE,
-        "user_created_at": user_created_at,
-    }
-    policy = {
-        "idle_timeout": threshold,
-    }
-
-    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
-    checker_host = await init_idle_checkers(
-        root_ctx.db,
-        root_ctx.config_provider,
-        root_ctx.event_producer,
-        root_ctx.distributed_lock_factory,
-    )
-    try:
-        await checker_host.start()
-        network_idle_checker = get_checker_from_host(checker_host, NetworkTimeoutIdleChecker)
-
-        await checker_host._valkey_live.store_live_data(
-            f"session.{session_id}.last_access", str(last_access)
-        )
-
-        grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(kernel)
-        should_alive = await network_idle_checker.check_idleness(
-            kernel,
-            checker_host._db,
-            policy,
+        # When
+        should_alive = await network_timeout_checker_with_grace.check_idleness(
+            kernel_row,
+            mock_db_connection,
+            {"idle_timeout": scenario.idle_timeout},
             grace_period_end=grace_period_end,
         )
-        remaining = await network_idle_checker.get_checker_result(
-            checker_host._valkey_live, session_id
-        )
-    finally:
-        await checker_host.shutdown()
 
-    assert should_alive
-    assert remaining == expected
-
-    # test 4
-    # remaining time is negative with new user grace period
-    session_id = SessionId(uuid4())
-    threshold = 10
-    last_access = datetime(2020, 3, 1, 12, 30, second=0).timestamp()
-    now = datetime(2020, 3, 1, 12, 30, second=50).timestamp()
-    user_created_at = datetime(2020, 3, 1, 12, 30, second=0)
-    grace_period = 30
-    mocker.patch("ai.backend.manager.idle.get_redis_now", return_value=now)
-    expected = -1
-    idle_value = {
-        "checkers": {
-            "user_grace_period": {"user_initial_grace_period": str(grace_period)},
-            "network_timeout": {
-                "threshold": str(threshold),
-            },
-        },
-        "enabled": "network_timeout,",
-    }
-    kernel = {
-        "session_id": session_id,
-        "session_type": SessionTypes.INTERACTIVE,
-        "user_created_at": user_created_at,
-    }
-    policy = {
-        "idle_timeout": threshold,
-    }
-
-    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
-    checker_host = await init_idle_checkers(
-        root_ctx.db,
-        root_ctx.config_provider,
-        root_ctx.event_producer,
-        root_ctx.distributed_lock_factory,
-    )
-    try:
-        await checker_host.start()
-        network_idle_checker = get_checker_from_host(checker_host, NetworkTimeoutIdleChecker)
-
-        await checker_host._valkey_live.store_live_data(
-            f"session.{session_id}.last_access", str(last_access)
+        test_valkey_live.get_live_data.return_value = msgpack.packb(scenario.expected_remaining)
+        remaining = await network_timeout_checker_with_grace.get_checker_result(
+            network_timeout_checker_with_grace._redis_live,
+            session_id,
         )
 
-        grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(kernel)
-        should_alive = await network_idle_checker.check_idleness(
-            kernel,
-            checker_host._db,
-            policy,
-            grace_period_end=grace_period_end,
-        )
-        remaining = await network_idle_checker.get_checker_result(
-            checker_host._valkey_live, session_id
-        )
-    finally:
-        await checker_host.shutdown()
-
-    assert not should_alive
-    assert remaining == expected
+        # Then
+        assert should_alive is scenario.should_alive
+        assert remaining == scenario.expected_remaining
 
 
 @pytest.mark.asyncio
