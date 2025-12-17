@@ -30,28 +30,36 @@ import yarl
 from async_timeout import timeout
 from pydantic import BaseModel
 
-if TYPE_CHECKING:
-    from decimal import Decimal
-
-    from aiofiles.threadpool.text import AsyncTextIOWrapper
-
 # It is a bad practice to keep all "miscellaneous" stuffs
 # into the single "utils" module.
 # Let's categorize them by purpose and domain, and keep
 # refactoring to use the proper module names.
-
 from .asyncio import (  # for legacy imports  # noqa
     AsyncBarrier,
     cancel_tasks,
     current_loop,
     run_through,
 )
+from .defs import DEFAULT_FILE_IO_TIMEOUT
 from .enum_extension import StringSetFlag  # for legacy imports  # noqa
+from .exception import (
+    BaseNFSMountCheckFailed,
+    ExportPathNotFound,
+    NFSTimeoutError,
+    NFSUnexpectedError,
+    ShowmountFailed,
+    ShowmountNotFound,
+    VolumeMountFailed,
+    VolumeUnmountFailed,
+)
 from .files import AsyncFileWriter  # for legacy imports  # noqa
 from .networking import curl, find_free_port  # for legacy imports  # noqa
 from .types import BinarySize
-from .exception import VolumeMountFailed, VolumeUnmountFailed
-from .defs import DEFAULT_FILE_IO_TIMEOUT
+
+if TYPE_CHECKING:
+    from decimal import Decimal
+
+    from aiofiles.threadpool.text import AsyncTextIOWrapper
 
 KT = TypeVar("KT")
 VT = TypeVar("VT")
@@ -354,6 +362,66 @@ class Fstab:
         if entry:
             return await self.remove_entry(entry)
         return False
+
+
+async def check_nfs_remote_server(
+    server: str,
+    export_path: str,
+) -> None:
+    """
+    Check if NFS export is available on the remote server.
+
+    Args:
+        server: NFS server hostname or IP address
+        export_path: Export directory path to check (e.g., '/export')
+    """
+    try:
+        # Execute showmount command to list exports
+        process = await asyncio.create_subprocess_exec(
+            "showmount",
+            "-e",
+            server,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        # Wait for command completion with timeout
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=10.0)
+
+        # Check if command succeeded
+        if process.returncode != 0:
+            error_msg = stderr.decode().strip()
+            raise ShowmountFailed(f"showmount command failed: {error_msg}")
+
+        # Parse output to find the export path
+        output = stdout.decode().strip()
+        lines = output.split("\n")
+
+        # Skip header line (usually "Export list for server:")
+        export_lines = [line for line in lines[1:] if line.strip()]
+
+        # Check if the requested export path exists
+        for line in export_lines:
+            # Format is typically: /export  192.168.1.0/24
+            # or: /export  *
+            parts = line.split()
+            if parts and parts[0] == export_path:
+                # Export path found
+                return
+
+        # Export path not found
+        raise ExportPathNotFound(f"Export '{export_path}' not found on server '{server}'.")
+    except BaseNFSMountCheckFailed:
+        raise
+
+    except asyncio.TimeoutError:
+        raise NFSTimeoutError(f"Timeout: No response from {server} within 10 seconds")
+
+    except FileNotFoundError:
+        raise ShowmountNotFound("showmount command not found. Install nfs-common package.")
+
+    except Exception as e:
+        raise NFSUnexpectedError(f"Unexpected error: {str(e)}") from e
 
 
 async def mount(
