@@ -25,12 +25,17 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.deployment.types import ModelRevisionData
+from ai.backend.manager.data.image.types import ImageType
+from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.models import KeyPairResourcePolicyRow, KeyPairRow
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
@@ -46,7 +51,14 @@ from ai.backend.manager.models.session import (
 )
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.pagination import OffsetPagination
+from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.creators import DeploymentRevisionCreatorSpec
+from ai.backend.manager.repositories.deployment.updaters import RevisionStateUpdaterSpec
+from ai.backend.manager.types import TriState
 
 
 def create_test_password_info(password: str) -> PasswordInfo:
@@ -1113,3 +1125,590 @@ class TestGetDefaultArchitectureFromScalingGroup:
         )
 
         assert result is None
+
+
+class TestDeploymentRevisionOperations:
+    """Test cases for deployment revision repository operations."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database engine that auto-cleans data after each test."""
+        yield database_engine
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(sa.delete(DeploymentRevisionRow))
+            await db_sess.execute(sa.delete(EndpointRow))
+            await db_sess.execute(sa.delete(ImageRow))
+            await db_sess.execute(sa.delete(GroupRow))
+            await db_sess.execute(sa.delete(UserRow))
+            await db_sess.execute(sa.delete(UserResourcePolicyRow))
+            await db_sess.execute(sa.delete(ProjectResourcePolicyRow))
+            await db_sess.execute(sa.delete(ScalingGroupRow))
+            await db_sess.execute(sa.delete(DomainRow))
+
+    @pytest.fixture
+    async def test_domain_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create test domain and return domain name."""
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            domain = DomainRow(
+                name=domain_name,
+                description="Test domain",
+                is_active=True,
+                total_resource_slots={},
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+            )
+            db_sess.add(domain)
+            await db_sess.flush()
+
+        yield domain_name
+
+    @pytest.fixture
+    async def test_scaling_group_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create test scaling group and return name."""
+        sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                description="Test scaling group",
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            db_sess.add(sgroup)
+            await db_sess.flush()
+
+        yield sgroup_name
+
+    @pytest.fixture
+    async def test_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create test resource policy and return policy name."""
+        policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_session_count_per_model_session=5,
+                max_customized_image_count=3,
+            )
+            db_sess.add(policy)
+            await db_sess.flush()
+
+        yield policy_name
+
+    @pytest.fixture
+    async def test_project_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create test project resource policy and return policy name."""
+        policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = ProjectResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=int(BinarySize.from_str("100GiB")),
+                max_network_count=5,
+            )
+            db_sess.add(policy)
+            await db_sess.flush()
+
+        yield policy_name
+
+    @pytest.fixture
+    async def test_user_uuid(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_resource_policy_name: str,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create test user and return user UUID."""
+        user_uuid = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            user = UserRow(
+                uuid=user_uuid,
+                username=f"testuser-{user_uuid.hex[:8]}",
+                email=f"test-{user_uuid.hex[:8]}@example.com",
+                password=create_test_password_info("test_password"),
+                need_password_change=False,
+                status=UserStatus.ACTIVE,
+                status_info="active",
+                domain_name=test_domain_name,
+                role=UserRole.USER,
+                resource_policy=test_resource_policy_name,
+            )
+            db_sess.add(user)
+            await db_sess.flush()
+
+        yield user_uuid
+
+    @pytest.fixture
+    async def test_group_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_project_resource_policy_name: str,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create test group and return group ID."""
+        group_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            group = GroupRow(
+                id=group_id,
+                name=f"test-group-{uuid.uuid4().hex[:8]}",
+                domain_name=test_domain_name,
+                resource_policy=test_project_resource_policy_name,
+            )
+            db_sess.add(group)
+            await db_sess.flush()
+
+        yield group_id
+
+    @pytest.fixture
+    async def test_image_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create test image and return image ID."""
+        async with db_with_cleanup.begin_session() as db_sess:
+            image = ImageRow(
+                name="test-image:latest",
+                project=str(uuid.uuid4()),
+                image="test-image",
+                registry="docker.io",
+                registry_id=uuid.uuid4(),
+                architecture="x86_64",
+                is_local=False,
+                config_digest="sha256:abc123",
+                size_bytes=1000000,
+                type=ImageType.COMPUTE,
+                labels={},
+            )
+            db_sess.add(image)
+            await db_sess.flush()
+            image_id = image.id
+
+        yield image_id
+
+    @pytest.fixture
+    async def test_endpoint_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_scaling_group_name: str,
+        test_user_uuid: uuid.UUID,
+        test_group_id: uuid.UUID,
+        test_image_id: uuid.UUID,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create test endpoint and return endpoint ID."""
+        endpoint_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            endpoint = EndpointRow(
+                id=endpoint_id,
+                name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
+                created_user=test_user_uuid,
+                session_owner=test_user_uuid,
+                domain=test_domain_name,
+                project=test_group_id,
+                resource_group=test_scaling_group_name,
+                model=None,
+                replicas=1,
+                image=test_image_id,
+                runtime_variant=RuntimeVariant.CUSTOM,
+                url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
+                open_to_public=False,
+                lifecycle_stage=EndpointLifecycle.CREATED,
+                resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
+                model_mount_destination="/models",
+                cluster_mode=ClusterMode.SINGLE_NODE.name,
+                cluster_size=1,
+                environ={},
+                resource_opts={},
+                extra_mounts=[],
+            )
+            db_sess.add(endpoint)
+            await db_sess.flush()
+
+        yield endpoint_id
+
+    @pytest.fixture
+    async def deployment_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[DeploymentRepository, None]:
+        """Create DeploymentRepository instance."""
+        storage_manager = MagicMock()
+        valkey_stat = MagicMock()
+        valkey_live = MagicMock()
+        valkey_schedule = MagicMock()
+
+        repo = DeploymentRepository(
+            db=db_with_cleanup,
+            storage_manager=storage_manager,
+            valkey_stat=valkey_stat,
+            valkey_live=valkey_live,
+            valkey_schedule=valkey_schedule,
+        )
+        yield repo
+
+    @pytest.fixture
+    async def test_revision_data(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: uuid.UUID,
+        test_image_id: uuid.UUID,
+        test_scaling_group_name: str,
+    ) -> AsyncGenerator[ModelRevisionData, None]:
+        """Create a single test revision."""
+
+        spec = DeploymentRevisionCreatorSpec(
+            endpoint=test_endpoint_id,
+            revision_number=1,
+            image=test_image_id,
+            resource_group=test_scaling_group_name,
+            resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
+            resource_opts={},
+            cluster_mode=ClusterMode.SINGLE_NODE.name,
+            cluster_size=1,
+            model=None,
+            model_mount_destination="/models",
+            model_definition_path=None,
+            model_definition=None,
+            startup_command=None,
+            bootstrap_script=None,
+            environ={},
+            callback_url=None,
+            runtime_variant=RuntimeVariant.CUSTOM,
+            extra_mounts=[],
+        )
+        revision = await deployment_repository.create_revision(Creator(spec=spec))
+        yield revision
+
+    @pytest.fixture
+    async def test_multiple_revisions(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: uuid.UUID,
+        test_image_id: uuid.UUID,
+        test_scaling_group_name: str,
+    ) -> AsyncGenerator[list[ModelRevisionData], None]:
+        """Create multiple test revisions (revision 1, 2, 3)."""
+        revisions: list[ModelRevisionData] = []
+        for rev_num in [1, 2, 3]:
+            spec = DeploymentRevisionCreatorSpec(
+                endpoint=test_endpoint_id,
+                revision_number=rev_num,
+                image=test_image_id,
+                resource_group=test_scaling_group_name,
+                resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
+                resource_opts={},
+                cluster_mode=ClusterMode.SINGLE_NODE.name,
+                cluster_size=1,
+                model=None,
+                model_mount_destination="/models",
+                model_definition_path=None,
+                model_definition=None,
+                startup_command=None,
+                bootstrap_script=None,
+                environ={},
+                callback_url=None,
+                runtime_variant=RuntimeVariant.CUSTOM,
+                extra_mounts=[],
+            )
+            revision = await deployment_repository.create_revision(Creator(spec=spec))
+            revisions.append(revision)
+        yield revisions
+
+    @pytest.fixture
+    async def test_five_revisions(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: uuid.UUID,
+        test_image_id: uuid.UUID,
+        test_scaling_group_name: str,
+    ) -> AsyncGenerator[list[ModelRevisionData], None]:
+        """Create 5 test revisions for pagination tests."""
+        revisions: list[ModelRevisionData] = []
+        for rev_num in range(1, 6):
+            spec = DeploymentRevisionCreatorSpec(
+                endpoint=test_endpoint_id,
+                revision_number=rev_num,
+                image=test_image_id,
+                resource_group=test_scaling_group_name,
+                resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
+                resource_opts={},
+                cluster_mode=ClusterMode.SINGLE_NODE.name,
+                cluster_size=1,
+                model=None,
+                model_mount_destination="/models",
+                model_definition_path=None,
+                model_definition=None,
+                startup_command=None,
+                bootstrap_script=None,
+                environ={},
+                callback_url=None,
+                runtime_variant=RuntimeVariant.CUSTOM,
+                extra_mounts=[],
+            )
+            revision = await deployment_repository.create_revision(Creator(spec=spec))
+            revisions.append(revision)
+        yield revisions
+
+    @pytest.mark.asyncio
+    async def test_create_revision(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: uuid.UUID,
+        test_image_id: uuid.UUID,
+        test_scaling_group_name: str,
+    ) -> None:
+        """Test creating a deployment revision using Creator."""
+        spec = DeploymentRevisionCreatorSpec(
+            endpoint=test_endpoint_id,
+            revision_number=1,
+            image=test_image_id,
+            resource_group=test_scaling_group_name,
+            resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
+            resource_opts={},
+            cluster_mode=ClusterMode.SINGLE_NODE.name,
+            cluster_size=1,
+            model=None,
+            model_mount_destination="/models",
+            model_definition_path=None,
+            model_definition=None,
+            startup_command=None,
+            bootstrap_script=None,
+            environ={},
+            callback_url=None,
+            runtime_variant=RuntimeVariant.CUSTOM,
+            extra_mounts=[],
+        )
+        creator = Creator(spec=spec)
+
+        result = await deployment_repository.create_revision(creator)
+
+        assert result.id is not None
+        assert result.cluster_config.mode == ClusterMode.SINGLE_NODE
+        assert result.cluster_config.size == 1
+        assert result.resource_config.resource_group_name == test_scaling_group_name
+        assert result.model_runtime_config.runtime_variant == RuntimeVariant.CUSTOM
+        assert result.name == "revision-1"
+
+    @pytest.mark.asyncio
+    async def test_get_revision(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_revision_data: ModelRevisionData,
+    ) -> None:
+        """Test getting a deployment revision by ID."""
+        result = await deployment_repository.get_revision(test_revision_data.id)
+
+        assert result.id == test_revision_data.id
+        assert result.name == "revision-1"
+        assert result.cluster_config.mode == ClusterMode.SINGLE_NODE
+
+    @pytest.mark.asyncio
+    async def test_get_revision_not_found(
+        self,
+        deployment_repository: DeploymentRepository,
+    ) -> None:
+        """Test that get_revision raises DeploymentRevisionNotFound for nonexistent ID."""
+        nonexistent_id = uuid.uuid4()
+
+        with pytest.raises(DeploymentRevisionNotFound):
+            await deployment_repository.get_revision(nonexistent_id)
+
+    @pytest.mark.asyncio
+    async def test_get_latest_revision_number_no_revisions(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: uuid.UUID,
+    ) -> None:
+        """Test that get_latest_revision_number returns None when no revisions exist."""
+        result = await deployment_repository.get_latest_revision_number(test_endpoint_id)
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_get_latest_revision_number_with_revisions(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: uuid.UUID,
+        test_multiple_revisions: list[ModelRevisionData],
+    ) -> None:
+        """Test that get_latest_revision_number returns correct value."""
+        result = await deployment_repository.get_latest_revision_number(test_endpoint_id)
+
+        assert result == 3
+
+    @pytest.mark.asyncio
+    async def test_search_revisions_empty(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: uuid.UUID,
+    ) -> None:
+        """Test search_revisions returns empty result when no revisions exist."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10),
+            conditions=[lambda: DeploymentRevisionRow.endpoint == test_endpoint_id],
+        )
+
+        result = await deployment_repository.search_revisions(querier)
+
+        assert result.total_count == 0
+        assert result.items == []
+        assert result.has_next_page is False
+        assert result.has_previous_page is False
+
+    @pytest.mark.asyncio
+    async def test_search_revisions_with_results(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: uuid.UUID,
+        test_multiple_revisions: list[ModelRevisionData],
+    ) -> None:
+        """Test search_revisions returns correct results."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10),
+            conditions=[lambda: DeploymentRevisionRow.endpoint == test_endpoint_id],
+        )
+
+        result = await deployment_repository.search_revisions(querier)
+
+        assert result.total_count == 3
+        assert len(result.items) == 3
+        assert result.has_next_page is False
+        assert result.has_previous_page is False
+
+    @pytest.mark.asyncio
+    async def test_search_revisions_with_pagination(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: uuid.UUID,
+        test_five_revisions: list[ModelRevisionData],
+    ) -> None:
+        """Test search_revisions respects pagination."""
+        # First page
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=2, offset=0),
+            conditions=[lambda: DeploymentRevisionRow.endpoint == test_endpoint_id],
+        )
+        result = await deployment_repository.search_revisions(querier)
+
+        assert result.total_count == 5
+        assert len(result.items) == 2
+        assert result.has_next_page is True
+        assert result.has_previous_page is False
+
+        # Second page
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=2, offset=2),
+            conditions=[lambda: DeploymentRevisionRow.endpoint == test_endpoint_id],
+        )
+        result = await deployment_repository.search_revisions(querier)
+
+        assert result.total_count == 5
+        assert len(result.items) == 2
+        assert result.has_next_page is True
+        assert result.has_previous_page is True
+
+    @pytest.mark.asyncio
+    async def test_update_endpoint_deploying_revision(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_endpoint_id: uuid.UUID,
+        test_revision_data: ModelRevisionData,
+    ) -> None:
+        """Test updating endpoint deploying_revision using Updater."""
+        updater = Updater(
+            spec=RevisionStateUpdaterSpec(
+                deploying_revision=TriState.update(test_revision_data.id),
+            ),
+            pk_value=test_endpoint_id,
+        )
+        await deployment_repository.update_endpoint(updater)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            query = sa.select(EndpointRow).where(EndpointRow.id == test_endpoint_id)
+            result = await db_sess.execute(query)
+            endpoint = result.scalar_one()
+            assert endpoint.deploying_revision == test_revision_data.id
+
+    @pytest.mark.asyncio
+    async def test_update_endpoint_current_revision(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_endpoint_id: uuid.UUID,
+        test_revision_data: ModelRevisionData,
+    ) -> None:
+        """Test updating endpoint current_revision using Updater."""
+        updater = Updater(
+            spec=RevisionStateUpdaterSpec(
+                current_revision=TriState.update(test_revision_data.id),
+            ),
+            pk_value=test_endpoint_id,
+        )
+        await deployment_repository.update_endpoint(updater)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            query = sa.select(EndpointRow).where(EndpointRow.id == test_endpoint_id)
+            result = await db_sess.execute(query)
+            endpoint = result.scalar_one()
+            assert endpoint.current_revision == test_revision_data.id
+
+    @pytest.mark.asyncio
+    async def test_update_endpoint_nullify_deploying_revision(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_endpoint_id: uuid.UUID,
+        test_revision_data: ModelRevisionData,
+    ) -> None:
+        """Test nullifying endpoint deploying_revision using TriState.nullify()."""
+        # First set deploying_revision
+        updater = Updater(
+            spec=RevisionStateUpdaterSpec(
+                deploying_revision=TriState.update(test_revision_data.id),
+            ),
+            pk_value=test_endpoint_id,
+        )
+        await deployment_repository.update_endpoint(updater)
+
+        # Then nullify it
+        updater = Updater(
+            spec=RevisionStateUpdaterSpec(
+                deploying_revision=TriState.nullify(),
+            ),
+            pk_value=test_endpoint_id,
+        )
+        await deployment_repository.update_endpoint(updater)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            query = sa.select(EndpointRow).where(EndpointRow.id == test_endpoint_id)
+            result = await db_sess.execute(query)
+            endpoint = result.scalar_one()
+            assert endpoint.deploying_revision is None

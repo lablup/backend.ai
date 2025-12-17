@@ -32,6 +32,17 @@ class EndpointNotFound(ObjectNotFound):
         )
 
 
+class DeploymentRevisionNotFound(ObjectNotFound):
+    object_name = "deployment-revision"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_SERVICE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class UserNotFoundInDeployment(ObjectNotFound):
     object_name = "user in deployment"
 

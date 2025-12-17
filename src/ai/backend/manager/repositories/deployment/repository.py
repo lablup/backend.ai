@@ -36,6 +36,8 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentInfoWithAutoScalingRules,
     EndpointLifecycle,
+    ModelRevisionData,
+    RevisionSearchResult,
     RouteInfo,
     RouteStatus,
     ScaleOutDecision,
@@ -45,11 +47,13 @@ from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.deployment import DefinitionFileNotFound
 from ai.backend.manager.errors.service import EndpointNotFound
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointStatistics
 from ai.backend.manager.models.kernel import KernelStatistics
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
+from ai.backend.manager.repositories.base import BatchQuerier, Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
@@ -887,3 +891,52 @@ class DeploymentRepository:
         Returns None if no active agents exist.
         """
         return await self._db_source.get_default_architecture_from_scaling_group(scaling_group_name)
+
+    # ========== Deployment Revision Operations ==========
+
+    @deployment_repository_resilience.apply()
+    async def create_revision(
+        self,
+        creator: Creator[DeploymentRevisionRow],
+    ) -> ModelRevisionData:
+        """Create a new deployment revision."""
+        return await self._db_source.create_revision(creator)
+
+    @deployment_repository_resilience.apply()
+    async def get_revision(
+        self,
+        revision_id: uuid.UUID,
+    ) -> ModelRevisionData:
+        """Get a deployment revision by ID.
+
+        Raises:
+            DeploymentRevisionNotFound: If the revision does not exist.
+        """
+        return await self._db_source.get_revision(revision_id)
+
+    @deployment_repository_resilience.apply()
+    async def search_revisions(
+        self,
+        querier: BatchQuerier,
+    ) -> RevisionSearchResult:
+        """Search deployment revisions with pagination and filtering."""
+        return await self._db_source.search_revisions(querier)
+
+    @deployment_repository_resilience.apply()
+    async def get_latest_revision_number(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> Optional[int]:
+        """Get the latest revision number for an endpoint.
+
+        Returns None if no revisions exist for the endpoint.
+        """
+        return await self._db_source.get_latest_revision_number(endpoint_id)
+
+    @deployment_repository_resilience.apply()
+    async def update_endpoint(
+        self,
+        updater: Updater[EndpointRow],
+    ) -> None:
+        """Update an endpoint using the provided updater spec."""
+        await self._db_source.update_endpoint(updater)
