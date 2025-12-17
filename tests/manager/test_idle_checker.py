@@ -54,8 +54,9 @@ class _RemainingTimeCalculationTestConfig:
 @pytest.mark.parametrize(
     "remaining_time_config",
     [
-        # test 1
-        # now + 10.0 == idle_baseline + timeout_period
+        # Test 1: No grace period
+        # remaining = (idle_baseline - now) + timeout_period
+        # = (12:30:00 - 12:30:20) + 30s = -20s + 30s = 10s
         _RemainingTimeCalculationTestConfig(
             now=datetime(2020, 3, 1, 12, 30, second=20),
             idle_baseline=datetime(2020, 3, 1, 12, 30, second=0),
@@ -63,8 +64,10 @@ class _RemainingTimeCalculationTestConfig:
             grace_period_end=None,
             expected_remaining=10.0,
         ),
-        # test 2
-        # now + 40.0 == max(grace_period_end, idle_baseline) + timeout_period
+        # Test 2: Grace period takes precedence (grace_period_end > idle_baseline)
+        # baseline = max(idle_baseline, grace_period_end) = max(12:30:00, 12:30:30) = 12:30:30
+        # remaining = (baseline - now) + timeout_period
+        # = (12:30:30 - 12:30:20) + 30s = 10s + 30s = 40s
         _RemainingTimeCalculationTestConfig(
             now=datetime(2020, 3, 1, 12, 30, second=20),
             idle_baseline=datetime(2020, 3, 1, 12, 30, second=0),
@@ -72,7 +75,10 @@ class _RemainingTimeCalculationTestConfig:
             grace_period_end=datetime(2020, 3, 1, 12, 30, second=30),
             expected_remaining=40.0,
         ),
-        # test 3
+        # Test 3: idle_baseline takes precedence (idle_baseline > grace_period_end)
+        # baseline = max(idle_baseline, grace_period_end) = max(12:30:30, 12:30:20) = 12:30:30
+        # remaining = (baseline - now) + timeout_period
+        # = (12:30:30 - 12:30:20) + 30s = 10s + 30s = 40s
         _RemainingTimeCalculationTestConfig(
             now=datetime(2020, 3, 1, 12, 30, second=20),
             idle_baseline=datetime(2020, 3, 1, 12, 30, second=30),
@@ -80,8 +86,10 @@ class _RemainingTimeCalculationTestConfig:
             grace_period_end=datetime(2020, 3, 1, 12, 30, second=20),
             expected_remaining=40.0,
         ),
-        # test 4
-        # now - 30.0 == max(grace_period_end, idle_baseline) + timeout_period
+        # Test 4: Timeout exceeded (negative remaining time)
+        # baseline = max(idle_baseline, grace_period_end) = max(12:30:00, 12:30:10) = 12:30:10
+        # remaining = (baseline - now) + timeout_period
+        # = (12:30:10 - 12:30:50) + 10s = -40s + 10s = -30s
         _RemainingTimeCalculationTestConfig(
             now=datetime(2020, 3, 1, 12, 30, second=50),
             idle_baseline=datetime(2020, 3, 1, 12, 30, second=0),
@@ -92,7 +100,7 @@ class _RemainingTimeCalculationTestConfig:
     ],
 )
 @pytest.mark.asyncio
-async def remaining_time_calculation(
+async def test_remaining_time_calculation(
     remaining_time_config: _RemainingTimeCalculationTestConfig,
 ) -> None:
     remaining = calculate_remaining_time(
@@ -112,7 +120,7 @@ class TestNewUserGracePeriodChecker:
         return datetime.now(timezone.utc).replace(microsecond=0)
 
     @pytest.fixture
-    async def test_valkey_live(self) -> AsyncMock:
+    async def valkey_live(self) -> AsyncMock:
         """Mock ValkeyLiveClient - configure return values in scenario fixtures"""
         mock_client = AsyncMock()
         # Configure default return values
@@ -124,21 +132,16 @@ class TestNewUserGracePeriodChecker:
         return mock_client
 
     @pytest.fixture
-    def session_id(self) -> SessionId:
-        """Session ID for session lifetime tests"""
-        return SessionId(uuid4())
-
-    @pytest.fixture
     async def user_initial_grace_period_policy(self) -> dict[str, Any]:
         """Policy with user initial grace period"""
         return {"user_initial_grace_period": "100"}
 
     @pytest.fixture
     async def grace_period_checker(
-        self, test_valkey_live: AsyncMock, user_initial_grace_period_policy: dict[str, Any]
+        self, valkey_live: AsyncMock, user_initial_grace_period_policy: dict[str, Any]
     ) -> NewUserGracePeriodChecker:
         """Create and configure NewUserGracePeriodChecker"""
-        checker = NewUserGracePeriodChecker(test_valkey_live)
+        checker = NewUserGracePeriodChecker(valkey_live)
         await checker.populate_config(user_initial_grace_period_policy)
         return checker
 
