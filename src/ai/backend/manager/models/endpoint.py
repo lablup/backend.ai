@@ -280,6 +280,13 @@ class EndpointRow(Base):
         uselist=False,
     )
 
+    deployment_policy = relationship(
+        "DeploymentPolicyRow",
+        back_populates="endpoint_row",
+        primaryjoin="EndpointRow.id == foreign(DeploymentPolicyRow.endpoint)",
+        uselist=False,
+    )
+
     @classmethod
     async def get(
         cls,
