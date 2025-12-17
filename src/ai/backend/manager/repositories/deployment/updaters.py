@@ -78,8 +78,8 @@ class DeploymentNetworkSpecUpdaterSpec(UpdaterSpec[EndpointRow]):
 
 
 @dataclass
-class ModelRevisionUpdaterSpec(UpdaterSpec[EndpointRow]):
-    """UpdaterSpec for model revision updates - currently focused on model_id updates."""
+class MountUpdaterSpec(UpdaterSpec[EndpointRow]):
+    """UpdaterSpec for mount-related updates."""
 
     model_vfolder_id: OptionalState[UUID] = field(default_factory=OptionalState[UUID].nop)
 
@@ -96,24 +96,40 @@ class ModelRevisionUpdaterSpec(UpdaterSpec[EndpointRow]):
 
 
 @dataclass
+class RevisionStateUpdaterSpec(UpdaterSpec[EndpointRow]):
+    """UpdaterSpec for deployment revision state updates.
+
+    Manages which revision is currently active and which is being deployed.
+    """
+
+    current_revision: TriState[UUID] = field(default_factory=TriState[UUID].nop)
+    deploying_revision: TriState[UUID] = field(default_factory=TriState[UUID].nop)
+
+    @property
+    @override
+    def row_class(self) -> type[EndpointRow]:
+        return EndpointRow
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.current_revision.update_dict(to_update, "current_revision")
+        self.deploying_revision.update_dict(to_update, "deploying_revision")
+        return to_update
+
+
+@dataclass
 class DeploymentUpdaterSpec(UpdaterSpec[EndpointRow]):
     """Composite UpdaterSpec for deployment updates.
 
-    Combines metadata, replica_spec, network, and model_revision updates.
+    Combines metadata, replica_spec, network, mount, and revision_state updates.
     """
 
     metadata: Optional[DeploymentMetadataUpdaterSpec] = None
     replica_spec: Optional[ReplicaSpecUpdaterSpec] = None
     network: Optional[DeploymentNetworkSpecUpdaterSpec] = None
-    model_revision: Optional[ModelRevisionUpdaterSpec] = None
-
-    # Accessor property for backward compatibility
-    @property
-    def model_id(self) -> OptionalState[UUID] | None:
-        """Get the model_vfolder_id from model revision modifier."""
-        if self.model_revision is None:
-            return None
-        return self.model_revision.model_vfolder_id
+    mount: Optional[MountUpdaterSpec] = None
+    revision_state: Optional[RevisionStateUpdaterSpec] = None
 
     @property
     @override
@@ -129,8 +145,10 @@ class DeploymentUpdaterSpec(UpdaterSpec[EndpointRow]):
             to_update.update(self.replica_spec.build_values())
         if self.network:
             to_update.update(self.network.build_values())
-        if self.model_revision:
-            to_update.update(self.model_revision.build_values())
+        if self.mount:
+            to_update.update(self.mount.build_values())
+        if self.revision_state:
+            to_update.update(self.revision_state.build_values())
         return to_update
 
 

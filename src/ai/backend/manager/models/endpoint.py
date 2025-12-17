@@ -233,6 +233,10 @@ class EndpointRow(Base):
         nullable=True,
     )
 
+    # Revision management columns
+    current_revision = sa.Column("current_revision", GUID, nullable=True)
+    deploying_revision = sa.Column("deploying_revision", GUID, nullable=True)
+
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     tokens = relationship(
         "EndpointTokenRow",
@@ -261,6 +265,12 @@ class EndpointRow(Base):
         back_populates="owned_endpoints",
         foreign_keys=[session_owner],
         primaryjoin=lambda: foreign(EndpointRow.session_owner) == UserRow.uuid,
+    )
+
+    revisions = relationship(
+        "DeploymentRevisionRow",
+        back_populates="endpoint_row",
+        primaryjoin="EndpointRow.id == foreign(DeploymentRevisionRow.endpoint)",
     )
 
     @classmethod

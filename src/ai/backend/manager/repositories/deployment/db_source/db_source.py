@@ -29,6 +29,8 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentInfoWithAutoScalingRules,
     EndpointLifecycle,
+    ModelRevisionData,
+    RevisionSearchResult,
     RouteInfo,
     RouteStatus,
     ScaleOutDecision,
@@ -39,6 +41,7 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.errors.deployment import (
     DeploymentHasNoTargetRevision,
+    DeploymentRevisionNotFound,
     UserNotFoundInDeployment,
 )
 from ai.backend.manager.errors.resource import ProjectNotFound, ScalingGroupProxyTargetNotFound
@@ -49,6 +52,7 @@ from ai.backend.manager.errors.service import (
 )
 from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
@@ -64,6 +68,12 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+    execute_batch_querier,
+    execute_creator,
+)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ContainerUserContext,
@@ -1418,3 +1428,89 @@ class DeploymentDBSource:
             architecture_counts = Counter(architectures)
             most_common_architecture, _ = architecture_counts.most_common(1)[0]
             return most_common_architecture
+
+    # Deployment Revision Methods
+
+    async def get_latest_revision_number(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> Optional[int]:
+        """Get the latest revision number for an endpoint.
+
+        Returns None if no revisions exist for the endpoint.
+        Service layer should call this to calculate next revision_number.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(sa.func.max(DeploymentRevisionRow.revision_number)).where(
+                DeploymentRevisionRow.endpoint == endpoint_id
+            )
+            result = await db_sess.execute(query)
+            return result.scalar()
+
+    async def create_revision(
+        self,
+        creator: Creator[DeploymentRevisionRow],
+    ) -> ModelRevisionData:
+        """Create a new deployment revision for an endpoint.
+
+        The Creator must contain a spec with revision_number already set.
+        Service layer should calculate revision_number using get_latest_revision_number()
+        before calling this method.
+
+        If a unique constraint violation occurs, the caller should retry.
+
+        TODO: Implement revision history pruning (similar to K8s revisionHistoryLimit).
+        After creating a new revision, old revisions beyond the limit should be deleted.
+        This requires adding a `revision_history_limit` column to EndpointRow.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            result = await execute_creator(db_sess, creator)
+            return result.row.to_data()
+
+    async def get_revision(
+        self,
+        revision_id: uuid.UUID,
+    ) -> ModelRevisionData:
+        """Get a deployment revision by ID.
+
+        Raises:
+            DeploymentRevisionNotFound: If the revision does not exist.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(DeploymentRevisionRow).where(DeploymentRevisionRow.id == revision_id)
+            result = await db_sess.execute(query)
+            row = result.scalar_one_or_none()
+            if row is None:
+                raise DeploymentRevisionNotFound(f"Deployment revision {revision_id} not found")
+            return row.to_data()
+
+    async def search_revisions(
+        self,
+        querier: BatchQuerier,
+    ) -> RevisionSearchResult:
+        """Search deployment revisions with pagination and filtering."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(DeploymentRevisionRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.DeploymentRevisionRow.to_data() for row in result.rows]
+
+            return RevisionSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def update_endpoint(
+        self,
+        updater: Updater[EndpointRow],
+    ) -> None:
+        """Update an endpoint using the provided updater spec."""
+        async with self._begin_session_read_committed() as db_sess:
+            await execute_updater(db_sess, updater)

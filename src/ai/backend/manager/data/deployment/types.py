@@ -525,3 +525,13 @@ class RouteHistoryListResult:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+
+
+@dataclass
+class RevisionSearchResult:
+    """Search result with pagination for deployment revisions."""
+
+    items: list[ModelRevisionData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
