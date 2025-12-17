@@ -233,7 +233,7 @@ class TestHuggingFaceRepository:
         """Test listing all HuggingFace registries"""
         registries = await huggingface_repository.list_registries()
 
-        assert len(registries) >= 4
+        assert len(registries) == 4
         registry_ids = [r.id for r in registries]
         for expected_id in sample_registries_for_ordering:
             assert expected_id in registry_ids
@@ -251,6 +251,7 @@ class TestHuggingFaceRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: HuggingFaceRegistryRow.url.like("%huggingface.co/registry-%"),
             ],
             orders=[],
@@ -270,6 +271,7 @@ class TestHuggingFaceRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: HuggingFaceRegistryRow.url.like("%huggingface.co/registry-%"),
             ],
             orders=[],
@@ -289,6 +291,7 @@ class TestHuggingFaceRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=20),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: HuggingFaceRegistryRow.url.like("%huggingface.co/registry-%"),
             ],
             orders=[],
@@ -312,6 +315,7 @@ class TestHuggingFaceRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: HuggingFaceRegistryRow.url.in_([
                     "https://huggingface.co/alpha-registry",
                     "https://huggingface.co/beta-registry",
@@ -336,6 +340,7 @@ class TestHuggingFaceRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: HuggingFaceRegistryRow.url.in_([
                     "https://huggingface.co/alpha-registry",
                     "https://huggingface.co/beta-registry",
@@ -364,6 +369,7 @@ class TestHuggingFaceRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=5, offset=5),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: HuggingFaceRegistryRow.url.like("%huggingface.co/registry-%"),
             ],
             orders=[HuggingFaceRegistryRow.url.asc()],
