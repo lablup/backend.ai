@@ -26,6 +26,11 @@ class CreatePermissionAction(PermissionAction):
 
     @override
     @classmethod
+    def entity_type(cls) -> str:
+        return "permission"
+
+    @override
+    @classmethod
     def operation_type(cls) -> str:
         return "create"
 
@@ -46,6 +51,11 @@ class DeletePermissionAction(PermissionAction):
     @override
     def entity_id(self) -> Optional[str]:
         return str(self.purger.pk_value)
+
+    @override
+    @classmethod
+    def entity_type(cls) -> str:
+        return "permission"
 
     @override
     @classmethod

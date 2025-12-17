@@ -13,11 +13,13 @@ from pydantic import BaseModel, Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 
-from .types import RoleSource, RoleStatus
+from .types import EntityType, OperationType, RoleSource, RoleStatus
 
 __all__ = (
     "RoleDTO",
     "AssignedUserDTO",
+    "PermissionDTO",
+    "ObjectPermissionDTO",
     "PaginationInfo",
     "CreateRoleResponse",
     "GetRoleResponse",
@@ -27,6 +29,10 @@ __all__ = (
     "AssignRoleResponse",
     "RevokeRoleResponse",
     "SearchUsersAssignedToRoleResponse",
+    "CreatePermissionResponse",
+    "DeletePermissionResponse",
+    "CreateObjectPermissionResponse",
+    "DeleteObjectPermissionResponse",
 )
 
 
@@ -110,3 +116,46 @@ class SearchUsersAssignedToRoleResponse(BaseResponseModel):
 
     users: list[AssignedUserDTO] = Field(description="List of assigned users")
     pagination: PaginationInfo = Field(description="Pagination information")
+
+
+class PermissionDTO(BaseModel):
+    """DTO for permission data."""
+
+    id: UUID = Field(description="Permission ID")
+    permission_group_id: UUID = Field(description="Permission group ID")
+    entity_type: EntityType = Field(description="Entity type")
+    operation: OperationType = Field(description="Operation type")
+
+
+class ObjectPermissionDTO(BaseModel):
+    """DTO for object permission data."""
+
+    id: UUID = Field(description="Object permission ID")
+    role_id: UUID = Field(description="Role ID")
+    entity_type: EntityType = Field(description="Entity type")
+    entity_id: str = Field(description="Entity ID")
+    operation: OperationType = Field(description="Operation type")
+
+
+class CreatePermissionResponse(BaseResponseModel):
+    """Response for creating a permission."""
+
+    permission: PermissionDTO = Field(description="Created permission")
+
+
+class DeletePermissionResponse(BaseResponseModel):
+    """Response for deleting a permission."""
+
+    deleted: bool = Field(description="Whether the permission was deleted")
+
+
+class CreateObjectPermissionResponse(BaseResponseModel):
+    """Response for creating an object permission."""
+
+    object_permission: ObjectPermissionDTO = Field(description="Created object permission")
+
+
+class DeleteObjectPermissionResponse(BaseResponseModel):
+    """Response for deleting an object permission."""
+
+    deleted: bool = Field(description="Whether the object permission was deleted")

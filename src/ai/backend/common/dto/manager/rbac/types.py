@@ -6,11 +6,20 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from ai.backend.common.data.permission.types import RoleSource, RoleStatus
+from ai.backend.common.data.permission.types import (
+    EntityType,
+    OperationType,
+    PermissionStatus,
+    RoleSource,
+    RoleStatus,
+)
 
 __all__ = (
     "RoleStatus",
     "RoleSource",
+    "EntityType",
+    "OperationType",
+    "PermissionStatus",
     "OrderDirection",
     "RoleOrderField",
     "AssignedUserOrderField",

@@ -9,13 +9,15 @@ from uuid import UUID
 
 from pydantic import Field
 
-from ...api_handlers import BaseRequestModel
+from ai.backend.common.api_handlers import BaseRequestModel
 
 __all__ = (
     "GetRolePathParam",
     "UpdateRolePathParam",
     "DeleteRolePathParam",
     "SearchUsersAssignedToRolePathParam",
+    "DeletePermissionPathParam",
+    "DeleteObjectPermissionPathParam",
 )
 
 
@@ -41,3 +43,15 @@ class SearchUsersAssignedToRolePathParam(BaseRequestModel):
     """Path parameter for searching users assigned to a role."""
 
     role_id: UUID = Field(description="The role ID to search assigned users for")
+
+
+class DeletePermissionPathParam(BaseRequestModel):
+    """Path parameter for deleting a permission."""
+
+    permission_id: UUID = Field(description="The permission ID to delete")
+
+
+class DeleteObjectPermissionPathParam(BaseRequestModel):
+    """Path parameter for deleting an object permission."""
+
+    object_permission_id: UUID = Field(description="The object permission ID to delete")

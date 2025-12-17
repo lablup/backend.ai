@@ -5,7 +5,9 @@ import uuid
 import sqlalchemy as sa
 
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import RoleSource
+from ai.backend.manager.data.permission.types import EntityType, RoleSource, ScopeType
+from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
+from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRow
@@ -78,6 +80,42 @@ class RoleConditions:
                 sa.select(RoleRow.created_at).where(RoleRow.id == cursor_uuid).scalar_subquery()
             )
             return RoleRow.created_at > subquery
+
+        return inner
+
+    @staticmethod
+    def by_scope_type(scope_type: ScopeType) -> QueryCondition:
+        """Filter roles by scope type.
+
+        Requires JOIN with PermissionGroupRow.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionGroupRow.scope_type == scope_type  # type: ignore[attr-defined]
+
+        return inner
+
+    @staticmethod
+    def by_scope_id(scope_id: str) -> QueryCondition:
+        """Filter roles by scope ID.
+
+        Requires JOIN with PermissionGroupRow.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionGroupRow.scope_id == scope_id  # type: ignore[attr-defined]
+
+        return inner
+
+    @staticmethod
+    def by_has_permission_for(entity_type: EntityType) -> QueryCondition:
+        """Filter roles having permission for entity type.
+
+        Requires JOIN with ObjectPermissionRow.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ObjectPermissionRow.entity_type == entity_type  # type: ignore[attr-defined]
 
         return inner
 
