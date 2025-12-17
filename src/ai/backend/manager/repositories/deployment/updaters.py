@@ -12,6 +12,11 @@ from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetr
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyRow,
 )
+from ai.backend.manager.models.deployment_policy import (
+    BlueGreenSpec,
+    DeploymentPolicyRow,
+    RollingUpdateSpec,
+)
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
@@ -234,4 +239,37 @@ class DeploymentAutoScalingPolicyUpdaterSpec(UpdaterSpec[DeploymentAutoScalingPo
         self.scale_up_step_size.update_dict(to_update, "scale_up_step_size")
         self.scale_down_step_size.update_dict(to_update, "scale_down_step_size")
         self.cooldown_seconds.update_dict(to_update, "cooldown_seconds")
+        return to_update
+
+
+@dataclass
+class DeploymentPolicyUpdaterSpec(UpdaterSpec[DeploymentPolicyRow]):
+    """UpdaterSpec for deployment policy updates.
+
+    All fields are optional - only specified fields will be updated.
+    Supports partial updates for deployment strategy configuration.
+    """
+
+    strategy: OptionalState[DeploymentStrategy] = field(
+        default_factory=OptionalState[DeploymentStrategy].nop
+    )
+    strategy_spec: OptionalState[RollingUpdateSpec | BlueGreenSpec] = field(
+        default_factory=OptionalState[RollingUpdateSpec | BlueGreenSpec].nop
+    )
+    rollback_on_failure: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
+
+    @property
+    @override
+    def row_class(self) -> type[DeploymentPolicyRow]:
+        return DeploymentPolicyRow
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.strategy.update_dict(to_update, "strategy")
+        # Convert Pydantic model to dict for JSONB storage
+        spec_value = self.strategy_spec.optional_value()
+        if spec_value is not None:
+            to_update["strategy_spec"] = spec_value.model_dump()
+        self.rollback_on_failure.update_dict(to_update, "rollback_on_failure")
         return to_update

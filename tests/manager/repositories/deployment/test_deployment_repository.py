@@ -13,6 +13,7 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -30,12 +31,18 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import ModelRevisionData
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
-from ai.backend.manager.errors.service import AutoScalingPolicyNotFound
+from ai.backend.manager.errors.service import AutoScalingPolicyNotFound, DeploymentPolicyNotFound
 from ai.backend.manager.models import KeyPairResourcePolicyRow, KeyPairRow
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyData,
     DeploymentAutoScalingPolicyRow,
+)
+from ai.backend.manager.models.deployment_policy import (
+    BlueGreenSpec,
+    DeploymentPolicyData,
+    DeploymentPolicyRow,
+    RollingUpdateSpec,
 )
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
@@ -66,10 +73,12 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import (
     DeploymentAutoScalingPolicyCreatorSpec,
+    DeploymentPolicyCreatorSpec,
     DeploymentRevisionCreatorSpec,
 )
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentAutoScalingPolicyUpdaterSpec,
+    DeploymentPolicyUpdaterSpec,
     RevisionStateUpdaterSpec,
 )
 from ai.backend.manager.types import OptionalState, TriState
@@ -2105,5 +2114,361 @@ class TestDeploymentAutoScalingPolicyOperations:
         )
 
         result = await deployment_repository.delete_auto_scaling_policy(purger)
+
+        assert result is None
+
+
+class TestDeploymentPolicyOperations:
+    """Test cases for deployment policy repository operations."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database engine that auto-cleans data after each test."""
+        yield database_engine
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(sa.delete(DeploymentPolicyRow))
+            await db_sess.execute(sa.delete(EndpointRow))
+            await db_sess.execute(sa.delete(GroupRow))
+            await db_sess.execute(sa.delete(UserRow))
+            await db_sess.execute(sa.delete(UserResourcePolicyRow))
+            await db_sess.execute(sa.delete(ProjectResourcePolicyRow))
+            await db_sess.execute(sa.delete(ScalingGroupRow))
+            await db_sess.execute(sa.delete(DomainRow))
+
+    @pytest.fixture
+    async def test_domain_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create test domain and return domain name."""
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            domain = DomainRow(
+                name=domain_name,
+                description="Test domain",
+                is_active=True,
+                total_resource_slots={},
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+            )
+            db_sess.add(domain)
+            await db_sess.flush()
+
+        yield domain_name
+
+    @pytest.fixture
+    async def test_scaling_group_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create test scaling group and return name."""
+        sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                description="Test scaling group",
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            db_sess.add(sgroup)
+            await db_sess.flush()
+
+        yield sgroup_name
+
+    @pytest.fixture
+    async def test_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create test resource policy and return policy name."""
+        policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_session_count_per_model_session=5,
+                max_customized_image_count=3,
+            )
+            db_sess.add(policy)
+            await db_sess.flush()
+
+        yield policy_name
+
+    @pytest.fixture
+    async def test_project_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create test project resource policy and return policy name."""
+        policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = ProjectResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=int(BinarySize.from_str("100GiB")),
+                max_network_count=5,
+            )
+            db_sess.add(policy)
+            await db_sess.flush()
+
+        yield policy_name
+
+    @pytest.fixture
+    async def test_user_uuid(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_resource_policy_name: str,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create test user and return user UUID."""
+        user_uuid = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            user = UserRow(
+                uuid=user_uuid,
+                username=f"testuser-{user_uuid.hex[:8]}",
+                email=f"test-{user_uuid.hex[:8]}@example.com",
+                password=create_test_password_info("test_password"),
+                need_password_change=False,
+                status=UserStatus.ACTIVE,
+                status_info="active",
+                domain_name=test_domain_name,
+                role=UserRole.USER,
+                resource_policy=test_resource_policy_name,
+            )
+            db_sess.add(user)
+            await db_sess.flush()
+
+        yield user_uuid
+
+    @pytest.fixture
+    async def test_group_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_project_resource_policy_name: str,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create test group and return group ID."""
+        group_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            group = GroupRow(
+                id=group_id,
+                name=f"test-group-{uuid.uuid4().hex[:8]}",
+                domain_name=test_domain_name,
+                resource_policy=test_project_resource_policy_name,
+            )
+            db_sess.add(group)
+            await db_sess.flush()
+
+        yield group_id
+
+    @pytest.fixture
+    async def test_endpoint_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_scaling_group_name: str,
+        test_user_uuid: uuid.UUID,
+        test_group_id: uuid.UUID,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create test endpoint and return endpoint ID."""
+        endpoint_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            endpoint = EndpointRow(
+                id=endpoint_id,
+                name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
+                created_user=test_user_uuid,
+                session_owner=test_user_uuid,
+                domain=test_domain_name,
+                project=test_group_id,
+                resource_group=test_scaling_group_name,
+                model=None,
+                desired_replicas=1,
+                image=None,
+                runtime_variant=RuntimeVariant.CUSTOM,
+                url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
+                open_to_public=False,
+                lifecycle_stage=EndpointLifecycle.DESTROYED,
+                resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
+            )
+            db_sess.add(endpoint)
+            await db_sess.flush()
+
+        yield endpoint_id
+
+    @pytest.fixture
+    async def deployment_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[DeploymentRepository, None]:
+        """Create DeploymentRepository instance."""
+        storage_manager = MagicMock()
+        valkey_stat = MagicMock()
+        valkey_live = MagicMock()
+        valkey_schedule = MagicMock()
+
+        repo = DeploymentRepository(
+            db=db_with_cleanup,
+            storage_manager=storage_manager,
+            valkey_stat=valkey_stat,
+            valkey_live=valkey_live,
+            valkey_schedule=valkey_schedule,
+        )
+        yield repo
+
+    @pytest.fixture
+    async def test_deployment_policy_data(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: uuid.UUID,
+    ) -> AsyncGenerator[DeploymentPolicyData, None]:
+        """Create a single test deployment policy."""
+        spec = DeploymentPolicyCreatorSpec(
+            endpoint=test_endpoint_id,
+            strategy=DeploymentStrategy.ROLLING,
+            strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
+            rollback_on_failure=False,
+        )
+        policy = await deployment_repository.create_deployment_policy(Creator(spec=spec))
+        yield policy
+
+    @pytest.mark.asyncio
+    async def test_create_deployment_policy(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: uuid.UUID,
+    ) -> None:
+        """Test creating a deployment policy using Creator."""
+        spec = DeploymentPolicyCreatorSpec(
+            endpoint=test_endpoint_id,
+            strategy=DeploymentStrategy.BLUE_GREEN,
+            strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=60),
+            rollback_on_failure=False,
+        )
+        creator = Creator(spec=spec)
+
+        result = await deployment_repository.create_deployment_policy(creator)
+
+        assert result.id is not None
+        assert result.endpoint == test_endpoint_id
+        assert result.strategy == DeploymentStrategy.BLUE_GREEN
+        assert result.strategy_spec == BlueGreenSpec(auto_promote=True, promote_delay_seconds=60)
+        assert result.rollback_on_failure is False
+
+    @pytest.mark.asyncio
+    async def test_get_deployment_policy(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: uuid.UUID,
+        test_deployment_policy_data: DeploymentPolicyData,
+    ) -> None:
+        """Test getting a deployment policy by endpoint ID."""
+        result = await deployment_repository.get_deployment_policy(test_endpoint_id)
+
+        assert result.id == test_deployment_policy_data.id
+        assert result.endpoint == test_endpoint_id
+        assert result.strategy == DeploymentStrategy.ROLLING
+        assert result.strategy_spec == RollingUpdateSpec(max_surge=1, max_unavailable=0)
+
+    @pytest.mark.asyncio
+    async def test_get_deployment_policy_not_found(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: uuid.UUID,
+    ) -> None:
+        """Test that get_deployment_policy raises DeploymentPolicyNotFound."""
+        with pytest.raises(DeploymentPolicyNotFound):
+            await deployment_repository.get_deployment_policy(test_endpoint_id)
+
+    @pytest.mark.asyncio
+    async def test_update_deployment_policy(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_deployment_policy_data: DeploymentPolicyData,
+    ) -> None:
+        """Test updating a deployment policy using Updater."""
+        new_strategy_spec = BlueGreenSpec(auto_promote=True, promote_delay_seconds=30)
+        updater = Updater(
+            spec=DeploymentPolicyUpdaterSpec(
+                strategy=OptionalState.update(DeploymentStrategy.BLUE_GREEN),
+                strategy_spec=OptionalState.update(new_strategy_spec),
+                rollback_on_failure=OptionalState.update(True),
+            ),
+            pk_value=test_deployment_policy_data.id,
+        )
+
+        result = await deployment_repository.update_deployment_policy(updater)
+
+        assert result.id == test_deployment_policy_data.id
+        assert result.strategy == DeploymentStrategy.BLUE_GREEN
+        assert result.strategy_spec == new_strategy_spec
+        assert result.rollback_on_failure is True
+
+    @pytest.mark.asyncio
+    async def test_update_deployment_policy_not_found(
+        self,
+        deployment_repository: DeploymentRepository,
+    ) -> None:
+        """Test that update_deployment_policy raises DeploymentPolicyNotFound."""
+        nonexistent_id = uuid.uuid4()
+        updater = Updater(
+            spec=DeploymentPolicyUpdaterSpec(
+                strategy=OptionalState.update(DeploymentStrategy.BLUE_GREEN),
+            ),
+            pk_value=nonexistent_id,
+        )
+
+        with pytest.raises(DeploymentPolicyNotFound):
+            await deployment_repository.update_deployment_policy(updater)
+
+    @pytest.mark.asyncio
+    async def test_delete_deployment_policy(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: uuid.UUID,
+        test_deployment_policy_data: DeploymentPolicyData,
+    ) -> None:
+        """Test deleting a deployment policy using Purger."""
+        purger = Purger(
+            row_class=DeploymentPolicyRow,
+            pk_value=test_deployment_policy_data.id,
+        )
+
+        result = await deployment_repository.delete_deployment_policy(purger)
+
+        assert result is not None
+        assert result.row.id == test_deployment_policy_data.id
+
+        # Verify the policy no longer exists
+        with pytest.raises(DeploymentPolicyNotFound):
+            await deployment_repository.get_deployment_policy(test_endpoint_id)
+
+    @pytest.mark.asyncio
+    async def test_delete_deployment_policy_not_found(
+        self,
+        deployment_repository: DeploymentRepository,
+    ) -> None:
+        """Test that delete_deployment_policy returns None for nonexistent policy."""
+        nonexistent_id = uuid.uuid4()
+        purger = Purger(
+            row_class=DeploymentPolicyRow,
+            pk_value=nonexistent_id,
+        )
+
+        result = await deployment_repository.delete_deployment_policy(purger)
 
         assert result is None

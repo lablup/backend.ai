@@ -48,6 +48,7 @@ from ai.backend.manager.errors.resource import ProjectNotFound, ScalingGroupProx
 from ai.backend.manager.errors.service import (
     AutoScalingPolicyNotFound,
     AutoScalingRuleNotFound,
+    DeploymentPolicyNotFound,
     EndpointNotFound,
     NoUpdatesToApply,
 )
@@ -56,6 +57,10 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyData,
     DeploymentAutoScalingPolicyRow,
+)
+from ai.backend.manager.models.deployment_policy import (
+    DeploymentPolicyData,
+    DeploymentPolicyRow,
 )
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import (
@@ -1586,6 +1591,73 @@ class DeploymentDBSource:
         purger: Purger[DeploymentAutoScalingPolicyRow],
     ) -> PurgerResult[DeploymentAutoScalingPolicyRow] | None:
         """Delete the auto-scaling policy by primary key.
+
+        Args:
+            purger: Purger containing the policy ID (primary key) to delete.
+
+        Returns:
+            PurgerResult containing the deleted row, or None if no policy existed.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            return await execute_purger(db_sess, purger)
+
+    async def create_deployment_policy(
+        self,
+        creator: Creator[DeploymentPolicyRow],
+    ) -> DeploymentPolicyData:
+        """Create a new deployment policy for an endpoint.
+
+        Each endpoint can have at most one deployment policy (1:1 relationship).
+        If a policy already exists for the endpoint, the database will raise a
+        unique constraint violation.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            result = await execute_creator(db_sess, creator)
+            return result.row.to_data()
+
+    async def get_deployment_policy(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> DeploymentPolicyData:
+        """Get the deployment policy for an endpoint.
+
+        Raises:
+            DeploymentPolicyNotFound: If no policy exists for the endpoint.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(DeploymentPolicyRow).where(
+                DeploymentPolicyRow.endpoint == endpoint_id
+            )
+            result = await db_sess.execute(query)
+            row = result.scalar_one_or_none()
+            if row is None:
+                raise DeploymentPolicyNotFound(
+                    f"Deployment policy for endpoint {endpoint_id} not found"
+                )
+            return row.to_data()
+
+    async def update_deployment_policy(
+        self,
+        updater: Updater[DeploymentPolicyRow],
+    ) -> DeploymentPolicyData:
+        """Update a deployment policy using the provided updater spec.
+
+        The updater's pk_value should be the policy ID (primary key).
+
+        Raises:
+            DeploymentPolicyNotFound: If the policy does not exist.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            result = await execute_updater(db_sess, updater)
+            if result is None:
+                raise DeploymentPolicyNotFound(f"Deployment policy {updater.pk_value} not found")
+            return result.row.to_data()
+
+    async def delete_deployment_policy(
+        self,
+        purger: Purger[DeploymentPolicyRow],
+    ) -> PurgerResult[DeploymentPolicyRow] | None:
+        """Delete the deployment policy by primary key.
 
         Args:
             purger: Purger containing the policy ID (primary key) to delete.
