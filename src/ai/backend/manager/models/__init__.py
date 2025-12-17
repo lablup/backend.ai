@@ -8,6 +8,7 @@ from . import association_artifacts_storages as _association_artifacts_storages
 from . import association_container_registries_groups as _association_container_registries_groups
 from . import audit_log as _auditlog
 from . import container_registry as _container_registry
+from . import deployment_auto_scaling_policy as _deployment_auto_scaling_policy
 from . import deployment_revision as _deployment_revision
 from . import domain as _domain
 from . import dotfile as _dotfile
@@ -56,6 +57,7 @@ __all__ = (
     *_association_artifacts_storages.__all__,
     *_association_container_registries_groups.__all__,
     *_container_registry.__all__,
+    *_deployment_auto_scaling_policy.__all__,
     *_deployment_revision.__all__,
     *_domain.__all__,
     *_endpoint.__all__,
@@ -102,6 +104,7 @@ from .agent import *  # noqa
 from .association_artifacts_storages import *  # noqa
 from .association_container_registries_groups import *  # noqa
 from .container_registry import *  # noqa
+from .deployment_auto_scaling_policy import *  # noqa
 from .deployment_revision import *  # noqa
 from .domain import *  # noqa
 from .dotfile import *  # noqa

@@ -273,6 +273,13 @@ class EndpointRow(Base):
         primaryjoin="EndpointRow.id == foreign(DeploymentRevisionRow.endpoint)",
     )
 
+    auto_scaling_policy = relationship(
+        "DeploymentAutoScalingPolicyRow",
+        back_populates="endpoint_row",
+        primaryjoin="EndpointRow.id == foreign(DeploymentAutoScalingPolicyRow.endpoint)",
+        uselist=False,
+    )
+
     @classmethod
     async def get(
         cls,

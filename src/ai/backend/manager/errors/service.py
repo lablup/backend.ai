@@ -77,6 +77,17 @@ class AutoScalingRuleNotFound(ObjectNotFound):
         )
 
 
+class AutoScalingPolicyNotFound(ObjectNotFound):
+    object_name = "auto_scaling_policy"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ENDPOINT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class RoutingNotFound(ObjectNotFound):
     object_name = "routing"
 

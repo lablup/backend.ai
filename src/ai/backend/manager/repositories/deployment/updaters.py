@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Any, Optional, override
 from uuid import UUID
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
+from ai.backend.manager.models.deployment_auto_scaling_policy import (
+    DeploymentAutoScalingPolicyRow,
+)
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
@@ -185,4 +190,48 @@ class NewDeploymentUpdaterSpec(UpdaterSpec[EndpointRow]):
         self.preferred_domain_name.update_dict(to_update, "preferred_domain_name")
         self.default_deployment_strategy.update_dict(to_update, "default_deployment_strategy")
         self.active_revision_id.update_dict(to_update, "current_revision_id")
+        return to_update
+
+
+@dataclass
+class DeploymentAutoScalingPolicyUpdaterSpec(UpdaterSpec[DeploymentAutoScalingPolicyRow]):
+    """UpdaterSpec for deployment auto-scaling policy updates.
+
+    All fields are optional - only specified fields will be updated.
+    Supports partial updates for hysteresis-based scaling configuration.
+    """
+
+    min_replicas: OptionalState[int] = field(default_factory=OptionalState[int].nop)
+    max_replicas: OptionalState[int] = field(default_factory=OptionalState[int].nop)
+    metric_source: TriState[AutoScalingMetricSource] = field(
+        default_factory=TriState[AutoScalingMetricSource].nop
+    )
+    metric_name: TriState[str] = field(default_factory=TriState[str].nop)
+    comparator: TriState[AutoScalingMetricComparator] = field(
+        default_factory=TriState[AutoScalingMetricComparator].nop
+    )
+    scale_up_threshold: TriState[Decimal] = field(default_factory=TriState[Decimal].nop)
+    scale_down_threshold: TriState[Decimal] = field(default_factory=TriState[Decimal].nop)
+    scale_up_step_size: OptionalState[int] = field(default_factory=OptionalState[int].nop)
+    scale_down_step_size: OptionalState[int] = field(default_factory=OptionalState[int].nop)
+    cooldown_seconds: OptionalState[int] = field(default_factory=OptionalState[int].nop)
+
+    @property
+    @override
+    def row_class(self) -> type[DeploymentAutoScalingPolicyRow]:
+        return DeploymentAutoScalingPolicyRow
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.min_replicas.update_dict(to_update, "min_replicas")
+        self.max_replicas.update_dict(to_update, "max_replicas")
+        self.metric_source.update_dict(to_update, "metric_source")
+        self.metric_name.update_dict(to_update, "metric_name")
+        self.comparator.update_dict(to_update, "comparator")
+        self.scale_up_threshold.update_dict(to_update, "scale_up_threshold")
+        self.scale_down_threshold.update_dict(to_update, "scale_down_threshold")
+        self.scale_up_step_size.update_dict(to_update, "scale_up_step_size")
+        self.scale_down_step_size.update_dict(to_update, "scale_down_step_size")
+        self.cooldown_seconds.update_dict(to_update, "cooldown_seconds")
         return to_update
