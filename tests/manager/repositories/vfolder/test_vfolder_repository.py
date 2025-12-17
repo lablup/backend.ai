@@ -6,7 +6,6 @@ Tests the repository layer with real database operations.
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock, create_autospec
 
@@ -38,17 +37,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-
-
-@dataclass
-class _CleanupTracker:
-    """Tracks created entities for cleanup after tests."""
-
-    domain_names: list[str] = field(default_factory=list)
-    user_ids: list[uuid.UUID] = field(default_factory=list)
-    group_ids: list[uuid.UUID] = field(default_factory=list)
-    user_policy_names: list[str] = field(default_factory=list)
-    project_policy_names: list[str] = field(default_factory=list)
 
 
 class TestVfolderRepository:
@@ -83,63 +71,32 @@ class TestVfolderRepository:
         )
 
     @pytest.fixture
-    def cleanup_tracker(self) -> _CleanupTracker:
-        """Create a cleanup tracker for tracking created entities."""
-        return _CleanupTracker()
-
-    # TODO: Simplify this after removing all fk constraints
-    @pytest.fixture
     async def db_with_cleanup(
         self,
         database_engine: ExtendedAsyncSAEngine,
-        cleanup_tracker: _CleanupTracker,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         """
         Database engine that auto-cleans all test data after each test.
 
-        Due to FK constraints (VFolderRow references UserRow and GroupRow),
-        cleanup must happen in specific order. This fixture cleans up
-        all test-created data in the correct FK order.
+        Deletes all rows from tables in FK dependency order
+        (tables without FK constraints first).
         """
         yield database_engine
 
         # Cleanup all test data in correct FK order
         async with database_engine.begin_session() as db_sess:
-            # 1. VFolder data (references User and Group)
             await db_sess.execute(sa.delete(VFolderPermissionRow))
             await db_sess.execute(sa.delete(VFolderRow))
-
-            # 2. Group (referenced by VFolderRow)
-            for group_id in cleanup_tracker.group_ids:
-                await db_sess.execute(sa.delete(GroupRow).where(GroupRow.id == group_id))
-
-            # 3. User (referenced by VFolderRow)
-            for user_id in cleanup_tracker.user_ids:
-                await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_id))
-
-            # 4. Resource policies (referenced by User and Group)
-            for policy_name in cleanup_tracker.project_policy_names:
-                await db_sess.execute(
-                    sa.delete(ProjectResourcePolicyRow).where(
-                        ProjectResourcePolicyRow.name == policy_name
-                    )
-                )
-            for policy_name in cleanup_tracker.user_policy_names:
-                await db_sess.execute(
-                    sa.delete(UserResourcePolicyRow).where(
-                        UserResourcePolicyRow.name == policy_name
-                    )
-                )
-
-            # 5. Domain (referenced by User and Group)
-            for domain_name in cleanup_tracker.domain_names:
-                await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
+            await db_sess.execute(sa.delete(GroupRow))
+            await db_sess.execute(sa.delete(UserRow))
+            await db_sess.execute(sa.delete(ProjectResourcePolicyRow))
+            await db_sess.execute(sa.delete(UserResourcePolicyRow))
+            await db_sess.execute(sa.delete(DomainRow))
 
     @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        cleanup_tracker: _CleanupTracker,
     ) -> AsyncGenerator[str, None]:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -156,14 +113,12 @@ class TestVfolderRepository:
             db_sess.add(domain)
             await db_sess.flush()
 
-        cleanup_tracker.domain_names.append(domain_name)
         yield domain_name
 
     @pytest.fixture
     async def test_user_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        cleanup_tracker: _CleanupTracker,
     ) -> AsyncGenerator[str, None]:
         """Create test user resource policy and return policy name"""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
@@ -179,14 +134,12 @@ class TestVfolderRepository:
             db_sess.add(user_policy)
             await db_sess.flush()
 
-        cleanup_tracker.user_policy_names.append(policy_name)
         yield policy_name
 
     @pytest.fixture
     async def test_project_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        cleanup_tracker: _CleanupTracker,
     ) -> AsyncGenerator[str, None]:
         """Create test project resource policy and return policy name"""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
@@ -201,14 +154,12 @@ class TestVfolderRepository:
             db_sess.add(project_policy)
             await db_sess.flush()
 
-        cleanup_tracker.project_policy_names.append(policy_name)
         yield policy_name
 
     @pytest.fixture
     async def test_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        cleanup_tracker: _CleanupTracker,
         test_domain_name: str,
         test_user_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
@@ -238,14 +189,12 @@ class TestVfolderRepository:
             db_sess.add(user)
             await db_sess.flush()
 
-        cleanup_tracker.user_ids.append(user_uuid)
         yield user_uuid
 
     @pytest.fixture
     async def test_model_store_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        cleanup_tracker: _CleanupTracker,
         test_domain_name: str,
         test_project_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
@@ -267,7 +216,6 @@ class TestVfolderRepository:
             db_sess.add(group)
             await db_sess.flush()
 
-        cleanup_tracker.group_ids.append(group_uuid)
         yield group_uuid
 
     @pytest.fixture
