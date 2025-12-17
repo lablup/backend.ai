@@ -10,10 +10,9 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.manager.data.artifact_registries.types import (
-    ArtifactRegistryData,
-    ArtifactRegistryListResult,
+from ai.backend.manager.data.reservoir_registry.types import (
+    ReservoirRegistryData,
+    ReservoirRegistryListResult,
 )
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
@@ -21,8 +20,8 @@ from ai.backend.manager.repositories.huggingface_registry.repository import Hugg
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
-from ai.backend.manager.services.artifact_registry.actions.common.search import (
-    SearchArtifactRegistriesAction,
+from ai.backend.manager.services.artifact_registry.actions.reservoir.search import (
+    SearchReservoirRegistriesAction,
 )
 from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
 
@@ -48,25 +47,27 @@ class TestReservoirRegistryService:
         )
 
     @pytest.fixture
-    def sample_registry_data(self) -> ArtifactRegistryData:
-        """Create sample artifact registry data"""
-        return ArtifactRegistryData(
+    def sample_reservoir_data(self) -> ReservoirRegistryData:
+        """Create sample reservoir registry data"""
+        return ReservoirRegistryData(
             id=uuid4(),
-            registry_id=uuid4(),
-            name="test-huggingface-registry",
-            type=ArtifactRegistryType.HUGGINGFACE,
+            name="test-reservoir-registry",
+            endpoint="https://reservoir.example.com",
+            access_key="test-access-key",
+            secret_key="test-secret-key",
+            api_version="v1",
         )
 
-    async def test_search_artifact_registries(
+    async def test_search_reservoir_registries(
         self,
         artifact_registry_service: ArtifactRegistryService,
-        mock_artifact_registry_repository: MagicMock,
-        sample_registry_data: ArtifactRegistryData,
+        mock_reservoir_repository: MagicMock,
+        sample_reservoir_data: ReservoirRegistryData,
     ) -> None:
-        """Test searching artifact registries with querier"""
-        mock_artifact_registry_repository.search_artifact_registries = AsyncMock(
-            return_value=ArtifactRegistryListResult(
-                items=[sample_registry_data],
+        """Test searching reservoir registries with querier"""
+        mock_reservoir_repository.search_registries = AsyncMock(
+            return_value=ReservoirRegistryListResult(
+                items=[sample_reservoir_data],
                 total_count=1,
                 has_next_page=False,
                 has_previous_page=False,
@@ -78,25 +79,23 @@ class TestReservoirRegistryService:
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactRegistriesAction(querier=querier)
-        result = await artifact_registry_service.search_artifact_registries(action)
+        action = SearchReservoirRegistriesAction(querier=querier)
+        result = await artifact_registry_service.search_reservoir_registries(action)
 
-        assert result.registries == [sample_registry_data]
+        assert result.registries == [sample_reservoir_data]
         assert result.total_count == 1
         assert result.has_next_page is False
         assert result.has_previous_page is False
-        mock_artifact_registry_repository.search_artifact_registries.assert_called_once_with(
-            querier=querier
-        )
+        mock_reservoir_repository.search_registries.assert_called_once_with(querier=querier)
 
-    async def test_search_artifact_registries_empty_result(
+    async def test_search_reservoir_registries_empty_result(
         self,
         artifact_registry_service: ArtifactRegistryService,
-        mock_artifact_registry_repository: MagicMock,
+        mock_reservoir_repository: MagicMock,
     ) -> None:
-        """Test searching artifact registries when no results are found"""
-        mock_artifact_registry_repository.search_artifact_registries = AsyncMock(
-            return_value=ArtifactRegistryListResult(
+        """Test searching reservoir registries when no results are found"""
+        mock_reservoir_repository.search_registries = AsyncMock(
+            return_value=ReservoirRegistryListResult(
                 items=[],
                 total_count=0,
                 has_next_page=False,
@@ -109,22 +108,22 @@ class TestReservoirRegistryService:
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactRegistriesAction(querier=querier)
-        result = await artifact_registry_service.search_artifact_registries(action)
+        action = SearchReservoirRegistriesAction(querier=querier)
+        result = await artifact_registry_service.search_reservoir_registries(action)
 
         assert result.registries == []
         assert result.total_count == 0
 
-    async def test_search_artifact_registries_with_pagination(
+    async def test_search_reservoir_registries_with_pagination(
         self,
         artifact_registry_service: ArtifactRegistryService,
-        mock_artifact_registry_repository: MagicMock,
-        sample_registry_data: ArtifactRegistryData,
+        mock_reservoir_repository: MagicMock,
+        sample_reservoir_data: ReservoirRegistryData,
     ) -> None:
-        """Test searching artifact registries with pagination"""
-        mock_artifact_registry_repository.search_artifact_registries = AsyncMock(
-            return_value=ArtifactRegistryListResult(
-                items=[sample_registry_data],
+        """Test searching reservoir registries with pagination"""
+        mock_reservoir_repository.search_registries = AsyncMock(
+            return_value=ReservoirRegistryListResult(
+                items=[sample_reservoir_data],
                 total_count=25,
                 has_next_page=True,
                 has_previous_page=True,
@@ -136,8 +135,8 @@ class TestReservoirRegistryService:
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactRegistriesAction(querier=querier)
-        result = await artifact_registry_service.search_artifact_registries(action)
+        action = SearchReservoirRegistriesAction(querier=querier)
+        result = await artifact_registry_service.search_reservoir_registries(action)
 
         assert result.total_count == 25
         assert result.has_next_page is True
