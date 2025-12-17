@@ -3,40 +3,23 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from .id import ObjectId, ScopeId
 from .object_permission import (
     ObjectPermissionCreateInput,
-    ObjectPermissionCreateInputBeforeRoleCreation,
     ObjectPermissionData,
 )
 from .permission import ScopedPermissionCreateInput
 from .permission_group import (
-    PermissionGroupCreatorBeforeRoleCreation,
     PermissionGroupExtendedData,
 )
 from .status import RoleStatus
 from .types import EntityType, OperationType, RoleSource
 
-
-@dataclass(frozen=True)
-class RoleCreateInput:
-    name: str
-    source: RoleSource = RoleSource.CUSTOM
-    status: RoleStatus = RoleStatus.ACTIVE
-    description: Optional[str] = None
-
-    permission_groups: list[PermissionGroupCreatorBeforeRoleCreation] = field(default_factory=list)
-    object_permissions: list[ObjectPermissionCreateInputBeforeRoleCreation] = field(
-        default_factory=list
-    )
-
-
-@dataclass(frozen=True)
-class RoleDeleteInput:
-    id: uuid.UUID
-    _status: RoleStatus = RoleStatus.DELETED
+if TYPE_CHECKING:
+    from .object_permission import ObjectPermissionCreateInput
+    from .permission import ScopedPermissionCreateInput
 
 
 @dataclass(frozen=True)
