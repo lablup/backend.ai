@@ -47,6 +47,10 @@ from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.deployment import DefinitionFileNotFound
 from ai.backend.manager.errors.service import EndpointNotFound
+from ai.backend.manager.models.deployment_auto_scaling_policy import (
+    DeploymentAutoScalingPolicyData,
+    DeploymentAutoScalingPolicyRow,
+)
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointStatistics
 from ai.backend.manager.models.kernel import KernelStatistics
@@ -54,6 +58,7 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
 from ai.backend.manager.repositories.base import BatchQuerier, Creator
+from ai.backend.manager.repositories.base.purger import Purger, PurgerResult
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
@@ -940,3 +945,49 @@ class DeploymentRepository:
     ) -> None:
         """Update an endpoint using the provided updater spec."""
         await self._db_source.update_endpoint(updater)
+
+    # ========== Deployment Auto-Scaling Policy Operations ==========
+
+    @deployment_repository_resilience.apply()
+    async def create_auto_scaling_policy(
+        self,
+        creator: Creator[DeploymentAutoScalingPolicyRow],
+    ) -> DeploymentAutoScalingPolicyData:
+        """Create a new auto-scaling policy for an endpoint."""
+        return await self._db_source.create_auto_scaling_policy(creator)
+
+    @deployment_repository_resilience.apply()
+    async def get_auto_scaling_policy(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> DeploymentAutoScalingPolicyData:
+        """Get the auto-scaling policy for an endpoint.
+
+        Raises:
+            AutoScalingPolicyNotFound: If no policy exists for the endpoint.
+        """
+        return await self._db_source.get_auto_scaling_policy(endpoint_id)
+
+    @deployment_repository_resilience.apply()
+    async def update_auto_scaling_policy(
+        self,
+        updater: Updater[DeploymentAutoScalingPolicyRow],
+    ) -> DeploymentAutoScalingPolicyData:
+        """Update an auto-scaling policy.
+
+        Raises:
+            AutoScalingPolicyNotFound: If the policy does not exist.
+        """
+        return await self._db_source.update_auto_scaling_policy(updater)
+
+    @deployment_repository_resilience.apply()
+    async def delete_auto_scaling_policy(
+        self,
+        purger: Purger[DeploymentAutoScalingPolicyRow],
+    ) -> PurgerResult[DeploymentAutoScalingPolicyRow] | None:
+        """Delete an auto-scaling policy by primary key.
+
+        Returns:
+            PurgerResult containing the deleted row, or None if no policy existed.
+        """
+        return await self._db_source.delete_auto_scaling_policy(purger)
