@@ -15,6 +15,10 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_multi impo
     GetArtifactRegistryMetasAction,
     GetArtifactRegistryMetasActionResult,
 )
+from ai.backend.manager.services.artifact_registry.actions.common.search import (
+    SearchArtifactRegistriesAction,
+    SearchArtifactRegistriesActionResult,
+)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
     CreateHuggingFaceRegistryActionResult,
@@ -240,3 +244,18 @@ class ArtifactRegistryService:
             action.registry_ids
         )
         return GetArtifactRegistryMetasActionResult(result=registry_metas)
+
+    async def search_artifact_registries(
+        self, action: SearchArtifactRegistriesAction
+    ) -> SearchArtifactRegistriesActionResult:
+        """Searches artifact registries."""
+        result = await self._artifact_registry_repository.search_artifact_registries(
+            querier=action.querier,
+        )
+
+        return SearchArtifactRegistriesActionResult(
+            registries=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
