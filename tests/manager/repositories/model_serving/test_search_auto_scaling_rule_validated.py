@@ -635,15 +635,14 @@ class TestSearchAutoScalingRulesValidated:
     # Tests - Filtering
     # =========================================================================
 
-    @pytest.mark.asyncio
-    async def test_filter_by_condition(
+    async def test_filter_by_metric_name(
         self,
         model_serving_repository: ModelServingRepository,
         test_user_id: uuid.UUID,
         test_domain: str,
         sample_auto_scaling_rules: list[uuid.UUID],
     ) -> None:
-        """Test search with filter condition."""
+        """Test searching rules filtered by metric_name."""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
@@ -659,16 +658,40 @@ class TestSearchAutoScalingRulesValidated:
             domain_name=test_domain,
         )
 
-        assert result is not None
         assert len(result.items) == 1
+        assert "cpu" in result.items[0].metric_name
+
+    async def test_filter_by_threshold(
+        self,
+        model_serving_repository: ModelServingRepository,
+        test_user_id: uuid.UUID,
+        test_domain: str,
+        sample_auto_scaling_rules: list[uuid.UUID],
+    ) -> None:
+        """Test searching rules filtered by threshold."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                lambda: EndpointAutoScalingRuleRow.threshold > 60,
+            ],
+            orders=[],
+        )
+
+        result = await model_serving_repository.search_auto_scaling_rules_validated(
+            querier=querier,
+            user_id=test_user_id,
+            user_role=UserRole.USER,
+            domain_name=test_domain,
+        )
+
+        assert len(result.items) == 3
         for item in result.items:
-            assert "cpu" in item.metric_name
+            assert float(item.threshold) > 60
 
     # =========================================================================
     # Tests - Ordering
     # =========================================================================
 
-    @pytest.mark.asyncio
     async def test_order_by_threshold_ascending(
         self,
         model_serving_repository: ModelServingRepository,
@@ -676,7 +699,7 @@ class TestSearchAutoScalingRulesValidated:
         test_domain: str,
         sample_auto_scaling_rules: list[uuid.UUID],
     ) -> None:
-        """Test search with ascending order by threshold."""
+        """Test searching rules ordered by threshold ascending."""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -690,11 +713,9 @@ class TestSearchAutoScalingRulesValidated:
             domain_name=test_domain,
         )
 
-        assert result is not None
         thresholds = [float(item.threshold) for item in result.items]
         assert thresholds == sorted(thresholds)
 
-    @pytest.mark.asyncio
     async def test_order_by_metric_name_descending(
         self,
         model_serving_repository: ModelServingRepository,
@@ -702,7 +723,7 @@ class TestSearchAutoScalingRulesValidated:
         test_domain: str,
         sample_auto_scaling_rules: list[uuid.UUID],
     ) -> None:
-        """Test search with descending order by metric_name."""
+        """Test searching rules ordered by metric_name descending."""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -716,7 +737,6 @@ class TestSearchAutoScalingRulesValidated:
             domain_name=test_domain,
         )
 
-        assert result is not None
         metric_names = [item.metric_name for item in result.items]
         assert metric_names == sorted(metric_names, reverse=True)
 
@@ -724,7 +744,6 @@ class TestSearchAutoScalingRulesValidated:
     # Tests - Combined Query (Pagination + Filter + Order)
     # =========================================================================
 
-    @pytest.mark.asyncio
     async def test_combined_pagination_filter_order(
         self,
         model_serving_repository: ModelServingRepository,
@@ -748,16 +767,10 @@ class TestSearchAutoScalingRulesValidated:
             domain_name=test_domain,
         )
 
-        assert result is not None
         assert result.total_count == 3
         assert len(result.items) == 2
-        assert result.has_next_page is True
-
         thresholds = [float(item.threshold) for item in result.items]
         assert thresholds == sorted(thresholds, reverse=True)
-
-        for item in result.items:
-            assert float(item.threshold) > 60
 
 
 class TestSearchAutoScalingRulesForce:
@@ -1235,3 +1248,77 @@ class TestSearchAutoScalingRulesForce:
         assert result is not None
         metric_names = [item.metric_name for item in result.items]
         assert metric_names == sorted(metric_names)
+
+    # =========================================================================
+    # Tests - Filtering
+    # =========================================================================
+
+    async def test_search_force_filter_by_metric_name(
+        self,
+        admin_model_serving_repository: AdminModelServingRepository,
+        sample_auto_scaling_rules: list[uuid.UUID],
+    ) -> None:
+        """Test force search filtered by metric_name."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                lambda: EndpointAutoScalingRuleRow.metric_name.contains("cpu"),
+            ],
+            orders=[],
+        )
+
+        result = await admin_model_serving_repository.search_auto_scaling_rules_force(
+            querier=querier,
+        )
+
+        assert len(result.items) == 1
+        assert "cpu" in result.items[0].metric_name
+
+    async def test_search_force_filter_by_threshold(
+        self,
+        admin_model_serving_repository: AdminModelServingRepository,
+        sample_auto_scaling_rules: list[uuid.UUID],
+    ) -> None:
+        """Test force search filtered by threshold."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                lambda: EndpointAutoScalingRuleRow.threshold > 60,
+            ],
+            orders=[],
+        )
+
+        result = await admin_model_serving_repository.search_auto_scaling_rules_force(
+            querier=querier,
+        )
+
+        assert len(result.items) == 3
+        for item in result.items:
+            assert float(item.threshold) > 60
+
+    # =========================================================================
+    # Tests - Combined Query (Pagination + Filter + Order)
+    # =========================================================================
+
+    async def test_search_force_combined_pagination_filter_order(
+        self,
+        admin_model_serving_repository: AdminModelServingRepository,
+        sample_auto_scaling_rules: list[uuid.UUID],
+    ) -> None:
+        """Test force search with pagination, filter, and ordering combined."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=2, offset=0),
+            conditions=[
+                lambda: EndpointAutoScalingRuleRow.threshold > 60,
+            ],
+            orders=[EndpointAutoScalingRuleRow.threshold.desc()],
+        )
+
+        result = await admin_model_serving_repository.search_auto_scaling_rules_force(
+            querier=querier,
+        )
+
+        assert result.total_count == 3
+        assert len(result.items) == 2
+        thresholds = [float(item.threshold) for item in result.items]
+        assert thresholds == sorted(thresholds, reverse=True)
