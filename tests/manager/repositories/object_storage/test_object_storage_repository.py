@@ -185,7 +185,7 @@ class TestObjectStorageRepository:
         """Test listing all Object storages"""
         storages = await object_storage_repository.list_object_storages()
 
-        assert len(storages) >= 4
+        assert len(storages) == 4
         storage_ids = [s.id for s in storages]
         for expected_id in sample_storages_for_ordering:
             assert expected_id in storage_ids
@@ -203,6 +203,7 @@ class TestObjectStorageRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: ObjectStorageRow.name.like("object-storage-%"),
             ],
             orders=[],
@@ -222,6 +223,7 @@ class TestObjectStorageRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: ObjectStorageRow.name.like("object-storage-%"),
             ],
             orders=[],
@@ -241,6 +243,7 @@ class TestObjectStorageRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=20),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: ObjectStorageRow.name.like("object-storage-%"),
             ],
             orders=[],
@@ -264,6 +267,7 @@ class TestObjectStorageRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: ObjectStorageRow.name.in_([
                     "alpha-storage",
                     "beta-storage",
@@ -288,6 +292,7 @@ class TestObjectStorageRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: ObjectStorageRow.name.in_([
                     "alpha-storage",
                     "beta-storage",
@@ -316,6 +321,7 @@ class TestObjectStorageRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=5, offset=5),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: ObjectStorageRow.name.like("object-storage-%"),
             ],
             orders=[ObjectStorageRow.name.asc()],
