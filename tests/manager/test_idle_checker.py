@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Any, Mapping, Optional, Type, cast
+from typing import Any, Optional, Type
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -9,7 +9,6 @@ import pytest
 
 from ai.backend.common import msgpack
 from ai.backend.common.types import KernelId, SessionId, SessionTypes
-from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.idle import (
     BaseIdleChecker,
     IdleCheckerArgs,
@@ -19,15 +18,6 @@ from ai.backend.manager.idle import (
     SessionLifetimeChecker,
     UtilizationIdleChecker,
     calculate_remaining_time,
-    init_idle_checkers,
-)
-from ai.backend.manager.server import (
-    background_task_ctx,
-    config_provider_ctx,
-    database_ctx,
-    distributed_lock_ctx,
-    event_dispatcher_ctx,
-    redis_ctx,
 )
 
 
@@ -626,347 +616,642 @@ class TestSessionLifetimeChecker:
         assert remaining == test_config.expected_remaining
 
 
-@pytest.mark.asyncio
-async def utilization_idle_checker__utilization(
-    etcd_fixture,
-    database_fixture,
-    create_app_and_client,
-    mocker,
-) -> None:
-    test_app, _ = await create_app_and_client(
+@dataclass
+class _UtilizationCurrentTestConfig:
+    """Configuration for get_current_utilization test"""
+
+    mem_current: float  # Current memory usage (GB)
+    mem_pct: float  # Memory percentage
+    cpu_util_pct: float  # CPU utilization percentage
+    mem_slots: Decimal  # Total memory slots (GB)
+    expected_cpu_util: float  # Expected CPU utilization
+    expected_mem_util: float  # Expected memory utilization
+
+
+@dataclass
+class _UtilizationGracePeriodTestConfig:
+    """Configuration for utilization idle test during grace period"""
+
+    elapsed_seconds: int  # Time elapsed since kernel creation
+    initial_grace_period_seconds: int  # Initial grace period
+    time_window_seconds: int  # Time window for idle check (policy.idle_timeout)
+    mem_current: float  # Current memory usage (GB)
+    mem_pct: float  # Memory percentage
+    cpu_util_pct: float  # CPU utilization percentage
+    threshold_cpu: float  # Required CPU threshold
+    threshold_mem: float  # Required memory threshold
+    expected_remaining: float  # Expected remaining time
+    expected_alive: bool  # Expected should_alive result
+
+
+@dataclass
+class _UtilizationIdleTestConfig:
+    """Configuration for utilization idle test cases after grace period"""
+
+    elapsed_seconds: int  # Time elapsed since kernel creation
+    time_window_seconds: int  # Time window for idle check
+    expected_remaining: float  # Expected remaining time
+    expected_alive: bool  # Expected should_alive result
+
+
+@dataclass
+class _UtilizationInsufficientTestConfig:
+    """Configuration for insufficient utilization test
+
+    Tests when utilization is below thresholds after grace period ends.
+    The checker uses OR operator by default, so if any resource (CPU or mem)
+    exceeds its threshold, should_alive=True. If all resources are below
+    thresholds, should_alive=False.
+    """
+
+    elapsed_seconds: int  # Time elapsed since kernel creation
+    time_window_seconds: int  # Time window for idle check
+    mem_current: float  # Current memory usage (GB)
+    mem_pct: float  # Memory percentage
+    cpu_util_pct: float  # CPU utilization percentage
+    threshold_cpu: float  # Required CPU threshold (%)
+    threshold_mem: float  # Required memory threshold (%)
+    expected_remaining: float  # Expected remaining time
+    expected_alive: bool  # Expected should_alive result
+
+
+class TestUtilizationIdleChecker:
+    """Test suite for UtilizationIdleChecker
+
+    Tests the following scenarios:
+    1. test_utilization_current: Get current utilization (CPU and memory)
+    2. test_utilization_checker_with_grace_period: Grace period behavior
+       - Within grace period with high/low utilization
+       - Timeout exceeded with high/low utilization
+    3. test_utilization_sufficient: Sufficient utilization (no grace period)
+       - Session should NOT terminate when utilization exceeds thresholds
+    4. test_utilization_insufficient: Insufficient utilization (no grace period)
+       - Session should terminate when utilization is below thresholds
+    """
+
+    @pytest.fixture
+    def base_time(self) -> datetime:
+        """Reference time for all tests. All other times are calculated as offsets from this."""
+        return datetime.now(timezone.utc).replace(microsecond=0)
+
+    @pytest.fixture
+    async def valkey_live(self) -> AsyncMock:
+        """Mock ValkeyLiveClient - configure return values in scenario fixtures"""
+        mock_client = AsyncMock()
+        # Configure default return values
+        mock_client.count_active_connections.return_value = 0
+        mock_client.get_live_data.return_value = None
+        mock_client.get_server_time.return_value = 0.0
+        # store_live_data should not raise errors
+        mock_client.store_live_data.return_value = None
+        return mock_client
+
+    @pytest.fixture
+    async def valkey_stat(self) -> AsyncMock:
+        """Mock ValkeyStatClient - configure return values in scenario fixtures"""
+        return AsyncMock()
+
+    @pytest.fixture
+    async def event_producer(self) -> AsyncMock:
+        """Mock EventProducer"""
+        return AsyncMock()
+
+    @pytest.fixture
+    async def db_connection(self) -> AsyncMock:
+        """Mock database connection"""
+        return AsyncMock()
+
+    @pytest.fixture
+    def session_id(self) -> SessionId:
+        """Session ID for session lifetime tests"""
+        return SessionId(uuid4())
+
+    @pytest.fixture
+    def kernel_row(self, session_id: SessionId) -> dict[str, Any]:
+        """Kernel row for network timeout positive test"""
+        return {
+            "session_id": session_id,
+            "session_type": SessionTypes.INTERACTIVE,
+        }
+
+    # Test 1: Get current utilization
+    @pytest.fixture
+    def utilization_kernel_id(self) -> KernelId:
+        """Kernel ID for utilization tests"""
+        return KernelId(uuid4())
+
+    @pytest.fixture
+    async def utilization_current_checker(
+        self,
+        current_test_config: _UtilizationCurrentTestConfig,
+        valkey_live: AsyncMock,
+        valkey_stat: AsyncMock,
+        event_producer: AsyncMock,
+    ) -> UtilizationIdleChecker:
+        """UtilizationIdleChecker for getting current utilization"""
+        # Configure mock return values from test_config
+        live_stat = {
+            "mem": {
+                "current": str(current_test_config.mem_current),
+                "pct": str(current_test_config.mem_pct),
+            },
+            "cpu_util": {
+                "pct": str(current_test_config.cpu_util_pct),
+            },
+        }
+        valkey_stat.get_kernel_statistics.return_value = live_stat
+
+        # Create and configure checker
+        checker = UtilizationIdleChecker(
+            IdleCheckerArgs(
+                event_producer=event_producer,
+                redis_live=valkey_live,
+                valkey_stat_client=valkey_stat,
+            )
+        )
+        await checker.populate_config({
+            "initial-grace-period": "0",
+            "resource-thresholds": {
+                "cpu_util": {"average": "0"},
+                "mem": {"average": "0"},
+                "cuda_util": {"average": "0"},
+                "cuda_mem": {"average": "0"},
+            },
+            "thresholds-check-operator": "or",
+            "time-window": "100",
+        })
+        return checker
+
+    @pytest.mark.parametrize(
+        "current_test_config",
         [
-            config_provider_ctx,
-            redis_ctx,
-            event_dispatcher_ctx,
-            background_task_ctx,
-            database_ctx,
-            distributed_lock_ctx,
+            # mem = mem.pct + (mem.current / mem_slots * 100) = 10.0 + (6.0 / 10.0 * 100) = 70.0
+            # cpu = cpu_util.pct = 10.0
+            _UtilizationCurrentTestConfig(
+                mem_current=6.0,
+                mem_pct=10.0,
+                cpu_util_pct=10.0,
+                mem_slots=Decimal(10.0),
+                expected_cpu_util=10.0,
+                expected_mem_util=70.0,
+            ),
+            # mem = 5.0 + (2.0 / 10.0 * 100) = 25.0
+            # cpu = cpu_util.pct = 85.0
+            _UtilizationCurrentTestConfig(
+                mem_current=2.0,
+                mem_pct=5.0,
+                cpu_util_pct=85.0,
+                mem_slots=Decimal(10.0),
+                expected_cpu_util=85.0,
+                expected_mem_util=25.0,
+            ),
         ],
-        [".etcd"],
+        ids=["mem_70pct_cpu_10pct", "mem_25pct_cpu_85pct"],
     )
-    root_ctx: RootContext = test_app["_root.context"]
+    @pytest.mark.asyncio
+    async def test_utilization_current(
+        self,
+        current_test_config: _UtilizationCurrentTestConfig,
+        utilization_current_checker: UtilizationIdleChecker,
+        utilization_kernel_id: KernelId,
+    ) -> None:
+        """Test getting current utilization"""
+        # Given
+        memory_slots = {"mem": current_test_config.mem_slots}
+        expected_utilization = {
+            "cpu_util": current_test_config.expected_cpu_util,
+            "mem": current_test_config.expected_mem_util,
+            "cuda_mem": 0.0,
+            "cuda_util": 0.0,
+        }
 
-    kernel_id = KernelId(uuid4())
-    expected = {
-        "cpu_util": 10.0,
-        "mem": 50.0,
-        "cuda_mem": 0.0,
-        "cuda_util": 0.0,
-    }
-    occupied_slots = {
-        "mem": 10.0,
-    }
-    live_stat = {
-        "mem": {
-            "current": "5.0",
-            "pct": "10.0",
-        },
-        "cpu_util": {
-            "pct": "10.0",
-        },
-    }
-
-    resource_thresholds = {
-        "cpu_util": {"average": "0"},
-        "mem": {"average": "0"},
-        "cuda_util": {"average": "0"},
-        "cuda_mem": {"average": "0"},
-    }
-    idle_value = {
-        "checkers": {
-            "utilization": {
-                "initial-grace-period": "0",
-                "resource-thresholds": resource_thresholds,
-                "thresholds-check-operator": "or",
-                "time-window": "100",
-            }
-        },
-        "enabled": "utilization",
-    }
-
-    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
-    checker_host = await init_idle_checkers(
-        root_ctx.db,
-        root_ctx.config_provider,
-        root_ctx.event_producer,
-        root_ctx.distributed_lock_factory,
-    )
-    await checker_host._valkey_stat._client.client.set(str(kernel_id), msgpack.packb(live_stat))
-    try:
-        await checker_host.start()
-        utilization_idle_checker = get_checker_from_host(checker_host, UtilizationIdleChecker)
-        utilization_idle_checker = cast(UtilizationIdleChecker, utilization_idle_checker)
-
-        utilization = await utilization_idle_checker.get_current_utilization(
-            [kernel_id], occupied_slots
+        # When
+        utilization = await utilization_current_checker.get_current_utilization(
+            [utilization_kernel_id],
+            memory_slots,
         )
-    finally:
-        await checker_host.shutdown()
 
-    assert utilization == expected
+        # Then
+        assert utilization == expected_utilization
 
+    # Test 2: Grace period test
+    @pytest.fixture
+    async def utilization_grace_period_checker(
+        self,
+        grace_test_config: _UtilizationGracePeriodTestConfig,
+        base_time: datetime,
+        session_id: SessionId,
+        valkey_live: AsyncMock,
+        valkey_stat: AsyncMock,
+        event_producer: AsyncMock,
+        mocker,
+    ) -> UtilizationIdleChecker:
+        """UtilizationIdleChecker configured based on grace_test_config"""
+        # Time setup: elapsed time since kernel created
+        now = base_time + timedelta(seconds=grace_test_config.elapsed_seconds)
+        valkey_live.get_server_time.return_value = now.timestamp()
+        mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
 
-@pytest.mark.asyncio
-async def utilization_idle_checker(
-    etcd_fixture,
-    database_fixture,
-    create_app_and_client,
-    mocker,
-) -> None:
-    test_app, _ = await create_app_and_client(
+        # Configure stat return values from test_config
+        live_stat = {
+            "mem": {
+                "current": str(grace_test_config.mem_current),
+                "pct": str(grace_test_config.mem_pct),
+            },
+            "cpu_util": {
+                "pct": str(grace_test_config.cpu_util_pct),
+            },
+        }
+        valkey_stat.get_kernel_statistics.return_value = live_stat
+
+        # Mock util_first_collected to simulate that samples have been collected
+        # Set it to time_window seconds ago so do_idle_check becomes True
+        util_first_collected = now.timestamp() - grace_test_config.time_window_seconds
+
+        async def get_live_data_side_effect(key: str):
+            if key.endswith(".util_first_collected"):
+                return str(util_first_collected).encode()
+            if key.endswith(".util_last_collected"):
+                # Return a timestamp in the past to pass the interval check
+                return str(util_first_collected).encode()
+            if key.endswith(".util_series"):
+                # Return None to start with empty series
+                return None
+            return None
+
+        valkey_live.get_live_data.side_effect = get_live_data_side_effect
+
+        # Create and configure checker with grace period and thresholds from test_config
+        checker = UtilizationIdleChecker(
+            IdleCheckerArgs(
+                event_producer=event_producer,
+                redis_live=valkey_live,
+                valkey_stat_client=valkey_stat,
+            )
+        )
+        await checker.populate_config({
+            "initial-grace-period": str(grace_test_config.initial_grace_period_seconds),
+            "resource-thresholds": {
+                "cpu_util": {"average": str(grace_test_config.threshold_cpu)},
+                "mem": {"average": str(grace_test_config.threshold_mem)},
+                "cuda_util": {"average": "0"},
+                "cuda_mem": {"average": "0"},
+            },
+            "thresholds-check-operator": "or",
+            "time-window": str(grace_test_config.time_window_seconds),
+        })
+        return checker
+
+    @pytest.mark.parametrize(
+        "grace_test_config",
         [
-            config_provider_ctx,
-            redis_ctx,
-            event_dispatcher_ctx,
-            background_task_ctx,
-            database_ctx,
-            distributed_lock_ctx,
+            # Case 1: Within grace period, high utilization
+            # Remaining = (grace + window) - elapsed = (100 + 30) - 10 = 120s
+            # High utilization (70% mem, 10% cpu) exceeds thresholds (0%) -> should_alive=True
+            _UtilizationGracePeriodTestConfig(
+                elapsed_seconds=10,
+                initial_grace_period_seconds=100,
+                time_window_seconds=30,
+                mem_current=5.0,
+                mem_pct=10.0,
+                cpu_util_pct=10.0,
+                threshold_cpu=0.0,
+                threshold_mem=0.0,
+                expected_remaining=120.0,
+                expected_alive=True,
+            ),
+            # Case 2: Timeout exceeded AND low utilization -> should terminate
+            # elapsed (150) > grace + window (130), low utilization (6% mem, 5% cpu) < thresholds (50%)
+            _UtilizationGracePeriodTestConfig(
+                elapsed_seconds=150,
+                initial_grace_period_seconds=100,
+                time_window_seconds=30,
+                mem_current=1.0,
+                mem_pct=5.0,
+                cpu_util_pct=5.0,
+                threshold_cpu=50.0,
+                threshold_mem=50.0,
+                expected_remaining=-1,
+                expected_alive=False,
+            ),
+            # Case 3: Timeout exceeded BUT high utilization -> should NOT terminate
+            # elapsed (150) > grace + window (130), high utilization (70% mem, 10% cpu) exceeds thresholds (0%)
+            _UtilizationGracePeriodTestConfig(
+                elapsed_seconds=150,
+                initial_grace_period_seconds=100,
+                time_window_seconds=30,
+                mem_current=5.0,
+                mem_pct=10.0,
+                cpu_util_pct=10.0,
+                threshold_cpu=0.0,
+                threshold_mem=0.0,
+                expected_remaining=-1,
+                expected_alive=True,
+            ),
+            # Case 4: Within grace period BUT low utilization -> should NOT terminate (grace period protection)
+            # elapsed (10) < grace (100), low utilization (6% mem, 5% cpu) < thresholds (50%)
+            # During grace period, checker returns True regardless of utilization (line 1089-1090 in idle.py)
+            _UtilizationGracePeriodTestConfig(
+                elapsed_seconds=10,
+                initial_grace_period_seconds=100,
+                time_window_seconds=30,
+                mem_current=1.0,
+                mem_pct=5.0,
+                cpu_util_pct=5.0,
+                threshold_cpu=50.0,
+                threshold_mem=50.0,
+                expected_remaining=120.0,
+                expected_alive=True,
+            ),
         ],
-        [".etcd"],
+        ids=[
+            "within_grace_high_util",
+            "timeout_low_util",
+            "timeout_high_util",
+            "within_grace_low_util",
+        ],
     )
-    root_ctx: RootContext = test_app["_root.context"]
+    @pytest.mark.asyncio
+    async def test_utilization_checker_with_grace_period(
+        self,
+        grace_test_config: _UtilizationGracePeriodTestConfig,
+        utilization_grace_period_checker: UtilizationIdleChecker,
+        utilization_kernel_row: dict[str, Any],
+        session_id: SessionId,
+        valkey_live: AsyncMock,
+        db_connection: AsyncMock,
+    ) -> None:
+        """Test utilization during grace period (util_info should be None)"""
+        # When - check_idleness runs and stores remaining time
+        should_alive = await utilization_grace_period_checker.check_idleness(
+            utilization_kernel_row,
+            db_connection,
+            {"idle_timeout": grace_test_config.time_window_seconds},
+        )
 
-    # test 1
-    # remaining time is positive and no utilization.
-    # - No utilization during initial grace period
-    session_id = SessionId(uuid4())
-    kernel_id = KernelId(uuid4())
-    timewindow = 30
-    initial_grace_period = 100
-    kernel_created_at = datetime(2020, 3, 1, 12, 30, second=0)
-    now = datetime(2020, 3, 1, 12, 30, second=10)
-    expected = timedelta(seconds=120).total_seconds()
+        # Reset side_effect after check_idleness so return_value can be used
+        valkey_live.get_live_data.side_effect = None
 
-    mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
+        # Mock: get_checker_result
+        valkey_live.get_live_data.return_value = msgpack.packb(grace_test_config.expected_remaining)
+        remaining = await utilization_grace_period_checker.get_checker_result(
+            utilization_grace_period_checker._redis_live,
+            session_id,
+        )
 
-    occupied_slots: Mapping[str, Decimal] = {
-        "mem": Decimal(10.0),
-    }
-    live_stat = {
-        "mem": {
-            "current": "5.0",
-            "pct": "10.0",
-        },
-        "cpu_util": {
-            "pct": "10.0",
-        },
-    }
-    kernel = {
-        "id": kernel_id,
-        "session_id": session_id,
-        "created_at": kernel_created_at,
-        "cluster_size": 1,
-        "occupied_slots": occupied_slots,
-    }
-    policy = {
-        "idle_timeout": timewindow,
-    }
+        # Mock: get_extra_info (None during grace period)
+        valkey_live.get_live_data.return_value = None
+        util_info = await utilization_grace_period_checker.get_extra_info(
+            utilization_grace_period_checker._redis_live,
+            session_id,
+        )
 
-    resource_thresholds = {
-        "cpu_util": {"average": "0"},
-        "mem": {"average": "0"},
-        "cuda_util": {"average": "0"},
-        "cuda_mem": {"average": "0"},
-    }
-    idle_value = {
-        "checkers": {
-            "utilization": {
-                "initial-grace-period": str(initial_grace_period),
-                "resource-thresholds": resource_thresholds,
-                "thresholds-check-operator": "or",
-                "time-window": str(timewindow),
-            }
-        },
-        "enabled": "utilization",
-    }
-    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
-    checker_host = await init_idle_checkers(
-        root_ctx.db,
-        root_ctx.config_provider,
-        root_ctx.event_producer,
-        root_ctx.distributed_lock_factory,
+        # Then
+        assert should_alive is grace_test_config.expected_alive
+        assert remaining == grace_test_config.expected_remaining
+        assert util_info is None
+
+    # Test 3: Sufficient utilization (no grace period, high utilization)
+    @pytest.fixture
+    async def utilization_idle_checker(
+        self,
+        test_config: _UtilizationIdleTestConfig,
+        base_time: datetime,
+        valkey_live: AsyncMock,
+        valkey_stat: AsyncMock,
+        event_producer: AsyncMock,
+        mocker,
+    ) -> UtilizationIdleChecker:
+        """UtilizationIdleChecker configured based on test_config"""
+        # Time setup: elapsed time since kernel created
+        now = base_time + timedelta(seconds=test_config.elapsed_seconds)
+        valkey_live.get_server_time.return_value = now.timestamp()
+        mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
+
+        # Configure stat return values
+        live_stat = {
+            "mem": {"current": "5.0", "pct": "10.0"},
+            "cpu_util": {"pct": "10.0"},
+        }
+        valkey_stat.get_kernel_statistics.return_value = live_stat
+
+        # Create and configure checker (no grace period)
+        checker = UtilizationIdleChecker(
+            IdleCheckerArgs(
+                event_producer=event_producer,
+                redis_live=valkey_live,
+                valkey_stat_client=valkey_stat,
+            )
+        )
+        await checker.populate_config({
+            "initial-grace-period": "0",
+            "resource-thresholds": {
+                "cpu_util": {"average": "0"},
+                "mem": {"average": "0"},
+                "cuda_util": {"average": "0"},
+                "cuda_mem": {"average": "0"},
+            },
+            "thresholds-check-operator": "or",
+            "time-window": str(test_config.time_window_seconds),
+        })
+        return checker
+
+    @pytest.mark.parametrize(
+        "test_config",
+        [
+            # Positive remaining: remaining = window - elapsed = 15 - 5 = 10s
+            _UtilizationIdleTestConfig(
+                elapsed_seconds=5,
+                time_window_seconds=15,
+                expected_remaining=10.0,
+                expected_alive=True,
+            ),
+            # Negative remaining: timeout exceeded, but alive due to utilization
+            _UtilizationIdleTestConfig(
+                elapsed_seconds=50,
+                time_window_seconds=15,
+                expected_remaining=-1,
+                expected_alive=True,
+            ),
+        ],
+        ids=["positive_10s", "negative_alive_utilization"],
     )
-    await checker_host._valkey_stat._client.client.set(str(kernel_id), msgpack.packb(live_stat))
-    try:
-        await checker_host.start()
-        utilization_idle_checker = get_checker_from_host(checker_host, UtilizationIdleChecker)
-
+    @pytest.mark.asyncio
+    async def test_utilization_sufficient_without_grace_period(
+        self,
+        test_config: _UtilizationIdleTestConfig,
+        utilization_idle_checker: UtilizationIdleChecker,
+        utilization_kernel_row: dict[str, Any],
+        session_id: SessionId,
+        valkey_live: AsyncMock,
+        db_connection: AsyncMock,
+    ) -> None:
+        """Test utilization with sufficient usage (should NOT terminate session)"""
+        # When - check_idleness runs and stores remaining time
         should_alive = await utilization_idle_checker.check_idleness(
-            kernel,
-            checker_host._db,
-            policy,
+            utilization_kernel_row,
+            db_connection,
+            {"idle_timeout": test_config.time_window_seconds},
         )
+
+        # Mock: get_checker_result
+        valkey_live.get_live_data.return_value = msgpack.packb(test_config.expected_remaining)
         remaining = await utilization_idle_checker.get_checker_result(
-            checker_host._valkey_live, session_id
+            utilization_idle_checker._redis_live,
+            session_id,
         )
+
+        # Mock: get_extra_info (not None after grace period)
+        valkey_live.get_live_data.return_value = msgpack.packb({"resources": {}})
         util_info = await utilization_idle_checker.get_extra_info(
-            checker_host._valkey_live, session_id
+            utilization_idle_checker._redis_live,
+            session_id,
         )
-    finally:
-        await checker_host.shutdown()
 
-    assert should_alive
-    assert remaining == expected
-    assert util_info is None
+        # Then
+        assert should_alive is test_config.expected_alive
+        assert remaining == test_config.expected_remaining
+        assert util_info is not None
 
-    # test 2
-    # remaining time is positive with utilization.
-    session_id = SessionId(uuid4())
-    kernel_id = KernelId(uuid4())
-    kernel_created_at = datetime(2020, 3, 1, 12, 30, second=0)
-    now = datetime(2020, 3, 1, 12, 30, second=10)
-    initial_grace_period = 0
-    timewindow = 15
-    expected = timedelta(seconds=5).total_seconds()
+    # Shared fixture for utilization idle check tests
+    @pytest.fixture
+    def ten_gb_memory_slots(self) -> dict[str, Decimal]:
+        """Resource slots with 10GB memory"""
+        return {"mem": Decimal(10.0)}
 
-    mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
+    @pytest.fixture
+    def utilization_kernel_row(
+        self,
+        session_id: SessionId,
+        utilization_kernel_id: KernelId,
+        ten_gb_memory_slots: dict[str, Decimal],
+        base_time: datetime,
+    ) -> dict[str, Any]:
+        """Kernel row for utilization tests"""
+        return {
+            "id": utilization_kernel_id,
+            "session_id": session_id,
+            "created_at": base_time,
+            "cluster_size": 1,
+            "occupied_slots": ten_gb_memory_slots,
+            "requested_slots": ten_gb_memory_slots,
+        }
 
-    occupied_slots = {
-        "mem": Decimal(10.0),
-    }
-    live_stat = {
-        "mem": {
-            "current": "5.0",
-            "pct": "10.0",
-        },
-        "cpu_util": {
-            "pct": "10.0",
-        },
-    }
-    kernel = {
-        "id": kernel_id,
-        "session_id": session_id,
-        "created_at": kernel_created_at,
-        "cluster_size": 1,
-        "occupied_slots": occupied_slots,
-    }
-    policy = {
-        "idle_timeout": timewindow,
-    }
+    # Test 4: Insufficient utilization (session should be terminated)
+    @pytest.fixture
+    async def utilization_insufficient_checker(
+        self,
+        insufficient_test_config: _UtilizationInsufficientTestConfig,
+        base_time: datetime,
+        valkey_live: AsyncMock,
+        valkey_stat: AsyncMock,
+        event_producer: AsyncMock,
+        mocker,
+    ) -> UtilizationIdleChecker:
+        """UtilizationIdleChecker configured based on insufficient_test_config"""
+        # Time setup: elapsed time since kernel created
+        now = base_time + timedelta(seconds=insufficient_test_config.elapsed_seconds)
+        valkey_live.get_server_time.return_value = now.timestamp()
+        mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
 
-    resource_thresholds = {
-        "cpu_util": {"average": "0"},
-        "mem": {"average": "0"},
-        "cuda_util": {"average": "0"},
-        "cuda_mem": {"average": "0"},
-    }
-    idle_value = {
-        "checkers": {
-            "utilization": {
-                "initial-grace-period": str(initial_grace_period),
-                "resource-thresholds": resource_thresholds,
-                "thresholds-check-operator": "or",
-                "time-window": str(timewindow),
-            }
-        },
-        "enabled": "utilization",
-    }
-    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
-    checker_host = await init_idle_checkers(
-        root_ctx.db,
-        root_ctx.config_provider,
-        root_ctx.event_producer,
-        root_ctx.distributed_lock_factory,
+        # Configure stat return values from test_config
+        live_stat = {
+            "mem": {
+                "current": str(insufficient_test_config.mem_current),
+                "pct": str(insufficient_test_config.mem_pct),
+            },
+            "cpu_util": {"pct": str(insufficient_test_config.cpu_util_pct)},
+        }
+        valkey_stat.get_kernel_statistics.return_value = live_stat
+
+        # Create and configure checker with thresholds from test_config
+        checker = UtilizationIdleChecker(
+            IdleCheckerArgs(
+                event_producer=event_producer,
+                redis_live=valkey_live,
+                valkey_stat_client=valkey_stat,
+            )
+        )
+        await checker.populate_config({
+            "initial-grace-period": "0",
+            "resource-thresholds": {
+                "cpu_util": {"average": str(insufficient_test_config.threshold_cpu)},
+                "mem": {"average": str(insufficient_test_config.threshold_mem)},
+                "cuda_util": {"average": "0"},
+                "cuda_mem": {"average": "0"},
+            },
+            "thresholds-check-operator": "or",
+            "time-window": str(insufficient_test_config.time_window_seconds),
+        })
+        return checker
+
+    @pytest.mark.parametrize(
+        "insufficient_test_config",
+        [
+            # Low utilization (5%) < high threshold (50%), timeout exceeded
+            _UtilizationInsufficientTestConfig(
+                elapsed_seconds=50,
+                time_window_seconds=15,
+                mem_current=1.0,
+                mem_pct=5.0,
+                cpu_util_pct=5.0,
+                threshold_cpu=50.0,
+                threshold_mem=50.0,
+                expected_remaining=-1,
+                expected_alive=False,
+            ),
+        ],
+        ids=["low_util_5pct_threshold_50pct"],
     )
-    await checker_host._valkey_stat._client.client.set(str(kernel_id), msgpack.packb(live_stat))
-    try:
-        await checker_host.start()
-        utilization_idle_checker = get_checker_from_host(checker_host, UtilizationIdleChecker)
+    @pytest.mark.asyncio
+    async def test_utilization_insufficient_without_grace_period(
+        self,
+        insufficient_test_config: _UtilizationInsufficientTestConfig,
+        utilization_insufficient_checker: UtilizationIdleChecker,
+        utilization_kernel_row: dict[str, Any],
+        session_id: SessionId,
+        base_time: datetime,
+        valkey_live: AsyncMock,
+        db_connection: AsyncMock,
+    ) -> None:
+        """Test utilization with insufficient usage below thresholds (should terminate session)"""
+        # Given
+        util_first_collected_time = base_time.timestamp()
 
-        should_alive = await utilization_idle_checker.check_idleness(
-            kernel, checker_host._db, policy
+        # Setup side_effect using key inspection
+        def mock_get_live_data_side_effect(key: str) -> Optional[bytes]:
+            if ".util_first_collected" in key:
+                return f"{util_first_collected_time:.06f}".encode()
+            elif ".util_series" in key:
+                return msgpack.packb({"cpu_util": [], "mem": [], "cuda_util": [], "cuda_mem": []})
+            elif ".utilization_extra" in key:
+                return msgpack.packb({"resources": {}})
+            elif ".utilization" in key:
+                return msgpack.packb(insufficient_test_config.expected_remaining)
+            return None
+
+        valkey_live.get_live_data.side_effect = mock_get_live_data_side_effect
+
+        # When - check_idleness runs and stores remaining time
+        should_alive = await utilization_insufficient_checker.check_idleness(
+            utilization_kernel_row,
+            db_connection,
+            {"idle_timeout": insufficient_test_config.time_window_seconds},
         )
-        remaining = await utilization_idle_checker.get_checker_result(
-            checker_host._valkey_live, session_id
+
+        # get_checker_result will read the stored result (already mocked above)
+        remaining = await utilization_insufficient_checker.get_checker_result(
+            utilization_insufficient_checker._redis_live,
+            session_id,
         )
-        util_info = await utilization_idle_checker.get_extra_info(
-            checker_host._valkey_live, session_id
+
+        # get_extra_info will read utilization extra info (already mocked above)
+        util_info = await utilization_insufficient_checker.get_extra_info(
+            utilization_insufficient_checker._redis_live,
+            session_id,
         )
-    finally:
-        await checker_host.shutdown()
 
-    assert should_alive
-    assert remaining == expected
-    assert util_info is not None
-
-    # test 3
-    # remaining time is negative with utilization.
-    session_id = SessionId(uuid4())
-    kernel_id = KernelId(uuid4())
-    timewindow = 15
-    initial_grace_period = 0
-    kernel_created_at = datetime(2020, 3, 1, 12, 30, second=0)
-    now = datetime(2020, 3, 1, 12, 30, second=50)
-    expected = -1
-
-    mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
-
-    occupied_slots = {
-        "mem": Decimal(10.0),
-    }
-    live_stat = {
-        "mem": {
-            "current": "5.0",
-            "pct": "10.0",
-        },
-        "cpu_util": {
-            "pct": "10.0",
-        },
-    }
-    kernel = {
-        "id": kernel_id,
-        "session_id": session_id,
-        "created_at": kernel_created_at,
-        "cluster_size": 1,
-        "occupied_slots": occupied_slots,
-    }
-    policy = {
-        "idle_timeout": timewindow,
-    }
-
-    resource_thresholds = {
-        "cpu_util": {"average": "0"},
-        "mem": {"average": "0"},
-        "cuda_util": {"average": "0"},
-        "cuda_mem": {"average": "0"},
-    }
-    idle_value = {
-        "checkers": {
-            "utilization": {
-                "initial-grace-period": str(initial_grace_period),
-                "resource-thresholds": resource_thresholds,
-                "thresholds-check-operator": "or",
-                "time-window": str(timewindow),
-            }
-        },
-        "enabled": "utilization",
-    }
-    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
-    checker_host = await init_idle_checkers(
-        root_ctx.db,
-        root_ctx.config_provider,
-        root_ctx.event_producer,
-        root_ctx.distributed_lock_factory,
-    )
-    await checker_host._valkey_stat._client.client.set(str(kernel_id), msgpack.packb(live_stat))
-    try:
-        await checker_host.start()
-        utilization_idle_checker = get_checker_from_host(checker_host, UtilizationIdleChecker)
-
-        should_alive = await utilization_idle_checker.check_idleness(
-            kernel,
-            checker_host._db,
-            policy,
-        )
-        remaining = await utilization_idle_checker.get_checker_result(
-            checker_host._valkey_live, session_id
-        )
-        util_info = await utilization_idle_checker.get_extra_info(
-            checker_host._valkey_live, session_id
-        )
-    finally:
-        await checker_host.shutdown()
-
-    assert should_alive
-    assert remaining == expected
-    assert util_info is not None
+        # Then
+        assert should_alive is insufficient_test_config.expected_alive
+        assert remaining == insufficient_test_config.expected_remaining
+        assert util_info is not None
