@@ -259,6 +259,7 @@ class TestReservoirRegistryRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: ReservoirRegistryRow.endpoint.like("%reservoir.example.com/registry-%"),
             ],
             orders=[],
@@ -278,6 +279,7 @@ class TestReservoirRegistryRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: ReservoirRegistryRow.endpoint.like("%reservoir.example.com/registry-%"),
             ],
             orders=[],
@@ -297,6 +299,7 @@ class TestReservoirRegistryRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=20),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: ReservoirRegistryRow.endpoint.like("%reservoir.example.com/registry-%"),
             ],
             orders=[],
@@ -320,6 +323,7 @@ class TestReservoirRegistryRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: ReservoirRegistryRow.endpoint.in_([
                     "https://reservoir.example.com/alpha-registry",
                     "https://reservoir.example.com/beta-registry",
@@ -344,6 +348,7 @@ class TestReservoirRegistryRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: ReservoirRegistryRow.endpoint.in_([
                     "https://reservoir.example.com/alpha-registry",
                     "https://reservoir.example.com/beta-registry",
@@ -372,6 +377,7 @@ class TestReservoirRegistryRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=5, offset=5),
             conditions=[
+                # TODO: Refactor after adding Condition type
                 lambda: ReservoirRegistryRow.endpoint.like("%reservoir.example.com/registry-%"),
             ],
             orders=[ReservoirRegistryRow.endpoint.asc()],
