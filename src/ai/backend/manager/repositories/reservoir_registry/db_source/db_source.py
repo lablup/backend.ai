@@ -10,13 +10,17 @@ from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
 )
-from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
+from ai.backend.manager.data.reservoir_registry.types import (
+    ReservoirRegistryData,
+    ReservoirRegistryListResult,
+)
 from ai.backend.manager.errors.artifact import ArtifactNotFoundError
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
@@ -183,3 +187,26 @@ class ReservoirDBSource:
             result = await db_session.execute(query)
             rows: list[ReservoirRegistryRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]
+
+    async def search_registries(
+        self,
+        querier: BatchQuerier,
+    ) -> ReservoirRegistryListResult:
+        """Searches Reservoir registries with total count."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ReservoirRegistryRow).options(selectinload(ReservoirRegistryRow.meta))
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.ReservoirRegistryRow.to_dataclass() for row in result.rows]
+
+            return ReservoirRegistryListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
