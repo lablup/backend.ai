@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 from .id import ObjectId, ScopeId
 from .object_permission import (
@@ -16,10 +16,6 @@ from .permission_group import (
 )
 from .status import RoleStatus
 from .types import EntityType, OperationType, RoleSource
-
-if TYPE_CHECKING:
-    from .object_permission import ObjectPermissionCreateInput
-    from .permission import ScopedPermissionCreateInput
 
 
 @dataclass(frozen=True)
