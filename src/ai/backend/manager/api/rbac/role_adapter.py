@@ -6,26 +6,36 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
+from uuid import UUID
+
+from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.dto.manager.rbac import (
     OrderDirection,
     RoleDTO,
     RoleFilter,
     RoleOrder,
     RoleOrderField,
+    RoleSource,
+    RoleStatus,
     SearchRolesRequest,
+    UpdateRoleRequest,
 )
 from ai.backend.manager.api.adapter import BaseFilterAdapter
 from ai.backend.manager.data.permission.role import RoleData, RoleDetailData
+from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
     QueryCondition,
     QueryOrder,
 )
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.options import (
     RoleConditions,
     RoleOrders,
 )
+from ai.backend.manager.repositories.permission_controller.updaters import RoleUpdaterSpec
+from ai.backend.manager.types import OptionalState, TriState
 
 __all__ = ("RoleAdapter",)
 
@@ -45,6 +55,33 @@ class RoleAdapter(BaseFilterAdapter):
             deleted_at=data.deleted_at,
             description=data.description,
         )
+
+    def build_updater(self, request: UpdateRoleRequest, role_id: UUID) -> Updater[RoleRow]:
+        """Convert update request to updater."""
+        name = OptionalState[str].nop()
+        source = OptionalState[RoleSource].nop()
+        status = OptionalState[RoleStatus].nop()
+        description = TriState[str].nop()
+
+        if request.name is not None:
+            name = OptionalState.update(request.name)
+        if request.source is not None:
+            source = OptionalState.update(request.source)
+        if request.status is not None:
+            status = OptionalState.update(request.status)
+        if request.description is not SENTINEL:
+            if request.description is None:
+                description = TriState.nullify()
+            else:
+                description = TriState.update(request.description)
+
+        spec = RoleUpdaterSpec(
+            name=name,
+            source=source,
+            status=status,
+            description=description,
+        )
+        return Updater(spec=spec, pk_value=role_id)
 
     def build_querier(self, request: SearchRolesRequest) -> BatchQuerier:
         """
