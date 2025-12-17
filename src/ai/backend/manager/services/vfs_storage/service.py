@@ -19,6 +19,10 @@ from ai.backend.manager.services.vfs_storage.actions.list import (
     ListVFSStorageAction,
     ListVFSStorageActionResult,
 )
+from ai.backend.manager.services.vfs_storage.actions.search import (
+    SearchVFSStoragesAction,
+    SearchVFSStoragesActionResult,
+)
 from ai.backend.manager.services.vfs_storage.actions.update import (
     UpdateVFSStorageAction,
     UpdateVFSStorageActionResult,
@@ -81,3 +85,16 @@ class VFSStorageService:
         log.info("Listing VFS storages")
         storage_data_list = await self._vfs_storage_repository.list_vfs_storages()
         return ListVFSStorageActionResult(data=storage_data_list)
+
+    async def search(self, action: SearchVFSStoragesAction) -> SearchVFSStoragesActionResult:
+        """
+        Search VFS storages with pagination and filtering.
+        """
+        log.info("Searching VFS storages with querier: {}", action.querier)
+        result = await self._vfs_storage_repository.search(action.querier)
+        return SearchVFSStoragesActionResult(
+            storages=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
