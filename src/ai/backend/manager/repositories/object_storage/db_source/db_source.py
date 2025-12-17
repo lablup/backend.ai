@@ -5,13 +5,14 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
-from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.data.object_storage.types import ObjectStorageData, ObjectStorageListResult
 from ai.backend.manager.errors.object_storage import (
     ObjectStorageNotFoundError,
 )
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
@@ -111,3 +112,26 @@ class ObjectStorageDBSource:
             result = await db_session.execute(query)
             rows: list[ObjectStorageRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]
+
+    async def search(
+        self,
+        querier: BatchQuerier,
+    ) -> ObjectStorageListResult:
+        """Searches Object storages with total count."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ObjectStorageRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.ObjectStorageRow.to_dataclass() for row in result.rows]
+
+            return ObjectStorageListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
