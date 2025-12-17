@@ -147,6 +147,7 @@ class DeploymentMetadata:
     created_user: UUID
     session_owner: UUID
     created_at: Optional[datetime]
+    revision_history_limit: int
     tag: Optional[str] = None
 
 

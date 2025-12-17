@@ -531,6 +531,7 @@ class CreateModelDeploymentInput:
             created_user=user_data.user_id,
             session_owner=user_data.user_id,
             created_at=None,
+            revision_history_limit=10,
             tag=tag,
         )
         return NewDeploymentCreator(
