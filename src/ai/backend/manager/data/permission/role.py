@@ -7,9 +7,11 @@ from typing import Optional
 
 from .id import ObjectId, ScopeId
 from .object_permission import (
+    ObjectPermissionCreateInput,
     ObjectPermissionCreateInputBeforeRoleCreation,
     ObjectPermissionData,
 )
+from .permission import ScopedPermissionCreateInput
 from .permission_group import (
     PermissionGroupCreatorBeforeRoleCreation,
     PermissionGroupExtendedData,
@@ -122,6 +124,32 @@ class UserRoleAssignmentData:
     user_id: uuid.UUID
     role_id: uuid.UUID
     granted_by: Optional[uuid.UUID] = None
+
+
+@dataclass(frozen=True)
+class RolePermissionsUpdateInput:
+    """
+    Input for batch updating role permissions.
+
+    Uses scope-based permission management:
+    - Scoped permissions are added using (scope_type, scope_id, entity_type, operation)
+    - System automatically finds or creates permission groups by scope
+    - All operations are performed in a single transaction
+
+    Breaking Change from previous version:
+    - Removed: add_permission_groups, remove_permission_group_ids, add_permissions, remove_permission_ids
+    - Added: add_scoped_permissions, remove_scoped_permission_ids
+    """
+
+    role_id: uuid.UUID
+
+    # Scoped permissions (automatic permission group management)
+    add_scoped_permissions: list[ScopedPermissionCreateInput] = field(default_factory=list)
+    remove_scoped_permission_ids: list[uuid.UUID] = field(default_factory=list)
+
+    # Object permissions
+    add_object_permissions: list[ObjectPermissionCreateInput] = field(default_factory=list)
+    remove_object_permission_ids: list[uuid.UUID] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
