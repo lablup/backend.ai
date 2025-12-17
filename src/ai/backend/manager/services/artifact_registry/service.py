@@ -39,6 +39,10 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.list impo
     ListHuggingFaceRegistryAction,
     ListHuggingFaceRegistryActionResult,
 )
+from ai.backend.manager.services.artifact_registry.actions.huggingface.search import (
+    SearchHuggingFaceRegistriesAction,
+    SearchHuggingFaceRegistriesActionResult,
+)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.update import (
     UpdateHuggingFaceRegistryAction,
     UpdateHuggingFaceRegistryActionResult,
@@ -153,6 +157,21 @@ class ArtifactRegistryService:
         log.info("Listing huggingface registries")
         registry_data_list = await self._huggingface_registry_repository.list_registries()
         return ListHuggingFaceRegistryActionResult(data=registry_data_list)
+
+    async def search_huggingface_registries(
+        self, action: SearchHuggingFaceRegistriesAction
+    ) -> SearchHuggingFaceRegistriesActionResult:
+        """Searches HuggingFace registries."""
+        result = await self._huggingface_registry_repository.search_registries(
+            querier=action.querier,
+        )
+
+        return SearchHuggingFaceRegistriesActionResult(
+            registries=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def create_reservoir_registry(
         self, action: CreateReservoirRegistryAction

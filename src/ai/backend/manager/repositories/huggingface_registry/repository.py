@@ -9,9 +9,13 @@ from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
 )
-from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
+from ai.backend.manager.data.huggingface_registry.types import (
+    HuggingFaceRegistryData,
+    HuggingFaceRegistryListResult,
+)
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.huggingface_registry.db_source.db_source import (
@@ -86,3 +90,11 @@ class HuggingFaceRepository:
     @huggingface_registry_repository_resilience.apply()
     async def list_registries(self) -> list[HuggingFaceRegistryData]:
         return await self._db_source.list_registries()
+
+    @huggingface_registry_repository_resilience.apply()
+    async def search_registries(
+        self,
+        querier: BatchQuerier,
+    ) -> HuggingFaceRegistryListResult:
+        """Searches HuggingFace registries with total count."""
+        return await self._db_source.search_registries(querier=querier)
