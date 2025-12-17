@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Any, Callable, Mapping, Optional, Type, cast
+from typing import Any, Mapping, Optional, Type, cast
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -12,7 +12,6 @@ from ai.backend.common.types import KernelId, SessionId, SessionTypes
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.idle import (
     BaseIdleChecker,
-    IdleCheckerArgs,
     IdleCheckerHost,
     NetworkTimeoutIdleChecker,
     NewUserGracePeriodChecker,
@@ -125,50 +124,9 @@ class TestNewUserGracePeriodChecker:
         return mock_client
 
     @pytest.fixture
-    async def test_valkey_stat(self) -> AsyncMock:
-        """Mock ValkeyStatClient - configure return values in scenario fixtures"""
-        return AsyncMock()
-
-    @pytest.fixture
-    async def mock_event_producer(self) -> AsyncMock:
-        """Mock EventProducer"""
-        return AsyncMock()
-
-    @pytest.fixture
-    async def mock_db_connection(self) -> AsyncMock:
-        """Mock database connection"""
-        return AsyncMock()
-
-    @pytest.fixture
     def session_id(self) -> SessionId:
         """Session ID for session lifetime tests"""
         return SessionId(uuid4())
-
-    @pytest.fixture
-    def kernel_row(self, session_id: SessionId) -> dict[str, Any]:
-        """Kernel row for network timeout positive test"""
-        return {
-            "session_id": session_id,
-            "session_type": SessionTypes.INTERACTIVE,
-        }
-
-    @pytest.fixture
-    def _create_idle_checker_args(
-        self,
-        mock_event_producer: AsyncMock,
-        test_valkey_live: AsyncMock,
-        test_valkey_stat: AsyncMock,
-    ) -> Callable[[], IdleCheckerArgs]:
-        """Internal helper: Create IdleCheckerArgs with standard dependencies"""
-
-        def _create() -> IdleCheckerArgs:
-            return IdleCheckerArgs(
-                event_producer=mock_event_producer,
-                redis_live=test_valkey_live,
-                valkey_stat_client=test_valkey_stat,
-            )
-
-        return _create
 
     @pytest.fixture
     async def user_initial_grace_period_policy(self) -> dict[str, Any]:
