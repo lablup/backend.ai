@@ -18,7 +18,7 @@ class SearchStorageNamespacesAction(StorageNamespaceAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "search_storage_namespaces"
+        return "search"
 
     @override
     def entity_id(self) -> Optional[str]:
