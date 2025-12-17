@@ -312,7 +312,7 @@ class TestArtifactRegistryRepository:
 
         result = await artifact_registry_repository.search_artifact_registries(querier=querier)
 
-        assert len(result.items) >= 1
+        assert len(result.items) == 1
         for registry in result.items:
             assert registry.name.startswith("alpha")
 
