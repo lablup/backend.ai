@@ -34,7 +34,7 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 
@@ -70,14 +70,66 @@ def _make_vfolder_create_params(
 class TestVfolderRepository:
     """Test cases for VfolderRepository"""
 
+    # TODO: Simplify this after removing all fk constraints
     @pytest.fixture
     async def db_with_cleanup(
         self,
         database_engine: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans vfolder data after each test"""
+        """
+        Database engine that auto-cleans all test data after each test.
+
+        Due to FK constraints (VFolderRow references UserRow and GroupRow),
+        cleanup must happen in specific order. This fixture cleans up
+        all test-created data in the correct FK order.
+        """
+        # Track created entities for cleanup
+        created_domain_names: list[str] = []
+        created_user_ids: list[uuid.UUID] = []
+        created_group_ids: list[uuid.UUID] = []
+        created_user_policy_names: list[str] = []
+        created_project_policy_names: list[str] = []
+
+        # Attach tracking lists to engine for other fixtures to use
+        database_engine._test_domain_names = created_domain_names  # type: ignore[attr-defined]
+        database_engine._test_user_ids = created_user_ids  # type: ignore[attr-defined]
+        database_engine._test_group_ids = created_group_ids  # type: ignore[attr-defined]
+        database_engine._test_user_policy_names = created_user_policy_names  # type: ignore[attr-defined]
+        database_engine._test_project_policy_names = created_project_policy_names  # type: ignore[attr-defined]
+
         yield database_engine
-        # Note: VFolderRow cleanup is handled by more specific fixtures due to FK constraints
+
+        # Cleanup all test data in correct FK order
+        async with database_engine.begin_session() as db_sess:
+            # 1. VFolder data (references User and Group)
+            await db_sess.execute(sa.delete(VFolderPermissionRow))
+            await db_sess.execute(sa.delete(VFolderRow))
+
+            # 2. Group (referenced by VFolderRow)
+            for group_id in created_group_ids:
+                await db_sess.execute(sa.delete(GroupRow).where(GroupRow.id == group_id))
+
+            # 3. User (referenced by VFolderRow)
+            for user_id in created_user_ids:
+                await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_id))
+
+            # 4. Resource policies (referenced by User and Group)
+            for policy_name in created_project_policy_names:
+                await db_sess.execute(
+                    sa.delete(ProjectResourcePolicyRow).where(
+                        ProjectResourcePolicyRow.name == policy_name
+                    )
+                )
+            for policy_name in created_user_policy_names:
+                await db_sess.execute(
+                    sa.delete(UserResourcePolicyRow).where(
+                        UserResourcePolicyRow.name == policy_name
+                    )
+                )
+
+            # 5. Domain (referenced by User and Group)
+            for domain_name in created_domain_names:
+                await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
 
     @pytest.fixture
     async def test_domain_name(
@@ -99,18 +151,15 @@ class TestVfolderRepository:
             db_sess.add(domain)
             await db_sess.flush()
 
-        try:
-            yield domain_name
-        finally:
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
+        db_with_cleanup._test_domain_names.append(domain_name)  # type: ignore[attr-defined]
+        yield domain_name
 
     @pytest.fixture
-    async def test_resource_policy_name(
+    async def test_user_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[str, None]:
-        """Create test resource policies and return policy name"""
+        """Create test user resource policy and return policy name"""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
@@ -122,7 +171,20 @@ class TestVfolderRepository:
                 max_customized_image_count=3,
             )
             db_sess.add(user_policy)
+            await db_sess.flush()
 
+        db_with_cleanup._test_user_policy_names.append(policy_name)  # type: ignore[attr-defined]
+        yield policy_name
+
+    @pytest.fixture
+    async def test_project_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create test project resource policy and return policy name"""
+        policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
             project_policy = ProjectResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
@@ -132,27 +194,15 @@ class TestVfolderRepository:
             db_sess.add(project_policy)
             await db_sess.flush()
 
-        try:
-            yield policy_name
-        finally:
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_sess.execute(
-                    sa.delete(UserResourcePolicyRow).where(
-                        UserResourcePolicyRow.name == policy_name
-                    )
-                )
-                await db_sess.execute(
-                    sa.delete(ProjectResourcePolicyRow).where(
-                        ProjectResourcePolicyRow.name == policy_name
-                    )
-                )
+        db_with_cleanup._test_project_policy_names.append(policy_name)  # type: ignore[attr-defined]
+        yield policy_name
 
     @pytest.fixture
     async def test_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
-        test_resource_policy_name: str,
+        test_user_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create test user and return user UUID"""
         user_uuid = uuid.uuid4()
@@ -175,23 +225,20 @@ class TestVfolderRepository:
                 status_info="active",
                 domain_name=test_domain_name,
                 role=UserRole.USER,
-                resource_policy=test_resource_policy_name,
+                resource_policy=test_user_resource_policy_name,
             )
             db_sess.add(user)
             await db_sess.flush()
 
-        try:
-            yield user_uuid
-        finally:
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
+        db_with_cleanup._test_user_ids.append(user_uuid)  # type: ignore[attr-defined]
+        yield user_uuid
 
     @pytest.fixture
     async def test_model_store_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
-        test_resource_policy_name: str,
+        test_project_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create test model-store group and return group UUID"""
         group_uuid = uuid.uuid4()
@@ -205,17 +252,14 @@ class TestVfolderRepository:
                 is_active=True,
                 total_resource_slots={},
                 allowed_vfolder_hosts={},
-                resource_policy=test_resource_policy_name,
+                resource_policy=test_project_resource_policy_name,
                 type=ProjectType.MODEL_STORE,
             )
             db_sess.add(group)
             await db_sess.flush()
 
-        try:
-            yield group_uuid
-        finally:
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_sess.execute(sa.delete(GroupRow).where(GroupRow.id == group_uuid))
+        db_with_cleanup._test_group_ids.append(group_uuid)  # type: ignore[attr-defined]
+        yield group_uuid
 
     @pytest.fixture
     def mock_role_manager(self) -> RoleManager:
@@ -236,28 +280,22 @@ class TestVfolderRepository:
         repo._role_manager = mock_role_manager
         yield repo
 
-    @pytest.fixture
-    async def test_vfolder_id(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[uuid.UUID, None]:
-        """Generate vfolder ID and cleanup after test"""
-        folder_id = uuid.uuid4()
-        yield folder_id
-        async with db_with_cleanup.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(VFolderRow).where(VFolderRow.id == folder_id))
-
-    async def test_create_vfolder_with_read_only_permission_in_model_store(
+    async def test_model_store_vfolder_permission_is_overridden_to_read_only(
         self,
         vfolder_repository: VfolderRepository,
         test_domain_name: str,
         test_user: uuid.UUID,
         test_model_store_group: uuid.UUID,
-        test_vfolder_id: uuid.UUID,
     ) -> None:
-        """Test creating vfolder with READ_ONLY permission in model-store group succeeds"""
+        """Test that model-store vfolder permission is always READ_ONLY.
+
+        The service layer (VFolderService.create) overrides any requested permission
+        to READ_ONLY for model-store group type. This test verifies that the repository
+        correctly stores the READ_ONLY permission received from the service layer.
+        """
+        folder_id = uuid.uuid4()
         params = _make_vfolder_create_params(
-            folder_id=test_vfolder_id,
+            folder_id=folder_id,
             domain_name=test_domain_name,
             group_id=test_model_store_group,
             user_id=test_user,
@@ -269,7 +307,7 @@ class TestVfolderRepository:
             params, create_owner_permission=True
         )
 
-        assert vfolder_data.id == test_vfolder_id
+        assert vfolder_data.id == folder_id
         assert vfolder_data.name == params.name
         assert vfolder_data.permission == VFolderMountPermission.READ_ONLY
         assert vfolder_data.usage_mode == VFolderUsageMode.MODEL
