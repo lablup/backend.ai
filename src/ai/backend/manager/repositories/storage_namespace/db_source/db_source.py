@@ -7,9 +7,13 @@ import sqlalchemy as sa
 from ai.backend.common.exception import (
     StorageNamespaceNotFoundError,
 )
-from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
+from ai.backend.manager.data.storage_namespace.types import (
+    StorageNamespaceData,
+    StorageNamespaceListResult,
+)
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 
 
@@ -116,3 +120,26 @@ class StorageNamespaceDBSource:
                 namespaces_by_storage[storage_id].append(namespace)
 
             return namespaces_by_storage
+
+    async def search(
+        self,
+        querier: BatchQuerier,
+    ) -> StorageNamespaceListResult:
+        """Searches storage namespaces with total count."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(StorageNamespaceRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.StorageNamespaceRow.to_dataclass() for row in result.rows]
+
+            return StorageNamespaceListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
