@@ -217,6 +217,10 @@ def get_redis_object(
     db: int = 0,
     **kwargs,
 ) -> RedisConnectionInfo:
+    """
+    Legacy function kept for external code that depends on the common package.
+    Not used in the current codebase.
+    """
     redis_helper_config: RedisHelperConfig = cast(
         RedisHelperConfig, redis_target.redis_helper_config
     )
@@ -324,9 +328,6 @@ def get_redis_object_for_lock(
         conn_opts["socket_connect_timeout"] = float(socket_connect_timeout)
     if max_connections := redis_helper_config.get("max_connections"):
         conn_pool_opts["max_connections"] = int(max_connections)
-    # NOTE: timeout is only supported in BlockingConnectionPool, not ConnectionPool.
-    # BlockingConnectionPool waits for an available connection up to `timeout` seconds,
-    # while ConnectionPool creates a new connection immediately when none are available.
     if connection_ready_timeout := redis_helper_config.get("connection_ready_timeout"):
         conn_pool_opts["timeout"] = float(connection_ready_timeout)
     if _sentinel_addresses := redis_target.get("sentinel"):
