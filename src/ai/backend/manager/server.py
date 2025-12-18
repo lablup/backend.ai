@@ -1593,6 +1593,7 @@ def build_prometheus_service_discovery_handler(
             resp.append({
                 "targets": [f"{service.endpoint.prometheus_address}"],
                 "labels": {
+                    **service.labels,
                     "service_id": service.id,
                     "service_group": service.service_group,
                     "display_name": service.display_name,
