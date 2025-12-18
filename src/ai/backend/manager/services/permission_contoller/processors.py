@@ -13,6 +13,7 @@ from .actions import (
     DeleteRoleActionResult,
     GetRoleDetailAction,
     GetRoleDetailActionResult,
+    PurgeRoleAction,
     RevokeRoleAction,
     RevokeRoleActionResult,
     SearchRolesAction,
@@ -45,6 +46,7 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
         self.create_role = ActionProcessor(service.create_role, action_monitors)
         self.update_role = ActionProcessor(service.update_role, action_monitors)
         self.delete_role = ActionProcessor(service.delete_role, action_monitors)
+        self.purge_role = ActionProcessor(service.purge_role, action_monitors)
         self.assign_role = ActionProcessor(service.assign_role, action_monitors)
         self.revoke_role = ActionProcessor(service.revoke_role, action_monitors)
         self.get_role_detail = ActionProcessor(service.get_role_detail, action_monitors)
@@ -59,6 +61,7 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             CreateRoleAction.spec(),
             UpdateRoleAction.spec(),
             DeleteRoleAction.spec(),
+            PurgeRoleAction.spec(),
             AssignRoleAction.spec(),
             RevokeRoleAction.spec(),
             GetRoleDetailAction.spec(),

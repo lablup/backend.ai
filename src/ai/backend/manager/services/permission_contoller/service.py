@@ -35,6 +35,10 @@ from ai.backend.manager.services.permission_contoller.actions.permission import 
     DeletePermissionAction,
     DeletePermissionActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.purge_role import (
+    PurgeRoleAction,
+    PurgeRoleActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.revoke_role import (
     RevokeRoleAction,
     RevokeRoleActionResult,
@@ -126,6 +130,14 @@ class PermissionControllerService:
         """
         result = await self._repository.delete_role(action.updater)
         return DeleteRoleActionResult(data=result)
+
+    async def purge_role(self, action: PurgeRoleAction) -> PurgeRoleActionResult:
+        """
+        Purges a role from the repository. It permanently removes the role (hard delete).
+        Raises ObjectNotFound if the role does not exist.
+        """
+        result = await self._repository.purge_role(action.purger)
+        return PurgeRoleActionResult(data=result)
 
     async def assign_role(self, action: AssignRoleAction) -> AssignRoleActionResult:
         """
