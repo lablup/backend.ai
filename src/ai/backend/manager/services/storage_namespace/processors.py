@@ -15,6 +15,10 @@ from ai.backend.manager.services.storage_namespace.actions.register import (
     RegisterNamespaceAction,
     RegisterNamespaceActionResult,
 )
+from ai.backend.manager.services.storage_namespace.actions.search import (
+    SearchStorageNamespacesAction,
+    SearchStorageNamespacesActionResult,
+)
 from ai.backend.manager.services.storage_namespace.actions.unregister import (
     UnregisterNamespaceAction,
     UnregisterNamespaceActionResult,
@@ -27,6 +31,9 @@ class StorageNamespaceProcessors(AbstractProcessorPackage):
     unregister: ActionProcessor[UnregisterNamespaceAction, UnregisterNamespaceActionResult]
     get_namespaces: ActionProcessor[GetNamespacesAction, GetNamespacesActionResult]
     get_all_namespaces: ActionProcessor[GetAllNamespacesAction, GetAllNamespacesActionResult]
+    search_storage_namespaces: ActionProcessor[
+        SearchStorageNamespacesAction, SearchStorageNamespacesActionResult
+    ]
 
     def __init__(
         self, service: StorageNamespaceService, action_monitors: list[ActionMonitor]
@@ -35,6 +42,7 @@ class StorageNamespaceProcessors(AbstractProcessorPackage):
         self.unregister = ActionProcessor(service.unregister, action_monitors)
         self.get_namespaces = ActionProcessor(service.get_namespaces, action_monitors)
         self.get_all_namespaces = ActionProcessor(service.get_all_namespaces, action_monitors)
+        self.search_storage_namespaces = ActionProcessor(service.search, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -43,4 +51,5 @@ class StorageNamespaceProcessors(AbstractProcessorPackage):
             UnregisterNamespaceAction.spec(),
             GetNamespacesAction.spec(),
             GetAllNamespacesAction.spec(),
+            SearchStorageNamespacesAction.spec(),
         ]
