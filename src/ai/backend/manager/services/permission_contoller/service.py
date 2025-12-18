@@ -1,6 +1,9 @@
 import logging
 
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
+    CreateRoleInput,
+)
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -62,11 +65,12 @@ class PermissionControllerService:
         """
         Creates a new role in the repository.
         """
-        result = await self._repository.create_role(
-            action.creator,
-            action.permission_groups,
-            action.object_permissions,
+        input_data = CreateRoleInput(
+            creator=action.creator,
+            permission_groups=action.permission_groups,
+            object_permissions=action.object_permissions,
         )
+        result = await self._repository.create_role(input_data)
         return CreateRoleActionResult(
             data=result,
         )

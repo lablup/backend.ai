@@ -9,15 +9,9 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 
 from ...data.permission.id import ObjectId
-from ...data.permission.object_permission import (
-    ObjectPermissionCreateInputBeforeRoleCreation,
-    ObjectPermissionData,
-)
+from ...data.permission.object_permission import ObjectPermissionData
 from ...data.permission.permission import PermissionData
-from ...data.permission.permission_group import (
-    PermissionGroupCreatorBeforeRoleCreation,
-    PermissionGroupData,
-)
+from ...data.permission.permission_group import PermissionGroupData
 from ...data.permission.role import (
     AssignedUserListResult,
     BatchEntityPermissionCheckInput,
@@ -40,7 +34,7 @@ from ...repositories.base.creator import Creator
 from ...repositories.base.purger import Purger
 from ...repositories.base.querier import BatchQuerier
 from ...repositories.base.updater import Updater
-from .db_source.db_source import PermissionDBSource
+from .db_source.db_source import CreateRoleInput, PermissionDBSource
 
 permission_controller_repository_resilience = Resilience(
     policies=[
@@ -68,18 +62,13 @@ class PermissionControllerRepository:
         self._db_source = PermissionDBSource(db)
 
     @permission_controller_repository_resilience.apply()
-    async def create_role(
-        self,
-        creator: Creator[RoleRow],
-        permission_groups: Sequence[PermissionGroupCreatorBeforeRoleCreation] = tuple(),
-        object_permissions: Sequence[ObjectPermissionCreateInputBeforeRoleCreation] = tuple(),
-    ) -> RoleData:
+    async def create_role(self, input_data: CreateRoleInput) -> RoleData:
         """
         Create a new role in the database.
 
         Returns the created role data.
         """
-        role_row = await self._db_source.create_role(creator, permission_groups, object_permissions)
+        role_row = await self._db_source.create_role(input_data)
         return role_row.to_data()
 
     @permission_controller_repository_resilience.apply()
@@ -118,14 +107,17 @@ class PermissionControllerRepository:
     async def delete_permission(
         self,
         purger: Purger[PermissionRow],
-    ) -> PermissionData | None:
+    ) -> PermissionData:
         """
         Delete a permission from the database.
 
-        Returns the deleted permission data, or None if not found.
+        Returns the deleted permission data.
+
+        Raises:
+            ObjectNotFound: If permission does not exist.
         """
         row = await self._db_source.delete_permission(purger)
-        return row.to_data() if row else None
+        return row.to_data()
 
     @permission_controller_repository_resilience.apply()
     async def create_object_permission(
