@@ -256,6 +256,9 @@ class TestSessionUniqueNamePerUser:
             db_sess.add(duplicate_session)
             await db_sess.flush()
 
+            # Clean up the duplicate session
+            await db_sess.delete(duplicate_session)
+
     @pytest.mark.parametrize(
         "test_config",
         [
@@ -326,3 +329,6 @@ class TestSessionUniqueNamePerUser:
             # This should succeed without IntegrityError
             db_sess.add(duplicate_session)
             await db_sess.flush()
+
+            # Clean up the duplicate session
+            await db_sess.delete(duplicate_session)
