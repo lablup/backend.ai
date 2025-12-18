@@ -55,8 +55,8 @@ class DeletePermissionAction(PermissionAction):
 
 @dataclass
 class DeletePermissionActionResult(BaseActionResult):
-    data: Optional[PermissionData]
+    data: PermissionData
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.data.id) if self.data else None
+        return str(self.data.id)
