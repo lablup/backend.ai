@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
-from ai.backend.common.dto.manager.query import StrictValueFilter, StringFilter
+from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.manager.repositories.base import QueryCondition
 
 
@@ -40,20 +40,3 @@ class BaseFilterAdapter:
         elif string_filter.i_contains is not None:
             return contains_fn(string_filter.i_contains, True)
         return None
-
-    def convert_strict_value_filter[T](
-        self,
-        strict_filter: StrictValueFilter[T],
-        equals_fn: Callable[[T], QueryCondition],
-    ) -> QueryCondition:
-        """
-        Convert StrictValueFilter to QueryCondition using provided equals function.
-
-        Args:
-            strict_filter: The strict value filter to convert
-            equals_fn: Function to create equals condition (value) -> QueryCondition
-
-        Returns:
-            QueryCondition
-        """
-        return equals_fn(strict_filter.equals)

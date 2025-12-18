@@ -32,13 +32,6 @@ class PermissionCreatorBeforePermissionGroupCreation:
     entity_type: EntityType
     operation: OperationType
 
-    def to_creator(self, permission_group_id: uuid.UUID) -> PermissionCreator:
-        return PermissionCreator(
-            permission_group_id=permission_group_id,
-            entity_type=self.entity_type,
-            operation=self.operation,
-        )
-
 
 @dataclass
 class ScopedPermissionCreateInput:
