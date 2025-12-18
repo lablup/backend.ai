@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Any, Optional, Type
+from typing import Any, Optional
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -10,27 +10,13 @@ import pytest
 from ai.backend.common import msgpack
 from ai.backend.common.types import KernelId, SessionId, SessionTypes
 from ai.backend.manager.idle import (
-    BaseIdleChecker,
     IdleCheckerArgs,
-    IdleCheckerHost,
     NetworkTimeoutIdleChecker,
     NewUserGracePeriodChecker,
     SessionLifetimeChecker,
     UtilizationIdleChecker,
     calculate_remaining_time,
 )
-
-
-def get_checker_from_host(
-    checker_host: IdleCheckerHost, checker_type: Type[BaseIdleChecker]
-) -> BaseIdleChecker:
-    for checker in checker_host._checkers:
-        if isinstance(checker, checker_type):
-            return checker
-    else:
-        raise ValueError(
-            f"{checker_type} not found in the checker_host. {checker_host._checkers = }"
-        )
 
 
 @dataclass
