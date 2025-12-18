@@ -87,7 +87,7 @@ class RoleRow(Base):
             source=self.source,
             status=self.status,
             created_at=self.created_at,
-            updated_at=self.updated_at,
+            updated_at=self.updated_at or self.created_at,
             deleted_at=self.deleted_at,
             description=self.description,
         )
@@ -100,7 +100,7 @@ class RoleRow(Base):
             source=self.source,
             status=self.status,
             created_at=self.created_at,
-            updated_at=self.updated_at,
+            updated_at=self.updated_at or self.created_at,
             deleted_at=self.deleted_at,
             description=self.description,
             permission_groups=[pg_row.to_extended_data() for pg_row in self.permission_group_rows],

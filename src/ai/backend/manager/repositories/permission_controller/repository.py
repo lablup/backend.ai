@@ -18,6 +18,7 @@ from ...data.permission.role import (
     RoleData,
     RoleDetailData,
     RoleListResult,
+    RolePermissionsUpdateInput,
     ScopePermissionCheckInput,
     SingleEntityPermissionCheckInput,
     UserRoleAssignmentData,
@@ -149,6 +150,14 @@ class PermissionControllerRepository:
     async def update_role(self, updater: Updater[RoleRow]) -> RoleData:
         result = await self._db_source.update_role(updater)
         return result.to_data()
+
+    @permission_controller_repository_resilience.apply()
+    async def update_role_permissions(
+        self, input_data: RolePermissionsUpdateInput
+    ) -> RoleDetailData:
+        """Update role permissions using batch update."""
+        result = await self._db_source.update_role_permissions(input_data=input_data)
+        return result.to_detail_data_without_users()
 
     @permission_controller_repository_resilience.apply()
     async def delete_role(self, updater: Updater[RoleRow]) -> RoleData:

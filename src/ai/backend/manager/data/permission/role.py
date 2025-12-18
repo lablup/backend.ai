@@ -30,7 +30,7 @@ class RoleData:
     source: RoleSource
     status: RoleStatus
     created_at: datetime
-    updated_at: Optional[datetime]
+    updated_at: datetime
     deleted_at: Optional[datetime]
     description: Optional[str] = None
 
@@ -60,7 +60,7 @@ class RoleDetailData:
     object_permissions: list[ObjectPermissionData]
 
     created_at: datetime
-    updated_at: Optional[datetime]
+    updated_at: datetime
     deleted_at: Optional[datetime]
     description: Optional[str] = None
 
