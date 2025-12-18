@@ -195,17 +195,17 @@ BEP documents define architectural decisions, API designs, and implementation st
 
 **Quick Decision Rule:**
 
-When creating or modifying a DTO, ask: "Will any other component or external client use this?"
-- **YES** → Put in `src/ai/backend/common/dto/{component}/`
-- **NO** → Put in `src/ai/backend/{package}/data/{domain}/`
+When creating or modifying a DTO, ask: "Will any other Backend.AI component use this?"
+- **YES (Inter-component)** → Put in `src/ai/backend/common/dto/{component}/`
+- **NO (Component-internal)** → Put in `src/ai/backend/{package}/data/{domain}/`
 
 **Placement:**
 
 ```
-Component-Internal:              Shared (Inter-Component):
-manager/data/{domain}/           common/dto/manager/
-storage/dto/                     common/dto/storage/
-agent/data/ (if needed)          common/dto/agent/
+Component-Internal:              Inter-Component (Current):      Legacy (Migrating to common/dto):
+manager/data/{domain}/           common/dto/manager/             manager/dto/
+agent/data/                      common/dto/storage/             storage/dto/
+                                 common/dto/agent/
                                  common/dto/internal/
 ```
 
@@ -219,16 +219,15 @@ from dataclasses import dataclass
 class InternalConfig:
     field: tuple[str, ...]  # Use tuple, not list
 
-# Shared (External API): Use Pydantic
+# Inter-Component: Use Pydantic (recommended)
 from pydantic import BaseModel
 
-class ApiRequest(BaseModel):
+class InterComponentRequest(BaseModel):
     field: list[str]  # Pydantic handles this
 
-# Shared (Internal RPC): Use dataclass
-@dataclass(frozen=True)
-class RpcMessage:
-    field: tuple[str, ...]
+# External API: Use Pydantic
+class ApiRequest(BaseModel):
+    field: list[str]
 ```
 
 **Decision Checklist:**
@@ -240,6 +239,12 @@ Use `common/dto/{component}/` if ANY of these are true:
 - [ ] Referenced by more than one component
 
 Otherwise use `{package}/data/{domain}/`
+
+**Legacy `{package}/dto/` modules:**
+- `manager/dto/` and `storage/dto/` are legacy inter-component DTO modules
+- Use Pydantic for new DTOs in these modules
+- Gradually migrate to `common/dto/{component}/` for better type sharing across components
+- Do NOT create new `{package}/dto/` modules; use `common/dto/` instead
 
 **See detailed guidelines:** `src/ai/backend/common/dto/README.md`
 

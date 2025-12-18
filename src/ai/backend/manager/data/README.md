@@ -46,7 +46,12 @@ Each domain directory contains DTOs specific to that domain's internal operation
 - The DTO is part of GraphQL schema consumed by web UI
 - Other components need the same data structure
 
-For shared DTOs, use `ai.backend.common.dto/manager/` instead.
+For inter-component DTOs, use `ai.backend.common.dto/manager/` instead.
+
+**Note on `ai.backend.manager.dto/`:**
+- This is a legacy module for inter-component communication
+- Use Pydantic models in `manager.dto/` for now
+- Gradually migrate DTOs to `common/dto/manager/` for better type sharing across components
 
 ## Guidelines
 

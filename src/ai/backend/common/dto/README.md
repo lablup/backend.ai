@@ -38,8 +38,12 @@ dto/
 
 For component-internal DTOs, use:
 - Manager: `ai.backend.manager.data/{domain}/`
-- Storage: `ai.backend.storage.dto/`
 - Agent: `ai.backend.agent.data/` (if needed)
+
+**Note on legacy `{package}/dto/` modules:**
+- `ai.backend.manager.dto/` and `ai.backend.storage.dto/` are legacy inter-component DTO modules
+- These should be gradually migrated to `common/dto/{component}/`
+- For new inter-component DTOs, always use `common/dto/` instead of `{package}/dto/`
 
 ## Guidelines
 
@@ -169,12 +173,30 @@ Examples:
 
 ## Migration Process
 
+### Moving from Legacy `{package}/dto/` to `common/dto/`
+
+**Priority migration:** Legacy inter-component DTOs in `{package}/dto/` should be moved here:
+
+1. **Identify** DTOs used in inter-component communication (RPC, message queues)
+2. **Copy** the DTO to the appropriate `common/dto/{component}/` directory
+3. **Convert** to Pydantic if not already (recommended for inter-component communication)
+4. **Add** backward compatibility imports in legacy location:
+   ```python
+   # In ai.backend.storage.dto/legacy_module.py
+   from ai.backend.common.dto.storage.new_module import NewDTO as LegacyDTO
+
+   __all__ = ["LegacyDTO"]
+   ```
+5. **Update** imports gradually across components
+6. **Document** deprecation in legacy module
+7. **Remove** legacy module after all references are updated
+
 ### Moving from Component-Internal to Shared
 
 When a component-internal DTO needs to be shared:
 
 1. **Copy** the DTO to the appropriate `common/dto/{component}/` directory
-2. **Convert** to Pydantic if it will be used in external APIs
+2. **Convert** to Pydantic (recommended for inter-component communication)
 3. **Update** imports in the original component
 4. **Document** the DTO's purpose and consumers
 5. **Coordinate** with teams that will use it
@@ -185,7 +207,7 @@ When a component-internal DTO needs to be shared:
 When a shared DTO is no longer used across components:
 
 1. **Verify** no other components reference it (grep, IDE search)
-2. **Move** to component's `data/` or `dto/` directory
+2. **Move** to component's `data/` directory (NOT `dto/`)
 3. **Simplify** to dataclass if Pydantic validation is not needed
 4. **Update** imports
 5. **Remove** from `common/dto/`
