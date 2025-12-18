@@ -22,6 +22,13 @@ class ArtifactConditions:
     """Query conditions for artifacts."""
 
     @staticmethod
+    def by_ids(artifact_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ArtifactRow.id.in_(artifact_ids)
+
+        return inner
+
+    @staticmethod
     def by_name_contains(name: str, case_insensitive: bool = False) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
