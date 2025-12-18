@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from typing import Optional, cast
 
 import sqlalchemy as sa
@@ -47,7 +48,15 @@ from ..creators import (
     PermissionCreatorSpec,
     PermissionGroupCreatorSpec,
 )
-from ..updaters import RoleUpdaterSpec
+
+
+@dataclass
+class CreateRoleInput:
+    """Input for creating a role with permission groups and object permissions."""
+
+    creator: Creator[RoleRow]
+    permission_groups: Sequence[PermissionGroupCreatorBeforeRoleCreation]
+    object_permissions: Sequence[ObjectPermissionCreateInputBeforeRoleCreation]
 
 
 class PermissionDBSource:
@@ -56,21 +65,14 @@ class PermissionDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def create_role(
-        self,
-        creator: Creator[RoleRow],
-        permission_groups: Sequence[PermissionGroupCreatorBeforeRoleCreation] = tuple(),
-        object_permissions: Sequence[ObjectPermissionCreateInputBeforeRoleCreation] = tuple(),
-    ) -> RoleRow:
+    async def create_role(self, input_data: CreateRoleInput) -> RoleRow:
         """
         Create a new role with permission groups and object permissions.
 
         All related entities are created in a single transaction.
 
         Args:
-            creator: Role creator defining the role to create
-            permission_groups: Optional sequence of permission groups with their permissions to create
-            object_permissions: Optional sequence of object permissions to create
+            input_data: Input containing creator, permission groups, and object permissions
 
         Returns:
             Created role row
@@ -78,28 +80,28 @@ class PermissionDBSource:
 
         async with self._db.begin_session() as db_session:
             # 1. Create role
-            result = await execute_creator(db_session, creator)
+            result = await execute_creator(db_session, input_data.creator)
             role_row = result.row
             role_id = role_row.id
 
             # 2. Create permission groups with their nested permissions
-            for pg_input in permission_groups:
-                pg_creator_input = pg_input.to_input(role_id)
+            for group_input in input_data.permission_groups:
+                group_creator_input = group_input.to_input(role_id)
                 # 2-1. Create permission group
-                pg_creator = Creator(
+                group_creator = Creator(
                     spec=PermissionGroupCreatorSpec(
-                        role_id=pg_creator_input.role_id,
-                        scope_id=pg_creator_input.scope_id,
-                        permissions=pg_creator_input.permissions,
+                        role_id=group_creator_input.role_id,
+                        scope_id=group_creator_input.scope_id,
+                        permissions=group_creator_input.permissions,
                     )
                 )
-                pg_row = await self._add_permission_group(db_session, pg_creator)
+                group_row = await self._add_permission_group(db_session, group_creator)
 
                 # 2-2. Create nested permissions
-                for perm_input in pg_creator_input.permissions:
+                for perm_input in group_creator_input.permissions:
                     perm_creator = Creator(
                         spec=PermissionCreatorSpec(
-                            permission_group_id=pg_row.id,
+                            permission_group_id=group_row.id,
                             entity_type=perm_input.entity_type,
                             operation=perm_input.operation,
                         )
@@ -107,7 +109,7 @@ class PermissionDBSource:
                     await self._add_permission_to_group(db_session, perm_creator)
 
             # 3. Create object permissions
-            for obj_perm_input in object_permissions:
+            for obj_perm_input in input_data.object_permissions:
                 obj_perm_creator = Creator(
                     spec=ObjectPermissionCreatorSpec(
                         role_id=role_id,
@@ -213,7 +215,7 @@ class PermissionDBSource:
     async def delete_permission(
         self,
         purger: Purger[PermissionRow],
-    ) -> PermissionRow | None:
+    ) -> PermissionRow:
         """
         Delete a permission.
 
@@ -221,11 +223,16 @@ class PermissionDBSource:
             purger: Purger with permission ID
 
         Returns:
-            Deleted permission row, or None if not found
+            Deleted permission row
+
+        Raises:
+            ObjectNotFound: If permission does not exist
         """
         async with self._db.begin_session() as db_session:
             result = await execute_purger(db_session, purger)
-            return result.row if result else None
+            if result is None:
+                raise ObjectNotFound(f"Permission with ID {purger.pk_value} does not exist.")
+            return result.row
 
     async def delete_object_permission(
         self,
