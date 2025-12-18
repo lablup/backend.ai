@@ -578,6 +578,12 @@ enum BgtaskEventType {
   FAILED
 }
 
+"""Added in 25.19.0. Configuration for blue-green deployment strategy."""
+input BlueGreenConfigInput {
+  autoPromote: Boolean! = false
+  promoteDelaySeconds: Int! = 0
+}
+
 scalar ByteSize
 
 """
@@ -1031,6 +1037,16 @@ enum DeploymentOrderField {
   NAME
 }
 
+"""Added in 25.19.0. Deployment policy configuration."""
+type DeploymentPolicy implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  strategySpec: DeploymentStrategySpec!
+  rollbackOnFailure: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
 """
 Added in 25.16.0. This enum represents the deployment status of a model deployment, indicating its current state.
 """
@@ -1055,13 +1071,25 @@ input DeploymentStatusFilter {
 }
 
 """Added in 25.16.0"""
-type DeploymentStrategy {
+type DeploymentStrategyGQL {
   type: DeploymentStrategyType!
 }
 
-"""Added in 25.16.0"""
+"""
+Added in 25.19.0. Deployment strategy configuration with discriminator pattern.
+"""
 input DeploymentStrategyInput {
   type: DeploymentStrategyType!
+  rollbackOnFailure: Boolean! = false
+  rollingUpdate: RollingUpdateConfigInput = null
+  blueGreen: BlueGreenConfigInput = null
+}
+
+"""
+Added in 25.19.0. Base interface for deployment strategy specifications.
+"""
+interface DeploymentStrategySpec {
+  strategy: DeploymentStrategyType!
 }
 
 """
@@ -1239,10 +1267,13 @@ type ModelDeployment implements Node {
   metadata: ModelDeploymentMetadata!
   networkAccess: ModelDeploymentNetworkAccess!
   revision: ModelRevision
-  defaultDeploymentStrategy: DeploymentStrategy!
+  defaultDeploymentStrategy: DeploymentStrategyGQL!
   createdUser: UserNode!
   scalingRule: ScalingRule!
   replicaState: ReplicaState!
+
+  """Added in 25.19.0. Deployment policy configuration."""
+  deploymentPolicy: DeploymentPolicy
   revisionHistory(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection!
 }
 
@@ -2271,6 +2302,12 @@ Contains the artifacts that were restored from soft-deleted state.
 """
 type RestoreArtifactsPayload {
   artifacts: [Artifact!]!
+}
+
+"""Added in 25.19.0. Configuration for rolling update strategy."""
+input RollingUpdateConfigInput {
+  maxSurge: Int! = 1
+  maxUnavailable: Int! = 0
 }
 
 """Added in 25.18.0. Driver configuration for resource allocation"""
