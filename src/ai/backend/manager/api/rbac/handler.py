@@ -36,7 +36,7 @@ from ai.backend.common.dto.manager.rbac import (
 from ai.backend.common.dto.manager.rbac.request import DeleteRoleRequest, PurgeRoleRequest
 from ai.backend.manager.data.permission.role import UserRoleAssignmentInput, UserRoleRevocationInput
 from ai.backend.manager.dto.context import ProcessorsCtx
-from ai.backend.manager.errors.permission import NotEnoughPermission, RoleNotFound
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.repositories.base import Creator, Purger, Updater
 from ai.backend.manager.repositories.permission_controller.creators import RoleCreatorSpec
@@ -80,7 +80,7 @@ class RBACAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can create roles.")
+            raise NotEnoughPermission("Only superadmin can create roles.")
 
         # Convert request to creator
         creator = Creator(
@@ -112,7 +112,7 @@ class RBACAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can search roles.")
+            raise NotEnoughPermission("Only superadmin can search roles.")
 
         # Build querier using adapter
         querier = self.role_adapter.build_querier(body.parsed)
@@ -144,15 +144,12 @@ class RBACAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can get role details.")
+            raise NotEnoughPermission("Only superadmin can get role details.")
 
         # Call service action
         action_result = await processors.permission_controller.get_role_detail.wait_for_complete(
             GetRoleDetailAction(role_id=path.parsed.role_id)
         )
-
-        if action_result.role is None:
-            raise web.HTTPNotFound(reason=f"Role {path.parsed.role_id} not found.")
 
         # Build response
         resp = GetRoleResponse(role=self.role_adapter.convert_to_dto(action_result.role))
@@ -170,7 +167,7 @@ class RBACAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can update roles.")
+            raise NotEnoughPermission("Only superadmin can update roles.")
 
         # Build updater using adapter
         role_id = path.parsed.role_id
@@ -180,9 +177,6 @@ class RBACAPIHandler:
         action_result = await processors.permission_controller.update_role.wait_for_complete(
             UpdateRoleAction(updater=updater)
         )
-
-        if action_result.data is None:
-            raise RoleNotFound(f"Role {role_id} not found.")
 
         # Build response
         resp = UpdateRoleResponse(role=self.role_adapter.convert_to_dto(action_result.data))
@@ -255,7 +249,7 @@ class RBACAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can assign roles.")
+            raise NotEnoughPermission("Only superadmin can assign roles.")
 
         # Create assignment input
         input_data = UserRoleAssignmentInput(
@@ -288,7 +282,7 @@ class RBACAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can revoke roles.")
+            raise NotEnoughPermission("Only superadmin can revoke roles.")
 
         # Create revocation input
         input_data = UserRoleRevocationInput(
@@ -320,7 +314,7 @@ class RBACAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can search assigned users.")
+            raise NotEnoughPermission("Only superadmin can search assigned users.")
 
         # Build querier using adapter (includes role_id as filter condition)
         querier = self.assigned_user_adapter.build_querier(path.parsed, body.parsed)
