@@ -5,15 +5,15 @@ from functools import lru_cache
 from typing import AsyncGenerator, Optional
 
 import strawberry
-from aiotools import apartial
 from strawberry import ID, Info
-from strawberry.dataloader import DataLoader
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import (
     to_global_id,
 )
+from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.artifact.types import ArtifactAvailability
@@ -22,6 +22,7 @@ from ai.backend.manager.errors.artifact import (
     ArtifactImportDelegationError,
     ArtifactScanLimitExceededError,
 )
+from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.repositories.artifact.updaters import ArtifactUpdaterSpec
@@ -56,7 +57,6 @@ from ai.backend.manager.services.artifact_revision.actions.search import (
 )
 from ai.backend.manager.types import TriState
 
-from ..artifact_registry_meta import ArtifactRegistryMeta
 from .types import (
     ApproveArtifactInput,
     ApproveArtifactPayload,
@@ -97,6 +97,26 @@ from .types import (
     UpdateArtifactInput,
     UpdateArtifactPayload,
 )
+
+
+async def _get_registry_url(
+    data_loaders: DataLoaders,
+    registry_id: uuid.UUID,
+    registry_type: ArtifactRegistryType,
+) -> str:
+    """Get the URL for a registry based on its type."""
+    match registry_type:
+        case ArtifactRegistryType.HUGGINGFACE:
+            hf_registry = await data_loaders.huggingface_registry_loader.load(registry_id)
+            if hf_registry is None:
+                raise ArtifactRegistryNotFoundError(f"HuggingFace registry {registry_id} not found")
+            return hf_registry.url
+        case ArtifactRegistryType.RESERVOIR:
+            reservoir_registry = await data_loaders.reservoir_registry_loader.load(registry_id)
+            if reservoir_registry is None:
+                raise ArtifactRegistryNotFoundError(f"Reservoir registry {registry_id} not found")
+            return reservoir_registry.endpoint
+    raise ArtifactRegistryNotFoundError(f"Unknown registry type: {registry_type}")
 
 
 @lru_cache(maxsize=1)
@@ -169,17 +189,28 @@ async def artifacts(
         SearchArtifactsAction(querier=querier)
     )
 
-    registry_meta_loader = DataLoader(
-        apartial(ArtifactRegistryMeta.load_by_id, info.context),
-    )
+    data_loaders = info.context.data_loaders
+    registry_loader = data_loaders.artifact_registry_loader
 
     # Build GraphQL connection response
     edges = []
     for artifact_data in action_result.data:
-        registry_meta = await registry_meta_loader.load(artifact_data.registry_id)
-        source_registry_meta = await registry_meta_loader.load(artifact_data.source_registry_id)
+        registry_data = await registry_loader.load(artifact_data.registry_id)
+        source_registry_data = await registry_loader.load(artifact_data.source_registry_id)
+        if registry_data is None:
+            raise ArtifactRegistryNotFoundError(f"Registry {artifact_data.registry_id} not found")
+        if source_registry_data is None:
+            raise ArtifactRegistryNotFoundError(
+                f"Source registry {artifact_data.source_registry_id} not found"
+            )
+        registry_url = await _get_registry_url(
+            data_loaders, artifact_data.registry_id, registry_data.type
+        )
+        source_url = await _get_registry_url(
+            data_loaders, artifact_data.source_registry_id, source_registry_data.type
+        )
         artifact = Artifact.from_dataclass(
-            artifact_data, registry_url=registry_meta.url, source_url=source_registry_meta.url
+            artifact_data, registry_url=registry_url, source_url=source_url
         )
         cursor = to_global_id(Artifact, artifact_data.id)
         edges.append(ArtifactEdge(node=artifact, cursor=cursor))
@@ -215,16 +246,28 @@ async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Artifac
         )
     )
 
-    registry_meta_loader = DataLoader(
-        apartial(ArtifactRegistryMeta.load_by_id, info.context),
+    data_loaders = info.context.data_loaders
+    registry_loader = data_loaders.artifact_registry_loader
+
+    registry_data = await registry_loader.load(action_result.result.registry_id)
+    source_registry_data = await registry_loader.load(action_result.result.source_registry_id)
+    if registry_data is None:
+        raise ArtifactRegistryNotFoundError(
+            f"Registry {action_result.result.registry_id} not found"
+        )
+    if source_registry_data is None:
+        raise ArtifactRegistryNotFoundError(
+            f"Source registry {action_result.result.source_registry_id} not found"
+        )
+
+    registry_url = await _get_registry_url(
+        data_loaders, action_result.result.registry_id, registry_data.type
+    )
+    source_url = await _get_registry_url(
+        data_loaders, action_result.result.source_registry_id, source_registry_data.type
     )
 
-    registry_data = await registry_meta_loader.load(action_result.result.registry_id)
-    source_registry_data = await registry_meta_loader.load(action_result.result.source_registry_id)
-
-    return Artifact.from_dataclass(
-        action_result.result, registry_data.url, source_registry_data.url
-    )
+    return Artifact.from_dataclass(action_result.result, registry_url, source_url)
 
 
 @strawberry.field(
@@ -344,15 +387,24 @@ async def scan_artifacts(
         )
     )
 
-    registry_meta_loader = DataLoader(
-        apartial(ArtifactRegistryMeta.load_by_id, info.context),
-    )
+    data_loaders = info.context.data_loaders
+    registry_loader = data_loaders.artifact_registry_loader
 
     artifacts = []
     for item in action_result.result:
-        registry_data = await registry_meta_loader.load(item.registry_id)
-        source_registry_data = await registry_meta_loader.load(item.source_registry_id)
-        artifacts.append(Artifact.from_dataclass(item, registry_data.url, source_registry_data.url))
+        registry_data = await registry_loader.load(item.registry_id)
+        source_registry_data = await registry_loader.load(item.source_registry_id)
+        if registry_data is None:
+            raise ArtifactRegistryNotFoundError(f"Registry {item.registry_id} not found")
+        if source_registry_data is None:
+            raise ArtifactRegistryNotFoundError(
+                f"Source registry {item.source_registry_id} not found"
+            )
+        registry_url = await _get_registry_url(data_loaders, item.registry_id, registry_data.type)
+        source_url = await _get_registry_url(
+            data_loaders, item.source_registry_id, source_registry_data.type
+        )
+        artifacts.append(Artifact.from_dataclass(item, registry_url, source_url))
     return ScanArtifactsPayload(artifacts=artifacts)
 
 
@@ -450,15 +502,24 @@ async def delegate_scan_artifacts(
         )
     )
 
-    registry_meta_loader = DataLoader(
-        apartial(ArtifactRegistryMeta.load_by_id, info.context),
-    )
+    data_loaders = info.context.data_loaders
+    registry_loader = data_loaders.artifact_registry_loader
 
     artifacts = []
     for item in action_result.result:
-        registry_data = await registry_meta_loader.load(item.registry_id)
-        source_registry_data = await registry_meta_loader.load(item.source_registry_id)
-        artifacts.append(Artifact.from_dataclass(item, registry_data.url, source_registry_data.url))
+        registry_data = await registry_loader.load(item.registry_id)
+        source_registry_data = await registry_loader.load(item.source_registry_id)
+        if registry_data is None:
+            raise ArtifactRegistryNotFoundError(f"Registry {item.registry_id} not found")
+        if source_registry_data is None:
+            raise ArtifactRegistryNotFoundError(
+                f"Source registry {item.source_registry_id} not found"
+            )
+        registry_url = await _get_registry_url(data_loaders, item.registry_id, registry_data.type)
+        source_url = await _get_registry_url(
+            data_loaders, item.source_registry_id, source_registry_data.type
+        )
+        artifacts.append(Artifact.from_dataclass(item, registry_url, source_url))
     return DelegateScanArtifactsPayload(artifacts=artifacts)
 
 
@@ -563,17 +624,25 @@ async def update_artifact(
     )
 
     artifact = action_result.result
-    registry_meta_loader = DataLoader(
-        apartial(ArtifactRegistryMeta.load_by_id, info.context),
+    data_loaders = info.context.data_loaders
+    registry_loader = data_loaders.artifact_registry_loader
+
+    registry_data = await registry_loader.load(artifact.registry_id)
+    source_registry_data = await registry_loader.load(artifact.source_registry_id)
+    if registry_data is None:
+        raise ArtifactRegistryNotFoundError(f"Registry {artifact.registry_id} not found")
+    if source_registry_data is None:
+        raise ArtifactRegistryNotFoundError(
+            f"Source registry {artifact.source_registry_id} not found"
+        )
+
+    registry_url = await _get_registry_url(data_loaders, artifact.registry_id, registry_data.type)
+    source_url = await _get_registry_url(
+        data_loaders, artifact.source_registry_id, source_registry_data.type
     )
 
-    registry_data = await registry_meta_loader.load(artifact.registry_id)
-    source_registry_data = await registry_meta_loader.load(artifact.source_registry_id)
-
     return UpdateArtifactPayload(
-        artifact=Artifact.from_dataclass(
-            artifact, registry_url=registry_data.url, source_url=source_registry_data.url
-        )
+        artifact=Artifact.from_dataclass(artifact, registry_url=registry_url, source_url=source_url)
     )
 
 
@@ -641,15 +710,24 @@ async def delete_artifacts(
         )
     )
 
-    registry_meta_loader = DataLoader(
-        apartial(ArtifactRegistryMeta.load_by_id, info.context),
-    )
+    data_loaders = info.context.data_loaders
+    registry_loader = data_loaders.artifact_registry_loader
 
     artifacts = []
     for item in action_result.artifacts:
-        registry_data = await registry_meta_loader.load(item.registry_id)
-        source_registry_data = await registry_meta_loader.load(item.source_registry_id)
-        artifacts.append(Artifact.from_dataclass(item, registry_data.url, source_registry_data.url))
+        registry_data = await registry_loader.load(item.registry_id)
+        source_registry_data = await registry_loader.load(item.source_registry_id)
+        if registry_data is None:
+            raise ArtifactRegistryNotFoundError(f"Registry {item.registry_id} not found")
+        if source_registry_data is None:
+            raise ArtifactRegistryNotFoundError(
+                f"Source registry {item.source_registry_id} not found"
+            )
+        registry_url = await _get_registry_url(data_loaders, item.registry_id, registry_data.type)
+        source_url = await _get_registry_url(
+            data_loaders, item.source_registry_id, source_registry_data.type
+        )
+        artifacts.append(Artifact.from_dataclass(item, registry_url, source_url))
 
     return DeleteArtifactsPayload(artifacts=artifacts)
 
@@ -673,15 +751,24 @@ async def restore_artifacts(
         )
     )
 
-    registry_meta_loader = DataLoader(
-        apartial(ArtifactRegistryMeta.load_by_id, info.context),
-    )
+    data_loaders = info.context.data_loaders
+    registry_loader = data_loaders.artifact_registry_loader
 
     artifacts = []
     for item in action_result.artifacts:
-        registry_data = await registry_meta_loader.load(item.registry_id)
-        source_registry_data = await registry_meta_loader.load(item.source_registry_id)
-        artifacts.append(Artifact.from_dataclass(item, registry_data.url, source_registry_data.url))
+        registry_data = await registry_loader.load(item.registry_id)
+        source_registry_data = await registry_loader.load(item.source_registry_id)
+        if registry_data is None:
+            raise ArtifactRegistryNotFoundError(f"Registry {item.registry_id} not found")
+        if source_registry_data is None:
+            raise ArtifactRegistryNotFoundError(
+                f"Source registry {item.source_registry_id} not found"
+            )
+        registry_url = await _get_registry_url(data_loaders, item.registry_id, registry_data.type)
+        source_url = await _get_registry_url(
+            data_loaders, item.source_registry_id, source_registry_data.type
+        )
+        artifacts.append(Artifact.from_dataclass(item, registry_url, source_url))
 
     return RestoreArtifactsPayload(artifacts=artifacts)
 
