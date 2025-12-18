@@ -9,7 +9,15 @@ from ai.backend.manager.repositories.base.purger import Purger
 
 
 @dataclass
-class CreatePermissionAction(BaseAction):
+class PermissionAction(BaseAction):
+    @override
+    @classmethod
+    def entity_type(cls) -> str:
+        return "permission"
+
+
+@dataclass
+class CreatePermissionAction(PermissionAction):
     creator: Creator[PermissionRow]
 
     @override
@@ -32,7 +40,7 @@ class CreatePermissionActionResult(BaseActionResult):
 
 
 @dataclass
-class DeletePermissionAction(BaseAction):
+class DeletePermissionAction(PermissionAction):
     purger: Purger[PermissionRow]
 
     @override
