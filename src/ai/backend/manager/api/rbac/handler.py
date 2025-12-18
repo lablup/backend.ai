@@ -18,7 +18,6 @@ from ai.backend.common.dto.manager.rbac import (
     AssignRoleResponse,
     CreateRoleRequest,
     CreateRoleResponse,
-    DeleteRolePathParam,
     DeleteRoleResponse,
     GetRolePathParam,
     GetRoleResponse,
@@ -34,11 +33,12 @@ from ai.backend.common.dto.manager.rbac import (
     UpdateRoleRequest,
     UpdateRoleResponse,
 )
+from ai.backend.common.dto.manager.rbac.request import DeleteRoleRequest, PurgeRoleRequest
 from ai.backend.manager.data.permission.role import UserRoleAssignmentInput, UserRoleRevocationInput
 from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.errors.permission import NotEnoughPermission, RoleNotFound
 from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.repositories.base import Creator, Purger
+from ai.backend.manager.repositories.base import Creator, Purger, Updater
 from ai.backend.manager.repositories.permission_controller.creators import RoleCreatorSpec
 from ai.backend.manager.services.permission_contoller.actions import (
     AssignRoleAction,
@@ -50,6 +50,7 @@ from ai.backend.manager.services.permission_contoller.actions import (
     SearchUsersAssignedToRoleAction,
     UpdateRoleAction,
 )
+from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
 
 from ..auth import auth_required_for_method
 from ..types import CORSOptions, WebMiddleware
@@ -191,7 +192,7 @@ class RBACAPIHandler:
     @api_handler
     async def delete_role(
         self,
-        path: PathParam[DeleteRolePathParam],
+        body: BodyParam[DeleteRoleRequest],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         """Delete a role (soft delete)."""
@@ -200,12 +201,41 @@ class RBACAPIHandler:
         if me is None or not me.is_superadmin:
             raise NotEnoughPermission("Only superadmin can delete roles.")
 
-        # Create purger
-        purger: Purger[RoleRow] = Purger(row_class=RoleRow, pk_value=path.parsed.role_id)
+        role_id = body.parsed.role_id
+
+        # Create updater
+        updater: Updater[RoleRow] = self.role_adapter.build_deleter(role_id)
 
         # Call service action
         await processors.permission_controller.delete_role.wait_for_complete(
-            DeleteRoleAction(purger=purger)
+            DeleteRoleAction(updater=updater)
+        )
+
+        # Build response
+        resp = DeleteRoleResponse(deleted=True)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    @auth_required_for_method
+    @api_handler
+    async def purge_role(
+        self,
+        body: BodyParam[PurgeRoleRequest],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Delete a role (soft delete)."""
+        processors = processors_ctx.processors
+        me = current_user()
+        if me is None or not me.is_superadmin:
+            raise NotEnoughPermission("Only superadmin can delete roles.")
+
+        role_id = body.parsed.role_id
+
+        # Create purger
+        purger: Purger[RoleRow] = self.role_adapter.build_purger(role_id)
+
+        # Call service action
+        await processors.permission_controller.purge_role.wait_for_complete(
+            PurgeRoleAction(purger=purger)
         )
 
         # Build response
@@ -273,7 +303,6 @@ class RBACAPIHandler:
 
         # Build response
         resp = RevokeRoleResponse(
-            user_role_id=action_result.data.user_role_id,
             user_id=action_result.data.user_id,
             role_id=action_result.data.role_id,
         )
@@ -331,7 +360,8 @@ def create_app(
     cors.add(app.router.add_route("POST", "/roles/search", api_handler.search_roles))
     cors.add(app.router.add_route("GET", "/roles/{role_id}", api_handler.get_role))
     cors.add(app.router.add_route("PATCH", "/roles/{role_id}", api_handler.update_role))
-    cors.add(app.router.add_route("DELETE", "/roles/{role_id}", api_handler.delete_role))
+    cors.add(app.router.add_route("POST", "/roles/delete", api_handler.delete_role))
+    cors.add(app.router.add_route("POST", "/roles/purge", api_handler.purge_role))
 
     # Role assignment routes
     cors.add(app.router.add_route("POST", "/roles/assign", api_handler.assign_role))

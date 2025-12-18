@@ -61,6 +61,18 @@ class UpdateRoleRequest(BaseRequestModel):
     )
 
 
+class DeleteRoleRequest(BaseRequestModel):
+    """Request to delete a role."""
+
+    role_id: UUID = Field(description="Role ID to delete")
+
+
+class PurgeRoleRequest(BaseRequestModel):
+    """Request to purge a role."""
+
+    role_id: UUID = Field(description="Role ID to purge")
+
+
 class AssignRoleRequest(BaseRequestModel):
     """Request to assign a role to a user."""
 
