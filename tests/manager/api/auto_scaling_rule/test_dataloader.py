@@ -24,8 +24,8 @@ class TestLoadAutoScalingRulesByIds:
     def create_mock_processor(rules: list[MagicMock]) -> MagicMock:
         mock_processor = MagicMock()
         mock_action_result = MagicMock()
-        mock_action_result.data = rules
-        mock_processor.batch_load_auto_scaling_rules.wait_for_complete = AsyncMock(
+        mock_action_result.rules = rules
+        mock_processor.search_auto_scaling_rules.wait_for_complete = AsyncMock(
             return_value=mock_action_result
         )
         return mock_processor
@@ -39,7 +39,7 @@ class TestLoadAutoScalingRulesByIds:
 
         # Then
         assert result == []
-        mock_processor.batch_load_auto_scaling_rules.wait_for_complete.assert_not_called()
+        mock_processor.search_auto_scaling_rules.wait_for_complete.assert_not_called()
 
     async def test_returns_rules_in_request_order(self) -> None:
         # Given

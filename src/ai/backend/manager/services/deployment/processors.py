@@ -25,6 +25,10 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.delete_aut
     DeleteAutoScalingRuleAction,
     DeleteAutoScalingRuleActionResult,
 )
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
+    SearchAutoScalingRulesAction,
+    SearchAutoScalingRulesActionResult,
+)
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_auto_scaling_rule import (
     UpdateAutoScalingRuleAction,
     UpdateAutoScalingRuleActionResult,
@@ -146,6 +150,10 @@ class DeploymentServiceProtocol(Protocol):
         self, action: BatchLoadAutoScalingRulesAction
     ) -> BatchLoadAutoScalingRulesActionResult: ...
 
+    async def search_auto_scaling_rules(
+        self, action: SearchAutoScalingRulesAction
+    ) -> SearchAutoScalingRulesActionResult: ...
+
     async def get_revision_by_deployment_id(
         self, action: GetRevisionByDeploymentIdAction
     ) -> GetRevisionByDeploymentIdActionResult: ...
@@ -207,6 +215,9 @@ class DeploymentProcessors(AbstractProcessorPackage):
     batch_load_auto_scaling_rules: ActionProcessor[
         BatchLoadAutoScalingRulesAction, BatchLoadAutoScalingRulesActionResult
     ]
+    search_auto_scaling_rules: ActionProcessor[
+        SearchAutoScalingRulesAction, SearchAutoScalingRulesActionResult
+    ]
     get_revision_by_id: ActionProcessor[GetRevisionByIdAction, GetRevisionByIdActionResult]
     batch_load_revisions: ActionProcessor[BatchLoadRevisionsAction, BatchLoadRevisionsActionResult]
     get_revision_by_deployment_id: ActionProcessor[
@@ -259,6 +270,9 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.batch_load_auto_scaling_rules = ActionProcessor(
             service.batch_load_auto_scaling_rules, action_monitors
         )
+        self.search_auto_scaling_rules = ActionProcessor(
+            service.search_auto_scaling_rules, action_monitors
+        )
         self.get_revision_by_replica_id = ActionProcessor(
             service.get_revision_by_replica_id, action_monitors
         )
@@ -287,6 +301,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
             SyncReplicaAction.spec(),
             AddModelRevisionAction.spec(),
             BatchLoadAutoScalingRulesAction.spec(),
+            SearchAutoScalingRulesAction.spec(),
             GetRevisionByDeploymentIdAction.spec(),
             GetRevisionByReplicaIdAction.spec(),
             GetRevisionByIdAction.spec(),

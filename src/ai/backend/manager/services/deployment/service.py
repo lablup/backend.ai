@@ -50,6 +50,10 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.delete_aut
     DeleteAutoScalingRuleAction,
     DeleteAutoScalingRuleActionResult,
 )
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
+    SearchAutoScalingRulesAction,
+    SearchAutoScalingRulesActionResult,
+)
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_auto_scaling_rule import (
     UpdateAutoScalingRuleAction,
     UpdateAutoScalingRuleActionResult,
@@ -389,6 +393,31 @@ class DeploymentService:
                     last_triggered_at=datetime.now(),
                 ),
             ]
+        )
+
+    async def search_auto_scaling_rules(
+        self, action: SearchAutoScalingRulesAction
+    ) -> SearchAutoScalingRulesActionResult:
+        return SearchAutoScalingRulesActionResult(
+            rules=[
+                ModelDeploymentAutoScalingRuleData(
+                    id=uuid4(),
+                    model_deployment_id=uuid4(),
+                    metric_source=AutoScalingMetricSource.KERNEL,
+                    metric_name="test-metric",
+                    min_threshold=Decimal("0.5"),
+                    max_threshold=Decimal("21.0"),
+                    step_size=1,
+                    time_window=60,
+                    min_replicas=1,
+                    max_replicas=10,
+                    created_at=datetime.now(),
+                    last_triggered_at=datetime.now(),
+                ),
+            ],
+            total_count=1,
+            has_next_page=False,
+            has_previous_page=False,
         )
 
     async def list_replicas(self, action: ListReplicasAction) -> ListReplicasActionResult:
