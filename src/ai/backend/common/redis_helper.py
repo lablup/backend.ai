@@ -43,6 +43,7 @@ from .validators import DelimiterSeperatedList, HostPortPair
 __all__ = (
     "execute",
     "get_redis_object",
+    "get_redis_object_for_lock",
 )
 
 _keepalive_options: MutableMapping[int, int] = {}
@@ -234,11 +235,99 @@ def get_redis_object(
         conn_opts["socket_connect_timeout"] = float(socket_connect_timeout)
     if max_connections := redis_helper_config.get("max_connections"):
         conn_pool_opts["max_connections"] = int(max_connections)
+    if _sentinel_addresses := redis_target.get("sentinel"):
+        sentinel_addresses: Any = None
+        if isinstance(_sentinel_addresses, str):
+            sentinel_addresses = DelimiterSeperatedList(HostPortPair).check_and_return(
+                _sentinel_addresses
+            )
+        else:
+            sentinel_addresses = _sentinel_addresses
+
+        service_name = redis_target.get("service_name")
+        password = redis_target.get("password")
+        assert service_name is not None, (
+            "config/redis/service_name is required when using Redis Sentinel"
+        )
+
+        kwargs = {
+            "password": password,
+            "ssl": redis_target.use_tls,
+            "ssl_cert_reqs": SSL_CERT_NONE if redis_target.tls_skip_verify else SSL_CERT_REQUIRED,
+        }
+        sentinel = Sentinel(
+            [(str(host), port) for host, port in sentinel_addresses],
+            password=password,
+            db=str(db),
+            sentinel_kwargs={
+                "password": password,
+                **kwargs,
+            },
+        )
+        return RedisConnectionInfo(
+            client=sentinel.master_for(
+                service_name=service_name,
+                password=password,
+                **conn_opts,
+            ),
+            sentinel=sentinel,
+            name=name,
+            service_name=service_name,
+            redis_helper_config=redis_helper_config,
+        )
+    else:
+        redis_url = redis_target.addr
+        if redis_url is None:
+            raise ValueError("Redis URL is not provided in the configuration.")
+
+        url = _parse_redis_url(redis_target, db)
+        connection_pool: ConnectionPool = ConnectionPool.from_url(
+            str(url),
+            **conn_pool_opts,
+            **conn_opts,
+        )
+        return RedisConnectionInfo(
+            client=Redis.from_pool(connection_pool),  # type: ignore[attr-defined]
+            sentinel=None,
+            name=name,
+            service_name=None,
+            redis_helper_config=redis_helper_config,
+        )
+
+
+def get_redis_object_for_lock(
+    redis_target: RedisTarget,
+    *,
+    name: str,
+    db: int = 0,
+    **kwargs,
+) -> RedisConnectionInfo:
+    """
+    Create a Redis connection using BlockingConnectionPool for distributed locking.
+    Uses `connection_ready_timeout` from redis_helper_config as the blocking timeout.
+    """
+    redis_helper_config: RedisHelperConfig = cast(
+        RedisHelperConfig, redis_target.redis_helper_config
+    )
+    conn_opts = {
+        **_default_conn_opts,
+        **kwargs,
+        "lib_name": None,  # disable implicit "CLIENT SETINFO"
+        "lib_version": None,  # disable implicit "CLIENT SETINFO"
+    }
+    conn_pool_opts = {
+        **_default_conn_pool_opts,
+    }
+    if socket_timeout := redis_helper_config.get("socket_timeout"):
+        conn_opts["socket_timeout"] = float(socket_timeout)
+    if socket_connect_timeout := redis_helper_config.get("socket_connect_timeout"):
+        conn_opts["socket_connect_timeout"] = float(socket_connect_timeout)
+    if max_connections := redis_helper_config.get("max_connections"):
+        conn_pool_opts["max_connections"] = int(max_connections)
     # NOTE: timeout is only supported in BlockingConnectionPool, not ConnectionPool.
     # BlockingConnectionPool waits for an available connection up to `timeout` seconds,
     # while ConnectionPool creates a new connection immediately when none are available.
-    connection_ready_timeout = redis_helper_config.get("connection_ready_timeout")
-    if connection_ready_timeout is not None:
+    if connection_ready_timeout := redis_helper_config.get("connection_ready_timeout"):
         conn_pool_opts["timeout"] = float(connection_ready_timeout)
     if _sentinel_addresses := redis_target.get("sentinel"):
         sentinel_addresses: Any = None
@@ -286,12 +375,7 @@ def get_redis_object(
             raise ValueError("Redis URL is not provided in the configuration.")
 
         url = _parse_redis_url(redis_target, db)
-        # Use BlockingConnectionPool if connection_ready_timeout is set,
-        # otherwise use regular ConnectionPool.
-        pool_class: type[ConnectionPool] = (
-            BlockingConnectionPool if connection_ready_timeout is not None else ConnectionPool
-        )
-        connection_pool: ConnectionPool = pool_class.from_url(
+        connection_pool: BlockingConnectionPool = BlockingConnectionPool.from_url(
             str(url),
             **conn_pool_opts,
             **conn_opts,

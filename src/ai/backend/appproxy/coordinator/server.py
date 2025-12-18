@@ -253,7 +253,7 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
 
     # Keep redis_lock for distributed locking (not yet migrated)
-    root_ctx.redis_lock = redis_helper.get_redis_object(
+    root_ctx.redis_lock = redis_helper.get_redis_object_for_lock(
         redis_profile_target.profile_target(RedisRole.STREAM),
         name="lock",  # distributed locks
         db=REDIS_STREAM_LOCK,
