@@ -544,34 +544,16 @@ class DeploymentDBSource:
 
     async def create_route(
         self,
-        endpoint_id: uuid.UUID,
-        traffic_ratio: float,
+        creator: Creator[RoutingRow],
     ) -> uuid.UUID:
-        """Create a new route for an endpoint."""
-        route_id = uuid.uuid4()
+        """Create a new route using the provided creator.
 
+        The Creator is built at the upper layer (service/action) and injected here.
+        This method only executes the creator.
+        """
         async with self._begin_session_read_committed() as db_sess:
-            # First get the endpoint to get owner, domain, and project info
-            query = sa.select(EndpointRow).where(EndpointRow.id == endpoint_id)
-            result = await db_sess.execute(query)
-            endpoint = result.scalar_one_or_none()
-
-            if not endpoint:
-                raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
-
-            route = RoutingRow(
-                id=route_id,
-                endpoint=endpoint_id,
-                session=None,
-                session_owner=endpoint.created_user,
-                domain=endpoint.domain,
-                project=endpoint.project,
-                status=RouteStatus.PROVISIONING,
-                traffic_ratio=traffic_ratio,
-            )
-            db_sess.add(route)
-
-        return route_id
+            result = await execute_creator(db_sess, creator)
+            return result.row.id
 
     async def get_routes_by_endpoint(
         self,
@@ -610,6 +592,19 @@ class DeploymentDBSource:
             )
             result = await db_sess.execute(query)
             return result.rowcount > 0
+
+    async def update_route(
+        self,
+        updater: Updater[RoutingRow],
+    ) -> bool:
+        """Update a route using the provided updater.
+
+        The Updater is built at the upper layer (service/action) and injected here.
+        This method only executes the updater.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            result = await execute_updater(db_sess, updater)
+            return result is not None
 
     async def update_route_status(
         self,

@@ -14,13 +14,28 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteInfo, RouteStatus
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    RouteInfo,
+    RouteStatus,
+    RouteTrafficStatus,
+)
 from ai.backend.manager.data.model_serving.types import RoutingData
 
 from ..errors.service import RoutingNotFound
-from .base import GUID, Base, EnumValueType, IDColumn, InferenceSessionError, Item, PaginatedList
+from .base import (
+    GUID,
+    Base,
+    EnumValueType,
+    IDColumn,
+    InferenceSessionError,
+    Item,
+    PaginatedList,
+    StrEnumType,
+)
 
 if TYPE_CHECKING:
+    from .deployment_revision import DeploymentRevisionRow
     from .endpoint import EndpointRow
     from .gql import GraphQueryContext
 
@@ -76,8 +91,24 @@ class RoutingRow(Base):
 
     error_data = sa.Column("error_data", pgsql.JSONB(), nullable=True, default=sa.null())
 
+    # Revision reference without FK (relationship only)
+    revision = sa.Column("revision", GUID, nullable=True)
+    traffic_status = sa.Column(
+        "traffic_status",
+        StrEnumType(RouteTrafficStatus),
+        nullable=False,
+        server_default=sa.text("'active'"),
+        default=RouteTrafficStatus.ACTIVE,
+    )
+
     endpoint_row = relationship("EndpointRow", back_populates="routings")
     session_row = relationship("SessionRow", back_populates="routing")
+    revision_row: "DeploymentRevisionRow" = relationship(
+        "DeploymentRevisionRow",
+        primaryjoin="RoutingRow.revision == DeploymentRevisionRow.id",
+        foreign_keys="RoutingRow.revision",
+        viewonly=True,
+    )
 
     @classmethod
     def by_deployment_info(cls, deployment_info: DeploymentInfo) -> Self:
@@ -192,8 +223,10 @@ class RoutingRow(Base):
         session_owner: uuid.UUID,
         domain: str,
         project: uuid.UUID,
-        status=RouteStatus.PROVISIONING,
-        traffic_ratio=1.0,
+        status: RouteStatus = RouteStatus.PROVISIONING,
+        traffic_ratio: float = 1.0,
+        revision: uuid.UUID | None = None,
+        traffic_status: RouteTrafficStatus = RouteTrafficStatus.ACTIVE,
     ) -> None:
         self.id = id
         self.endpoint = endpoint
@@ -203,6 +236,8 @@ class RoutingRow(Base):
         self.project = project
         self.status = status
         self.traffic_ratio = traffic_ratio
+        self.revision = revision
+        self.traffic_status = traffic_status
 
     def delegate_ownership(self, user_uuid: uuid.UUID) -> None:
         self.session_owner = user_uuid
@@ -226,6 +261,8 @@ class RoutingRow(Base):
             status=self.status,
             traffic_ratio=self.traffic_ratio,
             created_at=self.created_at,
+            revision_id=self.revision,
+            traffic_status=self.traffic_status,
             error_data=self.error_data or {},
         )
 

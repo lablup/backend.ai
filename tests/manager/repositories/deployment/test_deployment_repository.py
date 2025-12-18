@@ -2472,3 +2472,365 @@ class TestDeploymentPolicyOperations:
         result = await deployment_repository.delete_deployment_policy(purger)
 
         assert result is None
+
+
+class TestRouteOperations:
+    """Test cases for route repository operations."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database engine that auto-cleans data after each test."""
+        yield database_engine
+
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(sa.delete(RoutingRow))
+            await db_sess.execute(sa.delete(EndpointRow))
+            await db_sess.execute(sa.delete(GroupRow))
+            await db_sess.execute(sa.delete(UserRow))
+            await db_sess.execute(sa.delete(UserResourcePolicyRow))
+            await db_sess.execute(sa.delete(ProjectResourcePolicyRow))
+            await db_sess.execute(sa.delete(ScalingGroupRow))
+            await db_sess.execute(sa.delete(DomainRow))
+
+    @pytest.fixture
+    async def test_domain_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create test domain and return domain name."""
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            domain = DomainRow(
+                name=domain_name,
+                description="Test domain",
+                is_active=True,
+                total_resource_slots={},
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+            )
+            db_sess.add(domain)
+            await db_sess.flush()
+
+        yield domain_name
+
+    @pytest.fixture
+    async def test_scaling_group_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create test scaling group and return name."""
+        sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                description="Test scaling group",
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            db_sess.add(sgroup)
+            await db_sess.flush()
+
+        yield sgroup_name
+
+    @pytest.fixture
+    async def test_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create test resource policy and return policy name."""
+        policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_session_count_per_model_session=5,
+                max_customized_image_count=3,
+            )
+            db_sess.add(policy)
+            await db_sess.flush()
+
+        yield policy_name
+
+    @pytest.fixture
+    async def test_project_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create test project resource policy and return policy name."""
+        policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = ProjectResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=int(BinarySize.from_str("100GiB")),
+                max_network_count=5,
+            )
+            db_sess.add(policy)
+            await db_sess.flush()
+
+        yield policy_name
+
+    @pytest.fixture
+    async def test_user_uuid(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_resource_policy_name: str,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create test user and return user UUID."""
+        user_uuid = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            user = UserRow(
+                uuid=user_uuid,
+                username=f"testuser-{user_uuid.hex[:8]}",
+                email=f"test-{user_uuid.hex[:8]}@example.com",
+                password=create_test_password_info("test_password"),
+                need_password_change=False,
+                status=UserStatus.ACTIVE,
+                status_info="active",
+                domain_name=test_domain_name,
+                role=UserRole.USER,
+                resource_policy=test_resource_policy_name,
+            )
+            db_sess.add(user)
+            await db_sess.flush()
+
+        yield user_uuid
+
+    @pytest.fixture
+    async def test_group_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_project_resource_policy_name: str,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create test group and return group ID."""
+        group_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            group = GroupRow(
+                id=group_id,
+                name=f"test-group-{uuid.uuid4().hex[:8]}",
+                domain_name=test_domain_name,
+                resource_policy=test_project_resource_policy_name,
+            )
+            db_sess.add(group)
+            await db_sess.flush()
+
+        yield group_id
+
+    @pytest.fixture
+    async def test_endpoint_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_scaling_group_name: str,
+        test_user_uuid: uuid.UUID,
+        test_group_id: uuid.UUID,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create test endpoint and return endpoint ID."""
+        endpoint_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            endpoint = EndpointRow(
+                id=endpoint_id,
+                name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
+                created_user=test_user_uuid,
+                session_owner=test_user_uuid,
+                domain=test_domain_name,
+                project=test_group_id,
+                resource_group=test_scaling_group_name,
+                model=None,
+                desired_replicas=1,
+                image=None,
+                runtime_variant=RuntimeVariant.CUSTOM,
+                url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
+                open_to_public=False,
+                lifecycle_stage=EndpointLifecycle.DESTROYED,  # DESTROYED allows null image
+                resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
+            )
+            db_sess.add(endpoint)
+            await db_sess.flush()
+
+        yield endpoint_id
+
+    @pytest.fixture
+    async def deployment_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[DeploymentRepository, None]:
+        """Create DeploymentRepository instance."""
+        storage_manager = MagicMock()
+        valkey_stat = MagicMock()
+        valkey_live = MagicMock()
+        valkey_schedule = MagicMock()
+
+        repo = DeploymentRepository(
+            db=db_with_cleanup,
+            storage_manager=storage_manager,
+            valkey_stat=valkey_stat,
+            valkey_live=valkey_live,
+            valkey_schedule=valkey_schedule,
+        )
+        yield repo
+
+    @pytest.mark.asyncio
+    async def test_create_route(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_domain_name: str,
+        test_group_id: uuid.UUID,
+    ) -> None:
+        """Test creating a route using Creator with RouteCreatorSpec."""
+        from ai.backend.manager.data.deployment.types import RouteTrafficStatus
+        from ai.backend.manager.repositories.deployment.creators import RouteCreatorSpec
+
+        spec = RouteCreatorSpec(
+            endpoint=test_endpoint_id,
+            session_owner=test_user_uuid,
+            domain=test_domain_name,
+            project=test_group_id,
+            traffic_ratio=1.0,
+            revision=None,
+            traffic_status=RouteTrafficStatus.ACTIVE,
+        )
+        creator = Creator(spec=spec)
+
+        route_id = await deployment_repository.create_route(creator)
+
+        assert route_id is not None
+        assert isinstance(route_id, uuid.UUID)
+
+    @pytest.mark.asyncio
+    async def test_update_route_status(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_endpoint_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_domain_name: str,
+        test_group_id: uuid.UUID,
+    ) -> None:
+        """Test updating route status using RouteStatusUpdaterSpec."""
+        from ai.backend.manager.data.deployment.types import (
+            RouteStatus,
+            RouteTrafficStatus,
+        )
+        from ai.backend.manager.repositories.deployment.creators import RouteCreatorSpec
+        from ai.backend.manager.repositories.deployment.updaters import RouteStatusUpdaterSpec
+        from ai.backend.manager.types import OptionalState
+
+        # Create a route first
+        spec = RouteCreatorSpec(
+            endpoint=test_endpoint_id,
+            session_owner=test_user_uuid,
+            domain=test_domain_name,
+            project=test_group_id,
+        )
+        route_id = await deployment_repository.create_route(Creator(spec=spec))
+
+        # Update the route status
+        updater = Updater(
+            spec=RouteStatusUpdaterSpec(
+                status=OptionalState.update(RouteStatus.HEALTHY),
+                traffic_status=OptionalState.update(RouteTrafficStatus.INACTIVE),
+            ),
+            pk_value=route_id,
+        )
+        result = await deployment_repository.update_route(updater)
+
+        assert result is True
+
+        # Verify the update
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            query = sa.select(RoutingRow).where(RoutingRow.id == route_id)
+            db_result = await db_sess.execute(query)
+            route = db_result.scalar_one()
+            assert route.status == RouteStatus.HEALTHY
+            assert route.traffic_status == RouteTrafficStatus.INACTIVE
+
+    @pytest.mark.asyncio
+    async def test_update_route_with_unified_spec(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_endpoint_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_domain_name: str,
+        test_group_id: uuid.UUID,
+    ) -> None:
+        """Test updating route using unified RouteUpdaterSpec."""
+        from ai.backend.manager.data.deployment.types import (
+            RouteStatus,
+            RouteTrafficStatus,
+        )
+        from ai.backend.manager.repositories.deployment.creators import RouteCreatorSpec
+        from ai.backend.manager.repositories.deployment.updaters import RouteUpdaterSpec
+        from ai.backend.manager.types import OptionalState
+
+        # Create a route first
+        spec = RouteCreatorSpec(
+            endpoint=test_endpoint_id,
+            session_owner=test_user_uuid,
+            domain=test_domain_name,
+            project=test_group_id,
+        )
+        route_id = await deployment_repository.create_route(Creator(spec=spec))
+
+        # Update the route using unified spec (excluding session to avoid FK constraint)
+        updater = Updater(
+            spec=RouteUpdaterSpec(
+                status=OptionalState.update(RouteStatus.HEALTHY),
+                traffic_status=OptionalState.update(RouteTrafficStatus.ACTIVE),
+                traffic_ratio=OptionalState.update(0.5),
+            ),
+            pk_value=route_id,
+        )
+        result = await deployment_repository.update_route(updater)
+
+        assert result is True
+
+        # Verify the update
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            query = sa.select(RoutingRow).where(RoutingRow.id == route_id)
+            db_result = await db_sess.execute(query)
+            route = db_result.scalar_one()
+            assert route.status == RouteStatus.HEALTHY
+            assert route.traffic_status == RouteTrafficStatus.ACTIVE
+            assert route.traffic_ratio == 0.5
+
+    @pytest.mark.asyncio
+    async def test_update_route_not_found(
+        self,
+        deployment_repository: DeploymentRepository,
+    ) -> None:
+        """Test that update_route returns False for nonexistent route."""
+        from ai.backend.manager.data.deployment.types import RouteStatus
+        from ai.backend.manager.repositories.deployment.updaters import RouteStatusUpdaterSpec
+        from ai.backend.manager.types import OptionalState
+
+        nonexistent_id = uuid.uuid4()
+        updater = Updater(
+            spec=RouteStatusUpdaterSpec(
+                status=OptionalState.update(RouteStatus.HEALTHY),
+            ),
+            pk_value=nonexistent_id,
+        )
+
+        result = await deployment_repository.update_route(updater)
+
+        assert result is False
