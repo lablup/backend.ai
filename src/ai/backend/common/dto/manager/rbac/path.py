@@ -14,7 +14,6 @@ from ai.backend.common.api_handlers import BaseRequestModel
 __all__ = (
     "GetRolePathParam",
     "UpdateRolePathParam",
-    "DeleteRolePathParam",
     "SearchUsersAssignedToRolePathParam",
     "DeletePermissionPathParam",
     "DeleteObjectPermissionPathParam",
@@ -31,12 +30,6 @@ class UpdateRolePathParam(BaseRequestModel):
     """Path parameter for updating a role."""
 
     role_id: UUID = Field(description="The role ID to update")
-
-
-class DeleteRolePathParam(BaseRequestModel):
-    """Path parameter for deleting a role."""
-
-    role_id: UUID = Field(description="The role ID to delete")
 
 
 class SearchUsersAssignedToRolePathParam(BaseRequestModel):

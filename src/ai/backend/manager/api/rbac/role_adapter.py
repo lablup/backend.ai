@@ -26,6 +26,7 @@ from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
+    Purger,
     QueryCondition,
     QueryOrder,
 )
@@ -54,6 +55,20 @@ class RoleAdapter(BaseFilterAdapter):
             updated_at=data.updated_at,
             deleted_at=data.deleted_at,
             description=data.description,
+        )
+
+    def build_deleter(self, role_id: UUID) -> Updater[RoleRow]:
+        """Build a deleter updater for the given role ID."""
+        spec = RoleUpdaterSpec(
+            status=OptionalState.update(RoleStatus.DELETED),
+        )
+        return Updater(spec=spec, pk_value=role_id)
+
+    def build_purger(self, role_id: UUID) -> Purger[RoleRow]:
+        """Build a purger for the given role ID."""
+        return Purger(
+            row_class=RoleRow,
+            pk_value=role_id,
         )
 
     def build_updater(self, request: UpdateRoleRequest, role_id: UUID) -> Updater[RoleRow]:
