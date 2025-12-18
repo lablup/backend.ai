@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 from .id import ObjectId, ScopeId
 from .object_permission import (

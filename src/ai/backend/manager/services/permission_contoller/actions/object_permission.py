@@ -9,17 +9,20 @@ from ai.backend.manager.repositories.base.purger import Purger
 
 
 @dataclass
-class CreateObjectPermissionAction(BaseAction):
+class ObjectPermissionAction(BaseAction):
+    @override
+    @classmethod
+    def entity_type(cls) -> str:
+        return "object_permission"
+
+
+@dataclass
+class CreateObjectPermissionAction(ObjectPermissionAction):
     creator: Creator[ObjectPermissionRow]
 
     @override
     def entity_id(self) -> Optional[str]:
         return None
-
-    @override
-    @classmethod
-    def entity_type(cls) -> str:
-        return "object_permission"
 
     @override
     @classmethod
@@ -37,17 +40,12 @@ class CreateObjectPermissionActionResult(BaseActionResult):
 
 
 @dataclass
-class DeleteObjectPermissionAction(BaseAction):
+class DeleteObjectPermissionAction(ObjectPermissionAction):
     purger: Purger[ObjectPermissionRow]
 
     @override
     def entity_id(self) -> Optional[str]:
         return str(self.purger.pk_value)
-
-    @override
-    @classmethod
-    def entity_type(cls) -> str:
-        return "object_permission"
 
     @override
     @classmethod
