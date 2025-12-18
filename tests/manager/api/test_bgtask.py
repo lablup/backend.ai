@@ -58,6 +58,7 @@ async def message_queue(
         db=REDIS_STREAM_DB,
     )
     await redis_helper.execute(stream_redis_conn, lambda r: r.flushdb())
+    await stream_redis_conn.close()
 
 
 @pytest.fixture
@@ -114,6 +115,7 @@ async def valkey_bgtask_client(
         db=REDIS_BGTASK_DB,
     )
     await redis_helper.execute(bgtask_redis_conn, lambda r: r.flushdb())
+    await bgtask_redis_conn.close()
 
 
 @pytest.fixture
@@ -136,7 +138,6 @@ async def background_task_manager(
 @pytest.mark.asyncio
 async def test_background_task(
     background_task_manager: BackgroundTaskManager,
-    event_producer: EventProducer,
     event_dispatcher: EventDispatcher,
 ) -> None:
     update_handler_ctx: dict[str, Any] = {}
