@@ -6,11 +6,13 @@ from typing import Optional
 
 from strawberry.dataloader import DataLoader
 
+from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.services.processors import Processors
 
+from .artifact_revision import load_artifact_revisions_by_ids
 from .huggingface_registry import load_huggingface_registries_by_ids
 from .notification import load_channels_by_ids, load_rules_by_ids
 from .object_storage import load_object_storages_by_ids
@@ -56,4 +58,12 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, Optional[ObjectStorageData]]:
         return DataLoader(
             load_fn=partial(load_object_storages_by_ids, self._processors.object_storage)
+        )
+
+    @cached_property
+    def artifact_revision_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, Optional[ArtifactRevisionData]]:
+        return DataLoader(
+            load_fn=partial(load_artifact_revisions_by_ids, self._processors.artifact_revision)
         )

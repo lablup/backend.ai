@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import Collection
+
 import sqlalchemy as sa
 
 from ai.backend.manager.data.artifact.types import (
@@ -127,6 +130,13 @@ class ArtifactOrders:
 
 class ArtifactRevisionConditions:
     """Query conditions for artifact revisions."""
+
+    @staticmethod
+    def by_ids(revision_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ArtifactRevisionRow.id.in_(revision_ids)
+
+        return inner
 
     @staticmethod
     def by_version_contains(version: str, case_insensitive: bool = False) -> QueryCondition:
