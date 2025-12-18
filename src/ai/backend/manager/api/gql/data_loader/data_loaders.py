@@ -12,6 +12,7 @@ from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegist
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
+from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.services.processors import Processors
 
 from .artifact import load_artifacts_by_ids
@@ -21,6 +22,7 @@ from .huggingface_registry import load_huggingface_registries_by_ids
 from .notification import load_channels_by_ids, load_rules_by_ids
 from .object_storage import load_object_storages_by_ids
 from .reservoir_registry import load_reservoir_registries_by_ids
+from .vfs_storage import load_vfs_storages_by_ids
 
 
 class DataLoaders:
@@ -94,3 +96,9 @@ class DataLoaders:
         return DataLoader(
             load_fn=partial(load_reservoir_registries_by_ids, self._processors.artifact_registry)
         )
+
+    @cached_property
+    def vfs_storage_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, Optional[VFSStorageData]]:
+        return DataLoader(load_fn=partial(load_vfs_storages_by_ids, self._processors.vfs_storage))
