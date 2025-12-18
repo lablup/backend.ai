@@ -14,7 +14,6 @@ from ...data.permission.role import (
     BatchEntityPermissionCheckInput,
     RoleCreateInput,
     RoleData,
-    RoleDeleteInput,
     RoleDetailData,
     RoleListResult,
     ScopePermissionCheckInput,
@@ -70,8 +69,8 @@ class PermissionControllerRepository:
         return result.to_data()
 
     @permission_controller_repository_resilience.apply()
-    async def delete_role(self, data: RoleDeleteInput) -> RoleData:
-        result = await self._db_source.delete_role(data)
+    async def delete_role(self, updater: Updater[RoleRow]) -> RoleData:
+        result = await self._db_source.delete_role(updater)
         return result.to_data()
 
     @permission_controller_repository_resilience.apply()

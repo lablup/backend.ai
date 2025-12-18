@@ -12,7 +12,6 @@ from ....data.permission.role import (
     AssignedUserData,
     AssignedUserListResult,
     RoleCreateInput,
-    RoleDeleteInput,
     RoleListResult,
     UserRoleAssignmentInput,
     UserRoleRevocationInput,
@@ -87,13 +86,12 @@ class PermissionDBSource:
                 raise ObjectNotFound(f"Role with ID {updater.pk_value} does not exist.")
             return result.row
 
-    async def delete_role(self, data: RoleDeleteInput) -> RoleRow:
+    async def delete_role(self, updater: Updater[RoleRow]) -> RoleRow:
         async with self._db.begin_session() as db_session:
-            role_row = await self._get_role(db_session, data.id)
-            role_row.status = RoleStatus.DELETED
-            await db_session.flush()
-            await db_session.refresh(role_row)
-            return role_row
+            result = await execute_updater(db_session, updater)
+            if result is None:
+                raise ObjectNotFound(f"Role with ID {updater.pk_value} does not exist.")
+            return result.row
 
     async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleRow:
         async with self._db.begin_session() as db_session:

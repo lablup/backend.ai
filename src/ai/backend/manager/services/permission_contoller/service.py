@@ -72,14 +72,11 @@ class PermissionControllerService:
 
     async def delete_role(self, action: DeleteRoleAction) -> DeleteRoleActionResult:
         """
-        Deletes a role from the repository. It marks the role as deleted.
-        If the role does not exist, it returns a result indicating failure.
+        Deletes a role from the repository. It marks the role as deleted (soft delete).
+        Raises ObjectNotFound if the role does not exist.
         """
-        try:
-            _ = await self._repository.delete_role(action.input)
-        except ObjectNotFound:
-            return DeleteRoleActionResult(success=False)
-        return DeleteRoleActionResult(success=True)
+        result = await self._repository.delete_role(action.updater)
+        return DeleteRoleActionResult(data=result)
 
     async def assign_role(self, action: AssignRoleAction) -> AssignRoleActionResult:
         """

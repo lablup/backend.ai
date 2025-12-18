@@ -4,28 +4,28 @@ from typing import Optional, override
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
 
 
 @dataclass
-class DeleteRoleAction(RoleAction):
-    """Action for soft-deleting a role (status update)."""
+class PurgeRoleAction(RoleAction):
+    """Action for permanently removing a role from the database (hard delete)."""
 
-    updater: Updater[RoleRow]
+    purger: Purger[RoleRow]
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.updater.pk_value)
+        return str(self.purger.pk_value)
 
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "delete"
+        return "purge"
 
 
 @dataclass
-class DeleteRoleActionResult(BaseActionResult):
+class PurgeRoleActionResult(BaseActionResult):
     data: RoleData
 
     @override
