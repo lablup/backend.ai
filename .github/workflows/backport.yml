@@ -109,7 +109,7 @@ jobs:
           result="[]"
           for branch in "${target_branches[@]}"; do
             if [ -n "$branch" ]; then
-              result=$(echo "$result" | jq --arg commit "${{ steps.commit.outputs.target_commit }}" \
+              result=$(echo "$result" | jq -c --arg commit "${{ steps.commit.outputs.target_commit }}" \
                 --arg branch "$branch" \
                 --arg message "$COMMIT_MESSAGE" \
                 --arg pr "${{ steps.commit.outputs.pr_number }}" \
@@ -161,7 +161,7 @@ jobs:
           for file in /tmp/backport-results/result-*/*.json; do
             if [ -f "$file" ]; then
               content=$(cat "$file")
-              combined=$(echo "$combined" | jq --argjson new "$content" '. + $new')
+              combined=$(echo "$combined" | jq -c --argjson new "$content" '. + $new')
             fi
           done
           echo "matrix=$combined" >> $GITHUB_OUTPUT
