@@ -71,26 +71,17 @@ jobs:
           DOCKERFILES=$(find docker -type f -name "*.dockerfile")
         fi
 
-        # Build JSON array for matrix
-        MATRIX_JSON='{"include":['
-        FIRST=true
-
-        for dockerfile in $DOCKERFILES; do
-          if [ -n "$dockerfile" ] && [ -f "$dockerfile" ]; then
-            # Get image name from filename
-            BASENAME=$(basename "$dockerfile" .dockerfile)
-
-            if [ "$FIRST" = true ]; then
-              FIRST=false
-            else
-              MATRIX_JSON="${MATRIX_JSON},"
-            fi
-
-            MATRIX_JSON="${MATRIX_JSON}{\"name\":\"${BASENAME}\",\"dockerfile\":\"${dockerfile}\",\"context\":\"docker\"}"
-          fi
-        done
-
-        MATRIX_JSON="${MATRIX_JSON}]}"
+        # Build JSON matrix
+        MATRIX_JSON=$(echo "$DOCKERFILES" | jq -R -s -c '
+          split("\n") |
+          map(select(length > 0)) |
+          map({
+            name: (split("/")[-1] | split(".dockerfile")[0]),
+            dockerfile: .,
+            context: "docker"
+          }) |
+          {include: .}
+        ')
 
         echo "Found Dockerfiles matrix:"
         echo "$MATRIX_JSON" | jq .
