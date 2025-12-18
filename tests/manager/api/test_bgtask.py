@@ -24,7 +24,6 @@ from ai.backend.common.events.event_types.bgtask.broadcast import (
 )
 from ai.backend.common.message_queue.redis_queue.queue import RedisMQArgs, RedisQueue
 from ai.backend.common.types import AgentId, RedisTarget, ValkeyTarget
-from ai.backend.testutils.bootstrap import redis_container  # noqa: F401
 
 
 class ContextSentinel(enum.Enum):
