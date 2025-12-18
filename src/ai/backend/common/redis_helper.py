@@ -80,6 +80,7 @@ _default_conn_pool_opts: Mapping[str, Any] = {
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+# TODO: Remove this after migrating redis_lock client to valkey glide
 async def execute(
     redis_obj: RedisConnectionInfo,
     func: Callable[[Union[Redis, Any]], Awaitable[Any]],
