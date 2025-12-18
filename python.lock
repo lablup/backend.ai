@@ -98,6 +98,7 @@
 //     "ruamel.yaml~=0.18.10",
 //     "setproctitle~=1.3.5",
 //     "setuptools~=80.0.0",
+//     "sniffio",
 //     "strawberry-graphql~=0.278.0",
 //     "tabulate~=0.8.9",
 //     "temporenc~=0.1.0",
@@ -5932,6 +5933,24 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2",
+              "url": "https://files.pythonhosted.org/packages/e9/44/75a9c9421471a6c4805dbf2356f7c181a29c1879239abab1ea2cc8f38b40/sniffio-1.3.1-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc",
+              "url": "https://files.pythonhosted.org/packages/a2/87/a6771e1546d97e7e041b6ae58d80074f81b7d5121207425c964ddf5cfdbd/sniffio-1.3.1.tar.gz"
+            }
+          ],
+          "project_name": "sniffio",
+          "requires_dists": [],
+          "requires_python": ">=3.7",
+          "version": "1.3.1"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "4470fbed088c35dc20b78a39aaf4ae54fe81790c783b3264872a0224f437c31a",
               "url": "https://files.pythonhosted.org/packages/ce/af/20290b55d469e873cba9d41c0206ab5461ff49d759989b3fe65010f9d265/sqlalchemy-1.4.54.tar.gz"
             }
@@ -7357,6 +7376,7 @@
     "ruamel.yaml~=0.18.10",
     "setproctitle~=1.3.5",
     "setuptools~=80.0.0",
+    "sniffio",
     "strawberry-graphql~=0.278.0",
     "tabulate~=0.8.9",
     "temporenc~=0.1.0",
