@@ -12,6 +12,7 @@ from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegist
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
+from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.services.processors import Processors
@@ -23,6 +24,7 @@ from .huggingface_registry import load_huggingface_registries_by_ids
 from .notification import load_channels_by_ids, load_rules_by_ids
 from .object_storage import load_object_storages_by_ids
 from .reservoir_registry import load_reservoir_registries_by_ids
+from .scaling_group import load_scaling_groups_by_names
 from .storage_namespace import load_storage_namespaces_by_ids
 from .vfs_storage import load_vfs_storages_by_ids
 
@@ -42,6 +44,14 @@ class DataLoaders:
         self._processors = processors
 
     @cached_property
+    def scaling_group_loader(
+        self,
+    ) -> DataLoader[str, Optional[ScalingGroupData]]:
+        return DataLoader(
+            load_fn=partial(load_scaling_groups_by_names, self._processors.scaling_group)
+        )
+
+    @cached_property
     def notification_channel_loader(
         self,
     ) -> DataLoader[uuid.UUID, Optional[NotificationChannelData]]:
@@ -54,41 +64,19 @@ class DataLoaders:
         return DataLoader(load_fn=partial(load_rules_by_ids, self._processors.notification))
 
     @cached_property
-    def huggingface_registry_loader(
-        self,
-    ) -> DataLoader[uuid.UUID, Optional[HuggingFaceRegistryData]]:
-        return DataLoader(
-            load_fn=partial(load_huggingface_registries_by_ids, self._processors.artifact_registry)
-        )
-
-    @cached_property
-    def object_storage_loader(
-        self,
-    ) -> DataLoader[uuid.UUID, Optional[ObjectStorageData]]:
-        return DataLoader(
-            load_fn=partial(load_object_storages_by_ids, self._processors.object_storage)
-        )
-
-    @cached_property
-    def artifact_revision_loader(
-        self,
-    ) -> DataLoader[uuid.UUID, Optional[ArtifactRevisionData]]:
-        return DataLoader(
-            load_fn=partial(load_artifact_revisions_by_ids, self._processors.artifact_revision)
-        )
-
-    @cached_property
-    def artifact_loader(
-        self,
-    ) -> DataLoader[uuid.UUID, Optional[ArtifactData]]:
-        return DataLoader(load_fn=partial(load_artifacts_by_ids, self._processors.artifact))
-
-    @cached_property
     def artifact_registry_loader(
         self,
     ) -> DataLoader[uuid.UUID, Optional[ArtifactRegistryData]]:
         return DataLoader(
             load_fn=partial(load_artifact_registries_by_ids, self._processors.artifact_registry)
+        )
+
+    @cached_property
+    def huggingface_registry_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, Optional[HuggingFaceRegistryData]]:
+        return DataLoader(
+            load_fn=partial(load_huggingface_registries_by_ids, self._processors.artifact_registry)
         )
 
     @cached_property
@@ -100,15 +88,37 @@ class DataLoaders:
         )
 
     @cached_property
+    def storage_namespace_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, Optional[StorageNamespaceData]]:
+        return DataLoader(
+            load_fn=partial(load_storage_namespaces_by_ids, self._processors.storage_namespace)
+        )
+
+    @cached_property
+    def object_storage_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, Optional[ObjectStorageData]]:
+        return DataLoader(
+            load_fn=partial(load_object_storages_by_ids, self._processors.object_storage)
+        )
+
+    @cached_property
     def vfs_storage_loader(
         self,
     ) -> DataLoader[uuid.UUID, Optional[VFSStorageData]]:
         return DataLoader(load_fn=partial(load_vfs_storages_by_ids, self._processors.vfs_storage))
 
     @cached_property
-    def storage_namespace_loader(
+    def artifact_loader(
         self,
-    ) -> DataLoader[uuid.UUID, Optional[StorageNamespaceData]]:
+    ) -> DataLoader[uuid.UUID, Optional[ArtifactData]]:
+        return DataLoader(load_fn=partial(load_artifacts_by_ids, self._processors.artifact))
+
+    @cached_property
+    def artifact_revision_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, Optional[ArtifactRevisionData]]:
         return DataLoader(
-            load_fn=partial(load_storage_namespaces_by_ids, self._processors.storage_namespace)
+            load_fn=partial(load_artifact_revisions_by_ids, self._processors.artifact_revision)
         )
