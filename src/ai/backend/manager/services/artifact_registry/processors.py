@@ -11,6 +11,10 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_multi impo
     GetArtifactRegistryMetasAction,
     GetArtifactRegistryMetasActionResult,
 )
+from ai.backend.manager.services.artifact_registry.actions.common.search import (
+    SearchArtifactRegistriesAction,
+    SearchArtifactRegistriesActionResult,
+)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
     CreateHuggingFaceRegistryActionResult,
@@ -113,6 +117,9 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     get_registry_metas: ActionProcessor[
         GetArtifactRegistryMetasAction, GetArtifactRegistryMetasActionResult
     ]
+    search_artifact_registries: ActionProcessor[
+        SearchArtifactRegistriesAction, SearchArtifactRegistriesActionResult
+    ]
 
     def __init__(
         self, service: ArtifactRegistryService, action_monitors: list[ActionMonitor]
@@ -158,6 +165,9 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
         )
         self.get_registry_meta = ActionProcessor(service.get_registry_meta, action_monitors)
         self.get_registry_metas = ActionProcessor(service.get_registry_metas, action_monitors)
+        self.search_artifact_registries = ActionProcessor(
+            service.search_artifact_registries, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -177,4 +187,5 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
             ListReservoirRegistriesAction.spec(),
             GetArtifactRegistryMetaAction.spec(),
             GetArtifactRegistryMetasAction.spec(),
+            SearchArtifactRegistriesAction.spec(),
         ]
