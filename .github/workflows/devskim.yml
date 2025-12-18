@@ -31,6 +31,7 @@ jobs:
           ignore-globs: |
             src/ai/backend/web/static/**
             src/ai/backend/test/**
+            tests/**
           options-json: .devskim.json
 
       - name: Upload DevSkim scan results to GitHub Security tab
