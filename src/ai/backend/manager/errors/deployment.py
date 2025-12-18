@@ -76,3 +76,15 @@ class InvalidDeploymentStrategy(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+class InvalidDeploymentStrategySpec(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-deployment-strategy-spec"
+    error_title = "Mismatched deployment strategy spec type."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_SERVICE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )

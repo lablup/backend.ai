@@ -186,12 +186,26 @@ class DeploymentDBSource:
         self,
         creator: DeploymentCreator,
     ) -> DeploymentInfo:
-        """Create a new endpoint in the database and return DeploymentInfo."""
+        """Create a new endpoint in the database and return DeploymentInfo.
+
+        If creator.policy is provided, the deployment policy is also created atomically.
+        """
         async with self._begin_session_read_committed() as db_sess:
             await self._check_group_exists(db_sess, creator.domain, creator.project)
             endpoint = await EndpointRow.from_deployment_creator(db_sess, creator)
             db_sess.add(endpoint)
             await db_sess.flush()
+
+            # Create deployment policy if provided
+            if creator.policy is not None:
+                policy_row = DeploymentPolicyRow(
+                    endpoint=endpoint.id,
+                    strategy=creator.policy.strategy,
+                    strategy_spec=creator.policy.strategy_spec.model_dump(),
+                    rollback_on_failure=creator.policy.rollback_on_failure,
+                )
+                db_sess.add(policy_row)
+                await db_sess.flush()
 
             stmt = (
                 sa.select(EndpointRow)
@@ -745,10 +759,16 @@ class DeploymentDBSource:
         db_sess: SASession,
         endpoint_id: uuid.UUID,
     ) -> bool:
-        """Private method to delete routes and endpoint in a single transaction."""
+        """Private method to delete routes, policy, and endpoint in a single transaction."""
         # First delete all routes for this endpoint
         routes_query = sa.delete(RoutingRow).where(RoutingRow.endpoint == endpoint_id)
         await db_sess.execute(routes_query)
+
+        # Delete the deployment policy if exists
+        policy_query = sa.delete(DeploymentPolicyRow).where(
+            DeploymentPolicyRow.endpoint == endpoint_id
+        )
+        await db_sess.execute(policy_query)
 
         # Then delete the endpoint itself
         endpoint_query = sa.delete(EndpointRow).where(EndpointRow.id == endpoint_id)

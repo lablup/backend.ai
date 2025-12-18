@@ -45,6 +45,10 @@ from ai.backend.manager.services.deployment.actions.create_legacy_deployment imp
     CreateLegacyDeploymentAction,
     CreateLegacyDeploymentActionResult,
 )
+from ai.backend.manager.services.deployment.actions.deployment_policy import (
+    GetDeploymentPolicyAction,
+    GetDeploymentPolicyActionResult,
+)
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
     DestroyDeploymentActionResult,
@@ -181,6 +185,10 @@ class DeploymentServiceProtocol(Protocol):
         self, action: ListAccessTokensAction
     ) -> ListAccessTokensActionResult: ...
 
+    async def get_deployment_policy(
+        self, action: GetDeploymentPolicyAction
+    ) -> GetDeploymentPolicyActionResult: ...
+
 
 class DeploymentProcessors(AbstractProcessorPackage):
     """Processors for deployment operations."""
@@ -230,6 +238,9 @@ class DeploymentProcessors(AbstractProcessorPackage):
     create_model_revision: ActionProcessor[
         CreateModelRevisionAction, CreateModelRevisionActionResult
     ]
+    get_deployment_policy: ActionProcessor[
+        GetDeploymentPolicyAction, GetDeploymentPolicyActionResult
+    ]
 
     def __init__(
         self, service: DeploymentServiceProtocol, action_monitors: list[ActionMonitor]
@@ -273,6 +284,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.list_revisions = ActionProcessor(service.list_revisions, action_monitors)
         self.create_model_revision = ActionProcessor(service.create_model_revision, action_monitors)
         self.batch_load_revisions = ActionProcessor(service.batch_load_revisions, action_monitors)
+        self.get_deployment_policy = ActionProcessor(service.get_deployment_policy, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -299,4 +311,5 @@ class DeploymentProcessors(AbstractProcessorPackage):
             BatchLoadDeploymentsAction.spec(),
             ListAccessTokensAction.spec(),
             BatchLoadReplicasByRevisionIdsAction.spec(),
+            GetDeploymentPolicyAction.spec(),
         ]

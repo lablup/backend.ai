@@ -70,6 +70,10 @@ from ai.backend.manager.services.deployment.actions.create_legacy_deployment imp
     CreateLegacyDeploymentAction,
     CreateLegacyDeploymentActionResult,
 )
+from ai.backend.manager.services.deployment.actions.deployment_policy import (
+    GetDeploymentPolicyAction,
+    GetDeploymentPolicyActionResult,
+)
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
     DestroyDeploymentActionResult,
@@ -438,6 +442,25 @@ class DeploymentService:
         self, action: CreateModelRevisionAction
     ) -> CreateModelRevisionActionResult:
         return CreateModelRevisionActionResult(revision=mock_revision_data_2)
+
+    # ========== Deployment Policy Methods ==========
+
+    async def get_deployment_policy(
+        self, action: GetDeploymentPolicyAction
+    ) -> GetDeploymentPolicyActionResult:
+        """Get the deployment policy for an endpoint.
+
+        Args:
+            action: Action containing the endpoint ID
+
+        Returns:
+            GetDeploymentPolicyActionResult: Result containing the policy data
+
+        Raises:
+            DeploymentPolicyNotFound: If the policy does not exist
+        """
+        data = await self._deployment_controller.get_deployment_policy(action.endpoint_id)
+        return GetDeploymentPolicyActionResult(data=data)
 
 
 mock_revision_data_1 = ModelRevisionData(

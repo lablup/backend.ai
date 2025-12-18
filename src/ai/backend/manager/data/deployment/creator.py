@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Optional
 from uuid import UUID
 
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
@@ -15,6 +18,7 @@ from ai.backend.manager.data.deployment.types import (
     ResourceSpec,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 
 
 @dataclass
@@ -47,6 +51,7 @@ class DeploymentCreator:
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
     model_revision: ModelRevisionSpec
+    policy: Optional[DeploymentPolicyConfig] = None
 
     # Accessor properties for backward compatibility
     @property
@@ -111,8 +116,21 @@ class DeploymentCreationDraft:
 
 
 @dataclass
+class DeploymentPolicyConfig:
+    """Configuration for deployment policy.
+
+    Passed from GQL layer to service layer for policy creation/update.
+    """
+
+    strategy: DeploymentStrategy
+    strategy_spec: RollingUpdateSpec | BlueGreenSpec
+    rollback_on_failure: bool = False
+
+
+@dataclass
 class NewDeploymentCreator:
     metadata: DeploymentMetadata
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
     model_revision: ModelRevisionCreator
+    policy: Optional[DeploymentPolicyConfig] = None
