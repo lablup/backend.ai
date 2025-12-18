@@ -58,6 +58,7 @@ from ai.backend.manager.models.deployment_policy import (
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointStatistics
 from ai.backend.manager.models.kernel import KernelStatistics
+from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
@@ -1039,3 +1040,36 @@ class DeploymentRepository:
             PurgerResult containing the deleted row, or None if no policy existed.
         """
         return await self._db_source.delete_deployment_policy(purger)
+
+    # ===================
+    # Route operations
+    # ===================
+
+    @deployment_repository_resilience.apply()
+    async def create_route(
+        self,
+        creator: Creator[RoutingRow],
+    ) -> uuid.UUID:
+        """Create a new route using the provided creator.
+
+        The Creator contains a RouteCreatorSpec that defines the route properties.
+
+        Returns:
+            UUID of the newly created route.
+        """
+        return await self._db_source.create_route(creator)
+
+    @deployment_repository_resilience.apply()
+    async def update_route(
+        self,
+        updater: Updater[RoutingRow],
+    ) -> bool:
+        """Update a route using the provided updater.
+
+        The Updater contains a RouteUpdaterSpec or RouteStatusUpdaterSpec
+        that defines which fields to update.
+
+        Returns:
+            True if the route was updated, False if not found.
+        """
+        return await self._db_source.update_route(updater)

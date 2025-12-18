@@ -18,6 +18,7 @@ from ai.backend.common.types import (
     RuntimeVariant,
     VFolderMount,
 )
+from ai.backend.manager.data.deployment.types import RouteStatus, RouteTrafficStatus
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyRow,
 )
@@ -27,6 +28,7 @@ from ai.backend.manager.models.deployment_policy import (
     RollingUpdateSpec,
 )
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base import CreatorSpec
 
 
@@ -138,4 +140,36 @@ class DeploymentPolicyCreatorSpec(CreatorSpec[DeploymentPolicyRow]):
             strategy=self.strategy,
             strategy_spec=self.strategy_spec.model_dump(),
             rollback_on_failure=self.rollback_on_failure,
+        )
+
+
+@dataclass
+class RouteCreatorSpec(CreatorSpec[RoutingRow]):
+    """CreatorSpec for route creation.
+
+    Routes are created for deployment endpoints to serve traffic.
+    Each route can be associated with a specific revision.
+    """
+
+    endpoint: uuid.UUID
+    session_owner: uuid.UUID
+    domain: str
+    project: uuid.UUID
+    traffic_ratio: float = 1.0
+    revision: Optional[uuid.UUID] = None
+    traffic_status: RouteTrafficStatus = RouteTrafficStatus.ACTIVE
+
+    @override
+    def build_row(self) -> RoutingRow:
+        return RoutingRow(
+            id=uuid.uuid4(),
+            endpoint=self.endpoint,
+            session=None,
+            session_owner=self.session_owner,
+            domain=self.domain,
+            project=self.project,
+            status=RouteStatus.PROVISIONING,
+            traffic_ratio=self.traffic_ratio,
+            revision=self.revision,
+            traffic_status=self.traffic_status,
         )

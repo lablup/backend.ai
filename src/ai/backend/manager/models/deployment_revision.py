@@ -33,7 +33,7 @@ from .base import (
 )
 
 if TYPE_CHECKING:
-    pass
+    from .routing import RoutingRow
 
 __all__ = ("DeploymentRevisionRow",)
 
@@ -136,6 +136,11 @@ class DeploymentRevisionRow(Base):
     image_row = relationship(
         "ImageRow",
         primaryjoin="foreign(DeploymentRevisionRow.image) == ImageRow.id",
+    )
+    routings: list["RoutingRow"] = relationship(
+        "RoutingRow",
+        primaryjoin="DeploymentRevisionRow.id == foreign(RoutingRow.revision)",
+        viewonly=True,
     )
 
     def to_data(self) -> ModelRevisionData:

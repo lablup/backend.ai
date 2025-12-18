@@ -130,6 +130,20 @@ class RouteStatus(enum.Enum):
         return priority_map.get(self, 0)
 
 
+class RouteTrafficStatus(enum.StrEnum):
+    """Traffic routing status for a route.
+
+    Controls whether traffic should be sent to this route.
+    Actual traffic delivery depends on RouteStatus being HEALTHY.
+
+    - ACTIVE: Traffic enabled (will receive traffic when RouteStatus is HEALTHY)
+    - INACTIVE: Traffic disabled (will not receive traffic regardless of RouteStatus)
+    """
+
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
+
 @dataclass
 class ScalingGroupCleanupConfig:
     """Cleanup configuration for a scaling group."""
@@ -310,6 +324,8 @@ class RouteInfo:
     status: RouteStatus
     traffic_ratio: float
     created_at: datetime
+    revision_id: Optional[UUID]
+    traffic_status: RouteTrafficStatus
     error_data: dict[str, Any] = field(default_factory=dict)
 
 
