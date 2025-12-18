@@ -11,7 +11,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.dto.manager.query import StrictValueFilter, StringFilter
+from ai.backend.common.dto.manager.query import StringFilter
 
 from .types import (
     AssignedUserOrderField,
@@ -94,7 +94,7 @@ class SearchRolesRequest(BaseRequestModel):
     """Request body for searching roles with filters, orders, and pagination."""
 
     filter: Optional[RoleFilter] = Field(default=None, description="Filter conditions")
-    order: Optional[RoleOrder] = Field(default=None, description="Order specification")
+    order: Optional[list[RoleOrder]] = Field(default=None, description="Order specifications")
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
@@ -104,9 +104,7 @@ class AssignedUserFilter(BaseRequestModel):
 
     username: Optional[StringFilter] = Field(default=None, description="Filter by username")
     email: Optional[StringFilter] = Field(default=None, description="Filter by email")
-    granted_by: Optional[StrictValueFilter[UUID]] = Field(
-        default=None, description="Filter by 'granted_by' user ID"
-    )
+    granted_by: Optional[UUID] = Field(default=None, description="Filter by 'granted_by' user ID")
 
 
 class AssignedUserOrder(BaseRequestModel):
@@ -120,6 +118,8 @@ class SearchUsersAssignedToRoleRequest(BaseRequestModel):
     """Request body for searching users assigned to a specific role."""
 
     filter: Optional[AssignedUserFilter] = Field(default=None, description="Filter conditions")
-    order: Optional[AssignedUserOrder] = Field(default=None, description="Order specification")
+    order: Optional[list[AssignedUserOrder]] = Field(
+        default=None, description="Order specifications"
+    )
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
     offset: int = Field(default=0, ge=0, description="Number of items to skip")

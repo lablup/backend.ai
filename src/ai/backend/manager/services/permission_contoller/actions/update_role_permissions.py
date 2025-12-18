@@ -28,8 +28,8 @@ class UpdateRolePermissionsAction(BaseAction):
 
 @dataclass
 class UpdateRolePermissionsActionResult(BaseActionResult):
-    role: Optional[RoleDetailData]
+    role: RoleDetailData
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.role.id) if self.role else None
+        return str(self.role.id)

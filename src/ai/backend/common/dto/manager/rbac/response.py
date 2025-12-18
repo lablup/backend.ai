@@ -38,7 +38,7 @@ class RoleDTO(BaseModel):
     source: RoleSource = Field(description="Role source")
     status: RoleStatus = Field(description="Role status")
     created_at: datetime = Field(description="Creation timestamp")
-    updated_at: Optional[datetime] = Field(default=None, description="Last update timestamp")
+    updated_at: datetime = Field(description="Last update timestamp")
     deleted_at: Optional[datetime] = Field(default=None, description="Deletion timestamp")
     description: Optional[str] = Field(default=None, description="Role description")
 
@@ -101,7 +101,6 @@ class AssignRoleResponse(BaseResponseModel):
 class RevokeRoleResponse(BaseResponseModel):
     """Response for revoking a role from a user."""
 
-    user_role_id: UUID = Field(description="ID of the revoked user-role association")
     user_id: UUID = Field(description="User ID")
     role_id: UUID = Field(description="Role ID")
 

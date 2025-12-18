@@ -192,7 +192,7 @@ class PermissionControllerService:
         self, action: UpdateRolePermissionsAction
     ) -> UpdateRolePermissionsActionResult:
         """Update role permissions using batch update."""
-        result = await self._repository._db_source.update_role_permissions(
+        result = await self._repository.update_role_permissions(
             input_data=action.input_data,
         )
-        return UpdateRolePermissionsActionResult(role=result.to_detail_data_without_users())
+        return UpdateRolePermissionsActionResult(role=result)
