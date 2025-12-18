@@ -44,7 +44,6 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.creator import DeploymentCreator
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingAction,
     AutoScalingCondition,
@@ -97,6 +96,7 @@ from .vfolder import prepare_vfolder_mounts
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+    from ai.backend.manager.data.deployment.creator import DeploymentCreator
 
     from .gql import GraphQueryContext
 

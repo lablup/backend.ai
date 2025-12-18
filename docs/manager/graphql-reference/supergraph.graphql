@@ -1046,6 +1046,14 @@ to support integers outside the range of a signed 32-bit integer.
 scalar BigInt
   @join__type(graph: GRAPHENE)
 
+"""Added in 25.19.0. Configuration for blue-green deployment strategy."""
+input BlueGreenConfigInput
+  @join__type(graph: STRAWBERRY)
+{
+  autoPromote: Boolean! = false
+  promoteDelaySeconds: Int! = 0
+}
+
 """Added in 24.09.1."""
 scalar Bytes
   @join__type(graph: GRAPHENE)
@@ -2421,6 +2429,19 @@ enum DeploymentOrderField
   NAME @join__enumValue(graph: STRAWBERRY)
 }
 
+"""Added in 25.19.0. Deployment policy configuration."""
+type DeploymentPolicy implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+  strategySpec: DeploymentStrategySpec!
+  rollbackOnFailure: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
 """
 Added in 25.16.0. This enum represents the deployment status of a model deployment, indicating its current state.
 """
@@ -2451,17 +2472,31 @@ input DeploymentStatusFilter
 }
 
 """Added in 25.16.0"""
-type DeploymentStrategy
+type DeploymentStrategyGQL
   @join__type(graph: STRAWBERRY)
 {
   type: DeploymentStrategyType!
 }
 
-"""Added in 25.16.0"""
+"""
+Added in 25.19.0. Deployment strategy configuration with discriminator pattern.
+"""
 input DeploymentStrategyInput
   @join__type(graph: STRAWBERRY)
 {
   type: DeploymentStrategyType!
+  rollbackOnFailure: Boolean! = false
+  rollingUpdate: RollingUpdateConfigInput = null
+  blueGreen: BlueGreenConfigInput = null
+}
+
+"""
+Added in 25.19.0. Base interface for deployment strategy specifications.
+"""
+interface DeploymentStrategySpec
+  @join__type(graph: STRAWBERRY)
+{
+  strategy: DeploymentStrategyType!
 }
 
 """
@@ -3620,10 +3655,13 @@ type ModelDeployment implements Node
   metadata: ModelDeploymentMetadata!
   networkAccess: ModelDeploymentNetworkAccess!
   revision: ModelRevision
-  defaultDeploymentStrategy: DeploymentStrategy!
+  defaultDeploymentStrategy: DeploymentStrategyGQL!
   createdUser: UserNode!
   scalingRule: ScalingRule!
   replicaState: ReplicaState!
+
+  """Added in 25.19.0. Deployment policy configuration."""
+  deploymentPolicy: DeploymentPolicy
   revisionHistory(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection!
 }
 
@@ -6212,6 +6250,14 @@ type RestoreArtifactsPayload
   @join__type(graph: STRAWBERRY)
 {
   artifacts: [Artifact!]!
+}
+
+"""Added in 25.19.0. Configuration for rolling update strategy."""
+input RollingUpdateConfigInput
+  @join__type(graph: STRAWBERRY)
+{
+  maxSurge: Int! = 1
+  maxUnavailable: Int! = 0
 }
 
 type Routing implements Item

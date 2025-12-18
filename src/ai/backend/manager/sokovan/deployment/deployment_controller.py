@@ -11,11 +11,15 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
 from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
 from ai.backend.manager.data.deployment.types import DeploymentInfo
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyData
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.updaters import DeploymentUpdaterSpec
+from ai.backend.manager.repositories.deployment.updaters import (
+    DeploymentPolicyUpdaterSpec,
+    DeploymentUpdaterSpec,
+)
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
     RevisionGeneratorRegistryArgs,
@@ -187,3 +191,39 @@ class DeploymentController:
         """
         await self._valkey_schedule.mark_deployment_needed(lifecycle_type.value)
         log.debug("Marked deployment lifecycle needed for type: {}", lifecycle_type.value)
+
+    # ========== Deployment Policy Methods ==========
+
+    async def get_deployment_policy(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> DeploymentPolicyData:
+        """Get the deployment policy for an endpoint.
+
+        Args:
+            endpoint_id: ID of the endpoint
+
+        Returns:
+            DeploymentPolicyData: Policy data
+        """
+        return await self._deployment_repository.get_deployment_policy(endpoint_id)
+
+    async def update_deployment_policy(
+        self,
+        endpoint_id: uuid.UUID,
+        updater_spec: DeploymentPolicyUpdaterSpec,
+    ) -> DeploymentPolicyData:
+        """Update the deployment policy for an endpoint.
+
+        Args:
+            endpoint_id: ID of the endpoint
+            updater_spec: Policy update specification
+
+        Returns:
+            DeploymentPolicyData: Updated policy data
+        """
+        # First get the policy to find its ID (primary key)
+        policy = await self._deployment_repository.get_deployment_policy(endpoint_id)
+        return await self._deployment_repository.update_deployment_policy(
+            Updater(spec=updater_spec, pk_value=policy.id)
+        )

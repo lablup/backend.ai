@@ -9,12 +9,14 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.model_deployment.types import (
-    DeploymentStrategy as CommonDeploymentStrategy,
+    DeploymentStrategy,
+    ModelDeploymentStatus,
 )
-from ai.backend.common.data.model_deployment.types import (
-    ModelDeploymentStatus as CommonDeploymentStatus,
+from ai.backend.common.exception import (
+    InvalidAPIParameters,
+    ModelDeploymentNotFound,
+    ModelDeploymentUnavailable,
 )
-from ai.backend.common.exception import ModelDeploymentNotFound, ModelDeploymentUnavailable
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
@@ -42,7 +44,7 @@ from ai.backend.manager.api.gql.model_deployment.model_replica import (
 from ai.backend.manager.api.gql.project import Project
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user import User
-from ai.backend.manager.data.deployment.creator import NewDeploymentCreator
+from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig, NewDeploymentCreator
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
@@ -52,6 +54,7 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaSpec,
     ReplicaStateData,
 )
+from ai.backend.manager.errors.service import DeploymentPolicyNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.gql_models.domain import DomainNode
 from ai.backend.manager.models.gql_models.group import GroupNode
@@ -65,7 +68,10 @@ from ai.backend.manager.repositories.deployment.types.types import (
 from ai.backend.manager.repositories.deployment.types.types import (
     DeploymentStatusFilter as RepoDeploymentStatusFilter,
 )
-from ai.backend.manager.repositories.deployment.updaters import NewDeploymentUpdaterSpec
+from ai.backend.manager.repositories.deployment.updaters import (
+    DeploymentPolicyUpdaterSpec,
+    NewDeploymentUpdaterSpec,
+)
 from ai.backend.manager.services.deployment.actions.access_token.list_access_tokens import (
     ListAccessTokensAction,
 )
@@ -78,6 +84,9 @@ from ai.backend.manager.services.deployment.actions.batch_load_deployments impor
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
 )
+from ai.backend.manager.services.deployment.actions.deployment_policy import (
+    GetDeploymentPolicyAction,
+)
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
 )
@@ -86,6 +95,12 @@ from ai.backend.manager.services.deployment.actions.sync_replicas import SyncRep
 from ai.backend.manager.services.deployment.actions.update_deployment import UpdateDeploymentAction
 from ai.backend.manager.types import OptionalState, TriState
 
+from .deployment_policy import (
+    BlueGreenConfigInputGQL,
+    DeploymentPolicyGQL,
+    DeploymentStrategyTypeGQL,
+    RollingUpdateConfigInputGQL,
+)
 from .model_revision import (
     CreateModelRevisionInput,
     ModelRevision,
@@ -95,22 +110,16 @@ from .model_revision import (
     resolve_revisions,
 )
 
-DeploymentStatus = strawberry.enum(
-    CommonDeploymentStatus,
+DeploymentStatusGQL: type[ModelDeploymentStatus] = strawberry.enum(
+    ModelDeploymentStatus,
     name="DeploymentStatus",
     description="Added in 25.16.0. This enum represents the deployment status of a model deployment, indicating its current state.",
 )
 
-DeploymentStrategyType = strawberry.enum(
-    CommonDeploymentStrategy,
-    name="DeploymentStrategyType",
-    description="Added in 25.16.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.",
-)
-
 
 @strawberry.type(description="Added in 25.16.0")
-class DeploymentStrategy:
-    type: DeploymentStrategyType
+class DeploymentStrategyGQL:
+    type: DeploymentStrategyTypeGQL
 
 
 @strawberry.type(description="Added in 25.16.0")
@@ -172,7 +181,7 @@ class ModelDeploymentMetadata:
     _project_id: strawberry.Private[UUID]
     _domain_name: strawberry.Private[str]
     name: str
-    status: DeploymentStatus
+    status: DeploymentStatusGQL
     tags: list[str]
     created_at: datetime
     updated_at: datetime
@@ -195,7 +204,7 @@ class ModelDeploymentMetadata:
     def from_dataclass(cls, data: ModelDeploymentMetadataInfo) -> "ModelDeploymentMetadata":
         return cls(
             name=data.name,
-            status=DeploymentStatus(data.status),
+            status=DeploymentStatusGQL(data.status),
             tags=data.tags,
             _project_id=data.project_id,
             _domain_name=data.domain_name,
@@ -295,11 +304,12 @@ class ModelDeployment(Node):
     metadata: ModelDeploymentMetadata
     network_access: ModelDeploymentNetworkAccess
     revision: Optional[ModelRevision] = None
-    default_deployment_strategy: DeploymentStrategy
+    default_deployment_strategy: DeploymentStrategyGQL
     _revision_history_ids: strawberry.Private[list[UUID]]
     _replica_state_data: strawberry.Private[ReplicaStateData]
     _created_user_id: strawberry.Private[UUID]
     _scaling_rule_ids: strawberry.Private[list[UUID]]
+    _endpoint_id: strawberry.Private[UUID]
 
     @strawberry.field
     async def created_user(self, info: Info[StrawberryGQLContext]) -> User:
@@ -320,6 +330,23 @@ class ModelDeployment(Node):
             desired_replica_count=self._replica_state_data.desired_replica_count,
             _replica_ids=self._replica_state_data.replica_ids,
         )
+
+    @strawberry.field(description="Added in 25.19.0. Deployment policy configuration.")
+    async def deployment_policy(
+        self, info: Info[StrawberryGQLContext]
+    ) -> Optional[DeploymentPolicyGQL]:
+        """Get the deployment policy for this deployment."""
+        processor = info.context.processors.deployment
+        if processor is None:
+            return None
+
+        try:
+            result = await processor.get_deployment_policy.wait_for_complete(
+                GetDeploymentPolicyAction(endpoint_id=self._endpoint_id)
+            )
+            return DeploymentPolicyGQL.from_data(result.data)
+        except DeploymentPolicyNotFound:
+            return None
 
     @strawberry.field
     async def revision_history(
@@ -382,7 +409,7 @@ class ModelDeployment(Node):
     ) -> "ModelDeployment":
         metadata = ModelDeploymentMetadata(
             name=data.metadata.name,
-            status=DeploymentStatus(data.metadata.status),
+            status=DeploymentStatusGQL(data.metadata.status),
             tags=data.metadata.tags,
             _project_id=data.metadata.project_id,
             _domain_name=data.metadata.domain_name,
@@ -395,21 +422,22 @@ class ModelDeployment(Node):
             metadata=metadata,
             network_access=ModelDeploymentNetworkAccess.from_dataclass(data.network_access),
             revision=ModelRevision.from_dataclass(data.revision) if data.revision else None,
-            default_deployment_strategy=DeploymentStrategy(
-                type=DeploymentStrategyType(data.default_deployment_strategy)
+            default_deployment_strategy=DeploymentStrategyGQL(
+                type=DeploymentStrategyTypeGQL(data.default_deployment_strategy)
             ),
             _created_user_id=data.created_user_id,
             _revision_history_ids=data.revision_history_ids,
             _scaling_rule_ids=data.scaling_rule_ids,
             _replica_state_data=data.replica_state,
+            _endpoint_id=data.id,
         )
 
 
 # Filter Types
 @strawberry.input(description="Added in 25.16.0")
 class DeploymentStatusFilter:
-    in_: Optional[list[DeploymentStatus]] = strawberry.field(name="in", default=None)
-    equals: Optional[DeploymentStatus] = None
+    in_: Optional[list[DeploymentStatusGQL]] = strawberry.field(name="in", default=None)
+    equals: Optional[DeploymentStatusGQL] = None
 
 
 @strawberry.input(description="Added in 25.16.0")
@@ -437,12 +465,12 @@ class DeploymentFilter:
             if self.status.in_ is not None:
                 repo_filter.status = RepoDeploymentStatusFilter(
                     type=DeploymentStatusFilterType.IN,
-                    values=[CommonDeploymentStatus(status) for status in self.status.in_],
+                    values=[ModelDeploymentStatus(status) for status in self.status.in_],
                 )
             elif self.status.equals is not None:
                 repo_filter.status = RepoDeploymentStatusFilter(
                     type=DeploymentStatusFilterType.EQUALS,
-                    values=[CommonDeploymentStatus(self.status.equals)],
+                    values=[ModelDeploymentStatus(self.status.equals)],
                 )
 
         # Handle logical operations
@@ -504,16 +532,56 @@ class ModelDeploymentNetworkAccessInput:
         )
 
 
-@strawberry.input(description="Added in 25.16.0")
-class DeploymentStrategyInput:
-    type: DeploymentStrategyType
+@strawberry.input(
+    name="DeploymentStrategyInput",
+    description="Added in 25.19.0. Deployment strategy configuration with discriminator pattern.",
+)
+class DeploymentStrategyInputGQL:
+    """Deployment strategy input with type discriminator and optional config fields.
+
+    The `type` field determines which config field should be provided:
+    - ROLLING: requires `rolling_update` config
+    - BLUE_GREEN: requires `blue_green` config
+    """
+
+    type: DeploymentStrategyTypeGQL
+    rollback_on_failure: bool = False
+    rolling_update: Optional[RollingUpdateConfigInputGQL] = None
+    blue_green: Optional[BlueGreenConfigInputGQL] = None
+
+    def validate(self) -> None:
+        """Validate that the appropriate config is provided for the strategy type."""
+        if self.type == DeploymentStrategy.ROLLING and not self.rolling_update:
+            raise InvalidAPIParameters("rolling_update config required for ROLLING strategy")
+        if self.type == DeploymentStrategy.BLUE_GREEN and not self.blue_green:
+            raise InvalidAPIParameters("blue_green config required for BLUE_GREEN strategy")
+
+    def to_policy_config(self) -> DeploymentPolicyConfig:
+        """Convert to DeploymentPolicyConfig for service layer."""
+        self.validate()
+        strategy = DeploymentStrategy(self.type.value)
+        match strategy:
+            case DeploymentStrategy.ROLLING:
+                assert self.rolling_update is not None
+                return DeploymentPolicyConfig(
+                    strategy=strategy,
+                    strategy_spec=self.rolling_update.to_spec(),
+                    rollback_on_failure=self.rollback_on_failure,
+                )
+            case DeploymentStrategy.BLUE_GREEN:
+                assert self.blue_green is not None
+                return DeploymentPolicyConfig(
+                    strategy=strategy,
+                    strategy_spec=self.blue_green.to_spec(),
+                    rollback_on_failure=self.rollback_on_failure,
+                )
 
 
 @strawberry.input(description="Added in 25.16.0")
 class CreateModelDeploymentInput:
     metadata: ModelDeploymentMetadataInput
     network_access: ModelDeploymentNetworkAccessInput
-    default_deployment_strategy: DeploymentStrategyInput
+    default_deployment_strategy: DeploymentStrategyInputGQL
     desired_replica_count: int
     initial_revision: CreateModelRevisionInput
 
@@ -539,6 +607,7 @@ class CreateModelDeploymentInput:
             replica_spec=ReplicaSpec(replica_count=self.desired_replica_count),
             network=self.network_access.to_network_spec(),
             model_revision=self.initial_revision.to_model_revision_creator(),
+            policy=self.default_deployment_strategy.to_policy_config(),
         )
 
 
@@ -547,7 +616,7 @@ class UpdateModelDeploymentInput:
     id: ID
     open_to_public: Optional[bool] = None
     tags: Optional[list[str]] = None
-    default_deployment_strategy: Optional[DeploymentStrategyInput] = None
+    default_deployment_strategy: Optional[DeploymentStrategyInputGQL] = None
     active_revision_id: Optional[ID] = None
     desired_replica_count: Optional[int] = None
     name: Optional[str] = None
@@ -556,17 +625,33 @@ class UpdateModelDeploymentInput:
     def to_updater_spec(self) -> NewDeploymentUpdaterSpec:
         strategy_type = None
         if self.default_deployment_strategy is not None:
-            strategy_type = CommonDeploymentStrategy(self.default_deployment_strategy.type)
+            strategy_type = DeploymentStrategy(self.default_deployment_strategy.type)
         return NewDeploymentUpdaterSpec(
             open_to_public=OptionalState[bool].from_graphql(self.open_to_public),
             tags=OptionalState[list[str]].from_graphql(self.tags),
-            default_deployment_strategy=OptionalState[CommonDeploymentStrategy].from_graphql(
+            default_deployment_strategy=OptionalState[DeploymentStrategy].from_graphql(
                 strategy_type
             ),
             active_revision_id=OptionalState[UUID].from_graphql(UUID(self.active_revision_id)),
             desired_replica_count=OptionalState[int].from_graphql(self.desired_replica_count),
             name=OptionalState[str].from_graphql(self.name),
             preferred_domain_name=TriState[str].from_graphql(self.preferred_domain_name),
+        )
+
+    def to_policy_updater_spec(self) -> Optional[DeploymentPolicyUpdaterSpec]:
+        """Convert deployment strategy input to policy updater spec.
+
+        Returns None if no deployment_strategy is provided (no policy update).
+        """
+        if self.default_deployment_strategy is None:
+            return None
+
+        # Validate and convert
+        policy_config = self.default_deployment_strategy.to_policy_config()
+        return DeploymentPolicyUpdaterSpec(
+            strategy=OptionalState.update(policy_config.strategy),
+            strategy_spec=OptionalState.update(policy_config.strategy_spec),
+            rollback_on_failure=OptionalState.update(policy_config.rollback_on_failure),
         )
 
 
