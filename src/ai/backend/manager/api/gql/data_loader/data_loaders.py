@@ -6,9 +6,11 @@ from typing import Optional
 
 from strawberry.dataloader import DataLoader
 
+from ai.backend.manager.data.deployment.types import ModelDeploymentAutoScalingRuleData
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.services.processors import Processors
 
+from .auto_scaling_rule import load_auto_scaling_rules_by_ids
 from .notification import load_channels_by_ids, load_rules_by_ids
 
 
@@ -37,3 +39,11 @@ class DataLoaders:
         self,
     ) -> DataLoader[uuid.UUID, Optional[NotificationRuleData]]:
         return DataLoader(load_fn=partial(load_rules_by_ids, self._processors.notification))
+
+    @cached_property
+    def auto_scaling_rule_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, Optional[ModelDeploymentAutoScalingRuleData]]:
+        return DataLoader(
+            load_fn=partial(load_auto_scaling_rules_by_ids, self._processors.deployment)
+        )
