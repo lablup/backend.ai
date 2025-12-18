@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Collection
+
 import sqlalchemy as sa
 
 from ai.backend.manager.models.scaling_group import (
@@ -84,6 +86,13 @@ class ScalingGroupConditions:
     def by_use_host_network(use_host_network: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ScalingGroupRow.use_host_network == use_host_network
+
+        return inner
+
+    @staticmethod
+    def by_names(names: Collection[str]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupRow.name.in_(names)
 
         return inner
 
