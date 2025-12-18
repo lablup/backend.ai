@@ -450,6 +450,13 @@ class PermissionDBSource:
                 raise ObjectNotFound(f"Role with ID {updater.pk_value} does not exist.")
             return result.row
 
+    async def purge_role(self, purger: Purger[RoleRow]) -> RoleRow:
+        async with self._db.begin_session() as db_session:
+            result = await execute_purger(db_session, purger)
+            if result is None:
+                raise ObjectNotFound(f"Role with ID {purger.pk_value} does not exist.")
+            return result.row
+
     async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleRow:
         async with self._db.begin_session() as db_session:
             user_role_row = UserRoleRow.from_input(data)

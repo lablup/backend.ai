@@ -156,6 +156,11 @@ class PermissionControllerRepository:
         return result.to_data()
 
     @permission_controller_repository_resilience.apply()
+    async def purge_role(self, purger: Purger[RoleRow]) -> RoleData:
+        result = await self._db_source.purge_role(purger)
+        return result.to_data()
+
+    @permission_controller_repository_resilience.apply()
     async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleAssignmentData:
         result = await self._db_source.assign_role(data)
         return result.to_data()
