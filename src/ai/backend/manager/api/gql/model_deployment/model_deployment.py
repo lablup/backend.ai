@@ -98,6 +98,7 @@ from ai.backend.manager.types import OptionalState, TriState
 from .deployment_policy import (
     BlueGreenConfigInputGQL,
     DeploymentPolicyGQL,
+    DeploymentStrategyTypeGQL,
     RollingUpdateConfigInputGQL,
 )
 from .model_revision import (
@@ -113,12 +114,6 @@ DeploymentStatusGQL: type[ModelDeploymentStatus] = strawberry.enum(
     ModelDeploymentStatus,
     name="DeploymentStatus",
     description="Added in 25.16.0. This enum represents the deployment status of a model deployment, indicating its current state.",
-)
-
-DeploymentStrategyTypeGQL: type[DeploymentStrategy] = strawberry.enum(
-    DeploymentStrategy,
-    name="DeploymentStrategyType",
-    description="Added in 25.16.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.",
 )
 
 
