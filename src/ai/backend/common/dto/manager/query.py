@@ -1,17 +1,9 @@
 import uuid
-from typing import Generic, Optional, TypeVar
+from typing import Optional
 
 from pydantic import Field
 
 from ...api_handlers import BaseRequestModel
-
-TFilterValue = TypeVar("TFilterValue")
-
-
-class StrictValueFilter(BaseRequestModel, Generic[TFilterValue]):
-    """Filter for exact match of a strict value type."""
-
-    equals: TFilterValue = Field(description="Exact match")
 
 
 class StringFilter(BaseRequestModel):
@@ -21,12 +13,6 @@ class StringFilter(BaseRequestModel):
     i_equals: Optional[str] = Field(default=None, description="Exact match (case-insensitive)")
     contains: Optional[str] = Field(default=None, description="Contains (case-sensitive)")
     i_contains: Optional[str] = Field(default=None, description="Contains (case-insensitive)")
-
-
-class UUIDFilter(BaseRequestModel):
-    """UUID field filter for exact match."""
-
-    equals: uuid.UUID = Field(description="Exact match UUID")
 
 
 class ListGroupQuery(BaseRequestModel):
