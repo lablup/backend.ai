@@ -69,13 +69,3 @@ class TestLoadAutoScalingRulesByIds:
 
         # Then
         assert result == [existing_rule, None]
-
-    async def test_returns_none_for_all_when_processor_is_none(self) -> None:
-        # Given
-        id1, id2 = uuid.uuid4(), uuid.uuid4()
-
-        # When
-        result = await load_auto_scaling_rules_by_ids(None, [id1, id2])
-
-        # Then
-        assert result == [None, None]

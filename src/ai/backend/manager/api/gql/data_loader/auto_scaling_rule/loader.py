@@ -12,7 +12,7 @@ from ai.backend.manager.services.deployment.processors import DeploymentProcesso
 
 
 async def load_auto_scaling_rules_by_ids(
-    processor: Optional[DeploymentProcessors],
+    processor: DeploymentProcessors,
     auto_scaling_rule_ids: Sequence[uuid.UUID],
 ) -> list[Optional[ModelDeploymentAutoScalingRuleData]]:
     """Batch load auto scaling rules by their IDs.
@@ -27,9 +27,6 @@ async def load_auto_scaling_rules_by_ids(
     """
     if not auto_scaling_rule_ids:
         return []
-
-    if processor is None:
-        return [None] * len(auto_scaling_rule_ids)
 
     action_result = await processor.batch_load_auto_scaling_rules.wait_for_complete(
         BatchLoadAutoScalingRulesAction(auto_scaling_rule_ids=list(auto_scaling_rule_ids))

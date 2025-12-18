@@ -44,6 +44,7 @@ class DataLoaders:
     def auto_scaling_rule_loader(
         self,
     ) -> DataLoader[uuid.UUID, Optional[ModelDeploymentAutoScalingRuleData]]:
+        assert self._processors.deployment is not None
         return DataLoader(
             load_fn=partial(load_auto_scaling_rules_by_ids, self._processors.deployment)
         )
