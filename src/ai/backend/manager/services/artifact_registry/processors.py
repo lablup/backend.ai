@@ -31,6 +31,10 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.list impo
     ListHuggingFaceRegistryAction,
     ListHuggingFaceRegistryActionResult,
 )
+from ai.backend.manager.services.artifact_registry.actions.huggingface.search import (
+    SearchHuggingFaceRegistriesAction,
+    SearchHuggingFaceRegistriesActionResult,
+)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.update import (
     UpdateHuggingFaceRegistryAction,
     UpdateHuggingFaceRegistryActionResult,
@@ -82,6 +86,9 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     list_huggingface_registries: ActionProcessor[
         ListHuggingFaceRegistryAction, ListHuggingFaceRegistryActionResult
     ]
+    search_huggingface_registries: ActionProcessor[
+        SearchHuggingFaceRegistriesAction, SearchHuggingFaceRegistriesActionResult
+    ]
     create_reservoir_registry: ActionProcessor[
         CreateReservoirRegistryAction, CreateReservoirActionResult
     ]
@@ -128,6 +135,9 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
         self.list_huggingface_registries = ActionProcessor(
             service.list_huggingface_registry, action_monitors
         )
+        self.search_huggingface_registries = ActionProcessor(
+            service.search_huggingface_registries, action_monitors
+        )
         self.create_reservoir_registry = ActionProcessor(
             service.create_reservoir_registry, action_monitors
         )
@@ -158,6 +168,7 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
             GetHuggingFaceRegistryAction.spec(),
             GetHuggingFaceRegistriesAction.spec(),
             ListHuggingFaceRegistryAction.spec(),
+            SearchHuggingFaceRegistriesAction.spec(),
             CreateReservoirRegistryAction.spec(),
             UpdateReservoirRegistryAction.spec(),
             DeleteReservoirRegistryAction.spec(),
