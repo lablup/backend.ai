@@ -116,7 +116,7 @@ class TestSessionUniqueNamePerUser:
         domain: DomainRow,
         user_policy: UserResourcePolicyRow,
     ) -> AsyncGenerator[UserData, None]:
-        """Create two test users for testing unique constraint."""
+        """Create test user for testing unique constraint."""
         user_a = UserRow(
             uuid=uuid.uuid4(),
             email=f"user-a-{uuid.uuid4().hex[:8]}@example.com",
