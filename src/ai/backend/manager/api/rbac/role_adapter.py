@@ -57,7 +57,10 @@ class RoleAdapter(BaseFilterAdapter):
             Querier object with converted conditions, orders, and pagination
         """
         conditions = self._convert_filter(request.filter) if request.filter else []
-        orders = [self._convert_order(request.order)] if request.order else []
+        orders: list[QueryOrder] = []
+        if request.order is not None:
+            for order in request.order:
+                orders.append(self._convert_order(order))
         pagination = self._build_pagination(request.limit, request.offset)
 
         return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)

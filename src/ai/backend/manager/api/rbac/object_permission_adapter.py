@@ -29,8 +29,7 @@ __all__ = ("ObjectPermissionAdapter",)
 class ObjectPermissionAdapter:
     """Adapter for converting object permission requests to actions and data to DTOs."""
 
-    @staticmethod
-    def to_object_permission_dto(data: ObjectPermissionData) -> ObjectPermissionDTO:
+    def to_object_permission_dto(self, data: ObjectPermissionData) -> ObjectPermissionDTO:
         """Convert ObjectPermissionData to ObjectPermissionDTO."""
         return ObjectPermissionDTO(
             id=data.id,
@@ -40,8 +39,8 @@ class ObjectPermissionAdapter:
             operation=data.operation,
         )
 
-    @staticmethod
     def to_create_object_permission_action(
+        self,
         request: CreateObjectPermissionRequest,
     ) -> CreateObjectPermissionAction:
         """Convert CreateObjectPermissionRequest to CreateObjectPermissionAction."""
@@ -56,8 +55,8 @@ class ObjectPermissionAdapter:
         )
         return CreateObjectPermissionAction(creator=creator)
 
-    @staticmethod
     def to_delete_object_permission_action(
+        self,
         object_permission_id: uuid.UUID,
     ) -> DeleteObjectPermissionAction:
         """Convert object_permission_id to DeleteObjectPermissionAction."""

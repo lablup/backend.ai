@@ -60,7 +60,10 @@ class AssignedUserAdapter(BaseFilterAdapter):
         conditions = [self._get_base_filter(param)]
         if request.filter is not None:
             conditions.extend(self._convert_filter(request.filter))
-        orders = [self._convert_order(request.order)] if request.order else []
+        orders: list[QueryOrder] = []
+        if request.order is not None:
+            for order in request.order:
+                orders.append(self._convert_order(order))
         pagination = self._build_pagination(request.limit, request.offset)
 
         return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
@@ -95,10 +98,7 @@ class AssignedUserAdapter(BaseFilterAdapter):
 
         # Granted by filter
         if filter.granted_by is not None:
-            condition = self.convert_strict_value_filter(
-                filter.granted_by,
-                equals_fn=AssignedUserConditions.by_granted_by_equals,
-            )
+            condition = AssignedUserConditions.by_granted_by_equals(filter.granted_by)
             conditions.append(condition)
 
         return conditions
@@ -107,14 +107,13 @@ class AssignedUserAdapter(BaseFilterAdapter):
         """Convert assigned user order specification to query order."""
         ascending = order.direction == OrderDirection.ASC
 
-        if order.field == AssignedUserOrderField.USERNAME:
-            return AssignedUserOrders.username(ascending=ascending)
-        elif order.field == AssignedUserOrderField.EMAIL:
-            return AssignedUserOrders.email(ascending=ascending)
-        elif order.field == AssignedUserOrderField.GRANTED_AT:
-            return AssignedUserOrders.granted_at(ascending=ascending)
-        else:
-            raise ValueError(f"Unknown order field: {order.field}")
+        match order.field:
+            case AssignedUserOrderField.USERNAME:
+                return AssignedUserOrders.username(ascending=ascending)
+            case AssignedUserOrderField.EMAIL:
+                return AssignedUserOrders.email(ascending=ascending)
+            case AssignedUserOrderField.GRANTED_AT:
+                return AssignedUserOrders.granted_at(ascending=ascending)
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""
