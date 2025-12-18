@@ -63,6 +63,10 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.list import
     ListReservoirRegistriesAction,
     ListReservoirRegistriesActionResult,
 )
+from ai.backend.manager.services.artifact_registry.actions.reservoir.search import (
+    SearchReservoirRegistriesAction,
+    SearchReservoirRegistriesActionResult,
+)
 from ai.backend.manager.services.artifact_registry.actions.reservoir.update import (
     UpdateReservoirRegistryAction,
     UpdateReservoirRegistryActionResult,
@@ -110,6 +114,9 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     ]
     list_reservoir_registries: ActionProcessor[
         ListReservoirRegistriesAction, ListReservoirRegistriesActionResult
+    ]
+    search_reservoir_registries: ActionProcessor[
+        SearchReservoirRegistriesAction, SearchReservoirRegistriesActionResult
     ]
     get_registry_meta: ActionProcessor[
         GetArtifactRegistryMetaAction, GetArtifactRegistryMetaActionResult
@@ -163,6 +170,9 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
         self.list_reservoir_registries = ActionProcessor(
             service.list_reservoir_registries, action_monitors
         )
+        self.search_reservoir_registries = ActionProcessor(
+            service.search_reservoir_registries, action_monitors
+        )
         self.get_registry_meta = ActionProcessor(service.get_registry_meta, action_monitors)
         self.get_registry_metas = ActionProcessor(service.get_registry_metas, action_monitors)
         self.search_artifact_registries = ActionProcessor(
@@ -185,6 +195,7 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
             GetReservoirRegistryAction.spec(),
             GetReservoirRegistriesAction.spec(),
             ListReservoirRegistriesAction.spec(),
+            SearchReservoirRegistriesAction.spec(),
             GetArtifactRegistryMetaAction.spec(),
             GetArtifactRegistryMetasAction.spec(),
             SearchArtifactRegistriesAction.spec(),

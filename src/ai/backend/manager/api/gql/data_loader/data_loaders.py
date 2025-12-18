@@ -11,6 +11,7 @@ from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryDa
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.services.processors import Processors
 
 from .artifact import load_artifacts_by_ids
@@ -19,6 +20,7 @@ from .artifact_revision import load_artifact_revisions_by_ids
 from .huggingface_registry import load_huggingface_registries_by_ids
 from .notification import load_channels_by_ids, load_rules_by_ids
 from .object_storage import load_object_storages_by_ids
+from .reservoir_registry import load_reservoir_registries_by_ids
 
 
 class DataLoaders:
@@ -83,4 +85,12 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, Optional[ArtifactRegistryData]]:
         return DataLoader(
             load_fn=partial(load_artifact_registries_by_ids, self._processors.artifact_registry)
+        )
+
+    @cached_property
+    def reservoir_registry_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, Optional[ReservoirRegistryData]]:
+        return DataLoader(
+            load_fn=partial(load_reservoir_registries_by_ids, self._processors.artifact_registry)
         )
