@@ -137,7 +137,7 @@ jobs:
           echo '${{ steps.milestones.outputs.result }}' > /tmp/backport-results/${{ matrix.commits }}.json
       - name: Upload result artifact
         if: ${{ steps.commit.outputs.pr_number }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: result-${{ matrix.commits }}
           path: /tmp/backport-results/${{ matrix.commits }}.json
