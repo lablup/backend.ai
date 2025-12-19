@@ -67,6 +67,9 @@ from .model_deployment.model_revision import (
     revision,
     revisions,
 )
+from .model_deployment.revision_operations import (
+    activate_deployment_revision,
+)
 from .notification import (
     create_notification_channel,
     create_notification_rule,
@@ -203,6 +206,7 @@ class Mutation:
     approve_artifact_revision = approve_artifact_revision
     reject_artifact_revision = reject_artifact_revision
     create_access_token = create_access_token
+    activate_deployment_revision = activate_deployment_revision
 
 
 @strawberry.type

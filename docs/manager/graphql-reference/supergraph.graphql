@@ -78,6 +78,25 @@ enum AccessTokenOrderField
 }
 
 """
+Added in 25.19.0. Input for activating a revision to be the current revision.
+"""
+input ActivateRevisionInput
+  @join__type(graph: STRAWBERRY)
+{
+  deploymentId: ID!
+  revisionId: ID!
+}
+
+"""Added in 25.19.0. Result of activating a revision."""
+type ActivateRevisionPayload
+  @join__type(graph: STRAWBERRY)
+{
+  deployment: ModelDeployment!
+  previousRevisionId: ID
+  activatedRevisionId: ID!
+}
+
+"""
 Added in 25.16.0. This enum represents the activeness status of a replica, indicating whether the deployment is currently active and able to serve requests.
 """
 enum ActivenessStatus
@@ -5018,6 +5037,11 @@ type Mutation
 
   """Added in 25.16.0"""
   createAccessToken(input: CreateAccessTokenInput!): CreateAccessTokenPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 25.19.0. Activate a specific revision to be the current revision.
+  """
+  activateDeploymentRevision(input: ActivateRevisionInput!): ActivateRevisionPayload! @join__field(graph: STRAWBERRY)
 }
 
 """Added in 24.12.0."""

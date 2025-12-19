@@ -93,6 +93,10 @@ from ai.backend.manager.services.deployment.actions.model_revision.list_revision
     ListRevisionsAction,
     ListRevisionsActionResult,
 )
+from ai.backend.manager.services.deployment.actions.revision_operations import (
+    ActivateRevisionAction,
+    ActivateRevisionActionResult,
+)
 from ai.backend.manager.services.deployment.actions.sync_replicas import (
     SyncReplicaAction,
     SyncReplicaActionResult,
@@ -189,6 +193,10 @@ class DeploymentServiceProtocol(Protocol):
         self, action: GetDeploymentPolicyAction
     ) -> GetDeploymentPolicyActionResult: ...
 
+    async def activate_revision(
+        self, action: ActivateRevisionAction
+    ) -> ActivateRevisionActionResult: ...
+
 
 class DeploymentProcessors(AbstractProcessorPackage):
     """Processors for deployment operations."""
@@ -241,6 +249,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
     get_deployment_policy: ActionProcessor[
         GetDeploymentPolicyAction, GetDeploymentPolicyActionResult
     ]
+    activate_revision: ActionProcessor[ActivateRevisionAction, ActivateRevisionActionResult]
 
     def __init__(
         self, service: DeploymentServiceProtocol, action_monitors: list[ActionMonitor]
@@ -285,6 +294,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.create_model_revision = ActionProcessor(service.create_model_revision, action_monitors)
         self.batch_load_revisions = ActionProcessor(service.batch_load_revisions, action_monitors)
         self.get_deployment_policy = ActionProcessor(service.get_deployment_policy, action_monitors)
+        self.activate_revision = ActionProcessor(service.activate_revision, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -312,4 +322,5 @@ class DeploymentProcessors(AbstractProcessorPackage):
             ListAccessTokensAction.spec(),
             BatchLoadReplicasByRevisionIdsAction.spec(),
             GetDeploymentPolicyAction.spec(),
+            ActivateRevisionAction.spec(),
         ]
