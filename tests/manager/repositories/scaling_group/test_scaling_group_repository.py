@@ -271,7 +271,7 @@ class TestScalingGroupRepositoryDB:
             config={"max_sessions": 10},
         )
         creator = self._create_scaling_group_creator(
-            name="test-sgroup-create-02",
+            name="test-sgroup-create-full",
             driver="docker",
             scheduler="fifo",
             description="Full test scaling group",
