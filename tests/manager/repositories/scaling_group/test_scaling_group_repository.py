@@ -268,11 +268,10 @@ class TestScalingGroupRepositoryDB:
         """Test creating a scaling group with all fields specified"""
         scheduler_opts = ScalingGroupOpts(
             allowed_session_types=[SessionTypes.INTERACTIVE],
-            pending_timeout=datetime.now() - datetime.now(),  # timedelta(0)
             config={"max_sessions": 10},
         )
         creator = self._create_scaling_group_creator(
-            name="test-sgroup-create-02",
+            name="test-sgroup-create-full",
             driver="docker",
             scheduler="fifo",
             description="Full test scaling group",
