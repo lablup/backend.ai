@@ -6,6 +6,10 @@ from ai.backend.manager.services.scaling_group.actions.list_scaling_groups impor
     SearchScalingGroupsAction,
     SearchScalingGroupsActionResult,
 )
+from ai.backend.manager.services.scaling_group.actions.modify import (
+    ModifyScalingGroupAction,
+    ModifyScalingGroupActionResult,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -30,3 +34,10 @@ class ScalingGroupService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    async def modify_scaling_group(
+        self, action: ModifyScalingGroupAction
+    ) -> ModifyScalingGroupActionResult:
+        """Modifies a scaling group."""
+        scaling_group_data = await self._repository.update_scaling_group(action.updater)
+        return ModifyScalingGroupActionResult(scaling_group=scaling_group_data)
