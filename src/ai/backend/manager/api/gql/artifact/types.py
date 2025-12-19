@@ -801,14 +801,14 @@ class Artifact(Node):
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> ArtifactRevisionConnection:
-        from .resolver import resolve_artifact_revisions
+        from .fetcher import fetch_artifact_revisions
 
         if filter is None:
             filter = ArtifactRevisionFilter(artifact_id=ID(self.id))
         else:
             filter.artifact_id = ID(self.id)
 
-        return await resolve_artifact_revisions(
+        return await fetch_artifact_revisions(
             info,
             filter=filter,
             order_by=order_by,

@@ -1,19 +1,15 @@
 from __future__ import annotations
 
 import uuid
-from functools import lru_cache
 from typing import AsyncGenerator, Optional
 
 import strawberry
 from strawberry import ID, Info
 
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import ModelSortKey
-from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import (
     to_global_id,
 )
-from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.artifact.types import ArtifactAvailability
@@ -23,17 +19,13 @@ from ai.backend.manager.errors.artifact import (
     ArtifactScanLimitExceededError,
 )
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
-from ai.backend.manager.models.artifact import ArtifactRow
-from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.repositories.artifact.updaters import ArtifactUpdaterSpec
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.artifact.actions.delegate_scan import DelegateScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.delete_multi import DeleteArtifactsAction
-from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
 from ai.backend.manager.services.artifact.actions.restore_multi import RestoreArtifactsAction
 from ai.backend.manager.services.artifact.actions.retrieve_model_multi import RetrieveModelsAction
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
-from ai.backend.manager.services.artifact.actions.search import SearchArtifactsAction
 from ai.backend.manager.services.artifact.actions.update import UpdateArtifactAction
 from ai.backend.manager.services.artifact_revision.actions.approve import (
     ApproveArtifactRevisionAction,
@@ -45,24 +37,26 @@ from ai.backend.manager.services.artifact_revision.actions.cleanup import (
 from ai.backend.manager.services.artifact_revision.actions.delegate_import_revision_batch import (
     DelegateImportArtifactRevisionBatchAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.get import GetArtifactRevisionAction
 from ai.backend.manager.services.artifact_revision.actions.import_revision import (
     ImportArtifactRevisionAction,
 )
 from ai.backend.manager.services.artifact_revision.actions.reject import (
     RejectArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.search import (
-    SearchArtifactRevisionsAction,
-)
 from ai.backend.manager.types import TriState
 
+from .fetcher import (
+    fetch_artifact,
+    fetch_artifact_revision,
+    fetch_artifact_revisions,
+    fetch_artifacts,
+    get_registry_url,
+)
 from .types import (
     ApproveArtifactInput,
     ApproveArtifactPayload,
     Artifact,
     ArtifactConnection,
-    ArtifactEdge,
     ArtifactFilter,
     ArtifactImportProgressUpdatedPayload,
     ArtifactOrderBy,
@@ -99,50 +93,6 @@ from .types import (
 )
 
 
-async def _get_registry_url(
-    data_loaders: DataLoaders,
-    registry_id: uuid.UUID,
-    registry_type: ArtifactRegistryType,
-) -> str:
-    """Get the URL for a registry based on its type."""
-    match registry_type:
-        case ArtifactRegistryType.HUGGINGFACE:
-            hf_registry = await data_loaders.huggingface_registry_loader.load(registry_id)
-            if hf_registry is None:
-                raise ArtifactRegistryNotFoundError(f"HuggingFace registry {registry_id} not found")
-            return hf_registry.url
-        case ArtifactRegistryType.RESERVOIR:
-            reservoir_registry = await data_loaders.reservoir_registry_loader.load(registry_id)
-            if reservoir_registry is None:
-                raise ArtifactRegistryNotFoundError(f"Reservoir registry {registry_id} not found")
-            return reservoir_registry.endpoint
-    raise ArtifactRegistryNotFoundError(f"Unknown registry type: {registry_type}")
-
-
-@lru_cache(maxsize=1)
-def _get_artifact_pagination_spec() -> PaginationSpec:
-    """Get pagination spec for Artifact queries."""
-    return PaginationSpec(
-        forward_order=ArtifactRow.id.asc(),
-        backward_order=ArtifactRow.id.desc(),
-        forward_condition_factory=lambda cursor_value: lambda: ArtifactRow.id > cursor_value,
-        backward_condition_factory=lambda cursor_value: lambda: ArtifactRow.id < cursor_value,
-    )
-
-
-@lru_cache(maxsize=1)
-def _get_artifact_revision_pagination_spec() -> PaginationSpec:
-    """Get pagination spec for ArtifactRevision queries."""
-    return PaginationSpec(
-        forward_order=ArtifactRevisionRow.id.asc(),
-        backward_order=ArtifactRevisionRow.id.desc(),
-        forward_condition_factory=lambda cursor_value: lambda: ArtifactRevisionRow.id
-        > cursor_value,
-        backward_condition_factory=lambda cursor_value: lambda: ArtifactRevisionRow.id
-        < cursor_value,
-    )
-
-
 # Query Fields
 @strawberry.field(
     description=dedent_strip("""
@@ -169,63 +119,16 @@ async def artifacts(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ArtifactConnection:
-    # Build querier using adapter
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        ),
-        _get_artifact_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
-    )
-
-    # Get artifacts using list action
-    action_result = await info.context.processors.artifact.search_artifacts.wait_for_complete(
-        SearchArtifactsAction(querier=querier)
-    )
-
-    data_loaders = info.context.data_loaders
-    registry_loader = data_loaders.artifact_registry_loader
-
-    # Build GraphQL connection response
-    edges = []
-    for artifact_data in action_result.data:
-        registry_data = await registry_loader.load(artifact_data.registry_id)
-        source_registry_data = await registry_loader.load(artifact_data.source_registry_id)
-        if registry_data is None:
-            raise ArtifactRegistryNotFoundError(f"Registry {artifact_data.registry_id} not found")
-        if source_registry_data is None:
-            raise ArtifactRegistryNotFoundError(
-                f"Source registry {artifact_data.source_registry_id} not found"
-            )
-        registry_url = await _get_registry_url(
-            data_loaders, artifact_data.registry_id, registry_data.type
-        )
-        source_url = await _get_registry_url(
-            data_loaders, artifact_data.source_registry_id, source_registry_data.type
-        )
-        artifact = Artifact.from_dataclass(
-            artifact_data, registry_url=registry_url, source_url=source_url
-        )
-        cursor = to_global_id(Artifact, artifact_data.id)
-        edges.append(ArtifactEdge(node=artifact, cursor=cursor))
-
-    page_info = strawberry.relay.PageInfo(
-        has_next_page=action_result.has_next_page,
-        has_previous_page=action_result.has_previous_page,
-        start_cursor=edges[0].cursor if edges else None,
-        end_cursor=edges[-1].cursor if edges else None,
-    )
-
-    return ArtifactConnection(
-        count=action_result.total_count,
-        edges=edges,
-        page_info=page_info,
+    return await fetch_artifacts(
+        info,
+        filter,
+        order_by,
+        before,
+        after,
+        first,
+        last,
+        limit,
+        offset,
     )
 
 
@@ -240,91 +143,7 @@ async def artifacts(
     """)
 )
 async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Artifact]:
-    action_result = await info.context.processors.artifact.get.wait_for_complete(
-        GetArtifactAction(
-            artifact_id=uuid.UUID(id),
-        )
-    )
-
-    data_loaders = info.context.data_loaders
-    registry_loader = data_loaders.artifact_registry_loader
-
-    registry_data = await registry_loader.load(action_result.result.registry_id)
-    source_registry_data = await registry_loader.load(action_result.result.source_registry_id)
-    if registry_data is None:
-        raise ArtifactRegistryNotFoundError(
-            f"Registry {action_result.result.registry_id} not found"
-        )
-    if source_registry_data is None:
-        raise ArtifactRegistryNotFoundError(
-            f"Source registry {action_result.result.source_registry_id} not found"
-        )
-
-    registry_url = await _get_registry_url(
-        data_loaders, action_result.result.registry_id, registry_data.type
-    )
-    source_url = await _get_registry_url(
-        data_loaders, action_result.result.source_registry_id, source_registry_data.type
-    )
-
-    return Artifact.from_dataclass(action_result.result, registry_url, source_url)
-
-
-async def resolve_artifact_revisions(
-    info: Info[StrawberryGQLContext],
-    filter: Optional[ArtifactRevisionFilter],
-    order_by: Optional[list[ArtifactRevisionOrderBy]],
-    before: Optional[str],
-    after: Optional[str],
-    first: Optional[int],
-    last: Optional[int],
-    limit: Optional[int],
-    offset: Optional[int],
-):
-    """
-    NOTE: This implementation has been separated from the resolver so that it can be imported from other files.
-    """
-    # Build querier using adapter
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        ),
-        _get_artifact_revision_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
-    )
-
-    # Get artifact revisions using list action
-    action_result = (
-        await info.context.processors.artifact_revision.search_revision.wait_for_complete(
-            SearchArtifactRevisionsAction(querier=querier)
-        )
-    )
-
-    # Build GraphQL connection response
-    edges = []
-    for revision_data in action_result.data:
-        revision = ArtifactRevision.from_dataclass(revision_data)
-        cursor = to_global_id(ArtifactRevision, revision_data.id)
-        edges.append(ArtifactRevisionEdge(node=revision, cursor=cursor))
-
-    page_info = strawberry.relay.PageInfo(
-        has_next_page=action_result.has_next_page,
-        has_previous_page=action_result.has_previous_page,
-        start_cursor=edges[0].cursor if edges else None,
-        end_cursor=edges[-1].cursor if edges else None,
-    )
-
-    return ArtifactRevisionConnection(
-        count=action_result.total_count,
-        edges=edges,
-        page_info=page_info,
-    )
+    return await fetch_artifact(info, uuid.UUID(id))
 
 
 @strawberry.field(
@@ -351,7 +170,7 @@ async def artifact_revisions(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ArtifactRevisionConnection:
-    return await resolve_artifact_revisions(
+    return await fetch_artifact_revisions(
         info,
         filter,
         order_by,
@@ -375,13 +194,7 @@ async def artifact_revisions(
     """)
 )
 async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ArtifactRevision]:
-    action_result = await info.context.processors.artifact_revision.get.wait_for_complete(
-        GetArtifactRevisionAction(
-            artifact_revision_id=uuid.UUID(id),
-        )
-    )
-
-    return ArtifactRevision.from_dataclass(action_result.revision)
+    return await fetch_artifact_revision(info, uuid.UUID(id))
 
 
 @strawberry.mutation(
@@ -427,8 +240,8 @@ async def scan_artifacts(
             raise ArtifactRegistryNotFoundError(
                 f"Source registry {item.source_registry_id} not found"
             )
-        registry_url = await _get_registry_url(data_loaders, item.registry_id, registry_data.type)
-        source_url = await _get_registry_url(
+        registry_url = await get_registry_url(data_loaders, item.registry_id, registry_data.type)
+        source_url = await get_registry_url(
             data_loaders, item.source_registry_id, source_registry_data.type
         )
         artifacts.append(Artifact.from_dataclass(item, registry_url, source_url))
@@ -542,8 +355,8 @@ async def delegate_scan_artifacts(
             raise ArtifactRegistryNotFoundError(
                 f"Source registry {item.source_registry_id} not found"
             )
-        registry_url = await _get_registry_url(data_loaders, item.registry_id, registry_data.type)
-        source_url = await _get_registry_url(
+        registry_url = await get_registry_url(data_loaders, item.registry_id, registry_data.type)
+        source_url = await get_registry_url(
             data_loaders, item.source_registry_id, source_registry_data.type
         )
         artifacts.append(Artifact.from_dataclass(item, registry_url, source_url))
@@ -663,8 +476,8 @@ async def update_artifact(
             f"Source registry {artifact.source_registry_id} not found"
         )
 
-    registry_url = await _get_registry_url(data_loaders, artifact.registry_id, registry_data.type)
-    source_url = await _get_registry_url(
+    registry_url = await get_registry_url(data_loaders, artifact.registry_id, registry_data.type)
+    source_url = await get_registry_url(
         data_loaders, artifact.source_registry_id, source_registry_data.type
     )
 
@@ -750,8 +563,8 @@ async def delete_artifacts(
             raise ArtifactRegistryNotFoundError(
                 f"Source registry {item.source_registry_id} not found"
             )
-        registry_url = await _get_registry_url(data_loaders, item.registry_id, registry_data.type)
-        source_url = await _get_registry_url(
+        registry_url = await get_registry_url(data_loaders, item.registry_id, registry_data.type)
+        source_url = await get_registry_url(
             data_loaders, item.source_registry_id, source_registry_data.type
         )
         artifacts.append(Artifact.from_dataclass(item, registry_url, source_url))
@@ -791,8 +604,8 @@ async def restore_artifacts(
             raise ArtifactRegistryNotFoundError(
                 f"Source registry {item.source_registry_id} not found"
             )
-        registry_url = await _get_registry_url(data_loaders, item.registry_id, registry_data.type)
-        source_url = await _get_registry_url(
+        registry_url = await get_registry_url(data_loaders, item.registry_id, registry_data.type)
+        source_url = await get_registry_url(
             data_loaders, item.source_registry_id, source_registry_data.type
         )
         artifacts.append(Artifact.from_dataclass(item, registry_url, source_url))
