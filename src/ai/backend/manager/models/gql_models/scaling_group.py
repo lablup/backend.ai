@@ -18,15 +18,16 @@ import graphene_federation
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
+from sqlalchemy.exc import DBAPIError, IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
 
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.errors.resource import ScalingGroupDeletionFailure, ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentStatus
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base import Purger
-from ai.backend.manager.services.scaling_group.actions.purge import PurgeScalingGroupAction
+from ai.backend.manager.models.utils import execute_with_txn_retry
 
 from ..base import (
     batch_multiresult,
@@ -693,13 +694,17 @@ class DeleteScalingGroup(graphene.Mutation):
         info: graphene.ResolveInfo,
         name: str,
     ) -> DeleteScalingGroup:
-        from ai.backend.manager.models.scaling_group import ScalingGroupRow
-
         graph_ctx: GraphQueryContext = info.context
-        purger = Purger(row_class=ScalingGroupRow, pk_value=name)
-        await graph_ctx.processors.scaling_group.purge_scaling_group.wait_for_complete(
-            PurgeScalingGroupAction(purger=purger)
-        )
+        delete_query = sa.delete(scaling_groups).where(scaling_groups.c.name == name)
+
+        async def delete(db_session: AsyncSession) -> None:
+            await db_session.execute(delete_query)
+
+        try:
+            async with graph_ctx.db.connect() as conn:
+                await execute_with_txn_retry(delete, graph_ctx.db.begin_session, conn)
+        except (DBAPIError, IntegrityError) as e:
+            raise ScalingGroupDeletionFailure from e
         return cls(ok=True, msg="success")
 
 
