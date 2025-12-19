@@ -114,6 +114,10 @@ from ai.backend.manager.services.deployment.actions.model_revision.list_revision
     ListRevisionsAction,
     ListRevisionsActionResult,
 )
+from ai.backend.manager.services.deployment.actions.revision_operations import (
+    ActivateRevisionAction,
+    ActivateRevisionActionResult,
+)
 from ai.backend.manager.services.deployment.actions.sync_replicas import (
     SyncReplicaAction,
     SyncReplicaActionResult,
@@ -461,6 +465,56 @@ class DeploymentService:
         """
         data = await self._deployment_controller.get_deployment_policy(action.endpoint_id)
         return GetDeploymentPolicyActionResult(data=data)
+
+    # ========== Revision Operations Methods ==========
+
+    async def activate_revision(
+        self, action: ActivateRevisionAction
+    ) -> ActivateRevisionActionResult:
+        """Activate a specific revision to be the current revision.
+
+        Args:
+            action: Action containing deployment and revision IDs
+
+        Returns:
+            ActivateRevisionActionResult: Result containing the updated deployment
+        """
+        # For now, return mock data
+        # TODO: Implement actual activation logic:
+        # 1. Validate revision exists and belongs to deployment
+        # 2. Update endpoint.current_revision
+        # 3. Trigger lifecycle check
+        return ActivateRevisionActionResult(
+            deployment=ModelDeploymentData(
+                id=action.deployment_id,
+                metadata=ModelDeploymentMetadataInfo(
+                    name="test-deployment",
+                    status=ModelDeploymentStatus.READY,
+                    tags=["tag1", "tag2"],
+                    project_id=uuid4(),
+                    domain_name="default",
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                ),
+                network_access=DeploymentNetworkSpec(
+                    open_to_public=True,
+                    url="http://example.com",
+                    preferred_domain_name="example.com",
+                    access_token_ids=[uuid4()],
+                ),
+                revision_history_ids=[uuid4(), uuid4()],
+                revision=mock_revision_data_1,
+                scaling_rule_ids=[uuid4(), uuid4()],
+                replica_state=ReplicaStateData(
+                    desired_replica_count=3,
+                    replica_ids=[uuid4(), uuid4(), uuid4()],
+                ),
+                default_deployment_strategy=DeploymentStrategy.ROLLING,
+                created_user_id=uuid4(),
+            ),
+            previous_revision_id=uuid4(),
+            activated_revision_id=action.revision_id,
+        )
 
 
 mock_revision_data_1 = ModelRevisionData(
