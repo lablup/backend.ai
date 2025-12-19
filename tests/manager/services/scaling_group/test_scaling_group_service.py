@@ -306,7 +306,6 @@ class TestScalingGroupService:
         assert result.scaling_group == sample_scaling_group
         mock_repository.create_scaling_group.assert_called_once_with(creator)
 
-    @pytest.mark.asyncio
     async def test_create_scaling_group_repository_error_propagates(
         self,
         scaling_group_service: ScalingGroupService,
