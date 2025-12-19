@@ -46,17 +46,18 @@ class TestSessionUniqueNamePerUser:
         self, database_engine: ExtendedAsyncSAEngine
     ) -> AsyncGenerator[DomainRow, None]:
         """Create test domain."""
-        domain = DomainRow(name="test-domain")
+        domain = DomainRow(name=f"test-{uuid.uuid4()}")
 
-        async with database_engine.begin_session() as db_sess:
-            db_sess.add(domain)
-            await db_sess.flush()
+        try:
+            async with database_engine.begin_session() as db_sess:
+                db_sess.add(domain)
+                await db_sess.flush()
 
-        yield domain
-
-        # Clean up domain data
-        async with database_engine.begin() as conn:
-            await conn.execute(sa.delete(DomainRow).where(DomainRow.name == domain.name))
+            yield domain
+        finally:
+            # Clean up domain data
+            async with database_engine.begin() as conn:
+                await conn.execute(sa.delete(DomainRow).where(DomainRow.name == domain.name))
 
     @pytest.fixture
     async def user_policy(
@@ -64,24 +65,28 @@ class TestSessionUniqueNamePerUser:
     ) -> AsyncGenerator[UserResourcePolicyRow, None]:
         """Create test user resource policy."""
         policy = UserResourcePolicyRow(
-            name="default-user-policy",
+            name=f"{uuid.uuid4()}",
             max_vfolder_count=10,
             max_quota_scope_size=BinarySize.from_str("10GiB"),
             max_session_count_per_model_session=5,
             max_customized_image_count=3,
         )
 
-        async with database_engine.begin_session() as db_sess:
-            db_sess.add(policy)
-            await db_sess.flush()
+        try:
+            async with database_engine.begin_session() as db_sess:
+                db_sess.add(policy)
+                await db_sess.flush()
 
-        yield policy
+            yield policy
 
-        # Clean up user policy data
-        async with database_engine.begin() as conn:
-            await conn.execute(
-                sa.delete(UserResourcePolicyRow).where(UserResourcePolicyRow.name == policy.name)
-            )
+        finally:
+            # Clean up user policy data
+            async with database_engine.begin() as conn:
+                await conn.execute(
+                    sa.delete(UserResourcePolicyRow).where(
+                        UserResourcePolicyRow.name == policy.name
+                    )
+                )
 
     @pytest.fixture
     async def group_policy(
@@ -89,25 +94,26 @@ class TestSessionUniqueNamePerUser:
     ) -> AsyncGenerator[ProjectResourcePolicyRow, None]:
         """Create test project resource policy."""
         policy = ProjectResourcePolicyRow(
-            name="default-group-policy",
+            name=f"{uuid.uuid4()}",
             max_vfolder_count=10,
             max_quota_scope_size=BinarySize.from_str("10GiB"),
             max_network_count=5,
         )
 
-        async with database_engine.begin_session() as db_sess:
-            db_sess.add(policy)
-            await db_sess.flush()
+        try:
+            async with database_engine.begin_session() as db_sess:
+                db_sess.add(policy)
+                await db_sess.flush()
 
-        yield policy
-
-        # Clean up group policy data
-        async with database_engine.begin() as conn:
-            await conn.execute(
-                sa.delete(ProjectResourcePolicyRow).where(
-                    ProjectResourcePolicyRow.name == policy.name
+            yield policy
+        finally:
+            # Clean up group policy data
+            async with database_engine.begin() as conn:
+                await conn.execute(
+                    sa.delete(ProjectResourcePolicyRow).where(
+                        ProjectResourcePolicyRow.name == policy.name
+                    )
                 )
-            )
 
     @pytest.fixture
     async def user_one(
@@ -124,15 +130,16 @@ class TestSessionUniqueNamePerUser:
             resource_policy=user_policy.name,
         )
 
-        async with database_engine.begin_session() as db_sess:
-            db_sess.add(user_a)
-            await db_sess.flush()
+        try:
+            async with database_engine.begin_session() as db_sess:
+                db_sess.add(user_a)
+                await db_sess.flush()
 
-        yield UserData(uuid=user_a.uuid, email=user_a.email)
-
-        # Clean up user data
-        async with database_engine.begin() as conn:
-            await conn.execute(sa.delete(UserRow).where(UserRow.uuid == user_a.uuid))
+            yield UserData(uuid=user_a.uuid, email=user_a.email)
+        finally:
+            # Clean up user data
+            async with database_engine.begin() as conn:
+                await conn.execute(sa.delete(UserRow).where(UserRow.uuid == user_a.uuid))
 
     @pytest.fixture
     async def user_two(
@@ -148,15 +155,16 @@ class TestSessionUniqueNamePerUser:
             resource_policy=user_policy.name,
         )
 
-        async with database_engine.begin_session() as db_sess:
-            db_sess.add(user_b)
-            await db_sess.flush()
+        try:
+            async with database_engine.begin_session() as db_sess:
+                db_sess.add(user_b)
+                await db_sess.flush()
 
-        yield UserData(uuid=user_b.uuid, email=user_b.email)
-
-        # Clean up user data
-        async with database_engine.begin() as conn:
-            await conn.execute(sa.delete(UserRow).where(UserRow.uuid == user_b.uuid))
+            yield UserData(uuid=user_b.uuid, email=user_b.email)
+        finally:
+            # Clean up user data
+            async with database_engine.begin() as conn:
+                await conn.execute(sa.delete(UserRow).where(UserRow.uuid == user_b.uuid))
 
     @pytest.fixture
     async def group(
@@ -173,15 +181,16 @@ class TestSessionUniqueNamePerUser:
             resource_policy=group_policy.name,
         )
 
-        async with database_engine.begin_session() as db_sess:
-            db_sess.add(group)
-            await db_sess.flush()
+        try:
+            async with database_engine.begin_session() as db_sess:
+                db_sess.add(group)
+                await db_sess.flush()
 
-        yield group
-
-        # Clean up group data
-        async with database_engine.begin() as conn:
-            await conn.execute(sa.delete(GroupRow).where(GroupRow.id == group.id))
+            yield group
+        finally:
+            # Clean up group data
+            async with database_engine.begin() as conn:
+                await conn.execute(sa.delete(GroupRow).where(GroupRow.id == group.id))
 
     @pytest.fixture
     async def prepared_first_session(
@@ -206,20 +215,21 @@ class TestSessionUniqueNamePerUser:
             vfolder_mounts=[],
         )
 
-        async with database_engine.begin_session() as db_sess:
-            db_sess.add(session)
-            await db_sess.flush()
+        try:
+            async with database_engine.begin_session() as db_sess:
+                db_sess.add(session)
+                await db_sess.flush()
 
-        yield SessionData(
-            name=session.name,
-            user_uuid=user_a.uuid,
-            group_id=group.id,
-            domain_name=domain.name,
-            status=status,
-        )
-
-        async with database_engine.begin() as conn:
-            await conn.execute(sa.delete(SessionRow).where(SessionRow.name == session.name))
+            yield SessionData(
+                name=session.name,
+                user_uuid=user_a.uuid,
+                group_id=group.id,
+                domain_name=domain.name,
+                status=status,
+            )
+        finally:
+            async with database_engine.begin() as conn:
+                await conn.execute(sa.delete(SessionRow).where(SessionRow.name == session.name))
 
     @pytest.mark.parametrize(
         "test_config",
@@ -252,12 +262,14 @@ class TestSessionUniqueNamePerUser:
                 vfolder_mounts=[],
             )
 
-            # This should succeed without IntegrityError
-            db_sess.add(duplicate_session)
-            await db_sess.flush()
+            try:
+                # This should succeed without IntegrityError
+                db_sess.add(duplicate_session)
+                await db_sess.flush()
 
-            # Clean up the duplicate session
-            await db_sess.delete(duplicate_session)
+            finally:
+                # Clean up the duplicate session
+                await db_sess.delete(duplicate_session)
 
     @pytest.mark.parametrize(
         "test_config",
@@ -326,9 +338,10 @@ class TestSessionUniqueNamePerUser:
                 vfolder_mounts=[],
             )
 
-            # This should succeed without IntegrityError
-            db_sess.add(duplicate_session)
-            await db_sess.flush()
-
-            # Clean up the duplicate session
-            await db_sess.delete(duplicate_session)
+            try:
+                # This should succeed without IntegrityError
+                db_sess.add(duplicate_session)
+                await db_sess.flush()
+            finally:
+                # Clean up the duplicate session
+                await db_sess.delete(duplicate_session)
