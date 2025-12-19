@@ -11,7 +11,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.exception import ScalingGroupConflict
-from ai.backend.common.types import SessionTypes
+from ai.backend.common.types import AgentSelectionStrategy, SessionTypes
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
@@ -308,3 +308,98 @@ class TestScalingGroupRepositoryDB:
         # Second creation with same name should raise conflict
         with pytest.raises(ScalingGroupConflict):
             await scaling_group_repository.create_scaling_group(creator)
+
+    @pytest.mark.asyncio
+    async def test_create_scaling_group_with_minimal_fields(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test creating a scaling group with only required fields uses defaults"""
+        creator = self._create_scaling_group_creator(name="test-sgroup-create-minimal")
+        result = await scaling_group_repository.create_scaling_group(creator)
+
+        assert result.name == "test-sgroup-create-minimal"
+        assert result.driver.name == "static"
+        assert result.scheduler.name.value == "fifo"
+        # Default values should be applied
+        assert result.status.is_active is True
+        assert result.status.is_public is True
+        assert result.network.use_host_network is False
+
+    @pytest.mark.asyncio
+    async def test_create_scaling_group_with_inactive_status(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test creating an inactive scaling group"""
+        creator = self._create_scaling_group_creator(
+            name="test-sgroup-create-inactive",
+            is_active=False,
+        )
+        result = await scaling_group_repository.create_scaling_group(creator)
+
+        assert result.name == "test-sgroup-create-inactive"
+        assert result.status.is_active is False
+
+    @pytest.mark.asyncio
+    async def test_create_scaling_group_with_private_status(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test creating a private scaling group"""
+        creator = self._create_scaling_group_creator(
+            name="test-sgroup-create-private",
+            is_public=False,
+        )
+        result = await scaling_group_repository.create_scaling_group(creator)
+
+        assert result.name == "test-sgroup-create-private"
+        assert result.status.is_public is False
+
+    @pytest.mark.asyncio
+    async def test_create_scaling_group_scheduler_opts_persisted(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test that scheduler options are correctly persisted"""
+        scheduler_opts = ScalingGroupOpts(
+            allowed_session_types=[SessionTypes.INTERACTIVE, SessionTypes.BATCH],
+            pending_timeout=datetime.now() - datetime.now(),  # timedelta(0)
+            config={"custom_key": "custom_value"},
+            agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
+        )
+        creator = self._create_scaling_group_creator(
+            name="test-sgroup-create-scheduler-opts",
+            scheduler_opts=scheduler_opts,
+        )
+        result = await scaling_group_repository.create_scaling_group(creator)
+
+        assert result.name == "test-sgroup-create-scheduler-opts"
+        assert SessionTypes.INTERACTIVE in result.scheduler.options.allowed_session_types
+        assert SessionTypes.BATCH in result.scheduler.options.allowed_session_types
+        assert result.scheduler.options.config == {"custom_key": "custom_value"}
+        assert (
+            result.scheduler.options.agent_selection_strategy == AgentSelectionStrategy.CONCENTRATED
+        )
+
+    @pytest.mark.asyncio
+    async def test_create_scaling_group_with_different_driver(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test creating scaling groups with different driver configurations"""
+        creator = self._create_scaling_group_creator(
+            name="test-sgroup-create-docker",
+            driver="docker",
+            driver_opts={"docker_host": "tcp://localhost:2375"},
+        )
+        result = await scaling_group_repository.create_scaling_group(creator)
+
+        assert result.name == "test-sgroup-create-docker"
+        assert result.driver.name == "docker"
+        assert result.driver.options == {"docker_host": "tcp://localhost:2375"}
