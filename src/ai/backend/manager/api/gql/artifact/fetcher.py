@@ -52,6 +52,17 @@ def _get_artifact_revision_pagination_spec() -> PaginationSpec:
     )
 
 
+@lru_cache(maxsize=1)
+def _get_artifact_pagination_spec() -> PaginationSpec:
+    """Get pagination spec for Artifact queries."""
+    return PaginationSpec(
+        forward_order=ArtifactRow.id.asc(),
+        backward_order=ArtifactRow.id.desc(),
+        forward_condition_factory=lambda cursor_value: lambda: ArtifactRow.id > cursor_value,
+        backward_condition_factory=lambda cursor_value: lambda: ArtifactRow.id < cursor_value,
+    )
+
+
 async def get_registry_url(
     data_loaders: DataLoaders,
     registry_id: uuid.UUID,
@@ -126,17 +137,6 @@ async def fetch_artifact_revisions(
         count=action_result.total_count,
         edges=edges,
         page_info=page_info,
-    )
-
-
-@lru_cache(maxsize=1)
-def _get_artifact_pagination_spec() -> PaginationSpec:
-    """Get pagination spec for Artifact queries."""
-    return PaginationSpec(
-        forward_order=ArtifactRow.id.asc(),
-        backward_order=ArtifactRow.id.desc(),
-        forward_condition_factory=lambda cursor_value: lambda: ArtifactRow.id > cursor_value,
-        backward_condition_factory=lambda cursor_value: lambda: ArtifactRow.id < cursor_value,
     )
 
 
