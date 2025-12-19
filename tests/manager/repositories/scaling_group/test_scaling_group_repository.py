@@ -142,7 +142,6 @@ class TestScalingGroupRepositoryDB:
         repo = ScalingGroupRepository(db=db_with_cleanup)
         yield repo
 
-    @pytest.mark.asyncio
     async def test_search_scaling_groups_all(
         self,
         scaling_group_repository: ScalingGroupRepository,
@@ -165,7 +164,6 @@ class TestScalingGroupRepositoryDB:
         for test_sg_name in sample_scaling_groups_small:
             assert test_sg_name in result_names
 
-    @pytest.mark.asyncio
     async def test_search_scaling_groups_with_querier(
         self,
         scaling_group_repository: ScalingGroupRepository,
@@ -184,7 +182,6 @@ class TestScalingGroupRepositoryDB:
 
     # Pagination Tests
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "limit,offset,expected_items,total_count,description",
         [
@@ -215,7 +212,6 @@ class TestScalingGroupRepositoryDB:
         assert len(result.items) == expected_items
         assert result.total_count == total_count
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "limit,offset,expected_items,total_count,description",
         [
@@ -245,7 +241,6 @@ class TestScalingGroupRepositoryDB:
         assert len(result.items) == expected_items
         assert result.total_count == total_count
 
-    @pytest.mark.asyncio
     async def test_search_scaling_groups_large_limit(
         self,
         scaling_group_repository: ScalingGroupRepository,
@@ -264,7 +259,7 @@ class TestScalingGroupRepositoryDB:
         assert result.total_count == 15
 
     # Create Tests
-    @pytest.mark.asyncio
+
     async def test_create_scaling_group_success(
         self,
         scaling_group_repository: ScalingGroupRepository,
@@ -300,7 +295,6 @@ class TestScalingGroupRepositoryDB:
         assert result.network.wsproxy_api_token == "test-token"
         assert result.network.use_host_network is True
 
-    @pytest.mark.asyncio
     async def test_create_scaling_group_duplicate_name_raises_conflict(
         self,
         scaling_group_repository: ScalingGroupRepository,

@@ -88,7 +88,6 @@ class TestScalingGroupService:
             ),
         )
 
-    @pytest.mark.asyncio
     async def test_search_scaling_groups_with_default_querier(
         self,
         scaling_group_service: ScalingGroupService,
@@ -117,7 +116,6 @@ class TestScalingGroupService:
         assert result.total_count == 1
         mock_repository.search_scaling_groups.assert_called_once_with(querier=querier)
 
-    @pytest.mark.asyncio
     async def test_search_scaling_groups_with_querier(
         self,
         scaling_group_service: ScalingGroupService,
@@ -148,7 +146,6 @@ class TestScalingGroupService:
         assert result.total_count == 1
         mock_repository.search_scaling_groups.assert_called_once_with(querier=querier)
 
-    @pytest.mark.asyncio
     async def test_search_scaling_groups_with_multiple_results(
         self,
         scaling_group_service: ScalingGroupService,
@@ -217,7 +214,6 @@ class TestScalingGroupService:
         assert result.total_count == 3
         assert result.scaling_groups == scaling_groups
 
-    @pytest.mark.asyncio
     async def test_search_scaling_groups_with_empty_result(
         self,
         scaling_group_service: ScalingGroupService,
@@ -244,7 +240,6 @@ class TestScalingGroupService:
         assert result.scaling_groups == []
         assert result.total_count == 0
 
-    @pytest.mark.asyncio
     async def test_create_scaling_group_success(
         self,
         scaling_group_service: ScalingGroupService,
@@ -269,7 +264,6 @@ class TestScalingGroupService:
         assert result.scaling_group == sample_scaling_group
         mock_repository.create_scaling_group.assert_called_once_with(creator)
 
-    @pytest.mark.asyncio
     async def test_create_scaling_group_with_all_fields(
         self,
         scaling_group_service: ScalingGroupService,
