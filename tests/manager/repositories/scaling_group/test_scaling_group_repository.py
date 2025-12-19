@@ -11,6 +11,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.exception import ScalingGroupConflict
+from ai.backend.common.types import SessionTypes
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
@@ -271,7 +272,7 @@ class TestScalingGroupRepositoryDB:
     ) -> None:
         """Test creating a scaling group with all fields specified"""
         scheduler_opts = ScalingGroupOpts(
-            allowed_session_types=[],
+            allowed_session_types=[SessionTypes.INTERACTIVE],
             pending_timeout=datetime.now() - datetime.now(),  # timedelta(0)
             config={"max_sessions": 10},
         )
