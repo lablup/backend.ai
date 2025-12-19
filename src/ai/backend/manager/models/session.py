@@ -851,10 +851,11 @@ class SessionRow(Base):
         ),
         sa.Index("ix_sessions_vfolder_mounts", "vfolder_mounts", postgresql_using="gin"),
         sa.Index("ix_session_status_with_priority", "status", "priority"),
-        # Unique index for session names excluding terminal statuses
+        # Unique index for session names per user excluding terminal statuses
         sa.Index(
-            "ix_sessions_unique_name_nonterminal",
+            "ix_sessions_unique_name_per_user_nonterminal",
             "name",
+            "user_uuid",
             unique=True,
             postgresql_where=sa.text("status NOT IN ('ERROR', 'TERMINATED', 'CANCELLED')"),
         ),
