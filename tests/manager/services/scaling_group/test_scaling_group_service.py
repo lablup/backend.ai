@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.exception import ScalingGroupConflict
 from ai.backend.common.types import AgentSelectionStrategy, SessionTypes
 from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupData,
@@ -304,3 +305,24 @@ class TestScalingGroupService:
 
         assert result.scaling_group == sample_scaling_group
         mock_repository.create_scaling_group.assert_called_once_with(creator)
+
+    async def test_create_scaling_group_repository_error_propagates(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test that repository errors propagate through the service"""
+        mock_repository.create_scaling_group = AsyncMock(
+            side_effect=ScalingGroupConflict("Scaling group already exists")
+        )
+
+        spec = ScalingGroupCreatorSpec(
+            name="test-sgroup-conflict",
+            driver="static",
+            scheduler="fifo",
+        )
+        creator: Creator[ScalingGroupRow] = Creator(spec=spec)
+        action = CreateScalingGroupAction(creator=creator)
+
+        with pytest.raises(ScalingGroupConflict):
+            await scaling_group_service.create_scaling_group(action)
