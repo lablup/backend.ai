@@ -16,7 +16,6 @@ from ai.backend.common.data.artifact.types import (
     VerifierResult,
 )
 from ai.backend.common.data.storage.registries.types import ModelTarget as ModelTargetData
-from ai.backend.manager.api.gql.artifact.fetcher import fetch_artifact_revisions
 from ai.backend.manager.api.gql.base import (
     ByteSize,
     IntFilter,
@@ -802,6 +801,8 @@ class Artifact(Node):
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> ArtifactRevisionConnection:
+        from .fetcher import fetch_artifact_revisions
+
         if filter is None:
             filter = ArtifactRevisionFilter(artifact_id=ID(self.id))
         else:
