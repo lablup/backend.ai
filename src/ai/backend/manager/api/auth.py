@@ -446,15 +446,18 @@ async def _query_cred_by_access_key(
         if keypair_row is None:
             return None, None
 
-        # Query user with resource policy
+        # Query user with resource policy by joining keypairs table
         j = users.join(
             user_resource_policies,
             users.c.resource_policy == user_resource_policies.c.name,
+        ).join(
+            keypairs,
+            users.c.uuid == keypairs.c.user,
         )
         query = (
             sa.select([users, user_resource_policies], use_labels=True)
             .select_from(j)
-            .where((users.c.main_access_key == access_key))
+            .where((keypairs.c.access_key == access_key))
         )
         result = await conn.execute(query)
         user_row = result.first()
