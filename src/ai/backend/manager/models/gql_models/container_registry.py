@@ -12,6 +12,7 @@ from graphql import Undefined, UndefinedType
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
+from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
@@ -298,8 +299,13 @@ async def handle_allowed_groups_update(
             for group_id in allowed_group_updates.add
         ]
 
-        insert_query = sa.insert(AssociationContainerRegistriesGroupsRow).values(insert_values)
-        await session.execute(insert_query)
+        try:
+            insert_query = sa.insert(AssociationContainerRegistriesGroupsRow).values(insert_values)
+            await session.execute(insert_query)
+        except sa.exc.IntegrityError:
+            raise ContainerRegistryGroupsAlreadyAssociated(
+                f"Already associated groups for registry_id: {registry_id}, group_ids: {allowed_group_updates.add}"
+            )
 
     if allowed_group_updates.remove:
         delete_query = (
