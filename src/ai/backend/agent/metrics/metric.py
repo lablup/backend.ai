@@ -129,6 +129,7 @@ class UtilizationMetricObserver:
 
     async def lazy_remove_container_metric(
         self,
+        kernel_metrics,
         *,
         agent_id: AgentId,
         kernel_id: KernelId,
@@ -156,6 +157,7 @@ class UtilizationMetricObserver:
 
         def callback(task: asyncio.Task) -> None:
             self._removal_tasks.pop(kernel_id, None)
+            kernel_metrics.pop(kernel_id, None)
 
         task = asyncio.create_task(remove_later())
         self._removal_tasks[kernel_id] = task
