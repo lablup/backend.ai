@@ -77,6 +77,10 @@ class OrphanKernelCleanupObserver(AbstractObserver):
                 # No Redis entry - skip (not enough info to decide)
                 continue
 
+            if not status.last_check:
+                # No last_check info - skip
+                continue
+
             # Strict condition: kernel.last_check < agent_last_check - THRESHOLD
             if status.last_check < agent_last_check - ORPHAN_KERNEL_THRESHOLD_SEC:
                 orphan_kernels.append((kernel_id, kernel.session_id))
