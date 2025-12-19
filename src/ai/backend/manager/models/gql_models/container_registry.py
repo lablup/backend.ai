@@ -12,8 +12,10 @@ from graphql import Undefined, UndefinedType
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.image import (
-    ContainerRegistryGroupsAssociationNotFound,
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
+from ai.backend.manager.models.association_container_registries_groups import (
+    AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
@@ -30,9 +32,6 @@ from ai.backend.manager.models.rbac import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ...defs import PASSWORD_PLACEHOLDER
-from ..association_container_registries_groups import (
-    AssociationContainerRegistriesGroupsRow,
-)
 from ..base import (
     BigInt,
     FilterExprArg,
@@ -110,6 +109,22 @@ class ContainerRegistryNode(graphene.ObjectType):
         "row_id": ("id", None),
         "registry_name": ("registry_name", None),
     }
+
+    @classmethod
+    def from_dataclass(cls, data: ContainerRegistryData) -> Self:
+        return cls(
+            id=data.id,  # auto-converted to Relay global ID
+            row_id=data.id,
+            url=data.url,
+            type=data.type,
+            registry_name=data.registry_name,
+            project=data.project,
+            username=data.username,
+            password=PASSWORD_PLACEHOLDER if data.password is not None else None,
+            ssl_verify=data.ssl_verify,
+            is_global=data.is_global,
+            extra=data.extra,
+        )
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ContainerRegistryNode:

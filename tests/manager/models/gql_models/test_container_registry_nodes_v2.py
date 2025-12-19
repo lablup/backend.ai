@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 import pytest
 from graphene import Schema
 from graphene.test import Client
@@ -7,7 +9,16 @@ from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.gql import GraphQueryContext, Mutation, Query
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.container_registry.admin_repository import (
+    AdminContainerRegistryRepository,
+)
+from ai.backend.manager.repositories.container_registry.repository import (
+    ContainerRegistryRepository,
+)
 from ai.backend.manager.server import database_ctx
+from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
+from ai.backend.manager.services.container_registry.service import ContainerRegistryService
+from ai.backend.manager.services.processors import Processors
 
 CONTAINER_REGISTRY_FIELDS = """
     row_id
@@ -69,7 +80,34 @@ def client() -> Client:
     return Client(Schema(query=Query, mutation=Mutation, auto_camelcase=False))
 
 
-def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQueryContext:
+@pytest.fixture
+def container_registry_processor(
+    extra_fixtures, database_fixture, database_engine
+) -> ContainerRegistryProcessors:
+    repository = ContainerRegistryRepository(
+        db=database_engine,
+    )
+    admin_repository = AdminContainerRegistryRepository(
+        db=database_engine,
+    )
+    container_registry_service = ContainerRegistryService(
+        db=database_engine,
+        container_registry_repository=repository,
+        admin_container_registry_repository=admin_repository,
+    )
+    return ContainerRegistryProcessors(container_registry_service, [])
+
+
+@pytest.fixture
+def processors(container_registry_processor) -> Processors:
+    mock_processors = MagicMock(spec=Processors)
+    mock_processors.container_registry = container_registry_processor
+    return mock_processors
+
+
+def get_graphquery_context(
+    database_engine: ExtendedAsyncSAEngine, processors: Processors
+) -> GraphQueryContext:
     return GraphQueryContext(
         schema=None,  # type: ignore
         dataloader_manager=None,  # type: ignore
@@ -91,7 +129,7 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
         network_plugin_ctx=None,  # type: ignore
         services_ctx=None,  # type: ignore
         metric_observer=GraphQLMetricObserver.instance(),
-        processors=None,  # type: ignore
+        processors=processors,
         scheduler_repository=None,  # type: ignore
         user_repository=None,  # type: ignore
         agent_repository=None,  # type: ignore
@@ -100,8 +138,10 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
 
 @pytest.mark.dependency()
 @pytest.mark.asyncio
-async def test_create_container_registry(client: Client, database_engine: ExtendedAsyncSAEngine):
-    context = get_graphquery_context(database_engine)
+async def test_create_container_registry(
+    client: Client, database_engine: ExtendedAsyncSAEngine, processors: Processors
+):
+    context = get_graphquery_context(database_engine, processors)
 
     query = """
             mutation ($props: CreateContainerRegistryNodeInputV2!) {
@@ -149,8 +189,10 @@ async def test_create_container_registry(client: Client, database_engine: Extend
 
 @pytest.mark.dependency(depends=["test_create_container_registry_v2"])
 @pytest.mark.asyncio
-async def test_modify_container_registry(client: Client, database_engine: ExtendedAsyncSAEngine):
-    context = get_graphquery_context(database_engine)
+async def test_modify_container_registry(
+    client: Client, database_engine: ExtendedAsyncSAEngine, processors: Processors
+):
+    context = get_graphquery_context(database_engine, processors)
 
     query = """
         query ($filter: String!) {
@@ -236,9 +278,9 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
 @pytest.mark.dependency(depends=["test_modify_container_registry"])
 @pytest.mark.asyncio
 async def test_modify_container_registry_allows_empty_string(
-    client: Client, database_engine: ExtendedAsyncSAEngine
+    client: Client, database_engine: ExtendedAsyncSAEngine, processors: Processors
 ):
-    context = get_graphquery_context(database_engine)
+    context = get_graphquery_context(database_engine, processors)
 
     query = """
         query ($filter: String!) {
@@ -303,9 +345,9 @@ async def test_modify_container_registry_allows_empty_string(
 @pytest.mark.dependency(depends=["test_modify_container_registry_allows_empty_string"])
 @pytest.mark.asyncio
 async def test_modify_container_registry_allows_null_for_unset(
-    client: Client, database_engine: ExtendedAsyncSAEngine
+    client: Client, database_engine: ExtendedAsyncSAEngine, processors: Processors
 ):
-    context = get_graphquery_context(database_engine)
+    context = get_graphquery_context(database_engine, processors)
 
     query = """
         query ($filter: String!) {
@@ -369,8 +411,10 @@ async def test_modify_container_registry_allows_null_for_unset(
 
 @pytest.mark.dependency(depends=["test_modify_container_registry_allows_null_for_unset"])
 @pytest.mark.asyncio
-async def test_delete_container_registry(client: Client, database_engine: ExtendedAsyncSAEngine):
-    context = get_graphquery_context(database_engine)
+async def test_delete_container_registry(
+    client: Client, database_engine: ExtendedAsyncSAEngine, processors: Processors
+):
+    context = get_graphquery_context(database_engine, processors)
 
     query = """
         query ($filter: String!) {
@@ -464,6 +508,7 @@ async def test_associate_container_registry_with_group(
     extra_fixtures,
     test_case,
     create_app_and_client,
+    processors,
 ):
     test_app, _ = await create_app_and_client(
         [
@@ -475,7 +520,7 @@ async def test_associate_container_registry_with_group(
     )
 
     root_ctx = test_app["_root.context"]
-    context = get_graphquery_context(root_ctx.db)
+    context = get_graphquery_context(root_ctx.db, processors)
 
     query = """
         mutation ($id: String!, $props: ModifyContainerRegistryNodeInputV2!) {
@@ -536,6 +581,7 @@ async def test_disassociate_container_registry_with_group(
     extra_fixtures,
     test_case,
     create_app_and_client,
+    processors,
 ):
     test_app, _ = await create_app_and_client(
         [
@@ -547,7 +593,7 @@ async def test_disassociate_container_registry_with_group(
     )
 
     root_ctx = test_app["_root.context"]
-    context = get_graphquery_context(root_ctx.db)
+    context = get_graphquery_context(root_ctx.db, processors)
 
     query = """
         mutation ($id: String!, $props: ModifyContainerRegistryNodeInputV2!) {

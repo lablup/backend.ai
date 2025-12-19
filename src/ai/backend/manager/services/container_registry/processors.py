@@ -19,6 +19,10 @@ from ai.backend.manager.services.container_registry.actions.load_container_regis
     LoadContainerRegistriesAction,
     LoadContainerRegistriesActionResult,
 )
+from ai.backend.manager.services.container_registry.actions.modify_container_registry import (
+    ModifyContainerRegistryAction,
+    ModifyContainerRegistryActionResult,
+)
 from ai.backend.manager.services.container_registry.actions.rescan_images import (
     RescanImagesAction,
     RescanImagesActionResult,
@@ -38,6 +42,9 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
     get_container_registries: ActionProcessor[
         GetContainerRegistriesAction, GetContainerRegistriesActionResult
     ]
+    modify_container_registry: ActionProcessor[
+        ModifyContainerRegistryAction, ModifyContainerRegistryActionResult
+    ]
 
     def __init__(
         self, service: ContainerRegistryService, action_monitors: list[ActionMonitor]
@@ -53,6 +60,9 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
         self.get_container_registries = ActionProcessor(
             service.get_container_registries, action_monitors
         )
+        self.modify_container_registry = ActionProcessor(
+            service.modify_container_registry, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -62,4 +72,5 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
             LoadContainerRegistriesAction.spec(),
             LoadAllContainerRegistriesAction.spec(),
             GetContainerRegistriesAction.spec(),
+            ModifyContainerRegistryAction.spec(),
         ]
