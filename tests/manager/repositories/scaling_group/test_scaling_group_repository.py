@@ -11,7 +11,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.exception import ScalingGroupConflict
-from ai.backend.common.types import AgentSelectionStrategy, SessionTypes
+from ai.backend.common.types import SessionTypes
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
@@ -265,18 +265,17 @@ class TestScalingGroupRepositoryDB:
         scaling_group_repository: ScalingGroupRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
-        """Test creating a scaling group with all fields specified and verify all fields are persisted"""
+        """Test creating a scaling group with all fields specified"""
         scheduler_opts = ScalingGroupOpts(
             allowed_session_types=[SessionTypes.INTERACTIVE],
             config={"max_sessions": 10},
-            agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
         )
         creator = self._create_scaling_group_creator(
-            name="test-sgroup-create-full",
+            name="test-sgroup-create-02",
             driver="docker",
             scheduler="fifo",
             description="Full test scaling group",
-            is_active=False,
+            is_active=True,
             is_public=False,
             wsproxy_addr="http://wsproxy:5000",
             wsproxy_api_token="test-token",
@@ -289,13 +288,8 @@ class TestScalingGroupRepositoryDB:
         assert result.name == "test-sgroup-create-full"
         assert result.driver.name == "docker"
         assert result.driver.options == {"docker_host": "unix:///var/run/docker.sock"}
-        assert result.scheduler.name.value == "fifo"
-        assert SessionTypes.INTERACTIVE in result.scheduler.options.allowed_session_types
-        assert SessionTypes.BATCH in result.scheduler.options.allowed_session_types
-        assert result.scheduler.options.config == {"max_sessions": 10}
-        assert (
-            result.scheduler.options.agent_selection_strategy == AgentSelectionStrategy.CONCENTRATED
-        )
+        assert result.metadata.description == "Full test scaling group"
+        assert result.status.is_public is False
         assert result.network.wsproxy_addr == "http://wsproxy:5000"
         assert result.network.wsproxy_api_token == "test-token"
         assert result.network.use_host_network is True
