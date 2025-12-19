@@ -5,6 +5,7 @@ Tests the repository layer with real database operations.
 
 from collections.abc import AsyncGenerator, Callable
 from datetime import datetime
+from typing import Any
 
 import pytest
 import sqlalchemy as sa
@@ -35,6 +36,36 @@ class TestScalingGroupRepositoryDB:
                 sa.delete(ScalingGroupRow).where(ScalingGroupRow.name.like("test-sgroup-%")),
                 execution_options={"synchronize_session": False},
             )
+
+    def _create_scaling_group_creator(
+        self,
+        name: str,
+        driver: str = "static",
+        scheduler: str = "fifo",
+        description: str | None = None,
+        is_active: bool = True,
+        is_public: bool = True,
+        wsproxy_addr: str | None = None,
+        wsproxy_api_token: str | None = None,
+        driver_opts: dict[str, Any] | None = None,
+        scheduler_opts: ScalingGroupOpts | None = None,
+        use_host_network: bool = False,
+    ) -> Creator[ScalingGroupRow]:
+        """Create a ScalingGroupCreatorSpec with the given parameters."""
+        spec = ScalingGroupCreatorSpec(
+            name=name,
+            driver=driver,
+            scheduler=scheduler,
+            description=description,
+            is_active=is_active,
+            is_public=is_public,
+            wsproxy_addr=wsproxy_addr,
+            wsproxy_api_token=wsproxy_api_token,
+            driver_opts=driver_opts if driver_opts is not None else {},
+            scheduler_opts=scheduler_opts,
+            use_host_network=use_host_network,
+        )
+        return Creator(spec=spec)
 
     async def _create_scaling_groups(
         self,
@@ -232,34 +263,8 @@ class TestScalingGroupRepositoryDB:
         assert result.total_count == 15
 
     # Create Tests
-
     @pytest.mark.asyncio
     async def test_create_scaling_group_success(
-        self,
-        scaling_group_repository: ScalingGroupRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> None:
-        """Test creating a scaling group successfully"""
-        spec = ScalingGroupCreatorSpec(
-            name="test-sgroup-create-01",
-            driver="static",
-            scheduler="fifo",
-            description="Test scaling group",
-            is_active=True,
-            is_public=True,
-        )
-        creator: Creator[ScalingGroupRow] = Creator(spec=spec)
-        result = await scaling_group_repository.create_scaling_group(creator)
-
-        assert result.name == "test-sgroup-create-01"
-        assert result.driver.name == "static"
-        assert result.scheduler.name.value == "fifo"
-        assert result.metadata.description == "Test scaling group"
-        assert result.status.is_active is True
-        assert result.status.is_public is True
-
-    @pytest.mark.asyncio
-    async def test_create_scaling_group_with_all_fields(
         self,
         scaling_group_repository: ScalingGroupRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -270,7 +275,7 @@ class TestScalingGroupRepositoryDB:
             pending_timeout=datetime.now() - datetime.now(),  # timedelta(0)
             config={"max_sessions": 10},
         )
-        spec = ScalingGroupCreatorSpec(
+        creator = self._create_scaling_group_creator(
             name="test-sgroup-create-02",
             driver="docker",
             scheduler="fifo",
@@ -283,7 +288,6 @@ class TestScalingGroupRepositoryDB:
             scheduler_opts=scheduler_opts,
             use_host_network=True,
         )
-        creator: Creator[ScalingGroupRow] = Creator(spec=spec)
         result = await scaling_group_repository.create_scaling_group(creator)
 
         assert result.name == "test-sgroup-create-02"
@@ -302,12 +306,7 @@ class TestScalingGroupRepositoryDB:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Test creating a scaling group with duplicate name raises ScalingGroupConflict"""
-        spec = ScalingGroupCreatorSpec(
-            name="test-sgroup-create-dup",
-            driver="static",
-            scheduler="fifo",
-        )
-        creator: Creator[ScalingGroupRow] = Creator(spec=spec)
+        creator = self._create_scaling_group_creator(name="test-sgroup-create-dup")
 
         # First creation should succeed
         await scaling_group_repository.create_scaling_group(creator)
