@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import sqlalchemy as sa
 
-from ai.backend.manager.data.scaling_group.types import ScalingGroupListResult
+from ai.backend.common.exception import ScalingGroupConflict
+from ai.backend.manager.data.scaling_group.types import ScalingGroupData, ScalingGroupListResult
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -30,6 +33,22 @@ class ScalingGroupDBSource:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+
+    async def create_scaling_group(
+        self,
+        creator: Creator[ScalingGroupRow],
+    ) -> ScalingGroupData:
+        """Creates a new scaling group.
+
+        Raises ScalingGroupConflict if a scaling group with the same name already exists.
+        """
+        spec = cast(ScalingGroupCreatorSpec, creator.spec)
+        async with self._db.begin_session() as session:
+            try:
+                result = await execute_creator(session, creator)
+            except sa.exc.IntegrityError:
+                raise ScalingGroupConflict(f"Duplicate scaling group name: {spec.name}")
+            return result.row.to_dataclass()
 
     async def search_scaling_groups(
         self,

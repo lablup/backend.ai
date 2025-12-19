@@ -20,8 +20,14 @@ from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupStatus,
     SchedulerType,
 )
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
+from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
+from ai.backend.manager.services.scaling_group.actions.create_scaling_group import (
+    CreateScalingGroupAction,
+)
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
 )
@@ -237,3 +243,66 @@ class TestScalingGroupService:
 
         assert result.scaling_groups == []
         assert result.total_count == 0
+
+    @pytest.mark.asyncio
+    async def test_create_scaling_group_success(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+        sample_scaling_group: ScalingGroupData,
+    ) -> None:
+        """Test creating a scaling group successfully"""
+        mock_repository.create_scaling_group = AsyncMock(return_value=sample_scaling_group)
+
+        spec = ScalingGroupCreatorSpec(
+            name="test-sgroup",
+            driver="static",
+            scheduler="fifo",
+            description="Test scaling group",
+            is_active=True,
+            is_public=True,
+        )
+        creator: Creator[ScalingGroupRow] = Creator(spec=spec)
+        action = CreateScalingGroupAction(creator=creator)
+        result = await scaling_group_service.create_scaling_group(action)
+
+        assert result.scaling_group == sample_scaling_group
+        mock_repository.create_scaling_group.assert_called_once_with(creator)
+
+    @pytest.mark.asyncio
+    async def test_create_scaling_group_with_all_fields(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+        sample_scaling_group: ScalingGroupData,
+    ) -> None:
+        """Test creating a scaling group with all fields specified"""
+        from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+
+        mock_repository.create_scaling_group = AsyncMock(return_value=sample_scaling_group)
+
+        scheduler_opts = ScalingGroupOpts(
+            allowed_session_types=[SessionTypes.INTERACTIVE, SessionTypes.BATCH],
+            pending_timeout=timedelta(seconds=300),
+            config={"max_sessions": 10},
+            agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
+        )
+        spec = ScalingGroupCreatorSpec(
+            name="test-sgroup-full",
+            driver="docker",
+            scheduler="fifo",
+            description="Full test scaling group",
+            is_active=True,
+            is_public=False,
+            wsproxy_addr="http://wsproxy:5000",
+            wsproxy_api_token="test-token",
+            driver_opts={"docker_host": "unix:///var/run/docker.sock"},
+            scheduler_opts=scheduler_opts,
+            use_host_network=True,
+        )
+        creator: Creator[ScalingGroupRow] = Creator(spec=spec)
+        action = CreateScalingGroupAction(creator=creator)
+        result = await scaling_group_service.create_scaling_group(action)
+
+        assert result.scaling_group == sample_scaling_group
+        mock_repository.create_scaling_group.assert_called_once_with(creator)

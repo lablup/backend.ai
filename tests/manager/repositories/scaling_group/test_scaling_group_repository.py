@@ -9,10 +9,13 @@ from datetime import datetime
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.exception import ScalingGroupConflict
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
+from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
 
 
 class TestScalingGroupRepositoryDB:
@@ -227,3 +230,88 @@ class TestScalingGroupRepositoryDB:
         # Should have exactly 15 test scaling groups
         assert len(result.items) == 15
         assert result.total_count == 15
+
+    # Create Tests
+
+    @pytest.mark.asyncio
+    async def test_create_scaling_group_success(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test creating a scaling group successfully"""
+        spec = ScalingGroupCreatorSpec(
+            name="test-sgroup-create-01",
+            driver="static",
+            scheduler="fifo",
+            description="Test scaling group",
+            is_active=True,
+            is_public=True,
+        )
+        creator: Creator[ScalingGroupRow] = Creator(spec=spec)
+        result = await scaling_group_repository.create_scaling_group(creator)
+
+        assert result.name == "test-sgroup-create-01"
+        assert result.driver.name == "static"
+        assert result.scheduler.name.value == "fifo"
+        assert result.metadata.description == "Test scaling group"
+        assert result.status.is_active is True
+        assert result.status.is_public is True
+
+    @pytest.mark.asyncio
+    async def test_create_scaling_group_with_all_fields(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test creating a scaling group with all fields specified"""
+        scheduler_opts = ScalingGroupOpts(
+            allowed_session_types=[],
+            pending_timeout=datetime.now() - datetime.now(),  # timedelta(0)
+            config={"max_sessions": 10},
+        )
+        spec = ScalingGroupCreatorSpec(
+            name="test-sgroup-create-02",
+            driver="docker",
+            scheduler="fifo",
+            description="Full test scaling group",
+            is_active=True,
+            is_public=False,
+            wsproxy_addr="http://wsproxy:5000",
+            wsproxy_api_token="test-token",
+            driver_opts={"docker_host": "unix:///var/run/docker.sock"},
+            scheduler_opts=scheduler_opts,
+            use_host_network=True,
+        )
+        creator: Creator[ScalingGroupRow] = Creator(spec=spec)
+        result = await scaling_group_repository.create_scaling_group(creator)
+
+        assert result.name == "test-sgroup-create-02"
+        assert result.driver.name == "docker"
+        assert result.driver.options == {"docker_host": "unix:///var/run/docker.sock"}
+        assert result.metadata.description == "Full test scaling group"
+        assert result.status.is_public is False
+        assert result.network.wsproxy_addr == "http://wsproxy:5000"
+        assert result.network.wsproxy_api_token == "test-token"
+        assert result.network.use_host_network is True
+
+    @pytest.mark.asyncio
+    async def test_create_scaling_group_duplicate_name_raises_conflict(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test creating a scaling group with duplicate name raises ScalingGroupConflict"""
+        spec = ScalingGroupCreatorSpec(
+            name="test-sgroup-create-dup",
+            driver="static",
+            scheduler="fifo",
+        )
+        creator: Creator[ScalingGroupRow] = Creator(spec=spec)
+
+        # First creation should succeed
+        await scaling_group_repository.create_scaling_group(creator)
+
+        # Second creation with same name should raise conflict
+        with pytest.raises(ScalingGroupConflict):
+            await scaling_group_repository.create_scaling_group(creator)
