@@ -57,8 +57,10 @@ async def message_queue(
         name="test_cleanup_stream",
         db=REDIS_STREAM_DB,
     )
-    await redis_helper.execute(stream_redis_conn, lambda r: r.flushdb())
-    await stream_redis_conn.close()
+    try:
+        await redis_helper.execute(stream_redis_conn, lambda r: r.flushdb())
+    finally:
+        await stream_redis_conn.close()
 
 
 @pytest.fixture
@@ -69,10 +71,11 @@ async def event_producer(
         message_queue,
         source=AgentId(f"test-agent-{uuid4()}"),
     )
+    try:
+        yield producer
 
-    yield producer
-
-    await producer.close()
+    finally:
+        await producer.close()
 
 
 @pytest.fixture
@@ -80,11 +83,11 @@ async def event_dispatcher(
     message_queue: RedisQueue,
 ) -> AsyncIterator[EventDispatcher]:
     dispatcher = EventDispatcher(message_queue)
-    await dispatcher.start()
-
-    yield dispatcher
-
-    await dispatcher.close()
+    try:
+        await dispatcher.start()
+        yield dispatcher
+    finally:
+        await dispatcher.close()
 
 
 @pytest.fixture
@@ -114,8 +117,10 @@ async def valkey_bgtask_client(
         name="test_cleanup_bgtask",
         db=REDIS_BGTASK_DB,
     )
-    await redis_helper.execute(bgtask_redis_conn, lambda r: r.flushdb())
-    await bgtask_redis_conn.close()
+    try:
+        await redis_helper.execute(bgtask_redis_conn, lambda r: r.flushdb())
+    finally:
+        await bgtask_redis_conn.close()
 
 
 @pytest.fixture
