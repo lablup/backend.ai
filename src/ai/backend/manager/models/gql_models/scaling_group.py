@@ -28,6 +28,11 @@ from ai.backend.manager.errors.resource import ScalingGroupDeletionFailure, Scal
 from ai.backend.manager.models.agent import AgentStatus
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import execute_with_txn_retry
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
+from ai.backend.manager.services.scaling_group.actions.create import (
+    CreateScalingGroupAction,
+)
 
 from ..base import (
     batch_multiresult,
@@ -35,7 +40,6 @@ from ..base import (
     batch_result,
     set_if_set,
     simple_db_mutate,
-    simple_db_mutate_returning_item,
 )
 from ..gql_relay import (
     AsyncNode,
@@ -621,25 +625,42 @@ class CreateScalingGroup(graphene.Mutation):
         name: str,
         props: CreateScalingGroupInput,
     ) -> CreateScalingGroup:
-        data = {
-            "name": name,
-            "description": props.description,
-            "is_active": bool(props.is_active),
-            "is_public": bool(props.is_public),
-            "wsproxy_addr": props.wsproxy_addr,
-            "wsproxy_api_token": props.wsproxy_api_token,
-            "driver": props.driver,
-            "driver_opts": props.driver_opts,
-            "scheduler": props.scheduler,
-            "scheduler_opts": ScalingGroupOpts.from_json(props.scheduler_opts),
-            "use_host_network": bool(props.use_host_network),
-        }
-        insert_query = sa.insert(scaling_groups).values(data)
-        return await simple_db_mutate_returning_item(
-            cls,
-            info.context,
-            insert_query,
-            item_cls=ScalingGroup,
+        graph_ctx: GraphQueryContext = info.context
+        spec = ScalingGroupCreatorSpec(
+            name=name,
+            description=props.description,
+            is_active=bool(props.is_active),
+            is_public=bool(props.is_public),
+            wsproxy_addr=props.wsproxy_addr,
+            wsproxy_api_token=props.wsproxy_api_token,
+            driver=props.driver,
+            driver_opts=props.driver_opts,
+            scheduler=props.scheduler,
+            scheduler_opts=ScalingGroupOpts.from_json(props.scheduler_opts),
+            use_host_network=bool(props.use_host_network),
+        )
+        creator = Creator(spec=spec)
+        action = CreateScalingGroupAction(creator=creator)
+        result = await graph_ctx.processors.scaling_group.create_scaling_group.wait_for_complete(
+            action
+        )
+        return cls(
+            ok=True,
+            msg="success",
+            scaling_group=ScalingGroup(
+                name=result.scaling_group.name,
+                description=result.scaling_group.metadata.description,
+                is_active=result.scaling_group.status.is_active,
+                is_public=result.scaling_group.status.is_public,
+                created_at=result.scaling_group.metadata.created_at,
+                wsproxy_addr=result.scaling_group.network.wsproxy_addr,
+                wsproxy_api_token=result.scaling_group.network.wsproxy_api_token,
+                driver=result.scaling_group.driver.name,
+                driver_opts=dict(result.scaling_group.driver.options),
+                scheduler=result.scaling_group.scheduler.name.value,
+                scheduler_opts=result.scaling_group.scheduler.options.to_json(),
+                use_host_network=result.scaling_group.network.use_host_network,
+            ),
         )
 
 

@@ -5,14 +5,19 @@ Tests the repository layer with real database operations.
 
 from collections.abc import AsyncGenerator, Callable
 from datetime import datetime
+from typing import Any, Optional
 
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.exception import ScalingGroupConflict
+from ai.backend.common.types import SessionTypes
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
+from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
 
 
 class TestScalingGroupRepositoryDB:
@@ -32,6 +37,36 @@ class TestScalingGroupRepositoryDB:
                 sa.delete(ScalingGroupRow).where(ScalingGroupRow.name.like("test-sgroup-%")),
                 execution_options={"synchronize_session": False},
             )
+
+    def _create_scaling_group_creator(
+        self,
+        name: str,
+        driver: str = "static",
+        scheduler: str = "fifo",
+        description: Optional[str] = None,
+        is_active: bool = True,
+        is_public: bool = True,
+        wsproxy_addr: Optional[str] = None,
+        wsproxy_api_token: Optional[str] = None,
+        driver_opts: Optional[dict[str, Any]] = None,
+        scheduler_opts: Optional[ScalingGroupOpts] = None,
+        use_host_network: bool = False,
+    ) -> Creator[ScalingGroupRow]:
+        """Create a ScalingGroupCreatorSpec with the given parameters."""
+        spec = ScalingGroupCreatorSpec(
+            name=name,
+            driver=driver,
+            scheduler=scheduler,
+            description=description,
+            is_active=is_active,
+            is_public=is_public,
+            wsproxy_addr=wsproxy_addr,
+            wsproxy_api_token=wsproxy_api_token,
+            driver_opts=driver_opts if driver_opts is not None else {},
+            scheduler_opts=scheduler_opts,
+            use_host_network=use_host_network,
+        )
+        return Creator(spec=spec)
 
     async def _create_scaling_groups(
         self,
@@ -107,7 +142,6 @@ class TestScalingGroupRepositoryDB:
         repo = ScalingGroupRepository(db=db_with_cleanup)
         yield repo
 
-    @pytest.mark.asyncio
     async def test_search_scaling_groups_all(
         self,
         scaling_group_repository: ScalingGroupRepository,
@@ -130,7 +164,6 @@ class TestScalingGroupRepositoryDB:
         for test_sg_name in sample_scaling_groups_small:
             assert test_sg_name in result_names
 
-    @pytest.mark.asyncio
     async def test_search_scaling_groups_with_querier(
         self,
         scaling_group_repository: ScalingGroupRepository,
@@ -149,7 +182,6 @@ class TestScalingGroupRepositoryDB:
 
     # Pagination Tests
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "limit,offset,expected_items,total_count,description",
         [
@@ -180,7 +212,6 @@ class TestScalingGroupRepositoryDB:
         assert len(result.items) == expected_items
         assert result.total_count == total_count
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "limit,offset,expected_items,total_count,description",
         [
@@ -210,7 +241,6 @@ class TestScalingGroupRepositoryDB:
         assert len(result.items) == expected_items
         assert result.total_count == total_count
 
-    @pytest.mark.asyncio
     async def test_search_scaling_groups_large_limit(
         self,
         scaling_group_repository: ScalingGroupRepository,
@@ -227,3 +257,54 @@ class TestScalingGroupRepositoryDB:
         # Should have exactly 15 test scaling groups
         assert len(result.items) == 15
         assert result.total_count == 15
+
+    # Create Tests
+
+    async def test_create_scaling_group_success(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test creating a scaling group with all fields specified"""
+        scheduler_opts = ScalingGroupOpts(
+            allowed_session_types=[SessionTypes.INTERACTIVE],
+            config={"max_sessions": 10},
+        )
+        creator = self._create_scaling_group_creator(
+            name="test-sgroup-create-full",
+            driver="docker",
+            scheduler="fifo",
+            description="Full test scaling group",
+            is_active=True,
+            is_public=False,
+            wsproxy_addr="http://wsproxy:5000",
+            wsproxy_api_token="test-token",
+            driver_opts={"docker_host": "unix:///var/run/docker.sock"},
+            scheduler_opts=scheduler_opts,
+            use_host_network=True,
+        )
+        result = await scaling_group_repository.create_scaling_group(creator)
+
+        assert result.name == "test-sgroup-create-full"
+        assert result.driver.name == "docker"
+        assert result.driver.options == {"docker_host": "unix:///var/run/docker.sock"}
+        assert result.metadata.description == "Full test scaling group"
+        assert result.status.is_public is False
+        assert result.network.wsproxy_addr == "http://wsproxy:5000"
+        assert result.network.wsproxy_api_token == "test-token"
+        assert result.network.use_host_network is True
+
+    async def test_create_scaling_group_duplicate_name_raises_conflict(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test creating a scaling group with duplicate name raises ScalingGroupConflict"""
+        creator = self._create_scaling_group_creator(name="test-sgroup-create-dup")
+
+        # First creation should succeed
+        await scaling_group_repository.create_scaling_group(creator)
+
+        # Second creation with same name should raise conflict
+        with pytest.raises(ScalingGroupConflict):
+            await scaling_group_repository.create_scaling_group(creator)

@@ -11,8 +11,10 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
-from ai.backend.manager.data.scaling_group.types import ScalingGroupListResult
+from ai.backend.manager.data.scaling_group.types import ScalingGroupData, ScalingGroupListResult
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.creator import Creator
 
 from .db_source import ScalingGroupDBSource
 
@@ -45,6 +47,17 @@ class ScalingGroupRepository:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db_source = ScalingGroupDBSource(db)
+
+    @scaling_group_repository_resilience.apply()
+    async def create_scaling_group(
+        self,
+        creator: Creator[ScalingGroupRow],
+    ) -> ScalingGroupData:
+        """Creates a new scaling group.
+
+        Raises ScalingGroupConflict if a scaling group with the same name already exists.
+        """
+        return await self._db_source.create_scaling_group(creator)
 
     @scaling_group_repository_resilience.apply()
     async def search_scaling_groups(

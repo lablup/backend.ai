@@ -688,6 +688,18 @@ class ScalingGroupNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
+class ScalingGroupConflict(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/duplicate-scaling-group"
+    error_title = "Duplicate Scaling Group"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SCALING_GROUP,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class VFolderNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/vfolder-not-found"
     error_title = "Virtual Folder Not Found"

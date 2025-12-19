@@ -2,6 +2,10 @@ import logging
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
+from ai.backend.manager.services.scaling_group.actions.create import (
+    CreateScalingGroupAction,
+    CreateScalingGroupActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
     SearchScalingGroupsActionResult,
@@ -30,3 +34,10 @@ class ScalingGroupService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    async def create_scaling_group(
+        self, action: CreateScalingGroupAction
+    ) -> CreateScalingGroupActionResult:
+        """Creates a scaling group."""
+        scaling_group_data = await self._repository.create_scaling_group(action.creator)
+        return CreateScalingGroupActionResult(scaling_group=scaling_group_data)
