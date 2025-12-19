@@ -228,7 +228,7 @@ class AuthService:
             "need_password_change": False,
             "full_name": action.full_name if action.full_name is not None else "",
             "description": action.description if action.description is not None else "",
-            "status": UserStatus.ACTIVE,
+            "status": UserStatus.INACTIVE,
             "status_info": "user-signup",
             "role": UserRole.USER,
             "integration_id": None,
