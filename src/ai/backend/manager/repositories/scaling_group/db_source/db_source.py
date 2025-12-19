@@ -42,11 +42,11 @@ class ScalingGroupDBSource:
 
         Raises ScalingGroupConflict if a scaling group with the same name already exists.
         """
-        spec = cast(ScalingGroupCreatorSpec, creator.spec)
         async with self._db.begin_session() as session:
             try:
                 result = await execute_creator(session, creator)
             except sa.exc.IntegrityError:
+                spec = cast(ScalingGroupCreatorSpec, creator.spec)
                 raise ScalingGroupConflict(f"Duplicate scaling group name: {spec.name}")
             return result.row.to_dataclass()
 

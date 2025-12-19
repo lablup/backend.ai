@@ -2,7 +2,7 @@ import logging
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
-from ai.backend.manager.services.scaling_group.actions.create_scaling_group import (
+from ai.backend.manager.services.scaling_group.actions.create import (
     CreateScalingGroupAction,
     CreateScalingGroupActionResult,
 )

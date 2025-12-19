@@ -3,7 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.services.scaling_group.actions.create_scaling_group import (
+from ai.backend.manager.services.scaling_group.actions.create import (
     CreateScalingGroupAction,
     CreateScalingGroupActionResult,
 )

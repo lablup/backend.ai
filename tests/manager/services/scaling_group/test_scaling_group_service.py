@@ -25,7 +25,7 @@ from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
-from ai.backend.manager.services.scaling_group.actions.create_scaling_group import (
+from ai.backend.manager.services.scaling_group.actions.create import (
     CreateScalingGroupAction,
 )
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
