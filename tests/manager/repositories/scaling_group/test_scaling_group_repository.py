@@ -285,7 +285,7 @@ class TestScalingGroupRepositoryDB:
         )
         result = await scaling_group_repository.create_scaling_group(creator)
 
-        assert result.name == "test-sgroup-create-02"
+        assert result.name == "test-sgroup-create-full"
         assert result.driver.name == "docker"
         assert result.driver.options == {"docker_host": "unix:///var/run/docker.sock"}
         assert result.metadata.description == "Full test scaling group"
