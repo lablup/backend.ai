@@ -6,6 +6,10 @@ from ai.backend.manager.services.scaling_group.actions.list_scaling_groups impor
     SearchScalingGroupsAction,
     SearchScalingGroupsActionResult,
 )
+from ai.backend.manager.services.scaling_group.actions.purge import (
+    PurgeScalingGroupAction,
+    PurgeScalingGroupActionResult,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -30,3 +34,11 @@ class ScalingGroupService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    async def purge_scaling_group(
+        self, action: PurgeScalingGroupAction
+    ) -> PurgeScalingGroupActionResult:
+        """Purges a scaling group."""
+        result = await self._repository.purge_scaling_group(purger=action.purger)
+
+        return PurgeScalingGroupActionResult(scaling_group=result)
