@@ -6,7 +6,6 @@ from collections.abc import Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
     Mapping,
     Optional,
     Self,
@@ -28,12 +27,17 @@ from ai.backend.manager.errors.resource import ScalingGroupDeletionFailure, Scal
 from ai.backend.manager.models.agent import AgentStatus
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import execute_with_txn_retry
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.scaling_group.updaters import ScalingGroupUpdaterSpec
+from ai.backend.manager.services.scaling_group.actions.modify import (
+    ModifyScalingGroupAction,
+)
+from ai.backend.manager.types import OptionalState, TriState
 
 from ..base import (
     batch_multiresult,
     batch_multiresult_in_scalar_stream,
     batch_result,
-    set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
@@ -601,6 +605,62 @@ class ModifyScalingGroupInput(graphene.InputObjectType):
     scheduler_opts = graphene.JSONString(required=False)
     use_host_network = graphene.Boolean(required=False)
 
+    def to_updater(self, name: str) -> Updater[ScalingGroupRow]:
+        """Convert GraphQL input to Updater for scaling group modification."""
+        spec = ScalingGroupUpdaterSpec(
+            description=(
+                TriState.update(self.description)
+                if self.description is not None
+                else TriState.nop()
+            ),
+            is_active=(
+                OptionalState.update(self.is_active)
+                if self.is_active is not None
+                else OptionalState.nop()
+            ),
+            is_public=(
+                OptionalState.update(self.is_public)
+                if self.is_public is not None
+                else OptionalState.nop()
+            ),
+            wsproxy_addr=(
+                TriState.update(self.wsproxy_addr)
+                if self.wsproxy_addr is not None
+                else TriState.nop()
+            ),
+            wsproxy_api_token=(
+                TriState.update(self.wsproxy_api_token)
+                if self.wsproxy_api_token is not None
+                else TriState.nop()
+            ),
+            driver=(
+                OptionalState.update(self.driver)
+                if self.driver is not None
+                else OptionalState.nop()
+            ),
+            driver_opts=(
+                OptionalState.update(self.driver_opts)
+                if self.driver_opts is not None
+                else OptionalState.nop()
+            ),
+            scheduler=(
+                OptionalState.update(self.scheduler)
+                if self.scheduler is not None
+                else OptionalState.nop()
+            ),
+            scheduler_opts=(
+                OptionalState.update(ScalingGroupOpts.from_json(self.scheduler_opts))
+                if self.scheduler_opts is not None
+                else OptionalState.nop()
+            ),
+            use_host_network=(
+                OptionalState.update(self.use_host_network)
+                if self.use_host_network is not None
+                else OptionalState.nop()
+            ),
+        )
+        return Updater(spec=spec, pk_value=name)
+
 
 class CreateScalingGroup(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
@@ -661,21 +721,11 @@ class ModifyScalingGroup(graphene.Mutation):
         name: str,
         props: ModifyScalingGroupInput,
     ) -> ModifyScalingGroup:
-        data: Dict[str, Any] = {}
-        set_if_set(props, data, "description")
-        set_if_set(props, data, "is_active")
-        set_if_set(props, data, "is_public")
-        set_if_set(props, data, "wsproxy_addr")
-        set_if_set(props, data, "wsproxy_api_token")
-        set_if_set(props, data, "driver")
-        set_if_set(props, data, "driver_opts")
-        set_if_set(props, data, "scheduler")
-        set_if_set(
-            props, data, "scheduler_opts", clean_func=lambda v: ScalingGroupOpts.from_json(v)
+        graph_ctx: GraphQueryContext = info.context
+        await graph_ctx.processors.scaling_group.modify_scaling_group.wait_for_complete(
+            ModifyScalingGroupAction(updater=props.to_updater(name))
         )
-        set_if_set(props, data, "use_host_network")
-        update_query = sa.update(scaling_groups).values(data).where(scaling_groups.c.name == name)
-        return await simple_db_mutate(cls, info.context, update_query)
+        return cls(ok=True, msg="success")
 
 
 class DeleteScalingGroup(graphene.Mutation):
