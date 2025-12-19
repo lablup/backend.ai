@@ -270,30 +270,20 @@ async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Artifac
     return Artifact.from_dataclass(action_result.result, registry_url, source_url)
 
 
-@strawberry.field(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Query artifact revisions with optional filtering, ordering, and pagination.
-
-    Returns specific versions/revisions of artifacts. Each revision represents
-    a specific version of an artifact with its own status, file data, and metadata.
-
-    Use filters to find revisions by status, version, or artifact ID.
-    Supports cursor-based pagination for efficient browsing.
-    """)
-)
-async def artifact_revisions(
+async def resolve_artifact_revisions(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ArtifactRevisionFilter] = None,
-    order_by: Optional[list[ArtifactRevisionOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-) -> ArtifactRevisionConnection:
+    filter: Optional[ArtifactRevisionFilter],
+    order_by: Optional[list[ArtifactRevisionOrderBy]],
+    before: Optional[str],
+    after: Optional[str],
+    first: Optional[int],
+    last: Optional[int],
+    limit: Optional[int],
+    offset: Optional[int],
+):
+    """
+    NOTE: This implementation has been separated from the resolver so that it can be imported from other files.
+    """
     # Build querier using adapter
     querier = info.context.gql_adapter.build_querier(
         PaginationOptions(
@@ -334,6 +324,43 @@ async def artifact_revisions(
         count=action_result.total_count,
         edges=edges,
         page_info=page_info,
+    )
+
+
+@strawberry.field(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Query artifact revisions with optional filtering, ordering, and pagination.
+
+    Returns specific versions/revisions of artifacts. Each revision represents
+    a specific version of an artifact with its own status, file data, and metadata.
+
+    Use filters to find revisions by status, version, or artifact ID.
+    Supports cursor-based pagination for efficient browsing.
+    """)
+)
+async def artifact_revisions(
+    info: Info[StrawberryGQLContext],
+    filter: Optional[ArtifactRevisionFilter] = None,
+    order_by: Optional[list[ArtifactRevisionOrderBy]] = None,
+    before: Optional[str] = None,
+    after: Optional[str] = None,
+    first: Optional[int] = None,
+    last: Optional[int] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+) -> ArtifactRevisionConnection:
+    return await resolve_artifact_revisions(
+        info,
+        filter,
+        order_by,
+        before,
+        after,
+        first,
+        last,
+        limit,
+        offset,
     )
 
 
