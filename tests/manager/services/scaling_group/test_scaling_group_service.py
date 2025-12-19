@@ -20,11 +20,13 @@ from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupStatus,
     SchedulerType,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, Purger
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
 )
+from ai.backend.manager.services.scaling_group.actions.purge import PurgeScalingGroupAction
 from ai.backend.manager.services.scaling_group.service import ScalingGroupService
 
 
@@ -237,3 +239,22 @@ class TestScalingGroupService:
 
         assert result.scaling_groups == []
         assert result.total_count == 0
+
+    # Purge Tests
+
+    @pytest.mark.asyncio
+    async def test_purge_scaling_group_success(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+        sample_scaling_group: ScalingGroupData,
+    ) -> None:
+        """Test purging a scaling group successfully"""
+        mock_repository.purge_scaling_group = AsyncMock(return_value=sample_scaling_group)
+
+        purger = Purger(row_class=ScalingGroupRow, pk_value="default")
+        action = PurgeScalingGroupAction(purger=purger)
+        result = await scaling_group_service.purge_scaling_group(action)
+
+        assert result.scaling_group == sample_scaling_group
+        mock_repository.purge_scaling_group.assert_called_once_with(purger=purger)

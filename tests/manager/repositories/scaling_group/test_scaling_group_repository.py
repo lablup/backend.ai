@@ -9,9 +9,10 @@ from datetime import datetime
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, Purger
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 
 
@@ -227,3 +228,46 @@ class TestScalingGroupRepositoryDB:
         # Should have exactly 15 test scaling groups
         assert len(result.items) == 15
         assert result.total_count == 15
+
+    # Purge Tests
+
+    @pytest.fixture
+    async def scaling_group_for_purge(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create a scaling group for purge testing"""
+        names = await self._create_scaling_groups(db_with_cleanup, 1, "purge")
+        return names[0]
+
+    @pytest.mark.asyncio
+    async def test_purge_scaling_group_success(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        scaling_group_for_purge: str,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test purging a scaling group successfully"""
+        purger = Purger(row_class=ScalingGroupRow, pk_value=scaling_group_for_purge)
+        result = await scaling_group_repository.purge_scaling_group(purger=purger)
+
+        assert result.name == scaling_group_for_purge
+
+        # Verify it's deleted from DB
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            query = sa.select(ScalingGroupRow).where(
+                ScalingGroupRow.name == scaling_group_for_purge
+            )
+            db_result = await db_sess.execute(query)
+            assert db_result.scalar_one_or_none() is None
+
+    @pytest.mark.asyncio
+    async def test_purge_scaling_group_not_found(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+    ) -> None:
+        """Test purging a non-existent scaling group raises error"""
+        purger = Purger(row_class=ScalingGroupRow, pk_value="non-existent-sgroup")
+
+        with pytest.raises(ScalingGroupNotFound):
+            await scaling_group_repository.purge_scaling_group(purger=purger)

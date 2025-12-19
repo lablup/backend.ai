@@ -11,8 +11,9 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
-from ai.backend.manager.data.scaling_group.types import ScalingGroupListResult
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.data.scaling_group.types import ScalingGroupData, ScalingGroupListResult
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.repositories.base import BatchQuerier, Purger
 
 from .db_source import ScalingGroupDBSource
 
@@ -53,3 +54,8 @@ class ScalingGroupRepository:
     ) -> ScalingGroupListResult:
         """Searches scaling groups with total count."""
         return await self._db_source.search_scaling_groups(querier=querier)
+
+    @scaling_group_repository_resilience.apply()
+    async def purge_scaling_group(self, purger: Purger[ScalingGroupRow]) -> ScalingGroupData:
+        """Purges a scaling group."""
+        return await self._db_source.purge_scaling_group(purger=purger)
