@@ -16,6 +16,7 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.purger import Purger, execute_purger
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
 
 if TYPE_CHECKING:
@@ -127,4 +128,16 @@ class ScalingGroupDBSource:
             if result is None:
                 raise ScalingGroupNotFound(f"Scaling group not found (name:{purger.pk_value})")
 
+    async def update_scaling_group(
+        self,
+        updater: Updater[ScalingGroupRow],
+    ) -> ScalingGroupData:
+        """Updates an existing scaling group.
+
+        Raises ScalingGroupNotFound if the scaling group does not exist.
+        """
+        async with self._db.begin_session() as session:
+            result = await execute_updater(session, updater)
+            if result is None:
+                raise ScalingGroupNotFound(f"Scaling group not found: {updater.pk_value}")
             return result.row.to_dataclass()

@@ -3,13 +3,13 @@ Tests for ScalingGroupService functionality.
 Tests the service layer with mocked repository operations.
 """
 
+from collections.abc import Mapping
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Any, Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.exception import ScalingGroupConflict
 from ai.backend.common.types import AgentSelectionStrategy, SessionTypes
 from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupData,
@@ -22,18 +22,22 @@ from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupStatus,
     SchedulerType,
 )
+from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
-from ai.backend.manager.services.scaling_group.actions.create import (
-    CreateScalingGroupAction,
-)
+from ai.backend.manager.repositories.scaling_group.updaters import ScalingGroupUpdaterSpec
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
 )
+from ai.backend.manager.services.scaling_group.actions.modify import (
+    ModifyScalingGroupAction,
+)
 from ai.backend.manager.services.scaling_group.service import ScalingGroupService
+from ai.backend.manager.types import OptionalState, TriState
 
 
 class TestScalingGroupService:
@@ -272,57 +276,78 @@ class TestScalingGroupService:
         assert result.scaling_groups == []
         assert result.total_count == 0
 
-    async def test_create_scaling_group_success(
+    # Modify Tests
+
+    def _create_scaling_group_updater(
+        self,
+        name: str,
+        description: Optional[TriState[str]] = None,
+        is_active: Optional[OptionalState[bool]] = None,
+        is_public: Optional[OptionalState[bool]] = None,
+        wsproxy_addr: Optional[TriState[str]] = None,
+        wsproxy_api_token: Optional[TriState[str]] = None,
+        driver: Optional[OptionalState[str]] = None,
+        driver_opts: Optional[OptionalState[Mapping[str, Any]]] = None,
+        scheduler: Optional[OptionalState[str]] = None,
+        scheduler_opts: Optional[OptionalState[ScalingGroupOpts]] = None,
+        use_host_network: Optional[OptionalState[bool]] = None,
+    ) -> Updater[ScalingGroupRow]:
+        """Create a ScalingGroupUpdaterSpec with the given parameters."""
+        spec = ScalingGroupUpdaterSpec(
+            description=description if description is not None else TriState.nop(),
+            is_active=is_active if is_active is not None else OptionalState.nop(),
+            is_public=is_public if is_public is not None else OptionalState.nop(),
+            wsproxy_addr=wsproxy_addr if wsproxy_addr is not None else TriState.nop(),
+            wsproxy_api_token=(
+                wsproxy_api_token if wsproxy_api_token is not None else TriState.nop()
+            ),
+            driver=driver if driver is not None else OptionalState.nop(),
+            driver_opts=driver_opts if driver_opts is not None else OptionalState.nop(),
+            scheduler=scheduler if scheduler is not None else OptionalState.nop(),
+            scheduler_opts=scheduler_opts if scheduler_opts is not None else OptionalState.nop(),
+            use_host_network=(
+                use_host_network if use_host_network is not None else OptionalState.nop()
+            ),
+        )
+        return Updater(spec=spec, pk_value=name)
+
+    @pytest.mark.asyncio
+    async def test_modify_scaling_group_success(
         self,
         scaling_group_service: ScalingGroupService,
         mock_repository: MagicMock,
         sample_scaling_group: ScalingGroupData,
     ) -> None:
-        """Test creating a scaling group with all fields specified"""
-        mock_repository.create_scaling_group = AsyncMock(return_value=sample_scaling_group)
+        """Test modifying a scaling group successfully"""
+        mock_repository.update_scaling_group = AsyncMock(return_value=sample_scaling_group)
 
-        scheduler_opts = ScalingGroupOpts(
-            allowed_session_types=[SessionTypes.INTERACTIVE, SessionTypes.BATCH],
-            pending_timeout=timedelta(seconds=300),
-            config={"max_sessions": 10},
-            agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
+        updater = self._create_scaling_group_updater(
+            name="default",
+            description=TriState.update("Updated description"),
+            is_active=OptionalState.update(False),
         )
-        creator = self._create_scaling_group_creator(
-            name="test-sgroup-full",
-            driver="docker",
-            scheduler="fifo",
-            description="Full test scaling group",
-            is_active=True,
-            is_public=False,
-            wsproxy_addr="http://wsproxy:5000",
-            wsproxy_api_token="test-token",
-            driver_opts={"docker_host": "unix:///var/run/docker.sock"},
-            scheduler_opts=scheduler_opts,
-            use_host_network=True,
-        )
-        action = CreateScalingGroupAction(creator=creator)
-        result = await scaling_group_service.create_scaling_group(action)
+        action = ModifyScalingGroupAction(updater=updater)
+        result = await scaling_group_service.modify_scaling_group(action)
 
         assert result.scaling_group == sample_scaling_group
-        mock_repository.create_scaling_group.assert_called_once_with(creator)
+        mock_repository.update_scaling_group.assert_called_once_with(updater)
 
-    async def test_create_scaling_group_repository_error_propagates(
+    @pytest.mark.asyncio
+    async def test_modify_scaling_group_not_found(
         self,
         scaling_group_service: ScalingGroupService,
         mock_repository: MagicMock,
     ) -> None:
-        """Test that repository errors propagate through the service"""
-        mock_repository.create_scaling_group = AsyncMock(
-            side_effect=ScalingGroupConflict("Scaling group already exists")
+        """Test that ScalingGroupNotFound propagates through the service"""
+        mock_repository.update_scaling_group = AsyncMock(
+            side_effect=ScalingGroupNotFound("Scaling group not found: nonexistent")
         )
 
-        spec = ScalingGroupCreatorSpec(
-            name="test-sgroup-conflict",
-            driver="static",
-            scheduler="fifo",
+        updater = self._create_scaling_group_updater(
+            name="nonexistent",
+            description=TriState.update("Updated description"),
         )
-        creator: Creator[ScalingGroupRow] = Creator(spec=spec)
-        action = CreateScalingGroupAction(creator=creator)
+        action = ModifyScalingGroupAction(updater=updater)
 
-        with pytest.raises(ScalingGroupConflict):
-            await scaling_group_service.create_scaling_group(action)
+        with pytest.raises(ScalingGroupNotFound):
+            await scaling_group_service.modify_scaling_group(action)

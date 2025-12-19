@@ -10,6 +10,10 @@ from ai.backend.manager.services.scaling_group.actions.list_scaling_groups impor
     SearchScalingGroupsAction,
     SearchScalingGroupsActionResult,
 )
+from ai.backend.manager.services.scaling_group.actions.modify import (
+    ModifyScalingGroupAction,
+    ModifyScalingGroupActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.purge_scaling_group import (
     PurgeScalingGroupAction,
     PurgeScalingGroupActionResult,
@@ -52,3 +56,10 @@ class ScalingGroupService:
         """Purges a scaling group and all related sessions and routes."""
         data = await self._repository.purge_scaling_group(action.purger)
         return PurgeScalingGroupActionResult(data=data)
+
+    async def modify_scaling_group(
+        self, action: ModifyScalingGroupAction
+    ) -> ModifyScalingGroupActionResult:
+        """Modifies a scaling group."""
+        scaling_group_data = await self._repository.update_scaling_group(action.updater)
+        return ModifyScalingGroupActionResult(scaling_group=scaling_group_data)
