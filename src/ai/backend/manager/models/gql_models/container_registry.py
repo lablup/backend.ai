@@ -9,6 +9,7 @@ import graphene
 import graphql
 import sqlalchemy as sa
 from graphql import Undefined, UndefinedType
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.logging import BraceStyleAdapter
@@ -29,7 +30,6 @@ from ai.backend.manager.models.rbac import (
     ScopeType,
     SystemScope,
 )
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ...defs import PASSWORD_PLACEHOLDER
 from ..base import (
@@ -288,35 +288,32 @@ class AllowedGroups(graphene.InputObjectType):
 
 
 async def handle_allowed_groups_update(
-    db: ExtendedAsyncSAEngine,
+    session: SASession,
     registry_id: uuid.UUID,
     allowed_group_updates: AllowedGroups | AllowedGroupsModel,
 ):
-    async with db.begin_session() as db_sess:
-        if allowed_group_updates.add:
-            insert_values = [
-                {"registry_id": registry_id, "group_id": group_id}
-                for group_id in allowed_group_updates.add
-            ]
+    if allowed_group_updates.add:
+        insert_values = [
+            {"registry_id": registry_id, "group_id": group_id}
+            for group_id in allowed_group_updates.add
+        ]
 
-            insert_query = sa.insert(AssociationContainerRegistriesGroupsRow).values(insert_values)
-            await db_sess.execute(insert_query)
+        insert_query = sa.insert(AssociationContainerRegistriesGroupsRow).values(insert_values)
+        await session.execute(insert_query)
 
-        if allowed_group_updates.remove:
-            delete_query = (
-                sa.delete(AssociationContainerRegistriesGroupsRow)
-                .where(AssociationContainerRegistriesGroupsRow.registry_id == registry_id)
-                .where(
-                    AssociationContainerRegistriesGroupsRow.group_id.in_(
-                        allowed_group_updates.remove
-                    )
-                )
+    if allowed_group_updates.remove:
+        delete_query = (
+            sa.delete(AssociationContainerRegistriesGroupsRow)
+            .where(AssociationContainerRegistriesGroupsRow.registry_id == registry_id)
+            .where(
+                AssociationContainerRegistriesGroupsRow.group_id.in_(allowed_group_updates.remove)
             )
-            result = await db_sess.execute(delete_query)
-            if result.rowcount == 0:
-                raise ContainerRegistryGroupsAssociationNotFound(
-                    f"Tried to remove non-existing associations for registry_id: {registry_id}, group_ids: {allowed_group_updates.remove}"
-                )
+        )
+        result = await session.execute(delete_query)
+        if result.rowcount == 0:
+            raise ContainerRegistryGroupsAssociationNotFound(
+                f"Tried to remove non-existing associations for registry_id: {registry_id}, group_ids: {allowed_group_updates.remove}"
+            )
 
 
 class CreateContainerRegistryNode(graphene.Mutation):

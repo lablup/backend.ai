@@ -5,8 +5,7 @@ from typing import Optional, cast
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.container_registry import AllowedGroupsModel
-from ai.backend.common.exception import BackendAIError, ContainerRegistryGroupsAlreadyAssociated
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -15,17 +14,14 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.errors.image import (
-    ContainerRegistryGroupsAssociationNotFound,
     ContainerRegistryNotFound,
-)
-from ai.backend.manager.models.association_container_registries_groups import (
-    AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
+from ai.backend.manager.models.gql_models.container_registry import handle_allowed_groups_update
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
@@ -74,10 +70,8 @@ class ContainerRegistryRepository:
                 raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
 
             if updater.spec.has_allowed_groups_update is True:
-                await self._update_registry_access_allowed_groups(
-                    session,
-                    registry_id,
-                    updater.spec.allowed_groups.value(),
+                await handle_allowed_groups_update(
+                    session, registry_id, updater.spec.allowed_groups.value()
                 )
 
             to_update = updater.spec.build_values()
@@ -99,43 +93,6 @@ class ContainerRegistryRepository:
             )
             validator.validate()
             return reg_row.to_dataclass()
-
-    async def _update_registry_access_allowed_groups(
-        self, session: SASession, registry_id: uuid.UUID, allowed_groups: AllowedGroupsModel
-    ) -> None:
-        if allowed_groups.add:
-            existing_stmt = sa.select(AssociationContainerRegistriesGroupsRow.group_id).where(
-                AssociationContainerRegistriesGroupsRow.registry_id == registry_id
-            )
-            result = await session.execute(existing_stmt)
-            # Convert UUID objects to strings for comparison with allowed_groups.add
-            existing_group_ids = {str(gid) for gid in result.scalars().all()}
-
-            # Check if any group is already associated
-            already_associated = [gid for gid in allowed_groups.add if gid in existing_group_ids]
-            if already_associated:
-                raise ContainerRegistryGroupsAlreadyAssociated(
-                    f"Groups are already associated with registry_id: {registry_id}, group_ids: {already_associated}"
-                )
-
-            # Add new group associations
-            insert_values = [
-                {"registry_id": registry_id, "group_id": group_id}
-                for group_id in allowed_groups.add
-            ]
-            insert_query = sa.insert(AssociationContainerRegistriesGroupsRow).values(insert_values)
-            await session.execute(insert_query)
-        if allowed_groups.remove:
-            delete_query = (
-                sa.delete(AssociationContainerRegistriesGroupsRow)
-                .where(AssociationContainerRegistriesGroupsRow.registry_id == registry_id)
-                .where(AssociationContainerRegistriesGroupsRow.group_id.in_(allowed_groups.remove))
-            )
-            result = await session.execute(delete_query)
-            if result.rowcount == 0:
-                raise ContainerRegistryGroupsAssociationNotFound(
-                    f"Tried to remove non-existing associations for registry_id: {registry_id}, group_ids: {allowed_groups.remove}"
-                )
 
     @container_registry_repository_resilience.apply()
     async def get_by_registry_and_project(

@@ -114,8 +114,8 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):
                 await db_session.flush()
                 await db_session.refresh(reg_row)
 
-            if props.allowed_groups:
-                await handle_allowed_groups_update(ctx.db, reg_row.id, props.allowed_groups)
+                if props.allowed_groups:
+                    await handle_allowed_groups_update(db_session, reg_row.id, props.allowed_groups)
 
             return cls(
                 container_registry=ContainerRegistryNode.from_row(ctx, reg_row),
