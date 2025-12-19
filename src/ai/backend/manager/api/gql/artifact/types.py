@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional, Self
-
-if TYPE_CHECKING:
-    from .resolver import artifact_revisions as resolve_artifact_revisions
+from typing import Optional, Self
 
 import strawberry
 from aiotools import apartial
@@ -804,12 +801,14 @@ class Artifact(Node):
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> ArtifactRevisionConnection:
+        from .fetcher import fetch_artifact_revisions
+
         if filter is None:
             filter = ArtifactRevisionFilter(artifact_id=ID(self.id))
         else:
             filter.artifact_id = ID(self.id)
 
-        return await resolve_artifact_revisions(
+        return await fetch_artifact_revisions(
             info,
             filter=filter,
             order_by=order_by,
