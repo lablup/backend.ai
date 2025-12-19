@@ -75,7 +75,7 @@ pydantic[email]~=2.11.3
 packaging>=24.1
 hiredis>=3.0.0
 huggingface-hub~=0.34.3
-redis[hiredis]==4.5.5
+redis[hiredis]~=7.1.0
 rich~=13.6
 ruamel.yaml~=0.18.10
 SQLAlchemy[postgresql_asyncpg]~=1.4.54

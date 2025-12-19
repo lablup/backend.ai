@@ -28,7 +28,7 @@ from glide import (
     ServerCredentials,
     TlsAdvancedConfiguration,
 )
-from redis.asyncio import ConnectionPool, Redis
+from redis.asyncio import BlockingConnectionPool, ConnectionPool, Redis
 from redis.asyncio.client import Pipeline
 from redis.asyncio.sentinel import MasterNotFoundError, Sentinel, SlaveNotFoundError
 from redis.backoff import ExponentialBackoff
@@ -43,6 +43,7 @@ from .validators import DelimiterSeperatedList, HostPortPair
 __all__ = (
     "execute",
     "get_redis_object",
+    "get_redis_object_for_lock",
 )
 
 _keepalive_options: MutableMapping[int, int] = {}
@@ -74,13 +75,12 @@ _default_conn_opts: Mapping[str, Any] = {
 }
 _default_conn_pool_opts: Mapping[str, Any] = {
     "max_connections": 16,
-    # "timeout": 20.0,  # for redis-py 5.0+
 }
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-# Leaving it as is since the CLI is still using redis-py version 4.x
+# TODO: Remove this after migrating redis_lock client to valkey glide
 async def execute(
     redis_obj: RedisConnectionInfo,
     func: Callable[[Union[Redis, Any]], Awaitable[Any]],
@@ -124,39 +124,40 @@ async def execute(
 
     while True:
         try:
-            async with redis_client:
-                aw_or_pipe = func(redis_client)
-                if isinstance(aw_or_pipe, Pipeline):
-                    async with aw_or_pipe:
-                        result = await aw_or_pipe.execute()
-                elif inspect.isawaitable(aw_or_pipe):
-                    result = await aw_or_pipe
-                else:
-                    raise ValueError(
-                        "The redis execute's return value must be an awaitable"
-                        " or redis.asyncio.client.Pipeline object"
-                    )
-                if isinstance(result, Pipeline):
-                    # This happens when func is an async function that returns a pipeline.
-                    async with result:
-                        result = await result.execute()
-                if encoding:
-                    if isinstance(result, bytes):
-                        return result.decode(encoding)
-                    elif isinstance(result, dict):
-                        newdict = {}
-                        for k, v in result.items():
-                            newdict[k.decode(encoding)] = v.decode(encoding)
-                        return newdict
-                else:
-                    return result
+            # In redis-py 5.x, we no longer need `async with redis_client:` as connection
+            # pooling is handled automatically. The context manager in 5.x closes the pool
+            # on exit, which is not desired for reuse.
+            aw_or_pipe = func(redis_client)
+            if isinstance(aw_or_pipe, Pipeline):
+                async with aw_or_pipe:
+                    result = await aw_or_pipe.execute()
+            elif inspect.isawaitable(aw_or_pipe):
+                result = await aw_or_pipe
+            else:
+                raise ValueError(
+                    "The redis execute's return value must be an awaitable"
+                    " or redis.asyncio.client.Pipeline object"
+                )
+            if isinstance(result, Pipeline):
+                # This happens when func is an async function that returns a pipeline.
+                async with result:
+                    result = await result.execute()
+            if encoding:
+                if isinstance(result, bytes):
+                    return result.decode(encoding)
+                elif isinstance(result, dict):
+                    newdict = {}
+                    for k, v in result.items():
+                        newdict[k.decode(encoding)] = v.decode(encoding)
+                    return newdict
+            else:
+                return result
         except (
             MasterNotFoundError,
             SlaveNotFoundError,
             redis.exceptions.ReadOnlyError,
             redis.exceptions.ConnectionError,
             ConnectionResetError,
-            TypeError,  # 4.5.5 version of redis.py raises a TypeError when the Connection is closed.
         ) as e:
             warn_on_first_attempt = True
             if (
@@ -217,14 +218,18 @@ def get_redis_object(
     db: int = 0,
     **kwargs,
 ) -> RedisConnectionInfo:
+    """
+    Legacy function kept for external code that depends on the common package.
+    Not used in the current codebase.
+    """
     redis_helper_config: RedisHelperConfig = cast(
         RedisHelperConfig, redis_target.redis_helper_config
     )
     conn_opts = {
         **_default_conn_opts,
         **kwargs,
-        # "lib_name": None,  # disable implicit "CLIENT SETINFO" (for redis-py 5.0+)
-        # "lib_version": None,  # disable implicit "CLIENT SETINFO" (for redis-py 5.0+)
+        "lib_name": None,  # disable implicit "CLIENT SETINFO"
+        "lib_version": None,  # disable implicit "CLIENT SETINFO"
     }
     conn_pool_opts = {
         **_default_conn_pool_opts,
@@ -235,9 +240,6 @@ def get_redis_object(
         conn_opts["socket_connect_timeout"] = float(socket_connect_timeout)
     if max_connections := redis_helper_config.get("max_connections"):
         conn_pool_opts["max_connections"] = int(max_connections)
-    # for redis-py 5.0+
-    # if connection_ready_timeout := redis_helper_config.get("connection_ready_timeout"):
-    #     conn_pool_opts["timeout"] = float(connection_ready_timeout)
     if _sentinel_addresses := redis_target.get("sentinel"):
         sentinel_addresses: Any = None
         if isinstance(_sentinel_addresses, str):
@@ -284,19 +286,104 @@ def get_redis_object(
             raise ValueError("Redis URL is not provided in the configuration.")
 
         url = _parse_redis_url(redis_target, db)
+        connection_pool: ConnectionPool = ConnectionPool.from_url(
+            str(url),
+            **conn_pool_opts,
+            **conn_opts,
+        )
         return RedisConnectionInfo(
-            # In redis-py 5.0.1+, we should migrate to `Redis.from_pool()` API
-            client=Redis(
-                connection_pool=ConnectionPool.from_url(
-                    str(url),
-                    **conn_pool_opts,
-                    **conn_opts,
-                ),
+            client=Redis.from_pool(connection_pool),  # type: ignore[attr-defined]
+            sentinel=None,
+            name=name,
+            service_name=None,
+            redis_helper_config=redis_helper_config,
+        )
+
+
+def get_redis_object_for_lock(
+    redis_target: RedisTarget,
+    *,
+    name: str,
+    db: int = 0,
+    **kwargs,
+) -> RedisConnectionInfo:
+    """
+    Create a Redis connection using BlockingConnectionPool for distributed locking.
+    Uses `connection_ready_timeout` from redis_helper_config as the blocking timeout.
+    """
+    redis_helper_config: RedisHelperConfig = cast(
+        RedisHelperConfig, redis_target.redis_helper_config
+    )
+    conn_opts = {
+        **_default_conn_opts,
+        **kwargs,
+        "lib_name": None,  # disable implicit "CLIENT SETINFO"
+        "lib_version": None,  # disable implicit "CLIENT SETINFO"
+    }
+    conn_pool_opts = {
+        **_default_conn_pool_opts,
+    }
+    if socket_timeout := redis_helper_config.get("socket_timeout"):
+        conn_opts["socket_timeout"] = float(socket_timeout)
+    if socket_connect_timeout := redis_helper_config.get("socket_connect_timeout"):
+        conn_opts["socket_connect_timeout"] = float(socket_connect_timeout)
+    if max_connections := redis_helper_config.get("max_connections"):
+        conn_pool_opts["max_connections"] = int(max_connections)
+    if connection_ready_timeout := redis_helper_config.get("connection_ready_timeout"):
+        conn_pool_opts["timeout"] = float(connection_ready_timeout)
+    if _sentinel_addresses := redis_target.get("sentinel"):
+        sentinel_addresses: Any = None
+        if isinstance(_sentinel_addresses, str):
+            sentinel_addresses = DelimiterSeperatedList(HostPortPair).check_and_return(
+                _sentinel_addresses
+            )
+        else:
+            sentinel_addresses = _sentinel_addresses
+
+        service_name = redis_target.get("service_name")
+        password = redis_target.get("password")
+        assert service_name is not None, (
+            "config/redis/service_name is required when using Redis Sentinel"
+        )
+
+        kwargs = {
+            "password": password,
+            "ssl": redis_target.use_tls,
+            "ssl_cert_reqs": SSL_CERT_NONE if redis_target.tls_skip_verify else SSL_CERT_REQUIRED,
+        }
+        sentinel = Sentinel(
+            [(str(host), port) for host, port in sentinel_addresses],
+            password=password,
+            db=str(db),
+            sentinel_kwargs={
+                "password": password,
+                **kwargs,
+            },
+        )
+        return RedisConnectionInfo(
+            client=sentinel.master_for(
+                service_name=service_name,
+                password=password,
                 **conn_opts,
-                auto_close_connection_pool=True,
-                ssl=redis_target.use_tls,
-                ssl_cert_reqs=SSL_CERT_NONE if redis_target.tls_skip_verify else SSL_CERT_REQUIRED,
             ),
+            sentinel=sentinel,
+            name=name,
+            service_name=service_name,
+            redis_helper_config=redis_helper_config,
+        )
+    else:
+        redis_url = redis_target.addr
+        if redis_url is None:
+            raise ValueError("Redis URL is not provided in the configuration.")
+
+        url = _parse_redis_url(redis_target, db)
+        connection_pool: BlockingConnectionPool = BlockingConnectionPool.from_url(
+            str(url),
+            **conn_pool_opts,
+            **conn_opts,
+        )
+        return RedisConnectionInfo(
+            client=Redis.from_pool(connection_pool),  # type: ignore[attr-defined]
             sentinel=None,
             name=name,
             service_name=None,

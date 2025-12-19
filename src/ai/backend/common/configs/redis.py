@@ -42,12 +42,24 @@ class RedisHelperConfig(BaseModel):
         validation_alias=AliasChoices("reconnect_poll_timeout", "reconnect-poll-timeout"),
         serialization_alias="reconnect_poll_timeout",
     )
+    connection_ready_timeout: float = Field(
+        default=20.0,
+        description="""
+        Timeout in seconds to wait for a connection from the blocking connection pool.
+        Used by BlockingConnectionPool for distributed locking scenarios.
+        If no connection is available within this time, a timeout error is raised.
+        """,
+        examples=[20.0, 30.0],
+        validation_alias=AliasChoices("connection_ready_timeout", "connection-ready-timeout"),
+        serialization_alias="connection_ready_timeout",
+    )
 
     def to_dict(self) -> RedisHelperConfigDict:
         return RedisHelperConfigDict(
             socket_timeout=self.socket_timeout,
             socket_connect_timeout=self.socket_connect_timeout,
             reconnect_poll_timeout=self.reconnect_poll_timeout,
+            connection_ready_timeout=self.connection_ready_timeout,
         )
 
 

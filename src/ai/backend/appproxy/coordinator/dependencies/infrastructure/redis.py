@@ -63,7 +63,7 @@ class RedisProvider(DependencyProvider[ServerConfig, CoordinatorValkeyClients]):
         )
 
         # Keep redis_lock for distributed locking (not yet migrated)
-        redis_lock = redis_helper.get_redis_object(
+        redis_lock = redis_helper.get_redis_object_for_lock(
             redis_profile_target.profile_target(RedisRole.STREAM),
             name="lock",  # distributed locks
             db=REDIS_STREAM_LOCK,
