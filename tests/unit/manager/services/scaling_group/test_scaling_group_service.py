@@ -311,7 +311,6 @@ class TestScalingGroupService:
         )
         return Updater(spec=spec, pk_value=name)
 
-    @pytest.mark.asyncio
     async def test_modify_scaling_group_success(
         self,
         scaling_group_service: ScalingGroupService,
@@ -332,7 +331,6 @@ class TestScalingGroupService:
         assert result.scaling_group == sample_scaling_group
         mock_repository.update_scaling_group.assert_called_once_with(updater)
 
-    @pytest.mark.asyncio
     async def test_modify_scaling_group_not_found(
         self,
         scaling_group_service: ScalingGroupService,
