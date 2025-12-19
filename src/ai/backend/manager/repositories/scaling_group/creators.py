@@ -26,16 +26,16 @@ class ScalingGroupCreatorSpec(CreatorSpec[ScalingGroupRow]):
 
     @override
     def build_row(self) -> ScalingGroupRow:
-        row = ScalingGroupRow()
-        row.name = self.name
-        row.description = self.description
-        row.is_active = self.is_active
-        row.is_public = self.is_public
-        row.wsproxy_addr = self.wsproxy_addr
-        row.wsproxy_api_token = self.wsproxy_api_token
-        row.driver = self.driver
-        row.driver_opts = dict(self.driver_opts)
-        row.scheduler = self.scheduler
-        row.scheduler_opts = self.scheduler_opts if self.scheduler_opts else ScalingGroupOpts()
-        row.use_host_network = self.use_host_network
-        return row
+        return ScalingGroupRow(
+            name=self.name,
+            description=self.description,
+            is_active=self.is_active,
+            is_public=self.is_public,
+            wsproxy_addr=self.wsproxy_addr,
+            wsproxy_api_token=self.wsproxy_api_token,
+            driver=self.driver,
+            driver_opts=dict(self.driver_opts),
+            scheduler=self.scheduler,
+            scheduler_opts=self.scheduler_opts if self.scheduler_opts else ScalingGroupOpts(),
+            use_host_network=self.use_host_network,
+        )
