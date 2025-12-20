@@ -952,6 +952,19 @@ class DeploymentRepository:
         """Update an endpoint using the provided updater spec."""
         await self._db_source.update_endpoint(updater)
 
+    @deployment_repository_resilience.apply()
+    async def update_current_revision(
+        self,
+        endpoint_id: uuid.UUID,
+        revision_id: uuid.UUID,
+    ) -> uuid.UUID | None:
+        """Update the current revision of a deployment.
+
+        Returns:
+            The previous revision ID, or None if there was no previous revision.
+        """
+        return await self._db_source.update_current_revision(endpoint_id, revision_id)
+
     # ========== Deployment Auto-Scaling Policy Operations ==========
 
     @deployment_repository_resilience.apply()

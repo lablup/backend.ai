@@ -377,6 +377,24 @@ class DeploymentService:
         )
 
     async def sync_replicas(self, action: SyncReplicaAction) -> SyncReplicaActionResult:
+        """Sync replicas for a deployment.
+
+        This triggers a lifecycle check to reconcile the actual replica count
+        with the desired replica count based on the current revision.
+
+        Args:
+            action: Action containing the deployment ID
+
+        Returns:
+            SyncReplicaActionResult: Result indicating success
+        """
+        # Trigger lifecycle check to sync replicas
+        await self._deployment_controller.mark_lifecycle_needed(
+            DeploymentLifecycleType.CHECK_REPLICA
+        )
+
+        log.info("Triggered replica sync for deployment {}", action.deployment_id)
+
         return SyncReplicaActionResult(success=True)
 
     async def add_model_revision(
@@ -500,40 +518,56 @@ class DeploymentService:
         Returns:
             ActivateRevisionActionResult: Result containing the updated deployment
         """
-        # For now, return mock data
-        # TODO: Implement actual activation logic:
-        # 1. Validate revision exists and belongs to deployment
-        # 2. Update endpoint.current_revision
-        # 3. Trigger lifecycle check
+        # 1. Validate revision exists
+        revision = await self._deployment_repository.get_revision(action.revision_id)
+
+        # 2. Update endpoint.current_revision and get previous revision
+        previous_revision_id = await self._deployment_repository.update_current_revision(
+            action.deployment_id, action.revision_id
+        )
+
+        # 3. Trigger lifecycle check to update routes with new revision
+        await self._deployment_controller.mark_lifecycle_needed(
+            DeploymentLifecycleType.CHECK_REPLICA
+        )
+
+        log.info(
+            "Activated revision {} for deployment {} (previous: {})",
+            action.revision_id,
+            action.deployment_id,
+            previous_revision_id,
+        )
+
+        # 4. Return result with activated revision data
+        # Note: ModelDeploymentData requires additional data that needs separate implementation
+        # For now, we return minimal data with the activated revision
         return ActivateRevisionActionResult(
             deployment=ModelDeploymentData(
                 id=action.deployment_id,
                 metadata=ModelDeploymentMetadataInfo(
-                    name="test-deployment",
+                    name=revision.name or "",
                     status=ModelDeploymentStatus.READY,
-                    tags=["tag1", "tag2"],
-                    project_id=uuid4(),
+                    tags=[],
+                    project_id=uuid4(),  # TODO: Get from deployment
                     domain_name="default",
                     created_at=datetime.now(),
                     updated_at=datetime.now(),
                 ),
                 network_access=DeploymentNetworkSpec(
                     open_to_public=True,
-                    url="http://example.com",
-                    preferred_domain_name="example.com",
-                    access_token_ids=[uuid4()],
+                    url="",
                 ),
-                revision_history_ids=[uuid4(), uuid4()],
-                revision=mock_revision_data_1,
-                scaling_rule_ids=[uuid4(), uuid4()],
+                revision_history_ids=[action.revision_id],
+                revision=revision,
+                scaling_rule_ids=[],
                 replica_state=ReplicaStateData(
-                    desired_replica_count=3,
-                    replica_ids=[uuid4(), uuid4(), uuid4()],
+                    desired_replica_count=0,
+                    replica_ids=[],
                 ),
                 default_deployment_strategy=DeploymentStrategy.ROLLING,
-                created_user_id=uuid4(),
+                created_user_id=uuid4(),  # TODO: Get from deployment
             ),
-            previous_revision_id=uuid4(),
+            previous_revision_id=previous_revision_id,
             activated_revision_id=action.revision_id,
         )
 

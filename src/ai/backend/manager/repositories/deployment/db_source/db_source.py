@@ -1580,6 +1580,29 @@ class DeploymentDBSource:
         async with self._begin_session_read_committed() as db_sess:
             await execute_updater(db_sess, updater)
 
+    async def update_current_revision(
+        self,
+        endpoint_id: uuid.UUID,
+        revision_id: uuid.UUID,
+    ) -> uuid.UUID | None:
+        """Update the current_revision of an endpoint and return the previous revision ID."""
+        async with self._begin_session_read_committed() as db_sess:
+            # Get current revision first
+            query = sa.select(EndpointRow.current_revision).where(EndpointRow.id == endpoint_id)
+            result = await db_sess.execute(query)
+            row = result.scalar_one_or_none()
+            previous_revision_id = row
+
+            # Update to new revision
+            update_query = (
+                sa.update(EndpointRow)
+                .where(EndpointRow.id == endpoint_id)
+                .values(current_revision=revision_id)
+            )
+            await db_sess.execute(update_query)
+
+            return previous_revision_id
+
     # -------------------------------------------------------------------------
     # Auto-Scaling Policy Methods (DeploymentAutoScalingPolicyRow)
     # -------------------------------------------------------------------------
