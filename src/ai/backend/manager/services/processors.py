@@ -318,7 +318,10 @@ class Services:
             repositories.reservoir_registry.repository,
             repositories.artifact_registry.repository,
         )
-        deployment_service = DeploymentService(args.deployment_controller)
+        deployment_service = DeploymentService(
+            args.deployment_controller,
+            args.deployment_controller._deployment_repository,
+        )
         storage_namespace_service = StorageNamespaceService(
             repositories.storage_namespace.repository
         )

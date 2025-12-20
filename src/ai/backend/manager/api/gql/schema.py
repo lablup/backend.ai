@@ -70,6 +70,11 @@ from .model_deployment.model_revision import (
 from .model_deployment.revision_operations import (
     activate_deployment_revision,
 )
+from .model_deployment.route import (
+    route,
+    routes,
+    update_route_traffic_status,
+)
 from .notification import (
     create_notification_channel,
     create_notification_rule,
@@ -152,6 +157,8 @@ class Query:
     agent_stats = agent_stats
     inference_runtime_configs = inference_runtime_configs
     inference_runtime_config = inference_runtime_config
+    route = route
+    routes = routes
 
 
 @strawberry.type
@@ -207,6 +214,7 @@ class Mutation:
     reject_artifact_revision = reject_artifact_revision
     create_access_token = create_access_token
     activate_deployment_revision = activate_deployment_revision
+    update_route_traffic_status = update_route_traffic_status
 
 
 @strawberry.type

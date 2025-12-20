@@ -3,6 +3,7 @@
 import logging
 import uuid
 from dataclasses import dataclass
+from typing import Optional
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
@@ -10,15 +11,23 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
 from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
-from ai.backend.manager.data.deployment.types import DeploymentInfo
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    RouteInfo,
+    RouteSearchResult,
+    RouteTrafficStatus,
+)
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyData
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.options import RouteConditions
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentPolicyUpdaterSpec,
     DeploymentUpdaterSpec,
+    RouteUpdaterSpec,
 )
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
@@ -227,3 +236,69 @@ class DeploymentController:
         return await self._deployment_repository.update_deployment_policy(
             Updater(spec=updater_spec, pk_value=policy.id)
         )
+
+    # Route operations
+
+    async def search_routes(
+        self,
+        querier: BatchQuerier,
+    ) -> RouteSearchResult:
+        """Search routes with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination
+
+        Returns:
+            RouteSearchResult with items, total_count, and pagination info
+        """
+        return await self._deployment_repository.search_routes(querier)
+
+    async def get_route(
+        self,
+        route_id: uuid.UUID,
+    ) -> Optional[RouteInfo]:
+        """Get a single route by its ID.
+
+        Args:
+            route_id: The route ID
+
+        Returns:
+            RouteInfo if found, None otherwise
+        """
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=1),
+            conditions=[RouteConditions.by_ids([route_id])],
+        )
+        result = await self._deployment_repository.search_routes(querier)
+        return result.items[0] if result.items else None
+
+    async def update_route_traffic_status(
+        self,
+        route_id: uuid.UUID,
+        traffic_status: RouteTrafficStatus,
+    ) -> Optional[RouteInfo]:
+        """Update route traffic status.
+
+        Args:
+            route_id: The route ID
+            traffic_status: New traffic status
+
+        Returns:
+            Updated RouteInfo if found, None otherwise
+        """
+        from ai.backend.manager.models.routing import RoutingRow
+        from ai.backend.manager.types import OptionalState
+
+        spec = RouteUpdaterSpec(
+            traffic_status=OptionalState.update(traffic_status),
+        )
+        updater: Updater[RoutingRow] = Updater(spec=spec, pk_value=route_id)
+        success = await self._deployment_repository.update_route(updater)
+        if not success:
+            return None
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=1),
+            conditions=[RouteConditions.by_ids([route_id])],
+        )
+        result = await self._deployment_repository.search_routes(querier)
+        return result.items[0] if result.items else None
