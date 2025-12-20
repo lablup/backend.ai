@@ -5,7 +5,6 @@ RBAC DTOs for Manager API.
 from .path import (
     DeleteObjectPermissionPathParam,
     DeletePermissionPathParam,
-    DeleteRolePathParam,
     GetRolePathParam,
     SearchUsersAssignedToRolePathParam,
     UpdateRolePathParam,
@@ -56,7 +55,6 @@ __all__ = (
     # Path DTOs
     "GetRolePathParam",
     "UpdateRolePathParam",
-    "DeleteRolePathParam",
     "SearchUsersAssignedToRolePathParam",
     "DeletePermissionPathParam",
     "DeleteObjectPermissionPathParam",
