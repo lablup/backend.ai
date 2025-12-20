@@ -10587,6 +10587,211 @@
         ],
         "description": "Update traffic status of a route.\n\n**Preconditions:**\n* User privilege required.\n"
       }
+    },
+    "/v2.0/admin/rbac/roles": {
+      "post": {
+        "operationId": "v2.0.create_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Create a new role.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/search": {
+      "post": {
+        "operationId": "v2.0.search_roles",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search roles with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/{role_id}": {
+      "get": {
+        "operationId": "v2.0.get_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific role with details.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "v2.0.update_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an existing role.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/delete": {
+      "post": {
+        "operationId": "v2.0.delete_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Delete a role (soft delete).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/purge": {
+      "post": {
+        "operationId": "v2.0.purge_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Delete a role (soft delete).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/assign": {
+      "post": {
+        "operationId": "v2.0.assign_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Assign a role to a user.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/revoke": {
+      "post": {
+        "operationId": "v2.0.revoke_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Revoke a role from a user.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/{role_id}/assigned-users/search": {
+      "post": {
+        "operationId": "v2.0.search_assigned_users",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Search users assigned to a specific role with filters and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
     }
   }
 }

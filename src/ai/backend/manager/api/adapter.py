@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
-from ai.backend.common.dto.manager.notification import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.manager.repositories.base import QueryCondition
 
 
