@@ -24,7 +24,7 @@ class UpdateRoleAction(RoleAction):
 
 @dataclass
 class UpdateRoleActionResult(BaseActionResult):
-    data: Optional[RoleData]
+    data: RoleData
 
     @override
     def entity_id(self) -> Optional[str]:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 from .id import ObjectId, ScopeId
 from .object_permission import (
@@ -16,10 +16,6 @@ from .permission_group import (
 )
 from .status import RoleStatus
 from .types import EntityType, OperationType, RoleSource
-
-if TYPE_CHECKING:
-    from .object_permission import ObjectPermissionCreateInput
-    from .permission import ScopedPermissionCreateInput
 
 
 @dataclass(frozen=True)
@@ -34,7 +30,7 @@ class RoleData:
     source: RoleSource
     status: RoleStatus
     created_at: datetime
-    updated_at: Optional[datetime]
+    updated_at: datetime
     deleted_at: Optional[datetime]
     description: Optional[str] = None
 
@@ -64,7 +60,7 @@ class RoleDetailData:
     object_permissions: list[ObjectPermissionData]
 
     created_at: datetime
-    updated_at: Optional[datetime]
+    updated_at: datetime
     deleted_at: Optional[datetime]
     description: Optional[str] = None
 
