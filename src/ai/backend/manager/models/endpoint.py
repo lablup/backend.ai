@@ -98,6 +98,7 @@ if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
     from ai.backend.manager.data.deployment.creator import DeploymentCreator
 
+    from .deployment_revision import DeploymentRevisionRow
     from .gql import GraphQueryContext
 
 __all__ = (
@@ -687,10 +688,86 @@ class EndpointRow(Base):
         """
         Convert EndpointRow to DeploymentInfo dataclass.
 
-        If image_row is loaded (via selectinload), ImageIdentifier will be populated.
-        Otherwise, ImageIdentifier will be None.
+        If current_revision is set and revisions are loaded, uses revision data.
+        Otherwise, falls back to endpoint-level fields for legacy compatibility.
         """
-        # Create ImageIdentifier only if image_row is loaded
+        # Try to use current revision if available
+        if self.current_revision and hasattr(self, "revisions") and self.revisions:
+            current_rev = next(
+                (r for r in self.revisions if r.id == self.current_revision),
+                None,
+            )
+            if current_rev:
+                return self._to_deployment_info_from_revision(current_rev)
+
+        # Fallback: use endpoint-level fields (legacy)
+        return self._to_deployment_info_legacy()
+
+    def _to_deployment_info_from_revision(
+        self,
+        revision: DeploymentRevisionRow,
+    ) -> DeploymentInfo:
+        """Build DeploymentInfo using revision data."""
+        # Get image identifier from revision's image_row
+        image_identifier = ImageIdentifier(
+            canonical=revision.image_row.name,
+            architecture=revision.image_row.architecture,
+        )
+        return DeploymentInfo(
+            id=self.id,
+            metadata=DeploymentMetadata(
+                name=self.name,
+                domain=self.domain,
+                project=self.project,
+                resource_group=self.resource_group,
+                created_user=self.created_user,
+                session_owner=self.session_owner,
+                created_at=self.created_at,
+                revision_history_limit=self.revision_history_limit,
+                tag=self.tag,
+            ),
+            state=DeploymentState(
+                lifecycle=self.lifecycle_stage,
+                retry_count=self.retry_count,
+            ),
+            replica_spec=ReplicaSpec(
+                replica_count=self.replicas,
+                desired_replica_count=self.desired_replicas,
+            ),
+            network=DeploymentNetworkSpec(
+                open_to_public=self.open_to_public,
+                url=self.url,
+            ),
+            model_revisions=[
+                ModelRevisionSpec(
+                    image_identifier=image_identifier,
+                    resource_spec=ResourceSpec(
+                        cluster_mode=ClusterMode(revision.cluster_mode),
+                        cluster_size=revision.cluster_size,
+                        resource_slots=revision.resource_slots,
+                        resource_opts=revision.resource_opts,
+                    ),
+                    mounts=MountMetadata(
+                        model_vfolder_id=revision.model,
+                        model_definition_path=revision.model_definition_path,
+                        model_mount_destination=revision.model_mount_destination,
+                        extra_mounts=revision.extra_mounts or [],
+                    ),
+                    execution=ExecutionSpec(
+                        startup_command=revision.startup_command,
+                        bootstrap_script=revision.bootstrap_script,
+                        environ=revision.environ,
+                        runtime_variant=revision.runtime_variant,
+                        callback_url=revision.callback_url,
+                    ),
+                ),
+            ],
+            current_revision_id=self.current_revision,
+        )
+
+    def _to_deployment_info_legacy(self) -> DeploymentInfo:
+        """Build DeploymentInfo using endpoint-level fields (legacy fallback)."""
+        # Create ImageIdentifier from endpoint's image_row
         image_identifier = ImageIdentifier(
             canonical=self.image_row.name,
             architecture=self.image_row.architecture,

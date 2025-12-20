@@ -252,7 +252,12 @@ class DeploymentDBSource:
             query = (
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
-                .options(selectinload(EndpointRow.image_row))
+                .options(
+                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                )
             )
             result = await db_sess.execute(query)
             row: Optional[EndpointRow] = result.scalar_one_or_none()
@@ -279,7 +284,12 @@ class DeploymentDBSource:
                         EndpointRow.lifecycle_stage.in_(EndpointLifecycle.active_states()),
                     )
                 )
-                .options(selectinload(EndpointRow.image_row))
+                .options(
+                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                )
             )
             result = await db_sess.execute(query)
             rows: Sequence[EndpointRow] = result.scalars().all()
@@ -343,7 +353,10 @@ class DeploymentDBSource:
         query = (
             sa.select(EndpointRow)
             .where(EndpointRow.lifecycle_stage.in_(statuses))
-            .options(selectinload(EndpointRow.image_row))
+            .options(
+                selectinload(EndpointRow.image_row),
+                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
+            )
         )
         result = await db_sess.execute(query)
         return result.scalars().all()
