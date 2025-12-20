@@ -60,6 +60,31 @@ class ValkeyArtifactCtx(MiddlewareParam):
         return cls(valkey_artifact=root_ctx.valkey_artifact)
 
 
+class UserContext(MiddlewareParam):
+    """
+    Middleware parameter providing authenticated user information.
+
+    This context is populated by @auth_required decorator.
+    """
+
+    user_uuid: uuid.UUID
+    user_email: str
+    user_domain: str
+    access_key: str
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @override
+    @classmethod
+    async def from_request(cls, request: web.Request) -> Self:
+        return cls(
+            user_uuid=request["user"]["uuid"],
+            user_email=request["user"]["email"],
+            user_domain=request["user"]["domain_name"],
+            access_key=request["keypair"]["access_key"],
+        )
+
+
 class VFolderAuthContext(MiddlewareParam):
     """
     Middleware parameter providing authenticated user and vfolder information.

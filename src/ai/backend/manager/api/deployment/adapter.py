@@ -6,6 +6,11 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
+from pathlib import PurePosixPath
+from typing import Any
+from uuid import UUID, uuid4
+
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.model_deployment.types import (
     RouteStatus as CommonRouteStatus,
 )
@@ -14,6 +19,8 @@ from ai.backend.common.data.model_deployment.types import (
 )
 from ai.backend.common.dto.manager.deployment import (
     ClusterConfigDTO,
+    CreateDeploymentRequest,
+    CreateRevisionRequest,
     DeploymentDTO,
     DeploymentFilter,
     DeploymentOrder,
@@ -38,10 +45,23 @@ from ai.backend.common.dto.manager.deployment.types import (
     RevisionOrderField,
     RouteOrderField,
 )
+from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.api.adapter import BaseFilterAdapter
+from ai.backend.manager.data.deployment.creator import (
+    DeploymentPolicyConfig,
+    ModelRevisionCreator,
+    NewDeploymentCreator,
+    VFolderMountsCreator,
+)
 from ai.backend.manager.data.deployment.types import (
+    DeploymentMetadata,
+    DeploymentNetworkSpec,
+    ExecutionSpec,
     ModelDeploymentData,
     ModelRevisionData,
+    MountInfo,
+    ReplicaSpec,
+    ResourceSpec,
     RouteInfo,
 )
 from ai.backend.manager.data.deployment.types import (
@@ -50,6 +70,8 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
+from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
@@ -69,6 +91,8 @@ __all__ = (
     "DeploymentAdapter",
     "RevisionAdapter",
     "RouteAdapter",
+    "CreateDeploymentAdapter",
+    "CreateRevisionAdapter",
 )
 
 
@@ -326,3 +350,181 @@ class RouteAdapter(BaseFilterAdapter):
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""
         return OffsetPagination(limit=limit, offset=offset)
+
+
+class CreateDeploymentAdapter:
+    """Adapter for converting create deployment request to creators."""
+
+    def build_creator(
+        self,
+        request: CreateDeploymentRequest,
+        user_uuid: UUID,
+        user_domain: str,
+    ) -> NewDeploymentCreator:
+        """
+        Convert CreateDeploymentRequest to NewDeploymentCreator.
+
+        Args:
+            request: Create deployment request DTO
+            user_uuid: UUID of the user creating the deployment
+            user_domain: Domain name of the user
+
+        Returns:
+            NewDeploymentCreator for service layer
+        """
+        # Generate name if not provided
+        name = request.metadata.name or f"deployment-{uuid4().hex[:8]}"
+        tag = ",".join(request.metadata.tags) if request.metadata.tags else None
+
+        # Build metadata
+        metadata = DeploymentMetadata(
+            name=name,
+            domain=request.metadata.domain_name,
+            project=request.metadata.project_id,
+            resource_group=request.initial_revision.resource_config.resource_group,
+            created_user=user_uuid,
+            session_owner=user_uuid,
+            created_at=None,
+            revision_history_limit=10,
+            tag=tag,
+        )
+
+        # Build replica spec
+        replica_spec = ReplicaSpec(replica_count=request.desired_replica_count)
+
+        # Build network spec
+        network = DeploymentNetworkSpec(
+            open_to_public=request.network_access.open_to_public,
+            preferred_domain_name=request.network_access.preferred_domain_name,
+        )
+
+        # Build model revision creator
+        model_revision = self._build_revision_creator(request.initial_revision)
+
+        # Build policy config
+        policy = self._build_policy_config(request.default_deployment_strategy)
+
+        return NewDeploymentCreator(
+            metadata=metadata,
+            replica_spec=replica_spec,
+            network=network,
+            model_revision=model_revision,
+            policy=policy,
+        )
+
+    def _build_revision_creator(
+        self,
+        revision_input: Any,  # RevisionInput or CreateRevisionRequest
+    ) -> ModelRevisionCreator:
+        """Build ModelRevisionCreator from revision input."""
+        # Build image identifier
+        image_identifier = ImageIdentifier(
+            canonical=revision_input.image.name,
+            architecture=revision_input.image.architecture,
+        )
+
+        # Build resource spec
+        resource_spec = ResourceSpec(
+            cluster_mode=ClusterMode(revision_input.cluster_config.mode),
+            cluster_size=revision_input.cluster_config.size,
+            resource_slots=dict(revision_input.resource_config.resource_slots),
+            resource_opts=(
+                dict(revision_input.resource_config.resource_opts)
+                if revision_input.resource_config.resource_opts
+                else None
+            ),
+        )
+
+        # Build extra mounts
+        extra_mounts: list[MountInfo] = []
+        if revision_input.extra_mounts:
+            extra_mounts = [
+                MountInfo(
+                    vfolder_id=mount.vfolder_id,
+                    kernel_path=PurePosixPath(mount.mount_destination or ""),
+                )
+                for mount in revision_input.extra_mounts
+            ]
+
+        # Build vfolder mounts creator
+        mounts = VFolderMountsCreator(
+            model_vfolder_id=revision_input.model_mount_config.vfolder_id,
+            model_definition_path=revision_input.model_mount_config.definition_path,
+            model_mount_destination=revision_input.model_mount_config.mount_destination,
+            extra_mounts=extra_mounts,
+        )
+
+        # Build execution spec
+        execution = ExecutionSpec(
+            runtime_variant=RuntimeVariant(revision_input.model_runtime_config.runtime_variant),
+            inference_runtime_config=(
+                dict(revision_input.model_runtime_config.inference_runtime_config)
+                if revision_input.model_runtime_config.inference_runtime_config
+                else None
+            ),
+            environ=(
+                dict(revision_input.model_runtime_config.environ)
+                if revision_input.model_runtime_config.environ
+                else None
+            ),
+        )
+
+        return ModelRevisionCreator(
+            image_identifier=image_identifier,
+            resource_spec=resource_spec,
+            mounts=mounts,
+            execution=execution,
+        )
+
+    def _build_policy_config(
+        self,
+        strategy_input: Any,  # DeploymentStrategyInput
+    ) -> DeploymentPolicyConfig:
+        """Build DeploymentPolicyConfig from strategy input."""
+        strategy = DeploymentStrategy(strategy_input.type)
+
+        strategy_spec: RollingUpdateSpec | BlueGreenSpec
+        if strategy == DeploymentStrategy.ROLLING:
+            if strategy_input.rolling_update is None:
+                # Use defaults
+                strategy_spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+            else:
+                strategy_spec = RollingUpdateSpec(
+                    max_surge=strategy_input.rolling_update.max_surge,
+                    max_unavailable=strategy_input.rolling_update.max_unavailable,
+                )
+        elif strategy == DeploymentStrategy.BLUE_GREEN:
+            if strategy_input.blue_green is None:
+                # Use defaults
+                strategy_spec = BlueGreenSpec(auto_promote=False, promote_delay_seconds=0)
+            else:
+                strategy_spec = BlueGreenSpec(
+                    auto_promote=strategy_input.blue_green.auto_promote,
+                    promote_delay_seconds=strategy_input.blue_green.promote_delay_seconds,
+                )
+        else:
+            # Default to rolling update
+            strategy_spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+
+        return DeploymentPolicyConfig(
+            strategy=strategy,
+            strategy_spec=strategy_spec,
+            rollback_on_failure=strategy_input.rollback_on_failure,
+        )
+
+
+class CreateRevisionAdapter:
+    """Adapter for converting create revision request to creators."""
+
+    def build_creator(self, request: CreateRevisionRequest) -> ModelRevisionCreator:
+        """
+        Convert CreateRevisionRequest to ModelRevisionCreator.
+
+        Args:
+            request: Create revision request DTO
+
+        Returns:
+            ModelRevisionCreator for service layer
+        """
+        deployment_adapter = CreateDeploymentAdapter()
+        return deployment_adapter._build_revision_creator(request)

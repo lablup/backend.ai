@@ -5,10 +5,24 @@ Common DTOs for deployment system used by both Client SDK and Manager.
 from __future__ import annotations
 
 from .request import (
+    BlueGreenConfigInput,
+    ClusterConfigInput,
+    CreateDeploymentRequest,
+    CreateRevisionRequest,
     DeploymentFilter,
+    DeploymentMetadataInput,
     DeploymentPathParam,
+    DeploymentStrategyInput,
+    ExtraVFolderMountInput,
+    ImageInput,
+    ModelMountConfigInput,
+    ModelRuntimeConfigInput,
+    NetworkAccessInput,
+    ResourceConfigInput,
     RevisionFilter,
+    RevisionInput,
     RevisionPathParam,
+    RollingUpdateConfigInput,
     RouteFilter,
     RoutePathParam,
     SearchDeploymentsRequest,
@@ -20,6 +34,8 @@ from .request import (
 from .response import (
     ActivateRevisionResponse,
     ClusterConfigDTO,
+    CreateDeploymentResponse,
+    CreateRevisionResponse,
     CursorPaginationInfo,
     DeactivateRevisionResponse,
     DeploymentDTO,
@@ -59,19 +75,37 @@ __all__ = (
     "DeploymentOrder",
     "RevisionOrder",
     "RouteOrder",
-    # Request DTOs
+    # Request DTOs - Filters
     "DeploymentFilter",
     "RevisionFilter",
     "RouteFilter",
-    "SearchDeploymentsRequest",
-    "SearchRevisionsRequest",
-    "SearchRoutesRequest",
-    "UpdateDeploymentRequest",
-    "UpdateRouteTrafficStatusRequest",
+    # Request DTOs - Path params
     "DeploymentPathParam",
     "RevisionPathParam",
     "RoutePathParam",
-    # Response DTOs
+    # Request DTOs - Search/List
+    "SearchDeploymentsRequest",
+    "SearchRevisionsRequest",
+    "SearchRoutesRequest",
+    # Request DTOs - Create inputs
+    "RollingUpdateConfigInput",
+    "BlueGreenConfigInput",
+    "DeploymentMetadataInput",
+    "NetworkAccessInput",
+    "DeploymentStrategyInput",
+    "ImageInput",
+    "ClusterConfigInput",
+    "ResourceConfigInput",
+    "ModelMountConfigInput",
+    "ModelRuntimeConfigInput",
+    "ExtraVFolderMountInput",
+    "RevisionInput",
+    # Request DTOs - Create/Update requests
+    "CreateDeploymentRequest",
+    "CreateRevisionRequest",
+    "UpdateDeploymentRequest",
+    "UpdateRouteTrafficStatusRequest",
+    # Response DTOs - Data
     "DeploymentDTO",
     "RevisionDTO",
     "RouteDTO",
@@ -81,6 +115,10 @@ __all__ = (
     "ModelRuntimeConfigDTO",
     "ModelMountConfigDTO",
     "ReplicaStateDTO",
+    # Response DTOs - Create responses
+    "CreateDeploymentResponse",
+    "CreateRevisionResponse",
+    # Response DTOs - Get/List responses
     "GetDeploymentResponse",
     "ListDeploymentsResponse",
     "UpdateDeploymentResponse",
@@ -91,6 +129,7 @@ __all__ = (
     "DeactivateRevisionResponse",
     "ListRoutesResponse",
     "UpdateRouteTrafficStatusResponse",
+    # Response DTOs - Pagination
     "PaginationInfo",
     "CursorPaginationInfo",
 )
