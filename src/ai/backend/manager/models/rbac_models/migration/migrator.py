@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Generator
 from dataclasses import dataclass
 from typing import Generic
 
@@ -6,7 +7,7 @@ import sqlalchemy as sa
 from sqlalchemy.engine import Connection
 
 from .adapter import MigrationAdapter
-from .entity.abc import EntityQuerier, TEntity
+from .entity.abc import TEntity
 from .enums import RoleSource
 from .models import (
     get_association_scopes_entities_table,
@@ -22,6 +23,28 @@ from .utils import insert_if_data_exists, insert_skip_on_conflict
 class PermissionGroupInfo:
     id: uuid.UUID
     role_source: RoleSource
+
+
+class EntityQuerier(Generic[TEntity]):
+    def __init__(self, entity_type: type[TEntity]) -> None:
+        self._entity_type = entity_type
+
+    def query_entities(
+        self,
+        db_conn: Connection,
+    ) -> Generator[list[TEntity], None, None]:
+        offset = 0
+        limit = 100
+
+        while True:
+            stmt = self._entity_type.query_statement().offset(offset).limit(limit)
+            result = db_conn.execute(stmt)
+            rows = result.all()
+            if not rows:
+                break
+
+            offset += limit
+            yield [self._entity_type.from_row(entity_row) for entity_row in rows]
 
 
 class EntityMigrator(Generic[TEntity]):
