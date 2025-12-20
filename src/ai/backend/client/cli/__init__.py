@@ -13,6 +13,11 @@ def dotfile():
     """Provides dotfile operations."""
 
 
+@cli_main.group(cls=LazyGroup, import_name="ai.backend.client.cli.deployment:deployment")
+def deployment():
+    """Set of deployment operations (deployments, revisions, routes)"""
+
+
 @cli_main.group(cls=LazyGroup, import_name="ai.backend.client.cli.model:model")
 def model():
     """Set of model operations"""
