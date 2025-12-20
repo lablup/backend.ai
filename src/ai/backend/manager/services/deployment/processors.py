@@ -93,9 +93,23 @@ from ai.backend.manager.services.deployment.actions.model_revision.list_revision
     ListRevisionsAction,
     ListRevisionsActionResult,
 )
+from ai.backend.manager.services.deployment.actions.model_revision.search_revisions import (
+    SearchRevisionsAction,
+    SearchRevisionsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.revision_operations import (
     ActivateRevisionAction,
     ActivateRevisionActionResult,
+)
+from ai.backend.manager.services.deployment.actions.route import (
+    SearchRoutesAction,
+    SearchRoutesActionResult,
+    UpdateRouteTrafficStatusAction,
+    UpdateRouteTrafficStatusActionResult,
+)
+from ai.backend.manager.services.deployment.actions.search_deployments import (
+    SearchDeploymentsAction,
+    SearchDeploymentsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.sync_replicas import (
     SyncReplicaAction,
@@ -197,6 +211,20 @@ class DeploymentServiceProtocol(Protocol):
         self, action: ActivateRevisionAction
     ) -> ActivateRevisionActionResult: ...
 
+    async def search_routes(self, action: SearchRoutesAction) -> SearchRoutesActionResult: ...
+
+    async def update_route_traffic_status(
+        self, action: UpdateRouteTrafficStatusAction
+    ) -> UpdateRouteTrafficStatusActionResult: ...
+
+    async def search_deployments(
+        self, action: SearchDeploymentsAction
+    ) -> SearchDeploymentsActionResult: ...
+
+    async def search_revisions(
+        self, action: SearchRevisionsAction
+    ) -> SearchRevisionsActionResult: ...
+
 
 class DeploymentProcessors(AbstractProcessorPackage):
     """Processors for deployment operations."""
@@ -250,6 +278,12 @@ class DeploymentProcessors(AbstractProcessorPackage):
         GetDeploymentPolicyAction, GetDeploymentPolicyActionResult
     ]
     activate_revision: ActionProcessor[ActivateRevisionAction, ActivateRevisionActionResult]
+    search_routes: ActionProcessor[SearchRoutesAction, SearchRoutesActionResult]
+    update_route_traffic_status: ActionProcessor[
+        UpdateRouteTrafficStatusAction, UpdateRouteTrafficStatusActionResult
+    ]
+    search_deployments: ActionProcessor[SearchDeploymentsAction, SearchDeploymentsActionResult]
+    search_revisions: ActionProcessor[SearchRevisionsAction, SearchRevisionsActionResult]
 
     def __init__(
         self, service: DeploymentServiceProtocol, action_monitors: list[ActionMonitor]
@@ -295,6 +329,12 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.batch_load_revisions = ActionProcessor(service.batch_load_revisions, action_monitors)
         self.get_deployment_policy = ActionProcessor(service.get_deployment_policy, action_monitors)
         self.activate_revision = ActionProcessor(service.activate_revision, action_monitors)
+        self.search_routes = ActionProcessor(service.search_routes, action_monitors)
+        self.update_route_traffic_status = ActionProcessor(
+            service.update_route_traffic_status, action_monitors
+        )
+        self.search_deployments = ActionProcessor(service.search_deployments, action_monitors)
+        self.search_revisions = ActionProcessor(service.search_revisions, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -323,4 +363,8 @@ class DeploymentProcessors(AbstractProcessorPackage):
             BatchLoadReplicasByRevisionIdsAction.spec(),
             GetDeploymentPolicyAction.spec(),
             ActivateRevisionAction.spec(),
+            SearchRoutesAction.spec(),
+            UpdateRouteTrafficStatusAction.spec(),
+            SearchDeploymentsAction.spec(),
+            SearchRevisionsAction.spec(),
         ]

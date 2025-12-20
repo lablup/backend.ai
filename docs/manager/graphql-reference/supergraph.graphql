@@ -5042,6 +5042,9 @@ type Mutation
   Added in 25.19.0. Activate a specific revision to be the current revision.
   """
   activateDeploymentRevision(input: ActivateRevisionInput!): ActivateRevisionPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.19.0. Update the traffic status of a route."""
+  updateRouteTrafficStatus(input: UpdateRouteTrafficStatusInput!): UpdateRouteTrafficStatusPayload! @join__field(graph: STRAWBERRY)
 }
 
 """Added in 24.12.0."""
@@ -5989,6 +5992,12 @@ type Query
 
   """Added in 25.16.0. Get JSON Schema for inference runtime configuration"""
   inferenceRuntimeConfig(name: String!): JSON! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.19.0. Get a specific route by ID."""
+  route(id: ID!): Route @join__field(graph: STRAWBERRY)
+
+  """Added in 25.19.0. List routes for a deployment with optional filters."""
+  routes(deploymentId: ID!, filter: RouteFilter = null, orderBy: [RouteOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteConnection! @join__field(graph: STRAWBERRY)
 }
 
 type QuotaDetails
@@ -6282,6 +6291,117 @@ input RollingUpdateConfigInput
 {
   maxSurge: Int! = 1
   maxUnavailable: Int! = 0
+}
+
+"""Added in 25.19.0. Represents a route for a model deployment."""
+type Route implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """The current status of the route indicating its health state."""
+  status: RouteStatus!
+
+  """
+  The traffic routing status (ACTIVE/INACTIVE). Controls whether traffic should be sent to this route.
+  """
+  trafficStatus: RouteTrafficStatus!
+
+  """The traffic ratio for load balancing."""
+  trafficRatio: Float!
+
+  """The timestamp when the route was created."""
+  createdAt: DateTime!
+
+  """Error data if the route is in a failed state."""
+  errorData: JSONString
+
+  """The deployment this route belongs to."""
+  deployment: ModelDeployment!
+
+  """
+  The session associated with the route. Can be null if the route is still provisioning.
+  """
+  session: ID
+
+  """The revision associated with the route."""
+  revision: ModelRevision
+}
+
+"""Added in 25.19.0. Connection type for paginated route results."""
+type RouteConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RouteEdge!]!
+
+  """Total number of routes matching the filter criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RouteEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: Route!
+}
+
+"""Added in 25.19.0. Filter for routes."""
+input RouteFilter
+  @join__type(graph: STRAWBERRY)
+{
+  status: [RouteStatus!] = null
+  trafficStatus: [RouteTrafficStatus!] = null
+}
+
+"""Added in 25.19.0. Order by specification for routes."""
+input RouteOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: RouteOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum RouteOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  STATUS @join__enumValue(graph: STRAWBERRY)
+  TRAFFIC_RATIO @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 25.19.0. Route status indicating the health and lifecycle state of a route.
+"""
+enum RouteStatus
+  @join__type(graph: STRAWBERRY)
+{
+  PROVISIONING @join__enumValue(graph: STRAWBERRY)
+  HEALTHY @join__enumValue(graph: STRAWBERRY)
+  UNHEALTHY @join__enumValue(graph: STRAWBERRY)
+  DEGRADED @join__enumValue(graph: STRAWBERRY)
+  TERMINATING @join__enumValue(graph: STRAWBERRY)
+  TERMINATED @join__enumValue(graph: STRAWBERRY)
+  FAILED_TO_START @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 25.19.0. Traffic routing status for a route. Controls whether traffic should be sent to this route.
+"""
+enum RouteTrafficStatus
+  @join__type(graph: STRAWBERRY)
+{
+  ACTIVE @join__enumValue(graph: STRAWBERRY)
+  INACTIVE @join__enumValue(graph: STRAWBERRY)
 }
 
 type Routing implements Item
@@ -7260,6 +7380,25 @@ type UpdateReservoirRegistryPayload
   @join__type(graph: STRAWBERRY)
 {
   reservoir: ReservoirRegistry!
+}
+
+"""Added in 25.19.0. Input for updating route traffic status."""
+input UpdateRouteTrafficStatusInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The ID of the route to update."""
+  routeId: ID!
+
+  """The new traffic status (ACTIVE/INACTIVE)."""
+  trafficStatus: RouteTrafficStatus!
+}
+
+"""Added in 25.19.0. Result of updating route traffic status."""
+type UpdateRouteTrafficStatusPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated route."""
+  route: Route!
 }
 
 """Added in 25.16.0. Input for updating VFS storage"""

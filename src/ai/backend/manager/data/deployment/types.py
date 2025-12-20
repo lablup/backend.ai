@@ -552,3 +552,23 @@ class RevisionSearchResult:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+
+
+@dataclass
+class RouteSearchResult:
+    """Search result with pagination for routes."""
+
+    items: list[RouteInfo]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class DeploymentSearchResult:
+    """Search result with pagination for deployments."""
+
+    items: list[ModelDeploymentData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool

@@ -30,6 +30,7 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaStateData,
     ResourceConfigData,
 )
+from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
@@ -114,9 +115,23 @@ from ai.backend.manager.services.deployment.actions.model_revision.list_revision
     ListRevisionsAction,
     ListRevisionsActionResult,
 )
+from ai.backend.manager.services.deployment.actions.model_revision.search_revisions import (
+    SearchRevisionsAction,
+    SearchRevisionsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.revision_operations import (
     ActivateRevisionAction,
     ActivateRevisionActionResult,
+)
+from ai.backend.manager.services.deployment.actions.route import (
+    SearchRoutesAction,
+    SearchRoutesActionResult,
+    UpdateRouteTrafficStatusAction,
+    UpdateRouteTrafficStatusActionResult,
+)
+from ai.backend.manager.services.deployment.actions.search_deployments import (
+    SearchDeploymentsAction,
+    SearchDeploymentsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.sync_replicas import (
     SyncReplicaAction,
@@ -136,10 +151,16 @@ class DeploymentService:
     """Service for managing deployments."""
 
     _deployment_controller: DeploymentController
+    _deployment_repository: DeploymentRepository
 
-    def __init__(self, deployment_controller: DeploymentController) -> None:
-        """Initialize deployment service with controller."""
+    def __init__(
+        self,
+        deployment_controller: DeploymentController,
+        deployment_repository: DeploymentRepository,
+    ) -> None:
+        """Initialize deployment service with controller and repository."""
         self._deployment_controller = deployment_controller
+        self._deployment_repository = deployment_repository
 
     async def create_deployment(
         self, action: CreateDeploymentAction
@@ -514,6 +535,117 @@ class DeploymentService:
             ),
             previous_revision_id=uuid4(),
             activated_revision_id=action.revision_id,
+        )
+
+    # ========== Route Operations Methods ==========
+
+    async def search_routes(self, action: SearchRoutesAction) -> SearchRoutesActionResult:
+        """Search routes with filtering and pagination.
+
+        Args:
+            action: Action containing BatchQuerier for filtering and pagination
+
+        Returns:
+            SearchRoutesActionResult: Result containing list of routes and pagination info
+        """
+        result = await self._deployment_repository.search_routes(action.querier)
+        return SearchRoutesActionResult(
+            routes=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def update_route_traffic_status(
+        self, action: UpdateRouteTrafficStatusAction
+    ) -> UpdateRouteTrafficStatusActionResult:
+        """Update route traffic status.
+
+        Args:
+            action: Action containing route ID and new traffic status
+
+        Returns:
+            UpdateRouteTrafficStatusActionResult: Result containing updated route
+
+        Raises:
+            RouteNotFound: If the route does not exist
+        """
+        from ai.backend.manager.errors.service import RoutingNotFound
+
+        route = await self._deployment_controller.update_route_traffic_status(
+            route_id=action.route_id,
+            traffic_status=action.traffic_status,
+        )
+        if route is None:
+            raise RoutingNotFound
+        return UpdateRouteTrafficStatusActionResult(route=route)
+
+    async def search_deployments(
+        self, action: SearchDeploymentsAction
+    ) -> SearchDeploymentsActionResult:
+        """Search deployments with filtering and pagination.
+
+        Args:
+            action: Action containing BatchQuerier for filtering and pagination
+
+        Returns:
+            SearchDeploymentsActionResult: Result containing list of deployments and pagination info
+        """
+        # TODO: Implement proper database query through controller
+        # For now, return mock data similar to batch_load_deployments
+        deployments = [
+            ModelDeploymentData(
+                id=uuid4(),
+                metadata=ModelDeploymentMetadataInfo(
+                    name="test-deployment",
+                    status=ModelDeploymentStatus.READY,
+                    tags=["tag1", "tag2"],
+                    project_id=uuid4(),
+                    domain_name="default",
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                ),
+                network_access=DeploymentNetworkSpec(
+                    open_to_public=True,
+                    url="http://example.com",
+                    preferred_domain_name="example.com",
+                    access_token_ids=[uuid4()],
+                ),
+                revision_history_ids=[uuid4(), uuid4()],
+                revision=mock_revision_data_1,
+                scaling_rule_ids=[uuid4(), uuid4()],
+                replica_state=ReplicaStateData(
+                    desired_replica_count=3,
+                    replica_ids=[uuid4(), uuid4(), uuid4()],
+                ),
+                default_deployment_strategy=DeploymentStrategy.ROLLING,
+                created_user_id=uuid4(),
+            )
+        ]
+        return SearchDeploymentsActionResult(
+            deployments=deployments,
+            total_count=len(deployments),
+            has_next_page=False,
+            has_previous_page=False,
+        )
+
+    async def search_revisions(self, action: SearchRevisionsAction) -> SearchRevisionsActionResult:
+        """Search revisions with filtering and pagination.
+
+        Args:
+            action: Action containing BatchQuerier for filtering and pagination
+
+        Returns:
+            SearchRevisionsActionResult: Result containing list of revisions and pagination info
+        """
+        # TODO: Implement proper database query through controller
+        # For now, return mock data similar to batch_load_revisions
+        revisions = [mock_revision_data_1, mock_revision_data_2]
+        return SearchRevisionsActionResult(
+            revisions=revisions,
+            total_count=len(revisions),
+            has_next_page=False,
+            has_previous_page=False,
         )
 
 

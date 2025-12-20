@@ -32,6 +32,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionData,
     RevisionSearchResult,
     RouteInfo,
+    RouteSearchResult,
     RouteStatus,
     ScaleOutDecision,
     ScalingGroupCleanupConfig,
@@ -660,6 +661,36 @@ class DeploymentDBSource:
             query = sa.delete(RoutingRow).where(RoutingRow.id == route_id)
             result = await db_sess.execute(query)
             return result.rowcount > 0
+
+    async def search_routes(
+        self,
+        querier: BatchQuerier,
+    ) -> RouteSearchResult:
+        """Search routes with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination
+
+        Returns:
+            RouteSearchResult with items, total_count, and pagination info
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(RoutingRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.RoutingRow.to_route_info() for row in result.rows]
+
+            return RouteSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
 
     async def get_endpoint_id_by_session(
         self,

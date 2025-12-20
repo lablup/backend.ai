@@ -39,6 +39,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionData,
     RevisionSearchResult,
     RouteInfo,
+    RouteSearchResult,
     RouteStatus,
     ScaleOutDecision,
     ScalingGroupCleanupConfig,
@@ -1073,3 +1074,18 @@ class DeploymentRepository:
             True if the route was updated, False if not found.
         """
         return await self._db_source.update_route(updater)
+
+    @deployment_repository_resilience.apply()
+    async def search_routes(
+        self,
+        querier: BatchQuerier,
+    ) -> RouteSearchResult:
+        """Search routes with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination
+
+        Returns:
+            RouteSearchResult with items, total_count, and pagination info
+        """
+        return await self._db_source.search_routes(querier)
