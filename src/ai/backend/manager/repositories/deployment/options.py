@@ -24,6 +24,67 @@ class DeploymentConditions:
 
         return inner
 
+    @staticmethod
+    def by_name_equals(value: str, case_insensitive: bool = False) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if case_insensitive:
+                return sa.func.lower(EndpointRow.name) == value.lower()
+            return EndpointRow.name == value
+
+        return inner
+
+    @staticmethod
+    def by_name_contains(value: str, case_insensitive: bool = False) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if case_insensitive:
+                return sa.func.lower(EndpointRow.name).contains(value.lower())
+            return EndpointRow.name.contains(value)
+
+        return inner
+
+    @staticmethod
+    def by_project_id(project_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.project == project_id
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_equals(value: str, case_insensitive: bool = False) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if case_insensitive:
+                return sa.func.lower(EndpointRow.domain) == value.lower()
+            return EndpointRow.domain == value
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_contains(value: str, case_insensitive: bool = False) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if case_insensitive:
+                return sa.func.lower(EndpointRow.domain).contains(value.lower())
+            return EndpointRow.domain.contains(value)
+
+        return inner
+
+
+class DeploymentOrders:
+    """Query orders for deployments."""
+
+    @staticmethod
+    def name(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return EndpointRow.name.asc()
+        else:
+            return EndpointRow.name.desc()
+
+    @staticmethod
+    def created_at(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return EndpointRow.created_at.asc()
+        else:
+            return EndpointRow.created_at.desc()
+
 
 class RevisionConditions:
     """Query conditions for revisions."""
@@ -34,6 +95,49 @@ class RevisionConditions:
             return DeploymentRevisionRow.id.in_(revision_ids)
 
         return inner
+
+    @staticmethod
+    def by_deployment_id(deployment_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DeploymentRevisionRow.endpoint == deployment_id
+
+        return inner
+
+    @staticmethod
+    def by_name_equals(value: str, case_insensitive: bool = False) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if case_insensitive:
+                return sa.func.lower(DeploymentRevisionRow.name) == value.lower()
+            return DeploymentRevisionRow.name == value
+
+        return inner
+
+    @staticmethod
+    def by_name_contains(value: str, case_insensitive: bool = False) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if case_insensitive:
+                return sa.func.lower(DeploymentRevisionRow.name).contains(value.lower())
+            return DeploymentRevisionRow.name.contains(value)
+
+        return inner
+
+
+class RevisionOrders:
+    """Query orders for revisions."""
+
+    @staticmethod
+    def name(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return DeploymentRevisionRow.name.asc()
+        else:
+            return DeploymentRevisionRow.name.desc()
+
+    @staticmethod
+    def created_at(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return DeploymentRevisionRow.created_at.asc()
+        else:
+            return DeploymentRevisionRow.created_at.desc()
 
 
 class RouteConditions:
