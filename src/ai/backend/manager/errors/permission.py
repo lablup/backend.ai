@@ -15,6 +15,8 @@ __all__ = (
     "RoleAlreadyAssigned",
     "RoleNotAssigned",
     "NotEnoughPermission",
+    "PermissionNotFound",
+    "ObjectPermissionNotFound",
 )
 
 
@@ -63,4 +65,28 @@ class NotEnoughPermission(BackendAIError, web.HTTPForbidden):
             domain=ErrorDomain.ROLE,
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
+class PermissionNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/permission-not-found"
+    error_title = "The permission does not exist."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PERMISSION,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ObjectPermissionNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/object-permission-not-found"
+    error_title = "The object permission does not exist."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PERMISSION,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
         )

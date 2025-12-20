@@ -122,7 +122,6 @@ class PermissionControllerService:
     async def update_role(self, action: UpdateRoleAction) -> UpdateRoleActionResult:
         """
         Updates an existing role in the repository.
-        If the role does not exist, it returns a result indicating failure.
         """
         result = await self._repository.update_role(action.updater)
         return UpdateRoleActionResult(data=result)

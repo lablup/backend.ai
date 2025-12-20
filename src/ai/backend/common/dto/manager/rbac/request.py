@@ -15,7 +15,10 @@ from ai.backend.common.dto.manager.query import StringFilter
 
 from .types import (
     AssignedUserOrderField,
+    EntityType,
+    OperationType,
     OrderDirection,
+    PermissionStatus,
     RoleOrderField,
     RoleSource,
     RoleStatus,
@@ -28,6 +31,8 @@ __all__ = (
     "AssignRoleRequest",
     "RevokeRoleRequest",
     "SearchUsersAssignedToRoleRequest",
+    "CreatePermissionRequest",
+    "CreateObjectPermissionRequest",
     "StringFilter",
     "RoleFilter",
     "RoleOrder",
@@ -54,6 +59,18 @@ class UpdateRoleRequest(BaseRequestModel):
     description: Optional[str | Sentinel] = Field(
         default=SENTINEL, description="Updated role description"
     )
+
+
+class DeleteRoleRequest(BaseRequestModel):
+    """Request to delete a role."""
+
+    role_id: UUID = Field(description="Role ID to delete")
+
+
+class PurgeRoleRequest(BaseRequestModel):
+    """Request to purge a role."""
+
+    role_id: UUID = Field(description="Role ID to purge")
 
 
 class AssignRoleRequest(BaseRequestModel):
@@ -123,3 +140,23 @@ class SearchUsersAssignedToRoleRequest(BaseRequestModel):
     )
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
+
+
+class CreatePermissionRequest(BaseRequestModel):
+    """Request to create a permission in a permission group."""
+
+    permission_group_id: UUID = Field(description="Permission group ID to add the permission to")
+    entity_type: EntityType = Field(description="Entity type for the permission")
+    operation: OperationType = Field(description="Operation type for the permission")
+
+
+class CreateObjectPermissionRequest(BaseRequestModel):
+    """Request to create an object permission for a role."""
+
+    role_id: UUID = Field(description="Role ID to add the object permission to")
+    entity_type: EntityType = Field(description="Entity type for the object permission")
+    entity_id: str = Field(description="Entity ID (e.g., project_id, user_id)")
+    operation: OperationType = Field(description="Operation type for the object permission")
+    status: PermissionStatus = Field(
+        default=PermissionStatus.ACTIVE, description="Permission status"
+    )
