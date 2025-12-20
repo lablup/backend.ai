@@ -111,7 +111,11 @@ class RoutingRow(Base):
     )
 
     @classmethod
-    def by_deployment_info(cls, deployment_info: DeploymentInfo) -> Self:
+    def by_deployment_info(
+        cls,
+        deployment_info: DeploymentInfo,
+        revision_id: uuid.UUID | None = None,
+    ) -> Self:
         return cls(
             id=uuid.uuid4(),
             endpoint=deployment_info.id,
@@ -119,6 +123,7 @@ class RoutingRow(Base):
             session_owner=deployment_info.metadata.created_user,
             domain=deployment_info.metadata.domain,
             project=deployment_info.metadata.project,
+            revision=revision_id,
         )
 
     @classmethod

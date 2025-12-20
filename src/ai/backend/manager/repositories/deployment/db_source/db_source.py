@@ -1076,8 +1076,12 @@ class DeploymentDBSource:
             # Scale out routes
             new_routes = []
             for scale_out in scale_outs:
+                revision_id = scale_out.target_revision_id
                 for _ in range(scale_out.new_replica_count):
-                    route = RoutingRow.by_deployment_info(scale_out.deployment_info)
+                    route = RoutingRow.by_deployment_info(
+                        scale_out.deployment_info,
+                        revision_id=revision_id,
+                    )
                     new_routes.append(route)
             db_sess.add_all(new_routes)
             # Scale in routes

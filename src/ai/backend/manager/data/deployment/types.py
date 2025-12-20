@@ -289,6 +289,7 @@ class DeploymentInfo:
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
     model_revisions: list[ModelRevisionSpec]
+    current_revision_id: UUID | None = None
 
     def target_revision(self) -> Optional[ModelRevisionSpec]:
         if self.model_revisions:
@@ -306,6 +307,7 @@ class DeploymentSessionSpec:
 class ScaleOutDecision:
     deployment_info: DeploymentInfo
     new_replica_count: int
+    target_revision_id: UUID | None = None
 
 
 @dataclass

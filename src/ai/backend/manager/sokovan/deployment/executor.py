@@ -195,6 +195,7 @@ class DeploymentExecutor:
                         ScaleOutDecision(
                             deployment_info=deployment,
                             new_replica_count=target_count - len(routes),
+                            target_revision_id=deployment.current_revision_id,
                         )
                     )
                 elif len(routes) > target_count:

@@ -710,7 +710,7 @@ class EndpointRow(Base):
             ),
             state=DeploymentState(
                 lifecycle=self.lifecycle_stage,
-                retry_count=self.retries,
+                retry_count=self.retry_count,
             ),
             replica_spec=ReplicaSpec(
                 replica_count=self.replicas,
@@ -744,6 +744,7 @@ class EndpointRow(Base):
                     ),
                 ),
             ],
+            current_revision_id=self.current_revision,
         )
 
 
