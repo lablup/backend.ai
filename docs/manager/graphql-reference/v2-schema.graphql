@@ -1807,6 +1807,9 @@ type Mutation {
   Added in 25.19.0. Activate a specific revision to be the current revision.
   """
   activateDeploymentRevision(input: ActivateRevisionInput!): ActivateRevisionPayload!
+
+  """Added in 25.19.0. Update the traffic status of a route."""
+  updateRouteTrafficStatus(input: UpdateRouteTrafficStatusInput!): UpdateRouteTrafficStatusPayload!
 }
 
 """An object with a Globally Unique ID"""
@@ -2146,6 +2149,12 @@ type Query {
 
   """Added in 25.16.0. Get JSON Schema for inference runtime configuration"""
   inferenceRuntimeConfig(name: String!): JSON!
+
+  """Added in 25.19.0. Get a specific route by ID."""
+  route(id: ID!): Route
+
+  """Added in 25.19.0. List routes for a deployment with optional filters."""
+  routes(deploymentId: ID!, filter: RouteFilter = null, orderBy: [RouteOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteConnection!
 }
 
 """
@@ -2328,6 +2337,100 @@ type RestoreArtifactsPayload {
 input RollingUpdateConfigInput {
   maxSurge: Int! = 1
   maxUnavailable: Int! = 0
+}
+
+"""Added in 25.19.0. Represents a route for a model deployment."""
+type Route implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """The current status of the route indicating its health state."""
+  status: RouteStatus!
+
+  """
+  The traffic routing status (ACTIVE/INACTIVE). Controls whether traffic should be sent to this route.
+  """
+  trafficStatus: RouteTrafficStatus!
+
+  """The traffic ratio for load balancing."""
+  trafficRatio: Float!
+
+  """The timestamp when the route was created."""
+  createdAt: DateTime!
+
+  """Error data if the route is in a failed state."""
+  errorData: JSONString
+
+  """The deployment this route belongs to."""
+  deployment: ModelDeployment!
+
+  """
+  The session associated with the route. Can be null if the route is still provisioning.
+  """
+  session: ID
+
+  """The revision associated with the route."""
+  revision: ModelRevision
+}
+
+"""Added in 25.19.0. Connection type for paginated route results."""
+type RouteConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RouteEdge!]!
+
+  """Total number of routes matching the filter criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RouteEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: Route!
+}
+
+"""Added in 25.19.0. Filter for routes."""
+input RouteFilter {
+  status: [RouteStatus!] = null
+  trafficStatus: [RouteTrafficStatus!] = null
+}
+
+"""Added in 25.19.0. Order by specification for routes."""
+input RouteOrderBy {
+  field: RouteOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum RouteOrderField {
+  CREATED_AT
+  STATUS
+  TRAFFIC_RATIO
+}
+
+"""
+Added in 25.19.0. Route status indicating the health and lifecycle state of a route.
+"""
+enum RouteStatus {
+  PROVISIONING
+  HEALTHY
+  UNHEALTHY
+  DEGRADED
+  TERMINATING
+  TERMINATED
+  FAILED_TO_START
+}
+
+"""
+Added in 25.19.0. Traffic routing status for a route. Controls whether traffic should be sent to this route.
+"""
+enum RouteTrafficStatus {
+  ACTIVE
+  INACTIVE
 }
 
 """Added in 25.18.0. Driver configuration for resource allocation"""
@@ -2925,6 +3028,21 @@ input UpdateReservoirRegistryInput {
 """Added in 25.14.0"""
 type UpdateReservoirRegistryPayload {
   reservoir: ReservoirRegistry!
+}
+
+"""Added in 25.19.0. Input for updating route traffic status."""
+input UpdateRouteTrafficStatusInput {
+  """The ID of the route to update."""
+  routeId: ID!
+
+  """The new traffic status (ACTIVE/INACTIVE)."""
+  trafficStatus: RouteTrafficStatus!
+}
+
+"""Added in 25.19.0. Result of updating route traffic status."""
+type UpdateRouteTrafficStatusPayload {
+  """The updated route."""
+  route: Route!
 }
 
 """Added in 25.16.0. Input for updating VFS storage"""
