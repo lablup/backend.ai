@@ -32,10 +32,12 @@ __all__ = (
     "ModelMountConfigDTO",
     "ReplicaStateDTO",
     # Responses
+    "CreateDeploymentResponse",
     "GetDeploymentResponse",
     "ListDeploymentsResponse",
     "UpdateDeploymentResponse",
     "DestroyDeploymentResponse",
+    "CreateRevisionResponse",
     "GetRevisionResponse",
     "ListRevisionsResponse",
     "ActivateRevisionResponse",
@@ -134,6 +136,12 @@ class DeploymentDTO(BaseModel):
     )
 
 
+class CreateDeploymentResponse(BaseResponseModel):
+    """Response for creating a deployment."""
+
+    deployment: DeploymentDTO = Field(description="Created deployment")
+
+
 class GetDeploymentResponse(BaseResponseModel):
     """Response for getting a deployment."""
 
@@ -157,6 +165,12 @@ class DestroyDeploymentResponse(BaseResponseModel):
     """Response for destroying a deployment."""
 
     deleted: bool = Field(description="Whether the deployment was deleted")
+
+
+class CreateRevisionResponse(BaseResponseModel):
+    """Response for creating a revision."""
+
+    revision: RevisionDTO = Field(description="Created revision")
 
 
 class GetRevisionResponse(BaseResponseModel):

@@ -14,6 +14,10 @@ from aiohttp import web
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, api_handler
 from ai.backend.common.dto.manager.deployment import (
     ActivateRevisionResponse,
+    CreateDeploymentRequest,
+    CreateDeploymentResponse,
+    CreateRevisionRequest,
+    CreateRevisionResponse,
     CursorPaginationInfo,
     DeactivateRevisionResponse,
     DeploymentPathParam,
@@ -35,13 +39,19 @@ from ai.backend.common.dto.manager.deployment import (
     UpdateRouteTrafficStatusResponse,
 )
 from ai.backend.manager.data.deployment.types import RouteTrafficStatus as ManagerRouteTrafficStatus
-from ai.backend.manager.dto.context import ProcessorsCtx
+from ai.backend.manager.dto.context import ProcessorsCtx, UserContext
 from ai.backend.manager.repositories.deployment.updaters import NewDeploymentUpdaterSpec
 from ai.backend.manager.services.deployment.actions.batch_load_deployments import (
     BatchLoadDeploymentsAction,
 )
+from ai.backend.manager.services.deployment.actions.create_deployment import (
+    CreateDeploymentAction,
+)
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
+)
+from ai.backend.manager.services.deployment.actions.model_revision.create_model_revision import (
+    CreateModelRevisionAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.search_revisions import (
     SearchRevisionsAction,
@@ -65,7 +75,13 @@ from ai.backend.manager.types import OptionalState
 
 from ..auth import auth_required_for_method
 from ..types import CORSOptions, WebMiddleware
-from .adapter import DeploymentAdapter, RevisionAdapter, RouteAdapter
+from .adapter import (
+    CreateDeploymentAdapter,
+    CreateRevisionAdapter,
+    DeploymentAdapter,
+    RevisionAdapter,
+    RouteAdapter,
+)
 
 __all__ = ("create_app",)
 
@@ -77,6 +93,8 @@ class DeploymentAPIHandler:
         self.deployment_adapter = DeploymentAdapter()
         self.revision_adapter = RevisionAdapter()
         self.route_adapter = RouteAdapter()
+        self.create_deployment_adapter = CreateDeploymentAdapter()
+        self.create_revision_adapter = CreateRevisionAdapter()
 
     def _get_deployment_processors(self, processors: Processors) -> DeploymentProcessors:
         """Get deployment processors, raising ServiceUnavailable if not available."""
@@ -87,6 +105,35 @@ class DeploymentAPIHandler:
         return processors.deployment
 
     # Deployment Endpoints
+
+    @auth_required_for_method
+    @api_handler
+    async def create_deployment(
+        self,
+        body: BodyParam[CreateDeploymentRequest],
+        processors_ctx: ProcessorsCtx,
+        user_ctx: UserContext,
+    ) -> APIResponse:
+        """Create a new deployment."""
+        deployment_processors = self._get_deployment_processors(processors_ctx.processors)
+
+        # Build creator from request using adapter
+        creator = self.create_deployment_adapter.build_creator(
+            body.parsed,
+            user_uuid=user_ctx.user_uuid,
+            user_domain=user_ctx.user_domain,
+        )
+
+        # Call service action
+        action_result = await deployment_processors.create_deployment.wait_for_complete(
+            CreateDeploymentAction(creator=creator)
+        )
+
+        # Build response
+        resp = CreateDeploymentResponse(
+            deployment=self.deployment_adapter.convert_to_dto(action_result.data)
+        )
+        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
 
     @auth_required_for_method
     @api_handler
@@ -202,6 +249,31 @@ class DeploymentAPIHandler:
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     # Revision Endpoints
+
+    @auth_required_for_method
+    @api_handler
+    async def create_revision(
+        self,
+        path: PathParam[DeploymentPathParam],
+        body: BodyParam[CreateRevisionRequest],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Create a new revision for a deployment."""
+        deployment_processors = self._get_deployment_processors(processors_ctx.processors)
+
+        # Build creator from request using adapter
+        creator = self.create_revision_adapter.build_creator(body.parsed)
+
+        # Call service action
+        action_result = await deployment_processors.create_model_revision.wait_for_complete(
+            CreateModelRevisionAction(creator=creator)
+        )
+
+        # Build response
+        resp = CreateRevisionResponse(
+            revision=self.revision_adapter.convert_to_dto(action_result.revision)
+        )
+        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
 
     @auth_required_for_method
     @api_handler
@@ -385,12 +457,16 @@ def create_app(
     api_handler = DeploymentAPIHandler()
 
     # Deployment routes
+    cors.add(app.router.add_route("POST", "/", api_handler.create_deployment))
     cors.add(app.router.add_route("POST", "/search", api_handler.search_deployments))
     cors.add(app.router.add_route("GET", "/{deployment_id}", api_handler.get_deployment))
     cors.add(app.router.add_route("PATCH", "/{deployment_id}", api_handler.update_deployment))
     cors.add(app.router.add_route("DELETE", "/{deployment_id}", api_handler.destroy_deployment))
 
     # Revision routes (nested under deployment)
+    cors.add(
+        app.router.add_route("POST", "/{deployment_id}/revisions", api_handler.create_revision)
+    )
     cors.add(
         app.router.add_route(
             "POST", "/{deployment_id}/revisions/search", api_handler.search_revisions

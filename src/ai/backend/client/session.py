@@ -259,6 +259,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "Image",
         "ComputeSession",
         "SessionTemplate",
+        "Deployment",
         "Domain",
         "Group",
         "Auth",
@@ -305,6 +306,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.auth import Auth
         from .func.bgtask import BackgroundTask
         from .func.container_registry import ContainerRegistry
+        from .func.deployment import Deployment
         from .func.domain import Domain
         from .func.dotfile import Dotfile
         from .func.etcd import EtcdConfig
@@ -339,6 +341,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.BackgroundTask = BackgroundTask
         self.ContainerRegistry = ContainerRegistry
         self.EtcdConfig = EtcdConfig
+        self.Deployment = Deployment
         self.Domain = Domain
         self.Group = Group
         self.Image = Image
