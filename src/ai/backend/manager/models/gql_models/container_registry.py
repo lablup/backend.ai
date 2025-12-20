@@ -9,11 +9,15 @@ import graphene
 import graphql
 import sqlalchemy as sa
 from graphql import Undefined, UndefinedType
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
+from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.image import (
-    ContainerRegistryGroupsAssociationNotFound,
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
+from ai.backend.manager.models.association_container_registries_groups import (
+    AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
@@ -27,12 +31,8 @@ from ai.backend.manager.models.rbac import (
     ScopeType,
     SystemScope,
 )
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ...defs import PASSWORD_PLACEHOLDER
-from ..association_container_registries_groups import (
-    AssociationContainerRegistriesGroupsRow,
-)
 from ..base import (
     BigInt,
     FilterExprArg,
@@ -110,6 +110,22 @@ class ContainerRegistryNode(graphene.ObjectType):
         "row_id": ("id", None),
         "registry_name": ("registry_name", None),
     }
+
+    @classmethod
+    def from_dataclass(cls, data: ContainerRegistryData) -> Self:
+        return cls(
+            id=data.id,  # auto-converted to Relay global ID
+            row_id=data.id,
+            url=data.url,
+            type=data.type,
+            registry_name=data.registry_name,
+            project=data.project,
+            username=data.username,
+            password=PASSWORD_PLACEHOLDER if data.password is not None else None,
+            ssl_verify=data.ssl_verify,
+            is_global=data.is_global,
+            extra=data.extra,
+        )
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ContainerRegistryNode:
@@ -273,35 +289,37 @@ class AllowedGroups(graphene.InputObjectType):
 
 
 async def handle_allowed_groups_update(
-    db: ExtendedAsyncSAEngine,
+    session: SASession,
     registry_id: uuid.UUID,
     allowed_group_updates: AllowedGroups | AllowedGroupsModel,
 ):
-    async with db.begin_session() as db_sess:
-        if allowed_group_updates.add:
-            insert_values = [
-                {"registry_id": registry_id, "group_id": group_id}
-                for group_id in allowed_group_updates.add
-            ]
+    if allowed_group_updates.add:
+        insert_values = [
+            {"registry_id": registry_id, "group_id": group_id}
+            for group_id in allowed_group_updates.add
+        ]
 
+        try:
             insert_query = sa.insert(AssociationContainerRegistriesGroupsRow).values(insert_values)
-            await db_sess.execute(insert_query)
-
-        if allowed_group_updates.remove:
-            delete_query = (
-                sa.delete(AssociationContainerRegistriesGroupsRow)
-                .where(AssociationContainerRegistriesGroupsRow.registry_id == registry_id)
-                .where(
-                    AssociationContainerRegistriesGroupsRow.group_id.in_(
-                        allowed_group_updates.remove
-                    )
-                )
+            await session.execute(insert_query)
+        except sa.exc.IntegrityError:
+            raise ContainerRegistryGroupsAlreadyAssociated(
+                f"Already associated groups for registry_id: {registry_id}, group_ids: {allowed_group_updates.add}"
             )
-            result = await db_sess.execute(delete_query)
-            if result.rowcount == 0:
-                raise ContainerRegistryGroupsAssociationNotFound(
-                    f"Tried to remove non-existing associations for registry_id: {registry_id}, group_ids: {allowed_group_updates.remove}"
-                )
+
+    if allowed_group_updates.remove:
+        delete_query = (
+            sa.delete(AssociationContainerRegistriesGroupsRow)
+            .where(AssociationContainerRegistriesGroupsRow.registry_id == registry_id)
+            .where(
+                AssociationContainerRegistriesGroupsRow.group_id.in_(allowed_group_updates.remove)
+            )
+        )
+        result = await session.execute(delete_query)
+        if result.rowcount == 0:
+            raise ContainerRegistryGroupsAssociationNotFound(
+                f"Tried to remove non-existing associations for registry_id: {registry_id}, group_ids: {allowed_group_updates.remove}"
+            )
 
 
 class CreateContainerRegistryNode(graphene.Mutation):
