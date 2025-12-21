@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, TypeAlias
 
 import graphene
 import sqlalchemy as sa
@@ -10,9 +10,14 @@ from graphql import GraphQLError, Undefined
 
 from ai.backend.common.container_registry import AllowedGroupsModel
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.container_registry.creators import ContainerRegistryCreatorSpec
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
+)
+from ai.backend.manager.services.container_registry.actions.create_container_registry import (
+    CreateContainerRegistryAction,
 )
 from ai.backend.manager.services.container_registry.actions.modify_container_registry import (
     ModifyContainerRegistryAction,
@@ -30,7 +35,6 @@ from .container_registry import (
     AllowedGroups,
     ContainerRegistryNode,
     ContainerRegistryTypeField,
-    handle_allowed_groups_update,
 )
 
 if TYPE_CHECKING:
@@ -59,6 +63,29 @@ class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):
     ssl_verify = graphene.Boolean(description="Added in 25.3.0.")
     extra = graphene.JSONString(description="Added in 25.3.0.")
     allowed_groups = AllowedGroups(description="Added in 25.3.0.")
+
+    def to_action(self) -> CreateContainerRegistryAction:
+        def value_or_none(val):
+            return None if val is Undefined else val
+
+        return CreateContainerRegistryAction(
+            creator=Creator(
+                spec=ContainerRegistryCreatorSpec(
+                    url=self.url,
+                    type=self.type,
+                    registry_name=self.registry_name,
+                    is_global=value_or_none(self.is_global),
+                    project=value_or_none(self.project),
+                    username=value_or_none(self.username),
+                    password=value_or_none(self.password),
+                    ssl_verify=value_or_none(self.ssl_verify),
+                    extra=value_or_none(self.extra),
+                    allowed_groups=self.allowed_groups.to_model()
+                    if self.allowed_groups is not Undefined
+                    else None,
+                )
+            )
+        )
 
 
 class CreateContainerRegistryNodeV2(graphene.Mutation):
@@ -90,38 +117,15 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):
 
         validator.validate()
 
-        input_config: dict[str, Any] = {
-            "registry_name": props.registry_name,
-            "url": props.url,
-            "type": props.type,
-        }
-
-        def _set_if_set(name: str, val: Any) -> None:
-            if val is not Undefined:
-                input_config[name] = val
-
-        _set_if_set("project", props.project)
-        _set_if_set("username", props.username)
-        _set_if_set("password", props.password)
-        _set_if_set("ssl_verify", props.ssl_verify)
-        _set_if_set("is_global", props.is_global)
-        _set_if_set("extra", props.extra)
-
-        try:
-            async with ctx.db.begin_session() as db_session:
-                reg_row = ContainerRegistryRow(**input_config)
-                db_session.add(reg_row)
-                await db_session.flush()
-                await db_session.refresh(reg_row)
-
-                if props.allowed_groups:
-                    await handle_allowed_groups_update(db_session, reg_row.id, props.allowed_groups)
-
-            return cls(
-                container_registry=ContainerRegistryNode.from_row(ctx, reg_row),
+        result = (
+            await ctx.processors.container_registry.create_container_registry.wait_for_complete(
+                props.to_action()
             )
-        except Exception as e:
-            raise GraphQLError(str(e))
+        )
+
+        return cls(
+            container_registry=ContainerRegistryNode.from_dataclass(result.data),
+        )
 
 
 class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):

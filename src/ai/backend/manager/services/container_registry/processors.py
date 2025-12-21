@@ -7,6 +7,10 @@ from ai.backend.manager.services.container_registry.actions.clear_images import 
     ClearImagesAction,
     ClearImagesActionResult,
 )
+from ai.backend.manager.services.container_registry.actions.create_container_registry import (
+    CreateContainerRegistryAction,
+    CreateContainerRegistryActionResult,
+)
 from ai.backend.manager.services.container_registry.actions.get_container_registries import (
     GetContainerRegistriesAction,
     GetContainerRegistriesActionResult,
@@ -42,6 +46,9 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
     get_container_registries: ActionProcessor[
         GetContainerRegistriesAction, GetContainerRegistriesActionResult
     ]
+    create_container_registry: ActionProcessor[
+        CreateContainerRegistryAction, CreateContainerRegistryActionResult
+    ]
     modify_container_registry: ActionProcessor[
         ModifyContainerRegistryAction, ModifyContainerRegistryActionResult
     ]
@@ -60,6 +67,9 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
         self.get_container_registries = ActionProcessor(
             service.get_container_registries, action_monitors
         )
+        self.create_container_registry = ActionProcessor(
+            service.create_container_registry, action_monitors
+        )
         self.modify_container_registry = ActionProcessor(
             service.modify_container_registry, action_monitors
         )
@@ -72,5 +82,6 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
             LoadContainerRegistriesAction.spec(),
             LoadAllContainerRegistriesAction.spec(),
             GetContainerRegistriesAction.spec(),
+            CreateContainerRegistryAction.spec(),
             ModifyContainerRegistryAction.spec(),
         ]
