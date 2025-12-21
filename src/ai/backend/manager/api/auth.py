@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any, Final, Iterable, Mapping, Tuple
 from urllib.parse import urlparse
 
 import aiohttp_cors
-import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
 from dateutil.parser import parse as dtparse
@@ -48,7 +47,6 @@ from ai.backend.manager.services.auth.actions.upload_ssh_keypair import UploadSS
 from ..errors.auth import AuthorizationFailed, InvalidAuthParameters, InvalidClientIPConfig
 from ..errors.common import RejectedByHook
 from ..models import keypair_resource_policies, keypairs, user_resource_policies, users
-from ..models.utils import execute_with_retry
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params, get_handler_attr, set_handler_attr
 
@@ -417,54 +415,6 @@ def _set_unauthenticated_state(request: web.Request) -> None:
     request["user"] = None
 
 
-async def _query_cred_by_access_key(
-    root_ctx: RootContext,
-    access_key: str,
-) -> tuple[Any, Any]:
-    """
-    Query keypair and user information by access_key.
-
-    Returns:
-        Tuple of (user_row, keypair_row) or (None, None) if not found
-    """
-    async with root_ctx.db.begin_readonly() as conn:
-        # Query keypair with resource policy
-        j = keypairs.join(
-            keypair_resource_policies,
-            keypairs.c.resource_policy == keypair_resource_policies.c.name,
-        )
-        query = (
-            sa.select([keypairs, keypair_resource_policies], use_labels=True)
-            .select_from(j)
-            .where(
-                (keypairs.c.access_key == access_key) & (keypairs.c.is_active.is_(True)),
-            )
-        )
-        result = await conn.execute(query)
-        keypair_row = result.first()
-
-        if keypair_row is None:
-            return None, None
-
-        # Query user with resource policy by joining keypairs table
-        j = users.join(
-            user_resource_policies,
-            users.c.resource_policy == user_resource_policies.c.name,
-        ).join(
-            keypairs,
-            users.c.uuid == keypairs.c.user,
-        )
-        query = (
-            sa.select([users, user_resource_policies], use_labels=True)
-            .select_from(j)
-            .where((keypairs.c.access_key == access_key))
-        )
-        result = await conn.execute(query)
-        user_row = result.first()
-
-        return user_row, keypair_row
-
-
 def _populate_auth_result(
     request: web.Request,
     user_row: Any,
@@ -543,9 +493,11 @@ async def _authenticate_via_jwt(
             raise AuthorizationFailed("Access key not found in JWT token")
 
         # 2. Query keypair and user from database to get secret_key
-        user_row, keypair_row = await execute_with_retry(
-            functools.partial(_query_cred_by_access_key, root_ctx, access_key)
+        creds = await root_ctx.repositories.auth.repository.get_credentials_by_access_key(
+            access_key
         )
+        user_row = creds.user_row
+        keypair_row = creds.keypair_row
 
         if keypair_row is None:
             raise AuthorizationFailed("Access key not found in database")
@@ -596,9 +548,9 @@ async def _authenticate_via_hmac(
     sign_method, access_key, signature = params
 
     # 3. Query keypair and user from database
-    user_row, keypair_row = await execute_with_retry(
-        functools.partial(_query_cred_by_access_key, root_ctx, access_key)
-    )
+    creds = await root_ctx.repositories.auth.repository.get_credentials_by_access_key(access_key)
+    user_row = creds.user_row
+    keypair_row = creds.keypair_row
 
     if keypair_row is None:
         raise AuthorizationFailed("Access key not found in HMAC")
@@ -654,9 +606,9 @@ async def _authenticate_via_hook(
         return
 
     # 3. Query keypair and user from database
-    user_row, keypair_row = await execute_with_retry(
-        functools.partial(_query_cred_by_access_key, root_ctx, access_key)
-    )
+    creds = await root_ctx.repositories.auth.repository.get_credentials_by_access_key(access_key)
+    user_row = creds.user_row
+    keypair_row = creds.keypair_row
 
     if keypair_row is None:
         raise AuthorizationFailed("Access key not found in hook")
