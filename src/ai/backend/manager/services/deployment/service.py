@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timedelta
 from uuid import uuid4
 
+from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
@@ -16,6 +17,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
+    DeploymentInfo,
     DeploymentNetworkSpec,
     ExtraVFolderMountData,
     ModelDeploymentAccessTokenData,
@@ -46,10 +48,6 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.delete_aut
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_auto_scaling_rule import (
     UpdateAutoScalingRuleAction,
     UpdateAutoScalingRuleActionResult,
-)
-from ai.backend.manager.services.deployment.actions.batch_load_deployments import (
-    BatchLoadDeploymentsAction,
-    BatchLoadDeploymentsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
@@ -121,6 +119,94 @@ from ai.backend.manager.sokovan.deployment import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
+
+
+def _map_lifecycle_to_status(lifecycle: EndpointLifecycle) -> ModelDeploymentStatus:
+    """Map EndpointLifecycle to ModelDeploymentStatus."""
+    match lifecycle:
+        case EndpointLifecycle.PENDING:
+            return ModelDeploymentStatus.PENDING
+        case EndpointLifecycle.CREATED | EndpointLifecycle.READY:
+            return ModelDeploymentStatus.READY
+        case EndpointLifecycle.SCALING:
+            return ModelDeploymentStatus.SCALING
+        case EndpointLifecycle.DEPLOYING:
+            return ModelDeploymentStatus.DEPLOYING
+        case EndpointLifecycle.DESTROYING:
+            return ModelDeploymentStatus.STOPPING
+        case EndpointLifecycle.DESTROYED:
+            return ModelDeploymentStatus.STOPPED
+        case _:
+            return ModelDeploymentStatus.PENDING
+
+
+def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentData:
+    """Convert DeploymentInfo to ModelDeploymentData.
+
+    Note: Some fields are set to defaults as DeploymentInfo doesn't have all the data.
+    """
+    # Map revision if available
+    revision: ModelRevisionData | None = None
+    if info.model_revisions:
+        rev = info.model_revisions[0]
+        revision = ModelRevisionData(
+            id=info.current_revision_id or info.id,
+            name=rev.image_identifier.canonical,
+            cluster_config=ClusterConfigData(
+                mode=rev.resource_spec.cluster_mode,
+                size=rev.resource_spec.cluster_size,
+            ),
+            resource_config=ResourceConfigData(
+                resource_group_name=info.metadata.resource_group,
+                resource_slot=ResourceSlot.from_json(rev.resource_spec.resource_slots),
+            ),
+            model_mount_config=ModelMountConfigData(
+                vfolder_id=rev.mounts.model_vfolder_id,
+                mount_destination=rev.mounts.model_mount_destination,
+                definition_path=rev.mounts.model_definition_path or "",
+            ),
+            model_runtime_config=ModelRuntimeConfigData(
+                runtime_variant=rev.execution.runtime_variant,
+                inference_runtime_config=rev.execution.inference_runtime_config or {},
+            ),
+            extra_vfolder_mounts=[
+                ExtraVFolderMountData(
+                    vfolder_id=m.vfid.folder_id,
+                    mount_destination=m.kernel_path.as_posix(),
+                )
+                for m in rev.mounts.extra_mounts
+            ],
+            image_id=info.current_revision_id
+            or info.id,  # Placeholder: actual image_id not in ImageIdentifier
+            created_at=info.metadata.created_at or datetime.now(),
+        )
+
+    desired_count = info.replica_spec.desired_replica_count
+    if desired_count is None:
+        desired_count = info.replica_spec.replica_count
+
+    return ModelDeploymentData(
+        id=info.id,
+        metadata=ModelDeploymentMetadataInfo(
+            name=info.metadata.name,
+            status=_map_lifecycle_to_status(info.state.lifecycle),
+            tags=[info.metadata.tag] if info.metadata.tag else [],
+            project_id=info.metadata.project,
+            domain_name=info.metadata.domain,
+            created_at=info.metadata.created_at or datetime.now(),
+            updated_at=info.metadata.created_at or datetime.now(),
+        ),
+        network_access=info.network,
+        revision_history_ids=[info.current_revision_id] if info.current_revision_id else [],
+        revision=revision,
+        scaling_rule_ids=[],  # Not available in DeploymentInfo
+        replica_state=ReplicaStateData(
+            desired_replica_count=desired_count,
+            replica_ids=[],  # Not available in DeploymentInfo
+        ),
+        default_deployment_strategy=DeploymentStrategy.ROLLING,
+        created_user_id=info.metadata.created_user,
+    )
 
 
 class DeploymentService:
@@ -243,42 +329,6 @@ class DeploymentService:
         await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.DESTROYING)
         return DestroyDeploymentActionResult(success=success)
 
-    async def batch_load_deployments(
-        self, action: BatchLoadDeploymentsAction
-    ) -> BatchLoadDeploymentsActionResult:
-        return BatchLoadDeploymentsActionResult(
-            data=[
-                ModelDeploymentData(
-                    id=deployment_id,
-                    metadata=ModelDeploymentMetadataInfo(
-                        name=f"test-deployment-{i}",
-                        status=ModelDeploymentStatus.READY,
-                        tags=["tag1", "tag2"],
-                        project_id=uuid4(),
-                        domain_name="default",
-                        created_at=datetime.now(),
-                        updated_at=datetime.now(),
-                    ),
-                    network_access=DeploymentNetworkSpec(
-                        open_to_public=True,
-                        url="http://example.com",
-                        preferred_domain_name="example.com",
-                        access_token_ids=[uuid4()],
-                    ),
-                    revision_history_ids=[uuid4(), uuid4()],
-                    revision=mock_revision_data_1,
-                    scaling_rule_ids=[uuid4(), uuid4()],
-                    replica_state=ReplicaStateData(
-                        desired_replica_count=3,
-                        replica_ids=[uuid4(), uuid4(), uuid4()],
-                    ),
-                    default_deployment_strategy=DeploymentStrategy.ROLLING,
-                    created_user_id=uuid4(),
-                )
-                for i, deployment_id in enumerate(action.deployment_ids)
-            ]
-        )
-
     async def search_deployments(
         self, action: SearchDeploymentsAction
     ) -> SearchDeploymentsActionResult:
@@ -290,42 +340,13 @@ class DeploymentService:
         Returns:
             SearchDeploymentsActionResult: Result containing list of deployments and pagination info
         """
-        # TODO: Implement proper database query through controller
-        # For now, return mock data similar to batch_load_deployments
-        deployments = [
-            ModelDeploymentData(
-                id=uuid4(),
-                metadata=ModelDeploymentMetadataInfo(
-                    name="test-deployment",
-                    status=ModelDeploymentStatus.READY,
-                    tags=["tag1", "tag2"],
-                    project_id=uuid4(),
-                    domain_name="default",
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
-                ),
-                network_access=DeploymentNetworkSpec(
-                    open_to_public=True,
-                    url="http://example.com",
-                    preferred_domain_name="example.com",
-                    access_token_ids=[uuid4()],
-                ),
-                revision_history_ids=[uuid4(), uuid4()],
-                revision=mock_revision_data_1,
-                scaling_rule_ids=[uuid4(), uuid4()],
-                replica_state=ReplicaStateData(
-                    desired_replica_count=3,
-                    replica_ids=[uuid4(), uuid4(), uuid4()],
-                ),
-                default_deployment_strategy=DeploymentStrategy.ROLLING,
-                created_user_id=uuid4(),
-            )
-        ]
+        result = await self._deployment_repository.search_endpoints(action.querier)
+        deployments = [_convert_deployment_info_to_data(info) for info in result.items]
         return SearchDeploymentsActionResult(
             deployments=deployments,
-            total_count=len(deployments),
-            has_next_page=False,
-            has_previous_page=False,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def get_deployment_policy(
