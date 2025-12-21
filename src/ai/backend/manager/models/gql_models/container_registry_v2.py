@@ -120,7 +120,7 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):
                 )
                 if duplicate_registry.scalar() is not None:
                     msg = f"Container registry already exists with registry_name: {props.registry_name}"
-                    if props.project is Undefined:
+                    if props.project is Undefined or props.project is None:
                         msg += ", with no project registry"
                     else:
                         msg += f", in project: {props.project}"
