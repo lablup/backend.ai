@@ -187,6 +187,50 @@ async def test_create_container_registry(
     await client.execute_async(query, variables=variables, context_value=context)
 
 
+@pytest.mark.dependency(depends=["test_create_container_registry"])
+@pytest.mark.asyncio
+async def test_create_container_registry_duplicate_fails(
+    client: Client, database_engine: ExtendedAsyncSAEngine, processors: Processors
+) -> None:
+    context = get_graphquery_context(database_engine, processors)
+
+    query = """
+            mutation ($props: CreateContainerRegistryNodeInputV2!) {
+                create_container_registry_node_v2(props: $props) {
+                    container_registry {
+                        $CONTAINER_REGISTRY_FIELDS
+                    }
+                }
+            }
+        """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
+
+    # First create a registry
+    variables = {
+        "props": {
+            "registry_name": "cr.example.com",
+            "url": "http://cr.example.com",
+            "type": ContainerRegistryType.DOCKER,
+            "project": "default",
+            "username": "username",
+            "password": "password",
+            "ssl_verify": False,
+            "is_global": False,
+        }
+    }
+
+    # Create the first registry - should succeed
+    response = await client.execute_async(query, variables=variables, context_value=context)
+    assert response["data"]["create_container_registry_node_v2"] is not None
+
+    # Now attempt to create duplicate registry with same registry_name and project - should fail
+    response = await client.execute_async(query, variables=variables, context_value=context)
+
+    # Should fail with error
+    assert response["data"]["create_container_registry_node_v2"] is None
+    assert response["errors"] is not None
+    assert any("Container registry already exists" in str(error) for error in response["errors"])
+
+
 @pytest.mark.dependency(depends=["test_create_container_registry_v2"])
 @pytest.mark.asyncio
 async def test_modify_container_registry(

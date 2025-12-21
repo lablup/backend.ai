@@ -122,6 +122,43 @@ async def test_create_container_registry(
 
 @pytest.mark.dependency(depends=["test_create_container_registry"])
 @pytest.mark.asyncio
+async def test_create_container_registry_duplicate_fails(
+    client: Client, database_engine: ExtendedAsyncSAEngine, unified_config: ManagerUnifiedConfig
+) -> None:
+    context = await get_graphquery_context(database_engine, unified_config)
+
+    query = """
+            mutation CreateContainerRegistryNode($type: ContainerRegistryTypeField!, $registry_name: String!, $url: String!, $project: String!, $username: String!, $password: String!, $ssl_verify: Boolean!, $is_global: Boolean!) {
+                create_container_registry_node(type: $type, registry_name: $registry_name, url: $url, project: $project, username: $username, password: $password, ssl_verify: $ssl_verify, is_global: $is_global) {
+                    container_registry {
+                        $CONTAINER_REGISTRY_FIELDS
+                    }
+                }
+            }
+        """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
+
+    # Attempt to create duplicate registry with same registry_name and project
+    variables = {
+        "registry_name": "cr.example.com",
+        "url": "http://cr.example.com",
+        "type": ContainerRegistryType.DOCKER,
+        "project": "default",
+        "username": "username",
+        "password": "password",
+        "ssl_verify": False,
+        "is_global": False,
+    }
+
+    response = await client.execute_async(query, variables=variables, context_value=context)
+
+    # Should fail with error
+    assert response["data"]["create_container_registry_node"] is None
+    assert response["errors"] is not None
+    assert any("Container registry already exists" in str(error) for error in response["errors"])
+
+
+@pytest.mark.dependency(depends=["test_create_container_registry"])
+@pytest.mark.asyncio
 async def test_modify_container_registry(
     client: Client, database_engine: ExtendedAsyncSAEngine, unified_config: ManagerUnifiedConfig
 ):

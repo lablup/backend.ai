@@ -981,3 +981,15 @@ class ContainerRegistryGroupsAlreadyAssociated(BackendAIError, web.HTTPConflict)
             operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.ALREADY_EXISTS,
         )
+
+
+class ContainerRegistryAlreadyExists(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/container-registry-already-exists"
+    error_title = "Container registry with the same name and project already exists."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.CONTAINER_REGISTRY,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.ALREADY_EXISTS,
+        )

@@ -12,7 +12,10 @@ from graphql import Undefined, UndefinedType
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
-from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
+from ai.backend.common.exception import (
+    ContainerRegistryAlreadyExists,
+    ContainerRegistryGroupsAlreadyAssociated,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
@@ -391,6 +394,22 @@ class CreateContainerRegistryNode(graphene.Mutation):
         _set_if_set("extra", extra)
 
         async with ctx.db.begin_session() as db_session:
+            duplicate_registry = await db_session.execute(
+                sa.select(ContainerRegistryRow).where(
+                    sa.and_(
+                        ContainerRegistryRow.registry_name == registry_name,
+                        ContainerRegistryRow.project == input_config.get("project", None),
+                    )
+                )
+            )
+            if duplicate_registry.scalar() is not None:
+                msg = f"Container registry already exists with registry_name: {registry_name}"
+                if project is Undefined:
+                    msg += ", with no project registry"
+                else:
+                    msg += f", in project: {project}"
+                raise ContainerRegistryAlreadyExists(msg)
+
             reg_row = ContainerRegistryRow(**input_config)
             db_session.add(reg_row)
             await db_session.flush()
