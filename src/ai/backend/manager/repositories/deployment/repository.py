@@ -41,7 +41,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
-    ScaleOutDecision,
     ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
@@ -65,7 +64,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
 from ai.backend.manager.repositories.base import BatchQuerier, Creator
 from ai.backend.manager.repositories.base.purger import Purger, PurgerResult
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.base.updater import BatchUpdater, Updater
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
 from .db_source import DeploymentDBSource
@@ -446,10 +445,10 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def scale_routes(
         self,
-        scale_outs: Sequence[ScaleOutDecision],
-        scale_ins: Sequence[RouteInfo],
+        scale_out_creators: Sequence[Creator[RoutingRow]],
+        scale_in_updater: BatchUpdater[RoutingRow] | None,
     ) -> None:
-        await self._db_source.scale_routes(scale_outs, scale_ins)
+        await self._db_source.scale_routes(scale_out_creators, scale_in_updater)
 
     # Route operations
 

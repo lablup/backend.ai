@@ -34,7 +34,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
-    ScaleOutDecision,
     ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
@@ -90,7 +89,12 @@ from ai.backend.manager.repositories.base.purger import (
     PurgerResult,
     execute_purger,
 )
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.base.updater import (
+    BatchUpdater,
+    Updater,
+    execute_batch_updater,
+    execute_updater,
+)
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ContainerUserContext,
     DeploymentContext,
@@ -1081,29 +1085,17 @@ class DeploymentDBSource:
 
     async def scale_routes(
         self,
-        scale_outs: Sequence[ScaleOutDecision],
-        scale_ins: Sequence[RouteInfo],
+        scale_out_creators: Sequence[Creator[RoutingRow]],
+        scale_in_updater: BatchUpdater[RoutingRow] | None,
     ) -> None:
-        """Scale out/in routes based on provided mappings."""
+        """Scale out/in routes based on provided creators and updater."""
         async with self._begin_session_read_committed() as db_sess:
             # Scale out routes
-            new_routes = []
-            for scale_out in scale_outs:
-                revision_id = scale_out.target_revision_id
-                for _ in range(scale_out.new_replica_count):
-                    route = RoutingRow.by_deployment_info(
-                        scale_out.deployment_info,
-                        revision_id=revision_id,
-                    )
-                    new_routes.append(route)
-            db_sess.add_all(new_routes)
+            for creator in scale_out_creators:
+                await execute_creator(db_sess, creator)
             # Scale in routes
-            query = (
-                sa.update(RoutingRow)
-                .where(RoutingRow.id.in_([route.route_id for route in scale_ins]))
-                .values(traffic_ratio=0.0, status=RouteStatus.TERMINATING)
-            )
-            await db_sess.execute(query)
+            if scale_in_updater:
+                await execute_batch_updater(db_sess, scale_in_updater)
 
     # Route operations
 

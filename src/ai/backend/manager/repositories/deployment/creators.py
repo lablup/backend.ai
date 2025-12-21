@@ -30,6 +30,7 @@ from ai.backend.manager.models.deployment_policy import (
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base import CreatorSpec
+from ai.backend.manager.repositories.base.updater import BatchUpdaterSpec
 
 
 @dataclass
@@ -173,3 +174,32 @@ class RouteCreatorSpec(CreatorSpec[RoutingRow]):
             revision=self.revision,
             traffic_status=self.traffic_status,
         )
+
+
+@dataclass
+class RouteBatchUpdaterSpec(BatchUpdaterSpec[RoutingRow]):
+    """BatchUpdaterSpec for batch updating routes.
+
+    Accepts optional fields and only updates fields that are specified.
+    This allows flexible partial updates for various route operations.
+    """
+
+    status: Optional[RouteStatus] = None
+    traffic_ratio: Optional[float] = None
+    traffic_status: Optional[RouteTrafficStatus] = None
+
+    @property
+    @override
+    def row_class(self) -> type[RoutingRow]:
+        return RoutingRow
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        values: dict[str, Any] = {}
+        if self.status is not None:
+            values["status"] = self.status
+        if self.traffic_ratio is not None:
+            values["traffic_ratio"] = self.traffic_ratio
+        if self.traffic_status is not None:
+            values["traffic_status"] = self.traffic_status
+        return values

@@ -15,7 +15,6 @@ from sqlalchemy.orm.exc import NoResultFound
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
-    DeploymentInfo,
     RouteInfo,
     RouteStatus,
     RouteTrafficStatus,
@@ -109,22 +108,6 @@ class RoutingRow(Base):
         foreign_keys="RoutingRow.revision",
         viewonly=True,
     )
-
-    @classmethod
-    def by_deployment_info(
-        cls,
-        deployment_info: DeploymentInfo,
-        revision_id: uuid.UUID | None = None,
-    ) -> Self:
-        return cls(
-            id=uuid.uuid4(),
-            endpoint=deployment_info.id,
-            session=None,
-            session_owner=deployment_info.metadata.created_user,
-            domain=deployment_info.metadata.domain,
-            project=deployment_info.metadata.project,
-            revision=revision_id,
-        )
 
     @classmethod
     async def get_by_session(
