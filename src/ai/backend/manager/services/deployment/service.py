@@ -141,6 +141,8 @@ class DeploymentService:
         self._deployment_controller = deployment_controller
         self._deployment_repository = deployment_repository
 
+    # ========== Deployment CRUD ==========
+
     async def create_deployment(
         self, action: CreateDeploymentAction
     ) -> CreateDeploymentActionResult:
@@ -280,139 +282,54 @@ class DeploymentService:
             ]
         )
 
-    async def create_auto_scaling_rule(
-        self, action: CreateAutoScalingRuleAction
-    ) -> CreateAutoScalingRuleActionResult:
-        return CreateAutoScalingRuleActionResult(
-            data=ModelDeploymentAutoScalingRuleData(
-                id=uuid4(),
-                model_deployment_id=action.creator.model_deployment_id,
-                metric_source=action.creator.metric_source,
-                metric_name=action.creator.metric_name,
-                min_threshold=action.creator.min_threshold,
-                max_threshold=action.creator.max_threshold,
-                step_size=action.creator.step_size,
-                time_window=action.creator.time_window,
-                min_replicas=action.creator.min_replicas,
-                max_replicas=action.creator.max_replicas,
-                created_at=datetime.now(),
-                last_triggered_at=datetime.now(),
-            )
-        )
-
-    async def update_auto_scaling_rule(
-        self, action: UpdateAutoScalingRuleAction
-    ) -> UpdateAutoScalingRuleActionResult:
-        return UpdateAutoScalingRuleActionResult(
-            data=ModelDeploymentAutoScalingRuleData(
-                id=uuid4(),
-                model_deployment_id=uuid4(),
-                metric_source=AutoScalingMetricSource.KERNEL,
-                metric_name="test-metric",
-                min_threshold=Decimal("0.5"),
-                max_threshold=Decimal("21.0"),
-                step_size=1,
-                time_window=60,
-                min_replicas=1,
-                max_replicas=10,
-                created_at=datetime.now(),
-                last_triggered_at=datetime.now(),
-            )
-        )
-
-    async def delete_auto_scaling_rule(
-        self, action: DeleteAutoScalingRuleAction
-    ) -> DeleteAutoScalingRuleActionResult:
-        return DeleteAutoScalingRuleActionResult(success=True)
-
-    async def create_access_token(
-        self, action: CreateAccessTokenAction
-    ) -> CreateAccessTokenActionResult:
-        return CreateAccessTokenActionResult(
-            data=ModelDeploymentAccessTokenData(
-                id=uuid4(),
-                token="test_token",
-                valid_until=datetime.now() + timedelta(hours=1),
-                created_at=datetime.now(),
-            )
-        )
-
-    async def sync_replicas(self, action: SyncReplicaAction) -> SyncReplicaActionResult:
-        """Sync replicas for a deployment.
-
-        This triggers a lifecycle check to reconcile the actual replica count
-        with the desired replica count based on the current revision.
+    async def search_deployments(
+        self, action: SearchDeploymentsAction
+    ) -> SearchDeploymentsActionResult:
+        """Search deployments with filtering and pagination.
 
         Args:
-            action: Action containing the deployment ID
+            action: Action containing BatchQuerier for filtering and pagination
 
         Returns:
-            SyncReplicaActionResult: Result indicating success
+            SearchDeploymentsActionResult: Result containing list of deployments and pagination info
         """
-        # Trigger lifecycle check to sync replicas
-        await self._deployment_controller.mark_lifecycle_needed(
-            DeploymentLifecycleType.CHECK_REPLICA
+        # TODO: Implement proper database query through controller
+        # For now, return mock data similar to batch_load_deployments
+        deployments = [
+            ModelDeploymentData(
+                id=uuid4(),
+                metadata=ModelDeploymentMetadataInfo(
+                    name="test-deployment",
+                    status=ModelDeploymentStatus.READY,
+                    tags=["tag1", "tag2"],
+                    project_id=uuid4(),
+                    domain_name="default",
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                ),
+                network_access=DeploymentNetworkSpec(
+                    open_to_public=True,
+                    url="http://example.com",
+                    preferred_domain_name="example.com",
+                    access_token_ids=[uuid4()],
+                ),
+                revision_history_ids=[uuid4(), uuid4()],
+                revision=mock_revision_data_1,
+                scaling_rule_ids=[uuid4(), uuid4()],
+                replica_state=ReplicaStateData(
+                    desired_replica_count=3,
+                    replica_ids=[uuid4(), uuid4(), uuid4()],
+                ),
+                default_deployment_strategy=DeploymentStrategy.ROLLING,
+                created_user_id=uuid4(),
+            )
+        ]
+        return SearchDeploymentsActionResult(
+            deployments=deployments,
+            total_count=len(deployments),
+            has_next_page=False,
+            has_previous_page=False,
         )
-
-        log.info("Triggered replica sync for deployment {}", action.deployment_id)
-
-        return SyncReplicaActionResult(success=True)
-
-    async def add_model_revision(
-        self, action: AddModelRevisionAction
-    ) -> AddModelRevisionActionResult:
-        # TODO: Implement full revision creation logic
-        # 1. Resolve image ID from action.adder.image_identifier
-        # 2. Get latest revision number via get_latest_revision_number(action.model_deployment_id)
-        # 3. Build DeploymentRevisionCreatorSpec from action.adder
-        # 4. Create revision via repository.create_revision(creator)
-        raise NotImplementedError(
-            "add_model_revision requires full ModelRevisionCreator to "
-            "DeploymentRevisionCreatorSpec conversion - pending implementation"
-        )
-
-    async def get_revision_by_deployment_id(
-        self, action: GetRevisionByDeploymentIdAction
-    ) -> GetRevisionByDeploymentIdActionResult:
-        revision = await self._deployment_repository.get_current_revision(action.deployment_id)
-        return GetRevisionByDeploymentIdActionResult(data=revision)
-
-    async def get_revision_by_id(
-        self, action: GetRevisionByIdAction
-    ) -> GetRevisionByIdActionResult:
-        revision = await self._deployment_repository.get_revision(action.revision_id)
-        return GetRevisionByIdActionResult(data=revision)
-
-    async def get_revision_by_replica_id(
-        self, action: GetRevisionByReplicaIdAction
-    ) -> GetRevisionByReplicaIdActionResult:
-        revision = await self._deployment_repository.get_revision_by_route_id(action.replica_id)
-        return GetRevisionByReplicaIdActionResult(data=revision)
-
-    async def get_revisions_by_deployment_id(
-        self, action: GetRevisionsByDeploymentIdAction
-    ) -> GetRevisionsByDeploymentIdActionResult:
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=100, offset=0),
-            conditions=[RevisionConditions.by_deployment_id(action.deployment_id)],
-        )
-        result = await self._deployment_repository.search_revisions(querier)
-        return GetRevisionsByDeploymentIdActionResult(data=result.items)
-
-    async def create_model_revision(
-        self, action: CreateModelRevisionAction
-    ) -> CreateModelRevisionActionResult:
-        # TODO: Implement full revision creation logic
-        # 1. Resolve image ID from action.creator.image_identifier
-        # 2. Get latest revision number via get_latest_revision_number()
-        # 3. Build DeploymentRevisionCreatorSpec from action.creator
-        # 4. Create revision via repository.create_revision(creator)
-        raise NotImplementedError(
-            "create_model_revision requires full ModelRevisionCreator to "
-            "DeploymentRevisionCreatorSpec conversion - pending implementation"
-        )
-
-    # ========== Deployment Policy Methods ==========
 
     async def get_deployment_policy(
         self, action: GetDeploymentPolicyAction
@@ -431,7 +348,78 @@ class DeploymentService:
         data = await self._deployment_controller.get_deployment_policy(action.endpoint_id)
         return GetDeploymentPolicyActionResult(data=data)
 
-    # ========== Revision Operations Methods ==========
+    # ========== Revision Operations ==========
+
+    async def add_model_revision(
+        self, action: AddModelRevisionAction
+    ) -> AddModelRevisionActionResult:
+        # TODO: Implement full revision creation logic
+        # 1. Resolve image ID from action.adder.image_identifier
+        # 2. Get latest revision number via get_latest_revision_number(action.model_deployment_id)
+        # 3. Build DeploymentRevisionCreatorSpec from action.adder
+        # 4. Create revision via repository.create_revision(creator)
+        raise NotImplementedError(
+            "add_model_revision requires full ModelRevisionCreator to "
+            "DeploymentRevisionCreatorSpec conversion - pending implementation"
+        )
+
+    async def create_model_revision(
+        self, action: CreateModelRevisionAction
+    ) -> CreateModelRevisionActionResult:
+        # TODO: Implement full revision creation logic
+        # 1. Resolve image ID from action.creator.image_identifier
+        # 2. Get latest revision number via get_latest_revision_number()
+        # 3. Build DeploymentRevisionCreatorSpec from action.creator
+        # 4. Create revision via repository.create_revision(creator)
+        raise NotImplementedError(
+            "create_model_revision requires full ModelRevisionCreator to "
+            "DeploymentRevisionCreatorSpec conversion - pending implementation"
+        )
+
+    async def get_revision_by_id(
+        self, action: GetRevisionByIdAction
+    ) -> GetRevisionByIdActionResult:
+        revision = await self._deployment_repository.get_revision(action.revision_id)
+        return GetRevisionByIdActionResult(data=revision)
+
+    async def get_revision_by_deployment_id(
+        self, action: GetRevisionByDeploymentIdAction
+    ) -> GetRevisionByDeploymentIdActionResult:
+        revision = await self._deployment_repository.get_current_revision(action.deployment_id)
+        return GetRevisionByDeploymentIdActionResult(data=revision)
+
+    async def get_revision_by_replica_id(
+        self, action: GetRevisionByReplicaIdAction
+    ) -> GetRevisionByReplicaIdActionResult:
+        revision = await self._deployment_repository.get_revision_by_route_id(action.replica_id)
+        return GetRevisionByReplicaIdActionResult(data=revision)
+
+    async def get_revisions_by_deployment_id(
+        self, action: GetRevisionsByDeploymentIdAction
+    ) -> GetRevisionsByDeploymentIdActionResult:
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[RevisionConditions.by_deployment_id(action.deployment_id)],
+        )
+        result = await self._deployment_repository.search_revisions(querier)
+        return GetRevisionsByDeploymentIdActionResult(data=result.items)
+
+    async def search_revisions(self, action: SearchRevisionsAction) -> SearchRevisionsActionResult:
+        """Search revisions with filtering and pagination.
+
+        Args:
+            action: Action containing BatchQuerier for filtering and pagination
+
+        Returns:
+            SearchRevisionsActionResult: Result containing list of revisions and pagination info
+        """
+        result = await self._deployment_repository.search_revisions(action.querier)
+        return SearchRevisionsActionResult(
+            revisions=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def activate_revision(
         self, action: ActivateRevisionAction
@@ -497,7 +485,28 @@ class DeploymentService:
             activated_revision_id=action.revision_id,
         )
 
-    # ========== Route Operations Methods ==========
+    # ========== Route Operations ==========
+
+    async def sync_replicas(self, action: SyncReplicaAction) -> SyncReplicaActionResult:
+        """Sync replicas for a deployment.
+
+        This triggers a lifecycle check to reconcile the actual replica count
+        with the desired replica count based on the current revision.
+
+        Args:
+            action: Action containing the deployment ID
+
+        Returns:
+            SyncReplicaActionResult: Result indicating success
+        """
+        # Trigger lifecycle check to sync replicas
+        await self._deployment_controller.mark_lifecycle_needed(
+            DeploymentLifecycleType.CHECK_REPLICA
+        )
+
+        log.info("Triggered replica sync for deployment {}", action.deployment_id)
+
+        return SyncReplicaActionResult(success=True)
 
     async def search_routes(self, action: SearchRoutesAction) -> SearchRoutesActionResult:
         """Search routes with filtering and pagination.
@@ -540,70 +549,65 @@ class DeploymentService:
             raise RoutingNotFound
         return UpdateRouteTrafficStatusActionResult(route=route)
 
-    async def search_deployments(
-        self, action: SearchDeploymentsAction
-    ) -> SearchDeploymentsActionResult:
-        """Search deployments with filtering and pagination.
+    # ========== Auto-scaling Rules ==========
 
-        Args:
-            action: Action containing BatchQuerier for filtering and pagination
-
-        Returns:
-            SearchDeploymentsActionResult: Result containing list of deployments and pagination info
-        """
-        # TODO: Implement proper database query through controller
-        # For now, return mock data similar to batch_load_deployments
-        deployments = [
-            ModelDeploymentData(
+    async def create_auto_scaling_rule(
+        self, action: CreateAutoScalingRuleAction
+    ) -> CreateAutoScalingRuleActionResult:
+        return CreateAutoScalingRuleActionResult(
+            data=ModelDeploymentAutoScalingRuleData(
                 id=uuid4(),
-                metadata=ModelDeploymentMetadataInfo(
-                    name="test-deployment",
-                    status=ModelDeploymentStatus.READY,
-                    tags=["tag1", "tag2"],
-                    project_id=uuid4(),
-                    domain_name="default",
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
-                ),
-                network_access=DeploymentNetworkSpec(
-                    open_to_public=True,
-                    url="http://example.com",
-                    preferred_domain_name="example.com",
-                    access_token_ids=[uuid4()],
-                ),
-                revision_history_ids=[uuid4(), uuid4()],
-                revision=mock_revision_data_1,
-                scaling_rule_ids=[uuid4(), uuid4()],
-                replica_state=ReplicaStateData(
-                    desired_replica_count=3,
-                    replica_ids=[uuid4(), uuid4(), uuid4()],
-                ),
-                default_deployment_strategy=DeploymentStrategy.ROLLING,
-                created_user_id=uuid4(),
+                model_deployment_id=action.creator.model_deployment_id,
+                metric_source=action.creator.metric_source,
+                metric_name=action.creator.metric_name,
+                min_threshold=action.creator.min_threshold,
+                max_threshold=action.creator.max_threshold,
+                step_size=action.creator.step_size,
+                time_window=action.creator.time_window,
+                min_replicas=action.creator.min_replicas,
+                max_replicas=action.creator.max_replicas,
+                created_at=datetime.now(),
+                last_triggered_at=datetime.now(),
             )
-        ]
-        return SearchDeploymentsActionResult(
-            deployments=deployments,
-            total_count=len(deployments),
-            has_next_page=False,
-            has_previous_page=False,
         )
 
-    async def search_revisions(self, action: SearchRevisionsAction) -> SearchRevisionsActionResult:
-        """Search revisions with filtering and pagination.
+    async def update_auto_scaling_rule(
+        self, action: UpdateAutoScalingRuleAction
+    ) -> UpdateAutoScalingRuleActionResult:
+        return UpdateAutoScalingRuleActionResult(
+            data=ModelDeploymentAutoScalingRuleData(
+                id=uuid4(),
+                model_deployment_id=uuid4(),
+                metric_source=AutoScalingMetricSource.KERNEL,
+                metric_name="test-metric",
+                min_threshold=Decimal("0.5"),
+                max_threshold=Decimal("21.0"),
+                step_size=1,
+                time_window=60,
+                min_replicas=1,
+                max_replicas=10,
+                created_at=datetime.now(),
+                last_triggered_at=datetime.now(),
+            )
+        )
 
-        Args:
-            action: Action containing BatchQuerier for filtering and pagination
+    async def delete_auto_scaling_rule(
+        self, action: DeleteAutoScalingRuleAction
+    ) -> DeleteAutoScalingRuleActionResult:
+        return DeleteAutoScalingRuleActionResult(success=True)
 
-        Returns:
-            SearchRevisionsActionResult: Result containing list of revisions and pagination info
-        """
-        result = await self._deployment_repository.search_revisions(action.querier)
-        return SearchRevisionsActionResult(
-            revisions=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
+    # ========== Access Token ==========
+
+    async def create_access_token(
+        self, action: CreateAccessTokenAction
+    ) -> CreateAccessTokenActionResult:
+        return CreateAccessTokenActionResult(
+            data=ModelDeploymentAccessTokenData(
+                id=uuid4(),
+                token="test_token",
+                valid_until=datetime.now() + timedelta(hours=1),
+                created_at=datetime.now(),
+            )
         )
 
 
