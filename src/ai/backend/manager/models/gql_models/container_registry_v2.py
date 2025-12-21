@@ -111,17 +111,19 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):
         try:
             async with ctx.db.begin_session() as db_session:
                 duplicate_registry = await db_session.execute(
-                    sa.select(ContainerRegistryRow).where(
+                    sa.select(ContainerRegistryRow)
+                    .where(
                         sa.and_(
                             ContainerRegistryRow.registry_name == props.registry_name,
                             ContainerRegistryRow.project == input_config.get("project", None),
                         )
                     )
+                    .with_for_update()
                 )
                 if duplicate_registry.scalar() is not None:
                     msg = f"Container registry already exists with registry_name: {props.registry_name}"
                     if props.project is Undefined or props.project is None:
-                        msg += ", with no project registry"
+                        msg += " without a project"
                     else:
                         msg += f", in project: {props.project}"
                     raise ContainerRegistryAlreadyExists(msg)
