@@ -65,3 +65,17 @@ class ModelDeploymentAutoScalingRule:
     time_window: int
     min_replicas: Optional[int]
     max_replicas: Optional[int]
+
+
+@dataclass
+class ModelDeploymentAutoScalingRuleModifier:
+    """Modifier for updating auto-scaling rule fields."""
+
+    metric_source: Optional[AutoScalingMetricSource] = None
+    metric_name: Optional[str] = None
+    min_threshold: Optional[Decimal] = None
+    max_threshold: Optional[Decimal] = None
+    step_size: Optional[int] = None
+    time_window: Optional[int] = None
+    min_replicas: Optional[int] = None
+    max_replicas: Optional[int] = None

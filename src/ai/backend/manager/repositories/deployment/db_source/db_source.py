@@ -23,12 +23,18 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.deployment.creator import DeploymentCreator
-from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
+from ai.backend.manager.data.deployment.scale import (
+    AutoScalingRule,
+    AutoScalingRuleCreator,
+    ModelDeploymentAutoScalingRuleCreator,
+    ModelDeploymentAutoScalingRuleModifier,
+)
 from ai.backend.manager.data.deployment.scale_modifier import AutoScalingRuleModifier
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentInfoWithAutoScalingRules,
     EndpointLifecycle,
+    ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
     RouteInfo,
@@ -571,6 +577,74 @@ class DeploymentDBSource:
             )
             result = await db_sess.execute(query)
             return result.rowcount > 0
+
+    # New Model Deployment Auto-scaling Rule methods (using new types)
+
+    async def create_model_deployment_autoscaling_rule(
+        self,
+        creator: ModelDeploymentAutoScalingRuleCreator,
+    ) -> ModelDeploymentAutoScalingRuleData:
+        """Create a new autoscaling rule using ModelDeployment types."""
+        async with self._begin_session_read_committed() as db_sess:
+            # First get the endpoint to ensure it exists
+            query = sa.select(EndpointRow).where(EndpointRow.id == creator.model_deployment_id)
+            result = await db_sess.execute(query)
+            endpoint = result.scalar_one_or_none()
+            if not endpoint:
+                raise EndpointNotFound(f"Endpoint {creator.model_deployment_id} not found")
+
+            row = EndpointAutoScalingRuleRow.from_model_deployment_creator(creator)
+            db_sess.add(row)
+            await db_sess.flush()
+            return row.to_model_deployment_data()
+
+    async def update_model_deployment_autoscaling_rule(
+        self,
+        rule_id: uuid.UUID,
+        modifier: ModelDeploymentAutoScalingRuleModifier,
+    ) -> ModelDeploymentAutoScalingRuleData:
+        """Update an autoscaling rule using ModelDeployment types."""
+        async with self._begin_session_read_committed() as db_sess:
+            query = sa.select(EndpointAutoScalingRuleRow).where(
+                EndpointAutoScalingRuleRow.id == rule_id
+            )
+            result = await db_sess.execute(query)
+            row = result.scalar_one_or_none()
+
+            if not row:
+                raise AutoScalingRuleNotFound(f"Autoscaling rule {rule_id} not found")
+
+            row.apply_model_deployment_modifier(modifier)
+            await db_sess.flush()
+            return row.to_model_deployment_data()
+
+    async def list_model_deployment_autoscaling_rules(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> list[ModelDeploymentAutoScalingRuleData]:
+        """List all autoscaling rules for an endpoint using ModelDeployment types."""
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(EndpointAutoScalingRuleRow).where(
+                EndpointAutoScalingRuleRow.endpoint == endpoint_id
+            )
+            result = await db_sess.execute(query)
+            rows = result.scalars().all()
+            return [row.to_model_deployment_data() for row in rows]
+
+    async def get_model_deployment_autoscaling_rule(
+        self,
+        rule_id: uuid.UUID,
+    ) -> ModelDeploymentAutoScalingRuleData:
+        """Get a single autoscaling rule by ID using ModelDeployment types."""
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(EndpointAutoScalingRuleRow).where(
+                EndpointAutoScalingRuleRow.id == rule_id
+            )
+            result = await db_sess.execute(query)
+            row = result.scalar_one_or_none()
+            if not row:
+                raise AutoScalingRuleNotFound(f"Autoscaling rule {rule_id} not found")
+            return row.to_model_deployment_data()
 
     # Route operations
 

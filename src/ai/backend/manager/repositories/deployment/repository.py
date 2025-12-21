@@ -29,13 +29,19 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.deployment.creator import DeploymentCreator
-from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
+from ai.backend.manager.data.deployment.scale import (
+    AutoScalingRule,
+    AutoScalingRuleCreator,
+    ModelDeploymentAutoScalingRuleCreator,
+    ModelDeploymentAutoScalingRuleModifier,
+)
 from ai.backend.manager.data.deployment.scale_modifier import AutoScalingRuleModifier
 from ai.backend.manager.data.deployment.types import (
     DefinitionFiles,
     DeploymentInfo,
     DeploymentInfoWithAutoScalingRules,
     EndpointLifecycle,
+    ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
     RouteInfo,
@@ -295,6 +301,41 @@ class DeploymentRepository:
     ) -> bool:
         """Delete an autoscaling rule."""
         return await self._db_source.delete_autoscaling_rule(rule_id)
+
+    # Model Deployment Auto-scaling Rule operations (new types)
+
+    @deployment_repository_resilience.apply()
+    async def create_model_deployment_autoscaling_rule(
+        self,
+        creator: ModelDeploymentAutoScalingRuleCreator,
+    ) -> ModelDeploymentAutoScalingRuleData:
+        """Create a new autoscaling rule using ModelDeployment types."""
+        return await self._db_source.create_model_deployment_autoscaling_rule(creator)
+
+    @deployment_repository_resilience.apply()
+    async def update_model_deployment_autoscaling_rule(
+        self,
+        rule_id: uuid.UUID,
+        modifier: ModelDeploymentAutoScalingRuleModifier,
+    ) -> ModelDeploymentAutoScalingRuleData:
+        """Update an autoscaling rule using ModelDeployment types."""
+        return await self._db_source.update_model_deployment_autoscaling_rule(rule_id, modifier)
+
+    @deployment_repository_resilience.apply()
+    async def list_model_deployment_autoscaling_rules(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> list[ModelDeploymentAutoScalingRuleData]:
+        """List all autoscaling rules for an endpoint using ModelDeployment types."""
+        return await self._db_source.list_model_deployment_autoscaling_rules(endpoint_id)
+
+    @deployment_repository_resilience.apply()
+    async def get_model_deployment_autoscaling_rule(
+        self,
+        rule_id: uuid.UUID,
+    ) -> ModelDeploymentAutoScalingRuleData:
+        """Get a single autoscaling rule by ID using ModelDeployment types."""
+        return await self._db_source.get_model_deployment_autoscaling_rule(rule_id)
 
     # Data fetching operations
     @deployment_repository_resilience.apply()

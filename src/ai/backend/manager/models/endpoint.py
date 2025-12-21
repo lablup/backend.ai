@@ -49,6 +49,8 @@ from ai.backend.manager.data.deployment.scale import (
     AutoScalingCondition,
     AutoScalingRule,
     AutoScalingRuleCreator,
+    ModelDeploymentAutoScalingRuleCreator,
+    ModelDeploymentAutoScalingRuleModifier,
 )
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
@@ -56,6 +58,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     DeploymentState,
     ExecutionSpec,
+    ModelDeploymentAutoScalingRuleData,
     ModelRevisionSpec,
     MountMetadata,
     ReplicaSpec,
@@ -1066,6 +1069,92 @@ class EndpointAutoScalingRuleRow(Base):
             created_at=self.created_at,
             last_triggered_at=self.last_triggered_at,
         )
+
+    # New type conversion methods for Model Deployment
+
+    @classmethod
+    def from_model_deployment_creator(cls, creator: ModelDeploymentAutoScalingRuleCreator) -> Self:
+        """Create from ModelDeploymentAutoScalingRuleCreator (new type)."""
+        # Map min/max threshold to single threshold + comparator
+        # If max_threshold is set, use it with GREATER_THAN (scale down when above)
+        # If only min_threshold is set, use it with LESS_THAN (scale up when below)
+        if creator.max_threshold is not None:
+            threshold = creator.max_threshold
+            comparator = AutoScalingMetricComparator.GREATER_THAN
+        elif creator.min_threshold is not None:
+            threshold = creator.min_threshold
+            comparator = AutoScalingMetricComparator.LESS_THAN
+        else:
+            # Default: no threshold means no scaling trigger
+            threshold = Decimal("0")
+            comparator = AutoScalingMetricComparator.GREATER_THAN
+
+        return cls(
+            id=uuid4(),
+            endpoint=creator.model_deployment_id,
+            metric_source=creator.metric_source,
+            metric_name=creator.metric_name,
+            threshold=threshold,
+            comparator=comparator,
+            step_size=creator.step_size,
+            cooldown_seconds=creator.time_window,  # Map time_window to cooldown_seconds
+            min_replicas=creator.min_replicas,
+            max_replicas=creator.max_replicas,
+        )
+
+    def to_model_deployment_data(self) -> ModelDeploymentAutoScalingRuleData:
+        """Convert to ModelDeploymentAutoScalingRuleData (new type)."""
+        # Map threshold + comparator back to min/max threshold
+        min_threshold: Optional[Decimal] = None
+        max_threshold: Optional[Decimal] = None
+
+        if self.comparator == AutoScalingMetricComparator.GREATER_THAN:
+            max_threshold = self.threshold
+        elif self.comparator == AutoScalingMetricComparator.LESS_THAN:
+            min_threshold = self.threshold
+        else:
+            # For other comparators (EQUAL, etc.), default to max_threshold
+            max_threshold = self.threshold
+
+        return ModelDeploymentAutoScalingRuleData(
+            id=self.id,
+            model_deployment_id=self.endpoint,
+            metric_source=self.metric_source,
+            metric_name=self.metric_name,
+            min_threshold=min_threshold,
+            max_threshold=max_threshold,
+            step_size=self.step_size,
+            time_window=self.cooldown_seconds,  # Map cooldown_seconds to time_window
+            min_replicas=self.min_replicas,
+            max_replicas=self.max_replicas,
+            created_at=self.created_at,
+            last_triggered_at=self.last_triggered_at,
+        )
+
+    def apply_model_deployment_modifier(
+        self, modifier: ModelDeploymentAutoScalingRuleModifier
+    ) -> None:
+        """Apply ModelDeploymentAutoScalingRuleModifier to update fields."""
+        if modifier.metric_source is not None:
+            self.metric_source = modifier.metric_source
+        if modifier.metric_name is not None:
+            self.metric_name = modifier.metric_name
+        if modifier.step_size is not None:
+            self.step_size = modifier.step_size
+        if modifier.time_window is not None:
+            self.cooldown_seconds = modifier.time_window
+        if modifier.min_replicas is not None:
+            self.min_replicas = modifier.min_replicas
+        if modifier.max_replicas is not None:
+            self.max_replicas = modifier.max_replicas
+
+        # Update threshold and comparator based on min/max threshold
+        if modifier.max_threshold is not None:
+            self.threshold = modifier.max_threshold
+            self.comparator = AutoScalingMetricComparator.GREATER_THAN
+        elif modifier.min_threshold is not None:
+            self.threshold = modifier.min_threshold
+            self.comparator = AutoScalingMetricComparator.LESS_THAN
 
 
 class ModelServiceHelper:
