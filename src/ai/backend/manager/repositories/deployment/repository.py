@@ -65,7 +65,7 @@ from ai.backend.manager.models.deployment_policy import (
     DeploymentPolicyRow,
 )
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.endpoint import EndpointRow, EndpointStatistics
+from ai.backend.manager.models.endpoint import EndpointRow, EndpointStatistics, EndpointTokenRow
 from ai.backend.manager.models.kernel import KernelStatistics
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -1192,3 +1192,20 @@ class DeploymentRepository:
             DeploymentInfoSearchResult with items, total_count, and pagination info
         """
         return await self._db_source.search_endpoints(querier)
+
+    # ========== Access Token Operations ==========
+
+    @deployment_repository_resilience.apply()
+    async def create_access_token(
+        self,
+        creator: Creator[EndpointTokenRow],
+    ) -> EndpointTokenRow:
+        """Create a new access token for a model deployment.
+
+        Args:
+            creator: Creator containing the EndpointTokenCreatorSpec.
+
+        Returns:
+            Created EndpointTokenRow.
+        """
+        return await self._db_source.create_access_token(creator)

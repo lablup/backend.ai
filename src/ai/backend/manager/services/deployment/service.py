@@ -1,7 +1,7 @@
 """Deployment service for managing model deployments."""
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from uuid import uuid4
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -29,9 +29,12 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaStateData,
     ResourceConfigData,
 )
+from ai.backend.manager.models.endpoint import EndpointTokenRow
+from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.creators import EndpointTokenCreatorSpec
 from ai.backend.manager.repositories.deployment.options import RevisionConditions
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
@@ -623,14 +626,40 @@ class DeploymentService:
     async def create_access_token(
         self, action: CreateAccessTokenAction
     ) -> CreateAccessTokenActionResult:
-        return CreateAccessTokenActionResult(
-            data=ModelDeploymentAccessTokenData(
-                id=uuid4(),
-                token="test_token",
-                valid_until=datetime.now() + timedelta(hours=1),
-                created_at=datetime.now(),
-            )
+        """Create a new access token for a model deployment.
+
+        Args:
+            action: CreateAccessTokenAction containing the creator spec.
+
+        Returns:
+            CreateAccessTokenActionResult with the created token data.
+        """
+        # Get endpoint info to retrieve domain, project, session_owner
+        endpoint_info = await self._deployment_repository.get_endpoint_info(
+            action.creator.model_deployment_id
         )
+
+        # Create the Creator with EndpointTokenCreatorSpec
+        spec = EndpointTokenCreatorSpec(
+            endpoint=action.creator.model_deployment_id,
+            domain=endpoint_info.metadata.domain,
+            project=endpoint_info.metadata.project,
+            session_owner=endpoint_info.metadata.session_owner,
+        )
+        creator: Creator[EndpointTokenRow] = Creator(spec=spec)
+
+        # Create the token via repository
+        token_row = await self._deployment_repository.create_access_token(creator)
+
+        # Convert to ModelDeploymentAccessTokenData
+        # Note: valid_until is returned as provided but not persisted in DB
+        data = ModelDeploymentAccessTokenData(
+            id=token_row.id,
+            token=token_row.token,
+            valid_until=action.creator.valid_until,
+            created_at=token_row.created_at or datetime.now(),
+        )
+        return CreateAccessTokenActionResult(data=data)
 
 
 mock_revision_data_1 = ModelRevisionData(

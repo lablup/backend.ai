@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -28,6 +29,7 @@ from ai.backend.manager.models.deployment_policy import (
     RollingUpdateSpec,
 )
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.endpoint import EndpointTokenRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base import CreatorSpec
 from ai.backend.manager.repositories.base.updater import BatchUpdaterSpec
@@ -203,3 +205,29 @@ class RouteBatchUpdaterSpec(BatchUpdaterSpec[RoutingRow]):
         if self.traffic_status is not None:
             values["traffic_status"] = self.traffic_status
         return values
+
+
+@dataclass
+class EndpointTokenCreatorSpec(CreatorSpec[EndpointTokenRow]):
+    """CreatorSpec for endpoint access token creation.
+
+    Creates an access token that can be used to authenticate requests
+    to a specific endpoint. Token ID and token value are generated
+    automatically in build_row().
+    """
+
+    endpoint: uuid.UUID
+    domain: str
+    project: uuid.UUID
+    session_owner: uuid.UUID
+
+    @override
+    def build_row(self) -> EndpointTokenRow:
+        return EndpointTokenRow(
+            id=uuid.uuid4(),
+            token=secrets.token_urlsafe(32),
+            endpoint=self.endpoint,
+            domain=self.domain,
+            project=self.project,
+            session_owner=self.session_owner,
+        )

@@ -75,6 +75,7 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
+    EndpointTokenRow,
     ModelServiceHelper,
 )
 from ai.backend.manager.models.group import groups
@@ -1914,3 +1915,21 @@ class DeploymentDBSource:
         """
         async with self._begin_session_read_committed() as db_sess:
             return await execute_purger(db_sess, purger)
+
+    # ========== Access Token Operations ==========
+
+    async def create_access_token(
+        self,
+        creator: Creator[EndpointTokenRow],
+    ) -> EndpointTokenRow:
+        """Create a new access token for a model deployment.
+
+        Args:
+            creator: Creator containing the EndpointTokenCreatorSpec.
+
+        Returns:
+            Created EndpointTokenRow.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            result = await execute_creator(db_sess, creator)
+            return result.row
