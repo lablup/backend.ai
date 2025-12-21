@@ -574,3 +574,13 @@ class DeploymentSearchResult:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+
+
+@dataclass
+class DeploymentInfoSearchResult:
+    """Search result with pagination for deployment info."""
+
+    items: list[DeploymentInfo]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool

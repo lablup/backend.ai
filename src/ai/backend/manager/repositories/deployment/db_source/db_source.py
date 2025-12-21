@@ -34,6 +34,7 @@ from ai.backend.manager.data.deployment.scale_modifier import (
 )
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
+    DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
     EndpointLifecycle,
     ModelDeploymentAutoScalingRuleData,
@@ -779,6 +780,36 @@ class DeploymentDBSource:
             items = [row.RoutingRow.to_route_info() for row in result.rows]
 
             return RouteSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_endpoints(
+        self,
+        querier: BatchQuerier,
+    ) -> DeploymentInfoSearchResult:
+        """Search endpoints with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination
+
+        Returns:
+            DeploymentInfoSearchResult with items, total_count, and pagination info
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(EndpointRow).options(selectinload(EndpointRow.revisions))
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.EndpointRow.to_deployment_info() for row in result.rows]
+
+            return DeploymentInfoSearchResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,

@@ -41,6 +41,7 @@ from ai.backend.manager.data.deployment.scale_modifier import (
 from ai.backend.manager.data.deployment.types import (
     DefinitionFiles,
     DeploymentInfo,
+    DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
     EndpointLifecycle,
     ModelDeploymentAutoScalingRuleData,
@@ -1176,3 +1177,18 @@ class DeploymentRepository:
             RouteSearchResult with items, total_count, and pagination info
         """
         return await self._db_source.search_routes(querier)
+
+    @deployment_repository_resilience.apply()
+    async def search_endpoints(
+        self,
+        querier: BatchQuerier,
+    ) -> DeploymentInfoSearchResult:
+        """Search endpoints with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination
+
+        Returns:
+            DeploymentInfoSearchResult with items, total_count, and pagination info
+        """
+        return await self._db_source.search_endpoints(querier)
