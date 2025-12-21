@@ -466,11 +466,14 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             j = users.join(
                 user_resource_policies,
                 users.c.resource_policy == user_resource_policies.c.name,
+            ).join(
+                keypairs,
+                users.c.uuid == keypairs.c.user,
             )
             query = (
                 sa.select([users, user_resource_policies], use_labels=True)
                 .select_from(j)
-                .where((users.c.main_access_key == access_key))
+                .where((keypairs.c.access_key == access_key))
             )
             result = await conn.execute(query)
             user_row = result.first()
