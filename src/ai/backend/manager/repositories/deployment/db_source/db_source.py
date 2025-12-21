@@ -1554,6 +1554,68 @@ class DeploymentDBSource:
                 raise DeploymentRevisionNotFound(f"Deployment revision {revision_id} not found")
             return row.to_data()
 
+    async def get_revision_by_route_id(
+        self,
+        route_id: uuid.UUID,
+    ) -> ModelRevisionData:
+        """Get a deployment revision by route (replica) ID.
+
+        Args:
+            route_id: ID of the route (replica)
+
+        Raises:
+            RouteNotFound: If the route does not exist.
+            DeploymentRevisionNotFound: If the route has no revision linked.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            route_query = sa.select(RoutingRow.revision).where(RoutingRow.id == route_id)
+            result = await db_sess.execute(route_query)
+            revision_id = result.scalar_one_or_none()
+            if revision_id is None:
+                raise DeploymentRevisionNotFound(f"Route {route_id} has no revision linked")
+
+            revision_query = sa.select(DeploymentRevisionRow).where(
+                DeploymentRevisionRow.id == revision_id
+            )
+            revision_result = await db_sess.execute(revision_query)
+            row = revision_result.scalar_one_or_none()
+            if row is None:
+                raise DeploymentRevisionNotFound(f"Deployment revision {revision_id} not found")
+            return row.to_data()
+
+    async def get_current_revision(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> ModelRevisionData:
+        """Get the current revision of a deployment.
+
+        Args:
+            endpoint_id: ID of the deployment endpoint
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist.
+            DeploymentRevisionNotFound: If the endpoint has no current revision.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            endpoint_query = sa.select(EndpointRow.current_revision).where(
+                EndpointRow.id == endpoint_id
+            )
+            result = await db_sess.execute(endpoint_query)
+            current_revision_id = result.scalar_one_or_none()
+            if current_revision_id is None:
+                raise DeploymentRevisionNotFound(f"Endpoint {endpoint_id} has no current revision")
+
+            revision_query = sa.select(DeploymentRevisionRow).where(
+                DeploymentRevisionRow.id == current_revision_id
+            )
+            revision_result = await db_sess.execute(revision_query)
+            row = revision_result.scalar_one_or_none()
+            if row is None:
+                raise DeploymentRevisionNotFound(
+                    f"Deployment revision {current_revision_id} not found"
+                )
+            return row.to_data()
+
     async def search_revisions(
         self,
         querier: BatchQuerier,

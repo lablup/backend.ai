@@ -30,18 +30,13 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaStateData,
     ResourceConfigData,
 )
+from ai.backend.manager.repositories.base.pagination import OffsetPagination
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.options import RevisionConditions
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
-)
-from ai.backend.manager.services.deployment.actions.access_token.list_access_tokens import (
-    ListAccessTokensAction,
-    ListAccessTokensActionResult,
-)
-from ai.backend.manager.services.deployment.actions.auto_scaling_rule.batch_load_auto_scaling_rules import (
-    BatchLoadAutoScalingRulesAction,
-    BatchLoadAutoScalingRulesActionResult,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_auto_scaling_rule import (
     CreateAutoScalingRuleAction,
@@ -59,10 +54,6 @@ from ai.backend.manager.services.deployment.actions.batch_load_deployments impor
     BatchLoadDeploymentsAction,
     BatchLoadDeploymentsActionResult,
 )
-from ai.backend.manager.services.deployment.actions.batch_load_replicas_by_revision_ids import (
-    BatchLoadReplicasByRevisionIdsAction,
-    BatchLoadReplicasByRevisionIdsActionResult,
-)
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
     CreateDeploymentActionResult,
@@ -79,17 +70,9 @@ from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
     DestroyDeploymentActionResult,
 )
-from ai.backend.manager.services.deployment.actions.list_replicas import (
-    ListReplicasAction,
-    ListReplicasActionResult,
-)
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
     AddModelRevisionActionResult,
-)
-from ai.backend.manager.services.deployment.actions.model_revision.batch_load_revisions import (
-    BatchLoadRevisionsAction,
-    BatchLoadRevisionsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.create_model_revision import (
     CreateModelRevisionAction,
@@ -110,10 +93,6 @@ from ai.backend.manager.services.deployment.actions.model_revision.get_revision_
 from ai.backend.manager.services.deployment.actions.model_revision.get_revisions_by_deployment_id import (
     GetRevisionsByDeploymentIdAction,
     GetRevisionsByDeploymentIdActionResult,
-)
-from ai.backend.manager.services.deployment.actions.model_revision.list_revisions import (
-    ListRevisionsAction,
-    ListRevisionsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.search_revisions import (
     SearchRevisionsAction,
@@ -358,24 +337,6 @@ class DeploymentService:
             )
         )
 
-    async def list_access_tokens(
-        self, action: ListAccessTokensAction
-    ) -> ListAccessTokensActionResult:
-        tokens = []
-        for i in range(5):
-            tokens.append(
-                ModelDeploymentAccessTokenData(
-                    id=uuid4(),
-                    token=f"test_token_{i}",
-                    valid_until=datetime.now() + timedelta(hours=24 * (i + 1)),
-                    created_at=datetime.now() - timedelta(hours=i),
-                )
-            )
-        return ListAccessTokensActionResult(
-            data=tokens,
-            total_count=len(tokens),
-        )
-
     async def sync_replicas(self, action: SyncReplicaAction) -> SyncReplicaActionResult:
         """Sync replicas for a deployment.
 
@@ -400,91 +361,56 @@ class DeploymentService:
     async def add_model_revision(
         self, action: AddModelRevisionAction
     ) -> AddModelRevisionActionResult:
-        return AddModelRevisionActionResult(revision=mock_revision_data_2)
-
-    async def batch_load_auto_scaling_rules(
-        self, action: BatchLoadAutoScalingRulesAction
-    ) -> BatchLoadAutoScalingRulesActionResult:
-        return BatchLoadAutoScalingRulesActionResult(
-            data=[
-                ModelDeploymentAutoScalingRuleData(
-                    id=uuid4(),
-                    model_deployment_id=uuid4(),
-                    metric_source=AutoScalingMetricSource.KERNEL,
-                    metric_name="test-metric",
-                    min_threshold=Decimal("0.5"),
-                    max_threshold=Decimal("21.0"),
-                    step_size=1,
-                    time_window=60,
-                    min_replicas=1,
-                    max_replicas=10,
-                    created_at=datetime.now(),
-                    last_triggered_at=datetime.now(),
-                ),
-                ModelDeploymentAutoScalingRuleData(
-                    id=uuid4(),
-                    model_deployment_id=uuid4(),
-                    metric_source=AutoScalingMetricSource.KERNEL,
-                    metric_name="test-metric",
-                    min_threshold=Decimal("0.0"),
-                    max_threshold=Decimal("10.0"),
-                    step_size=2,
-                    time_window=200,
-                    min_replicas=1,
-                    max_replicas=5,
-                    created_at=datetime.now(),
-                    last_triggered_at=datetime.now(),
-                ),
-            ]
+        # TODO: Implement full revision creation logic
+        # 1. Resolve image ID from action.adder.image_identifier
+        # 2. Get latest revision number via get_latest_revision_number(action.model_deployment_id)
+        # 3. Build DeploymentRevisionCreatorSpec from action.adder
+        # 4. Create revision via repository.create_revision(creator)
+        raise NotImplementedError(
+            "add_model_revision requires full ModelRevisionCreator to "
+            "DeploymentRevisionCreatorSpec conversion - pending implementation"
         )
-
-    async def list_replicas(self, action: ListReplicasAction) -> ListReplicasActionResult:
-        return ListReplicasActionResult(
-            data=[],
-            total_count=0,
-        )
-
-    async def batch_load_revisions(
-        self, action: BatchLoadRevisionsAction
-    ) -> BatchLoadRevisionsActionResult:
-        return BatchLoadRevisionsActionResult(data=[mock_revision_data_1, mock_revision_data_2])
-
-    async def list_revisions(self, action: ListRevisionsAction) -> ListRevisionsActionResult:
-        return ListRevisionsActionResult(data=[], total_count=0)
 
     async def get_revision_by_deployment_id(
         self, action: GetRevisionByDeploymentIdAction
     ) -> GetRevisionByDeploymentIdActionResult:
-        return GetRevisionByDeploymentIdActionResult(data=mock_revision_data_1)
+        revision = await self._deployment_repository.get_current_revision(action.deployment_id)
+        return GetRevisionByDeploymentIdActionResult(data=revision)
 
     async def get_revision_by_id(
         self, action: GetRevisionByIdAction
     ) -> GetRevisionByIdActionResult:
-        return GetRevisionByIdActionResult(data=mock_revision_data_1)
+        revision = await self._deployment_repository.get_revision(action.revision_id)
+        return GetRevisionByIdActionResult(data=revision)
 
     async def get_revision_by_replica_id(
         self, action: GetRevisionByReplicaIdAction
     ) -> GetRevisionByReplicaIdActionResult:
-        return GetRevisionByReplicaIdActionResult(data=mock_revision_data_1)
+        revision = await self._deployment_repository.get_revision_by_route_id(action.replica_id)
+        return GetRevisionByReplicaIdActionResult(data=revision)
 
     async def get_revisions_by_deployment_id(
         self, action: GetRevisionsByDeploymentIdAction
     ) -> GetRevisionsByDeploymentIdActionResult:
-        # For now, return mock revision data list
-        return GetRevisionsByDeploymentIdActionResult(
-            data=[mock_revision_data_1, mock_revision_data_2]
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[RevisionConditions.by_deployment_id(action.deployment_id)],
         )
-
-    async def batch_load_replicas_by_revision_ids(
-        self, action: BatchLoadReplicasByRevisionIdsAction
-    ) -> BatchLoadReplicasByRevisionIdsActionResult:
-        # For now, return empty replica list
-        return BatchLoadReplicasByRevisionIdsActionResult(data={})
+        result = await self._deployment_repository.search_revisions(querier)
+        return GetRevisionsByDeploymentIdActionResult(data=result.items)
 
     async def create_model_revision(
         self, action: CreateModelRevisionAction
     ) -> CreateModelRevisionActionResult:
-        return CreateModelRevisionActionResult(revision=mock_revision_data_2)
+        # TODO: Implement full revision creation logic
+        # 1. Resolve image ID from action.creator.image_identifier
+        # 2. Get latest revision number via get_latest_revision_number()
+        # 3. Build DeploymentRevisionCreatorSpec from action.creator
+        # 4. Create revision via repository.create_revision(creator)
+        raise NotImplementedError(
+            "create_model_revision requires full ModelRevisionCreator to "
+            "DeploymentRevisionCreatorSpec conversion - pending implementation"
+        )
 
     # ========== Deployment Policy Methods ==========
 
@@ -672,14 +598,12 @@ class DeploymentService:
         Returns:
             SearchRevisionsActionResult: Result containing list of revisions and pagination info
         """
-        # TODO: Implement proper database query through controller
-        # For now, return mock data similar to batch_load_revisions
-        revisions = [mock_revision_data_1, mock_revision_data_2]
+        result = await self._deployment_repository.search_revisions(action.querier)
         return SearchRevisionsActionResult(
-            revisions=revisions,
-            total_count=len(revisions),
-            has_next_page=False,
-            has_previous_page=False,
+            revisions=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
 

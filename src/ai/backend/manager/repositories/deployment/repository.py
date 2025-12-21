@@ -925,6 +925,38 @@ class DeploymentRepository:
         return await self._db_source.get_revision(revision_id)
 
     @deployment_repository_resilience.apply()
+    async def get_revision_by_route_id(
+        self,
+        route_id: uuid.UUID,
+    ) -> ModelRevisionData:
+        """Get a deployment revision by route (replica) ID.
+
+        Args:
+            route_id: ID of the route (replica)
+
+        Raises:
+            RouteNotFound: If the route does not exist.
+            DeploymentRevisionNotFound: If the route has no revision linked.
+        """
+        return await self._db_source.get_revision_by_route_id(route_id)
+
+    @deployment_repository_resilience.apply()
+    async def get_current_revision(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> ModelRevisionData:
+        """Get the current revision of a deployment.
+
+        Args:
+            endpoint_id: ID of the deployment endpoint
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist.
+            DeploymentRevisionNotFound: If the endpoint has no current revision.
+        """
+        return await self._db_source.get_current_revision(endpoint_id)
+
+    @deployment_repository_resilience.apply()
     async def search_revisions(
         self,
         querier: BatchQuerier,

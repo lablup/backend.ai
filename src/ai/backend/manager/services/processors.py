@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Self, override
+from typing import Self, override
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
@@ -393,7 +393,7 @@ class Processors(AbstractProcessorPackage):
     artifact: ArtifactProcessors
     artifact_registry: ArtifactRegistryProcessors
     artifact_revision: ArtifactRevisionProcessors
-    deployment: Optional[DeploymentProcessors]
+    deployment: DeploymentProcessors
     storage_namespace: StorageNamespaceProcessors
 
     @classmethod
@@ -451,10 +451,7 @@ class Processors(AbstractProcessorPackage):
             services.artifact_revision, action_monitors
         )
 
-        # Initialize deployment processors if service is available
-        deployment_processors = None
-        if services.deployment is not None:
-            deployment_processors = DeploymentProcessors(services.deployment, action_monitors)
+        deployment_processors = DeploymentProcessors(services.deployment, action_monitors)
 
         storage_namespace_processors = StorageNamespaceProcessors(
             services.storage_namespace, action_monitors
