@@ -50,6 +50,8 @@ from ai.backend.manager.data.deployment.scale import (
     AutoScalingRule,
     AutoScalingRuleCreator,
     ModelDeploymentAutoScalingRuleCreator,
+)
+from ai.backend.manager.data.deployment.scale_modifier import (
     ModelDeploymentAutoScalingRuleModifier,
 )
 from ai.backend.manager.data.deployment.types import (
@@ -1134,26 +1136,30 @@ class EndpointAutoScalingRuleRow(Base):
     def apply_model_deployment_modifier(
         self, modifier: ModelDeploymentAutoScalingRuleModifier
     ) -> None:
-        """Apply ModelDeploymentAutoScalingRuleModifier to update fields."""
-        if modifier.metric_source is not None:
-            self.metric_source = modifier.metric_source
-        if modifier.metric_name is not None:
-            self.metric_name = modifier.metric_name
-        if modifier.step_size is not None:
-            self.step_size = modifier.step_size
-        if modifier.time_window is not None:
-            self.cooldown_seconds = modifier.time_window
-        if modifier.min_replicas is not None:
-            self.min_replicas = modifier.min_replicas
-        if modifier.max_replicas is not None:
-            self.max_replicas = modifier.max_replicas
+        """Apply ModelDeploymentAutoScalingRuleModifier to update fields.
+
+        Uses OptionalState pattern where optional_value() returns the value to update
+        or None if no update should be performed.
+        """
+        if (metric_source := modifier.metric_source.optional_value()) is not None:
+            self.metric_source = metric_source
+        if (metric_name := modifier.metric_name.optional_value()) is not None:
+            self.metric_name = metric_name
+        if (step_size := modifier.step_size.optional_value()) is not None:
+            self.step_size = step_size
+        if (time_window := modifier.time_window.optional_value()) is not None:
+            self.cooldown_seconds = time_window
+        if (min_replicas := modifier.min_replicas.optional_value()) is not None:
+            self.min_replicas = min_replicas
+        if (max_replicas := modifier.max_replicas.optional_value()) is not None:
+            self.max_replicas = max_replicas
 
         # Update threshold and comparator based on min/max threshold
-        if modifier.max_threshold is not None:
-            self.threshold = modifier.max_threshold
+        if (max_threshold := modifier.max_threshold.optional_value()) is not None:
+            self.threshold = max_threshold
             self.comparator = AutoScalingMetricComparator.GREATER_THAN
-        elif modifier.min_threshold is not None:
-            self.threshold = modifier.min_threshold
+        elif (min_threshold := modifier.min_threshold.optional_value()) is not None:
+            self.threshold = min_threshold
             self.comparator = AutoScalingMetricComparator.LESS_THAN
 
 

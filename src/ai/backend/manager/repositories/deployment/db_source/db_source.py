@@ -27,9 +27,11 @@ from ai.backend.manager.data.deployment.scale import (
     AutoScalingRule,
     AutoScalingRuleCreator,
     ModelDeploymentAutoScalingRuleCreator,
+)
+from ai.backend.manager.data.deployment.scale_modifier import (
+    AutoScalingRuleModifier,
     ModelDeploymentAutoScalingRuleModifier,
 )
-from ai.backend.manager.data.deployment.scale_modifier import AutoScalingRuleModifier
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentInfoWithAutoScalingRules,

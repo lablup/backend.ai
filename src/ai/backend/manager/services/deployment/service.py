@@ -2,7 +2,6 @@
 
 import logging
 from datetime import datetime, timedelta
-from decimal import Decimal
 from uuid import uuid4
 
 from ai.backend.common.data.model_deployment.types import (
@@ -10,7 +9,6 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
 )
 from ai.backend.common.types import (
-    AutoScalingMetricSource,
     ClusterMode,
     ResourceSlot,
     RuntimeVariant,
@@ -21,7 +19,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     ExtraVFolderMountData,
     ModelDeploymentAccessTokenData,
-    ModelDeploymentAutoScalingRuleData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
     ModelMountConfigData,
@@ -554,47 +551,51 @@ class DeploymentService:
     async def create_auto_scaling_rule(
         self, action: CreateAutoScalingRuleAction
     ) -> CreateAutoScalingRuleActionResult:
-        return CreateAutoScalingRuleActionResult(
-            data=ModelDeploymentAutoScalingRuleData(
-                id=uuid4(),
-                model_deployment_id=action.creator.model_deployment_id,
-                metric_source=action.creator.metric_source,
-                metric_name=action.creator.metric_name,
-                min_threshold=action.creator.min_threshold,
-                max_threshold=action.creator.max_threshold,
-                step_size=action.creator.step_size,
-                time_window=action.creator.time_window,
-                min_replicas=action.creator.min_replicas,
-                max_replicas=action.creator.max_replicas,
-                created_at=datetime.now(),
-                last_triggered_at=datetime.now(),
-            )
+        """Create a new auto-scaling rule for a deployment.
+
+        Args:
+            action: Action containing the rule creator specification
+
+        Returns:
+            CreateAutoScalingRuleActionResult: Result containing the created rule data
+        """
+        data = await self._deployment_repository.create_model_deployment_autoscaling_rule(
+            action.creator
         )
+        return CreateAutoScalingRuleActionResult(data=data)
 
     async def update_auto_scaling_rule(
         self, action: UpdateAutoScalingRuleAction
     ) -> UpdateAutoScalingRuleActionResult:
-        return UpdateAutoScalingRuleActionResult(
-            data=ModelDeploymentAutoScalingRuleData(
-                id=uuid4(),
-                model_deployment_id=uuid4(),
-                metric_source=AutoScalingMetricSource.KERNEL,
-                metric_name="test-metric",
-                min_threshold=Decimal("0.5"),
-                max_threshold=Decimal("21.0"),
-                step_size=1,
-                time_window=60,
-                min_replicas=1,
-                max_replicas=10,
-                created_at=datetime.now(),
-                last_triggered_at=datetime.now(),
-            )
+        """Update an existing auto-scaling rule.
+
+        Args:
+            action: Action containing the rule ID and modifier
+
+        Returns:
+            UpdateAutoScalingRuleActionResult: Result containing the updated rule data
+        """
+        data = await self._deployment_repository.update_model_deployment_autoscaling_rule(
+            action.auto_scaling_rule_id,
+            action.modifier,
         )
+        return UpdateAutoScalingRuleActionResult(data=data)
 
     async def delete_auto_scaling_rule(
         self, action: DeleteAutoScalingRuleAction
     ) -> DeleteAutoScalingRuleActionResult:
-        return DeleteAutoScalingRuleActionResult(success=True)
+        """Delete an auto-scaling rule.
+
+        Args:
+            action: Action containing the rule ID to delete
+
+        Returns:
+            DeleteAutoScalingRuleActionResult: Result indicating success
+        """
+        success = await self._deployment_repository.delete_autoscaling_rule(
+            action.auto_scaling_rule_id
+        )
+        return DeleteAutoScalingRuleActionResult(success=success)
 
     # ========== Access Token ==========
 
