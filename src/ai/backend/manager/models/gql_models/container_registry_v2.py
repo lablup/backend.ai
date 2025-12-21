@@ -14,6 +14,9 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
 )
+from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
+    DeleteContainerRegistryAction,
+)
 from ai.backend.manager.services.container_registry.actions.modify_container_registry import (
     ModifyContainerRegistryAction,
 )
@@ -231,20 +234,9 @@ class DeleteContainerRegistryNodeV2(graphene.Mutation):
         _, _id = AsyncNode.resolve_global_id(info, id)
         reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
 
-        try:
-            async with ctx.db.begin_session() as db_session:
-                reg_row = await ContainerRegistryRow.get(db_session, reg_id)
-                reg_row = await db_session.scalar(
-                    sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
-                )
-                if reg_row is None:
-                    raise ValueError(f"Container registry not found (id:{reg_id})")
-                container_registry = ContainerRegistryNode.from_row(ctx, reg_row)
-                await db_session.execute(
-                    sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
-                )
-
-            return cls(container_registry=container_registry)
-
-        except Exception as e:
-            raise GraphQLError(str(e))
+        result = (
+            await ctx.processors.container_registry.delete_container_registry.wait_for_complete(
+                DeleteContainerRegistryAction(id=reg_id)
+            )
+        )
+        return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))

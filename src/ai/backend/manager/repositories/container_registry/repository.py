@@ -94,6 +94,31 @@ class ContainerRegistryRepository:
             validator.validate()
             return reg_row.to_dataclass()
 
+    async def delete_registry(self, registry_id: uuid.UUID) -> ContainerRegistryData:
+        """
+        Delete a container registry by ID.
+        Returns the deleted registry data.
+        Raises ContainerRegistryNotFound if registry doesn't exist.
+        """
+        async with self._db.begin_session() as session:
+            # Fetch registry before deletion
+            stmt = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == registry_id)
+            result = await session.execute(stmt)
+            reg_row = result.scalar_one_or_none()
+
+            if reg_row is None:
+                raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
+
+            # Store data before deletion
+            registry_data = reg_row.to_dataclass()
+
+            # Delete registry
+            await session.execute(
+                sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.id == registry_id)
+            )
+
+            return registry_data
+
     @container_registry_repository_resilience.apply()
     async def get_by_registry_and_project(
         self,
