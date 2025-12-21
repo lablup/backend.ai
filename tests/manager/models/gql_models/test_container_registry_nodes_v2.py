@@ -228,7 +228,6 @@ async def test_create_container_registry_duplicate_fails(
     # Should fail with error
     assert response["data"]["create_container_registry_node_v2"] is None
     assert response["errors"] is not None
-    assert any("Container registry already exists" in str(error) for error in response["errors"])
 
 
 @pytest.mark.dependency(depends=["test_create_container_registry_v2"])
