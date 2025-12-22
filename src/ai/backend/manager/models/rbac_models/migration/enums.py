@@ -113,6 +113,7 @@ class EntityType(enum.StrEnum):
     SESSION = "session"
 
     ARTIFACT = "artifact"
+    ARTIFACT_REGISTRY = "artifact_registry"
 
     def to_original(self) -> OriginalEntityType:
         return OriginalEntityType(self.value)

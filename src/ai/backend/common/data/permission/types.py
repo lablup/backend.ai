@@ -79,6 +79,7 @@ class EntityType(enum.StrEnum):
     SESSION = "session"
 
     ARTIFACT = "artifact"
+    ARTIFACT_REGISTRY = "artifact_registry"
 
     @classmethod
     def _scope_types(cls) -> set[EntityType]:
