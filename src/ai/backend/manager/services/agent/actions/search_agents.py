@@ -6,16 +6,14 @@ from typing import Optional, override
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.agent.types import AgentData
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
-from ai.backend.manager.repositories.base import Querier
+from ai.backend.manager.repositories.base import BatchQuerier
 
 from .base import AgentAction
 
 
 @dataclass
 class SearchAgentsAction(AgentAction):
-    """Action to search agents."""
-
-    querier: Optional[Querier] = None
+    querier: BatchQuerier
 
     @override
     @classmethod
