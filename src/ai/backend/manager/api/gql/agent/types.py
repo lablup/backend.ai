@@ -23,7 +23,7 @@ from ai.backend.manager.repositories.base import (
 
 @strawberry.enum(
     name="AgentOrderField",
-    description="Added in 25.18.0. Order by specification for agents",
+    description="Added in 25.19.0. Order by specification for agents",
 )
 class AgentOrderFieldGQL(StrEnum):
     ID = "id"
@@ -35,7 +35,7 @@ class AgentOrderFieldGQL(StrEnum):
 @strawberry.input(
     name="AgentStatusFilter",
     description=dedent_strip("""
-        Added in 25.18.0. Filter options for agent status within AgentFilter.
+        Added in 25.19.0. Filter options for agent status within AgentFilter.
         It includes options to filter whether agent status is in a specific list or equals a specific value.
     """),
 )
@@ -45,12 +45,13 @@ class AgentStatusFilterGQL:
 
 
 @strawberry.input(
-    name="AgentFilter", description="Added in 25.18.0. Filter options for querying agents"
+    name="AgentFilter", description="Added in 25.19.0. Filter options for querying agents"
 )
 class AgentFilterGQL(GQLFilter):
     id: Optional[StringFilter] = None
     status: Optional[AgentStatusFilterGQL] = None
     schedulable: Optional[bool] = None
+    scaling_group: Optional[StringFilter] = None
 
     AND: Optional[list["AgentFilterGQL"]] = None
     OR: Optional[list["AgentFilterGQL"]] = None
@@ -72,6 +73,13 @@ class AgentFilterGQL(GQLFilter):
                 field_conditions.append(AgentConditions.by_status_equals(self.status.equals))
         if self.schedulable is not None:
             field_conditions.append(AgentConditions.by_schedulable(self.schedulable))
+        if self.scaling_group is not None:
+            scaling_group_condition = self.scaling_group.build_query_condition(
+                contains_factory=AgentConditions.by_scaling_group_contains,
+                equals_factory=AgentConditions.by_scaling_group_equals,
+            )
+            if scaling_group_condition is not None:
+                field_conditions.append(scaling_group_condition)
 
         if self.AND:
             for sub_filter in self.AND:
@@ -96,7 +104,7 @@ class AgentFilterGQL(GQLFilter):
         return field_conditions
 
 
-@strawberry.input(name="AgentOrderBy", description="Added in 25.18.0. Options for ordering agents")
+@strawberry.input(name="AgentOrderBy", description="Added in 25.19.0. Options for ordering agents")
 class AgentOrderByGQL(GQLOrderBy):
     field: AgentOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
@@ -149,7 +157,7 @@ class AgentStatsGQL:
 
 @strawberry.type(
     name="AgentStatusInfo",
-    description="Added in 25.18.0. Status and lifecycle information for an agent",
+    description="Added in 25.19.0. Status and lifecycle information for an agent",
 )
 class AgentStatusInfoGQL:
     status: AgentStatus = strawberry.field(
@@ -192,7 +200,7 @@ class AgentStatusInfoGQL:
 
 @strawberry.type(
     name="AgentSystemInfo",
-    description="Added in 25.18.0. System and configuration information for an agent",
+    description="Added in 25.19.0. System and configuration information for an agent",
 )
 class AgentSystemInfoGQL:
     architecture: str = strawberry.field(
@@ -205,7 +213,7 @@ class AgentSystemInfoGQL:
     version: str = strawberry.field(
         description=dedent_strip("""
             Version string of the Backend.AI agent software running on this node.
-            Follows semantic versioning (e.g., "25.18.0") and helps identify
+            Follows semantic versioning (e.g., "25.19.0") and helps identify
             compatibility and available features.
         """)
     )
@@ -228,7 +236,7 @@ class AgentSystemInfoGQL:
 
 @strawberry.type(
     name="AgentNetworkInfo",
-    description="Added in 25.18.0. Network-related information for an agent",
+    description="Added in 25.19.0. Network-related information for an agent",
 )
 class AgentNetworkInfoGQL:
     region: str = strawberry.field(description="Logical region where the agent is deployed.")
@@ -242,7 +250,7 @@ class AgentNetworkInfoGQL:
 
 
 @strawberry.type(
-    name="AgentV2", description="Added in 25.18.0. Strawberry-based Agent type replacing AgentNode."
+    name="AgentV2", description="Added in 25.19.0. Strawberry-based Agent type replacing AgentNode."
 )
 class AgentV2GQL(Node):
     id: NodeID[str]
@@ -323,7 +331,7 @@ AgentV2Edge = Edge[AgentV2GQL]
 
 
 @strawberry.type(
-    description="Added in 25.18.0. Relay-style connection type for paginated lists of agents"
+    description="Added in 25.19.0. Relay-style connection type for paginated lists of agents"
 )
 class AgentV2Connection(Connection[AgentV2GQL]):
     count: int
