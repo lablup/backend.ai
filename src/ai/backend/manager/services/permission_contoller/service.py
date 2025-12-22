@@ -128,7 +128,7 @@ class PermissionControllerService:
         Deletes a permission from the repository.
         """
         result = await self._repository.delete_permission(action.purger)
-        return DeletePermissionActionResult(data=result)
+        return DeletePermissionActionResult(result)
 
     async def create_object_permission(
         self, action: CreateObjectPermissionAction
@@ -146,7 +146,7 @@ class PermissionControllerService:
         Deletes an object permission from the repository.
         """
         result = await self._repository.delete_object_permission(action.purger)
-        return DeleteObjectPermissionActionResult(data=result)
+        return DeleteObjectPermissionActionResult(result)
 
     async def update_role(self, action: UpdateRoleAction) -> UpdateRoleActionResult:
         """
