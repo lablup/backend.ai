@@ -112,6 +112,8 @@ class EntityType(enum.StrEnum):
     IMAGE = "image"
     SESSION = "session"
 
+    ARTIFACT = "artifact"
+
     def to_original(self) -> OriginalEntityType:
         return OriginalEntityType(self.value)
 
