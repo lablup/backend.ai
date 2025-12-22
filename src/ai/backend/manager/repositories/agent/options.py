@@ -49,6 +49,30 @@ class AgentConditions:
 
         return inner
 
+    @staticmethod
+    def by_scaling_group_contains(
+        scaling_group: str, case_insensitive: bool = False
+    ) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if case_insensitive:
+                return AgentRow.scaling_group.ilike(f"%{scaling_group}%")
+            else:
+                return AgentRow.scaling_group.like(f"%{scaling_group}%")
+
+        return inner
+
+    @staticmethod
+    def by_scaling_group_equals(
+        scaling_group: str, case_insensitive: bool = False
+    ) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if case_insensitive:
+                return sa.func.lower(AgentRow.scaling_group) == scaling_group.lower()
+            else:
+                return AgentRow.scaling_group == scaling_group
+
+        return inner
+
 
 class AgentOrders:
     @staticmethod
