@@ -108,6 +108,16 @@ from .object_storage import (
     object_storages,
     update_object_storage,
 )
+from .rbac import (
+    create_role,
+    create_role_assignment,
+    delete_role,
+    delete_role_assignment,
+    role,
+    roles,
+    update_role,
+    update_role_permissions,
+)
 from .reservoir_registry import (
     create_reservoir_registry,
     delete_reservoir_registry,
@@ -191,6 +201,8 @@ class Query:
     session_scheduling_histories = session_scheduling_histories
     deployment_histories = deployment_histories
     route_histories = route_histories
+    role = role
+    roles = roles
 
 
 @strawberry.type
@@ -247,6 +259,12 @@ class Mutation:
     create_access_token = create_access_token
     activate_deployment_revision = activate_deployment_revision
     update_route_traffic_status = update_route_traffic_status
+    create_role = create_role
+    update_role = update_role
+    delete_role = delete_role
+    update_role_permissions = update_role_permissions
+    create_role_assignment = create_role_assignment
+    delete_role_assignment = delete_role_assignment
 
 
 @strawberry.type
