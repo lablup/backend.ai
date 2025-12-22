@@ -2,7 +2,6 @@
 
 import logging
 from datetime import datetime
-from uuid import uuid4
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
@@ -10,15 +9,13 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
 )
 from ai.backend.common.types import (
-    ClusterMode,
     ResourceSlot,
-    RuntimeVariant,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.deployment.creator import DeploymentCreator
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
     DeploymentInfo,
-    DeploymentNetworkSpec,
     ExtraVFolderMountData,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
@@ -26,13 +23,15 @@ from ai.backend.manager.data.deployment.types import (
     ModelMountConfigData,
     ModelRevisionData,
     ModelRuntimeConfigData,
+    MountMetadata,
     ReplicaStateData,
     ResourceConfigData,
 )
-from ai.backend.manager.models.endpoint import EndpointTokenRow
+from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import EndpointTokenCreatorSpec
 from ai.backend.manager.repositories.deployment.options import RevisionConditions
@@ -232,35 +231,46 @@ class DeploymentService:
     async def create_deployment(
         self, action: CreateDeploymentAction
     ) -> CreateDeploymentActionResult:
-        return CreateDeploymentActionResult(
-            data=ModelDeploymentData(
-                id=uuid4(),
-                metadata=ModelDeploymentMetadataInfo(
-                    name="test-deployment",
-                    status=ModelDeploymentStatus.READY,
-                    tags=["tag1", "tag2"],
-                    project_id=uuid4(),
-                    domain_name="default",
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
-                ),
-                network_access=DeploymentNetworkSpec(
-                    open_to_public=True,
-                    url="http://example.com",
-                    preferred_domain_name="example.com",
-                    access_token_ids=[uuid4()],
-                ),
-                revision_history_ids=[uuid4(), uuid4()],
-                revision=mock_revision_data_1,
-                scaling_rule_ids=[uuid4(), uuid4()],
-                replica_state=ReplicaStateData(
-                    desired_replica_count=3,
-                    replica_ids=[uuid4(), uuid4(), uuid4()],
-                ),
-                default_deployment_strategy=DeploymentStrategy.ROLLING,
-                created_user_id=uuid4(),
-            )
+        """Create a new deployment.
+
+        Args:
+            action: Create deployment action containing the creator specification
+
+        Returns:
+            CreateDeploymentActionResult: Result containing the created deployment data
+        """
+        log.info("Creating deployment with name: {}", action.creator.metadata.name)
+
+        # Convert VFolderMountsCreator to MountMetadata
+        mounts = action.creator.model_revision.mounts
+        mount_metadata = MountMetadata(
+            model_vfolder_id=mounts.model_vfolder_id,
+            model_definition_path=mounts.model_definition_path,
+            model_mount_destination=mounts.model_mount_destination,
+            extra_mounts=[],  # TODO: Convert MountInfo to VFolderMount
         )
+
+        # Convert ModelRevisionCreator to ModelRevisionSpec
+        model_revision_spec = action.creator.model_revision.to_revision_spec(mount_metadata)
+
+        # Build DeploymentCreator from NewDeploymentCreator
+        deployment_creator = DeploymentCreator(
+            metadata=action.creator.metadata,
+            replica_spec=action.creator.replica_spec,
+            network=action.creator.network,
+            model_revision=model_revision_spec,
+            policy=action.creator.policy,
+        )
+
+        # Create endpoint via repository
+        deployment_info = await self._deployment_repository.create_endpoint(deployment_creator)
+
+        # Mark lifecycle needed to start provisioning
+        await self._deployment_controller.mark_lifecycle_needed(
+            DeploymentLifecycleType.CHECK_PENDING
+        )
+
+        return CreateDeploymentActionResult(data=_convert_deployment_info_to_data(deployment_info))
 
     async def create_legacy_deployment(
         self, action: CreateLegacyDeploymentAction
@@ -283,38 +293,34 @@ class DeploymentService:
     async def update_deployment(
         self, action: UpdateDeploymentAction
     ) -> UpdateDeploymentActionResult:
+        """Update an existing deployment.
+
+        Args:
+            action: Update deployment action containing the deployment ID and updater spec
+
+        Returns:
+            UpdateDeploymentActionResult: Result containing the updated deployment data
+        """
+        log.info("Updating deployment with ID: {}", action.deployment_id)
+
+        # Create Updater from the spec
+        updater: Updater[EndpointRow] = Updater(
+            spec=action.updater_spec,
+            pk_value=action.deployment_id,
+        )
+
+        # Update endpoint via repository
+        await self._deployment_repository.update_endpoint(updater)
+
+        # Get updated deployment info
+        deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
+
+        # Mark lifecycle needed for potential replica adjustments
         await self._deployment_controller.mark_lifecycle_needed(
             DeploymentLifecycleType.CHECK_REPLICA
         )
-        return UpdateDeploymentActionResult(
-            data=ModelDeploymentData(
-                id=action.deployment_id,
-                metadata=ModelDeploymentMetadataInfo(
-                    name="test-deployment",
-                    status=ModelDeploymentStatus.READY,
-                    tags=["tag1", "tag2"],
-                    project_id=uuid4(),
-                    domain_name="default",
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
-                ),
-                network_access=DeploymentNetworkSpec(
-                    open_to_public=True,
-                    url="http://example.com",
-                    preferred_domain_name="example.com",
-                    access_token_ids=[uuid4()],
-                ),
-                revision_history_ids=[uuid4(), uuid4()],
-                revision=mock_revision_data_1,
-                scaling_rule_ids=[uuid4(), uuid4()],
-                replica_state=ReplicaStateData(
-                    desired_replica_count=3,
-                    replica_ids=[uuid4(), uuid4(), uuid4()],
-                ),
-                default_deployment_strategy=DeploymentStrategy.ROLLING,
-                created_user_id=uuid4(),
-            )
-        )
+
+        return UpdateDeploymentActionResult(data=_convert_deployment_info_to_data(deployment_info))
 
     async def destroy_deployment(
         self, action: DestroyDeploymentAction
@@ -375,26 +381,25 @@ class DeploymentService:
         self, action: AddModelRevisionAction
     ) -> AddModelRevisionActionResult:
         # TODO: Implement full revision creation logic
-        # 1. Resolve image ID from action.adder.image_identifier
-        # 2. Get latest revision number via get_latest_revision_number(action.model_deployment_id)
-        # 3. Build DeploymentRevisionCreatorSpec from action.adder
-        # 4. Create revision via repository.create_revision(creator)
+        # This requires integration with the controller's revision generator system:
+        # 1. Get default architecture from scaling group
+        # 2. Use revision generator to resolve image and build ModelRevisionSpec
+        # 3. Get latest revision number via get_latest_revision_number()
+        # 4. Build DeploymentRevisionCreatorSpec and create revision
         raise NotImplementedError(
-            "add_model_revision requires full ModelRevisionCreator to "
-            "DeploymentRevisionCreatorSpec conversion - pending implementation"
+            "add_model_revision requires controller's revision generator for image resolution. "
+            "Use create_legacy_deployment for deployment creation with revision."
         )
 
     async def create_model_revision(
         self, action: CreateModelRevisionAction
     ) -> CreateModelRevisionActionResult:
         # TODO: Implement full revision creation logic
-        # 1. Resolve image ID from action.creator.image_identifier
-        # 2. Get latest revision number via get_latest_revision_number()
-        # 3. Build DeploymentRevisionCreatorSpec from action.creator
-        # 4. Create revision via repository.create_revision(creator)
+        # Note: CreateModelRevisionAction is missing deployment_id field
+        # This requires integration with the controller's revision generator system
         raise NotImplementedError(
-            "create_model_revision requires full ModelRevisionCreator to "
-            "DeploymentRevisionCreatorSpec conversion - pending implementation"
+            "create_model_revision requires controller's revision generator for image resolution "
+            "and is missing deployment_id in action definition."
         )
 
     async def get_revision_by_id(
@@ -453,8 +458,8 @@ class DeploymentService:
         Returns:
             ActivateRevisionActionResult: Result containing the updated deployment
         """
-        # 1. Validate revision exists
-        revision = await self._deployment_repository.get_revision(action.revision_id)
+        # 1. Validate revision exists (raises exception if not found)
+        _revision = await self._deployment_repository.get_revision(action.revision_id)
 
         # 2. Update endpoint.current_revision and get previous revision
         previous_revision_id = await self._deployment_repository.update_current_revision(
@@ -473,35 +478,11 @@ class DeploymentService:
             previous_revision_id,
         )
 
-        # 4. Return result with activated revision data
-        # Note: ModelDeploymentData requires additional data that needs separate implementation
-        # For now, we return minimal data with the activated revision
+        # 4. Get updated deployment info
+        deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
+
         return ActivateRevisionActionResult(
-            deployment=ModelDeploymentData(
-                id=action.deployment_id,
-                metadata=ModelDeploymentMetadataInfo(
-                    name=revision.name or "",
-                    status=ModelDeploymentStatus.READY,
-                    tags=[],
-                    project_id=uuid4(),  # TODO: Get from deployment
-                    domain_name="default",
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
-                ),
-                network_access=DeploymentNetworkSpec(
-                    open_to_public=True,
-                    url="",
-                ),
-                revision_history_ids=[action.revision_id],
-                revision=revision,
-                scaling_rule_ids=[],
-                replica_state=ReplicaStateData(
-                    desired_replica_count=0,
-                    replica_ids=[],
-                ),
-                default_deployment_strategy=DeploymentStrategy.ROLLING,
-                created_user_id=uuid4(),  # TODO: Get from deployment
-            ),
+            deployment=_convert_deployment_info_to_data(deployment_info),
             previous_revision_id=previous_revision_id,
             activated_revision_id=action.revision_id,
         )
@@ -660,62 +641,3 @@ class DeploymentService:
             created_at=token_row.created_at or datetime.now(),
         )
         return CreateAccessTokenActionResult(data=data)
-
-
-mock_revision_data_1 = ModelRevisionData(
-    id=uuid4(),
-    name="test-revision",
-    cluster_config=ClusterConfigData(
-        mode=ClusterMode.SINGLE_NODE,
-        size=1,
-    ),
-    resource_config=ResourceConfigData(
-        resource_group_name="default",
-        resource_slot=ResourceSlot.from_json({"cpu": 1, "memory": 1024}),
-    ),
-    model_mount_config=ModelMountConfigData(
-        vfolder_id=uuid4(),
-        mount_destination="/model",
-        definition_path="model-definition.yaml",
-    ),
-    model_runtime_config=ModelRuntimeConfigData(
-        runtime_variant=RuntimeVariant.VLLM,
-        inference_runtime_config={"tp_size": 2, "max_length": 1024},
-    ),
-    extra_vfolder_mounts=[
-        ExtraVFolderMountData(
-            vfolder_id=uuid4(),
-            mount_destination="/var",
-        ),
-        ExtraVFolderMountData(
-            vfolder_id=uuid4(),
-            mount_destination="/example",
-        ),
-    ],
-    image_id=uuid4(),
-    created_at=datetime.now(),
-)
-
-mock_revision_data_2 = ModelRevisionData(
-    id=uuid4(),
-    name="test-revision-2",
-    cluster_config=ClusterConfigData(
-        mode=ClusterMode.MULTI_NODE,
-        size=1,
-    ),
-    resource_config=ResourceConfigData(
-        resource_group_name="default",
-        resource_slot=ResourceSlot.from_json({"cpu": 1, "memory": 1024}),
-    ),
-    model_mount_config=ModelMountConfigData(
-        vfolder_id=uuid4(),
-        mount_destination="/model",
-        definition_path="model-definition.yaml",
-    ),
-    model_runtime_config=ModelRuntimeConfigData(
-        runtime_variant=RuntimeVariant.NIM,
-        inference_runtime_config={"tp_size": 2, "max_length": 1024},
-    ),
-    image_id=uuid4(),
-    created_at=datetime.now(),
-)
