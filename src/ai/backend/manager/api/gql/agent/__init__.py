@@ -1,4 +1,3 @@
-from .adapter import AgentGQLAdapter
 from .resolver import agent_stats, agents_v2
 from .types import (
     AgentFilterGQL,
@@ -11,8 +10,6 @@ from .types import (
 )
 
 __all__ = (
-    # Adapters
-    "AgentGQLAdapter",
     # Types
     "AgentFilterGQL",
     "AgentOrderByGQL",
