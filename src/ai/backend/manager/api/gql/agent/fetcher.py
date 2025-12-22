@@ -17,6 +17,7 @@ from ai.backend.manager.api.gql.agent.types import (
 from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.repositories.agent.options import AgentConditions
 from ai.backend.manager.services.agent.actions.search_agents import SearchAgentsAction
 
 
@@ -25,8 +26,8 @@ def _get_agent_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=AgentRow.id.asc(),
         backward_order=AgentRow.id.desc(),
-        forward_condition_factory=lambda cursor_value: lambda: AgentRow.id > cursor_value,
-        backward_condition_factory=lambda cursor_value: lambda: AgentRow.id < cursor_value,
+        forward_condition_factory=AgentConditions.by_cursor_forward,
+        backward_condition_factory=AgentConditions.by_cursor_backward,
     )
 
 
@@ -58,9 +59,7 @@ async def fetch_agents(
     action_result = await info.context.processors.agent.search_agents.wait_for_complete(
         SearchAgentsAction(querier=querier)
     )
-    permissions = action_result.permissions
-    nodes = [AgentV2GQL.from_action_result(data, permissions) for data in action_result.agents]
-
+    nodes = [AgentV2GQL.from_agent_detail_data(detail) for detail in action_result.agents]
     edges = [AgentV2Edge(node=node, cursor=to_global_id(AgentV2GQL, node.id)) for node in nodes]
 
     return AgentV2Connection(
