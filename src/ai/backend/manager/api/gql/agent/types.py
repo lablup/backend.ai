@@ -10,7 +10,7 @@ from strawberry.scalars import JSON
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.agent.types import AgentData, AgentStatus
+from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
 from ai.backend.manager.repositories.agent.options import AgentConditions, AgentOrders
 from ai.backend.manager.repositories.base import (
@@ -297,7 +297,9 @@ class AgentV2GQL(Node):
     )
 
     @classmethod
-    def from_action_result(cls, data: AgentData, permissions: list[AgentPermission]) -> Self:
+    def from_agent_detail_data(cls, detail_data: AgentDetailData) -> Self:
+        data = detail_data.agent
+
         return cls(
             id=ID(data.id),
             resource_info=AgentResourceGQL(
@@ -322,7 +324,7 @@ class AgentV2GQL(Node):
                 region=data.region,
                 addr=data.addr,
             ),
-            permissions=permissions,
+            permissions=detail_data.permissions,
             scaling_group=data.scaling_group,
         )
 

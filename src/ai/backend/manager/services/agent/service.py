@@ -25,6 +25,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import (
+    AgentDetailData,
     AgentHeartbeatUpsert,
     UpsertResult,
 )
@@ -241,10 +242,15 @@ class AgentService:
             querier=action.querier,
         )
 
+        admin_permissions = list(ADMIN_AGENT_PERMISSIONS)
+        agents_with_permissions = [
+            AgentDetailData(agent=agent_data, permissions=admin_permissions)
+            for agent_data in result.items
+        ]
+
         return SearchAgentsActionResult(
-            agents=result.items,
+            agents=agents_with_permissions,
             total_count=result.total_count,
-            permissions=list(ADMIN_AGENT_PERMISSIONS),
         )
 
     async def handle_heartbeat(self, action: HandleHeartbeatAction) -> HandleHeartbeatActionResult:
