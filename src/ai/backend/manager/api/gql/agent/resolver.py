@@ -32,7 +32,7 @@ async def agent_stats(info: Info[StrawberryGQLContext]) -> AgentStatsGQL:
     )
 
 
-@strawberry.field(description="Added in 25.18.0")
+@strawberry.field(description="Added in 25.19.0")
 async def agents_v2(
     info: Info[StrawberryGQLContext],
     filter: Optional[AgentFilterGQL] = None,
