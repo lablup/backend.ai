@@ -200,13 +200,14 @@ type AgentEdge
   cursor: String!
 }
 
-"""Added in 25.18.0. Filter options for querying agents"""
+"""Added in 25.19.0. Filter options for querying agents"""
 input AgentFilter
   @join__type(graph: STRAWBERRY)
 {
   id: StringFilter = null
   status: AgentStatusFilter = null
   schedulable: Boolean = null
+  scalingGroup: StringFilter = null
   AND: [AgentFilter!] = null
   OR: [AgentFilter!] = null
   NOT: [AgentFilter!] = null
@@ -220,7 +221,7 @@ type AgentList implements PaginatedList
   total_count: Int!
 }
 
-"""Added in 25.18.0. Network-related information for an agent"""
+"""Added in 25.19.0. Network-related information for an agent"""
 type AgentNetworkInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -274,7 +275,7 @@ type AgentNode implements Node
   permissions: [AgentPermissionField]
 }
 
-"""Added in 25.18.0. Options for ordering agents"""
+"""Added in 25.19.0. Options for ordering agents"""
 input AgentOrderBy
   @join__type(graph: STRAWBERRY)
 {
@@ -282,7 +283,7 @@ input AgentOrderBy
   direction: OrderDirection! = ASC
 }
 
-"""Added in 25.18.0. Order by specification for agents"""
+"""Added in 25.19.0. Order by specification for agents"""
 enum AgentOrderField
   @join__type(graph: STRAWBERRY)
 {
@@ -308,7 +309,7 @@ scalar AgentPermissionField
   @join__type(graph: GRAPHENE)
 
 """Added in 25.15.0"""
-type AgentResourceGQL
+type AgentResource
   @join__type(graph: STRAWBERRY)
 {
   """
@@ -341,7 +342,7 @@ type AgentStats
   @join__type(graph: STRAWBERRY)
 {
   """Added in 25.15.0"""
-  totalResource: AgentResourceGQL!
+  totalResource: AgentResource!
 }
 
 enum AgentStatus
@@ -354,7 +355,7 @@ enum AgentStatus
 }
 
 """
-Added in 25.18.0. Filter options for agent status within AgentFilter.
+Added in 25.19.0. Filter options for agent status within AgentFilter.
 It includes options to filter whether agent status is in a specific list or equals a specific value.
 """
 input AgentStatusFilter
@@ -364,7 +365,7 @@ input AgentStatusFilter
   equals: AgentStatus = null
 }
 
-"""Added in 25.18.0. Status and lifecycle information for an agent"""
+"""Added in 25.19.0. Status and lifecycle information for an agent"""
 type AgentStatusInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -427,7 +428,7 @@ type AgentSummaryList implements PaginatedList
   total_count: Int!
 }
 
-"""Added in 25.18.0. System and configuration information for an agent"""
+"""Added in 25.19.0. System and configuration information for an agent"""
 type AgentSystemInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -440,7 +441,7 @@ type AgentSystemInfo
 
   """
   Version string of the Backend.AI agent software running on this node.
-  Follows semantic versioning (e.g., "25.18.0") and helps identify
+  Follows semantic versioning (e.g., "25.19.0") and helps identify
   compatibility and available features.
   """
   version: String!
@@ -461,7 +462,7 @@ type AgentSystemInfo
   computePlugins: JSON!
 }
 
-"""Added in 25.18.0. Strawberry-based Agent type replacing AgentNode."""
+"""Added in 25.19.0. Strawberry-based Agent type replacing AgentNode."""
 type AgentV2 implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -474,7 +475,7 @@ type AgentV2 implements Node
   Contains capacity (total), used (occupied by sessions), and free (available) resource slots
   including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources.
   """
-  resourceInfo: AgentResourceGQL!
+  resourceInfo: AgentResource!
 
   """
   Current operational status and lifecycle timestamps.
@@ -512,7 +513,7 @@ type AgentV2 implements Node
 }
 
 """
-Added in 25.18.0. Relay-style connection type for paginated lists of agents
+Added in 25.19.0. Relay-style connection type for paginated lists of agents
 """
 type AgentV2Connection
   @join__type(graph: STRAWBERRY)
@@ -6210,7 +6211,7 @@ type Query
   """Added in 25.15.0"""
   agentStats: AgentStats! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.18.0"""
+  """Added in 25.19.0"""
   agentsV2(filter: AgentFilter = null, orderBy: [AgentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AgentV2Connection! @join__field(graph: STRAWBERRY)
 
   """
