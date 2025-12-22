@@ -8,6 +8,7 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.agent.types import AgentData, AgentStatus
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
@@ -46,7 +47,7 @@ class AgentStatusFilterGQL:
 @strawberry.input(
     name="AgentFilter", description="Added in 25.18.0. Filter options for querying agents"
 )
-class AgentFilterGQL:
+class AgentFilterGQL(GQLFilter):
     id: Optional[StringFilter] = None
     status: Optional[AgentStatusFilterGQL] = None
     schedulable: Optional[bool] = None
@@ -96,7 +97,7 @@ class AgentFilterGQL:
 
 
 @strawberry.input(name="AgentOrderBy", description="Added in 25.18.0. Options for ordering agents")
-class AgentOrderByGQL:
+class AgentOrderByGQL(GQLOrderBy):
     field: AgentOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
 
@@ -113,7 +114,7 @@ class AgentOrderByGQL:
                 return AgentOrders.schedulable(ascending)
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(name="AgentResource", description="Added in 25.15.0")
 class AgentResourceGQL:
     capacity: JSON = strawberry.field(
         description=dedent_strip("""

@@ -5,19 +5,16 @@ from typing import Optional
 import strawberry
 from strawberry import Info
 
+from ai.backend.manager.api.gql.agent.fetcher import fetch_agents
 from ai.backend.manager.api.gql.agent.types import (
     AgentFilterGQL,
     AgentOrderByGQL,
     AgentResourceGQL,
     AgentStatsGQL,
     AgentV2Connection,
-    AgentV2Edge,
-    AgentV2GQL,
 )
-from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.services.agent.actions.get_total_resources import GetTotalResourcesAction
-from ai.backend.manager.services.agent.actions.search_agents import SearchAgentsAction
 
 
 @strawberry.field(description="Added in 25.15.0")
@@ -47,33 +44,14 @@ async def agents_v2(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> AgentV2Connection:
-    processors = info.context.processors
-
-    querier = info.context.gql_adapters.agent.build_querier(
+    return await fetch_agents(
+        info,
         filter=filter,
         order_by=order_by,
-        first=first,
-        after=after,
-        last=last,
         before=before,
+        after=after,
+        first=first,
+        last=last,
         limit=limit,
         offset=offset,
-    )
-    action_result = await processors.agent.search_agents.wait_for_complete(
-        SearchAgentsAction(querier=querier)
-    )
-    permissions = action_result.permissions
-    nodes = [AgentV2GQL.from_action_result(data, permissions) for data in action_result.agents]
-
-    edges = [AgentV2Edge(node=node, cursor=to_global_id(AgentV2GQL, node.id)) for node in nodes]
-
-    return AgentV2Connection(
-        edges=edges,
-        page_info=strawberry.relay.PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        ),
-        count=action_result.total_count,
     )

@@ -34,6 +34,7 @@ from ai.backend.manager.repositories.agent.stateful_source.stateful_source impor
     AgentStatefulSource,
 )
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
 
@@ -208,7 +209,7 @@ class AgentRepository:
     @agent_repository_resilience.apply()
     async def search_agents(
         self,
-        querier: Optional[Querier] = None,
+        querier: BatchQuerier,
     ) -> AgentListResult:
         """Searches agents with total count."""
         return await self._db_source.search_agents(querier=querier)
