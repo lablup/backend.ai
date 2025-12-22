@@ -25,6 +25,7 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
+from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -140,7 +141,7 @@ class AgentDBSource:
 
     async def search_agents(
         self,
-        querier: Optional[Querier] = None,
+        querier: BatchQuerier,
     ) -> AgentListResult:
         """Searches agents with total count."""
 
@@ -154,7 +155,7 @@ class AgentDBSource:
                 )
             )
 
-            result = await execute_querier(
+            result = await execute_batch_querier(
                 db_sess,
                 query,
                 querier,
