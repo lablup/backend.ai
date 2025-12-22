@@ -4,13 +4,15 @@ import asyncio
 import enum
 from collections.abc import AsyncIterator
 from dataclasses import asdict
-from typing import Any, TypeAlias
+from typing import Any
+from uuid import uuid4
 
 import pytest
 
 from ai.backend.common import redis_helper
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
+from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
+from ai.backend.common.defs import REDIS_BGTASK_DB, REDIS_STREAM_DB
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
@@ -20,86 +22,129 @@ from ai.backend.common.events.event_types.bgtask.broadcast import (
     BgtaskFailedEvent,
     BgtaskUpdatedEvent,
 )
-from ai.backend.common.types import AgentId
-from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.server import (
-    agent_registry_ctx,
-    background_task_ctx,
-    database_ctx,
-    event_dispatcher_plugin_ctx,
-    event_hub_ctx,
-    event_producer_ctx,
-    hook_plugin_ctx,
-    message_queue_ctx,
-    monitoring_ctx,
-    network_plugin_ctx,
-    redis_ctx,
-    repositories_ctx,
-    storage_manager_ctx,
-)
+from ai.backend.common.message_queue.redis_queue.queue import RedisMQArgs, RedisQueue
+from ai.backend.common.types import AgentId, RedisTarget, ValkeyTarget
 
 
 class ContextSentinel(enum.Enum):
     TOKEN = enum.auto()
 
 
-BgtaskFixture: TypeAlias = tuple[BackgroundTaskManager, EventProducer, EventDispatcher]
+@pytest.fixture
+async def message_queue(
+    redis_container,
+) -> AsyncIterator[RedisQueue]:
+    _, redis_addr = redis_container
+    redis_target = RedisTarget(addr=redis_addr, redis_helper_config={})
+    message_queue = await RedisQueue.create(
+        redis_target,
+        RedisMQArgs(
+            anycast_stream_key="events",
+            broadcast_channel="events_all",
+            consume_stream_keys={"events"},
+            subscribe_channels={"events_all"},
+            group_name=f"test_message_queue_group_{uuid4()}",
+            node_id=f"test_node_{uuid4()}",
+            db=REDIS_STREAM_DB,
+        ),
+    )
+
+    yield message_queue
+
+    await message_queue.close()
+    stream_redis_conn = redis_helper.get_redis_object(
+        redis_target,
+        name="test_cleanup_stream",
+        db=REDIS_STREAM_DB,
+    )
+    try:
+        await redis_helper.execute(stream_redis_conn, lambda r: r.flushdb())
+    finally:
+        await stream_redis_conn.close()
 
 
 @pytest.fixture
-async def bgtask_fixture(
-    etcd_fixture,
-    mock_etcd_ctx,
-    mock_config_provider_ctx,
-    event_dispatcher_test_ctx,
-    database_fixture,
-    create_app_and_client,
-) -> AsyncIterator[BgtaskFixture]:
-    app, client = await create_app_and_client(
-        [
-            event_hub_ctx,
-            mock_etcd_ctx,
-            mock_config_provider_ctx,
-            database_ctx,
-            redis_ctx,
-            message_queue_ctx,
-            event_producer_ctx,
-            storage_manager_ctx,
-            repositories_ctx,
-            monitoring_ctx,
-            network_plugin_ctx,
-            hook_plugin_ctx,
-            event_dispatcher_plugin_ctx,
-            agent_registry_ctx,
-            event_dispatcher_test_ctx,
-            background_task_ctx,
-        ],
-        [".events"],
+async def event_producer(
+    message_queue: RedisQueue,
+) -> AsyncIterator[EventProducer]:
+    producer = EventProducer(
+        message_queue,
+        source=AgentId(f"test-agent-{uuid4()}"),
     )
-    root_ctx: RootContext = app["_root.context"]
-    producer: EventProducer = root_ctx.event_producer
-    dispatcher: EventDispatcher = root_ctx.event_dispatcher
+    try:
+        yield producer
 
-    yield root_ctx.background_task_manager, producer, dispatcher
+    finally:
+        await producer.close()
 
-    etcd_redis_config = root_ctx.config_provider.config.redis.to_redis_profile_target()
-    stream_redis_config = etcd_redis_config.profile_target(RedisRole.STREAM)
-    stream_redis = redis_helper.get_redis_object(
-        stream_redis_config,
-        name="event_producer.stream",
-        db=REDIS_STREAM_DB,
+
+@pytest.fixture
+async def event_dispatcher(
+    message_queue: RedisQueue,
+) -> AsyncIterator[EventDispatcher]:
+    dispatcher = EventDispatcher(message_queue)
+    try:
+        await dispatcher.start()
+        yield dispatcher
+    finally:
+        await dispatcher.close()
+
+
+@pytest.fixture
+async def valkey_bgtask_client(
+    redis_container,
+) -> AsyncIterator[ValkeyBgtaskClient]:
+    _, redis_addr = redis_container
+    redis_target = RedisTarget(addr=redis_addr, redis_helper_config={})
+
+    valkey_target = ValkeyTarget(
+        addr=redis_addr.address,
     )
 
-    await root_ctx.background_task_manager.shutdown()
-    await producer.close()
-    await dispatcher.close()
-    await redis_helper.execute(stream_redis, lambda r: r.flushdb())
+    valkey_client = await ValkeyBgtaskClient.create(
+        valkey_target,
+        db_id=REDIS_BGTASK_DB,
+        human_readable_name=f"test_bgtask_client_{uuid4()}",
+    )
+
+    yield valkey_client
+
+    await valkey_client.close()
+
+    # Flush BGTASK_DB for test isolation
+    bgtask_redis_conn = redis_helper.get_redis_object(
+        redis_target,
+        name="test_cleanup_bgtask",
+        db=REDIS_BGTASK_DB,
+    )
+    try:
+        await redis_helper.execute(bgtask_redis_conn, lambda r: r.flushdb())
+    finally:
+        await bgtask_redis_conn.close()
+
+
+@pytest.fixture
+async def background_task_manager(
+    event_producer: EventProducer,
+    valkey_bgtask_client: ValkeyBgtaskClient,
+) -> AsyncIterator[BackgroundTaskManager]:
+    bgtask_manager = BackgroundTaskManager(
+        event_producer,
+        valkey_client=valkey_bgtask_client,
+        server_id=f"test-server-{uuid4()}",
+    )
+
+    yield bgtask_manager
+
+    await bgtask_manager.shutdown()
 
 
 @pytest.mark.timeout(60)
 @pytest.mark.asyncio
-async def test_background_task(bgtask_fixture: BgtaskFixture) -> None:
-    background_task_manager, producer, dispatcher = bgtask_fixture
+async def test_background_task(
+    background_task_manager: BackgroundTaskManager,
+    event_dispatcher: EventDispatcher,
+) -> None:
     update_handler_ctx: dict[str, Any] = {}
     done_handler_ctx: dict[str, Any] = {}
     update_call_count = 0
@@ -138,8 +183,8 @@ async def test_background_task(bgtask_fixture: BgtaskFixture) -> None:
         await reporter.update(1, message="BGTask ex2")
         return "hooray"
 
-    dispatcher.subscribe(BgtaskUpdatedEvent, ContextSentinel.TOKEN, update_sub)
-    dispatcher.subscribe(BgtaskDoneEvent, ContextSentinel.TOKEN, done_sub)
+    event_dispatcher.subscribe(BgtaskUpdatedEvent, ContextSentinel.TOKEN, update_sub)
+    event_dispatcher.subscribe(BgtaskDoneEvent, ContextSentinel.TOKEN, done_sub)
     task_id = await background_task_manager.start(_mock_task, name="MockTask1234")
 
     # Wait for task completion and event processing
@@ -172,8 +217,9 @@ async def test_background_task(bgtask_fixture: BgtaskFixture) -> None:
 
 @pytest.mark.timeout(60)
 @pytest.mark.asyncio
-async def test_background_task_fail(bgtask_fixture: BgtaskFixture) -> None:
-    background_task_manager, producer, dispatcher = bgtask_fixture
+async def test_background_task_fail(
+    background_task_manager: BackgroundTaskManager, event_dispatcher: EventDispatcher
+) -> None:
     fail_handler_ctx: dict[str, Any] = {}
 
     async def fail_sub(
@@ -192,7 +238,7 @@ async def test_background_task_fail(bgtask_fixture: BgtaskFixture) -> None:
         await reporter.update(1, message="BGTask ex1")
         raise ZeroDivisionError("oops")
 
-    dispatcher.subscribe(BgtaskFailedEvent, ContextSentinel.TOKEN, fail_sub)
+    event_dispatcher.subscribe(BgtaskFailedEvent, ContextSentinel.TOKEN, fail_sub)
     task_id = await background_task_manager.start(_mock_task, name="MockTask1234")
 
     # Wait for task completion and event processing
