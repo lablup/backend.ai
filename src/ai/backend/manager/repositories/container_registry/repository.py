@@ -24,6 +24,7 @@ from ai.backend.manager.models.container_registry import (
 from ai.backend.manager.models.gql_models.container_registry import handle_allowed_groups_update
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.purger import Purger, execute_purger
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
@@ -94,30 +95,21 @@ class ContainerRegistryRepository:
             validator.validate()
             return reg_row.to_dataclass()
 
-    async def delete_registry(self, registry_id: uuid.UUID) -> ContainerRegistryData:
+    async def delete_registry(self, purger: Purger[ContainerRegistryRow]) -> ContainerRegistryData:
         """
-        Delete a container registry by ID.
+        Delete a container registry using a purger.
         Returns the deleted registry data.
         Raises ContainerRegistryNotFound if registry doesn't exist.
         """
         async with self._db.begin_session() as session:
-            # Fetch registry before deletion
-            stmt = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == registry_id)
-            result = await session.execute(stmt)
-            reg_row = result.scalar_one_or_none()
+            result = await execute_purger(session, purger)
 
-            if reg_row is None:
-                raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
+            if result is None:
+                raise ContainerRegistryNotFound(
+                    f"Container registry not found (id:{purger.pk_value})"
+                )
 
-            # Store data before deletion
-            registry_data = reg_row.to_dataclass()
-
-            # Delete registry
-            await session.execute(
-                sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.id == registry_id)
-            )
-
-            return registry_data
+            return result.row.to_dataclass()
 
     @container_registry_repository_resilience.apply()
     async def get_by_registry_and_project(

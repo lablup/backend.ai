@@ -31,6 +31,7 @@ from ai.backend.manager.models.rbac import (
     ScopeType,
     SystemScope,
 )
+from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
@@ -520,7 +521,9 @@ class DeleteContainerRegistryNode(graphene.Mutation):
 
         result = (
             await ctx.processors.container_registry.delete_container_registry.wait_for_complete(
-                DeleteContainerRegistryAction(id=reg_id)
+                DeleteContainerRegistryAction(
+                    purger=Purger(row_class=ContainerRegistryRow, pk_value=reg_id)
+                )
             )
         )
         return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))

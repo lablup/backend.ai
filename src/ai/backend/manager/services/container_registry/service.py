@@ -67,7 +67,7 @@ class ContainerRegistryService:
     async def delete_container_registry(
         self, action: DeleteContainerRegistryAction
     ) -> DeleteContainerRegistryActionResult:
-        data = await self._container_registry_repository.delete_registry(action.id)
+        data = await self._container_registry_repository.delete_registry(action.purger)
         return DeleteContainerRegistryActionResult(data=data)
 
     async def rescan_images(self, action: RescanImagesAction) -> RescanImagesActionResult:

@@ -29,6 +29,7 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.container_registry.admin_repository import (
     AdminContainerRegistryRepository,
@@ -114,6 +115,7 @@ class TestContainerRegistryRepository:
 
             async with database_engine.begin_session() as session:
                 registry = ContainerRegistryRow(
+                    id=uuid.uuid4(),
                     url=f"https://{registry_name}",
                     registry_name=registry_name,
                     type=ContainerRegistryType.HARBOR2,
@@ -289,6 +291,7 @@ class TestContainerRegistryRepository:
 
         async with database_engine.begin_session() as session:
             registry = ContainerRegistryRow(
+                id=uuid.uuid4(),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -320,6 +323,7 @@ class TestContainerRegistryRepository:
 
         async with database_engine.begin_session() as session:
             registry = ContainerRegistryRow(
+                id=uuid.uuid4(),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -964,7 +968,8 @@ class TestContainerRegistryRepository:
         registry_name = test_registry.registry_name
 
         # When: Delete the registry
-        result = await repository.delete_registry(registry_id)
+        purger = Purger(row_class=ContainerRegistryRow, pk_value=registry_id)
+        result = await repository.delete_registry(purger)
 
         # Then: Returns deleted registry data
         assert result.id == registry_id
@@ -972,7 +977,8 @@ class TestContainerRegistryRepository:
 
         # And: Registry no longer exists
         with pytest.raises(ContainerRegistryNotFound):
-            await repository.delete_registry(registry_id)
+            purger = Purger(row_class=ContainerRegistryRow, pk_value=registry_id)
+            await repository.delete_registry(purger)
 
     @pytest.mark.asyncio
     async def test_delete_registry_not_found(
@@ -985,7 +991,8 @@ class TestContainerRegistryRepository:
 
         # When/Then: Raises ContainerRegistryNotFound
         with pytest.raises(ContainerRegistryNotFound):
-            await repository.delete_registry(non_existent_id)
+            purger = Purger(row_class=ContainerRegistryRow, pk_value=non_existent_id)
+            await repository.delete_registry(purger)
 
     @pytest.mark.asyncio
     async def test_delete_registry_returns_data_before_deletion(
@@ -998,7 +1005,8 @@ class TestContainerRegistryRepository:
         registry = test_registry_with_custom_props
 
         # When: Delete the registry
-        result = await repository.delete_registry(registry.id)
+        purger = Purger(row_class=ContainerRegistryRow, pk_value=registry.id)
+        result = await repository.delete_registry(purger)
 
         # Then: Returns all registry data with correct properties
         assert result.id == registry.id

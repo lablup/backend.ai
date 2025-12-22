@@ -10,6 +10,7 @@ from graphql import GraphQLError, Undefined
 
 from ai.backend.common.container_registry import AllowedGroupsModel
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
@@ -236,7 +237,9 @@ class DeleteContainerRegistryNodeV2(graphene.Mutation):
 
         result = (
             await ctx.processors.container_registry.delete_container_registry.wait_for_complete(
-                DeleteContainerRegistryAction(id=reg_id)
+                DeleteContainerRegistryAction(
+                    purger=Purger(row_class=ContainerRegistryRow, pk_value=reg_id)
+                )
             )
         )
         return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))

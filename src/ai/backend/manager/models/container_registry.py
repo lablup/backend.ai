@@ -140,6 +140,7 @@ class ContainerRegistryRow(Base):
 
     def __init__(
         self,
+        id: uuid.UUID,
         url: str,
         registry_name: str,
         type: ContainerRegistryType,
@@ -150,6 +151,7 @@ class ContainerRegistryRow(Base):
         is_global: Optional[bool] = None,
         extra: Optional[dict] = None,
     ) -> None:
+        self.id = id
         self.url = url
         self.registry_name = registry_name
         self.type = type
@@ -239,6 +241,7 @@ class ContainerRegistryRow(Base):
     @classmethod
     def from_dataclass(cls, data: ContainerRegistryData) -> Self:
         instance = cls(
+            id=data.id,
             url=data.url,
             registry_name=data.registry_name,
             type=data.type,
