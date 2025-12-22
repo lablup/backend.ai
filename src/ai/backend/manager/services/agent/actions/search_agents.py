@@ -4,8 +4,7 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.agent.types import AgentData
-from ai.backend.manager.models.rbac.permission_defs import AgentPermission
+from ai.backend.manager.data.agent.types import AgentDetailData
 from ai.backend.manager.repositories.base import BatchQuerier
 
 from .base import AgentAction
@@ -27,10 +26,9 @@ class SearchAgentsAction(AgentAction):
 
 @dataclass
 class SearchAgentsActionResult(BaseActionResult):
-    """Result of searching agents."""
+    """Result of searching agents with their permissions."""
 
-    agents: list[AgentData]
-    permissions: list[AgentPermission]
+    agents: list[AgentDetailData]
     total_count: int
 
     @override

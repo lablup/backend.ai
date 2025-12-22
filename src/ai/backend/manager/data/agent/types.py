@@ -4,11 +4,14 @@ import enum
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional, Self, override
+from typing import TYPE_CHECKING, Any, Optional, Self, override
 
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.rbac.permission_defs import AgentPermission
 
 
 class AgentStatus(enum.Enum):
@@ -222,3 +225,16 @@ class AgentListResult:
 
     items: list[AgentData]
     total_count: int
+
+
+@dataclass
+class AgentDetailData:
+    """
+    Agent data with associated permissions.
+
+    This encapsulates an agent's data together with the permissions
+    the current user has on that agent.
+    """
+
+    agent: AgentData
+    permissions: list[AgentPermission]
