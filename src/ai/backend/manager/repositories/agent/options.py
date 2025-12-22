@@ -73,6 +73,36 @@ class AgentConditions:
 
         return inner
 
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to get first_contact of the cursor row and compare.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(AgentRow.first_contact).where(AgentRow.id == cursor_id).scalar_subquery()
+            )
+            return AgentRow.first_contact < subquery
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to get first_contact of the cursor row and compare.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(AgentRow.first_contact).where(AgentRow.id == cursor_id).scalar_subquery()
+            )
+            return AgentRow.first_contact > subquery
+
+        return inner
+
 
 class AgentOrders:
     @staticmethod
