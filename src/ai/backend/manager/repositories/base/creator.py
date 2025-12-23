@@ -5,14 +5,27 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import Generic, TypeVar
 
-from ai.backend.manager.models.base import Base
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from ai.backend.manager.data.permission.id import (
+    ObjectId,
+    ScopeId,
+)
 
-TRow = TypeVar("TRow", bound=Base)
+
+class RBACEntityRow(ABC):
+    @abstractmethod
+    def parsed_scope_id(self) -> ScopeId:
+        pass
+
+    @abstractmethod
+    def parsed_object_id(self) -> ObjectId:
+        pass
+
+
+TRow = TypeVar("TRow", bound=RBACEntityRow)
 
 
 class CreatorSpec(ABC, Generic[TRow]):
