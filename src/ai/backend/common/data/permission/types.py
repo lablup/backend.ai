@@ -96,6 +96,7 @@ class EntityType(enum.StrEnum):
             cls.VFOLDER,
             cls.IMAGE,
             cls.SESSION,
+            cls.ARTIFACT,
         }
 
     @classmethod
