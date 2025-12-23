@@ -98,6 +98,7 @@ class EntityType(enum.StrEnum):
             cls.IMAGE,
             cls.SESSION,
             cls.ARTIFACT,
+            cls.ARTIFACT_REGISTRY,
         }
 
     @classmethod
