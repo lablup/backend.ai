@@ -78,6 +78,8 @@ class EntityType(enum.StrEnum):
     IMAGE = "image"
     SESSION = "session"
 
+    ARTIFACT = "artifact"
+
     @classmethod
     def _scope_types(cls) -> set[EntityType]:
         """
@@ -94,6 +96,7 @@ class EntityType(enum.StrEnum):
             cls.VFOLDER,
             cls.IMAGE,
             cls.SESSION,
+            cls.ARTIFACT,
         }
 
     @classmethod
