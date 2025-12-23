@@ -2897,13 +2897,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d57701248d040ad456092820e6fde56c930f17749956ac47f4f655c0c547bfff",
-              "url": "https://files.pythonhosted.org/packages/c3/5b/9512c5fb6c8218332b530f13500c6ff5f3ce3342f35e0dd7be9ac3856fd3/humanize-4.14.0-py3-none-any.whl"
+              "hash": "b1186eb9f5a9749cd9cb8565aee77919dd7c8d076161cf44d70e59e3301e1769",
+              "url": "https://files.pythonhosted.org/packages/c5/7b/bca5613a0c3b542420cf92bd5e5fb8ebd5435ce1011a091f66bb7693285e/humanize-4.15.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "2fa092705ea640d605c435b1ca82b2866a1b601cdf96f076d70b79a855eba90d",
-              "url": "https://files.pythonhosted.org/packages/b6/43/50033d25ad96a7f3845f40999b4778f753c3901a11808a584fed7c00d9f5/humanize-4.14.0.tar.gz"
+              "hash": "1dd098483eb1c7ee8e32eb2e99ad1910baefa4b75c3aff3a82f4d78688993b10",
+              "url": "https://files.pythonhosted.org/packages/ba/66/a3921783d54be8a6870ac4ccffcd15c4dc0dd7fcce51c6d63b8c63935276/humanize-4.15.0.tar.gz"
             }
           ],
           "project_name": "humanize",
@@ -2913,7 +2913,7 @@
             "pytest; extra == \"tests\""
           ],
           "requires_python": ">=3.10",
-          "version": "4.14.0"
+          "version": "4.15.0"
         },
         {
           "artifacts": [
@@ -3464,13 +3464,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "3350409f20a70a7e4e11a27661187b77cdcaeb20abca41c1454fe33636bea09c",
-              "url": "https://files.pythonhosted.org/packages/34/75/51952c7b2d3873b44a0028b1bd26a25078c18f92f256608e8d1dc61b39fd/marshmallow-3.26.1-py3-none-any.whl"
+              "hash": "013fa8a3c4c276c24d26d84ce934dc964e2aa794345a0f8c7e5a7191482c8a73",
+              "url": "https://files.pythonhosted.org/packages/be/2f/5108cb3ee4ba6501748c4908b908e55f42a5b66245b4cfe0c99326e1ef6e/marshmallow-3.26.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e6d8affb6cb61d39d26402096dc0aee12d5a26d490a121f118d2e81dc0719dc6",
-              "url": "https://files.pythonhosted.org/packages/ab/5e/5e53d26b42ab75491cda89b871dab9e97c840bf12c63ec58a1919710cd06/marshmallow-3.26.1.tar.gz"
+              "hash": "bbe2adb5a03e6e3571b573f42527c6fe926e17467833660bebd11593ab8dfd57",
+              "url": "https://files.pythonhosted.org/packages/55/79/de6c16cc902f4fc372236926b0ce2ab7845268dcc30fb2fbb7f71b418631/marshmallow-3.26.2.tar.gz"
             }
           ],
           "project_name": "marshmallow",
@@ -3489,7 +3489,7 @@
             "tox; extra == \"dev\""
           ],
           "requires_python": ">=3.9",
-          "version": "3.26.1"
+          "version": "3.26.2"
         },
         {
           "artifacts": [
@@ -6703,19 +6703,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "53bf881cb9d7e46ed12c76ef76c0aaf28cfe6211d3fab12e0b83620b1a8642c3",
-              "url": "https://files.pythonhosted.org/packages/b6/2d/475bf15c1cdc172e7a0d665b6e373ebfb1e9bf734d3f2f543d668b07a142/types_setuptools-80.9.0.20250822-py3-none-any.whl"
+              "hash": "1b36db79d724c2287d83dc052cf887b47c0da6a2fff044378be0b019545f56e6",
+              "url": "https://files.pythonhosted.org/packages/78/5c/b8877da94012dbc6643e4eeca22bca9b99b295be05d161f8a403ae9387c0/types_setuptools-80.9.0.20251223-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "070ea7716968ec67a84c7f7768d9952ff24d28b65b6594797a464f1b3066f965",
-              "url": "https://files.pythonhosted.org/packages/19/bd/1e5f949b7cb740c9f0feaac430e301b8f1c5f11a81e26324299ea671a237/types_setuptools-80.9.0.20250822.tar.gz"
+              "hash": "d3411059ae2f5f03985217d86ac6084efea2c9e9cacd5f0869ef950f308169b2",
+              "url": "https://files.pythonhosted.org/packages/00/07/d1b605230730990de20477150191d6dccf6aecc037da94c9960a5d563bc8/types_setuptools-80.9.0.20251223.tar.gz"
             }
           ],
           "project_name": "types-setuptools",
           "requires_dists": [],
           "requires_python": ">=3.9",
-          "version": "80.9.0.20250822"
+          "version": "80.9.0.20251223"
         },
         {
           "artifacts": [
