@@ -1,19 +1,17 @@
 from dataclasses import dataclass
 from typing import Optional, override
-from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.deployment.types import (
-    ModelDeploymentAutoScalingRuleData,
-)
+from ai.backend.manager.data.deployment.types import ModelDeploymentAutoScalingRuleData
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.base import (
     AutoScalingRuleBaseAction,
 )
 
 
 @dataclass
-class BatchLoadAutoScalingRulesAction(AutoScalingRuleBaseAction):
-    auto_scaling_rule_ids: list[UUID]
+class SearchAutoScalingRulesAction(AutoScalingRuleBaseAction):
+    querier: BatchQuerier
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -22,12 +20,15 @@ class BatchLoadAutoScalingRulesAction(AutoScalingRuleBaseAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "batch_load_auto_scaling_rules"
+        return "search_auto_scaling_rules"
 
 
 @dataclass
-class BatchLoadAutoScalingRulesActionResult(BaseActionResult):
+class SearchAutoScalingRulesActionResult(BaseActionResult):
     data: list[ModelDeploymentAutoScalingRuleData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
     @override
     def entity_id(self) -> Optional[str]:

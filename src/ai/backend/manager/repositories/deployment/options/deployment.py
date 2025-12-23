@@ -1,4 +1,4 @@
-"""Query conditions and orders for deployment-related entities."""
+"""Query conditions and orders for deployments."""
 
 from __future__ import annotations
 
@@ -7,10 +7,8 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
-from ai.backend.manager.data.deployment.types import RouteStatus, RouteTrafficStatus
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 
@@ -67,6 +65,99 @@ class DeploymentConditions:
 
         return inner
 
+    @staticmethod
+    def by_status_equals(status: ModelDeploymentStatus) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.lifecycle_stage == status
+
+        return inner
+
+    @staticmethod
+    def by_status_in(statuses: Collection[ModelDeploymentStatus]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.lifecycle_stage.in_(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_open_to_public(value: bool) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.open_to_public == value
+
+        return inner
+
+    @staticmethod
+    def by_tag_contains(value: str, case_insensitive: bool = False) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if case_insensitive:
+                return sa.func.lower(EndpointRow.tag).contains(value.lower())
+            return EndpointRow.tag.contains(value)
+
+        return inner
+
+    @staticmethod
+    def by_tag_equals(value: str, case_insensitive: bool = False) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if case_insensitive:
+                return sa.func.lower(EndpointRow.tag) == value.lower()
+            return EndpointRow.tag == value
+
+        return inner
+
+    @staticmethod
+    def by_url_contains(value: str, case_insensitive: bool = False) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if case_insensitive:
+                return sa.func.lower(EndpointRow.url).contains(value.lower())
+            return EndpointRow.url.contains(value)
+
+        return inner
+
+    @staticmethod
+    def by_url_equals(value: str, case_insensitive: bool = False) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if case_insensitive:
+                return sa.func.lower(EndpointRow.url) == value.lower()
+            return EndpointRow.url == value
+
+        return inner
+
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(EndpointRow.created_at)
+                .where(EndpointRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return EndpointRow.created_at < subquery
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(EndpointRow.created_at)
+                .where(EndpointRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return EndpointRow.created_at > subquery
+
+        return inner
+
 
 class DeploymentOrders:
     """Query orders for deployments."""
@@ -84,150 +175,3 @@ class DeploymentOrders:
             return EndpointRow.created_at.asc()
         else:
             return EndpointRow.created_at.desc()
-
-
-class RevisionConditions:
-    """Query conditions for revisions."""
-
-    @staticmethod
-    def by_ids(revision_ids: Collection[uuid.UUID]) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DeploymentRevisionRow.id.in_(revision_ids)
-
-        return inner
-
-    @staticmethod
-    def by_deployment_id(deployment_id: uuid.UUID) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DeploymentRevisionRow.endpoint == deployment_id
-
-        return inner
-
-    @staticmethod
-    def by_name_equals(value: str, case_insensitive: bool = False) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(DeploymentRevisionRow.name) == value.lower()
-            return DeploymentRevisionRow.name == value
-
-        return inner
-
-    @staticmethod
-    def by_name_contains(value: str, case_insensitive: bool = False) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(DeploymentRevisionRow.name).contains(value.lower())
-            return DeploymentRevisionRow.name.contains(value)
-
-        return inner
-
-
-class RevisionOrders:
-    """Query orders for revisions."""
-
-    @staticmethod
-    def name(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return DeploymentRevisionRow.name.asc()
-        else:
-            return DeploymentRevisionRow.name.desc()
-
-    @staticmethod
-    def created_at(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return DeploymentRevisionRow.created_at.asc()
-        else:
-            return DeploymentRevisionRow.created_at.desc()
-
-
-class RouteConditions:
-    """Query conditions for routes."""
-
-    @staticmethod
-    def by_ids(route_ids: Collection[uuid.UUID]) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RoutingRow.id.in_(route_ids)
-
-        return inner
-
-    @staticmethod
-    def by_endpoint_id(endpoint_id: uuid.UUID) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RoutingRow.endpoint == endpoint_id
-
-        return inner
-
-    @staticmethod
-    def by_statuses(statuses: list[RouteStatus]) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RoutingRow.status.in_(statuses)
-
-        return inner
-
-    @staticmethod
-    def by_traffic_statuses(traffic_statuses: list[RouteTrafficStatus]) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RoutingRow.traffic_status.in_(traffic_statuses)
-
-        return inner
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(RoutingRow.created_at)
-                .where(RoutingRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return RoutingRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(RoutingRow.created_at)
-                .where(RoutingRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return RoutingRow.created_at > subquery
-
-        return inner
-
-
-class RouteOrders:
-    """Query orders for routes."""
-
-    @staticmethod
-    def created_at(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return RoutingRow.created_at.asc()
-        else:
-            return RoutingRow.created_at.desc()
-
-    @staticmethod
-    def status(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return RoutingRow.status.asc()
-        else:
-            return RoutingRow.status.desc()
-
-    @staticmethod
-    def traffic_ratio(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return RoutingRow.traffic_ratio.asc()
-        else:
-            return RoutingRow.traffic_ratio.desc()

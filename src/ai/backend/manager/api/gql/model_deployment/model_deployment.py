@@ -1,11 +1,12 @@
 from collections.abc import Sequence
 from datetime import datetime
-from typing import AsyncGenerator, Optional
+from functools import lru_cache
+from typing import AsyncGenerator, Optional, override
 from uuid import UUID, uuid4
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.model_deployment.types import (
@@ -14,14 +15,13 @@ from ai.backend.common.data.model_deployment.types import (
 )
 from ai.backend.common.exception import (
     InvalidAPIParameters,
-    ModelDeploymentNotFound,
     ModelDeploymentUnavailable,
 )
+from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
-    build_page_info,
-    build_pagination_options,
+    encode_cursor,
     resolve_global_id,
     to_global_id,
 )
@@ -30,6 +30,7 @@ from ai.backend.manager.api.gql.model_deployment.access_token import (
     AccessToken,
     AccessTokenConnection,
     AccessTokenEdge,
+    AccessTokenFilter,
     AccessTokenOrderBy,
 )
 from ai.backend.manager.api.gql.model_deployment.auto_scaling_rule import (
@@ -42,7 +43,7 @@ from ai.backend.manager.api.gql.model_deployment.model_replica import (
     resolve_replicas,
 )
 from ai.backend.manager.api.gql.project import Project
-from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.user import User
 from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig, NewDeploymentCreator
 from ai.backend.manager.data.deployment.types import (
@@ -59,27 +60,33 @@ from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.gql_models.domain import DomainNode
 from ai.backend.manager.models.gql_models.group import GroupNode
 from ai.backend.manager.models.gql_models.user import UserNode
-from ai.backend.manager.repositories.deployment.types.types import (
-    AccessTokenOrderingOptions,
-    DeploymentFilterOptions,
-    DeploymentOrderingOptions,
-    DeploymentStatusFilterType,
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    OffsetPagination,
+    QueryCondition,
+    QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
+)
+from ai.backend.manager.repositories.deployment.options import (
+    AccessTokenConditions,
+    AccessTokenOrders,
+    AutoScalingRuleConditions,
+    DeploymentConditions,
+    DeploymentOrders,
 )
 from ai.backend.manager.repositories.deployment.types.types import (
-    DeploymentStatusFilter as RepoDeploymentStatusFilter,
+    AccessTokenOrderingOptions,
 )
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentPolicyUpdaterSpec,
     NewDeploymentUpdaterSpec,
 )
-from ai.backend.manager.services.deployment.actions.access_token.list_access_tokens import (
-    ListAccessTokensAction,
+from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
+    SearchAccessTokensAction,
 )
-from ai.backend.manager.services.deployment.actions.auto_scaling_rule.batch_load_auto_scaling_rules import (
-    BatchLoadAutoScalingRulesAction,
-)
-from ai.backend.manager.services.deployment.actions.batch_load_deployments import (
-    BatchLoadDeploymentsAction,
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
+    SearchAutoScalingRulesAction,
 )
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
@@ -90,7 +97,12 @@ from ai.backend.manager.services.deployment.actions.deployment_policy import (
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
 )
-from ai.backend.manager.services.deployment.actions.list_deployments import ListDeploymentsAction
+from ai.backend.manager.services.deployment.actions.get_deployment_by_id import (
+    GetDeploymentByIdAction,
+)
+from ai.backend.manager.services.deployment.actions.search_deployments import (
+    SearchDeploymentsAction,
+)
 from ai.backend.manager.services.deployment.actions.sync_replicas import SyncReplicaAction
 from ai.backend.manager.services.deployment.actions.update_deployment import UpdateDeploymentAction
 from ai.backend.manager.types import OptionalState, TriState
@@ -115,6 +127,33 @@ DeploymentStatusGQL: type[ModelDeploymentStatus] = strawberry.enum(
     name="DeploymentStatus",
     description="Added in 25.16.0. This enum represents the deployment status of a model deployment, indicating its current state.",
 )
+
+
+# Pagination spec
+@lru_cache(maxsize=1)
+def _get_deployment_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=DeploymentOrders.created_at(ascending=False),
+        backward_order=DeploymentOrders.created_at(ascending=True),
+        forward_condition_factory=DeploymentConditions.by_cursor_forward,
+        backward_condition_factory=DeploymentConditions.by_cursor_backward,
+    )
+
+
+@lru_cache(maxsize=1)
+def _get_access_token_pagination_spec() -> PaginationSpec:
+    """Get pagination specification for access tokens.
+
+    Returns a cached PaginationSpec with:
+    - Forward pagination: created_at DESC (newest first)
+    - Backward pagination: created_at ASC
+    """
+    return PaginationSpec(
+        forward_order=AccessTokenOrders.created_at(ascending=False),
+        backward_order=AccessTokenOrders.created_at(ascending=True),
+        forward_condition_factory=AccessTokenConditions.by_cursor_forward,
+        backward_condition_factory=AccessTokenConditions.by_cursor_backward,
+    )
 
 
 @strawberry.type(description="Added in 25.16.0")
@@ -169,8 +208,15 @@ class ScalingRule:
                 "Model Deployment feature is unavailable. Please contact support."
             )
 
-        result = await processor.batch_load_auto_scaling_rules.wait_for_complete(
-            BatchLoadAutoScalingRulesAction(auto_scaling_rule_ids=self._scaling_rule_ids)
+        if not self._scaling_rule_ids:
+            return []
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(self._scaling_rule_ids)),
+            conditions=[AutoScalingRuleConditions.by_ids(self._scaling_rule_ids)],
+        )
+        result = await processor.search_auto_scaling_rules.wait_for_complete(
+            SearchAutoScalingRulesAction(querier=querier)
         )
 
         return [AutoScalingRule.from_dataclass(rule) for rule in result.data]
@@ -229,7 +275,7 @@ def _convert_gql_revision_ordering_to_repo_ordering(
 
 @strawberry.type(description="Added in 25.16.0")
 class ModelDeploymentNetworkAccess:
-    _access_token_ids: strawberry.Private[Optional[list[UUID]]]
+    _endpoint_id: strawberry.Private[UUID]
     endpoint_url: Optional[str] = None
     preferred_domain_name: Optional[str] = None
     open_to_public: bool = False
@@ -238,6 +284,7 @@ class ModelDeploymentNetworkAccess:
     async def access_tokens(
         self,
         info: Info[StrawberryGQLContext],
+        filter: Optional[AccessTokenFilter] = None,
         order_by: Optional[list[AccessTokenOrderBy]] = None,
         before: Optional[str] = None,
         after: Optional[str] = None,
@@ -246,51 +293,54 @@ class ModelDeploymentNetworkAccess:
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> AccessTokenConnection:
-        """Resolve access tokens using dataloader."""
-        repo_ordering = _convert_gql_revision_ordering_to_repo_ordering(order_by)
-
-        pagination_options = build_pagination_options(
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
-        )
-
+        """Resolve access tokens for this deployment."""
         processor = info.context.processors.deployment
         if processor is None:
             raise ModelDeploymentUnavailable(
                 "Model Deployment feature is unavailable. Please contact support."
             )
-        action_result = await processor.list_access_tokens.wait_for_complete(
-            ListAccessTokensAction(
-                pagination=pagination_options,
-                ordering=repo_ordering,
-            )
+
+        querier = info.context.gql_adapter.build_querier(
+            PaginationOptions(
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+            _get_access_token_pagination_spec(),
+            filter=filter,
+            order_by=order_by,
         )
-        edges = []
-        tokens = action_result.data
-        total_count = action_result.total_count
 
-        for token in tokens:
-            edges.append(
-                AccessTokenEdge(
-                    node=AccessToken.from_dataclass(token),
-                    cursor=to_global_id(AccessToken, token.id),
-                )
-            )
+        # Add endpoint_id condition (required for scoping to this deployment)
+        querier.conditions.insert(0, AccessTokenConditions.by_endpoint_id(self._endpoint_id))
 
-        page_info = build_page_info(edges, total_count, pagination_options)
+        action_result = await processor.search_access_tokens.wait_for_complete(
+            SearchAccessTokensAction(querier=querier)
+        )
+
+        nodes = [AccessToken.from_dataclass(token) for token in action_result.data]
+        edges = [AccessTokenEdge(node=node, cursor=str(node.id)) for node in nodes]
 
         return AccessTokenConnection(
-            count=total_count, edges=edges, page_info=page_info.to_strawberry_page_info()
+            count=action_result.total_count,
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=action_result.has_next_page,
+                has_previous_page=action_result.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
         )
 
     @classmethod
-    def from_dataclass(cls, data: DeploymentNetworkSpec) -> "ModelDeploymentNetworkAccess":
+    def from_dataclass(
+        cls, data: DeploymentNetworkSpec, endpoint_id: UUID
+    ) -> "ModelDeploymentNetworkAccess":
         return cls(
-            _access_token_ids=data.access_token_ids,
+            _endpoint_id=endpoint_id,
             endpoint_url=data.url,
             preferred_domain_name=data.preferred_domain_name,
             open_to_public=data.open_to_public,
@@ -378,31 +428,6 @@ class ModelDeployment(Node):
         )
 
     @classmethod
-    async def batch_load_by_ids(
-        cls, ctx: StrawberryGQLContext, deployment_ids: Sequence[UUID]
-    ) -> list["ModelDeployment"]:
-        """Batch load deployments by their IDs."""
-        processor = ctx.processors.deployment
-        if processor is None:
-            raise ModelDeploymentUnavailable(
-                "Model Deployment feature is unavailable. Please contact support."
-            )
-
-        result = await processor.batch_load_deployments.wait_for_complete(
-            BatchLoadDeploymentsAction(deployment_ids=list(deployment_ids))
-        )
-
-        deployment_map = {deployment.id: deployment for deployment in result.data}
-        model_deployments = []
-
-        for deployment_id in deployment_ids:
-            if deployment_id not in deployment_map:
-                raise ModelDeploymentNotFound(f"Deployment with ID {deployment_id} not found")
-            model_deployments.append(cls.from_dataclass(deployment_map[deployment_id]))
-
-        return model_deployments
-
-    @classmethod
     def from_dataclass(
         cls,
         data: ModelDeploymentData,
@@ -420,7 +445,9 @@ class ModelDeployment(Node):
         return cls(
             id=ID(str(data.id)),
             metadata=metadata,
-            network_access=ModelDeploymentNetworkAccess.from_dataclass(data.network_access),
+            network_access=ModelDeploymentNetworkAccess.from_dataclass(
+                data.network_access, endpoint_id=data.id
+            ),
             revision=ModelRevision.from_dataclass(data.revision) if data.revision else None,
             default_deployment_strategy=DeploymentStrategyGQL(
                 type=DeploymentStrategyTypeGQL(data.default_deployment_strategy)
@@ -441,53 +468,109 @@ class DeploymentStatusFilter:
 
 
 @strawberry.input(description="Added in 25.16.0")
-class DeploymentFilter:
+class DeploymentFilter(GQLFilter):
     name: Optional[StringFilter] = None
     status: Optional[DeploymentStatusFilter] = None
     open_to_public: Optional[bool] = None
     tags: Optional[StringFilter] = None
     endpoint_url: Optional[StringFilter] = None
-    id: Optional[ID] = None
+    ids_in: strawberry.Private[Optional[Sequence[UUID]]] = None
 
     AND: Optional[list["DeploymentFilter"]] = None
     OR: Optional[list["DeploymentFilter"]] = None
     NOT: Optional[list["DeploymentFilter"]] = None
 
-    def to_repo_filter(self) -> DeploymentFilterOptions:
-        repo_filter = DeploymentFilterOptions()
+    @override
+    def build_conditions(self) -> list[QueryCondition]:
+        """Build query conditions from this filter.
 
-        repo_filter.name = self.name
-        repo_filter.open_to_public = self.open_to_public
-        repo_filter.tags = self.tags
-        repo_filter.endpoint_url = self.endpoint_url
-        repo_filter.id = UUID(self.id) if self.id else None
+        Returns a list of QueryCondition callables that can be applied to SQLAlchemy queries.
+        """
+        field_conditions: list[QueryCondition] = []
+
+        # Apply name filter
+        if self.name:
+            name_condition = self.name.build_query_condition(
+                contains_factory=DeploymentConditions.by_name_contains,
+                equals_factory=DeploymentConditions.by_name_equals,
+            )
+            if name_condition:
+                field_conditions.append(name_condition)
+
+        # Apply status filter
         if self.status:
             if self.status.in_ is not None:
-                repo_filter.status = RepoDeploymentStatusFilter(
-                    type=DeploymentStatusFilterType.IN,
-                    values=[ModelDeploymentStatus(status) for status in self.status.in_],
-                )
+                statuses = [ModelDeploymentStatus(s) for s in self.status.in_]
+                field_conditions.append(DeploymentConditions.by_status_in(statuses))
             elif self.status.equals is not None:
-                repo_filter.status = RepoDeploymentStatusFilter(
-                    type=DeploymentStatusFilterType.EQUALS,
-                    values=[ModelDeploymentStatus(self.status.equals)],
+                field_conditions.append(
+                    DeploymentConditions.by_status_equals(ModelDeploymentStatus(self.status.equals))
                 )
 
-        # Handle logical operations
-        if self.AND:
-            repo_filter.AND = [f.to_repo_filter() for f in self.AND]
-        if self.OR:
-            repo_filter.OR = [f.to_repo_filter() for f in self.OR]
-        if self.NOT:
-            repo_filter.NOT = [f.to_repo_filter() for f in self.NOT]
+        # Apply open_to_public filter
+        if self.open_to_public is not None:
+            field_conditions.append(DeploymentConditions.by_open_to_public(self.open_to_public))
 
-        return repo_filter
+        # Apply tags filter
+        if self.tags:
+            tags_condition = self.tags.build_query_condition(
+                contains_factory=DeploymentConditions.by_tag_contains,
+                equals_factory=DeploymentConditions.by_tag_equals,
+            )
+            if tags_condition:
+                field_conditions.append(tags_condition)
+
+        # Apply endpoint_url filter
+        if self.endpoint_url:
+            url_condition = self.endpoint_url.build_query_condition(
+                contains_factory=DeploymentConditions.by_url_contains,
+                equals_factory=DeploymentConditions.by_url_equals,
+            )
+            if url_condition:
+                field_conditions.append(url_condition)
+
+        # Apply ids_in filter (internal use)
+        if self.ids_in:
+            field_conditions.append(DeploymentConditions.by_ids(self.ids_in))
+
+        # Handle AND logical operator - these are implicitly ANDed with field conditions
+        if self.AND:
+            for sub_filter in self.AND:
+                field_conditions.extend(sub_filter.build_conditions())
+
+        # Handle OR logical operator
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                field_conditions.append(combine_conditions_or(or_sub_conditions))
+
+        # Handle NOT logical operator
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                field_conditions.append(negate_conditions(not_sub_conditions))
+
+        return field_conditions
 
 
 @strawberry.input(description="Added in 25.16.0")
-class DeploymentOrderBy:
+class DeploymentOrderBy(GQLOrderBy):
     field: DeploymentOrderField
     direction: OrderDirection = OrderDirection.DESC
+
+    @override
+    def to_query_order(self) -> QueryOrder:
+        """Convert to repository QueryOrder."""
+        ascending = self.direction == OrderDirection.ASC
+        match self.field:
+            case DeploymentOrderField.NAME:
+                return DeploymentOrders.name(ascending)
+            case DeploymentOrderField.CREATED_AT:
+                return DeploymentOrders.created_at(ascending)
 
 
 # Payload Types
@@ -673,19 +756,6 @@ class ModelDeploymentConnection(Connection[ModelDeployment]):
         self.count = count
 
 
-def _convert_gql_deployment_ordering_to_repo(
-    order_by: Optional[list[DeploymentOrderBy]],
-) -> DeploymentOrderingOptions:
-    if order_by is None or len(order_by) == 0:
-        return DeploymentOrderingOptions()
-
-    repo_ordering = []
-    for order in order_by:
-        desc = order.direction == OrderDirection.DESC
-        repo_ordering.append((order.field, desc))
-    return DeploymentOrderingOptions(order_by=repo_ordering)
-
-
 async def resolve_deployments(
     info: Info[StrawberryGQLContext],
     filter: Optional[DeploymentFilter] = None,
@@ -697,50 +767,44 @@ async def resolve_deployments(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ModelDeploymentConnection:
-    repo_filter = None
-    if filter:
-        repo_filter = filter.to_repo_filter()
-
-    repo_ordering = _convert_gql_deployment_ordering_to_repo(order_by)
-
-    pagination_options = build_pagination_options(
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
-    )
-
     processor = info.context.processors.deployment
     if processor is None:
         raise ModelDeploymentUnavailable(
             "Model Deployment feature is unavailable. Please contact support."
         )
-    action_result = await processor.list_deployments.wait_for_complete(
-        ListDeploymentsAction(
-            pagination=pagination_options, ordering=repo_ordering, filters=repo_filter
-        )
-    )
-    edges = []
-    for deployment in action_result.data:
-        edges.append(
-            ModelDeploymentEdge(
-                node=ModelDeployment.from_dataclass(deployment), cursor=str(deployment.id)
-            )
-        )
-    page_info = build_page_info(
-        edges=edges,
-        total_count=action_result.total_count,
-        pagination_options=pagination_options,
+
+    # Build querier using gql_adapter
+    querier = info.context.gql_adapter.build_querier(
+        PaginationOptions(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        _get_deployment_pagination_spec(),
+        filter=filter,
+        order_by=order_by,
     )
 
-    connection = ModelDeploymentConnection(
-        count=action_result.total_count,
-        edges=edges,
-        page_info=page_info.to_strawberry_page_info(),
+    action_result = await processor.search_deployments.wait_for_complete(
+        SearchDeploymentsAction(querier=querier)
     )
-    return connection
+
+    nodes = [ModelDeployment.from_dataclass(data) for data in action_result.data]
+    edges = [ModelDeploymentEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+
+    return ModelDeploymentConnection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=action_result.total_count,
+    )
 
 
 # Resolvers
@@ -775,12 +839,15 @@ async def deployments(
 async def deployment(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ModelDeployment]:
     """Get a specific deployment by ID."""
     _, deployment_id = resolve_global_id(id)
-    deployment_dataloader = info.context.dataloader_registry.get_loader(
-        ModelDeployment.batch_load_by_ids, info.context
+    processor = info.context.processors.deployment
+    if processor is None:
+        raise ModelDeploymentUnavailable(
+            "Model Deployment feature is unavailable. Please contact support."
+        )
+    result = await processor.get_deployment_by_id.wait_for_complete(
+        GetDeploymentByIdAction(deployment_id=UUID(deployment_id))
     )
-    deployment: list[ModelDeployment] = await deployment_dataloader.load(deployment_id)
-
-    return deployment[0]
+    return ModelDeployment.from_dataclass(result.data)
 
 
 @strawberry.mutation(description="Added in 25.16.0")

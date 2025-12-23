@@ -1,8 +1,9 @@
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 from enum import StrEnum
+from functools import lru_cache
 from pathlib import PurePosixPath
-from typing import Any, Optional, cast
+from typing import Any, Optional, cast, override
 from uuid import UUID
 
 import strawberry
@@ -10,16 +11,16 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 from strawberry.scalars import JSON
 
-from ai.backend.common.exception import ModelDeploymentUnavailable, ModelRevisionNotFound
+from ai.backend.common.exception import ModelDeploymentUnavailable
 from ai.backend.common.types import ClusterMode as CommonClusterMode
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.common.types import RuntimeVariant
+from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import (
     JSONString,
     OrderDirection,
     StringFilter,
-    build_page_info,
-    build_pagination_options,
+    encode_cursor,
     resolve_global_id,
     to_global_id,
 )
@@ -29,7 +30,7 @@ from ai.backend.manager.api.gql.image import (
 from ai.backend.manager.api.gql.resource_group import (
     ResourceGroup,
 )
-from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder import (
     ExtraVFolderMountConnection,
     VFolder,
@@ -56,22 +57,37 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.models.gql_models.image import ImageNode
 from ai.backend.manager.models.gql_models.scaling_group import ScalingGroupNode
 from ai.backend.manager.models.gql_models.vfolder import VirtualFolderNode
-from ai.backend.manager.repositories.deployment.types.types import (
-    ModelRevisionFilterOptions,
-    ModelRevisionOrderingOptions,
+from ai.backend.manager.repositories.base import (
+    QueryCondition,
+    QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
 )
+from ai.backend.manager.repositories.deployment.options import RevisionConditions, RevisionOrders
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
-)
-from ai.backend.manager.services.deployment.actions.model_revision.batch_load_revisions import (
-    BatchLoadRevisionsAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.create_model_revision import (
     CreateModelRevisionAction,
 )
-from ai.backend.manager.services.deployment.actions.model_revision.list_revisions import (
-    ListRevisionsAction,
+from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
+    GetRevisionByIdAction,
 )
+from ai.backend.manager.services.deployment.actions.model_revision.search_revisions import (
+    SearchRevisionsAction,
+)
+
+
+# Pagination spec
+@lru_cache(maxsize=1)
+def _get_revision_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=RevisionOrders.created_at(ascending=False),
+        backward_order=RevisionOrders.created_at(ascending=True),
+        forward_condition_factory=RevisionConditions.by_cursor_forward,
+        backward_condition_factory=RevisionConditions.by_cursor_backward,
+    )
+
 
 MountPermission = strawberry.enum(
     CommonMountPermission,
@@ -198,34 +214,10 @@ class ModelRevision(Node):
             created_at=data.created_at,
         )
 
-    @classmethod
-    async def batch_load_by_ids(
-        cls, ctx: StrawberryGQLContext, revision_ids: Sequence[UUID]
-    ) -> list["ModelRevision"]:
-        """Batch load revisions by their IDs."""
-        processor = ctx.processors.deployment
-        if processor is None:
-            raise ModelDeploymentUnavailable(
-                "Model Deployment feature is unavailable. Please contact support."
-            )
-
-        result = await processor.batch_load_revisions.wait_for_complete(
-            BatchLoadRevisionsAction(revision_ids=list(revision_ids))
-        )
-
-        revision_map = {revision.id: revision for revision in result.data}
-        revisions = []
-        for revision_id in revision_ids:
-            if revision_id not in revision_map:
-                raise ModelRevisionNotFound(f"Revision {revision_id} not found")
-            revisions.append(cls.from_dataclass(revision_map[revision_id]))
-
-        return revisions
-
 
 # Filter and Order Types
 @strawberry.input(description="Added in 25.16.0")
-class ModelRevisionFilter:
+class ModelRevisionFilter(GQLFilter):
     name: Optional[StringFilter] = None
     deployment_id: Optional[ID] = None
     id: Optional[ID] = None
@@ -235,30 +227,73 @@ class ModelRevisionFilter:
     OR: Optional[list["ModelRevisionFilter"]] = None
     NOT: Optional[list["ModelRevisionFilter"]] = None
 
-    def to_repo_filter(self) -> ModelRevisionFilterOptions:
-        repo_filter = ModelRevisionFilterOptions()
+    @override
+    def build_conditions(self) -> list[QueryCondition]:
+        """Build query conditions from this filter.
 
-        # Handle basic filters
-        repo_filter.name = self.name
-        repo_filter.deployment_id = UUID(self.deployment_id) if self.deployment_id else None
-        repo_filter.id = UUID(self.id) if self.id else None
-        repo_filter.ids_in = list(self.ids_in) if self.ids_in is not None else None
+        Returns a list of QueryCondition callables that can be applied to SQLAlchemy queries.
+        """
+        field_conditions: list[QueryCondition] = []
 
-        # Handle logical operations
+        # Apply name filter
+        if self.name:
+            name_condition = self.name.build_query_condition(
+                contains_factory=RevisionConditions.by_name_contains,
+                equals_factory=RevisionConditions.by_name_equals,
+            )
+            if name_condition:
+                field_conditions.append(name_condition)
+
+        # Apply deployment_id filter
+        if self.deployment_id:
+            field_conditions.append(RevisionConditions.by_deployment_id(UUID(self.deployment_id)))
+
+        # Apply id filter
+        if self.id:
+            field_conditions.append(RevisionConditions.by_ids([UUID(self.id)]))
+
+        # Apply ids_in filter
+        if self.ids_in:
+            field_conditions.append(RevisionConditions.by_ids(self.ids_in))
+
+        # Handle AND logical operator - these are implicitly ANDed with field conditions
         if self.AND:
-            repo_filter.AND = [f.to_repo_filter() for f in self.AND]
-        if self.OR:
-            repo_filter.OR = [f.to_repo_filter() for f in self.OR]
-        if self.NOT:
-            repo_filter.NOT = [f.to_repo_filter() for f in self.NOT]
+            for sub_filter in self.AND:
+                field_conditions.extend(sub_filter.build_conditions())
 
-        return repo_filter
+        # Handle OR logical operator
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                field_conditions.append(combine_conditions_or(or_sub_conditions))
+
+        # Handle NOT logical operator
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                field_conditions.append(negate_conditions(not_sub_conditions))
+
+        return field_conditions
 
 
 @strawberry.input(description="Added in 25.16.0")
-class ModelRevisionOrderBy:
+class ModelRevisionOrderBy(GQLOrderBy):
     field: ModelRevisionOrderField
     direction: OrderDirection = OrderDirection.DESC
+
+    @override
+    def to_query_order(self) -> QueryOrder:
+        """Convert to repository QueryOrder."""
+        ascending = self.direction == OrderDirection.ASC
+        match self.field:
+            case ModelRevisionOrderField.NAME:
+                return RevisionOrders.name(ascending)
+            case ModelRevisionOrderField.CREATED_AT:
+                return RevisionOrders.created_at(ascending)
 
 
 # Payload Types
@@ -505,20 +540,6 @@ async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
     return all_configs
 
 
-def _convert_gql_revision_ordering_to_repo_ordering(
-    order_by: Optional[list[ModelRevisionOrderBy]],
-) -> ModelRevisionOrderingOptions:
-    if order_by is None or len(order_by) == 0:
-        return ModelRevisionOrderingOptions()
-
-    repo_ordering = []
-    for order in order_by:
-        desc = order.direction == OrderDirection.DESC
-        repo_ordering.append((order.field, desc))
-
-    return ModelRevisionOrderingOptions(order_by=repo_ordering)
-
-
 async def resolve_revisions(
     info: Info[StrawberryGQLContext],
     filter: Optional[ModelRevisionFilter] = None,
@@ -530,53 +551,44 @@ async def resolve_revisions(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ModelRevisionConnection:
-    repo_filter = None
-    if filter:
-        repo_filter = filter.to_repo_filter()
-
-    repo_ordering = _convert_gql_revision_ordering_to_repo_ordering(order_by)
-
-    pagination_options = build_pagination_options(
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
-    )
-
     processor = info.context.processors.deployment
     if processor is None:
         raise ModelDeploymentUnavailable(
             "Model Deployment feature is unavailable. Please contact support."
         )
-    action_result = await processor.list_revisions.wait_for_complete(
-        ListRevisionsAction(
-            pagination=pagination_options,
-            ordering=repo_ordering,
-            filters=repo_filter,
-        )
+
+    # Build querier using gql_adapter
+    querier = info.context.gql_adapter.build_querier(
+        PaginationOptions(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        _get_revision_pagination_spec(),
+        filter=filter,
+        order_by=order_by,
     )
 
-    edges = []
-    revisions = action_result.data
-    total_count = action_result.total_count
-    for revision in revisions:
-        edges.append(
-            ModelRevisionEdge(
-                node=ModelRevision.from_dataclass(revision),
-                cursor=to_global_id(ModelRevision, revision.id),
-            )
-        )
+    action_result = await processor.search_revisions.wait_for_complete(
+        SearchRevisionsAction(querier=querier)
+    )
 
-    page_info = build_page_info(edges, total_count, pagination_options)
+    nodes = [ModelRevision.from_dataclass(data) for data in action_result.data]
+    edges = [ModelRevisionEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
 
-    connection = ModelRevisionConnection(
-        count=total_count,
+    return ModelRevisionConnection(
         edges=edges,
-        page_info=page_info.to_strawberry_page_info(),
+        page_info=PageInfo(
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=action_result.total_count,
     )
-    return connection
 
 
 @strawberry.field(description="Added in 25.16.0")
@@ -609,11 +621,15 @@ async def revisions(
 async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision:
     """Get a specific revision by ID."""
     _, revision_id = resolve_global_id(id)
-    revision_loader = info.context.dataloader_registry.get_loader(
-        ModelRevision.batch_load_by_ids, info.context
+    processor = info.context.processors.deployment
+    if processor is None:
+        raise ModelDeploymentUnavailable(
+            "Model Deployment feature is unavailable. Please contact support."
+        )
+    result = await processor.get_revision_by_id.wait_for_complete(
+        GetRevisionByIdAction(revision_id=UUID(revision_id))
     )
-    revision: list[ModelRevision] = await revision_loader.load(revision_id)
-    return revision[0]
+    return ModelRevision.from_dataclass(result.data)
 
 
 @strawberry.mutation(description="Added in 25.16.0")

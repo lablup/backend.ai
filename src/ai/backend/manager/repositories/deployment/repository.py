@@ -39,6 +39,8 @@ from ai.backend.manager.data.deployment.scale_modifier import (
     ModelDeploymentAutoScalingRuleModifier,
 )
 from ai.backend.manager.data.deployment.types import (
+    AccessTokenSearchResult,
+    AutoScalingRuleSearchResult,
     DefinitionFiles,
     DeploymentInfo,
     DeploymentInfoSearchResult,
@@ -1179,6 +1181,21 @@ class DeploymentRepository:
         return await self._db_source.search_routes(querier)
 
     @deployment_repository_resilience.apply()
+    async def get_route(
+        self,
+        route_id: uuid.UUID,
+    ) -> Optional[RouteInfo]:
+        """Get a route by ID.
+
+        Args:
+            route_id: ID of the route (replica)
+
+        Returns:
+            RouteInfo if found, None otherwise
+        """
+        return await self._db_source.get_route(route_id)
+
+    @deployment_repository_resilience.apply()
     async def search_endpoints(
         self,
         querier: BatchQuerier,
@@ -1209,3 +1226,35 @@ class DeploymentRepository:
             Created EndpointTokenRow.
         """
         return await self._db_source.create_access_token(creator)
+
+    # ========== Additional Search Operations ==========
+
+    @deployment_repository_resilience.apply()
+    async def search_auto_scaling_rules(
+        self,
+        querier: BatchQuerier,
+    ) -> AutoScalingRuleSearchResult:
+        """Search auto-scaling rules with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            AutoScalingRuleSearchResult with items, total_count, and pagination info.
+        """
+        return await self._db_source.search_auto_scaling_rules(querier)
+
+    @deployment_repository_resilience.apply()
+    async def search_access_tokens(
+        self,
+        querier: BatchQuerier,
+    ) -> AccessTokenSearchResult:
+        """Search access tokens with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            AccessTokenSearchResult with items, total_count, and pagination info.
+        """
+        return await self._db_source.search_access_tokens(querier)

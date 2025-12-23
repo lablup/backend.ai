@@ -584,3 +584,23 @@ class DeploymentInfoSearchResult:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+
+
+@dataclass
+class AutoScalingRuleSearchResult:
+    """Search result with pagination for auto-scaling rules."""
+
+    items: list[ModelDeploymentAutoScalingRuleData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class AccessTokenSearchResult:
+    """Search result with pagination for access tokens."""
+
+    items: list[ModelDeploymentAccessTokenData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool

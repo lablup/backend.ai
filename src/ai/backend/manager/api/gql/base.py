@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Optional, Protocol, Type, TypeVar, cast
 
@@ -112,6 +113,40 @@ class IntFilter:
             less_than=self.less_than,
             less_than_or_equal=self.less_than_or_equal,
         )
+
+
+@strawberry.input
+class DateTimeFilter:
+    """Filter for datetime fields."""
+
+    before: Optional[datetime] = None
+    after: Optional[datetime] = None
+    equals: Optional[datetime] = None
+    not_equals: Optional[datetime] = None
+
+    def build_query_condition(
+        self,
+        before_factory: Callable[[datetime], QueryCondition],
+        after_factory: Callable[[datetime], QueryCondition],
+        equals_factory: Optional[Callable[[datetime], QueryCondition]] = None,
+    ) -> Optional[QueryCondition]:
+        """Build a query condition from this filter using the provided factory callables.
+
+        Args:
+            before_factory: Factory function that takes datetime and returns QueryCondition for < comparison
+            after_factory: Factory function that takes datetime and returns QueryCondition for > comparison
+            equals_factory: Optional factory function for = comparison
+
+        Returns:
+            QueryCondition if any filter field is set, None otherwise
+        """
+        if self.equals and equals_factory:
+            return equals_factory(self.equals)
+        elif self.before:
+            return before_factory(self.before)
+        elif self.after:
+            return after_factory(self.after)
+        return None
 
 
 @strawberry.enum

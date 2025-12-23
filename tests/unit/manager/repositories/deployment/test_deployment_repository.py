@@ -1407,15 +1407,15 @@ class TestDeploymentRevisionOperations:
         """Create a single test revision."""
 
         spec = DeploymentRevisionCreatorSpec(
-            endpoint=test_endpoint_id,
+            endpoint_id=test_endpoint_id,
             revision_number=1,
-            image=test_image_id,
+            image_id=test_image_id,
             resource_group=test_scaling_group_name,
             resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
             resource_opts={},
             cluster_mode=ClusterMode.SINGLE_NODE.name,
             cluster_size=1,
-            model=None,
+            model_id=None,
             model_mount_destination="/models",
             model_definition_path=None,
             model_definition=None,
@@ -1441,15 +1441,15 @@ class TestDeploymentRevisionOperations:
         revisions: list[ModelRevisionData] = []
         for rev_num in [1, 2, 3]:
             spec = DeploymentRevisionCreatorSpec(
-                endpoint=test_endpoint_id,
+                endpoint_id=test_endpoint_id,
                 revision_number=rev_num,
-                image=test_image_id,
+                image_id=test_image_id,
                 resource_group=test_scaling_group_name,
                 resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                model=None,
+                model_id=None,
                 model_mount_destination="/models",
                 model_definition_path=None,
                 model_definition=None,
@@ -1476,15 +1476,15 @@ class TestDeploymentRevisionOperations:
         revisions: list[ModelRevisionData] = []
         for rev_num in range(1, 6):
             spec = DeploymentRevisionCreatorSpec(
-                endpoint=test_endpoint_id,
+                endpoint_id=test_endpoint_id,
                 revision_number=rev_num,
-                image=test_image_id,
+                image_id=test_image_id,
                 resource_group=test_scaling_group_name,
                 resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                model=None,
+                model_id=None,
                 model_mount_destination="/models",
                 model_definition_path=None,
                 model_definition=None,
@@ -1509,15 +1509,15 @@ class TestDeploymentRevisionOperations:
     ) -> None:
         """Test creating a deployment revision using Creator."""
         spec = DeploymentRevisionCreatorSpec(
-            endpoint=test_endpoint_id,
+            endpoint_id=test_endpoint_id,
             revision_number=1,
-            image=test_image_id,
+            image_id=test_image_id,
             resource_group=test_scaling_group_name,
             resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
             resource_opts={},
             cluster_mode=ClusterMode.SINGLE_NODE.name,
             cluster_size=1,
-            model=None,
+            model_id=None,
             model_mount_destination="/models",
             model_definition_path=None,
             model_definition=None,
@@ -1957,7 +1957,7 @@ class TestDeploymentAutoScalingPolicyOperations:
     ) -> AsyncGenerator[DeploymentAutoScalingPolicyData, None]:
         """Create a single test auto-scaling policy."""
         spec = DeploymentAutoScalingPolicyCreatorSpec(
-            endpoint=test_endpoint_id,
+            endpoint_id=test_endpoint_id,
             min_replicas=1,
             max_replicas=10,
             metric_source=AutoScalingMetricSource.KERNEL,
@@ -1980,7 +1980,7 @@ class TestDeploymentAutoScalingPolicyOperations:
     ) -> None:
         """Test creating an auto-scaling policy using Creator."""
         spec = DeploymentAutoScalingPolicyCreatorSpec(
-            endpoint=test_endpoint_id,
+            endpoint_id=test_endpoint_id,
             min_replicas=2,
             max_replicas=20,
             metric_source=AutoScalingMetricSource.KERNEL,
@@ -2338,7 +2338,7 @@ class TestDeploymentPolicyOperations:
     ) -> AsyncGenerator[DeploymentPolicyData, None]:
         """Create a single test deployment policy."""
         spec = DeploymentPolicyCreatorSpec(
-            endpoint=test_endpoint_id,
+            endpoint_id=test_endpoint_id,
             strategy=DeploymentStrategy.ROLLING,
             strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
             rollback_on_failure=False,
@@ -2354,7 +2354,7 @@ class TestDeploymentPolicyOperations:
     ) -> None:
         """Test creating a deployment policy using Creator."""
         spec = DeploymentPolicyCreatorSpec(
-            endpoint=test_endpoint_id,
+            endpoint_id=test_endpoint_id,
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=60),
             rollback_on_failure=False,
@@ -2700,12 +2700,12 @@ class TestRouteOperations:
         from ai.backend.manager.repositories.deployment.creators import RouteCreatorSpec
 
         spec = RouteCreatorSpec(
-            endpoint=test_endpoint_id,
-            session_owner=test_user_uuid,
+            endpoint_id=test_endpoint_id,
+            session_owner_id=test_user_uuid,
             domain=test_domain_name,
-            project=test_group_id,
+            project_id=test_group_id,
             traffic_ratio=1.0,
-            revision=None,
+            revision_id=None,
             traffic_status=RouteTrafficStatus.ACTIVE,
         )
         creator = Creator(spec=spec)
@@ -2736,10 +2736,10 @@ class TestRouteOperations:
 
         # Create a route first
         spec = RouteCreatorSpec(
-            endpoint=test_endpoint_id,
-            session_owner=test_user_uuid,
+            endpoint_id=test_endpoint_id,
+            session_owner_id=test_user_uuid,
             domain=test_domain_name,
-            project=test_group_id,
+            project_id=test_group_id,
         )
         route_id = await deployment_repository.create_route(Creator(spec=spec))
 
@@ -2784,10 +2784,10 @@ class TestRouteOperations:
 
         # Create a route first
         spec = RouteCreatorSpec(
-            endpoint=test_endpoint_id,
-            session_owner=test_user_uuid,
+            endpoint_id=test_endpoint_id,
+            session_owner_id=test_user_uuid,
             domain=test_domain_name,
-            project=test_group_id,
+            project_id=test_group_id,
         )
         route_id = await deployment_repository.create_route(Creator(spec=spec))
 

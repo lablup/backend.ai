@@ -203,11 +203,11 @@ class DeploymentExecutor:
                     new_replica_count = target_count - len(routes)
                     for _ in range(new_replica_count):
                         creator_spec = RouteCreatorSpec(
-                            endpoint=deployment.id,
-                            session_owner=deployment.metadata.session_owner,
+                            endpoint_id=deployment.id,
+                            session_owner_id=deployment.metadata.session_owner,
                             domain=deployment.metadata.domain,
-                            project=deployment.metadata.project,
-                            revision=deployment.current_revision_id,
+                            project_id=deployment.metadata.project,
+                            revision_id=deployment.current_revision_id,
                         )
                         scale_out_creators.append(Creator(spec=creator_spec))
                 elif len(routes) > target_count:

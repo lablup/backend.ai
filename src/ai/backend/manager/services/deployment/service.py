@@ -14,30 +14,36 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.deployment.creator import DeploymentCreator
 from ai.backend.manager.data.deployment.types import (
+    ActivenessStatus,
     ClusterConfigData,
     DeploymentInfo,
     ExtraVFolderMountData,
+    LivenessStatus,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
     ModelMountConfigData,
+    ModelReplicaData,
     ModelRevisionData,
     ModelRuntimeConfigData,
     MountMetadata,
+    ReadinessStatus,
     ReplicaStateData,
     ResourceConfigData,
+    RouteInfo,
 )
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.repositories.base import Creator
-from ai.backend.manager.repositories.base.pagination import OffsetPagination
-from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import EndpointTokenCreatorSpec
-from ai.backend.manager.repositories.deployment.options import RevisionConditions
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
+)
+from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
+    SearchAccessTokensAction,
+    SearchAccessTokensActionResult,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_auto_scaling_rule import (
     CreateAutoScalingRuleAction,
@@ -46,6 +52,10 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_aut
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.delete_auto_scaling_rule import (
     DeleteAutoScalingRuleAction,
     DeleteAutoScalingRuleActionResult,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
+    SearchAutoScalingRulesAction,
+    SearchAutoScalingRulesActionResult,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_auto_scaling_rule import (
     UpdateAutoScalingRuleAction,
@@ -67,6 +77,14 @@ from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
     DestroyDeploymentActionResult,
 )
+from ai.backend.manager.services.deployment.actions.get_deployment_by_id import (
+    GetDeploymentByIdAction,
+    GetDeploymentByIdActionResult,
+)
+from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
+    GetReplicaByIdAction,
+    GetReplicaByIdActionResult,
+)
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
     AddModelRevisionActionResult,
@@ -75,21 +93,9 @@ from ai.backend.manager.services.deployment.actions.model_revision.create_model_
     CreateModelRevisionAction,
     CreateModelRevisionActionResult,
 )
-from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_deployment_id import (
-    GetRevisionByDeploymentIdAction,
-    GetRevisionByDeploymentIdActionResult,
-)
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
     GetRevisionByIdActionResult,
-)
-from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_replica_id import (
-    GetRevisionByReplicaIdAction,
-    GetRevisionByReplicaIdActionResult,
-)
-from ai.backend.manager.services.deployment.actions.model_revision.get_revisions_by_deployment_id import (
-    GetRevisionsByDeploymentIdAction,
-    GetRevisionsByDeploymentIdActionResult,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.search_revisions import (
     SearchRevisionsAction,
@@ -108,6 +114,10 @@ from ai.backend.manager.services.deployment.actions.route import (
 from ai.backend.manager.services.deployment.actions.search_deployments import (
     SearchDeploymentsAction,
     SearchDeploymentsActionResult,
+)
+from ai.backend.manager.services.deployment.actions.search_replicas import (
+    SearchReplicasAction,
+    SearchReplicasActionResult,
 )
 from ai.backend.manager.services.deployment.actions.sync_replicas import (
     SyncReplicaAction,
@@ -208,6 +218,28 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
         ),
         default_deployment_strategy=DeploymentStrategy.ROLLING,
         created_user_id=info.metadata.created_user,
+    )
+
+
+def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
+    """Convert RouteInfo to ModelReplicaData.
+
+    Note: Some fields are set to defaults as RouteInfo doesn't have all the data.
+    """
+    return ModelReplicaData(
+        id=route.route_id,
+        revision_id=route.revision_id
+        or route.endpoint_id,  # Fallback to endpoint_id if no revision
+        session_id=route.session_id or route.route_id,  # type: ignore[arg-type]  # Fallback if no session
+        readiness_status=ReadinessStatus.HEALTHY,  # Derived from route status
+        liveness_status=LivenessStatus.HEALTHY,  # Default
+        activeness_status=ActivenessStatus.ACTIVE
+        if route.traffic_ratio > 0
+        else ActivenessStatus.INACTIVE,
+        weight=int(route.traffic_ratio * 100),  # Convert ratio to weight
+        detail=route.error_data,
+        created_at=route.created_at,
+        live_stat={},  # Not available in RouteInfo
     )
 
 
@@ -352,11 +384,28 @@ class DeploymentService:
         result = await self._deployment_repository.search_endpoints(action.querier)
         deployments = [_convert_deployment_info_to_data(info) for info in result.items]
         return SearchDeploymentsActionResult(
-            deployments=deployments,
+            data=deployments,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    async def get_deployment_by_id(
+        self, action: GetDeploymentByIdAction
+    ) -> GetDeploymentByIdActionResult:
+        """Get a deployment by ID.
+
+        Args:
+            action: Action containing the deployment ID
+
+        Returns:
+            GetDeploymentByIdActionResult: Result containing the deployment data
+
+        Raises:
+            EndpointNotFound: If the deployment does not exist
+        """
+        deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
+        return GetDeploymentByIdActionResult(data=_convert_deployment_info_to_data(deployment_info))
 
     async def get_deployment_policy(
         self, action: GetDeploymentPolicyAction
@@ -408,28 +457,6 @@ class DeploymentService:
         revision = await self._deployment_repository.get_revision(action.revision_id)
         return GetRevisionByIdActionResult(data=revision)
 
-    async def get_revision_by_deployment_id(
-        self, action: GetRevisionByDeploymentIdAction
-    ) -> GetRevisionByDeploymentIdActionResult:
-        revision = await self._deployment_repository.get_current_revision(action.deployment_id)
-        return GetRevisionByDeploymentIdActionResult(data=revision)
-
-    async def get_revision_by_replica_id(
-        self, action: GetRevisionByReplicaIdAction
-    ) -> GetRevisionByReplicaIdActionResult:
-        revision = await self._deployment_repository.get_revision_by_route_id(action.replica_id)
-        return GetRevisionByReplicaIdActionResult(data=revision)
-
-    async def get_revisions_by_deployment_id(
-        self, action: GetRevisionsByDeploymentIdAction
-    ) -> GetRevisionsByDeploymentIdActionResult:
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=100, offset=0),
-            conditions=[RevisionConditions.by_deployment_id(action.deployment_id)],
-        )
-        result = await self._deployment_repository.search_revisions(querier)
-        return GetRevisionsByDeploymentIdActionResult(data=result.items)
-
     async def search_revisions(self, action: SearchRevisionsAction) -> SearchRevisionsActionResult:
         """Search revisions with filtering and pagination.
 
@@ -441,7 +468,7 @@ class DeploymentService:
         """
         result = await self._deployment_repository.search_revisions(action.querier)
         return SearchRevisionsActionResult(
-            revisions=result.items,
+            data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
@@ -622,10 +649,10 @@ class DeploymentService:
 
         # Create the Creator with EndpointTokenCreatorSpec
         spec = EndpointTokenCreatorSpec(
-            endpoint=action.creator.model_deployment_id,
+            endpoint_id=action.creator.model_deployment_id,
             domain=endpoint_info.metadata.domain,
-            project=endpoint_info.metadata.project,
-            session_owner=endpoint_info.metadata.session_owner,
+            project_id=endpoint_info.metadata.project,
+            session_owner_id=endpoint_info.metadata.session_owner,
         )
         creator: Creator[EndpointTokenRow] = Creator(spec=spec)
 
@@ -641,3 +668,49 @@ class DeploymentService:
             created_at=token_row.created_at or datetime.now(),
         )
         return CreateAccessTokenActionResult(data=data)
+
+    # ========== Replica Operations ==========
+
+    async def get_replica_by_id(self, action: GetReplicaByIdAction) -> GetReplicaByIdActionResult:
+        """Get a replica by ID."""
+        route = await self._deployment_repository.get_route(action.replica_id)
+        if route is None:
+            return GetReplicaByIdActionResult(data=None)
+        return GetReplicaByIdActionResult(data=_convert_route_info_to_replica_data(route))
+
+    # ========== Search Operations ==========
+
+    async def search_replicas(self, action: SearchReplicasAction) -> SearchReplicasActionResult:
+        """Search replicas with pagination, ordering, and filtering."""
+        result = await self._deployment_repository.search_routes(action.querier)
+        replicas = [_convert_route_info_to_replica_data(route) for route in result.items]
+        return SearchReplicasActionResult(
+            data=replicas,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_access_tokens(
+        self, action: SearchAccessTokensAction
+    ) -> SearchAccessTokensActionResult:
+        """Search access tokens with pagination and ordering."""
+        result = await self._deployment_repository.search_access_tokens(action.querier)
+        return SearchAccessTokensActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_auto_scaling_rules(
+        self, action: SearchAutoScalingRulesAction
+    ) -> SearchAutoScalingRulesActionResult:
+        """Search auto-scaling rules with pagination and ordering."""
+        result = await self._deployment_repository.search_auto_scaling_rules(action.querier)
+        return SearchAutoScalingRulesActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )

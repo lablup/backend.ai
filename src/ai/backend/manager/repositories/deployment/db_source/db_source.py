@@ -33,10 +33,13 @@ from ai.backend.manager.data.deployment.scale_modifier import (
     ModelDeploymentAutoScalingRuleModifier,
 )
 from ai.backend.manager.data.deployment.types import (
+    AccessTokenSearchResult,
+    AutoScalingRuleSearchResult,
     DeploymentInfo,
     DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
     EndpointLifecycle,
+    ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
@@ -786,6 +789,26 @@ class DeploymentDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    async def get_route(
+        self,
+        route_id: uuid.UUID,
+    ) -> Optional[RouteInfo]:
+        """Get a route by ID.
+
+        Args:
+            route_id: ID of the route (replica)
+
+        Returns:
+            RouteInfo if found, None otherwise
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(RoutingRow).where(RoutingRow.id == route_id)
+            result = await db_sess.execute(query)
+            row = result.scalar_one_or_none()
+            if row is None:
+                return None
+            return row.to_route_info()
 
     async def search_endpoints(
         self,
@@ -1933,3 +1956,69 @@ class DeploymentDBSource:
         async with self._begin_session_read_committed() as db_sess:
             result = await execute_creator(db_sess, creator)
             return result.row
+
+    # ========== Additional Search Operations ==========
+
+    async def search_auto_scaling_rules(
+        self,
+        querier: BatchQuerier,
+    ) -> AutoScalingRuleSearchResult:
+        """Search auto-scaling rules with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            AutoScalingRuleSearchResult with items, total_count, and pagination info.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(EndpointAutoScalingRuleRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            return AutoScalingRuleSearchResult(
+                items=[row.to_model_deployment_data() for row in result.rows],
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_access_tokens(
+        self,
+        querier: BatchQuerier,
+    ) -> AccessTokenSearchResult:
+        """Search access tokens with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            AccessTokenSearchResult with items, total_count, and pagination info.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(EndpointTokenRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            return AccessTokenSearchResult(
+                items=[
+                    ModelDeploymentAccessTokenData(
+                        id=row.id,
+                        token=row.token,
+                        valid_until=row.valid_until,
+                        created_at=row.created_at,
+                    )
+                    for row in result.rows
+                ],
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
