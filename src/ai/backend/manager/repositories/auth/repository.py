@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
+from ai.backend.common.dto.manager.auth.types import CredentialsByAccessKey
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.resilience import Resilience
@@ -100,3 +101,8 @@ class AuthRepository:
     @auth_repository_resilience.apply()
     async def get_current_time(self) -> datetime:
         return await self._db_source.fetch_current_time()
+
+    @auth_repository_resilience.apply()
+    async def get_credentials_by_access_key(self, access_key: str) -> CredentialsByAccessKey:
+        """Get keypair and user credentials by access_key."""
+        return await self._db_source.fetch_credentials_by_access_key(access_key)
