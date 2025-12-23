@@ -6,4 +6,3 @@ python_tests(
         "src/ai/backend/manager:src",
     ],
 )
-
