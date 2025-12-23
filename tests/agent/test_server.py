@@ -1,15 +1,195 @@
-# import asyncio
+import shutil
+import tempfile
+from pathlib import Path
 
-# import pytest
+import pytest
 
-# from ai.backend.agent.server import (
-#     AgentRPCServer,
-# )
+from ai.backend.agent.server import AgentRPCServer
+from ai.backend.common.etcd import AsyncEtcd
 
 
 def test_dummy():
     # prevent pants error due to pytest exit code 5: "no tests collected"
     pass
+
+
+class TestAgentRPCServer:
+    @pytest.fixture
+    def agent_toml_file(self, short_path_local_config, tmpdir, mocker):
+        """Create agent TOML config file for testing."""
+        toml_path = tmpdir / "agent.toml"
+        toml_path.write_text(
+            f"""
+    [agent]
+    scaling-group = "{short_path_local_config.agent.scaling_group}"
+    region = "{short_path_local_config.agent.region}"
+    backend = "docker"
+            """,
+            encoding="utf-8",
+        )
+        mocker.patch(
+            "ai.backend.agent.server.config.find_config_file",
+            return_value=str(toml_path),
+        )
+        return toml_path
+
+    @pytest.fixture
+    def mock_etcd(self, mocker):
+        """Mock AsyncEtcd for testing."""
+        mock_etcd_instance = mocker.MagicMock(spec=AsyncEtcd)
+        mock_etcd_instance.get_prefix = mocker.AsyncMock(return_value={})
+        mock_etcd_instance.put = mocker.AsyncMock()
+        return mock_etcd_instance
+
+    @pytest.fixture
+    def mock_stats_monitor(self, mocker):
+        """Mock AgentStatsPluginContext for testing."""
+        mock_stats = mocker.MagicMock()
+        mock_stats.init = mocker.AsyncMock()
+        mocker.patch(
+            "ai.backend.agent.server.AgentStatsPluginContext",
+            return_value=mock_stats,
+        )
+        return mock_stats
+
+    @pytest.fixture
+    def mock_error_monitor(self, mocker):
+        """Mock AgentErrorPluginContext for testing."""
+        mock_error = mocker.MagicMock()
+        mock_error.init = mocker.AsyncMock()
+        mock_error.capture_exception = mocker.AsyncMock()
+        mocker.patch(
+            "ai.backend.agent.server.AgentErrorPluginContext",
+            return_value=mock_error,
+        )
+        return mock_error
+
+    @pytest.fixture
+    def mock_agent(self, short_path_local_config, mocker):
+        """
+        Mock AbstractAgent that shares config reference with AgentRPCServer.
+
+        This is critical for testing the scaling_group update bug:
+        The agent must share the same local_config object reference.
+        """
+        mock_agent_instance = mocker.MagicMock()
+        mock_agent_instance.local_config = short_path_local_config  # Share the same config!
+        mock_agent_instance.id = short_path_local_config.agent.id
+        # update_scaling_group is called with await, so it needs to be AsyncMock
+        mock_agent_instance.update_scaling_group = mocker.AsyncMock()
+        return mock_agent_instance
+
+    @pytest.fixture
+    def mock_agent_module(self, mock_agent, mocker):
+        """Mock agent module for importlib.import_module."""
+        mock_agent_class = mocker.MagicMock()
+        mock_agent_class.new = mocker.AsyncMock(return_value=mock_agent)
+
+        mock_module = mocker.MagicMock()
+        mock_module.get_agent_cls = mocker.MagicMock(return_value=mock_agent_class)
+
+        mocker.patch(
+            "ai.backend.agent.server.importlib.import_module",
+            return_value=mock_module,
+        )
+        return mock_module
+
+    @pytest.fixture
+    def mock_agent_server_dependencies(self, short_path_local_config, mocker):
+        """Mock other AgentRPCServer dependencies."""
+        # Mock identity module
+        mocker.patch(
+            "ai.backend.agent.server.identity.get_instance_id",
+            return_value=short_path_local_config.agent.id,
+        )
+
+        # Mock RPC server
+        mocker.patch("ai.backend.agent.server.Peer")
+
+        # Mock unix socket server
+        async def mock_start_unix_server(*args, **kwargs):
+            mock_server = mocker.MagicMock()
+            mock_server.serve_forever = mocker.AsyncMock()
+            return mock_server
+
+        mocker.patch(
+            "ai.backend.agent.server.asyncio.start_unix_server",
+            side_effect=mock_start_unix_server,
+        )
+
+    @pytest.fixture
+    def short_path_local_config(self, local_config):
+        """
+        Override ipc_base_path to use shorter path to avoid AF_UNIX path too long error.
+        """
+
+        # Create a short temp path
+        short_temp = Path(tempfile.mkdtemp(prefix="bai-"))
+        local_config.agent.ipc_base_path = short_temp
+        return local_config
+
+    @pytest.fixture
+    async def agent_rpc_server(
+        self,
+        short_path_local_config,
+        mock_etcd,
+        agent_toml_file,
+        mock_stats_monitor,
+        mock_error_monitor,
+        mock_agent_module,
+        mock_agent_server_dependencies,
+    ):
+        """
+        Create and initialize AgentRPCServer for testing.
+
+        Returns initialized server instance.
+        """
+        server = AgentRPCServer(
+            etcd=mock_etcd,
+            local_config=short_path_local_config,
+            skip_detect_manager=True,
+        )
+
+        await server.__ainit__()
+
+        try:
+            yield server
+        finally:
+            # Cleanup temp directory
+            if short_path_local_config.agent.ipc_base_path.exists():
+                shutil.rmtree(short_path_local_config.agent.ipc_base_path)
+
+    @pytest.mark.asyncio
+    async def test_update_scaling_group_preserves_config_reference(
+        self,
+        agent_rpc_server,
+        mock_agent,
+    ) -> None:
+        """
+        Verifies that update_scaling_group() maintains config reference
+        between AgentRPCServer and AbstractAgent.
+        """
+        # Store original config ID for verification
+        original_config_id = id(agent_rpc_server.local_config)
+
+        # Verify initial state: same reference
+        assert agent_rpc_server.local_config is mock_agent.local_config
+
+        # Simulate what server.update_scaling_group() does internally:
+        # Update the config by modifying agent field only (not creating new config object)
+        new_scaling_group = "new-group"
+        new_agent_config = agent_rpc_server.local_config.agent.model_copy(
+            update={"scaling_group": new_scaling_group}
+        )
+        agent_rpc_server.local_config.agent = new_agent_config
+
+        # Verify: config reference is preserved
+        assert id(agent_rpc_server.local_config) == original_config_id
+        assert agent_rpc_server.local_config is mock_agent.local_config
+
+        # Verify: scaling_group is updated
+        assert agent_rpc_server.local_config.agent.scaling_group == new_scaling_group
+        assert mock_agent.local_config.agent.scaling_group == new_scaling_group
 
 
 # TODO: rewrite

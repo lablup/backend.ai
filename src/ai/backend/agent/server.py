@@ -609,7 +609,7 @@ class AgentRPCServer(aobject):
         new_agent_config = self.local_config.agent.model_copy(
             update={"scaling_group": scaling_group}
         )
-        self.local_config = self.local_config.model_copy(update={"agent": new_agent_config})
+        self.local_config.agent = new_agent_config
         log.info("rpc::update_scaling_group()")
 
     @rpc_function
