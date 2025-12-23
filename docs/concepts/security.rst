@@ -156,6 +156,6 @@ configuration.
 References
 ----------
 
-* `Backend.AI Installation Guide <../install/index.html>`_
-* `Networking Concepts <networking.html>`_
-* `Agent Installation <../install/install-from-package/install-agent.html>`_
+* :doc:`../install/index` - Backend.AI Installation Guide
+* :doc:`networking` - Networking Concepts
+* :doc:`../install/install-from-package/install-agent` - Agent Installation

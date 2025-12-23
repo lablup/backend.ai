@@ -95,5 +95,6 @@ checklists, see :ref:`concept-security`.
 
 .. seealso::
 
-   * :ref:`concept-security` - Comprehensive security architecture guide
-   * :doc:`../install/install-from-package/install-agent` - Agent installation with network configuration
+   :ref:`concept-security`
+
+   :doc:`../install/install-from-package/install-agent`

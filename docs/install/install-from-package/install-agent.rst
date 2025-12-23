@@ -34,8 +34,7 @@ Before installing the agent, ensure your network is properly configured:
 * Only expose webserver to the Internet (typically on port 443)
 * Route all interactive session access through AppProxy
 
-For detailed network architecture and configuration requirements, see:
-:ref:`concept-security`
+For detailed network architecture and configuration requirements, see :ref:`concept-security`.
 
 Refer to :ref:`prepare_python_and_venv` to setup Python and virtual environment
 for the service.
