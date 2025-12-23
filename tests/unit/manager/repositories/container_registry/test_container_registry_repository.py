@@ -11,7 +11,6 @@ import sqlalchemy as sa
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.exception import (
-    ContainerRegistryAlreadyExists,
     ContainerRegistryGroupsAlreadyAssociated,
 )
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
@@ -480,43 +479,6 @@ class TestContainerRegistryRepository:
                     sa.delete(ContainerRegistryRow).where(
                         (ContainerRegistryRow.registry_name == spec.registry_name)
                         & (ContainerRegistryRow.project == spec.project)
-                    )
-                )
-
-    @pytest.mark.asyncio
-    async def test_create_registry_duplicate_raises_error(
-        self,
-        repository: ContainerRegistryRepository,
-        database_engine: ExtendedAsyncSAEngine,
-        creator_spec: ContainerRegistryCreatorSpec,
-    ) -> None:
-        """Test creating duplicate registry (same registry_name and project) raises ContainerRegistryAlreadyExists"""
-        # Given - Create first registry
-        try:
-            result1 = await repository.create_registry(Creator(spec=creator_spec))
-            assert result1 is not None
-
-            # When - Try to create duplicate registry with same registry_name and project
-            # Then - Should raise ContainerRegistryAlreadyExists
-            with pytest.raises(ContainerRegistryAlreadyExists):
-                await repository.create_registry(
-                    Creator(
-                        spec=ContainerRegistryCreatorSpec(
-                            url=creator_spec.url,
-                            type=creator_spec.type,
-                            registry_name=creator_spec.registry_name,
-                            project=creator_spec.project,
-                        )
-                    )
-                )
-
-        finally:
-            # Cleanup
-            async with database_engine.begin_session() as session:
-                await session.execute(
-                    sa.delete(ContainerRegistryRow).where(
-                        (ContainerRegistryRow.registry_name == creator_spec.registry_name)
-                        & (ContainerRegistryRow.project == creator_spec.project)
                     )
                 )
 

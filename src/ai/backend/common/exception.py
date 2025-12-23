@@ -971,18 +971,6 @@ class AgentWatcherResponseError(BackendAIError, web.HTTPServiceUnavailable):
         return self._error_code
 
 
-class ContainerRegistryAlreadyExists(BackendAIError, web.HTTPConflict):
-    error_type = "https://api.backend.ai/probs/container-registry-already-exists"
-    error_title = "Container registry with the same name and project already exists."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.CONTAINER_REGISTRY,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.ALREADY_EXISTS,
-        )
-
-
 class ContainerRegistryGroupsAlreadyAssociated(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/container-registry/groups-already-associated"
     error_title = "Container registry groups already associated."

@@ -6,7 +6,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.container_registry import AllowedGroupsModel
-from ai.backend.common.exception import BackendAIError, ContainerRegistryAlreadyExists
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -61,23 +61,6 @@ class ContainerRegistryRepository:
     ) -> ContainerRegistryData:
         spec = cast(ContainerRegistryCreatorSpec, creator.spec)
         async with self._db.begin_session() as session:
-            # Check for existing registry with SELECT FOR UPDATE to prevent race conditions
-            existing = await session.scalar(
-                sa.select(ContainerRegistryRow)
-                .where(
-                    sa.and_(
-                        (ContainerRegistryRow.registry_name == spec.registry_name),
-                        (ContainerRegistryRow.project == spec.project),
-                    )
-                )
-                .with_for_update()
-            )
-            if existing:
-                raise ContainerRegistryAlreadyExists(
-                    f"Container registry '{spec.registry_name}' with project '{spec.project}' already exists"
-                )
-
-            # Create new registry
             creator_result = await execute_creator(session, creator)
             container_registry_row: ContainerRegistryRow = creator_result.row
 
