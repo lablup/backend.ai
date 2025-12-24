@@ -14,3 +14,7 @@ class DisallowedArgument(MessageError):
 
 class InvalidServiceDefinition(MessageError):
     pass
+
+
+class LogDirectorySetupError(ValueError):
+    pass

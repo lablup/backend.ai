@@ -38,6 +38,7 @@ from jupyter_client.kernelspec import KernelSpecManager
 from jupyter_client.manager import AsyncKernelManager
 
 from .compat import current_loop
+from .exception import LogDirectorySetupError
 from .intrinsic import (
     init_sshd_service,
     prepare_sshd_service,
@@ -476,8 +477,8 @@ class BaseRunner(metaclass=ABCMeta):
                 ret = await self.execute_heuristic()
             else:
                 ret = await self.run_subproc(exec_cmd, batch=True)
-        except Exception:
-            log.exception("unexpected error")
+        except Exception as e:
+            log.exception("unexpected error: {}", e)
             ret = -1
         finally:
             await asyncio.sleep(0.01)  # extra delay to flush logs
@@ -984,12 +985,8 @@ class BaseRunner(metaclass=ABCMeta):
             )
             try:
                 log_path.parent.mkdir(parents=True, exist_ok=True)
-            except PermissionError as e:
-                log.error("failed to create log directory due to permission error: {}", e)
-                raise
             except Exception as e:
-                log.error("failed to create log directory: {}", e)
-                raise
+                raise LogDirectorySetupError(f" failed while creating log directory: {e}")
         else:
             log_path = Path(os.path.devnull)
         try:
