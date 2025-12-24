@@ -982,7 +982,14 @@ class BaseRunner(metaclass=ABCMeta):
                 "/home/work/.logs/task/"
                 f"{kernel_id_hex[:2]}/{kernel_id_hex[2:4]}/{kernel_id_hex[4:]}.log",
             )
-            log_path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+            except PermissionError as e:
+                log.error("failed to create log directory due to permission error: {}", e)
+                raise
+            except Exception as e:
+                log.error("failed to create log directory: {}", e)
+                raise
         else:
             log_path = Path(os.path.devnull)
         try:
