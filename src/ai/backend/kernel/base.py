@@ -38,7 +38,6 @@ from jupyter_client.kernelspec import KernelSpecManager
 from jupyter_client.manager import AsyncKernelManager
 
 from .compat import current_loop
-from .exception import LogDirectorySetupError
 from .intrinsic import (
     init_sshd_service,
     prepare_sshd_service,
@@ -983,10 +982,7 @@ class BaseRunner(metaclass=ABCMeta):
                 "/home/work/.logs/task/"
                 f"{kernel_id_hex[:2]}/{kernel_id_hex[2:4]}/{kernel_id_hex[4:]}.log",
             )
-            try:
-                log_path.parent.mkdir(parents=True, exist_ok=True)
-            except Exception as e:
-                raise LogDirectorySetupError(f" failed while creating log directory: {e}")
+            log_path.parent.mkdir(parents=True, exist_ok=True)
         else:
             log_path = Path(os.path.devnull)
         try:
