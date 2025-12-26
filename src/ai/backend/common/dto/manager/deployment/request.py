@@ -210,8 +210,7 @@ class DeploymentStrategyInput(BaseRequestModel):
 class ImageInput(BaseRequestModel):
     """Container image input."""
 
-    name: str = Field(description="Image name (canonical reference)")
-    architecture: str = Field(description="Image architecture (e.g., x86_64, aarch64)")
+    id: UUID = Field(description="Image ID")
 
 
 class ClusterConfigInput(BaseRequestModel):
