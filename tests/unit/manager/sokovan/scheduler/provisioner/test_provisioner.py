@@ -251,11 +251,6 @@ class TestScheduleQueuedSessionsWithData:
     ) -> None:
         """
         Verify that _schedule_queued_sessions_with_data uses correct agent_selector.
-
-        This is the core test for the bug fix:
-        Line 227-228 in provisioner.py:
-            agent_selection_strategy = sg_info.scheduler_opts.agent_selection_strategy
-            agent_selector = self._agent_selector_pool[agent_selection_strategy]
         """
         # Given: Override provisioner's selector pool with mock selectors
         test_provisioner._agent_selector_pool = mock_selector_pool

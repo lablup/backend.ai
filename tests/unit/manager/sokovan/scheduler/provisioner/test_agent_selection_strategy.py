@@ -34,6 +34,12 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.roundrobin impor
 )
 
 
+@pytest.fixture
+def mock_resource_priority() -> list[str]:
+    """Mock resource priority list for agent selectors."""
+    return ["cpu", "mem"]
+
+
 class TestAgentSelectionStrategyFromScalingGroupOpts:
     """Test that agent_selection_strategy is correctly read from ScalingGroupOpts."""
 
@@ -49,9 +55,6 @@ class TestAgentSelectionStrategyFromScalingGroupOpts:
     def test_agent_selection_strategy_from_field(self, strategy: AgentSelectionStrategy) -> None:
         """
         Verify that agent_selection_strategy is correctly read from the field.
-
-        Before bug fix: sg_info.scheduler_opts.config.get("agent_selection_strategy", ...)
-        After bug fix: sg_info.scheduler_opts.agent_selection_strategy
         """
         # Given: ScalingGroupOpts with specific agent_selection_strategy
         scheduler_opts = ScalingGroupOpts(agent_selection_strategy=strategy)
@@ -89,12 +92,12 @@ class TestAgentSelectorPool:
     def test_agent_selector_pool_mapping(
         self,
         strategy: AgentSelectionStrategy,
+        mock_resource_priority: list[str],
         expected_selector_type: type,
     ) -> None:
         """Verify _make_agent_selector_pool creates correct selector for each strategy."""
         # Given: Create agent selector pool
-        resource_priority = ["cpu", "mem"]
-        pool = SessionProvisioner._make_agent_selector_pool(resource_priority)
+        pool = SessionProvisioner._make_agent_selector_pool(mock_resource_priority)
 
         # When: Get selector for strategy
         agent_selector = pool[strategy]
@@ -120,9 +123,6 @@ class TestSchedulingDataPath:
     ) -> None:
         """
         Verify the complete path from SchedulingData to agent_selection_strategy.
-
-        This tests the actual usage in _schedule_queued_sessions_with_data:
-        agent_selection_strategy = sg_info.scheduler_opts.agent_selection_strategy
         """
         # Given: Create complete SchedulingData structure
         scheduler_opts = ScalingGroupOpts(agent_selection_strategy=strategy)
