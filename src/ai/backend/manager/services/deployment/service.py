@@ -12,7 +12,6 @@ from ai.backend.common.types import (
     ResourceSlot,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.deployment.creator import DeploymentCreator
 from ai.backend.manager.data.deployment.types import (
     ActivenessStatus,
     ClusterConfigData,
@@ -26,7 +25,6 @@ from ai.backend.manager.data.deployment.types import (
     ModelReplicaData,
     ModelRevisionData,
     ModelRuntimeConfigData,
-    MountMetadata,
     ReadinessStatus,
     ReplicaStateData,
     ResourceConfigData,
@@ -36,7 +34,17 @@ from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.creators import EndpointTokenCreatorSpec
+from ai.backend.manager.repositories.deployment.creators import (
+    DeploymentCreatorSpec,
+    DeploymentExecutionFields,
+    DeploymentMetadataFields,
+    DeploymentMountFields,
+    DeploymentNetworkFields,
+    DeploymentReplicaFields,
+    DeploymentResourceFields,
+    EndpointTokenCreatorSpec,
+    ModelRevisionFields,
+)
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
@@ -273,29 +281,59 @@ class DeploymentService:
         """
         log.info("Creating deployment with name: {}", action.creator.metadata.name)
 
-        # Convert VFolderMountsCreator to MountMetadata
-        mounts = action.creator.model_revision.mounts
-        mount_metadata = MountMetadata(
-            model_vfolder_id=mounts.model_vfolder_id,
-            model_definition_path=mounts.model_definition_path,
-            model_mount_destination=mounts.model_mount_destination,
-            extra_mounts=[],  # TODO: Convert MountInfo to VFolderMount
-        )
+        # Build CreatorSpec from action data
+        metadata = action.creator.metadata
+        revision = action.creator.model_revision
+        mounts = revision.mounts
 
-        # Convert ModelRevisionCreator to ModelRevisionSpec
-        model_revision_spec = action.creator.model_revision.to_revision_spec(mount_metadata)
-
-        # Build DeploymentCreator from NewDeploymentCreator
-        deployment_creator = DeploymentCreator(
-            metadata=action.creator.metadata,
-            replica_spec=action.creator.replica_spec,
-            network=action.creator.network,
-            model_revision=model_revision_spec,
-            policy=action.creator.policy,
+        creator_spec = DeploymentCreatorSpec(
+            metadata=DeploymentMetadataFields(
+                name=metadata.name,
+                domain=metadata.domain,
+                project_id=metadata.project,
+                resource_group=metadata.resource_group,
+                created_user_id=metadata.created_user,
+                session_owner_id=metadata.session_owner,
+                revision_history_limit=metadata.revision_history_limit,
+                tag=metadata.tag,
+            ),
+            replica=DeploymentReplicaFields(
+                replica_count=action.creator.replica_spec.replica_count,
+                desired_replica_count=action.creator.replica_spec.desired_replica_count,
+            ),
+            network=DeploymentNetworkFields(
+                open_to_public=action.creator.network.open_to_public,
+                url=action.creator.network.url,
+            ),
+            revision=ModelRevisionFields(
+                image_id=revision.image_id,
+                resource=DeploymentResourceFields(
+                    cluster_mode=revision.resource_spec.cluster_mode,
+                    cluster_size=revision.resource_spec.cluster_size,
+                    resource_slots=ResourceSlot(revision.resource_spec.resource_slots),
+                    resource_opts=revision.resource_spec.resource_opts,
+                ),
+                mounts=DeploymentMountFields(
+                    model_vfolder_id=mounts.model_vfolder_id,
+                    model_mount_destination=mounts.model_mount_destination,
+                    model_definition_path=mounts.model_definition_path,
+                    extra_mounts=(),  # TODO: Convert MountInfo to VFolderMount
+                ),
+                execution=DeploymentExecutionFields(
+                    runtime_variant=revision.execution.runtime_variant,
+                    startup_command=revision.execution.startup_command,
+                    bootstrap_script=revision.execution.bootstrap_script,
+                    environ=revision.execution.environ,
+                    callback_url=revision.execution.callback_url,
+                ),
+            ),
         )
+        creator: Creator[EndpointRow] = Creator(spec=creator_spec)
 
         # Create endpoint via repository
-        deployment_info = await self._deployment_repository.create_endpoint(deployment_creator)
+        deployment_info = await self._deployment_repository.create_endpoint(
+            creator, action.creator.policy
+        )
 
         # Mark lifecycle needed to start provisioning
         await self._deployment_controller.mark_lifecycle_needed(

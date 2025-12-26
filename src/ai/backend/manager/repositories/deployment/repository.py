@@ -28,7 +28,7 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.creator import DeploymentCreator, DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingRule,
     AutoScalingRuleCreator,
@@ -140,10 +140,36 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_endpoint(
         self,
+        creator: Creator[EndpointRow],
+        policy_config: DeploymentPolicyConfig | None = None,
+    ) -> DeploymentInfo:
+        """Create a new endpoint and return DeploymentInfo.
+
+        Args:
+            creator: Creator containing DeploymentCreatorSpec with resolved image_id
+            policy_config: Optional deployment policy configuration
+
+        Returns:
+            DeploymentInfo for the created endpoint
+        """
+        return await self._db_source.create_endpoint(creator, policy_config)
+
+    @deployment_repository_resilience.apply()
+    async def create_endpoint_legacy(
+        self,
         creator: DeploymentCreator,
     ) -> DeploymentInfo:
-        """Create a new endpoint and return DeploymentInfo."""
-        return await self._db_source.create_endpoint(creator)
+        """Create a new endpoint using legacy DeploymentCreator.
+
+        This is for backward compatibility with legacy deployment creation flow.
+
+        Args:
+            creator: Legacy DeploymentCreator with ImageIdentifier
+
+        Returns:
+            DeploymentInfo for the created endpoint
+        """
+        return await self._db_source.create_endpoint_legacy(creator)
 
     @deployment_repository_resilience.apply()
     async def get_modified_endpoint(

@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncIterator, Optional, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -22,7 +22,7 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.manager.data.agent.types import AgentStatus
-from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.creator import DeploymentCreator, DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingRule,
     AutoScalingRuleCreator,
@@ -107,6 +107,10 @@ from ai.backend.manager.repositories.base.updater import (
     Updater,
     execute_batch_updater,
     execute_updater,
+)
+from ai.backend.manager.repositories.deployment.creators import (
+    DeploymentCreatorSpec,
+    DeploymentPolicyCreatorSpec,
 )
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ContainerUserContext,
@@ -202,11 +206,60 @@ class DeploymentDBSource:
 
     async def create_endpoint(
         self,
-        creator: DeploymentCreator,
+        creator: Creator[EndpointRow],
+        policy_config: DeploymentPolicyConfig | None = None,
     ) -> DeploymentInfo:
         """Create a new endpoint in the database and return DeploymentInfo.
 
-        If creator.policy is provided, the deployment policy is also created atomically.
+        Args:
+            creator: Creator containing DeploymentCreatorSpec with resolved image_id
+            policy_config: Optional deployment policy configuration
+
+        Returns:
+            DeploymentInfo for the created endpoint
+        """
+        spec = cast(DeploymentCreatorSpec, creator.spec)
+        async with self._begin_session_read_committed() as db_sess:
+            await self._check_group_exists(db_sess, spec.metadata.domain, spec.metadata.project_id)
+            endpoint = spec.build_row()
+            db_sess.add(endpoint)
+            await db_sess.flush()
+
+            # Create deployment policy if provided
+            if policy_config is not None:
+                policy_spec = DeploymentPolicyCreatorSpec(
+                    endpoint_id=endpoint.id,
+                    strategy=policy_config.strategy,
+                    strategy_spec=policy_config.strategy_spec,
+                    rollback_on_failure=policy_config.rollback_on_failure,
+                )
+                policy_row = policy_spec.build_row()
+                db_sess.add(policy_row)
+                await db_sess.flush()
+
+            stmt = (
+                sa.select(EndpointRow)
+                .where(EndpointRow.id == endpoint.id)
+                .options(selectinload(EndpointRow.image_row))
+            )
+            result = await db_sess.execute(stmt)
+            endpoint_result: EndpointRow = result.scalar_one()
+            deployment_info = endpoint_result.to_deployment_info()
+        return deployment_info
+
+    async def create_endpoint_legacy(
+        self,
+        creator: DeploymentCreator,
+    ) -> DeploymentInfo:
+        """Create a new endpoint using legacy DeploymentCreator.
+
+        This is for backward compatibility with legacy deployment creation flow.
+
+        Args:
+            creator: Legacy DeploymentCreator with ImageIdentifier
+
+        Returns:
+            DeploymentInfo for the created endpoint
         """
         async with self._begin_session_read_committed() as db_sess:
             await self._check_group_exists(db_sess, creator.domain, creator.project)
