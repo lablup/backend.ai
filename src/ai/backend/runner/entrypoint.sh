@@ -72,7 +72,7 @@ if [ $USER_ID -eq 0 ]; then
 else
 
   echo "Setting up uid and gid: $USER_ID:$GROUP_ID"
-  USER_NAME=$(getent group $USER_ID | cut -d: -f1)
+  USER_NAME=$(getent passwd $USER_ID | cut -d: -f1)
   GROUP_NAME=$(getent group $GROUP_ID | cut -d: -f1)
   if [ -f /bin/ash ]; then  # for alpine (busybox)
     if [ -z "$GROUP_NAME" ]; then
