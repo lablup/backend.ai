@@ -29,6 +29,7 @@ from ai.backend.manager.data.agent.types import AgentData
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
 
+from ...stat_utils import clamp_agent_cpu_util
 from ..agent import (
     ADMIN_PERMISSIONS,
     AgentRow,
@@ -192,7 +193,8 @@ class AgentNode(graphene.ObjectType):
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader_by_func(ctx, self.batch_load_live_stat)
-        return await loader.load(self.id)
+        stat_data = await loader.load(self.id)
+        return clamp_agent_cpu_util(stat_data)
 
     async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> dict[str, float]:
         return await _resolve_gpu_alloc_map(info.context, self.id)
@@ -408,7 +410,8 @@ class Agent(graphene.ObjectType):
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader_by_func(ctx, Agent.batch_load_live_stat)
-        return await loader.load(self.id)
+        stat_data = await loader.load(self.id)
+        return clamp_agent_cpu_util(stat_data)
 
     async def resolve_cpu_cur_pct(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
