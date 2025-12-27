@@ -149,7 +149,7 @@ jobs:
         fi
         pants lint --changed-since=$BASE_REF --changed-dependents=transitive
     - name: Upload pants log
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: pants.lint.log
         path: .pants.d/workdir/pants.log
@@ -273,7 +273,7 @@ jobs:
         fi
         pants check --changed-since=$BASE_REF --changed-dependents=transitive
     - name: Upload pants log
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: pants.check.log
         path: .pants.d/workdir/pants.log
@@ -352,7 +352,7 @@ jobs:
           pants test --changed-since=$BASE_REF $DEPENDENTS_OPT -- -v
         fi
     - name: Upload pants log
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: pants.test.log
         path: .pants.d/workdir/pants.log
@@ -413,12 +413,12 @@ jobs:
         mv dist/checksum.txt dist/checksum-${platform_suffix}.txt
         rm dist/*.sha256
     - name: Upload scies
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: scies-${{ matrix.os }}
         path: dist/*
     - name: Upload pants log
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: pants-${{ matrix.os }}.build-scies.log
         path: .pants.d/workdir/pants.log
@@ -458,12 +458,12 @@ jobs:
       run: |
         ./scripts/build-wheels.sh
     - name: Upload wheels
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: wheels
         path: dist/*
     - name: Upload pants log
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: pants.build-wheels.log
         path: .pants.d/workdir/pants.log
