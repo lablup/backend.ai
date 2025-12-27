@@ -64,6 +64,15 @@ type AccessTokenEdge
 }
 
 """Added in 25.16.0"""
+input AccessTokenFilter
+  @join__type(graph: STRAWBERRY)
+{
+  token: StringFilter = null
+  validUntil: DateTimeFilter = null
+  createdAt: DateTimeFilter = null
+}
+
+"""Added in 25.16.0"""
 input AccessTokenOrderBy
   @join__type(graph: STRAWBERRY)
 {
@@ -2028,6 +2037,15 @@ scalar DateTime
   @join__type(graph: GRAPHENE)
   @join__type(graph: STRAWBERRY)
 
+input DateTimeFilter
+  @join__type(graph: STRAWBERRY)
+{
+  before: DateTime = null
+  after: DateTime = null
+  equals: DateTime = null
+  notEquals: DateTime = null
+}
+
 type DealiasImage
   @join__type(graph: GRAPHENE)
 {
@@ -2426,7 +2444,6 @@ input DeploymentFilter
   openToPublic: Boolean = null
   tags: StringFilter = null
   endpointUrl: StringFilter = null
-  id: ID = null
   AND: [DeploymentFilter!] = null
   OR: [DeploymentFilter!] = null
   NOT: [DeploymentFilter!] = null
@@ -3158,8 +3175,7 @@ type ImageEdge
 input ImageInput
   @join__type(graph: STRAWBERRY)
 {
-  name: String!
-  architecture: String!
+  id: ID!
 }
 
 type ImageNode implements Node
@@ -3737,7 +3753,7 @@ type ModelDeploymentNetworkAccess
   endpointUrl: String
   preferredDomainName: String
   openToPublic: Boolean!
-  accessTokens(orderBy: [AccessTokenOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AccessTokenConnection!
+  accessTokens(filter: AccessTokenFilter = null, orderBy: [AccessTokenOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AccessTokenConnection!
 }
 
 """Added in 25.16.0"""
