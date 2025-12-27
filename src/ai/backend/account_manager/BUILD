@@ -86,6 +86,5 @@ resources(
     ],
     sources=[
         "**/py.typed",
-        "models/alembic/script.py.mako",
     ],
 )
