@@ -25,9 +25,11 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import (
+    AgentDetailData,
     AgentHeartbeatUpsert,
     UpsertResult,
 )
+from ai.backend.manager.models.agent import ADMIN_PERMISSIONS as ADMIN_AGENT_PERMISSIONS
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
@@ -63,6 +65,10 @@ from ai.backend.manager.services.agent.actions.remove_agent_from_images import (
 from ai.backend.manager.services.agent.actions.remove_agent_from_images_by_canonicals import (
     RemoveAgentFromImagesByCanonicalsAction,
     RemoveAgentFromImagesByCanonicalsActionResult,
+)
+from ai.backend.manager.services.agent.actions.search_agents import (
+    SearchAgentsAction,
+    SearchAgentsActionResult,
 )
 from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
@@ -229,6 +235,23 @@ class AgentService:
     ) -> GetTotalResourcesActionResult:
         total_resources = await self._scheduler_repository.get_total_resource_slots()
         return GetTotalResourcesActionResult(total_resources=total_resources)
+
+    async def search_agents(self, action: SearchAgentsAction) -> SearchAgentsActionResult:
+        """Searches agents. It is used by superadmin only."""
+        result = await self._agent_repository.search_agents(
+            querier=action.querier,
+        )
+
+        admin_permissions = list(ADMIN_AGENT_PERMISSIONS)
+        agents_with_permissions = [
+            AgentDetailData(agent=agent_data, permissions=admin_permissions)
+            for agent_data in result.items
+        ]
+
+        return SearchAgentsActionResult(
+            agents=agents_with_permissions,
+            total_count=result.total_count,
+        )
 
     async def handle_heartbeat(self, action: HandleHeartbeatAction) -> HandleHeartbeatActionResult:
         reported_agent_info = action.agent_info
