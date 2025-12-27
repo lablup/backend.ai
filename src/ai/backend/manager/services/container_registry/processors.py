@@ -7,6 +7,10 @@ from ai.backend.manager.services.container_registry.actions.clear_images import 
     ClearImagesAction,
     ClearImagesActionResult,
 )
+from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
+    DeleteContainerRegistryAction,
+    DeleteContainerRegistryActionResult,
+)
 from ai.backend.manager.services.container_registry.actions.get_container_registries import (
     GetContainerRegistriesAction,
     GetContainerRegistriesActionResult,
@@ -45,6 +49,9 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
     modify_container_registry: ActionProcessor[
         ModifyContainerRegistryAction, ModifyContainerRegistryActionResult
     ]
+    delete_container_registry: ActionProcessor[
+        DeleteContainerRegistryAction, DeleteContainerRegistryActionResult
+    ]
 
     def __init__(
         self, service: ContainerRegistryService, action_monitors: list[ActionMonitor]
@@ -63,6 +70,9 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
         self.modify_container_registry = ActionProcessor(
             service.modify_container_registry, action_monitors
         )
+        self.delete_container_registry = ActionProcessor(
+            service.delete_container_registry, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -73,4 +83,5 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
             LoadAllContainerRegistriesAction.spec(),
             GetContainerRegistriesAction.spec(),
             ModifyContainerRegistryAction.spec(),
+            DeleteContainerRegistryAction.spec(),
         ]
