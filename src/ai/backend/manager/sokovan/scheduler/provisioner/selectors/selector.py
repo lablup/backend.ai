@@ -248,6 +248,18 @@ class AgentSelector:
     def __init__(self, strategy: AbstractAgentSelector) -> None:
         self._strategy = strategy
 
+    def strategy_name(self) -> str:
+        """
+        Return the strategy name for predicates.
+        """
+        return self._strategy.name()
+
+    def strategy_success_message(self) -> str:
+        """
+        Return a message describing successful agent selection.
+        """
+        return self._strategy.success_message()
+
     async def select_agents_for_batch_requirements(
         self,
         agents: Sequence[AgentInfo],
