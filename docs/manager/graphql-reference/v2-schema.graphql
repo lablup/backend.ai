@@ -807,6 +807,21 @@ type CreateReservoirRegistryPayload {
   reservoir: ReservoirRegistry!
 }
 
+"""Input for creating a role assignment"""
+input CreateRoleAssignmentInput {
+  userId: ID!
+  roleId: ID!
+  scope: ScopeInput!
+  expiresAt: DateTime = null
+}
+
+"""Input for creating a new custom role"""
+input CreateRoleInput {
+  name: String!
+  description: String = null
+  scope: ScopeInput!
+}
+
 """Added in 25.16.0. Input for creating VFS storage"""
 input CreateVFSStorageInput {
   name: String!
@@ -1130,6 +1145,25 @@ enum DeploymentStrategyType {
 
 extend type DomainNode @key(fields: "id") {
   id: ID! @external
+}
+
+"""Entity types managed by the RBAC system"""
+enum EntityType {
+  COMPUTE_SESSION
+  VFOLDER
+  IMAGE
+  MODEL_SERVICE
+  MODEL_ARTIFACT
+  AGENT
+  RESOURCE_GROUP
+  STORAGE_HOST
+  APP_CONFIG
+  NOTIFICATION
+  DOMAIN
+  PROJECT
+  USER
+  ROLE
+  ROLE_ASSIGNMENT
 }
 
 type ExtraVFolderMount implements Node {
@@ -1822,6 +1856,24 @@ type Mutation {
 
   """Added in 25.19.0. Update the traffic status of a route."""
   updateRouteTrafficStatus(input: UpdateRouteTrafficStatusInput!): UpdateRouteTrafficStatusPayload!
+
+  """Create a new custom role"""
+  createRole(input: CreateRoleInput!): Role!
+
+  """Update an existing role"""
+  updateRole(input: UpdateRoleInput!): Role!
+
+  """Delete a role (soft delete)"""
+  deleteRole(id: ID!): Role!
+
+  """Update role permissions"""
+  updateRolePermissions(input: UpdateRolePermissionsInput!): Role!
+
+  """Assign a role to a user"""
+  createRoleAssignment(input: CreateRoleAssignmentInput!): Role!
+
+  """Revoke a role assignment"""
+  deleteRoleAssignment(id: ID!): Role!
 }
 
 """An object with a Globally Unique ID"""
@@ -1949,6 +2001,22 @@ enum NotificationRuleType {
   ARTIFACT_DOWNLOAD_COMPLETED
 }
 
+"""Object Permission: grants permission for a SPECIFIC entity instance"""
+type ObjectPermission implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  entityType: EntityType!
+  entityId: ID!
+  operation: OperationType!
+}
+
+"""Input for object permissions"""
+input ObjectPermissionInput {
+  entityType: EntityType!
+  entityId: ID!
+  operation: OperationType!
+}
+
 """Added in 25.14.0"""
 type ObjectStorage implements Node {
   """The Globally Unique ID of this object"""
@@ -1979,6 +2047,20 @@ type ObjectStorageEdge {
 
   """The item at the end of the edge"""
   node: ObjectStorage!
+}
+
+"""Operations that can be performed on entities"""
+enum OperationType {
+  CREATE
+  READ
+  UPDATE
+  SOFT_DELETE
+  HARD_DELETE
+  GRANT_ALL
+  GRANT_READ
+  GRANT_UPDATE
+  GRANT_SOFT_DELETE
+  GRANT_HARD_DELETE
 }
 
 enum OrderDirection {
@@ -2167,6 +2249,12 @@ type Query {
 
   """Added in 25.19.0. List routes for a deployment with optional filters."""
   routes(deploymentId: ID!, filter: RouteFilter = null, orderBy: [RouteOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteConnection!
+
+  """Get a specific role by ID"""
+  role(id: ID!): Role
+
+  """List roles with optional filtering and pagination"""
+  roles(filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection!
 }
 
 """
@@ -2343,6 +2431,72 @@ Contains the artifacts that were restored from soft-deleted state.
 """
 type RestoreArtifactsPayload {
   artifacts: [Artifact!]!
+}
+
+"""Role: defines a collection of permissions bound to a specific scope"""
+type Role implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  description: String
+  scope: Scope!
+  source: RoleSource!
+  createdAt: DateTime!
+  updatedAt: DateTime
+  deletedAt: DateTime
+  scopedPermissions: [ScopedPermission!]!
+  objectPermissions: [ObjectPermission!]!
+  additionalScopes: [Scope!]!
+}
+
+"""Connection for paginated role results"""
+type RoleConnection {
+  pageInfo: PageInfo!
+  edges: [RoleEdge!]!
+  count: Int!
+}
+
+"""Edge type for role connections"""
+type RoleEdge {
+  node: Role!
+  cursor: String!
+}
+
+"""Filter options for role queries"""
+input RoleFilter {
+  scopeType: ScopeTypeFilter = null
+  scopeId: ID = null
+  source: RoleSourceFilter = null
+  name: StringFilter = null
+  hasPermissionFor: EntityType = null
+  AND: [RoleFilter!] = null
+  OR: [RoleFilter!] = null
+  NOT: [RoleFilter!] = null
+}
+
+"""Ordering options for role queries"""
+input RoleOrderBy {
+  field: RoleOrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""Fields available for ordering role queries"""
+enum RoleOrderField {
+  NAME
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""Role source indicating how the role was created"""
+enum RoleSource {
+  SYSTEM
+  CUSTOM
+}
+
+"""Filter for role source"""
+input RoleSourceFilter {
+  in: [RoleSource!] = null
+  equals: RoleSource = null
 }
 
 """Added in 25.19.0. Configuration for rolling update strategy."""
@@ -2776,6 +2930,50 @@ enum SchedulingStatus {
   ERROR
 }
 
+"""Scope represents a level in the permission hierarchy"""
+type Scope {
+  type: ScopeType!
+  id: ID
+}
+
+"""Input for specifying a scope in mutations"""
+input ScopeInput {
+  type: ScopeType!
+  id: ID = null
+}
+
+"""Scope types in the permission hierarchy"""
+enum ScopeType {
+  GLOBAL
+  DOMAIN
+  PROJECT
+  USER
+}
+
+"""Filter for scope type"""
+input ScopeTypeFilter {
+  in: [ScopeType!] = null
+  equals: ScopeType = null
+}
+
+"""Scoped Permission: grants permission for an operation on ALL entities"""
+type ScopedPermission implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  scopeType: ScopeType!
+  scopeId: ID!
+  entityType: EntityType!
+  operation: OperationType!
+}
+
+"""Input for scoped permissions"""
+input ScopedPermissionInput {
+  scopeType: ScopeType!
+  scopeId: ID!
+  entityType: EntityType!
+  operation: OperationType!
+}
+
 """
 Added in 25.14.0.
 
@@ -3040,6 +3238,22 @@ input UpdateReservoirRegistryInput {
 """Added in 25.14.0"""
 type UpdateReservoirRegistryPayload {
   reservoir: ReservoirRegistry!
+}
+
+"""Input for updating an existing role"""
+input UpdateRoleInput {
+  id: ID!
+  name: String = null
+  description: String = null
+}
+
+"""Input for updating role permissions"""
+input UpdateRolePermissionsInput {
+  roleId: ID!
+  scopedPermissionsToAdd: [ScopedPermissionInput!] = null
+  objectPermissionsToAdd: [ObjectPermissionInput!] = null
+  scopedPermissionIdsToDelete: [ID!] = null
+  objectPermissionIdsToDelete: [ID!] = null
 }
 
 """Added in 25.19.0. Input for updating route traffic status."""
