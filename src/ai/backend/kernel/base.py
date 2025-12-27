@@ -476,8 +476,8 @@ class BaseRunner(metaclass=ABCMeta):
                 ret = await self.execute_heuristic()
             else:
                 ret = await self.run_subproc(exec_cmd, batch=True)
-        except Exception:
-            log.exception("unexpected error")
+        except Exception as e:
+            log.exception("unexpected error: {}", e)
             ret = -1
         finally:
             await asyncio.sleep(0.01)  # extra delay to flush logs
