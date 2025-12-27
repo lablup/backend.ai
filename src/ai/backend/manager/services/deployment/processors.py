@@ -1,5 +1,7 @@
 """Deployment service processors for GraphQL API."""
 
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
