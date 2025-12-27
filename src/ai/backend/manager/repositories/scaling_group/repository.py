@@ -15,6 +15,7 @@ from ai.backend.manager.data.scaling_group.types import ScalingGroupData, Scalin
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.purger import Purger
 
 from .db_source import ScalingGroupDBSource
 
@@ -66,3 +67,14 @@ class ScalingGroupRepository:
     ) -> ScalingGroupListResult:
         """Searches scaling groups with total count."""
         return await self._db_source.search_scaling_groups(querier=querier)
+
+    @scaling_group_repository_resilience.apply()
+    async def purge_scaling_group(
+        self,
+        purger: Purger[ScalingGroupRow],
+    ) -> ScalingGroupData:
+        """Purges a scaling group and all related sessions and routes using a purger.
+
+        Raises ScalingGroupNotFound if scaling group doesn't exist.
+        """
+        return await self._db_source.purge_scaling_group(purger)
