@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 from datetime import datetime
-from typing import AsyncGenerator, Optional
+from functools import lru_cache
+from typing import AsyncGenerator, Optional, override
 from uuid import UUID
 
 import strawberry
@@ -11,18 +12,19 @@ from ai.backend.common.data.model_deployment.types import ActivenessStatus as Co
 from ai.backend.common.data.model_deployment.types import LivenessStatus as CommonLivenessStatus
 from ai.backend.common.data.model_deployment.types import ReadinessStatus as CommonReadinessStatus
 from ai.backend.common.exception import ModelDeploymentUnavailable
+from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import (
     JSONString,
     OrderDirection,
-    build_page_info,
-    build_pagination_options,
     resolve_global_id,
     to_global_id,
 )
 from ai.backend.manager.api.gql.session import Session
-from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import ModelReplicaData, ReplicaOrderField
 from ai.backend.manager.models.gql_models.session import ComputeSessionNode
+from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.deployment.options import RouteConditions, RouteOrders
 from ai.backend.manager.repositories.deployment.types.types import (
     ActivenessStatusFilter as RepoActivenessStatus,
 )
@@ -30,7 +32,6 @@ from ai.backend.manager.repositories.deployment.types.types import (
     ActivenessStatusFilterType,
     LivenessStatusFilterType,
     ModelReplicaFilterOptions,
-    ModelReplicaOrderingOptions,
     ReadinessStatusFilterType,
 )
 from ai.backend.manager.repositories.deployment.types.types import (
@@ -39,11 +40,11 @@ from ai.backend.manager.repositories.deployment.types.types import (
 from ai.backend.manager.repositories.deployment.types.types import (
     ReadinessStatusFilter as RepoReadinessStatusFilter,
 )
-from ai.backend.manager.services.deployment.actions.batch_load_replicas_by_revision_ids import (
-    BatchLoadReplicasByRevisionIdsAction,
+from ai.backend.manager.services.deployment.actions.get_replica_by_id import GetReplicaByIdAction
+from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
+    GetRevisionByIdAction,
 )
-from ai.backend.manager.services.deployment.actions.list_replicas import ListReplicasAction
-from ai.backend.manager.types import PaginationOptions
+from ai.backend.manager.services.deployment.actions.search_replicas import SearchReplicasAction
 
 from .model_revision import (
     ModelRevision,
@@ -87,7 +88,7 @@ class ActivenessStatusFilter:
 
 
 @strawberry.input(description="Added in 25.16.0")
-class ReplicaFilter:
+class ReplicaFilter(GQLFilter):
     readiness_status: Optional[ReadinessStatusFilter] = None
     liveness_status: Optional[LivenessStatusFilter] = None
     activeness_status: Optional[ActivenessStatusFilter] = None
@@ -97,6 +98,31 @@ class ReplicaFilter:
     AND: Optional[list["ReplicaFilter"]] = None
     OR: Optional[list["ReplicaFilter"]] = None
     NOT: Optional[list["ReplicaFilter"]] = None
+
+    @override
+    def build_conditions(self) -> list[QueryCondition]:
+        """Build query conditions from this filter.
+
+        Returns a list of QueryCondition callables that can be applied to SQLAlchemy queries.
+        Note: Status filters (readiness/liveness/activeness) are not yet implemented
+        at the repository level.
+        """
+        field_conditions: list[QueryCondition] = []
+
+        # Apply ID filter
+        if self.id:
+            field_conditions.append(RouteConditions.by_ids([UUID(self.id)]))
+
+        # Apply ids_in filter
+        if self.ids_in:
+            field_conditions.append(RouteConditions.by_ids(list(self.ids_in)))
+
+        # TODO: Implement status filters at the repository level
+        # Status filters (readiness_status, liveness_status, activeness_status) are not yet
+        # implemented as RouteConditions. They would require adding new condition factories
+        # for filtering by these status fields.
+
+        return field_conditions
 
     def to_repo_filter(self) -> ModelReplicaFilterOptions:
         repo_filter = ModelReplicaFilterOptions()
@@ -152,9 +178,33 @@ class ReplicaFilter:
 
 
 @strawberry.input(description="Added in 25.16.0")
-class ReplicaOrderBy:
+class ReplicaOrderBy(GQLOrderBy):
     field: ReplicaOrderField
     direction: OrderDirection = OrderDirection.DESC
+
+    @override
+    def to_query_order(self) -> QueryOrder:
+        """Convert to repository QueryOrder."""
+        ascending = self.direction == OrderDirection.ASC
+        match self.field:
+            case ReplicaOrderField.CREATED_AT:
+                return RouteOrders.created_at(ascending)
+
+
+@lru_cache(maxsize=1)
+def _get_replica_pagination_spec() -> PaginationSpec:
+    """Get pagination specification for replicas.
+
+    Returns a cached PaginationSpec with:
+    - Forward pagination: created_at DESC (newest first)
+    - Backward pagination: created_at ASC
+    """
+    return PaginationSpec(
+        forward_order=RouteOrders.created_at(ascending=False),
+        backward_order=RouteOrders.created_at(ascending=True),
+        forward_condition_factory=RouteConditions.by_cursor_forward,
+        backward_condition_factory=RouteConditions.by_cursor_backward,
+    )
 
 
 @strawberry.type(description="Added in 25.16.0")
@@ -191,12 +241,16 @@ class ModelReplica(Node):
 
     @strawberry.field
     async def revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision:
-        """Resolve revision using dataloader."""
-        revision_loader = info.context.dataloader_registry.get_loader(
-            ModelRevision.batch_load_by_ids, info.context
+        """Resolve revision by ID."""
+        processor = info.context.processors.deployment
+        if processor is None:
+            raise ModelDeploymentUnavailable(
+                "Model Deployment feature is unavailable. Please contact support."
+            )
+        result = await processor.get_revision_by_id.wait_for_complete(
+            GetRevisionByIdAction(revision_id=self._revision_id)
         )
-        revision: list[ModelRevision] = await revision_loader.load(self._revision_id)
-        return revision[0]
+        return ModelRevision.from_dataclass(result.data)
 
     @classmethod
     def from_dataclass(cls, data: ModelReplicaData) -> "ModelReplica":
@@ -212,31 +266,6 @@ class ModelReplica(Node):
             created_at=data.created_at,
             live_stat=JSONString.serialize(data.live_stat),
         )
-
-    @classmethod
-    async def batch_load_by_revision_ids(
-        cls, ctx: StrawberryGQLContext, revision_ids: Sequence[UUID]
-    ) -> list[list["ModelReplica"]]:
-        """Batch load replicas by their revision IDs."""
-        processor = ctx.processors.deployment
-        if processor is None:
-            raise ModelDeploymentUnavailable(
-                "Model Deployment feature is unavailable. Please contact support."
-            )
-
-        action_result = await processor.batch_load_replicas_by_revision_ids.wait_for_complete(
-            BatchLoadReplicasByRevisionIdsAction(revision_ids=list(revision_ids))
-        )
-        replicas_map = action_result.data
-
-        result = []
-        for revision_id in revision_ids:
-            replica_data_list = replicas_map.get(revision_id, [])
-            replica_objects = [
-                cls.from_dataclass(replica_data) for replica_data in replica_data_list
-            ]
-            result.append(replica_objects)
-        return result
 
 
 ModelReplicaEdge = Edge[ModelReplica]
@@ -274,25 +303,18 @@ class ReplicaStatusChangedPayload:
 async def replica(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ModelReplica]:
     """Get a specific replica by ID."""
     _, replica_id = resolve_global_id(id)
-    replica_loader = info.context.dataloader_registry.get_loader(
-        ModelReplica.batch_load_by_revision_ids, info.context
+    processor = info.context.processors.deployment
+    if processor is None:
+        raise ModelDeploymentUnavailable(
+            "Model Deployment feature is unavailable. Please contact support."
+        )
+
+    result = await processor.get_replica_by_id.wait_for_complete(
+        GetReplicaByIdAction(replica_id=UUID(replica_id))
     )
-    replicas: list[ModelReplica] = await replica_loader.load(UUID(replica_id))
-    return replicas[0]
-
-
-def _convert_gql_replica_ordering_to_repo_ordering(
-    order_by: Optional[list[ReplicaOrderBy]],
-) -> ModelReplicaOrderingOptions:
-    if not order_by:
-        return ModelReplicaOrderingOptions()
-
-    repo_order_by = []
-    for order in order_by:
-        desc = order.direction == OrderDirection.DESC
-        repo_order_by.append((order.field, desc))
-
-    return ModelReplicaOrderingOptions(order_by=repo_order_by)
+    if result.data is None:
+        return None
+    return ModelReplica.from_dataclass(result.data)
 
 
 async def resolve_replicas(
@@ -306,48 +328,43 @@ async def resolve_replicas(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ModelReplicaConnection:
-    repo_filter = None
-    if filter:
-        repo_filter = filter.to_repo_filter()
-
-    repo_ordering = _convert_gql_replica_ordering_to_repo_ordering(order_by)
-
-    pagination_options = build_pagination_options(
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
-    )
-
     processor = info.context.processors.deployment
     if processor is None:
         raise ModelDeploymentUnavailable(
             "Model Deployment feature is unavailable. Please contact support."
         )
 
-    action_result = await processor.list_replicas.wait_for_complete(
-        ListReplicasAction(
-            pagination=PaginationOptions(),
-            ordering=repo_ordering,
-            filters=repo_filter,
-        )
+    # Build querier using gql_adapter
+    querier = info.context.gql_adapter.build_querier(
+        PaginationOptions(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        _get_replica_pagination_spec(),
+        filter=filter,
+        order_by=order_by,
     )
-    edges = []
-    for replica_data in action_result.data:
-        node = ModelReplica.from_dataclass(replica_data)
-        edge = ModelReplicaEdge(node=node, cursor=str(node.id))
-        edges.append(edge)
 
-    page_info = build_page_info(
-        edges=edges, total_count=action_result.total_count, pagination_options=pagination_options
+    action_result = await processor.search_replicas.wait_for_complete(
+        SearchReplicasAction(querier=querier)
     )
+
+    nodes = [ModelReplica.from_dataclass(data) for data in action_result.data]
+    edges = [ModelReplicaEdge(node=node, cursor=str(node.id)) for node in nodes]
 
     return ModelReplicaConnection(
         count=action_result.total_count,
         edges=edges,
-        page_info=page_info.to_strawberry_page_info(),
+        page_info=PageInfo(
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
     )
 
 

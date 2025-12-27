@@ -70,7 +70,6 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
-from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -417,12 +416,6 @@ class CreateDeploymentAdapter:
         revision_input: Any,  # RevisionInput or CreateRevisionRequest
     ) -> ModelRevisionCreator:
         """Build ModelRevisionCreator from revision input."""
-        # Build image identifier
-        image_identifier = ImageIdentifier(
-            canonical=revision_input.image.name,
-            architecture=revision_input.image.architecture,
-        )
-
         # Build resource spec
         resource_spec = ResourceSpec(
             cluster_mode=ClusterMode(revision_input.cluster_config.mode),
@@ -470,7 +463,7 @@ class CreateDeploymentAdapter:
         )
 
         return ModelRevisionCreator(
-            image_identifier=image_identifier,
+            image_id=revision_input.image.id,
             resource_spec=resource_spec,
             mounts=mounts,
             execution=execution,

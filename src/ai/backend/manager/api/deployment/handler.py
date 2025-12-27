@@ -41,17 +41,20 @@ from ai.backend.common.dto.manager.deployment import (
 from ai.backend.manager.data.deployment.types import RouteTrafficStatus as ManagerRouteTrafficStatus
 from ai.backend.manager.dto.context import ProcessorsCtx, UserContext
 from ai.backend.manager.repositories.deployment.updaters import NewDeploymentUpdaterSpec
-from ai.backend.manager.services.deployment.actions.batch_load_deployments import (
-    BatchLoadDeploymentsAction,
-)
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
 )
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
 )
+from ai.backend.manager.services.deployment.actions.get_deployment_by_id import (
+    GetDeploymentByIdAction,
+)
 from ai.backend.manager.services.deployment.actions.model_revision.create_model_revision import (
     CreateModelRevisionAction,
+)
+from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
+    GetRevisionByIdAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.search_revisions import (
     SearchRevisionsAction,
@@ -155,9 +158,7 @@ class DeploymentAPIHandler:
 
         # Build response
         resp = ListDeploymentsResponse(
-            deployments=[
-                self.deployment_adapter.convert_to_dto(dep) for dep in action_result.deployments
-            ],
+            deployments=[self.deployment_adapter.convert_to_dto(dep) for dep in action_result.data],
             pagination=PaginationInfo(
                 total=action_result.total_count,
                 offset=body.parsed.offset,
@@ -176,17 +177,14 @@ class DeploymentAPIHandler:
         """Get a specific deployment."""
         deployment_processors = self._get_deployment_processors(processors_ctx.processors)
 
-        # Call service action
-        action_result = await deployment_processors.batch_load_deployments.wait_for_complete(
-            BatchLoadDeploymentsAction(deployment_ids=[path.parsed.deployment_id])
+        # Call service action - raises EndpointNotFound if not found
+        action_result = await deployment_processors.get_deployment_by_id.wait_for_complete(
+            GetDeploymentByIdAction(deployment_id=path.parsed.deployment_id)
         )
-
-        if not action_result.data:
-            raise web.HTTPNotFound(reason=f"Deployment {path.parsed.deployment_id} not found")
 
         # Build response
         resp = GetDeploymentResponse(
-            deployment=self.deployment_adapter.convert_to_dto(action_result.data[0])
+            deployment=self.deployment_adapter.convert_to_dto(action_result.data)
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -303,9 +301,7 @@ class DeploymentAPIHandler:
 
         # Build response
         resp = ListRevisionsResponse(
-            revisions=[
-                self.revision_adapter.convert_to_dto(rev) for rev in action_result.revisions
-            ],
+            revisions=[self.revision_adapter.convert_to_dto(rev) for rev in action_result.data],
             pagination=PaginationInfo(
                 total=action_result.total_count,
                 offset=body.parsed.offset,
@@ -324,21 +320,14 @@ class DeploymentAPIHandler:
         """Get a specific revision."""
         deployment_processors = self._get_deployment_processors(processors_ctx.processors)
 
-        # Call service action
-        action_result = await deployment_processors.batch_load_revisions.wait_for_complete(
-            # Note: We need to import BatchLoadRevisionsAction
-            __import__(
-                "ai.backend.manager.services.deployment.actions.model_revision.batch_load_revisions",
-                fromlist=["BatchLoadRevisionsAction"],
-            ).BatchLoadRevisionsAction(revision_ids=[path.parsed.revision_id])
+        # Call service action - raises DeploymentRevisionNotFound if not found
+        action_result = await deployment_processors.get_revision_by_id.wait_for_complete(
+            GetRevisionByIdAction(revision_id=path.parsed.revision_id)
         )
-
-        if not action_result.data:
-            raise web.HTTPNotFound(reason=f"Revision {path.parsed.revision_id} not found")
 
         # Build response
         resp = GetRevisionResponse(
-            revision=self.revision_adapter.convert_to_dto(action_result.data[0])
+            revision=self.revision_adapter.convert_to_dto(action_result.data)
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 

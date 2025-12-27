@@ -1,12 +1,15 @@
+"""Deployment GraphQL types."""
+
+from __future__ import annotations
+
 from collections.abc import Sequence
 from datetime import datetime
-from functools import lru_cache
-from typing import AsyncGenerator, Optional, override
+from typing import TYPE_CHECKING, Optional, override
 from uuid import UUID, uuid4
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
+from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.model_deployment.types import (
@@ -15,33 +18,33 @@ from ai.backend.common.data.model_deployment.types import (
 )
 from ai.backend.common.exception import (
     InvalidAPIParameters,
-    ModelDeploymentUnavailable,
 )
-from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
-    encode_cursor,
-    resolve_global_id,
     to_global_id,
 )
-from ai.backend.manager.api.gql.domain import Domain
-from ai.backend.manager.api.gql.model_deployment.access_token import (
-    AccessToken,
+from ai.backend.manager.api.gql.deployment.fetcher.access_token import fetch_access_tokens
+from ai.backend.manager.api.gql.deployment.fetcher.replica import fetch_replicas
+from ai.backend.manager.api.gql.deployment.fetcher.revision import fetch_revisions
+from ai.backend.manager.api.gql.deployment.types.access_token import (
     AccessTokenConnection,
-    AccessTokenEdge,
     AccessTokenFilter,
     AccessTokenOrderBy,
 )
-from ai.backend.manager.api.gql.model_deployment.auto_scaling_rule import (
-    AutoScalingRule,
+from ai.backend.manager.api.gql.deployment.types.auto_scaling import AutoScalingRule
+from ai.backend.manager.api.gql.deployment.types.policy import (
+    BlueGreenConfigInputGQL,
+    DeploymentPolicyGQL,
+    DeploymentStrategyTypeGQL,
+    RollingUpdateConfigInputGQL,
 )
-from ai.backend.manager.api.gql.model_deployment.model_replica import (
-    ModelReplicaConnection,
-    ReplicaFilter,
-    ReplicaOrderBy,
-    resolve_replicas,
+from ai.backend.manager.api.gql.deployment.types.replica import ReplicaFilter
+from ai.backend.manager.api.gql.deployment.types.revision import (
+    ModelRevision,
+    ModelRevisionFilter,
 )
+from ai.backend.manager.api.gql.domain import Domain
 from ai.backend.manager.api.gql.project import Project
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.user import User
@@ -57,6 +60,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.errors.service import DeploymentPolicyNotFound
 from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.gql_models.domain import DomainNode
 from ai.backend.manager.models.gql_models.group import GroupNode
 from ai.backend.manager.models.gql_models.user import UserNode
@@ -65,105 +69,69 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     QueryCondition,
     QueryOrder,
+    Updater,
     combine_conditions_or,
     negate_conditions,
 )
 from ai.backend.manager.repositories.deployment.options import (
     AccessTokenConditions,
-    AccessTokenOrders,
     AutoScalingRuleConditions,
     DeploymentConditions,
     DeploymentOrders,
-)
-from ai.backend.manager.repositories.deployment.types.types import (
-    AccessTokenOrderingOptions,
+    RouteConditions,
 )
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentPolicyUpdaterSpec,
     NewDeploymentUpdaterSpec,
 )
-from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
-    SearchAccessTokensAction,
-)
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
     SearchAutoScalingRulesAction,
-)
-from ai.backend.manager.services.deployment.actions.create_deployment import (
-    CreateDeploymentAction,
 )
 from ai.backend.manager.services.deployment.actions.deployment_policy import (
     GetDeploymentPolicyAction,
 )
-from ai.backend.manager.services.deployment.actions.destroy_deployment import (
-    DestroyDeploymentAction,
-)
-from ai.backend.manager.services.deployment.actions.get_deployment_by_id import (
-    GetDeploymentByIdAction,
-)
-from ai.backend.manager.services.deployment.actions.search_deployments import (
-    SearchDeploymentsAction,
-)
-from ai.backend.manager.services.deployment.actions.sync_replicas import SyncReplicaAction
-from ai.backend.manager.services.deployment.actions.update_deployment import UpdateDeploymentAction
 from ai.backend.manager.types import OptionalState, TriState
 
-from .deployment_policy import (
-    BlueGreenConfigInputGQL,
-    DeploymentPolicyGQL,
-    DeploymentStrategyTypeGQL,
-    RollingUpdateConfigInputGQL,
-)
-from .model_revision import (
-    CreateModelRevisionInput,
-    ModelRevision,
-    ModelRevisionConnection,
-    ModelRevisionFilter,
-    ModelRevisionOrderBy,
-    resolve_revisions,
-)
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.deployment.types.replica import (
+        ModelReplicaConnection,
+        ReplicaOrderBy,
+    )
+    from ai.backend.manager.api.gql.deployment.types.revision import (
+        CreateRevisionInput,
+        ModelRevisionConnection,
+        ModelRevisionOrderBy,
+    )
 
 DeploymentStatusGQL: type[ModelDeploymentStatus] = strawberry.enum(
     ModelDeploymentStatus,
     name="DeploymentStatus",
-    description="Added in 25.16.0. This enum represents the deployment status of a model deployment, indicating its current state.",
+    description="Added in 25.19.0. This enum represents the deployment status of a model deployment, indicating its current state.",
 )
 
 
-# Pagination spec
-@lru_cache(maxsize=1)
-def _get_deployment_pagination_spec() -> PaginationSpec:
-    return PaginationSpec(
-        forward_order=DeploymentOrders.created_at(ascending=False),
-        backward_order=DeploymentOrders.created_at(ascending=True),
-        forward_condition_factory=DeploymentConditions.by_cursor_forward,
-        backward_condition_factory=DeploymentConditions.by_cursor_backward,
-    )
-
-
-@lru_cache(maxsize=1)
-def _get_access_token_pagination_spec() -> PaginationSpec:
-    """Get pagination specification for access tokens.
-
-    Returns a cached PaginationSpec with:
-    - Forward pagination: created_at DESC (newest first)
-    - Backward pagination: created_at ASC
-    """
-    return PaginationSpec(
-        forward_order=AccessTokenOrders.created_at(ascending=False),
-        backward_order=AccessTokenOrders.created_at(ascending=True),
-        forward_condition_factory=AccessTokenConditions.by_cursor_forward,
-        backward_condition_factory=AccessTokenConditions.by_cursor_backward,
-    )
-
-
-@strawberry.type(description="Added in 25.16.0")
+@strawberry.type
 class DeploymentStrategyGQL:
+    """
+    Added in 25.19.0.
+
+    Represents the deployment strategy configuration that determines how
+    updates are rolled out to replicas (e.g., rolling update, blue-green).
+    """
+
     type: DeploymentStrategyTypeGQL
 
 
-@strawberry.type(description="Added in 25.16.0")
+@strawberry.type
 class ReplicaState:
-    _replica_ids: strawberry.Private[list[UUID]]
+    """
+    Added in 25.19.0.
+
+    Represents the current replica state of a deployment, including the desired
+    replica count and access to the list of active replicas.
+    """
+
+    _deployment_id: strawberry.Private[UUID]
     desired_replica_count: int
 
     @strawberry.field
@@ -179,13 +147,9 @@ class ReplicaState:
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> ModelReplicaConnection:
-        final_filter = ReplicaFilter(ids_in=self._replica_ids)
-        if filter:
-            final_filter = ReplicaFilter(AND=[final_filter, filter])
-
-        return await resolve_replicas(
+        return await fetch_replicas(
             info=info,
-            filter=final_filter,
+            filter=filter,
             order_by=order_by,
             before=before,
             after=after,
@@ -193,24 +157,28 @@ class ReplicaState:
             last=last,
             limit=limit,
             offset=offset,
+            base_conditions=[RouteConditions.by_endpoint_id(self._deployment_id)],
         )
 
 
-@strawberry.type(description="Added in 25.16.0")
+@strawberry.type
 class ScalingRule:
+    """
+    Added in 25.19.0.
+
+    Provides access to auto-scaling rules configured for a deployment.
+    Auto-scaling rules define conditions for automatically adjusting
+    the number of replicas based on metrics.
+    """
+
     _scaling_rule_ids: strawberry.Private[list[UUID]]
 
     @strawberry.field
     async def auto_scaling_rules(self, info: Info[StrawberryGQLContext]) -> list[AutoScalingRule]:
-        processor = info.context.processors.deployment
-        if processor is None:
-            raise ModelDeploymentUnavailable(
-                "Model Deployment feature is unavailable. Please contact support."
-            )
-
         if not self._scaling_rule_ids:
             return []
 
+        processor = info.context.processors.deployment
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=len(self._scaling_rule_ids)),
             conditions=[AutoScalingRuleConditions.by_ids(self._scaling_rule_ids)],
@@ -222,8 +190,16 @@ class ScalingRule:
         return [AutoScalingRule.from_dataclass(rule) for rule in result.data]
 
 
-@strawberry.type(description="Added in 25.16.0")
+@strawberry.type
 class ModelDeploymentMetadata:
+    """
+    Added in 25.19.0.
+
+    Contains metadata information for a model deployment including its name,
+    status, tags, and timestamps. Also provides access to the associated
+    project and domain.
+    """
+
     _project_id: strawberry.Private[UUID]
     _domain_name: strawberry.Private[str]
     name: str
@@ -247,7 +223,7 @@ class ModelDeploymentMetadata:
         return Domain(id=ID(domain_global_id))
 
     @classmethod
-    def from_dataclass(cls, data: ModelDeploymentMetadataInfo) -> "ModelDeploymentMetadata":
+    def from_dataclass(cls, data: ModelDeploymentMetadataInfo) -> ModelDeploymentMetadata:
         return cls(
             name=data.name,
             status=DeploymentStatusGQL(data.status),
@@ -259,23 +235,17 @@ class ModelDeploymentMetadata:
         )
 
 
-def _convert_gql_revision_ordering_to_repo_ordering(
-    order_by: Optional[list[AccessTokenOrderBy]],
-) -> AccessTokenOrderingOptions:
-    if order_by is None or len(order_by) == 0:
-        return AccessTokenOrderingOptions()
-
-    repo_ordering = []
-    for order in order_by:
-        desc = order.direction == OrderDirection.DESC
-        repo_ordering.append((order.field, desc))
-
-    return AccessTokenOrderingOptions(order_by=repo_ordering)
-
-
-@strawberry.type(description="Added in 25.16.0")
+@strawberry.type
 class ModelDeploymentNetworkAccess:
-    _endpoint_id: strawberry.Private[UUID]
+    """
+    Added in 25.19.0.
+
+    Provides network access configuration for a model deployment, including
+    the endpoint URL, preferred domain name, and public access settings.
+    Also manages access tokens for authentication.
+    """
+
+    _deployment_id: strawberry.Private[UUID]
     endpoint_url: Optional[str] = None
     preferred_domain_name: Optional[str] = None
     open_to_public: bool = False
@@ -294,53 +264,25 @@ class ModelDeploymentNetworkAccess:
         offset: Optional[int] = None,
     ) -> AccessTokenConnection:
         """Resolve access tokens for this deployment."""
-        processor = info.context.processors.deployment
-        if processor is None:
-            raise ModelDeploymentUnavailable(
-                "Model Deployment feature is unavailable. Please contact support."
-            )
-
-        querier = info.context.gql_adapter.build_querier(
-            PaginationOptions(
-                first=first,
-                after=after,
-                last=last,
-                before=before,
-                limit=limit,
-                offset=offset,
-            ),
-            _get_access_token_pagination_spec(),
+        return await fetch_access_tokens(
+            info=info,
             filter=filter,
             order_by=order_by,
-        )
-
-        # Add endpoint_id condition (required for scoping to this deployment)
-        querier.conditions.insert(0, AccessTokenConditions.by_endpoint_id(self._endpoint_id))
-
-        action_result = await processor.search_access_tokens.wait_for_complete(
-            SearchAccessTokensAction(querier=querier)
-        )
-
-        nodes = [AccessToken.from_dataclass(token) for token in action_result.data]
-        edges = [AccessTokenEdge(node=node, cursor=str(node.id)) for node in nodes]
-
-        return AccessTokenConnection(
-            count=action_result.total_count,
-            edges=edges,
-            page_info=PageInfo(
-                has_next_page=action_result.has_next_page,
-                has_previous_page=action_result.has_previous_page,
-                start_cursor=edges[0].cursor if edges else None,
-                end_cursor=edges[-1].cursor if edges else None,
-            ),
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
+            base_conditions=[AccessTokenConditions.by_endpoint_id(self._deployment_id)],
         )
 
     @classmethod
     def from_dataclass(
-        cls, data: DeploymentNetworkSpec, endpoint_id: UUID
-    ) -> "ModelDeploymentNetworkAccess":
+        cls, data: DeploymentNetworkSpec, deployment_id: UUID
+    ) -> ModelDeploymentNetworkAccess:
         return cls(
-            _endpoint_id=endpoint_id,
+            _deployment_id=deployment_id,
             endpoint_url=data.url,
             preferred_domain_name=data.preferred_domain_name,
             open_to_public=data.open_to_public,
@@ -348,8 +290,18 @@ class ModelDeploymentNetworkAccess:
 
 
 # Main ModelDeployment Type
-@strawberry.type(description="Added in 25.16.0")
+@strawberry.type
 class ModelDeployment(Node):
+    """
+    Added in 25.19.0.
+
+    Represents a model deployment in Backend.AI. A deployment is a long-running
+    inference service that exposes a trained model via HTTP endpoints.
+
+    Deployments manage the lifecycle of model replicas, handle traffic routing,
+    and provide auto-scaling capabilities based on configured rules.
+    """
+
     id: NodeID
     metadata: ModelDeploymentMetadata
     network_access: ModelDeploymentNetworkAccess
@@ -359,7 +311,7 @@ class ModelDeployment(Node):
     _replica_state_data: strawberry.Private[ReplicaStateData]
     _created_user_id: strawberry.Private[UUID]
     _scaling_rule_ids: strawberry.Private[list[UUID]]
-    _endpoint_id: strawberry.Private[UUID]
+    _deployment_id: strawberry.Private[UUID]
 
     @strawberry.field
     async def created_user(self, info: Info[StrawberryGQLContext]) -> User:
@@ -378,7 +330,7 @@ class ModelDeployment(Node):
     async def replica_state(self, info: Info[StrawberryGQLContext]) -> ReplicaState:
         return ReplicaState(
             desired_replica_count=self._replica_state_data.desired_replica_count,
-            _replica_ids=self._replica_state_data.replica_ids,
+            _deployment_id=self._deployment_id,
         )
 
     @strawberry.field(description="Added in 25.19.0. Deployment policy configuration.")
@@ -387,12 +339,10 @@ class ModelDeployment(Node):
     ) -> Optional[DeploymentPolicyGQL]:
         """Get the deployment policy for this deployment."""
         processor = info.context.processors.deployment
-        if processor is None:
-            return None
 
         try:
             result = await processor.get_deployment_policy.wait_for_complete(
-                GetDeploymentPolicyAction(endpoint_id=self._endpoint_id)
+                GetDeploymentPolicyAction(endpoint_id=self._deployment_id)
             )
             return DeploymentPolicyGQL.from_data(result.data)
         except DeploymentPolicyNotFound:
@@ -415,7 +365,7 @@ class ModelDeployment(Node):
         if filter:
             final_filter = ModelRevisionFilter(AND=[final_filter, filter])
 
-        return await resolve_revisions(
+        return await fetch_revisions(
             info=info,
             filter=final_filter,
             order_by=order_by,
@@ -431,7 +381,7 @@ class ModelDeployment(Node):
     def from_dataclass(
         cls,
         data: ModelDeploymentData,
-    ) -> "ModelDeployment":
+    ) -> ModelDeployment:
         metadata = ModelDeploymentMetadata(
             name=data.metadata.name,
             status=DeploymentStatusGQL(data.metadata.status),
@@ -446,7 +396,7 @@ class ModelDeployment(Node):
             id=ID(str(data.id)),
             metadata=metadata,
             network_access=ModelDeploymentNetworkAccess.from_dataclass(
-                data.network_access, endpoint_id=data.id
+                data.network_access, deployment_id=data.id
             ),
             revision=ModelRevision.from_dataclass(data.revision) if data.revision else None,
             default_deployment_strategy=DeploymentStrategyGQL(
@@ -456,18 +406,18 @@ class ModelDeployment(Node):
             _revision_history_ids=data.revision_history_ids,
             _scaling_rule_ids=data.scaling_rule_ids,
             _replica_state_data=data.replica_state,
-            _endpoint_id=data.id,
+            _deployment_id=data.id,
         )
 
 
 # Filter Types
-@strawberry.input(description="Added in 25.16.0")
+@strawberry.input(description="Added in 25.19.0")
 class DeploymentStatusFilter:
     in_: Optional[list[DeploymentStatusGQL]] = strawberry.field(name="in", default=None)
     equals: Optional[DeploymentStatusGQL] = None
 
 
-@strawberry.input(description="Added in 25.16.0")
+@strawberry.input(description="Added in 25.19.0")
 class DeploymentFilter(GQLFilter):
     name: Optional[StringFilter] = None
     status: Optional[DeploymentStatusFilter] = None
@@ -557,7 +507,7 @@ class DeploymentFilter(GQLFilter):
         return field_conditions
 
 
-@strawberry.input(description="Added in 25.16.0")
+@strawberry.input(description="Added in 25.19.0")
 class DeploymentOrderBy(GQLOrderBy):
     field: DeploymentOrderField
     direction: OrderDirection = OrderDirection.DESC
@@ -574,28 +524,28 @@ class DeploymentOrderBy(GQLOrderBy):
 
 
 # Payload Types
-@strawberry.type(description="Added in 25.16.0")
-class CreateModelDeploymentPayload:
+@strawberry.type(description="Added in 25.19.0")
+class CreateDeploymentPayload:
     deployment: ModelDeployment
 
 
-@strawberry.type(description="Added in 25.16.0")
-class UpdateModelDeploymentPayload:
+@strawberry.type(description="Added in 25.19.0")
+class UpdateDeploymentPayload:
     deployment: ModelDeployment
 
 
-@strawberry.type(description="Added in 25.16.0")
-class DeleteModelDeploymentPayload:
+@strawberry.type(description="Added in 25.19.0")
+class DeleteDeploymentPayload:
     id: ID
 
 
-@strawberry.type(description="Added in 25.16.0")
+@strawberry.type(description="Added in 25.19.0")
 class DeploymentStatusChangedPayload:
     deployment: ModelDeployment
 
 
 # Input Types
-@strawberry.input(description="Added in 25.16.0")
+@strawberry.input(description="Added in 25.19.0")
 class ModelDeploymentMetadataInput:
     project_id: ID
     domain_name: str
@@ -603,7 +553,7 @@ class ModelDeploymentMetadataInput:
     tags: Optional[list[str]] = None
 
 
-@strawberry.input(description="Added in 25.16.0")
+@strawberry.input(description="Added in 25.19.0")
 class ModelDeploymentNetworkAccessInput:
     preferred_domain_name: Optional[str] = None
     open_to_public: bool = False
@@ -660,13 +610,13 @@ class DeploymentStrategyInputGQL:
                 )
 
 
-@strawberry.input(description="Added in 25.16.0")
-class CreateModelDeploymentInput:
+@strawberry.input(description="Added in 25.19.0")
+class CreateDeploymentInput:
     metadata: ModelDeploymentMetadataInput
     network_access: ModelDeploymentNetworkAccessInput
     default_deployment_strategy: DeploymentStrategyInputGQL
     desired_replica_count: int
-    initial_revision: CreateModelRevisionInput
+    initial_revision: CreateRevisionInput
 
     def to_creator(self) -> NewDeploymentCreator:
         name = self.metadata.name or f"deployment-{uuid4().hex[:8]}"
@@ -694,8 +644,8 @@ class CreateModelDeploymentInput:
         )
 
 
-@strawberry.input(description="Added in 25.16.0")
-class UpdateModelDeploymentInput:
+@strawberry.input(description="Added in 25.19.0")
+class UpdateDeploymentInput:
     id: ID
     open_to_public: Optional[bool] = None
     tags: Optional[list[str]] = None
@@ -705,21 +655,27 @@ class UpdateModelDeploymentInput:
     name: Optional[str] = None
     preferred_domain_name: Optional[str] = None
 
-    def to_updater_spec(self) -> NewDeploymentUpdaterSpec:
+    def to_updater(self, deployment_id: UUID) -> Updater[EndpointRow]:
         strategy_type = None
         if self.default_deployment_strategy is not None:
             strategy_type = DeploymentStrategy(self.default_deployment_strategy.type)
-        return NewDeploymentUpdaterSpec(
+
+        active_revision_uuid = None
+        if self.active_revision_id is not None:
+            active_revision_uuid = UUID(self.active_revision_id)
+
+        spec = NewDeploymentUpdaterSpec(
             open_to_public=OptionalState[bool].from_graphql(self.open_to_public),
             tags=OptionalState[list[str]].from_graphql(self.tags),
             default_deployment_strategy=OptionalState[DeploymentStrategy].from_graphql(
                 strategy_type
             ),
-            active_revision_id=OptionalState[UUID].from_graphql(UUID(self.active_revision_id)),
+            active_revision_id=OptionalState[UUID].from_graphql(active_revision_uuid),
             desired_replica_count=OptionalState[int].from_graphql(self.desired_replica_count),
             name=OptionalState[str].from_graphql(self.name),
             preferred_domain_name=TriState[str].from_graphql(self.preferred_domain_name),
         )
+        return Updater(spec=spec, pk_value=deployment_id)
 
     def to_policy_updater_spec(self) -> Optional[DeploymentPolicyUpdaterSpec]:
         """Convert deployment strategy input to policy updater spec.
@@ -738,8 +694,8 @@ class UpdateModelDeploymentInput:
         )
 
 
-@strawberry.input(description="Added in 25.16.0")
-class DeleteModelDeploymentInput:
+@strawberry.input(description="Added in 25.19.0")
+class DeleteDeploymentInput:
     id: ID
 
 
@@ -747,200 +703,21 @@ ModelDeploymentEdge = Edge[ModelDeployment]
 
 
 # Connection types for Relay support
-@strawberry.type(description="Added in 25.16.0")
+@strawberry.type(description="Added in 25.19.0")
 class ModelDeploymentConnection(Connection[ModelDeployment]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs):
+    def __init__(self, *args, count: int, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 
 
-async def resolve_deployments(
-    info: Info[StrawberryGQLContext],
-    filter: Optional[DeploymentFilter] = None,
-    order_by: Optional[list[DeploymentOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-) -> ModelDeploymentConnection:
-    processor = info.context.processors.deployment
-    if processor is None:
-        raise ModelDeploymentUnavailable(
-            "Model Deployment feature is unavailable. Please contact support."
-        )
-
-    # Build querier using gql_adapter
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        ),
-        _get_deployment_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
-    )
-
-    action_result = await processor.search_deployments.wait_for_complete(
-        SearchDeploymentsAction(querier=querier)
-    )
-
-    nodes = [ModelDeployment.from_dataclass(data) for data in action_result.data]
-    edges = [ModelDeploymentEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
-
-    return ModelDeploymentConnection(
-        edges=edges,
-        page_info=PageInfo(
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        ),
-        count=action_result.total_count,
-    )
-
-
-# Resolvers
-@strawberry.field(description="Added in 25.16.0")
-async def deployments(
-    info: Info[StrawberryGQLContext],
-    filter: Optional[DeploymentFilter] = None,
-    order_by: Optional[list[DeploymentOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-) -> ModelDeploymentConnection:
-    """List deployments with optional filtering and pagination."""
-
-    return await resolve_deployments(
-        info=info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
-    )
-
-
-@strawberry.field(description="Added in 25.16.0")
-async def deployment(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ModelDeployment]:
-    """Get a specific deployment by ID."""
-    _, deployment_id = resolve_global_id(id)
-    processor = info.context.processors.deployment
-    if processor is None:
-        raise ModelDeploymentUnavailable(
-            "Model Deployment feature is unavailable. Please contact support."
-        )
-    result = await processor.get_deployment_by_id.wait_for_complete(
-        GetDeploymentByIdAction(deployment_id=UUID(deployment_id))
-    )
-    return ModelDeployment.from_dataclass(result.data)
-
-
-@strawberry.mutation(description="Added in 25.16.0")
-async def create_model_deployment(
-    input: CreateModelDeploymentInput, info: Info[StrawberryGQLContext]
-) -> "CreateModelDeploymentPayload":
-    """Create a new model deployment."""
-
-    processor = info.context.processors.deployment
-    if processor is None:
-        raise ModelDeploymentUnavailable(
-            "Model Deployment feature is unavailable. Please contact support."
-        )
-
-    result = await processor.create_deployment.wait_for_complete(
-        CreateDeploymentAction(creator=input.to_creator())
-    )
-
-    return CreateModelDeploymentPayload(deployment=ModelDeployment.from_dataclass(result.data))
-
-
-@strawberry.mutation(description="Added in 25.16.0")
-async def update_model_deployment(
-    input: UpdateModelDeploymentInput, info: Info[StrawberryGQLContext]
-) -> UpdateModelDeploymentPayload:
-    """Update an existing model deployment."""
-    _, deployment_id = resolve_global_id(input.id)
-    deployment_processor = info.context.processors.deployment
-    if deployment_processor is None:
-        raise ModelDeploymentUnavailable(
-            "Model Deployment feature is unavailable. Please contact support."
-        )
-    action_result = await deployment_processor.update_deployment.wait_for_complete(
-        UpdateDeploymentAction(
-            deployment_id=UUID(deployment_id), updater_spec=input.to_updater_spec()
-        )
-    )
-    return UpdateModelDeploymentPayload(
-        deployment=ModelDeployment.from_dataclass(action_result.data)
-    )
-
-
-@strawberry.mutation(description="Added in 25.16.0")
-async def delete_model_deployment(
-    input: DeleteModelDeploymentInput, info: Info[StrawberryGQLContext]
-) -> DeleteModelDeploymentPayload:
-    """Delete a model deployment."""
-    _, deployment_id = resolve_global_id(input.id)
-    deployment_processor = info.context.processors.deployment
-    if deployment_processor is None:
-        raise ModelDeploymentUnavailable(
-            "Model Deployment feature is unavailable. Please contact support."
-        )
-    _ = await deployment_processor.destroy_deployment.wait_for_complete(
-        DestroyDeploymentAction(endpoint_id=UUID(deployment_id))
-    )
-    return DeleteModelDeploymentPayload(id=input.id)
-
-
-@strawberry.subscription(description="Added in 25.16.0")
-async def deployment_status_changed(
-    deployment_id: ID, info: Info[StrawberryGQLContext]
-) -> AsyncGenerator[DeploymentStatusChangedPayload, None]:
-    """Subscribe to deployment status changes."""
-    # Mock implementation
-    # In real implementation, this would yield artifacts when status changes
-    if False:  # Placeholder to make this a generator
-        yield DeploymentStatusChangedPayload(deployment_id=deployment_id)
-
-
-@strawberry.input(description="Added in 25.16.0")
+# Sync replica types
+@strawberry.input(description="Added in 25.19.0")
 class SyncReplicaInput:
     model_deployment_id: ID
 
 
-@strawberry.type(description="Added in 25.16.0")
+@strawberry.type(description="Added in 25.19.0")
 class SyncReplicaPayload:
     success: bool
-
-
-@strawberry.mutation(
-    description="Added in 25.16.0. Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers"
-)
-async def sync_replicas(
-    input: SyncReplicaInput, info: Info[StrawberryGQLContext]
-) -> SyncReplicaPayload:
-    _, deployment_id = resolve_global_id(input.model_deployment_id)
-    deployment_processor = info.context.processors.deployment
-    if deployment_processor is None:
-        raise ModelDeploymentUnavailable(
-            "Model Deployment feature is unavailable. Please contact support."
-        )
-    await deployment_processor.sync_replicas.wait_for_complete(
-        SyncReplicaAction(deployment_id=UUID(deployment_id))
-    )
-    return SyncReplicaPayload(success=True)

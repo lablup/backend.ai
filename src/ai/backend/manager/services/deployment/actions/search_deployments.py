@@ -1,7 +1,3 @@
-"""Action for searching deployments."""
-
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Optional, override
 
@@ -13,8 +9,6 @@ from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAc
 
 @dataclass
 class SearchDeploymentsAction(DeploymentBaseAction):
-    """Action to search deployments with filtering and pagination."""
-
     querier: BatchQuerier
 
     @override
@@ -29,9 +23,7 @@ class SearchDeploymentsAction(DeploymentBaseAction):
 
 @dataclass
 class SearchDeploymentsActionResult(BaseActionResult):
-    """Result of searching deployments."""
-
-    deployments: list[ModelDeploymentData]
+    data: list[ModelDeploymentData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

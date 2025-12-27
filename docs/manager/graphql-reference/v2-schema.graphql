@@ -38,6 +38,13 @@ type AccessTokenEdge {
 }
 
 """Added in 25.16.0"""
+input AccessTokenFilter {
+  token: StringFilter = null
+  validUntil: DateTimeFilter = null
+  createdAt: DateTimeFilter = null
+}
+
+"""Added in 25.16.0"""
 input AccessTokenOrderBy {
   field: AccessTokenOrderField!
   direction: OrderDirection! = DESC
@@ -815,6 +822,13 @@ type CreateVFSStoragePayload {
 """Date with time (isoformat)"""
 scalar DateTime
 
+input DateTimeFilter {
+  before: DateTime = null
+  after: DateTime = null
+  equals: DateTime = null
+  notEquals: DateTime = null
+}
+
 """Decimal (fixed-point)"""
 scalar Decimal
 
@@ -1034,7 +1048,6 @@ input DeploymentFilter {
   openToPublic: Boolean = null
   tags: StringFilter = null
   endpointUrl: StringFilter = null
-  id: ID = null
   AND: [DeploymentFilter!] = null
   OR: [DeploymentFilter!] = null
   NOT: [DeploymentFilter!] = null
@@ -1209,8 +1222,7 @@ type HuggingFaceRegistryEdge {
 
 """Added in 25.16.0"""
 input ImageInput {
-  name: String!
-  architecture: String!
+  id: ID!
 }
 
 extend type ImageNode @key(fields: "id") {
@@ -1335,7 +1347,7 @@ type ModelDeploymentNetworkAccess {
   endpointUrl: String
   preferredDomainName: String
   openToPublic: Boolean!
-  accessTokens(orderBy: [AccessTokenOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AccessTokenConnection!
+  accessTokens(filter: AccessTokenFilter = null, orderBy: [AccessTokenOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AccessTokenConnection!
 }
 
 """Added in 25.16.0"""

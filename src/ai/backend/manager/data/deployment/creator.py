@@ -13,7 +13,6 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionSpec,
     ModelRevisionSpecDraft,
     MountInfo,
-    MountMetadata,
     ReplicaSpec,
     ResourceSpec,
 )
@@ -31,18 +30,16 @@ class VFolderMountsCreator:
 
 @dataclass
 class ModelRevisionCreator:
-    image_identifier: ImageIdentifier
+    """Creator for model revision.
+
+    Note: Uses image_id directly instead of image_identifier.
+    The image_id is resolved by the GQL layer before being passed here.
+    """
+
+    image_id: UUID
     resource_spec: ResourceSpec
     mounts: VFolderMountsCreator
     execution: ExecutionSpec
-
-    def to_revision_spec(self, mount_metadata: MountMetadata) -> ModelRevisionSpec:
-        return ModelRevisionSpec(
-            image_identifier=self.image_identifier,
-            resource_spec=self.resource_spec,
-            mounts=mount_metadata,
-            execution=self.execution,
-        )
 
 
 @dataclass

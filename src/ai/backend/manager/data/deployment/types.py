@@ -289,6 +289,7 @@ class DeploymentInfo:
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
     model_revisions: list[ModelRevisionSpec]
+    current_revision_id: UUID | None = None
 
     def target_revision(self) -> Optional[ModelRevisionSpec]:
         if self.model_revisions:
@@ -306,6 +307,7 @@ class DeploymentSessionSpec:
 class ScaleOutDecision:
     deployment_info: DeploymentInfo
     new_replica_count: int
+    target_revision_id: UUID | None = None
 
 
 @dataclass
@@ -569,6 +571,36 @@ class DeploymentSearchResult:
     """Search result with pagination for deployments."""
 
     items: list[ModelDeploymentData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class DeploymentInfoSearchResult:
+    """Search result with pagination for deployment info."""
+
+    items: list[DeploymentInfo]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class AutoScalingRuleSearchResult:
+    """Search result with pagination for auto-scaling rules."""
+
+    items: list[ModelDeploymentAutoScalingRuleData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class AccessTokenSearchResult:
+    """Search result with pagination for access tokens."""
+
+    items: list[ModelDeploymentAccessTokenData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

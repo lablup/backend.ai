@@ -89,7 +89,7 @@ async def load_deployments_by_ids(
         SearchDeploymentsAction(querier=querier)
     )
 
-    deployment_map = {deployment.id: deployment for deployment in action_result.deployments}
+    deployment_map = {deployment.id: deployment for deployment in action_result.data}
     return [deployment_map.get(deployment_id) for deployment_id in deployment_ids]
 
 
@@ -122,5 +122,5 @@ async def load_revisions_by_ids(
         SearchRevisionsAction(querier=querier)
     )
 
-    revision_map = {revision.id: revision for revision in action_result.revisions}
+    revision_map = {revision.id: revision for revision in action_result.data}
     return [revision_map.get(revision_id) for revision_id in revision_ids]
