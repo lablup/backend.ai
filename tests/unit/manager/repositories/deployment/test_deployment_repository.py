@@ -78,8 +78,10 @@ from ai.backend.manager.repositories.deployment.creators import (
 )
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentAutoScalingPolicyUpdaterSpec,
+    DeploymentMetadataUpdaterSpec,
     DeploymentPolicyUpdaterSpec,
-    NewDeploymentUpdaterSpec,
+    DeploymentUpdaterSpec,
+    ReplicaSpecUpdaterSpec,
     RevisionStateUpdaterSpec,
 )
 from ai.backend.manager.types import OptionalState, TriState
@@ -1762,10 +1764,16 @@ class TestDeploymentRevisionOperations:
         new_desired_replica_count = 5
 
         updater = Updater(
-            spec=NewDeploymentUpdaterSpec(
-                name=OptionalState.update(new_name),
-                desired_replica_count=OptionalState.update(new_desired_replica_count),
-                active_revision_id=OptionalState.update(test_revision_data.id),
+            spec=DeploymentUpdaterSpec(
+                metadata=DeploymentMetadataUpdaterSpec(
+                    name=OptionalState.update(new_name),
+                ),
+                replica_spec=ReplicaSpecUpdaterSpec(
+                    desired_replica_count=OptionalState.update(new_desired_replica_count),
+                ),
+                revision_state=RevisionStateUpdaterSpec(
+                    current_revision=TriState.update(test_revision_data.id),
+                ),
             ),
             pk_value=test_endpoint_id,
         )

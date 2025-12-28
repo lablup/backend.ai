@@ -81,8 +81,12 @@ from ai.backend.manager.repositories.deployment.options import (
     RouteConditions,
 )
 from ai.backend.manager.repositories.deployment.updaters import (
+    DeploymentMetadataUpdaterSpec,
+    DeploymentNetworkSpecUpdaterSpec,
     DeploymentPolicyUpdaterSpec,
-    NewDeploymentUpdaterSpec,
+    DeploymentUpdaterSpec,
+    ReplicaSpecUpdaterSpec,
+    RevisionStateUpdaterSpec,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
     SearchAutoScalingRulesAction,
@@ -657,24 +661,45 @@ class UpdateDeploymentInput:
 
     def to_updater(self, deployment_id: UUID) -> Updater[EndpointRow]:
         """Convert input to deployment updater."""
-        strategy_type = None
-        if self.default_deployment_strategy is not None:
-            strategy_type = DeploymentStrategy(self.default_deployment_strategy.type)
+        # Build metadata sub-spec if any metadata fields are provided
+        metadata_spec: DeploymentMetadataUpdaterSpec | None = None
+        if self.name is not None or self.tags is not None:
+            # Convert tags list to comma-separated string for tag column
+            tag_str: str | None = None
+            if self.tags is not None:
+                tag_str = ",".join(self.tags)
+            metadata_spec = DeploymentMetadataUpdaterSpec(
+                name=OptionalState[str].from_graphql(self.name),
+                tag=TriState[str].from_graphql(tag_str),
+            )
 
-        active_revision_uuid = None
+        # Build replica spec sub-spec if any replica fields are provided
+        replica_spec: ReplicaSpecUpdaterSpec | None = None
+        if self.desired_replica_count is not None:
+            replica_spec = ReplicaSpecUpdaterSpec(
+                desired_replica_count=OptionalState[int].from_graphql(self.desired_replica_count),
+            )
+
+        # Build network sub-spec if any network fields are provided
+        network_spec: DeploymentNetworkSpecUpdaterSpec | None = None
+        if self.open_to_public is not None:
+            network_spec = DeploymentNetworkSpecUpdaterSpec(
+                open_to_public=OptionalState[bool].from_graphql(self.open_to_public),
+            )
+
+        # Build revision state sub-spec if any revision fields are provided
+        revision_state_spec: RevisionStateUpdaterSpec | None = None
         if self.active_revision_id is not None:
             active_revision_uuid = UUID(self.active_revision_id)
+            revision_state_spec = RevisionStateUpdaterSpec(
+                current_revision=TriState[UUID].from_graphql(active_revision_uuid),
+            )
 
-        spec = NewDeploymentUpdaterSpec(
-            open_to_public=OptionalState[bool].from_graphql(self.open_to_public),
-            tags=OptionalState[list[str]].from_graphql(self.tags),
-            default_deployment_strategy=OptionalState[DeploymentStrategy].from_graphql(
-                strategy_type
-            ),
-            active_revision_id=OptionalState[UUID].from_graphql(active_revision_uuid),
-            desired_replica_count=OptionalState[int].from_graphql(self.desired_replica_count),
-            name=OptionalState[str].from_graphql(self.name),
-            preferred_domain_name=TriState[str].from_graphql(self.preferred_domain_name),
+        spec = DeploymentUpdaterSpec(
+            metadata=metadata_spec,
+            replica_spec=replica_spec,
+            network=network_spec,
+            revision_state=revision_state_spec,
         )
         return Updater(spec=spec, pk_value=deployment_id)
 
