@@ -40,7 +40,13 @@ from ai.backend.common.dto.manager.deployment import (
 )
 from ai.backend.manager.data.deployment.types import RouteTrafficStatus as ManagerRouteTrafficStatus
 from ai.backend.manager.dto.context import ProcessorsCtx, UserContext
-from ai.backend.manager.repositories.deployment.updaters import NewDeploymentUpdaterSpec
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.deployment.updaters import (
+    DeploymentMetadataUpdaterSpec,
+    DeploymentUpdaterSpec,
+    ReplicaSpecUpdaterSpec,
+)
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
 )
@@ -199,26 +205,31 @@ class DeploymentAPIHandler:
         """Update an existing deployment."""
         deployment_processors = self._get_deployment_processors(processors_ctx.processors)
 
-        # Build updater spec
-        name = OptionalState[str].nop()
-        desired_replica_count = OptionalState[int].nop()
-
+        # Build sub-specs only if fields are provided
+        metadata_spec: DeploymentMetadataUpdaterSpec | None = None
         if body.parsed.name is not None:
-            name = OptionalState.update(body.parsed.name)
-        if body.parsed.desired_replicas is not None:
-            desired_replica_count = OptionalState.update(body.parsed.desired_replicas)
+            metadata_spec = DeploymentMetadataUpdaterSpec(
+                name=OptionalState.update(body.parsed.name),
+            )
 
-        updater_spec = NewDeploymentUpdaterSpec(
-            name=name,
-            desired_replica_count=desired_replica_count,
+        replica_spec: ReplicaSpecUpdaterSpec | None = None
+        if body.parsed.desired_replicas is not None:
+            replica_spec = ReplicaSpecUpdaterSpec(
+                desired_replica_count=OptionalState.update(body.parsed.desired_replicas),
+            )
+
+        updater_spec = DeploymentUpdaterSpec(
+            metadata=metadata_spec,
+            replica_spec=replica_spec,
+        )
+        updater = Updater[EndpointRow](
+            spec=updater_spec,
+            pk_value=path.parsed.deployment_id,
         )
 
         # Call service action
         action_result = await deployment_processors.update_deployment.wait_for_complete(
-            UpdateDeploymentAction(
-                deployment_id=path.parsed.deployment_id,
-                updater_spec=updater_spec,
-            )
+            UpdateDeploymentAction(updater=updater)
         )
 
         # Build response

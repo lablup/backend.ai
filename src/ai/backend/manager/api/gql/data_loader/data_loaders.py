@@ -10,6 +10,7 @@ from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactRevisio
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.data.deployment.types import (
     ModelDeploymentData,
+    ModelReplicaData,
     ModelRevisionData,
     RouteInfo,
 )
@@ -25,7 +26,12 @@ from ai.backend.manager.services.processors import Processors
 from .artifact import load_artifacts_by_ids
 from .artifact_registry import load_artifact_registries_by_ids
 from .artifact_revision import load_artifact_revisions_by_ids
-from .deployment import load_deployments_by_ids, load_revisions_by_ids, load_routes_by_ids
+from .deployment import (
+    load_deployments_by_ids,
+    load_replicas_by_ids,
+    load_revisions_by_ids,
+    load_routes_by_ids,
+)
 from .huggingface_registry import load_huggingface_registries_by_ids
 from .notification import load_channels_by_ids, load_rules_by_ids
 from .object_storage import load_object_storages_by_ids
@@ -146,3 +152,9 @@ class DataLoaders:
         self,
     ) -> DataLoader[uuid.UUID, Optional[ModelRevisionData]]:
         return DataLoader(load_fn=partial(load_revisions_by_ids, self._processors.deployment))
+
+    @cached_property
+    def replica_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, Optional[ModelReplicaData]]:
+        return DataLoader(load_fn=partial(load_replicas_by_ids, self._processors.deployment))

@@ -36,44 +36,44 @@ from .artifact import (
 )
 from .artifact_registry import default_artifact_registry
 from .background_task import background_task_events
+from .deployment import (
+    # Revision
+    activate_deployment_revision,
+    add_model_revision,
+    # Access Token
+    create_access_token,
+    # Auto Scaling
+    create_auto_scaling_rule,
+    # Deployment
+    create_model_deployment,
+    create_model_revision,
+    delete_auto_scaling_rule,
+    delete_model_deployment,
+    deployment,
+    deployment_status_changed,
+    deployments,
+    inference_runtime_config,
+    inference_runtime_configs,
+    # Replica
+    replica,
+    replica_status_changed,
+    replicas,
+    revision,
+    revisions,
+    # Route
+    route,
+    routes,
+    sync_replicas,
+    update_auto_scaling_rule,
+    update_model_deployment,
+    update_route_traffic_status,
+)
 from .huggingface_registry import (
     create_huggingface_registry,
     delete_huggingface_registry,
     huggingface_registries,
     huggingface_registry,
     update_huggingface_registry,
-)
-from .model_deployment.access_token import create_access_token
-from .model_deployment.auto_scaling_rule import (
-    create_auto_scaling_rule,
-    delete_auto_scaling_rule,
-    update_auto_scaling_rule,
-)
-from .model_deployment.model_deployment import (
-    create_model_deployment,
-    delete_model_deployment,
-    deployment,
-    deployment_status_changed,
-    deployments,
-    sync_replicas,
-    update_model_deployment,
-)
-from .model_deployment.model_replica import replica, replica_status_changed, replicas
-from .model_deployment.model_revision import (
-    add_model_revision,
-    create_model_revision,
-    inference_runtime_config,
-    inference_runtime_configs,
-    revision,
-    revisions,
-)
-from .model_deployment.revision_operations import (
-    activate_deployment_revision,
-)
-from .model_deployment.route import (
-    route,
-    routes,
-    update_route_traffic_status,
 )
 from .notification import (
     create_notification_channel,

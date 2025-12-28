@@ -134,6 +134,7 @@ class BaseGQLAdapter:
         pagination_spec: PaginationSpec,
         filter: Optional[GQLFilter] = None,
         order_by: Optional[Sequence[GQLOrderBy]] = None,
+        base_conditions: Optional[Sequence[QueryCondition]] = None,
     ) -> BatchQuerier:
         """Build BatchQuerier from GraphQL arguments with domain configuration.
 
@@ -142,6 +143,7 @@ class BaseGQLAdapter:
             pagination_spec: Domain-specific pagination specification (orders, condition factories)
             filter: Optional filter with build_conditions() method
             order_by: Optional sequence of order specifications with to_query_order() method
+            base_conditions: Optional base conditions to prepend (e.g., deployment_id filter)
 
         Returns:
             A BatchQuerier instance with conditions, orders, and pagination configured.
@@ -160,6 +162,10 @@ class BaseGQLAdapter:
 
         conditions: list[QueryCondition] = []
         orders: list[QueryOrder] = []
+
+        # Prepend base conditions first (e.g., deployment_id filter)
+        if base_conditions:
+            conditions.extend(base_conditions)
 
         if filter:
             conditions.extend(filter.build_conditions())

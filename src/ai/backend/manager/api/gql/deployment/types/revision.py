@@ -319,6 +319,11 @@ class AddRevisionPayload:
     revision: ModelRevision
 
 
+@strawberry.type(description="Added in 25.16.0")
+class CreateRevisionPayload:
+    revision: ModelRevision
+
+
 @strawberry.input(
     name="ActivateRevisionInput",
     description="Added in 25.19.0. Input for activating a revision to be the current revision.",

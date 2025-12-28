@@ -32,7 +32,6 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.repositories.base import Creator
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import (
     DeploymentCreatorSpec,
@@ -366,24 +365,15 @@ class DeploymentService:
         """Update an existing deployment.
 
         Args:
-            action: Update deployment action containing the deployment ID and updater spec
+            action: Update deployment action containing the updater
 
         Returns:
             UpdateDeploymentActionResult: Result containing the updated deployment data
         """
-        log.info("Updating deployment with ID: {}", action.deployment_id)
+        log.info("Updating deployment with ID: {}", action.updater.pk_value)
 
-        # Create Updater from the spec
-        updater: Updater[EndpointRow] = Updater(
-            spec=action.updater_spec,
-            pk_value=action.deployment_id,
-        )
-
-        # Update endpoint via repository
-        await self._deployment_repository.update_endpoint(updater)
-
-        # Get updated deployment info
-        deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
+        # Update endpoint and get updated deployment info in one call
+        deployment_info = await self._deployment_repository.update_endpoint(action.updater)
 
         # Mark lifecycle needed for potential replica adjustments
         await self._deployment_controller.mark_lifecycle_needed(
