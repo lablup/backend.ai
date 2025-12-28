@@ -40,6 +40,8 @@ from ai.backend.common.dto.manager.deployment import (
 )
 from ai.backend.manager.data.deployment.types import RouteTrafficStatus as ManagerRouteTrafficStatus
 from ai.backend.manager.dto.context import ProcessorsCtx, UserContext
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment.updaters import NewDeploymentUpdaterSpec
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
@@ -212,13 +214,14 @@ class DeploymentAPIHandler:
             name=name,
             desired_replica_count=desired_replica_count,
         )
+        updater = Updater[EndpointRow](
+            spec=updater_spec,
+            pk_value=path.parsed.deployment_id,
+        )
 
         # Call service action
         action_result = await deployment_processors.update_deployment.wait_for_complete(
-            UpdateDeploymentAction(
-                deployment_id=path.parsed.deployment_id,
-                updater_spec=updater_spec,
-            )
+            UpdateDeploymentAction(updater=updater)
         )
 
         # Build response

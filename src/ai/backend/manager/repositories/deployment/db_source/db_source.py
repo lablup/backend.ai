@@ -1826,10 +1826,35 @@ class DeploymentDBSource:
     async def update_endpoint(
         self,
         updater: Updater[EndpointRow],
-    ) -> None:
-        """Update an endpoint using the provided updater spec."""
+    ) -> DeploymentInfo:
+        """Update an endpoint using the provided updater spec.
+
+        Returns:
+            DeploymentInfo: The updated endpoint information.
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist.
+        """
         async with self._begin_session_read_committed() as db_sess:
-            await execute_updater(db_sess, updater)
+            result = await execute_updater(db_sess, updater)
+            if result is None:
+                raise EndpointNotFound(f"Endpoint {updater.pk_value} not found")
+
+            # Query the updated endpoint with related objects in the same session
+            query = (
+                sa.select(EndpointRow)
+                .where(EndpointRow.id == updater.pk_value)
+                .options(
+                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                )
+            )
+            query_result = await db_sess.execute(query)
+            row: EndpointRow = query_result.scalar_one()
+
+            return row.to_deployment_info()
 
     async def update_current_revision(
         self,

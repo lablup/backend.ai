@@ -1,24 +1,21 @@
-"""GraphQL types, queries and mutations for routes."""
+"""Route GraphQL types for model deployment."""
 
 from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
 from functools import lru_cache
-from typing import Optional, override
+from typing import TYPE_CHECKING, Optional, override
 from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.common.exception import ModelDeploymentUnavailable
-from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
+from ai.backend.manager.api.gql.adapter import PaginationSpec
 from ai.backend.manager.api.gql.base import (
     JSONString,
     OrderDirection,
-    encode_cursor,
-    resolve_global_id,
     to_global_id,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
@@ -35,13 +32,10 @@ from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.models.gql_models.session import ComputeSessionNode
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.deployment.options import RouteConditions, RouteOrders
-from ai.backend.manager.services.deployment.actions.route import (
-    SearchRoutesAction,
-    UpdateRouteTrafficStatusAction,
-)
 
-from .model_deployment import ModelDeployment
-from .model_revision import ModelRevision
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
+    from ai.backend.manager.api.gql.deployment.types.revision import ModelRevision
 
 RouteStatusGQL = strawberry.enum(
     RouteStatusEnum,
@@ -84,6 +78,8 @@ class Route(Node):
     @strawberry.field(description="The deployment this route belongs to.")
     async def deployment(self, info: Info[StrawberryGQLContext]) -> ModelDeployment:
         """Resolve deployment using dataloader."""
+        from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
+
         deployment_data = await info.context.data_loaders.deployment_loader.load(
             self._deployment_id
         )
@@ -106,6 +102,8 @@ class Route(Node):
     @strawberry.field(description="The revision associated with the route.")
     async def revision(self, info: Info[StrawberryGQLContext]) -> Optional[ModelRevision]:
         """Resolve revision using dataloader."""
+        from ai.backend.manager.api.gql.deployment.types.revision import ModelRevision
+
         if self._revision_id is None:
             return None
         revision_data = await info.context.data_loaders.revision_loader.load(self._revision_id)
@@ -137,7 +135,7 @@ class RouteConnection(Connection[Route]):
         description="Total number of routes matching the filter criteria."
     )
 
-    def __init__(self, *args, count: int, **kwargs):
+    def __init__(self, *args, count: int, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 
@@ -197,7 +195,7 @@ class RouteOrderBy(GQLOrderBy):
 
 
 @lru_cache(maxsize=1)
-def _get_route_pagination_spec() -> PaginationSpec:
+def get_route_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=RouteOrders.created_at(ascending=False),
         backward_order=RouteOrders.created_at(ascending=True),
@@ -226,109 +224,3 @@ class UpdateRouteTrafficStatusInputGQL:
 )
 class UpdateRouteTrafficStatusPayloadGQL:
     route: Route = strawberry.field(description="The updated route.")
-
-
-# Query fields
-
-
-@strawberry.field(description="Added in 25.19.0. Get a specific route by ID.")
-async def route(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Route]:
-    """Get a specific route by ID."""
-    _, route_id = resolve_global_id(id)
-
-    route_info = await info.context.data_loaders.route_loader.load(UUID(route_id))
-    if route_info is None:
-        return None
-    return Route.from_dataclass(route_info)
-
-
-@strawberry.field(
-    description="Added in 25.19.0. List routes for a deployment with optional filters."
-)
-async def routes(
-    info: Info[StrawberryGQLContext],
-    deployment_id: ID,
-    filter: Optional[RouteFilter] = None,
-    order_by: Optional[list[RouteOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-) -> RouteConnection:
-    """List routes for a deployment with optional filters."""
-    _, endpoint_id = resolve_global_id(deployment_id)
-
-    processor = info.context.processors.deployment
-    if processor is None:
-        raise ModelDeploymentUnavailable(
-            "Model Deployment feature is unavailable. Please contact support."
-        )
-
-    # Build querier using adapter with filter and order_by
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        ),
-        _get_route_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
-    )
-
-    # Add deployment_id condition (always required)
-    endpoint_uuid = UUID(endpoint_id)
-    querier.conditions.insert(0, RouteConditions.by_endpoint_id(endpoint_uuid))
-
-    action_result = await processor.search_routes.wait_for_complete(
-        SearchRoutesAction(querier=querier)
-    )
-
-    nodes = [Route.from_dataclass(data) for data in action_result.routes]
-
-    edges = [RouteEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
-
-    return RouteConnection(
-        edges=edges,
-        page_info=strawberry.relay.PageInfo(
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        ),
-        count=action_result.total_count,
-    )
-
-
-# Mutation fields
-
-
-@strawberry.mutation(description="Added in 25.19.0. Update the traffic status of a route.")
-async def update_route_traffic_status(
-    input: UpdateRouteTrafficStatusInputGQL,
-    info: Info[StrawberryGQLContext],
-) -> UpdateRouteTrafficStatusPayloadGQL:
-    """Update route traffic status (ACTIVE/INACTIVE)."""
-    _, route_id = resolve_global_id(input.route_id)
-
-    processor = info.context.processors.deployment
-    if processor is None:
-        raise ModelDeploymentUnavailable(
-            "Model Deployment feature is unavailable. Please contact support."
-        )
-
-    result = await processor.update_route_traffic_status.wait_for_complete(
-        UpdateRouteTrafficStatusAction(
-            route_id=UUID(route_id),
-            traffic_status=RouteTrafficStatusEnum(input.traffic_status.value),
-        )
-    )
-
-    return UpdateRouteTrafficStatusPayloadGQL(
-        route=Route.from_dataclass(result.route),
-    )

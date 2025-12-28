@@ -193,11 +193,11 @@ class NewDeploymentUpdaterSpec(UpdaterSpec[EndpointRow]):
         tag = self.tags.optional_value()
         if tag is not None:
             to_update["tags"] = ",".join(tag)
-        self.desired_replica_count.update_dict(to_update, "desired_replica_count")
+        self.desired_replica_count.update_dict(to_update, "desired_replicas")
         self.open_to_public.update_dict(to_update, "open_to_public")
         self.preferred_domain_name.update_dict(to_update, "preferred_domain_name")
         self.default_deployment_strategy.update_dict(to_update, "default_deployment_strategy")
-        self.active_revision_id.update_dict(to_update, "current_revision_id")
+        self.active_revision_id.update_dict(to_update, "current_revision")
         self.revision_history_limit.update_dict(to_update, "revision_history_limit")
         return to_update
 

@@ -1,26 +1,26 @@
+"""Access token GraphQL types for model deployment."""
+
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Optional, Self, override
 from uuid import UUID
 
 import strawberry
-from strawberry import ID, Info
+from strawberry import ID
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
 from ai.backend.manager.data.deployment.types import (
     AccessTokenOrderField,
     ModelDeploymentAccessTokenData,
 )
-from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.deployment.options import (
     AccessTokenConditions,
     AccessTokenOrders,
-)
-from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
-    CreateAccessTokenAction,
 )
 
 
@@ -106,7 +106,7 @@ AccessTokenEdge = Edge[AccessToken]
 class AccessTokenConnection(Connection[AccessToken]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs):
+    def __init__(self, *args, count: int, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 
@@ -120,7 +120,7 @@ class CreateAccessTokenInput:
         description="Added in 25.16.0: The expiration timestamp of the access token."
     )
 
-    def to_creator(self) -> "ModelDeploymentAccessTokenCreator":
+    def to_creator(self) -> ModelDeploymentAccessTokenCreator:
         return ModelDeploymentAccessTokenCreator(
             model_deployment_id=UUID(self.model_deployment_id),
             valid_until=self.valid_until,
@@ -130,16 +130,3 @@ class CreateAccessTokenInput:
 @strawberry.type
 class CreateAccessTokenPayload:
     access_token: AccessToken
-
-
-@strawberry.mutation(description="Added in 25.16.0")
-async def create_access_token(
-    input: CreateAccessTokenInput, info: Info[StrawberryGQLContext]
-) -> CreateAccessTokenPayload:
-    deployment_processor = info.context.processors.deployment
-    if deployment_processor is None:
-        raise ServerMisconfiguredError("Deployment processor is not available")
-    result = await deployment_processor.create_access_token.wait_for_complete(
-        action=CreateAccessTokenAction(input.to_creator())
-    )
-    return CreateAccessTokenPayload(access_token=AccessToken.from_dataclass(result.data))

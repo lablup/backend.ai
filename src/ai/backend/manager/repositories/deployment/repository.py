@@ -1051,9 +1051,16 @@ class DeploymentRepository:
     async def update_endpoint(
         self,
         updater: Updater[EndpointRow],
-    ) -> None:
-        """Update an endpoint using the provided updater spec."""
-        await self._db_source.update_endpoint(updater)
+    ) -> DeploymentInfo:
+        """Update an endpoint using the provided updater spec.
+
+        Returns:
+            DeploymentInfo: The updated endpoint information.
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist.
+        """
+        return await self._db_source.update_endpoint(updater)
 
     @deployment_repository_resilience.apply()
     async def update_current_revision(

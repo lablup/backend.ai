@@ -656,6 +656,7 @@ class UpdateDeploymentInput:
     preferred_domain_name: Optional[str] = None
 
     def to_updater(self, deployment_id: UUID) -> Updater[EndpointRow]:
+        """Convert input to deployment updater."""
         strategy_type = None
         if self.default_deployment_strategy is not None:
             strategy_type = DeploymentStrategy(self.default_deployment_strategy.type)
