@@ -60,17 +60,18 @@ valkey_schedule_resilience = Resilience(
 class HealthStatus:
     """Health status data for a route."""
 
-    readiness: HealthCheckStatus
-    liveness: HealthCheckStatus
-    last_check: int  # Unix timestamp of last check by manager
-    created_at: int  # Unix timestamp when route was initialized (Redis time)
+    readiness: HealthCheckStatus | None  # None if never checked
+    liveness: HealthCheckStatus | None  # None if never checked
+    last_check: int | None  # Unix timestamp of last check by manager, None if never checked
+    created_at: int  # Unix timestamp when route was initialized
 
-    def get_status(self) -> HealthCheckStatus:
+    def get_status(self) -> HealthCheckStatus | None:
         """
         Get the overall health status of the route.
 
         Returns:
             HealthCheckStatus based on readiness and liveness:
+            - None: if readiness is not set
             - STALE: if either readiness or liveness is stale
             - HEALTHY: if readiness is healthy (TODO: and liveness when implemented)
             - UNHEALTHY: if readiness is unhealthy
@@ -83,10 +84,10 @@ class HealthStatus:
 class KernelStatus:
     """Presence status for a kernel."""
 
-    presence: HealthCheckStatus  # HEALTHY, UNHEALTHY, STALE
-    last_presence: int  # Unix timestamp when Agent last reported presence
-    last_check: int  # Unix timestamp when Manager last checked
-    created_at: int  # Unix timestamp when first created
+    presence: HealthCheckStatus | None  # HEALTHY, UNHEALTHY, STALE, or None if never reported
+    last_presence: int | None  # Unix timestamp when Agent last reported presence, None if never
+    last_check: int | None  # Unix timestamp when Manager last checked, None if never
+    created_at: int  # Unix timestamp when first created  # Unix timestamp when first created, None if not initialized
 
 
 class ValkeyScheduleClient:
@@ -202,23 +203,27 @@ class ValkeyScheduleClient:
 
     async def _validate_health_status(
         self,
-        status: str,
-        timestamp_str: str,
+        status: str | None,
+        timestamp_str: str | None,
         current_time: int | None = None,
         staleness_sec: int = MAX_HEALTH_STALENESS_SEC,
-    ) -> HealthCheckStatus:
+    ) -> HealthCheckStatus | None:
         """
         Validate health status by checking if it's healthy and timestamp is not stale.
 
-        :param status: The status string ("1" for healthy, "0" for unhealthy)
-        :param timestamp_str: The timestamp string value from Redis
+        :param status: The status string ("1" for healthy, "0" for unhealthy), or None if missing
+        :param timestamp_str: The timestamp string value from Redis, or None if missing
         :param current_time: Optional pre-fetched Redis time (fetches if None)
         :param staleness_sec: Staleness threshold in seconds
         :return: HealthCheckStatus indicating the status:
+                 - None: if status or timestamp is missing
                  - HEALTHY: status is "1" and timestamp is fresh
                  - UNHEALTHY: status is "0" and timestamp is fresh
                  - STALE: timestamp is stale or invalid
         """
+        # Return None if status or timestamp is missing
+        if status is None or timestamp_str is None:
+            return None
         try:
             timestamp = int(timestamp_str)
             if current_time is None:
@@ -228,8 +233,8 @@ class ValkeyScheduleClient:
                 return HealthCheckStatus.STALE
             return HealthCheckStatus.HEALTHY if status == "1" else HealthCheckStatus.UNHEALTHY
         except (ValueError, TypeError):
-            # If timestamp is invalid, consider it stale
-            return HealthCheckStatus.STALE
+            # If timestamp is invalid, return None (not enough info)
+            return None
 
     @valkey_schedule_resilience.apply()
     async def mark_schedule_needed(self, schedule_type: str) -> None:
@@ -407,14 +412,15 @@ class ValkeyScheduleClient:
         data = {k.decode(): v.decode() for k, v in result.items()}
 
         # Parse boolean values using validation helper (checks both status and staleness)
+        # Pass None for missing fields instead of defaults
         readiness = await self._validate_health_status(
-            data.get("readiness", "0"), data.get("last_readiness", "0")
+            data.get("readiness"), data.get("last_readiness")
         )
         liveness = await self._validate_health_status(
-            data.get("liveness", "0"), data.get("last_liveness", "0")
+            data.get("liveness"), data.get("last_liveness")
         )
-        last_check = int(data["last_check"]) if "last_check" in data else 0
-        created_at = int(data["created_at"]) if "created_at" in data else 0
+        last_check = int(data["last_check"]) if "last_check" in data else None
+        created_at = int(data.get("created_at", "0"))
 
         return HealthStatus(
             readiness=readiness,
@@ -537,18 +543,18 @@ class ValkeyScheduleClient:
 
             # Parse existing data
             data = {k.decode(): v.decode() for k, v in result.items()}
-            # Validate health check statuses
+            # Validate health check statuses - pass None for missing fields
             readiness_status = await self._validate_health_status(
-                data.get("readiness", "0"), data.get("last_readiness", "0")
+                data.get("readiness"), data.get("last_readiness")
             )
             liveness_status = await self._validate_health_status(
-                data.get("liveness", "0"), data.get("last_liveness", "0")
+                data.get("liveness"), data.get("last_liveness")
             )
             health_statuses[route_id] = HealthStatus(
                 readiness=readiness_status,
                 liveness=liveness_status,
-                last_check=int(data["last_check"]) if "last_check" in data else 0,
-                created_at=int(data["created_at"]) if "created_at" in data else 0,
+                last_check=int(data["last_check"]) if "last_check" in data else None,
+                created_at=int(data.get("created_at", "0")),
             )
 
         return health_statuses
@@ -729,18 +735,18 @@ class ValkeyScheduleClient:
             # Parse existing data
             data = {k.decode(): v.decode() for k, v in hash_data.items()}
 
-            # Validate presence status with staleness check
+            # Validate presence status with staleness check - pass None for missing fields
             presence = await self._validate_health_status(
-                data.get("presence", "0"),
-                data.get("last_presence", "0"),
+                data.get("presence"),
+                data.get("last_presence"),
                 current_time,
                 MAX_KERNEL_HEALTH_STALENESS_SEC,
             )
             result[kernel_id] = KernelStatus(
                 presence=presence,
-                last_presence=int(data["last_presence"]) if "last_presence" in data else 0,
+                last_presence=int(data["last_presence"]) if "last_presence" in data else None,
                 last_check=current_time,
-                created_at=int(data["created_at"]) if "created_at" in data else 0,
+                created_at=int(data.get("created_at", "0")),
             )
 
         return result
@@ -799,16 +805,17 @@ class ValkeyScheduleClient:
                 continue
 
             data = {k.decode(): v.decode() for k, v in hash_data.items()}
+            # Pass None for missing fields
             presence = await self._validate_health_status(
-                data.get("presence", "0"),
-                data.get("last_presence", "0"),
+                data.get("presence"),
+                data.get("last_presence"),
                 current_time,
                 MAX_KERNEL_HEALTH_STALENESS_SEC,
             )
             result[kernel_id] = KernelStatus(
                 presence=presence,
-                last_presence=int(data["last_presence"]) if "last_presence" in data else 0,
-                last_check=int(data["last_check"]) if "last_check" in data else 0,
-                created_at=int(data["created_at"]) if "created_at" in data else 0,
+                last_presence=int(data["last_presence"]) if "last_presence" in data else None,
+                last_check=int(data["last_check"]) if "last_check" in data else None,
+                created_at=int(data.get("created_at", "0")),
             )
         return result

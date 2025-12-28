@@ -70,17 +70,17 @@ class TestValkeyScheduleClient:
     async def test_initialize_routes_health_status_batch(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
-        """Test that initialized routes are unhealthy until first health check"""
+        """Test that initialized routes have None readiness/liveness until first health check"""
         route_ids = ["route-1", "route-2", "route-3"]
 
         await valkey_schedule_client.initialize_routes_health_status_batch(route_ids)
 
-        # Verify all initialized routes are considered stale (no timestamp data)
+        # Verify all initialized routes have None readiness/liveness (no timestamp data yet)
         for route_id in route_ids:
             status = await valkey_schedule_client.get_route_health_status(route_id)
             assert status is not None
-            assert status.readiness == HealthCheckStatus.STALE, "Initialized route should be stale"
-            assert status.liveness == HealthCheckStatus.STALE, "Initialized route should be stale"
+            assert status.readiness is None, "Initialized route should have None readiness"
+            assert status.liveness is None, "Initialized route should have None liveness"
 
     @pytest.mark.asyncio
     async def test_update_route_readiness_healthy(
@@ -229,9 +229,9 @@ class TestValkeyScheduleClient:
 
         status = await valkey_schedule_client.get_route_health_status(route_id)
         assert status is not None
-        # Should be stale without timestamp fields
-        assert status.readiness == HealthCheckStatus.STALE
-        assert status.liveness == HealthCheckStatus.STALE
+        # Should be None without timestamp fields
+        assert status.readiness is None
+        assert status.liveness is None
 
     @pytest.mark.asyncio
     async def test_get_route_health_status_not_found(
@@ -308,6 +308,7 @@ class TestValkeyScheduleClient:
         # Verify last_check was updated to current time
         updated_status = await valkey_schedule_client.get_route_health_status(route_id)
         assert updated_status is not None
+        assert updated_status.last_check is not None
         assert updated_status.last_check > int(old_timestamp), (
             "last_check should be updated after check"
         )
@@ -463,8 +464,8 @@ class TestKernelPresenceStatus:
             status = statuses[kernel_id]
             assert status is not None
             assert status.presence == HealthCheckStatus.UNHEALTHY
-            assert status.last_presence > 0
-            assert status.last_check > 0
+            assert status.last_presence is not None and status.last_presence > 0
+            assert status.last_check is not None and status.last_check > 0
             assert status.created_at > 0
 
     @pytest.mark.asyncio
@@ -599,6 +600,7 @@ class TestKernelPresenceStatus:
         statuses = await valkey_schedule_client.check_kernel_presence_status_batch([kernel_id])
         status = statuses[kernel_id]
         assert status is not None
+        assert status.last_check is not None
         assert status.last_check > int(old_timestamp)
 
     @pytest.mark.asyncio
@@ -792,9 +794,10 @@ class TestAgentLastCheck:
         initial_statuses = await valkey_schedule_client.check_kernel_presence_status_batch(
             kernel_ids
         )
-        initial_last_checks = {
-            kid: status.last_check for kid, status in initial_statuses.items() if status
-        }
+        initial_last_checks: dict[KernelId, int] = {}
+        for kid, status in initial_statuses.items():
+            if status and status.last_check is not None:
+                initial_last_checks[kid] = status.last_check
 
         # Wait a bit
         import asyncio
@@ -809,10 +812,11 @@ class TestAgentLastCheck:
             kernel_ids
         )
         for kernel_id, status in current_statuses.items():
-            if status:
+            if status and status.last_check is not None:
                 # last_check should be updated by check_kernel_presence_status_batch
                 # but not by get_kernel_presence_batch
-                assert status.last_check >= initial_last_checks.get(kernel_id, 0)
+                initial_value = initial_last_checks.get(kernel_id, 0)
+                assert status.last_check >= initial_value
 
     @pytest.mark.asyncio
     async def test_get_kernel_presence_batch_returns_status(

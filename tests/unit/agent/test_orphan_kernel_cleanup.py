@@ -159,6 +159,34 @@ class TestOrphanKernelCleanupObserver:
         mock_agent.inject_container_lifecycle_event.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_skip_when_kernel_last_check_is_none(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+    ) -> None:
+        """Test that observe() skips kernel when last_check is None."""
+        mock_valkey_client.get_agent_last_check.return_value = 1000
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {
+            kernel_id: KernelStatus(
+                presence=HealthCheckStatus.HEALTHY,
+                last_presence=900,
+                last_check=None,  # last_check is None
+                created_at=800,
+            ),
+        }
+
+        await observer.observe()
+
+        # Should not call inject_container_lifecycle_event when last_check is None
+        mock_agent.inject_container_lifecycle_event.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_skip_when_kernel_recently_checked(
         self,
         observer: OrphanKernelCleanupObserver,
