@@ -77,6 +77,14 @@ class OrphanKernelCleanupObserver(AbstractObserver):
                 # No Redis entry - skip (not enough info to decide)
                 continue
 
+            # Skip if last_check is None (not enough info to decide)
+            if status.last_check is None:
+                log.debug(
+                    "Kernel {} has no last_check timestamp, skipping orphan check",
+                    kernel_id,
+                )
+                continue
+
             # Strict condition: kernel.last_check < agent_last_check - THRESHOLD
             if status.last_check < agent_last_check - ORPHAN_KERNEL_THRESHOLD_SEC:
                 orphan_kernels.append((kernel_id, kernel.session_id))
