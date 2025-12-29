@@ -113,7 +113,7 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):
 
         try:
             async with ctx.db.begin_session() as db_session:
-                reg_row = ContainerRegistryRow(**input_config)
+                reg_row = ContainerRegistryRow(id=uuid.uuid4(), **input_config)
                 db_session.add(reg_row)
                 await db_session.flush()
                 await db_session.refresh(reg_row)

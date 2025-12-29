@@ -62,6 +62,7 @@ async def create_test_registry(database_engine, registry_name="test-registry", p
         # Create registry
         async with database_engine.begin_session() as session:
             registry = ContainerRegistryRow(
+                id=uuid4(),
                 url=f"https://{registry_name}.example.com",
                 registry_name=registry_name,
                 type=ContainerRegistryType.DOCKER,
