@@ -16,6 +16,23 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.15.6 (2025-12-29)
+
+### Features
+* Fix autoscaling issue where deployments in ready state would not scale when their desired replica count is different from the number of their routes. Deployments now properly transition to scaling state and adjust their replicas as expected. ([#7254](https://github.com/lablup/backend.ai/issues/7254))
+* Change default signup status to inactive preventing newly registered accounts access system resources until an administrator explicitly activates them ([#7520](https://github.com/lablup/backend.ai/issues/7520))
+
+### Fixes
+* Fix `model-store` vfolder creation failing when requested with `READ_ONLY` permission. The unnecessary `READ_WRITE` permission validation has been removed since `model-store` vfolders are always created with `READ_ONLY` permission regardless of the requested permission. ([#7397](https://github.com/lablup/backend.ai/issues/7397))
+* Fix credential lookup to use keypairs table join instead of user table's  `main_access_key` col, resolving authentication failures for non-main keypairs ([#7533](https://github.com/lablup/backend.ai/issues/7533))
+* Fix broken config ref between `AgentRPCServer` and `AbstractAgent` in scaling group update ([#7586](https://github.com/lablup/backend.ai/issues/7586))
+* Add detailed log why command execution failed in kernel ([#7591](https://github.com/lablup/backend.ai/issues/7591))
+* Replace `getent group` with `getent passwd` to retrieve username from USER_ID in entrypoint.sh ([#7601](https://github.com/lablup/backend.ai/issues/7601))
+
+### External Dependency Updates
+* Upgrade krunner-extractor container image from Alpine 3.8 to Alpine 3.21 ([#7285](https://github.com/lablup/backend.ai/issues/7285))
+
+
 ## 25.15.5 (2025-12-12)
 
 ### Fixes
