@@ -672,7 +672,7 @@
     "NoExplorerSupportForUnmanagedFolder": "Unmanaged 폴더는 파일 탐색기를 지원하지 않습니다.",
     "NoPermissions": "이 폴더에 접근할 권한이 없습니다",
     "ProcessingUpload": "파일을 업로드하는 중입니다. 잠시만 기다려주세요.",
-    "SelectedItemsDeletedSuccessfully": "선택한 파일이 정상적으로 삭제되었습니다.",
+    "SelectedItemsDeletedSuccessfully": "선택한 파일이 삭제되었습니다.",
     "SelectedItemsDeletionFailed": "파일을 삭제하는 동안 문제가 발생했습니다. 다시 시도해 주세요.",
     "SuccessfullyUploadedToFolder": "파일 업로드가 완료되었습니다. ",
     "UploadFailed": "'{{folderName}}'에 업로드 실패",
@@ -2056,7 +2056,7 @@
       "PrimaryColor": "주요 색상",
       "PrimaryColorDesc": "주요 동작을 나타내는 버튼이나 설명 텍스트에 적용되는 기본 색상입니다. \n헤더의 로고 부분 배경색으로도 적용됩니다.",
       "SuccessColor": "완료 색상",
-      "SuccessColorDesc": "사용자가 수행한 동작이 정상적으로 완료되었음을 나타내는 버튼, 알림 또는 아이콘에 사용되는 색상입니다.",
+      "SuccessColorDesc": "사용자가 수행한 동작이 완료되었음을 나타내는 버튼, 알림 또는 아이콘에 사용되는 색상입니다.",
       "TextColor": "텍스트 색상",
       "TextColorDesc": "텍스트에 사용되는 색상입니다."
     }
