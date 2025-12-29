@@ -80,6 +80,9 @@ class EntityType(enum.StrEnum):
 
     ARTIFACT = "artifact"
     ARTIFACT_REGISTRY = "artifact_registry"
+    APP_CONFIG = "app_config"
+    NOTIFICATION_CHANNEL = "notification_channel"
+    NOTIFICATION_RULE = "notification_rule"
 
     @classmethod
     def _scope_types(cls) -> set[EntityType]:
@@ -98,6 +101,10 @@ class EntityType(enum.StrEnum):
             cls.IMAGE,
             cls.SESSION,
             cls.ARTIFACT,
+            cls.ARTIFACT_REGISTRY,
+            cls.APP_CONFIG,
+            cls.NOTIFICATION_CHANNEL,
+            cls.NOTIFICATION_RULE,
         }
 
     @classmethod
