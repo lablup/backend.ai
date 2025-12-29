@@ -734,6 +734,7 @@ class Context(metaclass=ABCMeta):
 
         # Coordinator
         coord_conf = self.copy_config("app-proxy-coordinator.toml")
+        public_facing_address = self.install_variable.public_facing_address
 
         self.log.write(f"DB HOST = {halfstack.postgres_addr.face.host}")
         self.log.write(f"DB PORT = {halfstack.postgres_addr.face.port}")
@@ -754,10 +755,12 @@ class Context(metaclass=ABCMeta):
             data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
             data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
             data["permit_hash"]["permit_hash_secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
-            data["proxy_coordinator"]["bind_addr"]["host"] = (  # type: ignore[index]
-                service.appproxy_coordinator_addr.bind.host
-            )
+            data["proxy_coordinator"]["bind_addr"]["host"] = "0.0.0.0"  # type: ignore[index]
             data["proxy_coordinator"]["bind_addr"]["port"] = (  # type: ignore[index]
+                service.appproxy_coordinator_addr.bind.port
+            )
+            data["proxy_coordinator"]["advertised_addr"]["host"] = public_facing_address  # type: ignore[index]
+            data["proxy_coordinator"]["advertised_addr"]["port"] = (  # type: ignore[index]
                 service.appproxy_coordinator_addr.bind.port
             )
         with coord_conf.open("w") as fp:
@@ -765,6 +768,7 @@ class Context(metaclass=ABCMeta):
 
         # Worker
         worker_conf = self.copy_config("app-proxy-worker.toml")
+        public_facing_address = self.install_variable.public_facing_address
         with worker_conf.open("r") as fp:
             data = tomlkit.load(fp)
             data["redis"]["host"] = halfstack.redis_addr.face.host  # type: ignore
@@ -772,12 +776,17 @@ class Context(metaclass=ABCMeta):
             data["proxy_worker"]["coordinator_endpoint"] = (  # type: ignore[index]
                 f"http://{service.appproxy_coordinator_addr.bind.host}:{service.appproxy_coordinator_addr.bind.port}"
             )
+            data["proxy_worker"]["api_advertised_addr"] = {  # type: ignore[index]
+                "host": public_facing_address,
+                "port": service.appproxy_worker_addr.bind.port,
+            }
             data["proxy_worker"]["api_bind_addr"] = {  # type: ignore[index]
                 "host": service.appproxy_worker_addr.bind.host,
                 "port": service.appproxy_worker_addr.bind.port,
             }
             data["proxy_worker"]["port_proxy"]["bind_port"] = service.appproxy_worker_addr.bind.port  # type: ignore[index]
-            data["proxy_worker"]["port_proxy"]["bind_host"] = service.appproxy_worker_addr.bind.host  # type: ignore[index]
+            data["proxy_worker"]["port_proxy"]["bind_host"] = "0.0.0.0"  # type: ignore[index]
+            data["proxy_worker"]["port_proxy"]["advertised_host"] = public_facing_address  # type: ignore[index]
             data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
             data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
             data["permit_hash"]["permit_hash_secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
