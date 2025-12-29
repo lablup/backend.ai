@@ -83,6 +83,7 @@ class EntityType(enum.StrEnum):
     APP_CONFIG = "app_config"
     NOTIFICATION_CHANNEL = "notification_channel"
     NOTIFICATION_RULE = "notification_rule"
+    DEPLOYMENT_REVISION = "deployment_revision"
 
     @classmethod
     def _scope_types(cls) -> set[EntityType]:
@@ -105,6 +106,7 @@ class EntityType(enum.StrEnum):
             cls.APP_CONFIG,
             cls.NOTIFICATION_CHANNEL,
             cls.NOTIFICATION_RULE,
+            cls.DEPLOYMENT_REVISION,
         }
 
     @classmethod
