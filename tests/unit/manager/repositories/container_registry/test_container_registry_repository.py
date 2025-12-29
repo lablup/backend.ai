@@ -29,6 +29,7 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.container_registry.admin_repository import (
     AdminContainerRegistryRepository,
@@ -114,6 +115,7 @@ class TestContainerRegistryRepository:
 
             async with database_engine.begin_session() as session:
                 registry = ContainerRegistryRow(
+                    id=uuid.uuid4(),
                     url=f"https://{registry_name}",
                     registry_name=registry_name,
                     type=ContainerRegistryType.HARBOR2,
@@ -278,6 +280,74 @@ class TestContainerRegistryRepository:
                     )
                 )
                 await session.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
+
+    @pytest.fixture
+    async def test_registry(
+        self, database_engine: ExtendedAsyncSAEngine
+    ) -> AsyncGenerator[ContainerRegistryData, None]:
+        """Fixture that provides a pre-created test registry with cleanup."""
+        registry_name = str(uuid.uuid4())[:8] + ".example.com"
+        project = "project-" + str(uuid.uuid4())[:8]
+
+        async with database_engine.begin_session() as session:
+            registry = ContainerRegistryRow(
+                id=uuid.uuid4(),
+                url=f"https://{registry_name}",
+                registry_name=registry_name,
+                type=ContainerRegistryType.HARBOR2,
+                project=project,
+            )
+            session.add(registry)
+            await session.flush()
+            await session.refresh(registry)  # Ensure all attributes are loaded
+            registry_data = registry.to_dataclass()
+
+        try:
+            yield registry_data
+        finally:
+            # Cleanup: attempt to delete registry if it still exists
+            async with database_engine.begin_session() as session:
+                await session.execute(
+                    sa.delete(ContainerRegistryRow).where(
+                        ContainerRegistryRow.id == registry_data.id
+                    )
+                )
+
+    @pytest.fixture
+    async def test_registry_with_custom_props(
+        self, database_engine: ExtendedAsyncSAEngine
+    ) -> AsyncGenerator[ContainerRegistryData, None]:
+        """Fixture that provides a registry with custom properties for detailed testing."""
+        registry_name = "test-registry"
+        project = "test-project"
+
+        async with database_engine.begin_session() as session:
+            registry = ContainerRegistryRow(
+                id=uuid.uuid4(),
+                url=f"https://{registry_name}",
+                registry_name=registry_name,
+                type=ContainerRegistryType.HARBOR2,
+                project=project,
+                username="test-user",
+                password="test-pass",
+                ssl_verify=False,
+                is_global=False,
+            )
+            session.add(registry)
+            await session.flush()
+            await session.refresh(registry)  # Ensure all attributes are loaded
+            registry_data = registry.to_dataclass()
+
+        try:
+            yield registry_data
+        finally:
+            # Cleanup: attempt to delete registry if it still exists
+            async with database_engine.begin_session() as session:
+                await session.execute(
+                    sa.delete(ContainerRegistryRow).where(
+                        ContainerRegistryRow.id == registry_data.id
+                    )
+                )
 
     @pytest.fixture
     async def sample_registry(
@@ -885,3 +955,64 @@ class TestContainerRegistryRepository:
                     pk_value=registry_with_partial_groups.registry.id,
                 )
             )
+
+    @pytest.mark.asyncio
+    async def test_delete_registry_success(
+        self,
+        repository: ContainerRegistryRepository,
+        test_registry: ContainerRegistryData,
+    ) -> None:
+        """Test successful registry deletion"""
+        # Given: A pre-created test registry
+        registry_id = test_registry.id
+        registry_name = test_registry.registry_name
+
+        # When: Delete the registry
+        purger = Purger(row_class=ContainerRegistryRow, pk_value=registry_id)
+        result = await repository.delete_registry(purger)
+
+        # Then: Returns deleted registry data
+        assert result.id == registry_id
+        assert result.registry_name == registry_name
+
+        # And: Registry no longer exists
+        with pytest.raises(ContainerRegistryNotFound):
+            purger = Purger(row_class=ContainerRegistryRow, pk_value=registry_id)
+            await repository.delete_registry(purger)
+
+    @pytest.mark.asyncio
+    async def test_delete_registry_not_found(
+        self,
+        repository: ContainerRegistryRepository,
+    ) -> None:
+        """Test deletion of non-existent registry raises error"""
+        # Given: Non-existent registry ID
+        non_existent_id = uuid.uuid4()
+
+        # When/Then: Raises ContainerRegistryNotFound
+        with pytest.raises(ContainerRegistryNotFound):
+            purger = Purger(row_class=ContainerRegistryRow, pk_value=non_existent_id)
+            await repository.delete_registry(purger)
+
+    @pytest.mark.asyncio
+    async def test_delete_registry_returns_data_before_deletion(
+        self,
+        repository: ContainerRegistryRepository,
+        test_registry_with_custom_props: ContainerRegistryData,
+    ) -> None:
+        """Test that delete_registry returns complete data before deletion"""
+        # Given: A registry with custom properties
+        registry = test_registry_with_custom_props
+
+        # When: Delete the registry
+        purger = Purger(row_class=ContainerRegistryRow, pk_value=registry.id)
+        result = await repository.delete_registry(purger)
+
+        # Then: Returns all registry data with correct properties
+        assert result.id == registry.id
+        assert result.registry_name == "test-registry"
+        assert result.project == "test-project"
+        assert result.username == "test-user"
+        assert result.password == "test-pass"
+        assert result.ssl_verify is False
+        assert result.is_global is False

@@ -10,6 +10,7 @@ from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads
 RESOURCE_LIMITS = {"cuda.device": {"min": "1", "max": None}}
 
 CONTAINER_REGISTRY_ROW_FIXTURE = ContainerRegistryRow(
+    id=uuid.uuid4(),
     url="https://registry.example.com",
     registry_name="registry.example.com",
     type=ContainerRegistryType.DOCKER,
@@ -21,7 +22,6 @@ CONTAINER_REGISTRY_ROW_FIXTURE = ContainerRegistryRow(
     extra=None,
 )
 
-CONTAINER_REGISTRY_ROW_FIXTURE.id = uuid.uuid4()
 CONTAINER_REGISTRY_FIXTURE_DATA = CONTAINER_REGISTRY_ROW_FIXTURE.to_dataclass()
 CONTAINER_REGISTRY_FIXTURE_DICT = dataclasses.asdict(
     dataclasses.replace(CONTAINER_REGISTRY_FIXTURE_DATA, type=ContainerRegistryType.DOCKER.value)  # type: ignore

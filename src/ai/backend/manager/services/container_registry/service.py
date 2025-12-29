@@ -14,6 +14,10 @@ from ai.backend.manager.services.container_registry.actions.clear_images import 
     ClearImagesAction,
     ClearImagesActionResult,
 )
+from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
+    DeleteContainerRegistryAction,
+    DeleteContainerRegistryActionResult,
+)
 from ai.backend.manager.services.container_registry.actions.get_container_registries import (
     GetContainerRegistriesAction,
     GetContainerRegistriesActionResult,
@@ -59,6 +63,12 @@ class ContainerRegistryService:
     ) -> ModifyContainerRegistryActionResult:
         data = await self._container_registry_repository.modify_registry(action.updater)
         return ModifyContainerRegistryActionResult(data=data)
+
+    async def delete_container_registry(
+        self, action: DeleteContainerRegistryAction
+    ) -> DeleteContainerRegistryActionResult:
+        data = await self._container_registry_repository.delete_registry(action.purger)
+        return DeleteContainerRegistryActionResult(data=data)
 
     async def rescan_images(self, action: RescanImagesAction) -> RescanImagesActionResult:
         registry_name = action.registry
