@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 from functools import lru_cache
-from typing import TYPE_CHECKING, Optional, override
+from typing import TYPE_CHECKING, Annotated, Optional, override
 from uuid import UUID
 
 import strawberry
@@ -76,7 +76,9 @@ class Route(Node):
     )
 
     @strawberry.field(description="The deployment this route belongs to.")
-    async def deployment(self, info: Info[StrawberryGQLContext]) -> ModelDeployment:
+    async def deployment(
+        self, info: Info[StrawberryGQLContext]
+    ) -> Annotated["ModelDeployment", strawberry.lazy(".deployment")]:
         """Resolve deployment using dataloader."""
         from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
 
@@ -100,7 +102,9 @@ class Route(Node):
         return ID(session_global_id)
 
     @strawberry.field(description="The revision associated with the route.")
-    async def revision(self, info: Info[StrawberryGQLContext]) -> Optional[ModelRevision]:
+    async def revision(
+        self, info: Info[StrawberryGQLContext]
+    ) -> Annotated["ModelRevision", strawberry.lazy(".revision")] | None:
         """Resolve revision using dataloader."""
         from ai.backend.manager.api.gql.deployment.types.revision import ModelRevision
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional, override
+from typing import Optional, override
 from uuid import UUID, uuid4
 
 import strawberry
@@ -24,25 +24,33 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
     to_global_id,
 )
-from ai.backend.manager.api.gql.deployment.fetcher.access_token import fetch_access_tokens
-from ai.backend.manager.api.gql.deployment.fetcher.replica import fetch_replicas
-from ai.backend.manager.api.gql.deployment.fetcher.revision import fetch_revisions
 from ai.backend.manager.api.gql.deployment.types.access_token import (
     AccessTokenConnection,
     AccessTokenFilter,
     AccessTokenOrderBy,
 )
-from ai.backend.manager.api.gql.deployment.types.auto_scaling import AutoScalingRule
+from ai.backend.manager.api.gql.deployment.types.auto_scaling import (
+    AutoScalingRuleConnection,
+    AutoScalingRuleFilter,
+    AutoScalingRuleOrderBy,
+)
 from ai.backend.manager.api.gql.deployment.types.policy import (
     BlueGreenConfigInputGQL,
     DeploymentPolicyGQL,
     DeploymentStrategyTypeGQL,
     RollingUpdateConfigInputGQL,
 )
-from ai.backend.manager.api.gql.deployment.types.replica import ReplicaFilter
+from ai.backend.manager.api.gql.deployment.types.replica import (
+    ModelReplicaConnection,
+    ReplicaFilter,
+    ReplicaOrderBy,
+)
 from ai.backend.manager.api.gql.deployment.types.revision import (
+    CreateRevisionInput,
     ModelRevision,
+    ModelRevisionConnection,
     ModelRevisionFilter,
+    ModelRevisionOrderBy,
 )
 from ai.backend.manager.api.gql.domain import Domain
 from ai.backend.manager.api.gql.project import Project
@@ -56,7 +64,6 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
     ReplicaSpec,
-    ReplicaStateData,
 )
 from ai.backend.manager.errors.service import DeploymentPolicyNotFound
 from ai.backend.manager.errors.user import UserNotFound
@@ -65,8 +72,6 @@ from ai.backend.manager.models.gql_models.domain import DomainNode
 from ai.backend.manager.models.gql_models.group import GroupNode
 from ai.backend.manager.models.gql_models.user import UserNode
 from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
     QueryCondition,
     QueryOrder,
     Updater,
@@ -78,6 +83,7 @@ from ai.backend.manager.repositories.deployment.options import (
     AutoScalingRuleConditions,
     DeploymentConditions,
     DeploymentOrders,
+    RevisionConditions,
     RouteConditions,
 )
 from ai.backend.manager.repositories.deployment.updaters import (
@@ -88,24 +94,10 @@ from ai.backend.manager.repositories.deployment.updaters import (
     ReplicaSpecUpdaterSpec,
     RevisionStateUpdaterSpec,
 )
-from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
-    SearchAutoScalingRulesAction,
-)
 from ai.backend.manager.services.deployment.actions.deployment_policy import (
     GetDeploymentPolicyAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
-
-if TYPE_CHECKING:
-    from ai.backend.manager.api.gql.deployment.types.replica import (
-        ModelReplicaConnection,
-        ReplicaOrderBy,
-    )
-    from ai.backend.manager.api.gql.deployment.types.revision import (
-        CreateRevisionInput,
-        ModelRevisionConnection,
-        ModelRevisionOrderBy,
-    )
 
 DeploymentStatusGQL: type[ModelDeploymentStatus] = strawberry.enum(
     ModelDeploymentStatus,
@@ -151,6 +143,8 @@ class ReplicaState:
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> ModelReplicaConnection:
+        from ai.backend.manager.api.gql.deployment.fetcher.replica import fetch_replicas
+
         return await fetch_replicas(
             info=info,
             filter=filter,
@@ -175,23 +169,37 @@ class ScalingRule:
     the number of replicas based on metrics.
     """
 
-    _scaling_rule_ids: strawberry.Private[list[UUID]]
+    _deployment_id: strawberry.Private[UUID]
 
     @strawberry.field
-    async def auto_scaling_rules(self, info: Info[StrawberryGQLContext]) -> list[AutoScalingRule]:
-        if not self._scaling_rule_ids:
-            return []
-
-        processor = info.context.processors.deployment
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=len(self._scaling_rule_ids)),
-            conditions=[AutoScalingRuleConditions.by_ids(self._scaling_rule_ids)],
+    async def auto_scaling_rules(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Optional[AutoScalingRuleFilter] = None,
+        order_by: Optional[list[AutoScalingRuleOrderBy]] = None,
+        before: Optional[str] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        last: Optional[int] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> AutoScalingRuleConnection:
+        from ai.backend.manager.api.gql.deployment.fetcher.auto_scaling import (
+            fetch_auto_scaling_rules,
         )
-        result = await processor.search_auto_scaling_rules.wait_for_complete(
-            SearchAutoScalingRulesAction(querier=querier)
-        )
 
-        return [AutoScalingRule.from_dataclass(rule) for rule in result.data]
+        return await fetch_auto_scaling_rules(
+            info=info,
+            filter=filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
+            base_conditions=[AutoScalingRuleConditions.by_deployment_id(self._deployment_id)],
+        )
 
 
 @strawberry.type
@@ -268,6 +276,10 @@ class ModelDeploymentNetworkAccess:
         offset: Optional[int] = None,
     ) -> AccessTokenConnection:
         """Resolve access tokens for this deployment."""
+        from ai.backend.manager.api.gql.deployment.fetcher.access_token import (
+            fetch_access_tokens,
+        )
+
         return await fetch_access_tokens(
             info=info,
             filter=filter,
@@ -311,10 +323,8 @@ class ModelDeployment(Node):
     network_access: ModelDeploymentNetworkAccess
     revision: Optional[ModelRevision] = None
     default_deployment_strategy: DeploymentStrategyGQL
-    _revision_history_ids: strawberry.Private[list[UUID]]
-    _replica_state_data: strawberry.Private[ReplicaStateData]
+    replica_state: ReplicaState
     _created_user_id: strawberry.Private[UUID]
-    _scaling_rule_ids: strawberry.Private[list[UUID]]
     _deployment_id: strawberry.Private[UUID]
 
     @strawberry.field
@@ -327,13 +337,6 @@ class ModelDeployment(Node):
     @strawberry.field
     async def scaling_rule(self, info: Info[StrawberryGQLContext]) -> ScalingRule:
         return ScalingRule(
-            _scaling_rule_ids=self._scaling_rule_ids,
-        )
-
-    @strawberry.field
-    async def replica_state(self, info: Info[StrawberryGQLContext]) -> ReplicaState:
-        return ReplicaState(
-            desired_replica_count=self._replica_state_data.desired_replica_count,
             _deployment_id=self._deployment_id,
         )
 
@@ -365,13 +368,11 @@ class ModelDeployment(Node):
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> ModelRevisionConnection:
-        final_filter = ModelRevisionFilter(ids_in=self._revision_history_ids)
-        if filter:
-            final_filter = ModelRevisionFilter(AND=[final_filter, filter])
+        from ai.backend.manager.api.gql.deployment.fetcher.revision import fetch_revisions
 
         return await fetch_revisions(
             info=info,
-            filter=final_filter,
+            filter=filter,
             order_by=order_by,
             before=before,
             after=after,
@@ -379,6 +380,7 @@ class ModelDeployment(Node):
             last=last,
             limit=limit,
             offset=offset,
+            base_conditions=[RevisionConditions.by_deployment_id(self._deployment_id)],
         )
 
     @classmethod
@@ -406,10 +408,11 @@ class ModelDeployment(Node):
             default_deployment_strategy=DeploymentStrategyGQL(
                 type=DeploymentStrategyTypeGQL(data.default_deployment_strategy)
             ),
+            replica_state=ReplicaState(
+                desired_replica_count=data.replica_state.desired_replica_count,
+                _deployment_id=data.id,
+            ),
             _created_user_id=data.created_user_id,
-            _revision_history_ids=data.revision_history_ids,
-            _scaling_rule_ids=data.scaling_rule_ids,
-            _replica_state_data=data.replica_state,
             _deployment_id=data.id,
         )
 

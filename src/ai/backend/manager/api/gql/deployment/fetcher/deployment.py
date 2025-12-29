@@ -23,7 +23,7 @@ from ai.backend.manager.repositories.deployment.options import (
     DeploymentConditions,
     DeploymentOrders,
 )
-from ai.backend.manager.services.deployment.actions.deployment.search_deployments import (
+from ai.backend.manager.services.deployment.actions.search_deployments import (
     SearchDeploymentsAction,
 )
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Collection
+from datetime import datetime
 
 import sqlalchemy as sa
 
@@ -25,6 +26,57 @@ class AutoScalingRuleConditions:
     def by_endpoint_id(endpoint_id: uuid.UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return EndpointAutoScalingRuleRow.endpoint == endpoint_id
+
+        return inner
+
+    @staticmethod
+    def by_deployment_id(deployment_id: uuid.UUID) -> QueryCondition:
+        """Alias for by_endpoint_id for consistency with deployment naming."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointAutoScalingRuleRow.endpoint == deployment_id
+
+        return inner
+
+    @staticmethod
+    def by_created_at_before(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointAutoScalingRuleRow.created_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_after(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointAutoScalingRuleRow.created_at > dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_equals(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointAutoScalingRuleRow.created_at == dt
+
+        return inner
+
+    @staticmethod
+    def by_last_triggered_at_before(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointAutoScalingRuleRow.last_triggered_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_last_triggered_at_after(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointAutoScalingRuleRow.last_triggered_at > dt
+
+        return inner
+
+    @staticmethod
+    def by_last_triggered_at_equals(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointAutoScalingRuleRow.last_triggered_at == dt
 
         return inner
 

@@ -5,17 +5,27 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Optional, Self
+from typing import Optional, Self, override
 from uuid import UUID
 
 import strawberry
 from strawberry import ID
-from strawberry.relay import Node, NodeID
+from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.types import AutoScalingMetricSource as CommonAutoScalingMetricSource
+from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.data.deployment.scale import ModelDeploymentAutoScalingRuleCreator
 from ai.backend.manager.data.deployment.scale_modifier import ModelDeploymentAutoScalingRuleModifier
-from ai.backend.manager.data.deployment.types import ModelDeploymentAutoScalingRuleData
+from ai.backend.manager.data.deployment.types import (
+    AutoScalingRuleOrderField,
+    ModelDeploymentAutoScalingRuleData,
+)
+from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.deployment.options import (
+    AutoScalingRuleConditions,
+    AutoScalingRuleOrders,
+)
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_auto_scaling_rule import (
     UpdateAutoScalingRuleAction,
 )
@@ -26,6 +36,53 @@ from ai.backend.manager.types import OptionalState
 class AutoScalingMetricSource(StrEnum):
     KERNEL = "KERNEL"
     INFERENCE_FRAMEWORK = "INFERENCE_FRAMEWORK"
+
+
+@strawberry.input(description="Added in 25.19.0")
+class AutoScalingRuleFilter(GQLFilter):
+    """Filter for auto-scaling rules."""
+
+    created_at: Optional[DateTimeFilter] = None
+    last_triggered_at: Optional[DateTimeFilter] = None
+
+    @override
+    def build_conditions(self) -> list[QueryCondition]:
+        """Build query conditions from this filter."""
+        conditions: list[QueryCondition] = []
+
+        if self.created_at:
+            condition = self.created_at.build_query_condition(
+                before_factory=AutoScalingRuleConditions.by_created_at_before,
+                after_factory=AutoScalingRuleConditions.by_created_at_after,
+                equals_factory=AutoScalingRuleConditions.by_created_at_equals,
+            )
+            if condition:
+                conditions.append(condition)
+
+        if self.last_triggered_at:
+            condition = self.last_triggered_at.build_query_condition(
+                before_factory=AutoScalingRuleConditions.by_last_triggered_at_before,
+                after_factory=AutoScalingRuleConditions.by_last_triggered_at_after,
+                equals_factory=AutoScalingRuleConditions.by_last_triggered_at_equals,
+            )
+            if condition:
+                conditions.append(condition)
+
+        return conditions
+
+
+@strawberry.input(description="Added in 25.19.0")
+class AutoScalingRuleOrderBy(GQLOrderBy):
+    field: AutoScalingRuleOrderField
+    direction: OrderDirection = OrderDirection.DESC
+
+    @override
+    def to_query_order(self) -> QueryOrder:
+        """Convert to repository QueryOrder."""
+        ascending = self.direction == OrderDirection.ASC
+        match self.field:
+            case AutoScalingRuleOrderField.CREATED_AT:
+                return AutoScalingRuleOrders.created_at(ascending)
 
 
 @strawberry.type
@@ -76,6 +133,18 @@ class AutoScalingRule(Node):
             created_at=data.created_at,
             last_triggered_at=data.last_triggered_at,
         )
+
+
+AutoScalingRuleEdge = Edge[AutoScalingRule]
+
+
+@strawberry.type(description="Added in 25.19.0")
+class AutoScalingRuleConnection(Connection[AutoScalingRule]):
+    count: int
+
+    def __init__(self, *args, count: int, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.count = count
 
 
 # Input Types
