@@ -413,6 +413,10 @@ class ModeMenu(Static):
         self.install_variable = InstallVariable(
             public_facing_address=args.public_facing_address,
             accelerator=Accelerator(args.accelerator) if args.accelerator is not None else None,
+            public_mode=args.public_mode,
+            fqdn_prefix=args.fqdn_prefix,
+            tls_advertised=args.tls_advertised,
+            advertised_port=args.advertised_port,
         )
 
     def compose(self) -> ComposeResult:
@@ -640,6 +644,30 @@ class InstallerApp(App):
     default="127.0.0.1",
     help="Set public facing address for the Backend.AI server.",
 )
+@click.option(
+    "--public-mode",
+    is_flag=True,
+    default=False,
+    help="Enable public mode with TLS and wildcard domain support.",
+)
+@click.option(
+    "--fqdn-prefix",
+    type=str,
+    default=None,
+    help="FQDN prefix for generating domain names (e.g., '786cdf' generates 786cdf.app.backend.ai, 786cdf.apphub.backend.ai, etc.).",
+)
+@click.option(
+    "--tls-advertised",
+    is_flag=True,
+    default=False,
+    help="Advertise TLS endpoints. Automatically enabled with --public-mode.",
+)
+@click.option(
+    "--advertised-port",
+    type=int,
+    default=443,
+    help="Advertised port for public endpoints (default: 443).",
+)
 @click.version_option(version=__version__)
 @click.pass_context
 def main(
@@ -650,6 +678,10 @@ def main(
     non_interactive: bool,
     headless: bool,
     public_facing_address: str,
+    public_mode: bool,
+    fqdn_prefix: str | None,
+    tls_advertised: bool,
+    advertised_port: int,
     accelerator: str,
 ) -> None:
     """The installer"""
@@ -669,6 +701,10 @@ def main(
         non_interactive=non_interactive,
         public_facing_address=public_facing_address,
         accelerator=accelerator,
+        public_mode=public_mode,
+        fqdn_prefix=fqdn_prefix,
+        tls_advertised=tls_advertised,
+        advertised_port=advertised_port,
     )
     app = InstallerApp(args)
     app.run(headless=headless)

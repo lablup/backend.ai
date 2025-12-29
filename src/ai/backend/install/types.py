@@ -54,6 +54,10 @@ class CliArgs:
     non_interactive: bool
     public_facing_address: str
     accelerator: Optional[str] = None
+    public_mode: bool = False
+    fqdn_prefix: Optional[str] = None
+    tls_advertised: bool = False
+    advertised_port: int = 443
 
 
 class PrerequisiteError(RichCast, Exception):
@@ -185,3 +189,31 @@ class ServiceConfig:
 class InstallVariable:
     public_facing_address: str = "127.0.0.1"
     accelerator: Optional[Accelerator] = None
+    public_mode: bool = False
+    fqdn_prefix: Optional[str] = None
+    tls_advertised: bool = False
+    advertised_port: int = 443
+
+    @property
+    def apphub_address(self) -> str:
+        if self.fqdn_prefix:
+            return f"{self.fqdn_prefix}.apphub.backend.ai"
+        return self.public_facing_address
+
+    @property
+    def app_address(self) -> str:
+        if self.fqdn_prefix:
+            return f"{self.fqdn_prefix}.app.backend.ai"
+        return self.public_facing_address
+
+    @property
+    def wildcard_domain(self) -> Optional[str]:
+        if self.fqdn_prefix:
+            return f".{self.fqdn_prefix}.app.backend.ai"
+        return None
+
+    @property
+    def storage_public_address(self) -> str:
+        if self.fqdn_prefix:
+            return f"{self.fqdn_prefix}.public.isla-sorna.backend.ai"
+        return self.public_facing_address
