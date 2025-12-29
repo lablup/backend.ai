@@ -129,3 +129,108 @@ class TestMonitoringValkeyClient:
         # Disconnect should cancel monitor task
         await monitoring_client.disconnect()
         assert monitoring_client._monitor_task is None
+
+    async def test_monitor_task_cancellation_no_error_log(
+        self,
+        redis_container: tuple[str, HostPortPairModel],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Test that CancelledError during shutdown does not produce error logs (BA-3593)"""
+        import logging
+
+        hostport_pair: HostPortPairModel = redis_container[1]
+        valkey_target = ValkeyTarget(addr=hostport_pair.address)
+        client = cast(
+            MonitoringValkeyClient,
+            create_valkey_client(
+                valkey_target,
+                db_id=REDIS_STREAM_DB,
+                human_readable_name="test.cancellation",
+            ),
+        )
+
+        await client.connect()
+
+        # Ensure monitor task is running
+        assert client._monitor_task is not None
+        assert not client._monitor_task.done()
+
+        # Allow monitor to start its sleep cycle
+        await asyncio.sleep(0.1)
+
+        # Clear any previous logs
+        caplog.clear()
+
+        # Disconnect - this should cancel the monitor task without error logs
+        with caplog.at_level(logging.ERROR):
+            await client.disconnect()
+
+        # Verify no error logs about CancelledError
+        error_logs = [record for record in caplog.records if record.levelno >= logging.ERROR]
+        cancelled_error_logs = [
+            record
+            for record in error_logs
+            if "CancelledError" in str(record.message)
+            or "Error in Valkey connection monitor" in str(record.message)
+        ]
+        assert len(cancelled_error_logs) == 0, (
+            f"Unexpected error logs during cancellation: {[r.message for r in cancelled_error_logs]}"
+        )
+
+    async def test_monitor_task_external_cancellation_no_error_log(
+        self,
+        redis_container: tuple[str, HostPortPairModel],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Test that external task cancellation (simulating shutdown) does not produce error logs (BA-3593)"""
+        import logging
+
+        hostport_pair: HostPortPairModel = redis_container[1]
+        valkey_target = ValkeyTarget(addr=hostport_pair.address)
+        client = cast(
+            MonitoringValkeyClient,
+            create_valkey_client(
+                valkey_target,
+                db_id=REDIS_STREAM_DB,
+                human_readable_name="test.external_cancellation",
+            ),
+        )
+
+        await client.connect()
+
+        # Ensure monitor task is running
+        monitor_task = client._monitor_task
+        assert monitor_task is not None
+        assert not monitor_task.done()
+
+        # Allow monitor to start its sleep cycle
+        await asyncio.sleep(0.1)
+
+        # Clear any previous logs
+        caplog.clear()
+
+        # Simulate external cancellation (like aiotools server shutdown)
+        # This is the scenario where cancellation happens BEFORE disconnect() is called
+        with caplog.at_level(logging.ERROR):
+            monitor_task.cancel()
+            try:
+                await monitor_task
+            except asyncio.CancelledError:
+                pass  # Expected
+
+        # Verify no error logs about CancelledError
+        error_logs = [record for record in caplog.records if record.levelno >= logging.ERROR]
+        cancelled_error_logs = [
+            record
+            for record in error_logs
+            if "CancelledError" in str(record.message)
+            or "Error in Valkey connection monitor" in str(record.message)
+        ]
+        assert len(cancelled_error_logs) == 0, (
+            f"Unexpected error logs during external cancellation: {[r.message for r in cancelled_error_logs]}"
+        )
+
+        # Cleanup - manually close the clients since we bypassed disconnect()
+        client._monitor_task = None
+        await client._monitor_client.disconnect()
+        await client._operation_client.disconnect()

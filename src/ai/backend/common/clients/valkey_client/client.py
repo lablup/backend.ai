@@ -537,15 +537,16 @@ class MonitoringValkeyClient(AbstractValkeyClient):
                     if await self._check_connection():
                         log.info("Reconnecting Valkey clients...")
                         await self._reconnect()
-                except BaseException as e:
+                except asyncio.CancelledError:
+                    # Normal shutdown - don't log as error
+                    raise
+                except Exception as e:
                     if not self._closed:
                         log.exception("Error in Valkey connection monitor: {}", e)
                         continue
                     raise
         finally:
-            log.info(
-                "Valkey connection monitor task stopped. {}", "Client closed: {}", self._closed
-            )
+            log.info("Valkey connection monitor task stopped. Client closed: {}", self._closed)
 
     async def _reconnect(self) -> None:
         # Disconnect both clients
