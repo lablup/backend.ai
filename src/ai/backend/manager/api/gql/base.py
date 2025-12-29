@@ -16,9 +16,9 @@ from strawberry.types import get_object_definition, has_object_definition
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.common.types import IntFilterData, StringFilterData
-from ai.backend.manager.repositories.base import QueryCondition
 
 if TYPE_CHECKING:
+    from ai.backend.manager.repositories.base import QueryCondition
     from ai.backend.manager.types import (
         PaginationOptions,
     )

@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime
 from enum import StrEnum
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, Optional, cast, override
+from typing import TYPE_CHECKING, Annotated, Any, Optional, cast, override
 from uuid import UUID
 
 import strawberry
@@ -338,7 +338,7 @@ class ActivateRevisionInputGQL:
     description="Added in 25.19.0. Result of activating a revision.",
 )
 class ActivateRevisionPayloadGQL:
-    deployment: ModelDeployment
+    deployment: Annotated["ModelDeployment", strawberry.lazy(".deployment")]
     previous_revision_id: Optional[ID]
     activated_revision_id: ID
 

@@ -23,7 +23,7 @@ from ai.backend.manager.repositories.deployment.options import (
     RouteConditions,
     RouteOrders,
 )
-from ai.backend.manager.services.deployment.actions.replica.search_replicas import (
+from ai.backend.manager.services.deployment.actions.search_replicas import (
     SearchReplicasAction,
 )
 

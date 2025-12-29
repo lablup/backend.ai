@@ -12,6 +12,10 @@ from .access_token import (
 from .auto_scaling import (
     AutoScalingMetricSource,
     AutoScalingRule,
+    AutoScalingRuleConnection,
+    AutoScalingRuleEdge,
+    AutoScalingRuleFilter,
+    AutoScalingRuleOrderBy,
     CreateAutoScalingRuleInput,
     CreateAutoScalingRulePayload,
     DeleteAutoScalingRuleInput,
@@ -121,6 +125,10 @@ __all__ = [
     # Auto Scaling
     "AutoScalingMetricSource",
     "AutoScalingRule",
+    "AutoScalingRuleConnection",
+    "AutoScalingRuleEdge",
+    "AutoScalingRuleFilter",
+    "AutoScalingRuleOrderBy",
     "CreateAutoScalingRuleInput",
     "CreateAutoScalingRulePayload",
     "DeleteAutoScalingRuleInput",

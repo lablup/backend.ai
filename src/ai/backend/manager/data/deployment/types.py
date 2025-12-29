@@ -482,6 +482,10 @@ class AccessTokenOrderField(enum.StrEnum):
     CREATED_AT = "CREATED_AT"
 
 
+class AutoScalingRuleOrderField(enum.StrEnum):
+    CREATED_AT = "CREATED_AT"
+
+
 # ========== Scheduling History Types ==========
 
 

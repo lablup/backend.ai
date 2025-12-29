@@ -10,6 +10,7 @@ Structure:
 """
 
 # Re-export all types for external use
+# NOTE: types must be imported before resolver to avoid circular imports
 # Re-export all resolvers for GraphQL schema registration
 from .resolver import (
     # Revision
@@ -60,6 +61,10 @@ from .types import (
     # Auto Scaling
     AutoScalingMetricSource,
     AutoScalingRule,
+    AutoScalingRuleConnection,
+    AutoScalingRuleEdge,
+    AutoScalingRuleFilter,
+    AutoScalingRuleOrderBy,
     # Policy
     BlueGreenConfigInputGQL,
     BlueGreenStrategySpecGQL,
@@ -159,6 +164,10 @@ __all__ = [
     # Auto Scaling Types
     "AutoScalingMetricSource",
     "AutoScalingRule",
+    "AutoScalingRuleConnection",
+    "AutoScalingRuleEdge",
+    "AutoScalingRuleFilter",
+    "AutoScalingRuleOrderBy",
     "CreateAutoScalingRuleInput",
     "CreateAutoScalingRulePayload",
     "DeleteAutoScalingRuleInput",
