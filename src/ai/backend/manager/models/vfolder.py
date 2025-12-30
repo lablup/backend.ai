@@ -25,7 +25,6 @@ from typing import (
     override,
 )
 
-import aiohttp
 import aiotools
 import graphene
 import sqlalchemy as sa
@@ -59,6 +58,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
 )
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
+from ai.backend.manager.errors.storage import QuotaScopeNotFoundError
 
 from ..defs import (
     RESERVED_VFOLDER_PATTERNS,
@@ -2006,7 +2006,7 @@ class QuotaScope(graphene.ObjectType):
                 hard_limit_bytes=quota_config["limit_bytes"] or None,
                 usage_count=None,  # TODO: Implement
             )
-        except aiohttp.ClientResponseError:
+        except QuotaScopeNotFoundError:
             qsid = QuotaScopeID.parse(self.quota_scope_id)
             async with graph_ctx.db.begin_readonly_session() as sess:
                 await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)

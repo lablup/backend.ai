@@ -97,7 +97,7 @@ class QuotaScopeNotFoundError(BackendAIError, web.HTTPNotFound):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.STORAGE_PROXY,
+            domain=ErrorDomain.QUOTA_SCOPE,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )

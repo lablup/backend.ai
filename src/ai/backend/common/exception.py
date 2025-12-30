@@ -157,6 +157,7 @@ class ErrorDomain(enum.StrEnum):
     ROUTE = "route"
     DOTFILE = "dotfile"
     VFOLDER = "vfolder"
+    QUOTA_SCOPE = "quota-scope"
     VFOLDER_INVITATION = "vfolder-invitation"
     MODEL_CARD = "model-card"
     MODEL_SERVICE = "model-service"
@@ -289,6 +290,27 @@ class ErrorCode:
     def __str__(self) -> str:
         return f"{self.domain}_{self.operation}_{self.error_detail}"
 
+    @classmethod
+    def from_str(cls, code_str: str) -> Self:
+        """
+        Parses an error code string and returns an ErrorCode instance.
+
+        :param code_str: The error code string to parse.
+        :return: An ErrorCode instance.
+        :raises InvalidErrorCode: If the code_str is not in the correct format.
+        """
+        parts = code_str.split("_")
+        if len(parts) != 3:
+            raise InvalidErrorCode(f"Invalid error code format: {code_str}")
+        domain_str, operation_str, error_detail_str = parts
+        try:
+            domain = ErrorDomain(domain_str)
+            operation = ErrorOperation(operation_str)
+            error_detail = ErrorDetail(error_detail_str)
+        except ValueError as e:
+            raise InvalidErrorCode(f"Invalid error code value. Err: {e}") from e
+        return cls(domain=domain, operation=operation, error_detail=error_detail)
+
 
 class BackendAIError(web.HTTPError, ABC):
     """
@@ -361,6 +383,19 @@ class BackendAIError(web.HTTPError, ABC):
         For example, "kernel_create_invalid-image" or "kernel_create_timeout".
         """
         raise NotImplementedError("Subclasses must implement error_code() method.")
+
+
+class InvalidErrorCode(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/invalid-error-code"
+    error_title = "Invalid error code in the raised exception."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
 
 
 class MalformedRequestBody(BackendAIError, web.HTTPBadRequest):

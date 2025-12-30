@@ -62,6 +62,18 @@ class VFolderNotFound(ObjectNotFound):
         )
 
 
+class QuotaScopeNotFoundError(ObjectNotFound):
+    object_name = "quota scope"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.QUOTA_SCOPE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class ModelCardParseError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/model-card-parse-error"
     error_title = "Model Card Parse Error"
@@ -75,7 +87,7 @@ class ModelCardParseError(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class VFolderAlreadyExists(BackendAIError, web.HTTPConflict):
+class VFolderAlreadyExists(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-already-exists"
     error_title = "The virtual folder already exists with the same name."
 
