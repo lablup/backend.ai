@@ -63,6 +63,10 @@
     "srcCollapsedDark": "/manifest/backend.ai-brand-simple-black.svg",
     "alt": "Backend.AI Logo",
     "href": "/start",
+    "size": {
+      "width": 180,
+      "height": 40
+    },
     "sizeCollapsed": {
       "width": 34,
       "height": 34

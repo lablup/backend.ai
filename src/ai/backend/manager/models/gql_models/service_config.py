@@ -80,8 +80,8 @@ class ServiceConfigNode(graphene.ObjectType):
         def _fallback(x):
             return str(x)
 
-        unified_config = (
-            ctx.config_provider.config.model_dump(mode="json", by_alias=True, fallback=_fallback),
+        unified_config = ctx.config_provider.config.model_dump(
+            mode="json", by_alias=True, fallback=_fallback
         )
         unified_config_schema = ctx.config_provider.config.model_json_schema(mode="serialization")
 

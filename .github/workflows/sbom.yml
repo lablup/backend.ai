@@ -89,12 +89,6 @@ jobs:
         tags: backendai-${{ matrix.name }}:sbom
         load: true
 
-    - name: Get image digest
-      id: digest
-      run: |
-        DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' backendai-${{ matrix.name }}:sbom 2>/dev/null || docker inspect --format='{{.Id}}' backendai-${{ matrix.name }}:sbom)
-        echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
-
     - name: Generate SBOM with Syft
       uses: anchore/sbom-action@v0
       with:
@@ -106,7 +100,7 @@ jobs:
       uses: actions/attest-sbom@v2
       with:
         subject-name: backendai-${{ matrix.name }}
-        subject-digest: ${{ steps.digest.outputs.digest }}
+        subject-digest: ${{ steps.build.outputs.digest }}
         sbom-path: bom-${{ matrix.name }}.json
         push-to-registry: false
 
