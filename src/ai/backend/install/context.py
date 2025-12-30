@@ -18,7 +18,7 @@ from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, AsyncIterator, Final, Iterator, Sequence
+from typing import Any, AsyncIterator, Final, Iterator, Sequence, cast
 
 import aiofiles
 import aiotools
@@ -603,14 +603,22 @@ class Context(metaclass=ABCMeta):
         conf_path = self.copy_config("webserver.conf")
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
+        public_mode = self.install_variable.public_mode
+        public_facing_address = self.install_variable.public_facing_address
+        advertised_port = self.install_variable.advertised_port
         assert halfstack.redis_addr is not None
         with conf_path.open("r") as fp:
             data = tomlkit.load(fp)
             appproxy_itable = tomlkit.inline_table()
-            appproxy_itable["url"] = (
-                f"http://{service.appproxy_coordinator_addr.face.host}:{service.appproxy_coordinator_addr.face.port}"
-            )
+            if public_mode:
+                appproxy_itable["url"] = f"https://{public_facing_address}:{advertised_port}"
+            else:
+                appproxy_itable["url"] = (
+                    f"http://{service.appproxy_coordinator_addr.face.host}:{service.appproxy_coordinator_addr.face.port}"
+                )
             data["service"]["appproxy"] = appproxy_itable  # type: ignore
+            if public_mode:
+                data["service"]["force_endpoint_protocol"] = "https"  # type: ignore
             data["api"][  # type: ignore
                 "endpoint"
             ] = f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}"
@@ -734,11 +742,18 @@ class Context(metaclass=ABCMeta):
 
         # Coordinator
         coord_conf = self.copy_config("app-proxy-coordinator.toml")
-        public_facing_address = self.install_variable.public_facing_address
 
         self.log.write(f"DB HOST = {halfstack.postgres_addr.face.host}")
         self.log.write(f"DB PORT = {halfstack.postgres_addr.face.port}")
         self.log.write(f"API SECRET = {service.appproxy_api_secret}")
+
+        public_mode = self.install_variable.public_mode
+        tls_advertised = self.install_variable.tls_advertised
+        advertised_port = self.install_variable.advertised_port
+        wildcard_domain = self.install_variable.wildcard_domain
+        public_facing_address = self.install_variable.public_facing_address
+        apphub_address = self.install_variable.apphub_address
+        app_address = self.install_variable.app_address
 
         with coord_conf.open("r") as fp:
             data = tomlkit.load(fp)
@@ -759,16 +774,20 @@ class Context(metaclass=ABCMeta):
             data["proxy_coordinator"]["bind_addr"]["port"] = (  # type: ignore[index]
                 service.appproxy_coordinator_addr.bind.port
             )
-            data["proxy_coordinator"]["advertised_addr"]["host"] = public_facing_address  # type: ignore[index]
+            data["proxy_coordinator"]["advertised_addr"]["host"] = apphub_address  # type: ignore[index]
             data["proxy_coordinator"]["advertised_addr"]["port"] = (  # type: ignore[index]
                 service.appproxy_coordinator_addr.bind.port
             )
+            if public_mode:
+                data["proxy_coordinator"]["tls_advertised"] = True  # type: ignore[index]
+                data["proxy_coordinator"]["advertised_addr"]["port"] = advertised_port  # type: ignore[index]
+            elif tls_advertised:
+                data["proxy_coordinator"]["tls_advertised"] = True  # type: ignore[index]
         with coord_conf.open("w") as fp:
             tomlkit.dump(data, fp)
 
         # Worker
         worker_conf = self.copy_config("app-proxy-worker.toml")
-        public_facing_address = self.install_variable.public_facing_address
         with worker_conf.open("r") as fp:
             data = tomlkit.load(fp)
             data["redis"]["host"] = halfstack.redis_addr.face.host  # type: ignore
@@ -790,6 +809,44 @@ class Context(metaclass=ABCMeta):
             data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
             data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
             data["permit_hash"]["permit_hash_secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
+
+            if public_mode:
+                data["proxy_worker"]["tls_advertised"] = True  # type: ignore[index]
+                data["proxy_worker"]["frontend_mode"] = "wildcard"  # type: ignore[index]
+                data["proxy_worker"]["bind_host"] = app_address  # type: ignore[index]
+                data["proxy_worker"]["api_advertised_addr"] = {  # type: ignore[index]
+                    "host": app_address,
+                    "port": advertised_port,
+                }
+                proxy_worker = cast(dict[str, Any], data["proxy_worker"])
+                if "api_bind_addr" in proxy_worker:
+                    del proxy_worker["api_bind_addr"]
+                if "port_proxy" in proxy_worker:
+                    del proxy_worker["port_proxy"]
+                if wildcard_domain:
+                    wildcard_table = tomlkit.table()
+                    wildcard_table["domain"] = wildcard_domain
+                    bind_addr_table = tomlkit.inline_table()
+                    bind_addr_table["host"] = "0.0.0.0"
+                    bind_addr_table["port"] = 10250
+                    wildcard_table["bind_addr"] = bind_addr_table
+                    wildcard_table["advertised_port"] = advertised_port
+                    data["proxy_worker"]["wildcard_domain"] = wildcard_table  # type: ignore[index]
+            else:
+                data["proxy_worker"]["api_advertised_addr"] = {  # type: ignore[index]
+                    "host": public_facing_address,
+                    "port": service.appproxy_worker_addr.bind.port,
+                }
+                data["proxy_worker"]["api_bind_addr"] = {  # type: ignore[index]
+                    "host": service.appproxy_worker_addr.bind.host,
+                    "port": service.appproxy_worker_addr.bind.port,
+                }
+                port_proxy = cast(dict[str, Any], data["proxy_worker"]["port_proxy"])  # type: ignore[index]
+                port_proxy["bind_port"] = service.appproxy_worker_addr.bind.port
+                port_proxy["bind_host"] = "0.0.0.0"
+                port_proxy["advertised_host"] = public_facing_address
+                if tls_advertised:
+                    data["proxy_worker"]["tls_advertised"] = True  # type: ignore[index]
         with worker_conf.open("w") as fp:
             tomlkit.dump(data, fp)
 
