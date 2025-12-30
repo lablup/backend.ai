@@ -195,6 +195,17 @@ class UserRepository:
             # Get current user data for validation
             current_user = await self._get_user_by_email_with_conn(conn, email)
 
+            # Check if new username is already taken by another user
+            new_username = updater_spec.username.optional_value()
+            if new_username and new_username != current_user.username:
+                username_exists = await self._check_username_exists_for_other_user(
+                    conn, username=new_username, exclude_email=email
+                )
+                if username_exists:
+                    raise UserConflict(
+                        f"Username '{new_username}' is already taken by another user."
+                    )
+
             # Handle main_access_key validation
             main_access_key = updater_spec.main_access_key.optional_value()
             if main_access_key:
@@ -262,6 +273,17 @@ class UserRepository:
             sa.or_(UserRow.email == email, UserRow.username == username)
         )
         result = await session.scalar(query)
+        result = cast(Optional[UUID], result)
+        return result is not None
+
+    async def _check_username_exists_for_other_user(
+        self, conn: SASession, *, username: str, exclude_email: str
+    ) -> bool:
+        """Check if the username is already taken by another user."""
+        query = sa.select(UserRow.uuid).where(
+            sa.and_(UserRow.username == username, UserRow.email != exclude_email)
+        )
+        result = await conn.scalar(query)
         result = cast(Optional[UUID], result)
         return result is not None
 
