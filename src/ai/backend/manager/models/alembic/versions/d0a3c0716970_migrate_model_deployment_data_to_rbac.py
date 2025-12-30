@@ -1,7 +1,7 @@
 """migrate_model_deployment_data_to_rbac
 
 Revision ID: d0a3c0716970
-Revises: 1fbbee0514bf
+Revises: 013a6676866c
 Create Date: 2025-12-29 15:33:09.793012
 
 """
@@ -21,7 +21,7 @@ from ai.backend.manager.models.rbac_models.migration.enums import (
 
 # revision identifiers, used by Alembic.
 revision = "d0a3c0716970"
-down_revision = "1fbbee0514bf"
+down_revision = "013a6676866c"
 branch_labels = None
 depends_on = None
 
