@@ -30,6 +30,7 @@ from ai.backend.manager.errors.user import (
     UserConflict,
     UserCreationBadRequest,
     UserCreationFailure,
+    UserModificationConflict,
     UserModificationFailure,
     UserNotFound,
 )
@@ -202,7 +203,7 @@ class UserRepository:
                     conn, username=new_username, exclude_email=email
                 )
                 if username_exists:
-                    raise UserConflict(
+                    raise UserModificationConflict(
                         f"Username '{new_username}' is already taken by another user."
                     )
 

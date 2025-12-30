@@ -33,6 +33,18 @@ class UserConflict(BackendAIError, web.HTTPConflict):
         )
 
 
+class UserModificationConflict(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/user-modification-conflict"
+    error_title = "The user modification conflicts with existing data."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class UserCreationBadRequest(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/user-creation-bad-request"
     error_title = "Failed to create user due to bad request."
