@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, patch
+from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
@@ -61,6 +62,7 @@ async def create_test_registry(database_engine, registry_name="test-registry", p
         # Create registry
         async with database_engine.begin_session() as session:
             registry = ContainerRegistryRow(
+                id=uuid4(),
                 url=f"https://{registry_name}.example.com",
                 registry_name=registry_name,
                 type=ContainerRegistryType.DOCKER,
@@ -321,9 +323,10 @@ async def test_get_container_registries_integration(
         create_test_registry(database_engine, "registry2", "projectB"),
     ):
         # For global registry, actually set project to None in the database
-        registry_id = None
+        registry_id = uuid4()
         async with database_engine.begin_session() as session:
             registry = ContainerRegistryRow(
+                id=registry_id,
                 url="https://registry3.example.com",
                 registry_name="registry3",
                 type=ContainerRegistryType.DOCKER,
@@ -336,7 +339,6 @@ async def test_get_container_registries_integration(
             )
             session.add(registry)
             await session.commit()
-            registry_id = registry.id
 
         # Action: Get known registries
         action = GetContainerRegistriesAction()

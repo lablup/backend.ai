@@ -140,6 +140,7 @@ class ContainerRegistryRow(Base):
 
     def __init__(
         self,
+        id: uuid.UUID,
         url: str,
         registry_name: str,
         type: ContainerRegistryType,
@@ -150,6 +151,7 @@ class ContainerRegistryRow(Base):
         is_global: Optional[bool] = None,
         extra: Optional[dict] = None,
     ) -> None:
+        self.id = id
         self.url = url
         self.registry_name = registry_name
         self.type = type
@@ -239,6 +241,7 @@ class ContainerRegistryRow(Base):
     @classmethod
     def from_dataclass(cls, data: ContainerRegistryData) -> Self:
         instance = cls(
+            id=data.id,
             url=data.url,
             registry_name=data.registry_name,
             type=data.type,
@@ -392,7 +395,7 @@ class CreateContainerRegistry(graphene.Mutation):
         set_if_set(props, input_config, "is_global")
 
         async with ctx.db.begin_session() as db_session:
-            reg_row = ContainerRegistryRow(**input_config)
+            reg_row = ContainerRegistryRow(id=uuid.uuid4(), **input_config)
             db_session.add(reg_row)
             await db_session.flush()
             await db_session.refresh(reg_row)

@@ -155,6 +155,7 @@ class TestSyncInstalledImagesIntegration:
         async with database_engine.begin_session() as db_session:
             # Create container registry first
             registry = ContainerRegistryRow(
+                id=registry_id,
                 url="https://cr.backend.ai",
                 registry_name="test-registry",
                 type=ContainerRegistryType.HARBOR2,
@@ -164,7 +165,6 @@ class TestSyncInstalledImagesIntegration:
             )
             db_session.add(registry)
             await db_session.flush()
-            registry_id = registry.id
 
             # Create images
             for img_data in images_data:

@@ -213,11 +213,11 @@ class TestSearchAutoScalingRulesValidated:
 
         async with db_with_cleanup.begin_session() as db_sess:
             registry = ContainerRegistryRow(
+                id=registry_id,
                 url="http://test-registry.local",
                 registry_name=f"test-registry-{uuid.uuid4().hex[:8]}",
                 type=ContainerRegistryType.DOCKER,
             )
-            registry.id = registry_id
             db_sess.add(registry)
             await db_sess.flush()
 
