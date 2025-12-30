@@ -9,13 +9,12 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.orm import joinedload, selectinload
 
-from ai.backend.common.dto.manager.auth.types import CredentialsByAccessKey
 from ai.backend.common.exception import BackendAIError, UserNotFound
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
+from ai.backend.manager.data.auth.types import CredentialsByAccessKey, GroupMembershipData, UserData
 from ai.backend.manager.errors.auth import GroupMembershipNotFoundError, UserCreationError
 from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.hasher.types import PasswordInfo

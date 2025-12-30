@@ -2,11 +2,10 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from ai.backend.common.dto.manager.auth.types import CredentialsByAccessKey
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
+from ai.backend.manager.data.auth.types import CredentialsByAccessKey, GroupMembershipData, UserData
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
