@@ -203,7 +203,7 @@ class UserRepository:
                     conn, username=new_username, exclude_email=email
                 )
                 if username_exists:
-                    raise UserConflict(
+                    raise UserModificationBadRequest(
                         f"Username '{new_username}' is already taken by another user."
                     )
 
