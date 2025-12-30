@@ -203,24 +203,8 @@ class UserRepository:
                     conn, username=new_username, exclude_email=email
                 )
                 if username_exists:
-                    raise UserModificationBadRequest(
+                    raise UserConflict(
                         f"Username '{new_username}' is already taken by another user."
-                    )
-
-            # Check if new domain_name exists
-            new_domain_name = updater_spec.domain_name.optional_value()
-            if new_domain_name and new_domain_name != current_user.domain_name:
-                domain_exists = await self._check_domain_exists(conn, new_domain_name)
-                if not domain_exists:
-                    raise UserModificationBadRequest(f"Domain '{new_domain_name}' does not exist.")
-
-            # Check if new resource_policy exists
-            new_resource_policy = updater_spec.resource_policy.optional_value()
-            if new_resource_policy and new_resource_policy != current_user.resource_policy:
-                policy_exists = await self._check_resource_policy_exists(conn, new_resource_policy)
-                if not policy_exists:
-                    raise UserModificationBadRequest(
-                        f"Resource policy '{new_resource_policy}' does not exist."
                     )
 
             # Handle main_access_key validation
