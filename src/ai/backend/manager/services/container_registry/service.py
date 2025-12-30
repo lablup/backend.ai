@@ -14,6 +14,10 @@ from ai.backend.manager.services.container_registry.actions.clear_images import 
     ClearImagesAction,
     ClearImagesActionResult,
 )
+from ai.backend.manager.services.container_registry.actions.create_container_registry import (
+    CreateContainerRegistryAction,
+    CreateContainerRegistryActionResult,
+)
 from ai.backend.manager.services.container_registry.actions.get_container_registries import (
     GetContainerRegistriesAction,
     GetContainerRegistriesActionResult,
@@ -53,6 +57,12 @@ class ContainerRegistryService:
         self._db = db
         self._container_registry_repository = container_registry_repository
         self._admin_container_registry_repository = admin_container_registry_repository
+
+    async def create_container_registry(
+        self, action: CreateContainerRegistryAction
+    ) -> CreateContainerRegistryActionResult:
+        data = await self._container_registry_repository.create_registry(action.creator)
+        return CreateContainerRegistryActionResult(data=data)
 
     async def modify_container_registry(
         self, action: ModifyContainerRegistryAction
