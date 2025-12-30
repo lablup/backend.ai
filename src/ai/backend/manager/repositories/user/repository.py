@@ -30,6 +30,7 @@ from ai.backend.manager.errors.user import (
     UserConflict,
     UserCreationBadRequest,
     UserCreationFailure,
+    UserModificationBadRequest,
     UserModificationConflict,
     UserModificationFailure,
     UserNotFound,
@@ -39,6 +40,7 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
 from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
 from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair_data, keypairs
+from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
@@ -207,6 +209,22 @@ class UserRepository:
                         f"Username '{new_username}' is already taken by another user."
                     )
 
+            # Check if new domain_name exists
+            new_domain_name = updater_spec.domain_name.optional_value()
+            if new_domain_name and new_domain_name != current_user.domain_name:
+                domain_exists = await self._check_domain_exists(conn, new_domain_name)
+                if not domain_exists:
+                    raise UserModificationBadRequest(f"Domain '{new_domain_name}' does not exist.")
+
+            # Check if new resource_policy exists
+            new_resource_policy = updater_spec.resource_policy.optional_value()
+            if new_resource_policy and new_resource_policy != current_user.resource_policy:
+                policy_exists = await self._check_resource_policy_exists(conn, new_resource_policy)
+                if not policy_exists:
+                    raise UserModificationBadRequest(
+                        f"Resource policy '{new_resource_policy}' does not exist."
+                    )
+
             # Handle main_access_key validation
             main_access_key = updater_spec.main_access_key.optional_value()
             if main_access_key:
@@ -263,6 +281,15 @@ class UserRepository:
 
     async def _check_domain_exists(self, session: SASession, domain_name: str) -> bool:
         query = sa.select(DomainRow.name).where(DomainRow.name == domain_name)
+        result = await session.scalar(query)
+        result = cast(Optional[str], result)
+        return result is not None
+
+    async def _check_resource_policy_exists(self, session: SASession, policy_name: str) -> bool:
+        """Check if the resource policy exists."""
+        query = sa.select(UserResourcePolicyRow.name).where(
+            UserResourcePolicyRow.name == policy_name
+        )
         result = await session.scalar(query)
         result = cast(Optional[str], result)
         return result is not None
