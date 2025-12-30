@@ -60,44 +60,32 @@ class TestUserRepository:
         self,
         database_engine: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans user data after each test"""
-        # Track created entities for cleanup
-        created_domain_names: list[str] = []
-        created_policy_names: list[str] = []
-        created_keypair_policy_names: list[str] = []
-
-        # Store tracking lists on the engine for other fixtures to use
-        database_engine._test_created_domains = created_domain_names  # type: ignore
-        database_engine._test_created_policies = created_policy_names  # type: ignore
-        database_engine._test_created_keypair_policies = created_keypair_policy_names  # type: ignore
-
+        """Database engine that auto-cleans test data after each test"""
         yield database_engine
 
-        # Cleanup all user-related data after test (in correct dependency order)
+        # Cleanup in FK-safe order
         async with database_engine.begin_session() as db_sess:
-            # Delete in reverse order of dependencies
             await db_sess.execute(sa.delete(KeyPairRow))
-            await db_sess.execute(sa.delete(UserRow))
-
-            # Clean up domains that were created
-            for domain_name in created_domain_names:
-                await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
-
-            # Clean up user policies that were created
-            for policy_name in created_policy_names:
-                await db_sess.execute(
-                    sa.delete(UserResourcePolicyRow).where(
-                        UserResourcePolicyRow.name == policy_name
-                    )
+            await db_sess.execute(
+                sa.delete(UserRow)
+                .where(UserRow.domain_name.like("test-domain-%"))
+                .execution_options(synchronize_session=False)
+            )
+            await db_sess.execute(
+                sa.delete(UserResourcePolicyRow)
+                .where(UserResourcePolicyRow.name.like("test-policy%"))
+                .execution_options(synchronize_session=False)
+            )
+            await db_sess.execute(
+                sa.delete(DomainRow)
+                .where(DomainRow.name.like("test-domain-%"))
+                .execution_options(synchronize_session=False)
+            )
+            await db_sess.execute(
+                sa.delete(KeyPairResourcePolicyRow).where(
+                    KeyPairResourcePolicyRow.name == DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
                 )
-
-            # Clean up keypair policies that were created
-            for policy_name in created_keypair_policy_names:
-                await db_sess.execute(
-                    sa.delete(KeyPairResourcePolicyRow).where(
-                        KeyPairResourcePolicyRow.name == policy_name
-                    )
-                )
+            )
 
     @pytest.fixture
     async def default_keypair_resource_policy(
@@ -108,7 +96,6 @@ class TestUserRepository:
         policy_name = DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 
         async with db_with_cleanup.begin_session() as db_sess:
-            # Check if policy already exists
             existing = await db_sess.scalar(
                 sa.select(KeyPairResourcePolicyRow.name).where(
                     KeyPairResourcePolicyRow.name == policy_name
@@ -127,9 +114,6 @@ class TestUserRepository:
                 )
                 db_sess.add(policy)
                 await db_sess.flush()
-
-                # Register for cleanup only if we created it
-                db_with_cleanup._test_created_keypair_policies.append(policy_name)  # type: ignore
 
         yield policy_name
 
@@ -153,9 +137,6 @@ class TestUserRepository:
             db_sess.add(domain)
             await db_sess.flush()
 
-        # Register for cleanup
-        db_with_cleanup._test_created_domains.append(domain_name)  # type: ignore
-
         yield domain_name
 
     @pytest.fixture
@@ -176,9 +157,6 @@ class TestUserRepository:
             )
             db_sess.add(policy)
             await db_sess.flush()
-
-        # Register for cleanup
-        db_with_cleanup._test_created_policies.append(policy_name)  # type: ignore
 
         yield policy_name
 
@@ -201,9 +179,6 @@ class TestUserRepository:
             db_sess.add(policy)
             await db_sess.flush()
 
-        # Register for cleanup
-        db_with_cleanup._test_created_policies.append(policy_name)  # type: ignore
-
         yield policy_name
 
     @pytest.fixture
@@ -225,9 +200,6 @@ class TestUserRepository:
             )
             db_sess.add(domain)
             await db_sess.flush()
-
-        # Register for cleanup
-        db_with_cleanup._test_created_domains.append(domain_name)  # type: ignore
 
         yield domain_name
 
@@ -806,92 +778,29 @@ class TestUserRepository:
         assert hasattr(user_repository, "update_user_validated")
         assert hasattr(user_repository, "soft_delete_user_validated")
 
-
-class TestUserRepositoryIntegration:
-    """Integration tests that test UserRepository with real database operations"""
-
-    @pytest.mark.asyncio
-    async def test_user_data_conversion(
+    def test_user_data_conversion(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        sample_user_row: UserRow,
     ) -> None:
         """Test UserData conversion from UserRow"""
-        # Setup
-        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-        policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
-        user_uuid = uuid.uuid4()
+        user_data = UserData.from_row(sample_user_row)
 
-        async with database_engine.begin_session() as db_sess:
-            # Create domain
-            domain = DomainRow(
-                name=domain_name,
-                description="Test domain",
-                is_active=True,
-                total_resource_slots={},
-                allowed_vfolder_hosts={},
-                allowed_docker_registries=[],
-            )
-            db_sess.add(domain)
-
-            # Create resource policy
-            policy = UserResourcePolicyRow(
-                name=policy_name,
-                max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
-                max_session_count_per_model_session=5,
-                max_customized_image_count=3,
-            )
-            db_sess.add(policy)
-
-            # Create user
-            password_info = create_test_password_info("test")
-            user = UserRow(
-                uuid=user_uuid,
-                username="conversiontest",
-                email="conversion@test.com",
-                password=password_info,
-                need_password_change=False,
-                full_name="Conversion Test",
-                description="Test Description",
-                status=UserStatus.ACTIVE,
-                status_info="active",
-                domain_name=domain_name,
-                role=UserRole.USER,
-                resource_policy=policy_name,
-            )
-            db_sess.add(user)
-            await db_sess.flush()
-            await db_sess.refresh(user)
-
-            # Test conversion
-            user_data = UserData.from_row(user)
-
-            assert user_data.uuid == user_uuid
-            assert user_data.username == "conversiontest"
-            assert user_data.email == "conversion@test.com"
-            assert user_data.full_name == "Conversion Test"
-            assert user_data.role == UserRole.USER
-            assert user_data.status == UserStatus.ACTIVE.value
-            assert user_data.domain_name == domain_name
-
-        # Cleanup
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
-            await db_sess.execute(
-                sa.delete(UserResourcePolicyRow).where(UserResourcePolicyRow.name == policy_name)
-            )
-            await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
+        assert user_data.uuid == sample_user_row.uuid
+        assert user_data.username == sample_user_row.username
+        assert user_data.email == sample_user_row.email
+        assert user_data.full_name == sample_user_row.full_name
+        assert user_data.role == sample_user_row.role
+        assert user_data.status == sample_user_row.status.value
+        assert user_data.domain_name == sample_user_row.domain_name
 
     def test_user_status_validation(self) -> None:
         """Test user status validation"""
-        # Test valid statuses
         valid_statuses = [UserStatus.ACTIVE, UserStatus.INACTIVE, UserStatus.DELETED]
         for status in valid_statuses:
             assert status in UserStatus
 
     def test_user_role_validation(self) -> None:
         """Test user role validation"""
-        # Test valid roles
         valid_roles = [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN, UserRole.MONITOR]
         for role in valid_roles:
             assert role in UserRole
