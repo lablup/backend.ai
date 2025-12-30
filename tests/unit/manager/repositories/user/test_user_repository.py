@@ -701,18 +701,6 @@ class TestUserRepository:
         result = await user_repository.get_by_email_validated(sample_user_row.email)
         assert result.status == UserStatus.DELETED.value
 
-    @pytest.mark.asyncio
-    async def test_soft_delete_user_validated_not_found(
-        self,
-        user_repository: UserRepository,
-    ) -> None:
-        """Test soft delete when user not found"""
-        with pytest.raises(UserNotFound):
-            await user_repository.soft_delete_user_validated(
-                email="nonexistent@example.com",
-                requester_uuid=None,
-            )
-
     # ============ Statistics and Validation Tests ============
 
     @pytest.mark.asyncio

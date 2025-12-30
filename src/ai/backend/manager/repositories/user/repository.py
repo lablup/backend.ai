@@ -265,9 +265,6 @@ class UserRepository:
         Soft delete user by setting status to DELETED and deactivating keypairs.
         """
         async with self._db.begin() as conn:
-            # Check if user exists
-            await self._get_user_by_email_with_conn(conn, email)
-
             # Deactivate all user keypairs
             await conn.execute(
                 sa.update(keypairs).values(is_active=False).where(keypairs.c.user_id == email)
