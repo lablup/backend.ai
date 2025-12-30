@@ -66,26 +66,10 @@ class TestUserRepository:
         # Cleanup in FK-safe order
         async with database_engine.begin_session() as db_sess:
             await db_sess.execute(sa.delete(KeyPairRow))
-            await db_sess.execute(
-                sa.delete(UserRow)
-                .where(UserRow.domain_name.like("test-domain-%"))
-                .execution_options(synchronize_session=False)
-            )
-            await db_sess.execute(
-                sa.delete(UserResourcePolicyRow)
-                .where(UserResourcePolicyRow.name.like("test-policy%"))
-                .execution_options(synchronize_session=False)
-            )
-            await db_sess.execute(
-                sa.delete(DomainRow)
-                .where(DomainRow.name.like("test-domain-%"))
-                .execution_options(synchronize_session=False)
-            )
-            await db_sess.execute(
-                sa.delete(KeyPairResourcePolicyRow).where(
-                    KeyPairResourcePolicyRow.name == DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
-                )
-            )
+            await db_sess.execute(sa.delete(UserRow))
+            await db_sess.execute(sa.delete(UserResourcePolicyRow))
+            await db_sess.execute(sa.delete(DomainRow))
+            await db_sess.execute(sa.delete(KeyPairResourcePolicyRow))
 
     @pytest.fixture
     async def default_keypair_resource_policy(
