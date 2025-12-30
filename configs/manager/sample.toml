@@ -513,6 +513,10 @@
     # Controls the polling frequency when trying to reconnect to Redis.
     # Lower values reconnect faster but may increase network load.
     reconnect_poll_timeout = 0.3
+    # Timeout in seconds to wait for a connection from the blocking connection pool.
+    # Used by BlockingConnectionPool for distributed locking scenarios.
+    # If no connection is available within this time, a timeout error is raised.
+    connection_ready_timeout = 20.0
 
   # Optional override configurations for specific Redis contexts.
   # Allows different Redis settings for different services within Backend.AI.
@@ -695,7 +699,7 @@
   # Time window for metric collection.
   # Controls how often metrics are collected and reported.
   # Format is a duration string like "1h" for 1 hour.
-  timewindow = "1m"
+  timewindow = "5m"
 
 # Volume management settings.
 # Controls how volumes are managed and accessed.
