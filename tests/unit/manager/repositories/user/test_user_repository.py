@@ -21,7 +21,6 @@ from ai.backend.manager.errors.user import (
     UserConflict,
     UserCreationBadRequest,
     UserModificationBadRequest,
-    UserModificationConflict,
     UserNotFound,
 )
 from ai.backend.manager.models.domain import DomainRow
@@ -310,7 +309,7 @@ class TestUserRepository:
         self,
         test_domain_name: str,
         test_resource_policy_name: str,
-    ) -> Creator[UserCreatorSpec]:
+    ) -> Creator[UserRow]:
         """Create sample user creator for creation"""
         password_info = create_test_password_info("new_password")
         unique_suffix = uuid.uuid4().hex[:8]
@@ -405,17 +404,19 @@ class TestUserRepository:
     async def test_create_user_validated_success(
         self,
         user_repository: UserRepository,
-        sample_user_creator: Creator[UserCreatorSpec],
+        sample_user_creator: Creator[UserRow],
         default_keypair_resource_policy: str,
     ) -> None:
         """Test successful user creation"""
+        spec = sample_user_creator.spec
+        assert isinstance(spec, UserCreatorSpec)
         result = await user_repository.create_user_validated(sample_user_creator, group_ids=[])
 
         assert result is not None
-        assert result.user.email == sample_user_creator.spec.email
-        assert result.user.username == sample_user_creator.spec.username
-        assert result.user.role == sample_user_creator.spec.role
-        assert result.user.domain_name == sample_user_creator.spec.domain_name
+        assert result.user.email == spec.email
+        assert result.user.username == spec.username
+        assert result.user.role == spec.role
+        assert result.user.domain_name == spec.domain_name
         assert result.keypair is not None
         assert result.keypair.access_key is not None
 
@@ -575,7 +576,7 @@ class TestUserRepository:
         updater = Updater(spec=updater_spec, pk_value=sample_user_row.email)
 
         with pytest.raises(
-            UserModificationConflict, match="Username.*is already taken by another user"
+            UserModificationBadRequest, match="Username.*is already taken by another user"
         ):
             await user_repository.update_user_validated(
                 email=sample_user_row.email,
