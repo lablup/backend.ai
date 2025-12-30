@@ -30,6 +30,7 @@ from ai.backend.manager.errors.user import (
     UserConflict,
     UserCreationBadRequest,
     UserCreationFailure,
+    UserModificationBadRequest,
     UserModificationFailure,
     UserNotFound,
 )
@@ -38,6 +39,7 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
 from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
 from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair_data, keypairs
+from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
@@ -195,6 +197,33 @@ class UserRepository:
             # Get current user data for validation
             current_user = await self._get_user_by_email_with_conn(conn, email)
 
+            # Check if new username is already taken by another user
+            new_username = updater_spec.username.optional_value()
+            if new_username and new_username != current_user.username:
+                username_exists = await self._check_username_exists_for_other_user(
+                    conn, username=new_username, exclude_email=email
+                )
+                if username_exists:
+                    raise UserModificationBadRequest(
+                        f"Username '{new_username}' is already taken by another user."
+                    )
+
+            # Check if new domain_name exists
+            new_domain_name = updater_spec.domain_name.optional_value()
+            if new_domain_name and new_domain_name != current_user.domain_name:
+                domain_exists = await self._check_domain_exists(conn, new_domain_name)
+                if not domain_exists:
+                    raise UserModificationBadRequest(f"Domain '{new_domain_name}' does not exist.")
+
+            # Check if new resource_policy exists
+            new_resource_policy = updater_spec.resource_policy.optional_value()
+            if new_resource_policy and new_resource_policy != current_user.resource_policy:
+                policy_exists = await self._check_resource_policy_exists(conn, new_resource_policy)
+                if not policy_exists:
+                    raise UserModificationBadRequest(
+                        f"Resource policy '{new_resource_policy}' does not exist."
+                    )
+
             # Handle main_access_key validation
             main_access_key = updater_spec.main_access_key.optional_value()
             if main_access_key:
@@ -255,6 +284,15 @@ class UserRepository:
         result = cast(Optional[str], result)
         return result is not None
 
+    async def _check_resource_policy_exists(self, session: SASession, policy_name: str) -> bool:
+        """Check if the resource policy exists."""
+        query = sa.select(UserResourcePolicyRow.name).where(
+            UserResourcePolicyRow.name == policy_name
+        )
+        result = await session.scalar(query)
+        result = cast(Optional[str], result)
+        return result is not None
+
     async def _check_user_exists_with_email_or_username(
         self, session: SASession, *, email: str, username: str
     ) -> bool:
@@ -262,6 +300,17 @@ class UserRepository:
             sa.or_(UserRow.email == email, UserRow.username == username)
         )
         result = await session.scalar(query)
+        result = cast(Optional[UUID], result)
+        return result is not None
+
+    async def _check_username_exists_for_other_user(
+        self, conn: SASession, *, username: str, exclude_email: str
+    ) -> bool:
+        """Check if the username is already taken by another user."""
+        query = sa.select(UserRow.uuid).where(
+            sa.and_(UserRow.username == username, UserRow.email != exclude_email)
+        )
+        result = await conn.scalar(query)
         result = cast(Optional[UUID], result)
         return result is not None
 
