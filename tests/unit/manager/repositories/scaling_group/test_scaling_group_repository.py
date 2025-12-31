@@ -30,7 +30,11 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForDomainRow,
+    ScalingGroupOpts,
+    ScalingGroupRow,
+)
 from ai.backend.manager.models.session import SessionId, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -40,7 +44,10 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
-from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
+from ai.backend.manager.repositories.scaling_group.creators import (
+    ScalingGroupCreatorSpec,
+    ScalingGroupForDomainCreatorSpec,
+)
 from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupDriverConfigUpdaterSpec,
     ScalingGroupMetadataUpdaterSpec,
@@ -68,6 +75,7 @@ class TestScalingGroupRepositoryDB:
                 # FK dependency order: parents before children
                 DomainRow,
                 ScalingGroupRow,
+                ScalingGroupForDomainRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -431,6 +439,39 @@ class TestScalingGroupRepositoryDB:
         repo = ScalingGroupRepository(db=db_with_cleanup)
         yield repo
 
+    @pytest.fixture
+    async def sample_domain(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create a sample domain for testing"""
+        domain_name = "test-domain-for-sgroup"
+        async with db_with_cleanup.begin_session() as db_sess:
+            domain = DomainRow(
+                name=domain_name,
+                description="Test domain",
+                is_active=True,
+                total_resource_slots={},
+            )
+            db_sess.add(domain)
+
+        yield domain_name
+
+    @pytest.fixture
+    async def sample_scaling_group_for_association(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+    ) -> AsyncGenerator[str, None]:
+        """Create a sample scaling group for association testing"""
+        sgroup_name = "test-sgroup-associate-domain"
+        creator = self._create_scaling_group_creator(
+            name=sgroup_name,
+            description="Test scaling group for association",
+        )
+        await scaling_group_repository.create_scaling_group(creator)
+
+        yield sgroup_name
+
     async def test_search_scaling_groups_all(
         self,
         scaling_group_repository: ScalingGroupRepository,
@@ -714,3 +755,36 @@ class TestScalingGroupRepositoryDB:
         # Then: Should return the deleted scaling group data
         assert result.name == sgroup_name
         assert result.metadata.description == "Test scaling group for cascade delete"
+
+    # Associate Tests
+    async def test_associate_scaling_group_with_domain_success(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_scaling_group_for_association: str,
+        sample_domain: str,
+    ) -> None:
+        """Test associating a scaling group with a domain"""
+        creator = Creator(
+            spec=ScalingGroupForDomainCreatorSpec(
+                scaling_group=sample_scaling_group_for_association,
+                domain=sample_domain,
+            )
+        )
+        await scaling_group_repository.associate_scaling_group_with_domain(creator)
+
+        # Verify association
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ScalingGroupForDomainRow).where(
+                    sa.and_(
+                        ScalingGroupForDomainRow.scaling_group
+                        == sample_scaling_group_for_association,
+                        ScalingGroupForDomainRow.domain == sample_domain,
+                    )
+                )
+            )
+            association = result.scalar_one_or_none()
+            assert association is not None
+            assert association.scaling_group == sample_scaling_group_for_association
+            assert association.domain == sample_domain

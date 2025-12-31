@@ -36,7 +36,6 @@ from ai.backend.manager.models.scaling_group import (
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
 from ai.backend.manager.repositories.scaling_group.creators import (
     ScalingGroupCreatorSpec,
     ScalingGroupForDomainCreatorSpec,
