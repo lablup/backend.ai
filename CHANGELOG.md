@@ -16,6 +16,10 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.19.0 (2025-12-31)
+No significant changes.
+
+
 ## 25.19.0rc4 (2025-12-31)
 No significant changes.
 
