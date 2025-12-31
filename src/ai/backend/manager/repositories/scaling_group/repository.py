@@ -12,7 +12,11 @@ from ai.backend.common.resilience import (
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData, ScalingGroupListResult
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForDomainRow,
+    ScalingGroupForKeypairsRow,
+    ScalingGroupRow,
+)
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.purger import BatchPurger, Purger
@@ -114,3 +118,17 @@ class ScalingGroupRepository:
             scaling_group=scaling_group,
             domain=domain,
         )
+
+    async def associate_scaling_group_with_keypair(
+        self,
+        creator: Creator[ScalingGroupForKeypairsRow],
+    ) -> None:
+        """Associates a single scaling group with a keypair."""
+        await self._db_source.associate_scaling_group_with_keypair(creator)
+
+    async def disassociate_scaling_group_with_keypair(
+        self,
+        purger: BatchPurger[ScalingGroupForKeypairsRow],
+    ) -> None:
+        """Disassociates a single scaling group from a keypair."""
+        await self._db_source.disassociate_scaling_group_with_keypair(purger)

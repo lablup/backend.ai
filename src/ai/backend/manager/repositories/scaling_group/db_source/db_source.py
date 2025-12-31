@@ -11,7 +11,11 @@ from ai.backend.manager.data.scaling_group.types import ScalingGroupData, Scalin
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForDomainRow,
+    ScalingGroupForKeypairsRow,
+    ScalingGroupRow,
+)
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import (
@@ -189,3 +193,19 @@ class ScalingGroupDBSource:
             )
             result = await session.scalar(query)
             return (result or 0) > 0
+
+    async def associate_scaling_group_with_keypair(
+        self,
+        creator: Creator[ScalingGroupForKeypairsRow],
+    ) -> None:
+        """Associates a single scaling group with a keypair."""
+        async with self._db.begin_session() as session:
+            await execute_creator(session, creator)
+
+    async def disassociate_scaling_group_with_keypair(
+        self,
+        purger: BatchPurger[ScalingGroupForKeypairsRow],
+    ) -> None:
+        """Disassociates a single scaling group from a keypair."""
+        async with self._db.begin_session() as session:
+            await execute_batch_purger(session, purger)

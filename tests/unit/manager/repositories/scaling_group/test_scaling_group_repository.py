@@ -7,7 +7,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.exception import ScalingGroupConflict
-from ai.backend.common.types import SessionTypes
+from ai.backend.common.types import AccessKey, DefaultForUnspecified, SessionTypes
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
@@ -32,6 +32,7 @@ from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
+    ScalingGroupForKeypairsRow,
     ScalingGroupOpts,
     ScalingGroupRow,
 )
@@ -47,9 +48,11 @@ from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.repositories.scaling_group.creators import (
     ScalingGroupCreatorSpec,
     ScalingGroupForDomainCreatorSpec,
+    ScalingGroupForKeypairsCreatorSpec,
 )
 from ai.backend.manager.repositories.scaling_group.purgers import (
     create_scaling_group_for_domain_purger,
+    create_scaling_group_for_keypairs_purger,
 )
 from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupDriverConfigUpdaterSpec,
@@ -934,3 +937,148 @@ class TestScalingGroupRepositoryDB:
                 )
             )
             assert association_exists is False
+
+    # Associate/Disassociate with Keypair Tests
+
+    @pytest.fixture
+    async def test_keypair(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
+    ) -> AsyncGenerator[AccessKey, None]:
+        """Create a test keypair for association testing.
+
+        Returns:
+            The access_key of the created keypair.
+        """
+        test_user_uuid, _, _ = test_user_domain_group
+        # access_key column is varchar(20), so we need to keep it short
+        access_key = AccessKey(f"AK{uuid.uuid4().hex[:18].upper()}")
+        keypair_policy_name = f"test-kp-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            # Create keypair resource policy first
+            keypair_policy = KeyPairResourcePolicyRow(
+                name=keypair_policy_name,
+                default_for_unspecified=DefaultForUnspecified.UNLIMITED,
+                total_resource_slots={},
+                max_session_lifetime=0,
+                max_concurrent_sessions=30,
+                max_pending_session_count=None,
+                max_pending_session_resource_slots=None,
+                max_concurrent_sftp_sessions=1,
+                max_containers_per_session=1,
+                idle_timeout=0,
+                allowed_vfolder_hosts={},
+            )
+            db_sess.add(keypair_policy)
+
+            keypair = KeyPairRow(
+                user=test_user_uuid,
+                access_key=access_key,
+                secret_key=f"SK{uuid.uuid4().hex}",
+                is_active=True,
+                is_admin=False,
+                resource_policy=keypair_policy_name,
+                rate_limit=1000,
+                num_queries=0,
+                ssh_public_key=None,
+            )
+            db_sess.add(keypair)
+            await db_sess.flush()
+
+        yield access_key
+
+    async def test_associate_scaling_group_with_keypair_success(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        sample_scaling_group_for_purge: str,
+        test_keypair: AccessKey,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test associating a scaling group with a keypair."""
+        # Given: A scaling group and a keypair
+        sgroup_name = sample_scaling_group_for_purge
+        access_key = test_keypair
+
+        # When: Associate the scaling group with the keypair
+        creator = Creator(
+            spec=ScalingGroupForKeypairsCreatorSpec(
+                scaling_group=sgroup_name,
+                access_key=access_key,
+            )
+        )
+        await scaling_group_repository.associate_scaling_group_with_keypair(creator)
+
+        # Then: Association should exist in the database
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            query = sa.select(ScalingGroupForKeypairsRow).where(
+                sa.and_(
+                    ScalingGroupForKeypairsRow.scaling_group == sgroup_name,
+                    ScalingGroupForKeypairsRow.access_key == access_key,
+                )
+            )
+            result = await db_sess.execute(query)
+            row = result.scalar_one_or_none()
+            assert row is not None
+            assert row.scaling_group == sgroup_name
+            assert row.access_key == access_key
+
+    async def test_disassociate_scaling_group_with_keypair_success(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        sample_scaling_group_for_purge: str,
+        test_keypair: AccessKey,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test disassociating a scaling group from a keypair."""
+        # Given: A scaling group associated with a keypair
+        sgroup_name = sample_scaling_group_for_purge
+        access_key = test_keypair
+
+        # First, associate the scaling group with the keypair
+        async with db_with_cleanup.begin_session() as db_sess:
+            association = ScalingGroupForKeypairsRow(
+                scaling_group=sgroup_name,
+                access_key=access_key,
+            )
+            db_sess.add(association)
+            await db_sess.flush()
+
+        # When: Disassociate the scaling group from the keypair
+        purger = create_scaling_group_for_keypairs_purger(
+            scaling_group=sgroup_name,
+            access_key=access_key,
+        )
+        await scaling_group_repository.disassociate_scaling_group_with_keypair(purger)
+
+        # Then: Association should no longer exist in the database
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            query = sa.select(ScalingGroupForKeypairsRow).where(
+                sa.and_(
+                    ScalingGroupForKeypairsRow.scaling_group == sgroup_name,
+                    ScalingGroupForKeypairsRow.access_key == access_key,
+                )
+            )
+            result = await db_sess.execute(query)
+            row = result.scalar_one_or_none()
+            assert row is None
+
+    async def test_disassociate_nonexistent_scaling_group_with_keypair(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        sample_scaling_group_for_purge: str,
+        test_keypair: AccessKey,
+    ) -> None:
+        """Test disassociating a non-existent association does not raise error."""
+        # Given: A scaling group that is NOT associated with a keypair
+        sgroup_name = sample_scaling_group_for_purge
+        access_key = test_keypair
+
+        # When: Disassociate (even though no association exists)
+        purger = create_scaling_group_for_keypairs_purger(
+            scaling_group=sgroup_name,
+            access_key=access_key,
+        )
+        # Then: Should not raise any error (BatchPurger deletes 0 rows silently)
+        await scaling_group_repository.disassociate_scaling_group_with_keypair(purger)
