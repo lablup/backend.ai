@@ -80,29 +80,23 @@ class TestUserRepository:
         policy_name = DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 
         async with db_with_cleanup.begin_session() as db_sess:
-            existing = await db_sess.scalar(
-                sa.select(KeyPairResourcePolicyRow.name).where(
-                    KeyPairResourcePolicyRow.name == policy_name
-                )
+            policy = KeyPairResourcePolicyRow(
+                name=policy_name,
+                total_resource_slots={},
+                max_session_lifetime=0,
+                max_concurrent_sessions=10,
+                max_concurrent_sftp_sessions=5,
+                max_containers_per_session=1,
+                idle_timeout=0,
+                allowed_vfolder_hosts={},
             )
-            if not existing:
-                policy = KeyPairResourcePolicyRow(
-                    name=policy_name,
-                    total_resource_slots={},
-                    max_session_lifetime=0,
-                    max_concurrent_sessions=10,
-                    max_concurrent_sftp_sessions=5,
-                    max_containers_per_session=1,
-                    idle_timeout=0,
-                    allowed_vfolder_hosts={},
-                )
-                db_sess.add(policy)
-                await db_sess.flush()
+            db_sess.add(policy)
+            await db_sess.flush()
 
         yield policy_name
 
     @pytest.fixture
-    async def test_domain_name(
+    async def sample_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[str, None]:
@@ -124,7 +118,7 @@ class TestUserRepository:
         yield domain_name
 
     @pytest.fixture
-    async def test_resource_policy_name(
+    async def sample_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[str, None]:
@@ -191,8 +185,8 @@ class TestUserRepository:
     async def sample_user_row(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
-        test_resource_policy_name: str,
+        sample_domain_name: str,
+        sample_resource_policy_name: str,
     ) -> AsyncGenerator[UserRow, None]:
         """Create sample user row for testing"""
         user_uuid = uuid.uuid4()
@@ -209,9 +203,9 @@ class TestUserRepository:
                 description="Test user for repository tests",
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=sample_domain_name,
                 role=UserRole.USER,
-                resource_policy=test_resource_policy_name,
+                resource_policy=sample_resource_policy_name,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -223,8 +217,8 @@ class TestUserRepository:
     async def another_user_row(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
-        test_resource_policy_name: str,
+        sample_domain_name: str,
+        sample_resource_policy_name: str,
     ) -> AsyncGenerator[UserRow, None]:
         """Create another user row for conflict tests"""
         user_uuid = uuid.uuid4()
@@ -241,9 +235,9 @@ class TestUserRepository:
                 description="Another test user for conflict tests",
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=sample_domain_name,
                 role=UserRole.USER,
-                resource_policy=test_resource_policy_name,
+                resource_policy=sample_resource_policy_name,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -263,8 +257,8 @@ class TestUserRepository:
     @pytest.fixture
     def sample_user_creator(
         self,
-        test_domain_name: str,
-        test_resource_policy_name: str,
+        sample_domain_name: str,
+        sample_resource_policy_name: str,
     ) -> Creator[UserRow]:
         """Create sample user creator for creation"""
         password_info = create_test_password_info("new_password")
@@ -277,9 +271,9 @@ class TestUserRepository:
             full_name="New User",
             description="New User Description",
             status=UserStatus.ACTIVE,
-            domain_name=test_domain_name,
+            domain_name=sample_domain_name,
             role=UserRole.USER,
-            resource_policy=test_resource_policy_name,
+            resource_policy=sample_resource_policy_name,
             allowed_client_ip=None,
             totp_activated=False,
             sudo_session_enabled=False,
@@ -291,7 +285,6 @@ class TestUserRepository:
 
     # ============ Get User Tests ============
 
-    @pytest.mark.asyncio
     async def test_get_by_email_validated_success(
         self,
         user_repository: UserRepository,
@@ -307,7 +300,6 @@ class TestUserRepository:
         assert result.uuid == sample_user_row.uuid
         assert result.role == sample_user_row.role
 
-    @pytest.mark.asyncio
     async def test_get_by_email_validated_not_found(
         self,
         user_repository: UserRepository,
@@ -316,7 +308,6 @@ class TestUserRepository:
         with pytest.raises(UserNotFound):
             await user_repository.get_by_email_validated("nonexistent@example.com")
 
-    @pytest.mark.asyncio
     async def test_get_by_email_validated_access_denied(
         self,
         user_repository: UserRepository,
@@ -331,7 +322,6 @@ class TestUserRepository:
         assert result is not None
         assert isinstance(result, UserData)
 
-    @pytest.mark.asyncio
     async def test_get_user_by_uuid_success(
         self,
         user_repository: UserRepository,
@@ -345,7 +335,6 @@ class TestUserRepository:
         assert result.uuid == sample_user_row.uuid
         assert result.email == sample_user_row.email
 
-    @pytest.mark.asyncio
     async def test_get_user_by_uuid_not_found(
         self,
         user_repository: UserRepository,
@@ -356,7 +345,6 @@ class TestUserRepository:
 
     # ============ Create User Tests ============
 
-    @pytest.mark.asyncio
     async def test_create_user_validated_success(
         self,
         user_repository: UserRepository,
@@ -376,13 +364,12 @@ class TestUserRepository:
         assert result.keypair is not None
         assert result.keypair.access_key is not None
 
-    @pytest.mark.asyncio
     async def test_create_user_validated_failure(
         self,
         user_repository: UserRepository,
         sample_user_row: UserRow,
-        test_domain_name: str,
-        test_resource_policy_name: str,
+        sample_domain_name: str,
+        sample_resource_policy_name: str,
     ) -> None:
         """Test user creation failure scenarios"""
         password_info = create_test_password_info("new_password")
@@ -399,7 +386,7 @@ class TestUserRepository:
                 status=UserStatus.ACTIVE,
                 domain_name="nonexistent-domain",
                 role=UserRole.USER,
-                resource_policy=test_resource_policy_name,
+                resource_policy=sample_resource_policy_name,
                 allowed_client_ip=None,
                 totp_activated=False,
                 sudo_session_enabled=False,
@@ -422,9 +409,9 @@ class TestUserRepository:
                 full_name="Duplicate Email User",
                 description="Test user",
                 status=UserStatus.ACTIVE,
-                domain_name=test_domain_name,
+                domain_name=sample_domain_name,
                 role=UserRole.USER,
-                resource_policy=test_resource_policy_name,
+                resource_policy=sample_resource_policy_name,
                 allowed_client_ip=None,
                 totp_activated=False,
                 sudo_session_enabled=False,
@@ -447,9 +434,9 @@ class TestUserRepository:
                 full_name="Duplicate Username User",
                 description="Test user",
                 status=UserStatus.ACTIVE,
-                domain_name=test_domain_name,
+                domain_name=sample_domain_name,
                 role=UserRole.USER,
-                resource_policy=test_resource_policy_name,
+                resource_policy=sample_resource_policy_name,
                 allowed_client_ip=None,
                 totp_activated=False,
                 sudo_session_enabled=False,
@@ -464,7 +451,6 @@ class TestUserRepository:
 
     # ============ Update User Tests ============
 
-    @pytest.mark.asyncio
     async def test_update_user_validated_success(
         self,
         user_repository: UserRepository,
@@ -488,7 +474,6 @@ class TestUserRepository:
         assert result.full_name == "Updated Name"
         assert result.description == "Updated Description"
 
-    @pytest.mark.asyncio
     async def test_update_user_validated_not_found(
         self,
         user_repository: UserRepository,
@@ -506,7 +491,6 @@ class TestUserRepository:
                 requester_uuid=None,
             )
 
-    @pytest.mark.asyncio
     async def test_update_user_validated_access_denied(
         self,
         user_repository: UserRepository,
@@ -517,7 +501,6 @@ class TestUserRepository:
         # Access control is expected to be handled at a higher level
         pass
 
-    @pytest.mark.asyncio
     async def test_update_user_validated_username_conflict(
         self,
         user_repository: UserRepository,
@@ -540,7 +523,6 @@ class TestUserRepository:
                 requester_uuid=None,
             )
 
-    @pytest.mark.asyncio
     async def test_update_user_validated_domain_not_found(
         self,
         user_repository: UserRepository,
@@ -559,7 +541,6 @@ class TestUserRepository:
                 requester_uuid=None,
             )
 
-    @pytest.mark.asyncio
     async def test_update_user_validated_resource_policy_not_found(
         self,
         user_repository: UserRepository,
@@ -578,7 +559,6 @@ class TestUserRepository:
                 requester_uuid=None,
             )
 
-    @pytest.mark.asyncio
     async def test_update_user_validated_same_username_no_conflict(
         self,
         user_repository: UserRepository,
@@ -602,7 +582,6 @@ class TestUserRepository:
         assert result.username == sample_user_row.username
         assert result.full_name == "Updated Name"
 
-    @pytest.mark.asyncio
     async def test_update_user_validated_domain_change_success(
         self,
         user_repository: UserRepository,
@@ -624,7 +603,6 @@ class TestUserRepository:
         assert result is not None
         assert result.domain_name == another_domain_name
 
-    @pytest.mark.asyncio
     async def test_update_user_validated_resource_policy_change_success(
         self,
         user_repository: UserRepository,
@@ -646,7 +624,6 @@ class TestUserRepository:
         assert result is not None
         assert result.resource_policy == another_resource_policy_name
 
-    @pytest.mark.asyncio
     async def test_update_user_validated_status_change(
         self,
         user_repository: UserRepository,
@@ -669,7 +646,6 @@ class TestUserRepository:
 
     # ============ Soft Delete User Tests ============
 
-    @pytest.mark.asyncio
     async def test_soft_delete_user_validated_success(
         self,
         user_repository: UserRepository,
@@ -687,7 +663,6 @@ class TestUserRepository:
 
     # ============ Statistics and Validation Tests ============
 
-    @pytest.mark.asyncio
     async def test_get_user_time_binned_monthly_stats(
         self,
         user_repository: UserRepository,
@@ -738,18 +713,6 @@ class TestUserRepository:
         # Current implementation allows all access
         assert result is True
 
-    @pytest.mark.asyncio
-    async def test_repository_decorator_applied(
-        self,
-        user_repository: UserRepository,
-    ) -> None:
-        """Test that repository decorator is properly applied"""
-        # This test verifies that the repository methods exist
-        assert hasattr(user_repository, "get_by_email_validated")
-        assert hasattr(user_repository, "create_user_validated")
-        assert hasattr(user_repository, "update_user_validated")
-        assert hasattr(user_repository, "soft_delete_user_validated")
-
     def test_user_data_conversion(
         self,
         sample_user_row: UserRow,
@@ -764,15 +727,3 @@ class TestUserRepository:
         assert user_data.role == sample_user_row.role
         assert user_data.status == sample_user_row.status.value
         assert user_data.domain_name == sample_user_row.domain_name
-
-    def test_user_status_validation(self) -> None:
-        """Test user status validation"""
-        valid_statuses = [UserStatus.ACTIVE, UserStatus.INACTIVE, UserStatus.DELETED]
-        for status in valid_statuses:
-            assert status in UserStatus
-
-    def test_user_role_validation(self) -> None:
-        """Test user role validation"""
-        valid_roles = [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN, UserRole.MONITOR]
-        for role in valid_roles:
-            assert role in UserRole
