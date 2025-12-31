@@ -35,11 +35,17 @@ from ai.backend.manager.repositories.scaling_group.creators import (
     ScalingGroupCreatorSpec,
     ScalingGroupForDomainCreatorSpec,
 )
+from ai.backend.manager.repositories.scaling_group.purgers import (
+    create_scaling_group_for_domain_purger,
+)
 from ai.backend.manager.services.scaling_group.actions.associate_with_domain import (
     AssociateScalingGroupWithDomainAction,
 )
 from ai.backend.manager.services.scaling_group.actions.create import (
     CreateScalingGroupAction,
+)
+from ai.backend.manager.services.scaling_group.actions.disassociate_with_domain import (
+    DisassociateScalingGroupWithDomainAction,
 )
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
@@ -380,3 +386,23 @@ class TestScalingGroupService:
 
         with pytest.raises(IntegrityError):
             await scaling_group_service.associate_scaling_group_with_domain(action)
+
+    # Disassociate Tests
+
+    async def test_disassociate_scaling_group_with_domain_success(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test disassociating a scaling group from a domain"""
+        mock_repository.disassociate_scaling_group_with_domain = AsyncMock(return_value=None)
+
+        purger = create_scaling_group_for_domain_purger(
+            scaling_group="test-sgroup",
+            domain="test-domain",
+        )
+        action = DisassociateScalingGroupWithDomainAction(purger=purger)
+        result = await scaling_group_service.disassociate_scaling_group_with_domain(action)
+
+        assert result is not None
+        mock_repository.disassociate_scaling_group_with_domain.assert_called_once_with(purger)
