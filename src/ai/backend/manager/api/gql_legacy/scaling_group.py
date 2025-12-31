@@ -37,6 +37,13 @@ from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
+from ai.backend.manager.repositories.scaling_group.creators import (
+    ScalingGroupCreatorSpec,
+    ScalingGroupForDomainCreatorSpec,
+)
+from ai.backend.manager.services.scaling_group.actions.associate_with_domain import (
+    AssociateScalingGroupWithDomainAction,
+)
 from ai.backend.manager.services.scaling_group.actions.create import (
     CreateScalingGroupAction,
 )
@@ -772,10 +779,20 @@ class AssociateScalingGroupsWithDomain(graphene.Mutation):
         scaling_groups: Sequence[str],
         domain: str,
     ) -> AssociateScalingGroupsWithDomain:
-        insert_query = sa.insert(sgroups_for_domains).values([
-            {"scaling_group": scaling_group, "domain": domain} for scaling_group in scaling_groups
-        ])
-        return await simple_db_mutate(cls, info.context, insert_query)
+        ctx: GraphQueryContext = info.context
+        for scaling_group in scaling_groups:
+            creator = Creator(
+                spec=ScalingGroupForDomainCreatorSpec(
+                    scaling_group=scaling_group,
+                    domain=domain,
+                )
+            )
+            await (
+                ctx.processors.scaling_group.associate_scaling_group_with_domain.wait_for_complete(
+                    AssociateScalingGroupWithDomainAction(creator=creator)
+                )
+            )
+        return cls(ok=True, msg="")
 
 
 class DisassociateScalingGroupWithDomain(graphene.Mutation):
