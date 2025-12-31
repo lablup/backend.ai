@@ -657,6 +657,7 @@ class TestScalingGroupRepositoryDB:
         assert result.driver.name == "docker"
         assert result.driver.options == {"new_opt": "value"}
         assert result.scheduler.name.value == "drf"
+        assert SessionTypes.BATCH in result.scheduler.options.allowed_session_types
         assert result.network.use_host_network is True
 
     async def test_update_scaling_group_not_found(
