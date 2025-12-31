@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.19.0rc3 (2025-12-31)
+
+### Fixes
+* Fix `modify_keypair_resource_policy` ignores empty JSON for `total_resource_slots` ([#7658](https://github.com/lablup/backend.ai/issues/7658))
+
+
 ## 25.19.0rc2 (2025-12-31)
 
 ### Features
