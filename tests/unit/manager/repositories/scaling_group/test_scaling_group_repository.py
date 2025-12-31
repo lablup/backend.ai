@@ -633,7 +633,6 @@ class TestScalingGroupRepositoryDB:
         """Test updating a scaling group"""
         new_scheduler_opts = ScalingGroupOpts(
             allowed_session_types=[SessionTypes.BATCH],
-            config={"updated": True},
         )
         updater = self._create_scaling_group_updater(
             name=sample_scaling_group_for_update,
