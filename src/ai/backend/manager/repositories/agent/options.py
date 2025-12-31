@@ -13,8 +13,7 @@ class AgentConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return AgentRow.id.ilike(f"%{id}%")
-            else:
-                return AgentRow.id.like(f"%{id}%")
+            return AgentRow.id.like(f"%{id}%")
 
         return inner
 
@@ -23,8 +22,7 @@ class AgentConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return sa.func.lower(AgentRow.id) == id.lower()
-            else:
-                return AgentRow.id == id
+            return AgentRow.id == id
 
         return inner
 
@@ -56,8 +54,7 @@ class AgentConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return AgentRow.scaling_group.ilike(f"%{scaling_group}%")
-            else:
-                return AgentRow.scaling_group.like(f"%{scaling_group}%")
+            return AgentRow.scaling_group.like(f"%{scaling_group}%")
 
         return inner
 
@@ -68,8 +65,7 @@ class AgentConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return sa.func.lower(AgentRow.scaling_group) == scaling_group.lower()
-            else:
-                return AgentRow.scaling_group == scaling_group
+            return AgentRow.scaling_group == scaling_group
 
         return inner
 
@@ -109,26 +105,22 @@ class AgentOrders:
     def id(ascending: bool = True) -> QueryOrder:
         if ascending:
             return AgentRow.id.asc()
-        else:
-            return AgentRow.id.desc()
+        return AgentRow.id.desc()
 
     @staticmethod
     def scaling_group(ascending: bool = True) -> QueryOrder:
         if ascending:
             return AgentRow.scaling_group.asc()
-        else:
-            return AgentRow.scaling_group.desc()
+        return AgentRow.scaling_group.desc()
 
     @staticmethod
     def first_contact(ascending: bool = True) -> QueryOrder:
         if ascending:
             return AgentRow.first_contact.asc()
-        else:
-            return AgentRow.first_contact.desc()
+        return AgentRow.first_contact.desc()
 
     @staticmethod
     def schedulable(ascending: bool = True) -> QueryOrder:
         if ascending:
             return AgentRow.schedulable.asc()
-        else:
-            return AgentRow.schedulable.desc()
+        return AgentRow.schedulable.desc()
