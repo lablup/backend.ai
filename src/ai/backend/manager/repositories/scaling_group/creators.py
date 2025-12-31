@@ -3,8 +3,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Optional, override
+from uuid import UUID
 
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForProjectRow,
+    ScalingGroupOpts,
+    ScalingGroupRow,
+)
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 
 
@@ -38,4 +43,19 @@ class ScalingGroupCreatorSpec(CreatorSpec[ScalingGroupRow]):
             scheduler=self.scheduler,
             scheduler_opts=self.scheduler_opts if self.scheduler_opts else ScalingGroupOpts(),
             use_host_network=self.use_host_network,
+        )
+
+
+@dataclass
+class ScalingGroupForProjectCreatorSpec(CreatorSpec[ScalingGroupForProjectRow]):
+    """CreatorSpec for associating a scaling group with a project (user group)."""
+
+    scaling_group: str
+    project: UUID
+
+    @override
+    def build_row(self) -> ScalingGroupForProjectRow:
+        return ScalingGroupForProjectRow(
+            scaling_group=self.scaling_group,
+            group=self.project,
         )

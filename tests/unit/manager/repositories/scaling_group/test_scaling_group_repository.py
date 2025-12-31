@@ -20,7 +20,11 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForProjectRow,
+    ScalingGroupOpts,
+    ScalingGroupRow,
+)
 from ai.backend.manager.models.session import SessionId, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -28,7 +32,13 @@ from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
-from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
+from ai.backend.manager.repositories.scaling_group.creators import (
+    ScalingGroupCreatorSpec,
+    ScalingGroupForProjectCreatorSpec,
+)
+from ai.backend.manager.repositories.scaling_group.purgers import (
+    create_scaling_group_for_project_purger,
+)
 
 
 class TestScalingGroupRepositoryDB:
@@ -554,3 +564,99 @@ class TestScalingGroupRepositoryDB:
         # Then: Should return the deleted scaling group data
         assert result.name == sgroup_name
         assert result.metadata.description == "Test scaling group for cascade delete"
+
+    # Associate/Disassociate with User Group (Project) Tests
+
+    async def test_associate_scaling_group_with_user_group_success(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        sample_scaling_group_for_purge: str,
+        test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test associating a scaling group with a user group (project)."""
+        # Given: A scaling group and a project (group)
+        sgroup_name = sample_scaling_group_for_purge
+        _, _, project_id = test_user_domain_group
+
+        # When: Associate the scaling group with the project
+        creator = Creator(
+            spec=ScalingGroupForProjectCreatorSpec(
+                scaling_group=sgroup_name,
+                project=project_id,
+            )
+        )
+        await scaling_group_repository.associate_scaling_group_with_user_group(creator)
+
+        # Then: Association should exist in the database
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            query = sa.select(ScalingGroupForProjectRow).where(
+                sa.and_(
+                    ScalingGroupForProjectRow.scaling_group == sgroup_name,
+                    ScalingGroupForProjectRow.group == project_id,
+                )
+            )
+            result = await db_sess.execute(query)
+            row = result.scalar_one_or_none()
+            assert row is not None
+            assert row.scaling_group == sgroup_name
+            assert row.group == project_id
+
+    async def test_disassociate_scaling_group_with_user_group_success(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        sample_scaling_group_for_purge: str,
+        test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test disassociating a scaling group from a user group (project)."""
+        # Given: A scaling group associated with a project
+        sgroup_name = sample_scaling_group_for_purge
+        _, _, project_id = test_user_domain_group
+
+        # First, associate the scaling group with the project
+        async with db_with_cleanup.begin_session() as db_sess:
+            association = ScalingGroupForProjectRow(
+                scaling_group=sgroup_name,
+                group=project_id,
+            )
+            db_sess.add(association)
+            await db_sess.flush()
+
+        # When: Disassociate the scaling group from the project
+        purger = create_scaling_group_for_project_purger(
+            scaling_group=sgroup_name,
+            project=project_id,
+        )
+        await scaling_group_repository.disassociate_scaling_group_with_user_group(purger)
+
+        # Then: Association should no longer exist in the database
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            query = sa.select(ScalingGroupForProjectRow).where(
+                sa.and_(
+                    ScalingGroupForProjectRow.scaling_group == sgroup_name,
+                    ScalingGroupForProjectRow.group == project_id,
+                )
+            )
+            result = await db_sess.execute(query)
+            row = result.scalar_one_or_none()
+            assert row is None
+
+    async def test_disassociate_nonexistent_scaling_group_with_user_group(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        sample_scaling_group_for_purge: str,
+        test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
+    ) -> None:
+        """Test disassociating a non-existent association does not raise error."""
+        # Given: A scaling group that is NOT associated with a project
+        sgroup_name = sample_scaling_group_for_purge
+        _, _, project_id = test_user_domain_group
+
+        # When: Disassociate (even though no association exists)
+        purger = create_scaling_group_for_project_purger(
+            scaling_group=sgroup_name,
+            project=project_id,
+        )
+        # Then: Should not raise any error (BatchPurger deletes 0 rows silently)
+        await scaling_group_repository.disassociate_scaling_group_with_user_group(purger)
