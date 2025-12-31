@@ -3,6 +3,7 @@ Tests for ScalingGroupService functionality.
 Tests the service layer with mocked repository operations.
 """
 
+import uuid
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -27,20 +28,24 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
+    ScalingGroupForProjectRow,
     ScalingGroupOpts,
     ScalingGroupRow,
 )
 from ai.backend.manager.registry import check_scaling_group
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
+from ai.backend.manager.repositories.base.purger import BatchPurger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.repositories.scaling_group.creators import (
     ScalingGroupCreatorSpec,
     ScalingGroupForDomainCreatorSpec,
+    ScalingGroupForProjectCreatorSpec,
 )
 from ai.backend.manager.repositories.scaling_group.purgers import (
     create_scaling_group_for_domain_purger,
+    create_scaling_group_for_project_purger,
 )
 from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupMetadataUpdaterSpec,
@@ -50,9 +55,15 @@ from ai.backend.manager.repositories.scaling_group.updaters import (
 from ai.backend.manager.services.scaling_group.actions.associate_with_domain import (
     AssociateScalingGroupWithDomainsAction,
 )
+from ai.backend.manager.services.scaling_group.actions.associate_with_user_group import (
+    AssociateScalingGroupWithUserGroupAction,
+)
 from ai.backend.manager.services.scaling_group.actions.create import CreateScalingGroupAction
 from ai.backend.manager.services.scaling_group.actions.disassociate_with_domain import (
     DisassociateScalingGroupWithDomainsAction,
+)
+from ai.backend.manager.services.scaling_group.actions.disassociate_with_user_group import (
+    DisassociateScalingGroupWithUserGroupAction,
 )
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
@@ -375,7 +386,7 @@ class TestScalingGroupService:
         with pytest.raises(ScalingGroupNotFound):
             await scaling_group_service.modify_scaling_group(action)
 
-    # Associate Tests
+    # Associate with Domain Tests
 
     async def test_associate_scaling_group_with_domains_success(
         self,
@@ -399,7 +410,7 @@ class TestScalingGroupService:
         assert result is not None
         mock_repository.associate_scaling_group_with_domains.assert_called_once_with(bulk_creator)
 
-    # Disassociate Tests
+    # Disassociate with Domain Tests
 
     async def test_disassociate_scaling_group_with_domains_success(
         self,
@@ -418,6 +429,52 @@ class TestScalingGroupService:
 
         assert result is not None
         mock_repository.disassociate_scaling_group_with_domains.assert_called_once_with(purger)
+
+    # Associate/Disassociate with User Group (Project) Tests
+
+    async def test_associate_scaling_group_with_user_group_success(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test associating a scaling group with a user group (project)"""
+        mock_repository.associate_scaling_group_with_user_group = AsyncMock(return_value=None)
+
+        scaling_group_name = "test-scaling-group"
+        project_id = uuid.uuid4()
+
+        creator: Creator[ScalingGroupForProjectRow] = Creator(
+            spec=ScalingGroupForProjectCreatorSpec(
+                scaling_group=scaling_group_name,
+                project=project_id,
+            )
+        )
+        action = AssociateScalingGroupWithUserGroupAction(creator=creator)
+        result = await scaling_group_service.associate_scaling_group_with_user_group(action)
+
+        assert result is not None
+        mock_repository.associate_scaling_group_with_user_group.assert_called_once_with(creator)
+
+    async def test_disassociate_scaling_group_with_user_group_success(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test disassociating a scaling group from a user group (project)"""
+        mock_repository.disassociate_scaling_group_with_user_group = AsyncMock(return_value=None)
+
+        scaling_group_name = "test-scaling-group"
+        project_id = uuid.uuid4()
+
+        purger: BatchPurger[ScalingGroupForProjectRow] = create_scaling_group_for_project_purger(
+            scaling_group=scaling_group_name,
+            project=project_id,
+        )
+        action = DisassociateScalingGroupWithUserGroupAction(purger=purger)
+        result = await scaling_group_service.disassociate_scaling_group_with_user_group(action)
+
+        assert result is not None
+        mock_repository.disassociate_scaling_group_with_user_group.assert_called_once_with(purger)
 
 
 class TestCheckScalingGroup:
