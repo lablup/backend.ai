@@ -15,9 +15,9 @@ jobs:
       matrix:
         # ubuntu-22.04: x86-64
         # ubuntu-22.04-arm64: aarch64
-        # self-hosted-macos-14-x64: intel
+        # macos-14-large: intel
         # self-hosted-macos-14: apple silicon
-        os: [ubuntu-22.04, ubuntu-22.04-arm64, self-hosted-macos-14-x64, self-hosted-macos-14]
+        os: [ubuntu-22.04, ubuntu-22.04-arm64, macos-14-large, self-hosted-macos-14]
     runs-on: ${{ matrix.os }}
     steps:
     - name: Check out the revision
