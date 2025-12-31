@@ -11,12 +11,13 @@ from ai.backend.manager.services.scaling_group.actions.list_scaling_groups impor
     SearchScalingGroupsAction,
     SearchScalingGroupsActionResult,
 )
-from ai.backend.manager.services.scaling_group.actions.purge_scaling_group import (
-    PurgeScalingGroupAction,
-    PurgeScalingGroupActionResult,
 from ai.backend.manager.services.scaling_group.actions.modify import (
     ModifyScalingGroupAction,
     ModifyScalingGroupActionResult,
+)
+from ai.backend.manager.services.scaling_group.actions.purge_scaling_group import (
+    PurgeScalingGroupAction,
+    PurgeScalingGroupActionResult,
 )
 from ai.backend.manager.services.scaling_group.service import ScalingGroupService
 
