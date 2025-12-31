@@ -32,5 +32,4 @@ class TestModifyKeyPairResourcePolicyInputType:
         mock_input.max_pending_session_resource_slots = Undefined
 
         result = ModifyKeyPairResourcePolicyInput.to_updater(mock_input, "test_policy")
-
-        assert result.spec.total_resource_slots._state != _TriStateEnum.UPDATE  # type: ignore[attr-defined]
+        assert result.spec.total_resource_slots._state == _TriStateEnum.UPDATE  # type: ignore[attr-defined]
