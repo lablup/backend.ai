@@ -367,9 +367,9 @@ jobs:
       matrix:
         # ubuntu-22.04: x86-64
         # ubuntu-22.04-arm64: aarch64
-        # self-hosted-macos-14-x64: intel
+        # macos-14-large: intel
         # self-hosted-macos-14: apple silicon
-        os: [ubuntu-22.04, ubuntu-22.04-arm64, self-hosted-macos-14-x64, self-hosted-macos-14]
+        os: [ubuntu-22.04, ubuntu-22.04-arm64, macos-14-large, self-hosted-macos-14]
     runs-on: ${{ matrix.os }}
     env:
       SCIENCE_AUTH_API_GITHUB_COM_BEARER: ${{ secrets.GITHUB_TOKEN }}
@@ -476,7 +476,7 @@ jobs:
     uses: ./.github/workflows/sbom.yml
 
   build-isla-sorna-image:
-    needs: [build-scies, build-wheels, build-sbom, optimize-ci]
+    needs: [build-scies, build-wheels, optimize-ci]
     if: needs.optimize-ci.outputs.release == 'true'
     runs-on: ubuntu-latest
 
@@ -491,7 +491,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT }}
 
   make-final-release:
-    needs: [build-scies, build-wheels, build-sbom, optimize-ci]
+    needs: [build-scies, build-wheels, optimize-ci]
     if: needs.optimize-ci.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -532,6 +532,7 @@ jobs:
         cat dist/checksum-*.txt > dist/checksum.txt
         sort -u -k2 dist/checksum.txt -o dist/checksum.txt
     - name: Download SBOM report
+      continue-on-error: true
       uses: actions/download-artifact@v6
       with:
         name: SBOM report
