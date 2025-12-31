@@ -48,6 +48,9 @@ from ai.backend.manager.repositories.scaling_group.creators import (
     ScalingGroupCreatorSpec,
     ScalingGroupForDomainCreatorSpec,
 )
+from ai.backend.manager.repositories.scaling_group.purgers import (
+    create_scaling_group_for_domain_purger,
+)
 from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupDriverConfigUpdaterSpec,
     ScalingGroupMetadataUpdaterSpec,
@@ -788,3 +791,71 @@ class TestScalingGroupRepositoryDB:
             assert association is not None
             assert association.scaling_group == sample_scaling_group_for_association
             assert association.domain == sample_domain
+
+    # Disassociate Tests
+    async def test_disassociate_scaling_group_with_domain_success(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_scaling_group_for_association: str,
+        sample_domain: str,
+    ) -> None:
+        """Test disassociating a scaling group from a domain"""
+        # First, associate the scaling group with the domain
+        creator = Creator(
+            spec=ScalingGroupForDomainCreatorSpec(
+                scaling_group=sample_scaling_group_for_association,
+                domain=sample_domain,
+            )
+        )
+        await scaling_group_repository.associate_scaling_group_with_domain(creator)
+
+        # Verify association exists
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ScalingGroupForDomainRow).where(
+                    sa.and_(
+                        ScalingGroupForDomainRow.scaling_group
+                        == sample_scaling_group_for_association,
+                        ScalingGroupForDomainRow.domain == sample_domain,
+                    )
+                )
+            )
+            association = result.scalar_one_or_none()
+            assert association is not None
+
+        # Disassociate the scaling group from the domain
+        purger = create_scaling_group_for_domain_purger(
+            scaling_group=sample_scaling_group_for_association,
+            domain=sample_domain,
+        )
+        await scaling_group_repository.disassociate_scaling_group_with_domain(purger)
+
+        # Verify association is removed
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ScalingGroupForDomainRow).where(
+                    sa.and_(
+                        ScalingGroupForDomainRow.scaling_group
+                        == sample_scaling_group_for_association,
+                        ScalingGroupForDomainRow.domain == sample_domain,
+                    )
+                )
+            )
+            association = result.scalar_one_or_none()
+            assert association is None
+
+    async def test_disassociate_scaling_group_with_domain_nonexistent(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_scaling_group_for_association: str,
+        sample_domain: str,
+    ) -> None:
+        """Test disassociating a non-existent association (should not raise error)"""
+        # Disassociate without prior association should succeed without error
+        purger = create_scaling_group_for_domain_purger(
+            scaling_group=sample_scaling_group_for_association,
+            domain=sample_domain,
+        )
+        await scaling_group_repository.disassociate_scaling_group_with_domain(purger)

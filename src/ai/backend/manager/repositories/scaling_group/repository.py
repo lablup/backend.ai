@@ -15,7 +15,7 @@ from ai.backend.manager.data.scaling_group.types import ScalingGroupData, Scalin
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.repositories.base.purger import BatchPurger, Purger
 from ai.backend.manager.repositories.base.updater import Updater
 
 from .db_source import ScalingGroupDBSource
@@ -96,3 +96,10 @@ class ScalingGroupRepository:
     ) -> None:
         """Associates a single scaling group with a domain."""
         await self._db_source.associate_scaling_group_with_domain(creator)
+
+    async def disassociate_scaling_group_with_domain(
+        self,
+        purger: BatchPurger[ScalingGroupForDomainRow],
+    ) -> None:
+        """Disassociates a single scaling group from a domain."""
+        await self._db_source.disassociate_scaling_group_with_domain(purger)

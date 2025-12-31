@@ -15,7 +15,12 @@ from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, Sc
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
-from ai.backend.manager.repositories.base.purger import Purger, execute_purger
+from ai.backend.manager.repositories.base.purger import (
+    BatchPurger,
+    Purger,
+    execute_batch_purger,
+    execute_purger,
+)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
 
@@ -151,3 +156,11 @@ class ScalingGroupDBSource:
         """Associates a single scaling group with a domain."""
         async with self._db.begin_session() as session:
             await execute_creator(session, creator)
+
+    async def disassociate_scaling_group_with_domain(
+        self,
+        purger: BatchPurger[ScalingGroupForDomainRow],
+    ) -> None:
+        """Disassociates a single scaling group from a domain."""
+        async with self._db.begin_session() as session:
+            await execute_batch_purger(session, purger)

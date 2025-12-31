@@ -10,6 +10,10 @@ from ai.backend.manager.services.scaling_group.actions.create import (
     CreateScalingGroupAction,
     CreateScalingGroupActionResult,
 )
+from ai.backend.manager.services.scaling_group.actions.disassociate_with_domain import (
+    DisassociateScalingGroupWithDomainAction,
+    DisassociateScalingGroupWithDomainActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
     SearchScalingGroupsActionResult,
@@ -74,3 +78,10 @@ class ScalingGroupService:
         """Associates a single scaling group with a domain."""
         await self._repository.associate_scaling_group_with_domain(action.creator)
         return AssociateScalingGroupWithDomainActionResult()
+
+    async def disassociate_scaling_group_with_domain(
+        self, action: DisassociateScalingGroupWithDomainAction
+    ) -> DisassociateScalingGroupWithDomainActionResult:
+        """Disassociates a single scaling group from a domain."""
+        await self._repository.disassociate_scaling_group_with_domain(action.purger)
+        return DisassociateScalingGroupWithDomainActionResult()

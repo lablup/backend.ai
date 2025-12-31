@@ -11,6 +11,10 @@ from ai.backend.manager.services.scaling_group.actions.create import (
     CreateScalingGroupAction,
     CreateScalingGroupActionResult,
 )
+from ai.backend.manager.services.scaling_group.actions.disassociate_with_domain import (
+    DisassociateScalingGroupWithDomainAction,
+    DisassociateScalingGroupWithDomainActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
     SearchScalingGroupsActionResult,
@@ -36,6 +40,9 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
     associate_scaling_group_with_domain: ActionProcessor[
         AssociateScalingGroupWithDomainAction, AssociateScalingGroupWithDomainActionResult
     ]
+    disassociate_scaling_group_with_domain: ActionProcessor[
+        DisassociateScalingGroupWithDomainAction, DisassociateScalingGroupWithDomainActionResult
+    ]
 
     def __init__(self, service: ScalingGroupService, action_monitors: list[ActionMonitor]) -> None:
         self.create_scaling_group = ActionProcessor(service.create_scaling_group, action_monitors)
@@ -44,6 +51,9 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         self.search_scaling_groups = ActionProcessor(service.search_scaling_groups, action_monitors)
         self.associate_scaling_group_with_domain = ActionProcessor(
             service.associate_scaling_group_with_domain, action_monitors
+        )
+        self.disassociate_scaling_group_with_domain = ActionProcessor(
+            service.disassociate_scaling_group_with_domain, action_monitors
         )
 
     @override
@@ -54,4 +64,5 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
             ModifyScalingGroupAction.spec(),
             SearchScalingGroupsAction.spec(),
             AssociateScalingGroupWithDomainAction.spec(),
+            DisassociateScalingGroupWithDomainAction.spec(),
         ]
