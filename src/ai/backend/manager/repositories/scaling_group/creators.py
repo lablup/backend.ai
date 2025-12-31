@@ -4,7 +4,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Optional, override
 
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.common.types import AccessKey
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForKeypairsRow,
+    ScalingGroupOpts,
+    ScalingGroupRow,
+)
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 
 
@@ -38,4 +43,19 @@ class ScalingGroupCreatorSpec(CreatorSpec[ScalingGroupRow]):
             scheduler=self.scheduler,
             scheduler_opts=self.scheduler_opts if self.scheduler_opts else ScalingGroupOpts(),
             use_host_network=self.use_host_network,
+        )
+
+
+@dataclass
+class ScalingGroupForKeypairsCreatorSpec(CreatorSpec[ScalingGroupForKeypairsRow]):
+    """CreatorSpec for associating a scaling group with a keypair."""
+
+    scaling_group: str
+    access_key: AccessKey
+
+    @override
+    def build_row(self) -> ScalingGroupForKeypairsRow:
+        return ScalingGroupForKeypairsRow(
+            scaling_group=self.scaling_group,
+            access_key=self.access_key,
         )
