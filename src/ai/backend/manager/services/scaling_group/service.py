@@ -2,9 +2,17 @@ import logging
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
+from ai.backend.manager.services.scaling_group.actions.associate_with_keypair import (
+    AssociateScalingGroupWithKeypairAction,
+    AssociateScalingGroupWithKeypairActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.create import (
     CreateScalingGroupAction,
     CreateScalingGroupActionResult,
+)
+from ai.backend.manager.services.scaling_group.actions.disassociate_with_keypair import (
+    DisassociateScalingGroupWithKeypairAction,
+    DisassociateScalingGroupWithKeypairActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
@@ -52,3 +60,17 @@ class ScalingGroupService:
         """Purges a scaling group and all related sessions and routes."""
         data = await self._repository.purge_scaling_group(action.purger)
         return PurgeScalingGroupActionResult(data=data)
+
+    async def associate_scaling_group_with_keypair(
+        self, action: AssociateScalingGroupWithKeypairAction
+    ) -> AssociateScalingGroupWithKeypairActionResult:
+        """Associates a scaling group with a keypair."""
+        await self._repository.associate_scaling_group_with_keypair(action.creator)
+        return AssociateScalingGroupWithKeypairActionResult()
+
+    async def disassociate_scaling_group_with_keypair(
+        self, action: DisassociateScalingGroupWithKeypairAction
+    ) -> DisassociateScalingGroupWithKeypairActionResult:
+        """Disassociates a scaling group from a keypair."""
+        await self._repository.disassociate_scaling_group_with_keypair(action.purger)
+        return DisassociateScalingGroupWithKeypairActionResult()

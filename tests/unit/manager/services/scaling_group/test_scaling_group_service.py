@@ -26,14 +26,31 @@ from ai.backend.manager.errors.resource import (
     ScalingGroupNotFound,
     ScalingGroupSessionTypeNotAllowed,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForKeypairsRow,
+    ScalingGroupOpts,
+    ScalingGroupRow,
+)
 from ai.backend.manager.registry import check_scaling_group
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.purger import BatchPurger
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
-from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
+from ai.backend.manager.repositories.scaling_group.creators import (
+    ScalingGroupCreatorSpec,
+    ScalingGroupForKeypairsCreatorSpec,
+)
+from ai.backend.manager.repositories.scaling_group.purgers import (
+    create_scaling_group_for_keypairs_purger,
+)
+from ai.backend.manager.services.scaling_group.actions.associate_with_keypair import (
+    AssociateScalingGroupWithKeypairAction,
+)
 from ai.backend.manager.services.scaling_group.actions.create import (
     CreateScalingGroupAction,
+)
+from ai.backend.manager.services.scaling_group.actions.disassociate_with_keypair import (
+    DisassociateScalingGroupWithKeypairAction,
 )
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
@@ -331,6 +348,52 @@ class TestScalingGroupService:
 
         with pytest.raises(ScalingGroupConflict):
             await scaling_group_service.create_scaling_group(action)
+
+    # Associate/Disassociate with Keypair Tests
+
+    async def test_associate_scaling_group_with_keypair_success(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test associating a scaling group with a keypair"""
+        mock_repository.associate_scaling_group_with_keypair = AsyncMock(return_value=None)
+
+        scaling_group_name = "test-scaling-group"
+        access_key = AccessKey("AKTEST1234567890")
+
+        creator: Creator[ScalingGroupForKeypairsRow] = Creator(
+            spec=ScalingGroupForKeypairsCreatorSpec(
+                scaling_group=scaling_group_name,
+                access_key=access_key,
+            )
+        )
+        action = AssociateScalingGroupWithKeypairAction(creator=creator)
+        result = await scaling_group_service.associate_scaling_group_with_keypair(action)
+
+        assert result is not None
+        mock_repository.associate_scaling_group_with_keypair.assert_called_once_with(creator)
+
+    async def test_disassociate_scaling_group_with_keypair_success(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test disassociating a scaling group from a keypair"""
+        mock_repository.disassociate_scaling_group_with_keypair = AsyncMock(return_value=None)
+
+        scaling_group_name = "test-scaling-group"
+        access_key = AccessKey("AKTEST1234567890")
+
+        purger: BatchPurger[ScalingGroupForKeypairsRow] = create_scaling_group_for_keypairs_purger(
+            scaling_group=scaling_group_name,
+            access_key=access_key,
+        )
+        action = DisassociateScalingGroupWithKeypairAction(purger=purger)
+        result = await scaling_group_service.disassociate_scaling_group_with_keypair(action)
+
+        assert result is not None
+        mock_repository.disassociate_scaling_group_with_keypair.assert_called_once_with(purger)
 
 
 class TestCheckScalingGroup:
