@@ -11,6 +11,7 @@ from ai.backend.common.types import SessionTypes
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.models import DomainRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import GroupRow
@@ -20,15 +21,13 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
-from ai.backend.manager.models.session import SessionId, SessionRow
-from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.models import DomainRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
     ScalingGroupOpts,
     ScalingGroupRow,
 )
+from ai.backend.manager.models.session import SessionId, SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import Creator
