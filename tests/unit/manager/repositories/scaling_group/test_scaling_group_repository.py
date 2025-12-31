@@ -50,6 +50,14 @@ class TestScalingGroupRepositoryDB:
         yield database_engine
 
         async with database_engine.begin_session() as db_sess:
+            # Delete in dependency order to avoid foreign key violations
+            await db_sess.execute(sa.delete(RoutingRow))
+            await db_sess.execute(sa.delete(EndpointRow))
+            await db_sess.execute(sa.delete(SessionRow))
+            await db_sess.execute(sa.delete(GroupRow))
+            await db_sess.execute(sa.delete(UserRow))
+            await db_sess.execute(sa.delete(UserResourcePolicyRow))
+            await db_sess.execute(sa.delete(ProjectResourcePolicyRow))
             await db_sess.execute(sa.delete(ScalingGroupForDomainRow))
             await db_sess.execute(sa.delete(ScalingGroupRow))
             await db_sess.execute(sa.delete(DomainRow))
