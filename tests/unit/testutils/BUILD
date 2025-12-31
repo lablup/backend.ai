@@ -5,3 +5,7 @@ python_tests(
         "src/ai/backend/testutils:testutils",
     ],
 )
+
+python_test_utils(
+    name="test_utils",
+)
