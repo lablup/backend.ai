@@ -508,13 +508,13 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
     def to_updater(self, name: str) -> Updater[KeyPairResourcePolicyRow]:
         default_for_unspecified = (
             DefaultForUnspecified[self.default_for_unspecified]
-            if self.default_for_unspecified
+            if self.default_for_unspecified is not Undefined
             else Undefined
         )
 
         total_resource_slots = (
             ResourceSlot.from_user_input(self.total_resource_slots, None)
-            if self.total_resource_slots
+            if self.total_resource_slots is not Undefined
             else Undefined
         )
 
