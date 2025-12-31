@@ -10,6 +10,10 @@ from ai.backend.manager.services.scaling_group.actions.associate_with_keypair im
     AssociateScalingGroupWithKeypairsAction,
     AssociateScalingGroupWithKeypairsActionResult,
 )
+from ai.backend.manager.services.scaling_group.actions.associate_with_user_group import (
+    AssociateScalingGroupWithUserGroupAction,
+    AssociateScalingGroupWithUserGroupActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.create import (
     CreateScalingGroupAction,
     CreateScalingGroupActionResult,
@@ -21,6 +25,10 @@ from ai.backend.manager.services.scaling_group.actions.disassociate_with_domain 
 from ai.backend.manager.services.scaling_group.actions.disassociate_with_keypair import (
     DisassociateScalingGroupWithKeypairsAction,
     DisassociateScalingGroupWithKeypairsActionResult,
+)
+from ai.backend.manager.services.scaling_group.actions.disassociate_with_user_group import (
+    DisassociateScalingGroupWithUserGroupAction,
+    DisassociateScalingGroupWithUserGroupActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
@@ -107,3 +115,17 @@ class ScalingGroupService:
         """Disassociates a scaling group from multiple keypairs."""
         await self._repository.disassociate_scaling_group_with_keypairs(action.purger)
         return DisassociateScalingGroupWithKeypairsActionResult()
+
+    async def associate_scaling_group_with_user_group(
+        self, action: AssociateScalingGroupWithUserGroupAction
+    ) -> AssociateScalingGroupWithUserGroupActionResult:
+        """Associates a single scaling group with a user group (project)."""
+        await self._repository.associate_scaling_group_with_user_group(action.creator)
+        return AssociateScalingGroupWithUserGroupActionResult()
+
+    async def disassociate_scaling_group_with_user_group(
+        self, action: DisassociateScalingGroupWithUserGroupAction
+    ) -> DisassociateScalingGroupWithUserGroupActionResult:
+        """Disassociates a single scaling group from a user group (project)."""
+        await self._repository.disassociate_scaling_group_with_user_group(action.purger)
+        return DisassociateScalingGroupWithUserGroupActionResult()

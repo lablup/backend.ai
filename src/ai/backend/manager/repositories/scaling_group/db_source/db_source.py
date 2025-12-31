@@ -14,6 +14,7 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
     ScalingGroupForKeypairsRow,
+    ScalingGroupForProjectRow,
     ScalingGroupRow,
 )
 from ai.backend.manager.models.session import SessionRow
@@ -227,3 +228,19 @@ class ScalingGroupDBSource:
             )
             result = await session.execute(query)
             return result.scalar() or False
+
+    async def associate_scaling_group_with_user_group(
+        self,
+        creator: Creator[ScalingGroupForProjectRow],
+    ) -> None:
+        """Associates a single scaling group with a user group (project)."""
+        async with self._db.begin_session() as session:
+            await execute_creator(session, creator)
+
+    async def disassociate_scaling_group_with_user_group(
+        self,
+        purger: BatchPurger[ScalingGroupForProjectRow],
+    ) -> None:
+        """Disassociates a single scaling group from a user group (project)."""
+        async with self._db.begin_session() as session:
+            await execute_batch_purger(session, purger)

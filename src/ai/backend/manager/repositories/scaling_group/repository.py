@@ -15,6 +15,7 @@ from ai.backend.manager.data.scaling_group.types import ScalingGroupData, Scalin
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
     ScalingGroupForKeypairsRow,
+    ScalingGroupForProjectRow,
     ScalingGroupRow,
 )
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -143,3 +144,17 @@ class ScalingGroupRepository:
         return await self._db_source.check_scaling_group_keypair_association_exists(
             scaling_group_name, access_key
         )
+
+    async def associate_scaling_group_with_user_group(
+        self,
+        creator: Creator[ScalingGroupForProjectRow],
+    ) -> None:
+        """Associates a single scaling group with a user group (project)."""
+        await self._db_source.associate_scaling_group_with_user_group(creator)
+
+    async def disassociate_scaling_group_with_user_group(
+        self,
+        purger: BatchPurger[ScalingGroupForProjectRow],
+    ) -> None:
+        """Disassociates a single scaling group from a user group (project)."""
+        await self._db_source.disassociate_scaling_group_with_user_group(purger)
