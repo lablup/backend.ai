@@ -186,6 +186,7 @@ from .errors.resource import (
     InstanceNotFound,
     NoCurrentTaskContext,
     ScalingGroupNotFound,
+    ScalingGroupSessionTypeNotAllowed,
     SessionNotAllocated,
 )
 from .exceptions import MultiAgentError
@@ -4282,23 +4283,25 @@ async def check_scaling_group(
                 f"No scaling groups accept the session type '{session_type}'.",
             )
     else:
-        err_msg = (
-            f"The scaling group '{scaling_group}' does not exist "
-            f"or you do not have access to the scaling group '{scaling_group}'."
-        )
+        scaling_group_found = False
         for sgroup in candidates:
             if scaling_group == sgroup["name"]:
                 # scaling_group's unique key is 'name' field for now,
                 # but we will change scaling_group's unique key to new 'id' field.
+                scaling_group_found = True
                 allowed_session_types = sgroup["scheduler_opts"].allowed_session_types
                 if stype in allowed_session_types:
                     break
-                err_msg = (
-                    f"The scaling group '{scaling_group}' does not accept "
-                    f"the session type '{session_type}'. "
-                )
         else:
-            raise ScalingGroupNotFound(err_msg)
+            if scaling_group_found:
+                raise ScalingGroupSessionTypeNotAllowed(
+                    f"The scaling group '{scaling_group}' does not accept "
+                    f"the session type '{session_type}'."
+                )
+            raise ScalingGroupNotFound(
+                f"The scaling group '{scaling_group}' does not exist "
+                f"or you do not have access to the scaling group '{scaling_group}'."
+            )
     if scaling_group is None:
         raise ScalingGroupNotFound("Scaling group not found")
     return scaling_group
