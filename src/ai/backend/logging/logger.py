@@ -15,7 +15,7 @@ from typing import Optional, Self, override
 import msgpack
 import yarl
 import zmq
-from glide.exceptions import ConfigurationError
+from glide import ConfigurationError
 from pydantic import ByteSize
 
 from ai.backend.common.typed_validators import AutoDirectoryPath
