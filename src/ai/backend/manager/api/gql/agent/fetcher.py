@@ -6,6 +6,7 @@ from typing import Optional
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.types import AgentId
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.agent.types import (
     AgentFilterGQL,
@@ -72,3 +73,10 @@ async def fetch_agents(
         ),
         count=action_result.total_count,
     )
+
+
+async def fetch_container_counts(
+    info: Info[StrawberryGQLContext],
+    agent_id: AgentId,
+) -> int:
+    return await info.context.data_loaders.container_count_loader.load(agent_id)
