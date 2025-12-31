@@ -1,12 +1,14 @@
+import asyncio
 import secrets
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 
 import pytest
 from pytest import Config, Parser
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.testutils.bootstrap import etcd_container  # noqa: F401
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, create_async_engine
+from ai.backend.testutils.bootstrap import etcd_container, postgres_container  # noqa: F401
 
 
 def pytest_addoption(parser: Parser) -> None:
@@ -65,3 +67,30 @@ async def etcd(
         await etcd.delete_prefix("", scope=ConfigScopes.NODE)
         await etcd.close()
         del etcd
+
+
+@pytest.fixture(scope="session")
+def database_connection(
+    postgres_container: tuple[str, HostPortPairModel],  # noqa: F811
+) -> Iterator[ExtendedAsyncSAEngine]:
+    """
+    Database connection only - no table creation.
+    Use with `with_tables` from ai.backend.testutils.db for selective table loading.
+
+    This is a lightweight alternative to `database_engine` that doesn't
+    create any tables or run migrations. Tables should be created per-test
+    using the `with_tables` context manager.
+    """
+    _, addr = postgres_container
+    url = f"postgresql+asyncpg://postgres:develove@{addr.host}:{addr.port}/testing"
+
+    engine = create_async_engine(
+        url,
+        pool_size=8,
+        pool_pre_ping=False,
+        max_overflow=64,
+    )
+
+    yield engine
+
+    asyncio.run(engine.dispose())
