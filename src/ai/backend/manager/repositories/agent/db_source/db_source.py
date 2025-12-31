@@ -10,6 +10,7 @@ from ai.backend.common.types import AgentId, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import (
     AgentData,
+    AgentDetailData,
     AgentHeartbeatUpsert,
     AgentListResult,
     AgentStatus,
@@ -18,6 +19,7 @@ from ai.backend.manager.data.agent.types import (
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.models.agent import ADMIN_PERMISSIONS as ADMIN_AGENT_PERMISSIONS
 from ai.backend.manager.models.agent import AgentRow, agents
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -163,8 +165,15 @@ class AgentDBSource:
             )
             agent_rows: list[AgentRow] = [row.AgentRow for row in result.rows]
             items = [agent_row.to_data() for agent_row in agent_rows]
+            admin_permissions = list(ADMIN_AGENT_PERMISSIONS)
+            agents_with_permissions = [
+                AgentDetailData(agent=agent_data, permissions=admin_permissions)
+                for agent_data in items
+            ]
 
             return AgentListResult(
-                items=items,
+                items=agents_with_permissions,
                 total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
             )
