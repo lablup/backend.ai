@@ -211,6 +211,32 @@ class TestScalingGroupRepositoryDB:
         yield await self._create_scaling_groups(db_with_cleanup, 15)
 
     @pytest.fixture
+    async def sample_scaling_group_for_update(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create a single scaling group for update testing"""
+        sgroup_name = f"{uuid.uuid4()}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                description="Test scaling group for update",
+                is_active=True,
+                is_public=True,
+                created_at=datetime.now(),
+                wsproxy_addr=None,
+                wsproxy_api_token=None,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+                use_host_network=False,
+            )
+            db_sess.add(sgroup)
+            await db_sess.flush()
+        yield sgroup_name
+
+    @pytest.fixture
     async def sample_scaling_group_for_purge(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -602,7 +628,7 @@ class TestScalingGroupRepositoryDB:
     async def test_update_scaling_group_success(
         self,
         scaling_group_repository: ScalingGroupRepository,
-        scaling_group_for_update: str,
+        sample_scaling_group_for_update: str,
     ) -> None:
         """Test updating a scaling group"""
         new_scheduler_opts = ScalingGroupOpts(
@@ -610,7 +636,7 @@ class TestScalingGroupRepositoryDB:
             config={"updated": True},
         )
         updater = self._create_scaling_group_updater(
-            name=scaling_group_for_update,
+            name=sample_scaling_group_for_update,
             description=TriState.update("Updated description"),
             is_active=OptionalState.update(False),
             is_public=OptionalState.update(False),
