@@ -6,7 +6,10 @@ from unittest.mock import MagicMock
 import pytest
 
 from ai.backend.common.types import SessionTypes
-from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.errors.resource import (
+    ScalingGroupNotFound,
+    ScalingGroupSessionTypeNotAllowed,
+)
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.registry import check_scaling_group
 
@@ -47,7 +50,7 @@ async def test_allowed_session_types_check(mock_query):
     session_type = SessionTypes.BATCH
     scaling_group = "b"
     mock_sess_ctx.target_sgroup_names = []
-    with pytest.raises(ScalingGroupNotFound) as e:
+    with pytest.raises(ScalingGroupSessionTypeNotAllowed) as e:
         result = await check_scaling_group(mock_conn, scaling_group, session_type, None, None, None)
     assert f"'{scaling_group}' does not accept" in str(e.value)
 
@@ -60,7 +63,7 @@ async def test_allowed_session_types_check(mock_query):
     session_type = SessionTypes.INTERACTIVE
     scaling_group = "a"
     mock_sess_ctx.target_sgroup_names = []
-    with pytest.raises(ScalingGroupNotFound) as e:
+    with pytest.raises(ScalingGroupSessionTypeNotAllowed) as e:
         result = await check_scaling_group(mock_conn, scaling_group, session_type, None, None, None)
     assert f"'{scaling_group}' does not accept" in str(e.value)
 
