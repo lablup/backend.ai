@@ -1,5 +1,5 @@
 import uuid
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable, Mapping
 from datetime import datetime
 from typing import Any, Optional
 
@@ -27,8 +27,11 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
+from ai.backend.manager.repositories.scaling_group.updaters import ScalingGroupUpdaterSpec
+from ai.backend.manager.types import OptionalState, TriState
 
 
 class TestScalingGroupRepositoryDB:
@@ -75,6 +78,39 @@ class TestScalingGroupRepositoryDB:
             use_host_network=use_host_network,
         )
         return Creator(spec=spec)
+
+    def _create_scaling_group_updater(
+        self,
+        name: str,
+        description: Optional[TriState[str]] = None,
+        is_active: Optional[OptionalState[bool]] = None,
+        is_public: Optional[OptionalState[bool]] = None,
+        wsproxy_addr: Optional[TriState[str]] = None,
+        wsproxy_api_token: Optional[TriState[str]] = None,
+        driver: Optional[OptionalState[str]] = None,
+        driver_opts: Optional[OptionalState[Mapping[str, Any]]] = None,
+        scheduler: Optional[OptionalState[str]] = None,
+        scheduler_opts: Optional[OptionalState[ScalingGroupOpts]] = None,
+        use_host_network: Optional[OptionalState[bool]] = None,
+    ) -> Updater[ScalingGroupRow]:
+        """Create a ScalingGroupUpdaterSpec with the given parameters."""
+        spec = ScalingGroupUpdaterSpec(
+            description=description if description is not None else TriState.nop(),
+            is_active=is_active if is_active is not None else OptionalState.nop(),
+            is_public=is_public if is_public is not None else OptionalState.nop(),
+            wsproxy_addr=wsproxy_addr if wsproxy_addr is not None else TriState.nop(),
+            wsproxy_api_token=(
+                wsproxy_api_token if wsproxy_api_token is not None else TriState.nop()
+            ),
+            driver=driver if driver is not None else OptionalState.nop(),
+            driver_opts=driver_opts if driver_opts is not None else OptionalState.nop(),
+            scheduler=scheduler if scheduler is not None else OptionalState.nop(),
+            scheduler_opts=scheduler_opts if scheduler_opts is not None else OptionalState.nop(),
+            use_host_network=(
+                use_host_network if use_host_network is not None else OptionalState.nop()
+            ),
+        )
+        return Updater(spec=spec, pk_value=name)
 
     async def _create_scaling_groups(
         self,
@@ -500,6 +536,58 @@ class TestScalingGroupRepositoryDB:
         # Second creation with same name should raise conflict
         with pytest.raises(ScalingGroupConflict):
             await scaling_group_repository.create_scaling_group(creator)
+
+    # Update Tests
+
+    async def test_update_scaling_group_success(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        scaling_group_for_update: str,
+    ) -> None:
+        """Test updating a scaling group"""
+        new_scheduler_opts = ScalingGroupOpts(
+            allowed_session_types=[SessionTypes.BATCH],
+            config={"updated": True},
+        )
+        updater = self._create_scaling_group_updater(
+            name=scaling_group_for_update,
+            description=TriState.update("Updated description"),
+            is_active=OptionalState.update(False),
+            is_public=OptionalState.update(False),
+            wsproxy_addr=TriState.update("http://new-wsproxy:5000"),
+            wsproxy_api_token=TriState.update("new-token"),
+            driver=OptionalState.update("docker"),
+            driver_opts=OptionalState.update({"new_opt": "value"}),
+            scheduler=OptionalState.update("drf"),
+            scheduler_opts=OptionalState.update(new_scheduler_opts),
+            use_host_network=OptionalState.update(True),
+        )
+        result = await scaling_group_repository.update_scaling_group(updater)
+
+        assert result.metadata.description == "Updated description"
+        assert result.status.is_active is False
+        assert result.status.is_public is False
+        assert result.network.wsproxy_addr == "http://new-wsproxy:5000"
+        assert result.network.wsproxy_api_token == "new-token"
+        assert result.driver.name == "docker"
+        assert result.driver.options == {"new_opt": "value"}
+        assert result.scheduler.name.value == "drf"
+        assert result.network.use_host_network is True
+
+    async def test_update_scaling_group_not_found(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+    ) -> None:
+        """Test updating a non-existent scaling group raises ScalingGroupNotFound"""
+        updater = self._create_scaling_group_updater(
+            name="test-sgroup-nonexistent",
+            description=TriState.update("Updated description"),
+        )
+
+        with pytest.raises(ScalingGroupNotFound):
+            await scaling_group_repository.update_scaling_group(updater)
+
+    # Purge Tests
 
     async def test_purge_scaling_group_success(
         self,

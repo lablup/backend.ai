@@ -128,6 +128,8 @@ class ScalingGroupDBSource:
             if result is None:
                 raise ScalingGroupNotFound(f"Scaling group not found (name:{purger.pk_value})")
 
+            return result.row.to_dataclass()
+
     async def update_scaling_group(
         self,
         updater: Updater[ScalingGroupRow],
