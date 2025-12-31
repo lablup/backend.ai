@@ -16,6 +16,21 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.19.0rc2 (2025-12-31)
+
+### Features
+* Migrate model deployment data to RBAC system by adding MODEL_DEPLOYMENT entity type and associating all endpoints to user scopes based on creator. ([#7619](https://github.com/lablup/backend.ai/issues/7619))
+
+### Improvements
+* Apply action-processor pattern in container registry deletion API ([#7559](https://github.com/lablup/backend.ai/issues/7559))
+* Add pre-validation for user modification to prevent raw IntegrityError ([#7632](https://github.com/lablup/backend.ai/issues/7632))
+
+### Fixes
+* Remove FK relationship rows(session, route, endpoint) when purging scaling group to prevent integrity errors when Integrity error deleting scaling group row ([#7582](https://github.com/lablup/backend.ai/issues/7582))
+* Fix `unified_config` incorrectly assigned as tuple in `ServiceConfigNode.load` ([#7635](https://github.com/lablup/backend.ai/issues/7635))
+* Use 422 error code for scaling group session type rejection ([#7649](https://github.com/lablup/backend.ai/issues/7649))
+
+
 ## 25.19.0rc1 (2025-12-30)
 
 ### Features
