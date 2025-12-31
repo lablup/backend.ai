@@ -537,6 +537,8 @@ def database(request, bootstrap_config: BootstrapConfig, test_db: str) -> None:
         cli_schema_oneshot.invoke(click_ctx)
 
 
+# Deprecated: Use `database_connection` from tests/conftest.py with `with_tables` instead.
+# This fixture creates full schema via Alembic which is slow for simple repository tests.
 @pytest.fixture()
 async def database_engine(bootstrap_config, database):
     async with connect_database(bootstrap_config.db) as db:
