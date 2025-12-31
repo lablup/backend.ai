@@ -37,7 +37,7 @@ jobs:
       id: set-matrix
       run: |
         # Find all Dockerfiles in docker/ directory
-        DOCKERFILES=$(find docker -type f -name "*.dockerfile")
+        DOCKERFILES=$(find docker -type f -name "*.dockerfile" ! -name "backend.ai-*.dockerfile")
 
         # Build JSON array for matrix
         MATRIX_JSON='{"include":['
