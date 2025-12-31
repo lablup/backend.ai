@@ -36,21 +36,9 @@ from ai.backend.manager.models.scaling_group import (
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.scaling_group.creators import (
-    ScalingGroupCreatorSpec,
-    ScalingGroupForDomainCreatorSpec,
-)
-from ai.backend.manager.repositories.scaling_group.purgers import (
-    create_scaling_group_for_domain_purger,
-)
-from ai.backend.manager.services.scaling_group.actions.associate_with_domain import (
-    AssociateScalingGroupWithDomainAction,
-)
+from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
 from ai.backend.manager.services.scaling_group.actions.create import (
     CreateScalingGroupAction,
-)
-from ai.backend.manager.services.scaling_group.actions.disassociate_with_domain import (
-    DisassociateScalingGroupWithDomainAction,
 )
 from ai.backend.manager.services.scaling_group.actions.purge_scaling_group import (
     PurgeScalingGroupAction,
@@ -784,20 +772,10 @@ class AssociateScalingGroupsWithDomain(graphene.Mutation):
         scaling_groups: Sequence[str],
         domain: str,
     ) -> AssociateScalingGroupsWithDomain:
-        ctx: GraphQueryContext = info.context
-        for scaling_group in scaling_groups:
-            creator = Creator(
-                spec=ScalingGroupForDomainCreatorSpec(
-                    scaling_group=scaling_group,
-                    domain=domain,
-                )
-            )
-            await (
-                ctx.processors.scaling_group.associate_scaling_group_with_domain.wait_for_complete(
-                    AssociateScalingGroupWithDomainAction(creator=creator)
-                )
-            )
-        return cls(ok=True, msg="")
+        insert_query = sa.insert(sgroups_for_domains).values([
+            {"scaling_group": scaling_group, "domain": domain} for scaling_group in scaling_groups
+        ])
+        return await simple_db_mutate(cls, info.context, insert_query)
 
 
 class DisassociateScalingGroupWithDomain(graphene.Mutation):
@@ -818,15 +796,11 @@ class DisassociateScalingGroupWithDomain(graphene.Mutation):
         scaling_group: str,
         domain: str,
     ) -> DisassociateScalingGroupWithDomain:
-        ctx: GraphQueryContext = info.context
-        purger = create_scaling_group_for_domain_purger(
-            scaling_group=scaling_group,
-            domain=domain,
+        delete_query = sa.delete(sgroups_for_domains).where(
+            (sgroups_for_domains.c.scaling_group == scaling_group)
+            & (sgroups_for_domains.c.domain == domain),
         )
-        await ctx.processors.scaling_group.disassociate_scaling_group_with_domain.wait_for_complete(
-            DisassociateScalingGroupWithDomainAction(purger=purger)
-        )
-        return cls(ok=True, msg="")
+        return await simple_db_mutate(cls, info.context, delete_query)
 
 
 class DisassociateScalingGroupsWithDomain(graphene.Mutation):
@@ -849,16 +823,11 @@ class DisassociateScalingGroupsWithDomain(graphene.Mutation):
         scaling_groups: Sequence[str],
         domain: str,
     ) -> DisassociateScalingGroupsWithDomain:
-        ctx: GraphQueryContext = info.context
-        for scaling_group in scaling_groups:
-            purger = create_scaling_group_for_domain_purger(
-                scaling_group=scaling_group,
-                domain=domain,
-            )
-            await ctx.processors.scaling_group.disassociate_scaling_group_with_domain.wait_for_complete(
-                DisassociateScalingGroupWithDomainAction(purger=purger)
-            )
-        return cls(ok=True, msg="")
+        delete_query = sa.delete(sgroups_for_domains).where(
+            (sgroups_for_domains.c.scaling_group.in_(scaling_groups))
+            & (sgroups_for_domains.c.domain == domain),
+        )
+        return await simple_db_mutate(cls, info.context, delete_query)
 
 
 class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):
