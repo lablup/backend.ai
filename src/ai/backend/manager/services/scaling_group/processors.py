@@ -3,9 +3,17 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.services.scaling_group.actions.associate_with_user_group import (
+    AssociateScalingGroupWithUserGroupAction,
+    AssociateScalingGroupWithUserGroupActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.create import (
     CreateScalingGroupAction,
     CreateScalingGroupActionResult,
+)
+from ai.backend.manager.services.scaling_group.actions.disassociate_with_user_group import (
+    DisassociateScalingGroupWithUserGroupAction,
+    DisassociateScalingGroupWithUserGroupActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
@@ -24,11 +32,24 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
     search_scaling_groups: ActionProcessor[
         SearchScalingGroupsAction, SearchScalingGroupsActionResult
     ]
+    associate_scaling_group_with_user_group: ActionProcessor[
+        AssociateScalingGroupWithUserGroupAction, AssociateScalingGroupWithUserGroupActionResult
+    ]
+    disassociate_scaling_group_with_user_group: ActionProcessor[
+        DisassociateScalingGroupWithUserGroupAction,
+        DisassociateScalingGroupWithUserGroupActionResult,
+    ]
 
     def __init__(self, service: ScalingGroupService, action_monitors: list[ActionMonitor]) -> None:
         self.create_scaling_group = ActionProcessor(service.create_scaling_group, action_monitors)
         self.purge_scaling_group = ActionProcessor(service.purge_scaling_group, action_monitors)
         self.search_scaling_groups = ActionProcessor(service.search_scaling_groups, action_monitors)
+        self.associate_scaling_group_with_user_group = ActionProcessor(
+            service.associate_scaling_group_with_user_group, action_monitors
+        )
+        self.disassociate_scaling_group_with_user_group = ActionProcessor(
+            service.disassociate_scaling_group_with_user_group, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -36,4 +57,6 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
             CreateScalingGroupAction.spec(),
             PurgeScalingGroupAction.spec(),
             SearchScalingGroupsAction.spec(),
+            AssociateScalingGroupWithUserGroupAction.spec(),
+            DisassociateScalingGroupWithUserGroupAction.spec(),
         ]

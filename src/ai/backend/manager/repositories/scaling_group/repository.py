@@ -12,10 +12,10 @@ from ai.backend.common.resilience import (
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData, ScalingGroupListResult
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow, ScalingGroupRow
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.repositories.base.purger import BatchPurger, Purger
 
 from .db_source import ScalingGroupDBSource
 
@@ -78,3 +78,17 @@ class ScalingGroupRepository:
         Raises ScalingGroupNotFound if scaling group doesn't exist.
         """
         return await self._db_source.purge_scaling_group(purger)
+
+    async def associate_scaling_group_with_user_group(
+        self,
+        creator: Creator[ScalingGroupForProjectRow],
+    ) -> None:
+        """Associates a single scaling group with a user group (project)."""
+        await self._db_source.associate_scaling_group_with_user_group(creator)
+
+    async def disassociate_scaling_group_with_user_group(
+        self,
+        purger: BatchPurger[ScalingGroupForProjectRow],
+    ) -> None:
+        """Disassociates a single scaling group from a user group (project)."""
+        await self._db_source.disassociate_scaling_group_with_user_group(purger)
