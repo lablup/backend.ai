@@ -11,7 +11,6 @@ from ai.backend.common.types import SessionTypes
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
-from ai.backend.manager.models import DomainRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import GroupRow
