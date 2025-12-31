@@ -293,6 +293,7 @@ enum AgentOrderField
   SCHEDULABLE @join__enumValue(graph: STRAWBERRY)
 }
 
+"""Added in 25.19.0. Permissions related to agent operations"""
 enum AgentPermission
   @join__type(graph: STRAWBERRY)
 {

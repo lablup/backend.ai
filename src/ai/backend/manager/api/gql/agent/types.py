@@ -22,6 +22,29 @@ from ai.backend.manager.repositories.base import (
 
 
 @strawberry.enum(
+    name="AgentPermission",
+    description="Added in 25.19.0. Permissions related to agent operations",
+)
+class AgentPermissionGQL(StrEnum):
+    READ_ATTRIBUTE = "read_attribute"
+    UPDATE_ATTRIBUTE = "update_attribute"
+    CREATE_COMPUTE_SESSION = "create_compute_session"
+    CREATE_SERVICE = "create_service"
+
+    @classmethod
+    def from_agent_permission(cls, permission: AgentPermission) -> "AgentPermissionGQL":
+        match permission:
+            case AgentPermission.READ_ATTRIBUTE:
+                return AgentPermissionGQL.READ_ATTRIBUTE
+            case AgentPermission.UPDATE_ATTRIBUTE:
+                return AgentPermissionGQL.UPDATE_ATTRIBUTE
+            case AgentPermission.CREATE_COMPUTE_SESSION:
+                return AgentPermissionGQL.CREATE_COMPUTE_SESSION
+            case AgentPermission.CREATE_SERVICE:
+                return AgentPermissionGQL.CREATE_SERVICE
+
+
+@strawberry.enum(
     name="AgentOrderField",
     description="Added in 25.19.0. Order by specification for agents",
 )
@@ -281,7 +304,7 @@ class AgentV2GQL(Node):
             Provides the agent's region and network address for manager-to-agent communication.
         """)
     )
-    permissions: list[AgentPermission] = strawberry.field(
+    permissions: list[AgentPermissionGQL] = strawberry.field(
         description=dedent_strip("""
             List of permissions the current authenticated user has on this agent.
             Determines which operations (read attributes, create sessions, etc.)
@@ -324,7 +347,9 @@ class AgentV2GQL(Node):
                 region=data.region,
                 addr=data.addr,
             ),
-            permissions=detail_data.permissions,
+            permissions=[
+                AgentPermissionGQL.from_agent_permission(p) for p in detail_data.permissions
+            ],
             scaling_group=data.scaling_group,
         )
 
