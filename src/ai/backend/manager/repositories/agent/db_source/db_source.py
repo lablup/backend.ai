@@ -170,6 +170,12 @@ class AgentDBSource:
                 for agent_data in items
             ]
 
+            admin_permissions = list(ADMIN_AGENT_PERMISSIONS)
+            agents_with_permissions = [
+                AgentDetailData(agent=agent_data, permissions=admin_permissions)
+                for agent_data in items
+            ]
+
             return AgentListResult(
                 items=agents_with_permissions,
                 total_count=result.total_count,

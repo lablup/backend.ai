@@ -44,6 +44,10 @@ from ai.backend.manager.services.agent.actions.handle_heartbeat import (
     HandleHeartbeatAction,
     HandleHeartbeatActionResult,
 )
+from ai.backend.manager.services.agent.actions.load_container_counts import (
+    LoadContainerCountsAction,
+    LoadContainerCountsActionResult,
+)
 from ai.backend.manager.services.agent.actions.mark_agent_exit import (
     MarkAgentExitAction,
     MarkAgentExitActionResult,
@@ -323,3 +327,11 @@ class AgentService:
         )
 
         return RemoveAgentFromImagesByCanonicalsActionResult(agent_id=action.agent_id)
+
+    async def load_container_counts(
+        self, action: LoadContainerCountsAction
+    ) -> LoadContainerCountsActionResult:
+        container_counts = await self._agent_repository.load_agent_container_counts(
+            agent_ids=action.agent_ids
+        )
+        return LoadContainerCountsActionResult(container_counts=container_counts)

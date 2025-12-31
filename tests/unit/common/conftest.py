@@ -11,7 +11,6 @@ from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
 )
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
-from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.defs import (
     REDIS_LIVE_DB,
@@ -92,23 +91,6 @@ async def test_valkey_stream(redis_container) -> AsyncIterator[ValkeyStreamClien
         human_readable_name="event_producer.stream",
         db_id=REDIS_STREAM_DB,
         pubsub_channels={"test-broadcast"},
-    )
-    try:
-        yield client
-    finally:
-        await client.close()
-
-
-@pytest.fixture
-async def test_valkey_stat(redis_container) -> AsyncIterator[ValkeyStatClient]:  # noqa: F811
-    hostport_pair: HostPortPairModel = redis_container[1]
-    valkey_target = ValkeyTarget(
-        addr=hostport_pair.address,
-    )
-    client = await ValkeyStatClient.create(
-        valkey_target,
-        human_readable_name="test.stat",
-        db_id=REDIS_STATISTICS_DB,
     )
     try:
         yield client
