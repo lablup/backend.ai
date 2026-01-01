@@ -13,6 +13,7 @@ from uuid import UUID, uuid4
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.dto.agent.response import CodeCompletionResp, CodeCompletionResult
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -24,8 +25,21 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.repositories.scheduler import MarkTerminatingResult
 from ai.backend.manager.repositories.session.admin_repository import AdminSessionRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
+from ai.backend.manager.services.session.actions.complete import (
+    CompleteAction,
+    CompleteActionResult,
+)
+from ai.backend.manager.services.session.actions.destroy_session import (
+    DestroySessionAction,
+)
+from ai.backend.manager.services.session.actions.get_session_info import (
+    GetSessionInfoAction,
+    GetSessionInfoActionResult,
+)
 from ai.backend.manager.services.session.actions.get_status_history import (
     GetStatusHistoryAction,
 )
@@ -369,3 +383,283 @@ class TestGetStatusHistory:
 
         assert result.session_id == sample_session_id
         assert result.status_history is None
+
+
+# ==================== DestroySession Tests ====================
+
+
+@pytest.mark.asyncio
+class TestDestroySession:
+    """Test cases for SessionService.destroy_session"""
+
+    async def test_success_cancelled(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_scheduling_controller: MagicMock,
+        sample_session_id: SessionId,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test successfully destroying session (cancelled status)"""
+        mock_session_repository.get_target_session_ids = AsyncMock(return_value=[sample_session_id])
+        mock_scheduling_controller.mark_sessions_for_termination = AsyncMock(
+            return_value=MarkTerminatingResult(
+                cancelled_sessions=[sample_session_id],
+                terminating_sessions=[],
+                skipped_sessions=[],
+            )
+        )
+
+        action = DestroySessionAction(
+            user_role=UserRole.USER,
+            session_name="test-session",
+            forced=False,
+            recursive=False,
+            owner_access_key=sample_access_key,
+        )
+        result = await session_service.destroy_session(action)
+
+        assert result.result == {"stats": {"status": "cancelled"}}
+        mock_session_repository.get_target_session_ids.assert_called_once_with(
+            "test-session", sample_access_key, recursive=False
+        )
+        mock_scheduling_controller.mark_sessions_for_termination.assert_called_once()
+
+    async def test_success_terminated(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_scheduling_controller: MagicMock,
+        sample_session_id: SessionId,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test successfully destroying session (terminated status)"""
+        mock_session_repository.get_target_session_ids = AsyncMock(return_value=[sample_session_id])
+        mock_scheduling_controller.mark_sessions_for_termination = AsyncMock(
+            return_value=MarkTerminatingResult(
+                cancelled_sessions=[],
+                terminating_sessions=[sample_session_id],
+                skipped_sessions=[],
+            )
+        )
+
+        action = DestroySessionAction(
+            user_role=UserRole.USER,
+            session_name="test-session",
+            forced=True,
+            recursive=False,
+            owner_access_key=sample_access_key,
+        )
+        result = await session_service.destroy_session(action)
+
+        assert result.result == {"stats": {"status": "terminated"}}
+
+    async def test_recursive_destroy(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_scheduling_controller: MagicMock,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test destroying sessions recursively"""
+        session_ids = [SessionId(uuid4()) for _ in range(3)]
+        mock_session_repository.get_target_session_ids = AsyncMock(return_value=session_ids)
+        mock_scheduling_controller.mark_sessions_for_termination = AsyncMock(
+            return_value=MarkTerminatingResult(
+                cancelled_sessions=session_ids,
+                terminating_sessions=[],
+                skipped_sessions=[],
+            )
+        )
+
+        action = DestroySessionAction(
+            user_role=UserRole.USER,
+            session_name="test-session",
+            forced=False,
+            recursive=True,
+            owner_access_key=sample_access_key,
+        )
+        result = await session_service.destroy_session(action)
+
+        mock_session_repository.get_target_session_ids.assert_called_once_with(
+            "test-session", sample_access_key, recursive=True
+        )
+        assert result.result == {"stats": {"status": "cancelled"}}
+
+    async def test_no_sessions_to_destroy(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_scheduling_controller: MagicMock,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test destroying when no sessions found"""
+        mock_session_repository.get_target_session_ids = AsyncMock(return_value=[])
+        mock_scheduling_controller.mark_sessions_for_termination = AsyncMock(
+            return_value=MarkTerminatingResult(
+                cancelled_sessions=[],
+                terminating_sessions=[],
+                skipped_sessions=[],
+            )
+        )
+
+        action = DestroySessionAction(
+            user_role=UserRole.USER,
+            session_name="nonexistent",
+            forced=False,
+            recursive=False,
+            owner_access_key=sample_access_key,
+        )
+        result = await session_service.destroy_session(action)
+
+        assert result.result == {"stats": {}}
+
+
+# ==================== Complete Tests ====================
+
+
+@pytest.mark.asyncio
+class TestComplete:
+    """Test cases for SessionService.complete"""
+
+    async def test_success(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        sample_session_data: SessionData,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test successfully completing code"""
+        expected_response = CodeCompletionResp(
+            result=CodeCompletionResult(
+                status="finished",
+                error=None,
+                suggestions=["test_completion"],
+            )
+        )
+
+        mock_session = MagicMock()
+        mock_session.to_dataclass.return_value = sample_session_data
+        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
+        mock_agent_registry.get_completions = AsyncMock(return_value=expected_response)
+
+        action = CompleteAction(
+            session_name="test-session",
+            owner_access_key=sample_access_key,
+            code="print('Hello')",
+            options=None,
+        )
+        result = await session_service.complete(action)
+
+        assert isinstance(result, CompleteActionResult)
+        assert result.session_data == sample_session_data
+        assert result.result == expected_response
+        mock_session_repository.get_session_validated.assert_called_once()
+        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
+        mock_agent_registry.get_completions.assert_called_once()
+
+    async def test_session_not_found(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test completing code when session not found"""
+        mock_session_repository.get_session_validated = AsyncMock(
+            side_effect=SessionNotFound("Session not found")
+        )
+
+        action = CompleteAction(
+            session_name="nonexistent",
+            owner_access_key=sample_access_key,
+            code="print('Hello')",
+            options=None,
+        )
+
+        with pytest.raises(SessionNotFound):
+            await session_service.complete(action)
+
+
+# ==================== GetSessionInfo Tests ====================
+
+
+@pytest.mark.asyncio
+class TestGetSessionInfo:
+    """Test cases for SessionService.get_session_info"""
+
+    async def test_success(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        mock_idle_checker_host: MagicMock,
+        sample_session_data: SessionData,
+        sample_session_id: SessionId,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test successfully getting session info"""
+        # Create a mock session with main_kernel
+        mock_kernel = MagicMock()
+        mock_kernel.image = "cr.backend.ai/stable/python:latest"
+        mock_kernel.architecture = "x86_64"
+        mock_kernel.registry = "cr.backend.ai"
+        mock_kernel.container_id = uuid4()
+        mock_kernel.occupied_slots = ResourceSlot({"cpu": 1, "mem": 1024})
+        mock_kernel.occupied_shares = {}
+
+        mock_session = MagicMock()
+        mock_session.id = sample_session_id
+        mock_session.domain_name = "default"
+        mock_session.group_id = UUID("2de2b969-1d04-48a6-af16-0bc8adb3c831")
+        mock_session.user_uuid = UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4")
+        mock_session.tag = None
+        mock_session.main_kernel = mock_kernel
+        mock_session.occupying_slots = ResourceSlot({"cpu": 1, "mem": 1024})
+        mock_session.requested_slots = ResourceSlot({"cpu": 1, "mem": 1024})
+        mock_session.environ = {}
+        mock_session.resource_opts = {}
+        mock_session.status = SessionStatus.RUNNING
+        mock_session.status_info = None
+        mock_session.status_data = None
+        mock_session.created_at = datetime.now(tzutc())
+        mock_session.terminated_at = None
+        mock_session.num_queries = 0
+        mock_session.last_stat = None
+        mock_session.to_dataclass.return_value = sample_session_data
+
+        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
+        mock_idle_checker_host.get_idle_check_report = AsyncMock(return_value={})
+
+        action = GetSessionInfoAction(
+            session_name="test-session",
+            owner_access_key=sample_access_key,
+        )
+        result = await session_service.get_session_info(action)
+
+        assert isinstance(result, GetSessionInfoActionResult)
+        assert result.session_info is not None
+        assert result.session_info.domain_name == "default"
+        assert result.session_info.image == "cr.backend.ai/stable/python:latest"
+        assert result.session_data == sample_session_data
+        mock_session_repository.get_session_validated.assert_called_once()
+        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
+
+    async def test_session_not_found(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test getting session info when session not found"""
+        mock_session_repository.get_session_validated = AsyncMock(
+            side_effect=SessionNotFound("Session not found")
+        )
+
+        action = GetSessionInfoAction(
+            session_name="nonexistent",
+            owner_access_key=sample_access_key,
+        )
+
+        with pytest.raises(SessionNotFound):
+            await session_service.get_session_info(action)
