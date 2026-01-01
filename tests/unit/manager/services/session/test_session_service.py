@@ -36,6 +36,14 @@ from ai.backend.manager.services.session.actions.complete import (
 from ai.backend.manager.services.session.actions.destroy_session import (
     DestroySessionAction,
 )
+from ai.backend.manager.services.session.actions.download_files import (
+    DownloadFilesAction,
+    DownloadFilesActionResult,
+)
+from ai.backend.manager.services.session.actions.get_direct_access_info import (
+    GetDirectAccessInfoAction,
+    GetDirectAccessInfoActionResult,
+)
 from ai.backend.manager.services.session.actions.get_session_info import (
     GetSessionInfoAction,
     GetSessionInfoActionResult,
@@ -44,6 +52,18 @@ from ai.backend.manager.services.session.actions.get_status_history import (
     GetStatusHistoryAction,
 )
 from ai.backend.manager.services.session.actions.match_sessions import MatchSessionsAction
+from ai.backend.manager.services.session.actions.rename_session import (
+    RenameSessionAction,
+    RenameSessionActionResult,
+)
+from ai.backend.manager.services.session.actions.restart_session import (
+    RestartSessionAction,
+    RestartSessionActionResult,
+)
+from ai.backend.manager.services.session.actions.shutdown_service import (
+    ShutdownServiceAction,
+    ShutdownServiceActionResult,
+)
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 
 # ==================== Shared Fixtures ====================
@@ -663,3 +683,678 @@ class TestGetSessionInfo:
 
         with pytest.raises(SessionNotFound):
             await session_service.get_session_info(action)
+
+
+# ==================== DownloadFiles Tests ====================
+
+
+@pytest.mark.asyncio
+class TestDownloadFiles:
+    """Test cases for SessionService.download_files"""
+
+    async def test_success(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        sample_session_data: SessionData,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test successfully downloading files"""
+        mock_session = MagicMock()
+        mock_session.to_dataclass.return_value = sample_session_data
+        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
+        mock_agent_registry.download_file = AsyncMock(return_value=b"file content")
+
+        action = DownloadFilesAction(
+            user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+            session_name="test-session",
+            owner_access_key=sample_access_key,
+            files=["test_file.txt"],
+        )
+        result = await session_service.download_files(action)
+
+        assert isinstance(result, DownloadFilesActionResult)
+        assert result.session_data == sample_session_data
+        assert result.result is not None
+        mock_session_repository.get_session_validated.assert_called_once()
+        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
+        mock_agent_registry.download_file.assert_called_once()
+
+    async def test_session_not_found(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test downloading files when session not found"""
+        mock_session_repository.get_session_validated = AsyncMock(
+            side_effect=SessionNotFound("Session not found")
+        )
+
+        action = DownloadFilesAction(
+            user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+            session_name="nonexistent",
+            owner_access_key=sample_access_key,
+            files=["test_file.txt"],
+        )
+
+        with pytest.raises(SessionNotFound):
+            await session_service.download_files(action)
+
+    async def test_too_many_files(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_session_data: SessionData,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test downloading too many files raises error"""
+        from ai.backend.manager.errors.storage import VFolderBadRequest
+
+        mock_session = MagicMock()
+        mock_session.to_dataclass.return_value = sample_session_data
+        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
+
+        action = DownloadFilesAction(
+            user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+            session_name="test-session",
+            owner_access_key=sample_access_key,
+            files=["file1.txt", "file2.txt", "file3.txt", "file4.txt", "file5.txt", "file6.txt"],
+        )
+
+        with pytest.raises(VFolderBadRequest):
+            await session_service.download_files(action)
+
+
+# ==================== GetDirectAccessInfo Tests ====================
+
+
+@pytest.mark.asyncio
+class TestGetDirectAccessInfo:
+    """Test cases for SessionService.get_direct_access_info"""
+
+    async def test_success(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        sample_session_data: SessionData,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test successfully getting direct access info"""
+        mock_session = MagicMock()
+        mock_session.session_type = SessionTypes.INTERACTIVE
+        mock_session.to_dataclass.return_value = sample_session_data
+        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
+
+        action = GetDirectAccessInfoAction(
+            session_name="test-session",
+            owner_access_key=sample_access_key,
+        )
+        result = await session_service.get_direct_access_info(action)
+
+        assert isinstance(result, GetDirectAccessInfoActionResult)
+        assert result.session_data == sample_session_data
+        # For non-SYSTEM session types, result should be empty
+        assert result.result == {}
+        mock_session_repository.get_session_validated.assert_called_once()
+
+    async def test_session_not_found(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test getting direct access info when session not found"""
+        mock_session_repository.get_session_validated = AsyncMock(
+            side_effect=SessionNotFound("Session not found")
+        )
+
+        action = GetDirectAccessInfoAction(
+            session_name="nonexistent",
+            owner_access_key=sample_access_key,
+        )
+
+        with pytest.raises(SessionNotFound):
+            await session_service.get_direct_access_info(action)
+
+
+# ==================== RenameSession Tests ====================
+
+
+@pytest.mark.asyncio
+class TestRenameSession:
+    """Test cases for SessionService.rename_session"""
+
+    async def test_success(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_session_data: SessionData,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test successfully renaming session"""
+        mock_session = MagicMock()
+        mock_session.status = SessionStatus.RUNNING
+        mock_session.to_dataclass.return_value = sample_session_data
+        mock_session_repository.update_session_name = AsyncMock(return_value=mock_session)
+
+        action = RenameSessionAction(
+            session_name="test-session",
+            owner_access_key=sample_access_key,
+            new_name="new-session-name",
+        )
+        result = await session_service.rename_session(action)
+
+        assert isinstance(result, RenameSessionActionResult)
+        assert result.session_data == sample_session_data
+        mock_session_repository.update_session_name.assert_called_once_with(
+            "test-session", "new-session-name", sample_access_key
+        )
+
+    async def test_not_running_session(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_session_data: SessionData,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test renaming non-running session raises error"""
+        from ai.backend.common.exception import InvalidAPIParameters
+
+        mock_session = MagicMock()
+        mock_session.status = SessionStatus.PENDING  # Not running
+        mock_session_repository.update_session_name = AsyncMock(return_value=mock_session)
+
+        action = RenameSessionAction(
+            session_name="test-session",
+            owner_access_key=sample_access_key,
+            new_name="new-session-name",
+        )
+
+        with pytest.raises(InvalidAPIParameters):
+            await session_service.rename_session(action)
+
+
+# ==================== RestartSession Tests ====================
+
+
+@pytest.mark.asyncio
+class TestRestartSession:
+    """Test cases for SessionService.restart_session"""
+
+    async def test_success(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        sample_session_data: SessionData,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test successfully restarting session"""
+        mock_session = MagicMock()
+        mock_session.to_dataclass.return_value = sample_session_data
+        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
+        mock_agent_registry.restart_session = AsyncMock()
+
+        action = RestartSessionAction(
+            session_name="test-session",
+            owner_access_key=sample_access_key,
+        )
+        result = await session_service.restart_session(action)
+
+        assert isinstance(result, RestartSessionActionResult)
+        assert result.session_data == sample_session_data
+        assert result.result is None
+        mock_session_repository.get_session_validated.assert_called_once()
+        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
+        mock_agent_registry.restart_session.assert_called_once_with(mock_session)
+
+    async def test_session_not_found(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test restarting session when session not found"""
+        mock_session_repository.get_session_validated = AsyncMock(
+            side_effect=SessionNotFound("Session not found")
+        )
+
+        action = RestartSessionAction(
+            session_name="nonexistent",
+            owner_access_key=sample_access_key,
+        )
+
+        with pytest.raises(SessionNotFound):
+            await session_service.restart_session(action)
+
+
+# ==================== ShutdownService Tests ====================
+
+
+@pytest.mark.asyncio
+class TestShutdownService:
+    """Test cases for SessionService.shutdown_service"""
+
+    async def test_success(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        sample_session_data: SessionData,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test successfully shutting down service"""
+        mock_session = MagicMock()
+        mock_session.to_dataclass.return_value = sample_session_data
+        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
+        mock_agent_registry.shutdown_service = AsyncMock()
+
+        action = ShutdownServiceAction(
+            session_name="test-session",
+            owner_access_key=sample_access_key,
+            service_name="test-service",
+        )
+        result = await session_service.shutdown_service(action)
+
+        assert isinstance(result, ShutdownServiceActionResult)
+        assert result.session_data == sample_session_data
+        assert result.result is None
+        mock_session_repository.get_session_validated.assert_called_once()
+        mock_agent_registry.shutdown_service.assert_called_once_with(mock_session, "test-service")
+
+    async def test_session_not_found(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test shutting down service when session not found"""
+        mock_session_repository.get_session_validated = AsyncMock(
+            side_effect=SessionNotFound("Session not found")
+        )
+
+        action = ShutdownServiceAction(
+            session_name="nonexistent",
+            owner_access_key=sample_access_key,
+            service_name="test-service",
+        )
+
+        with pytest.raises(SessionNotFound):
+            await session_service.shutdown_service(action)
+
+
+# ==================== UploadFiles Tests ====================
+
+
+@pytest.mark.asyncio
+class TestUploadFiles:
+    """Test cases for SessionService.upload_files"""
+
+    async def test_success(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        sample_session_data: SessionData,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test successfully uploading files"""
+        from aiohttp.multipart import BodyPartReader
+
+        # Create a mock reader
+        mock_file = MagicMock(spec=BodyPartReader)
+        mock_file.filename = "test_file.txt"
+        mock_file.read_chunk = AsyncMock(side_effect=[b"test content", b""])
+
+        mock_reader = MagicMock()
+        call_count = 0
+
+        async def mock_next():
+            nonlocal call_count
+            if call_count == 0:
+                call_count += 1
+                return mock_file
+            return None
+
+        mock_reader.next = mock_next
+
+        mock_session = MagicMock()
+        mock_session.to_dataclass.return_value = sample_session_data
+        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
+        mock_agent_registry.upload_file = AsyncMock()
+
+        from ai.backend.manager.services.session.actions.upload_files import (
+            UploadFilesAction,
+            UploadFilesActionResult,
+        )
+
+        action = UploadFilesAction(
+            session_name="test-session",
+            owner_access_key=sample_access_key,
+            reader=mock_reader,
+        )
+        result = await session_service.upload_files(action)
+
+        assert isinstance(result, UploadFilesActionResult)
+        assert result.session_data == sample_session_data
+        mock_session_repository.get_session_validated.assert_called_once()
+        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
+
+    async def test_session_not_found(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test uploading files when session not found"""
+        mock_session_repository.get_session_validated = AsyncMock(
+            side_effect=SessionNotFound("Session not found")
+        )
+        mock_reader = MagicMock()
+        mock_reader.next = AsyncMock(return_value=None)
+
+        from ai.backend.manager.services.session.actions.upload_files import (
+            UploadFilesAction,
+        )
+
+        action = UploadFilesAction(
+            session_name="nonexistent",
+            owner_access_key=sample_access_key,
+            reader=mock_reader,
+        )
+
+        with pytest.raises(SessionNotFound):
+            await session_service.upload_files(action)
+
+
+# ==================== Execute Tests ====================
+
+
+@pytest.mark.asyncio
+class TestExecute:
+    """Test cases for SessionService.execute"""
+
+    async def test_success(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        sample_session_data: SessionData,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test successfully executing code"""
+        expected_execute_response = {
+            "status": "finished",
+            "runId": "test-run-id",
+            "exitCode": 0,
+            "options": {},
+            "files": [],
+            "console": [],
+        }
+
+        mock_session = MagicMock()
+        mock_session.to_dataclass.return_value = sample_session_data
+        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
+        mock_agent_registry.execute = AsyncMock(return_value=expected_execute_response)
+
+        from ai.backend.manager.services.session.actions.execute_session import (
+            ExecuteSessionAction,
+            ExecuteSessionActionParams,
+            ExecuteSessionActionResult,
+        )
+
+        params = ExecuteSessionActionParams(
+            mode="query",
+            options=None,
+            code="print('Hello World')",
+            run_id="test-run-id",
+        )
+        action = ExecuteSessionAction(
+            session_name="test-session",
+            api_version=(4, 0),
+            owner_access_key=sample_access_key,
+            params=params,
+        )
+        result = await session_service.execute_session(action)
+
+        assert isinstance(result, ExecuteSessionActionResult)
+        assert result.session_data == sample_session_data
+        assert result.result is not None
+        assert result.result["result"]["status"] == "finished"
+        mock_session_repository.get_session_validated.assert_called_once()
+        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
+        mock_agent_registry.execute.assert_called_once()
+
+    async def test_session_not_found(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test executing code when session not found"""
+        mock_session_repository.get_session_validated = AsyncMock(
+            side_effect=SessionNotFound("Session not found")
+        )
+
+        from ai.backend.manager.services.session.actions.execute_session import (
+            ExecuteSessionAction,
+            ExecuteSessionActionParams,
+        )
+
+        params = ExecuteSessionActionParams(
+            mode="query",
+            options=None,
+            code="print('Hello World')",
+            run_id="test-run-id",
+        )
+        action = ExecuteSessionAction(
+            session_name="nonexistent",
+            api_version=(4, 0),
+            owner_access_key=sample_access_key,
+            params=params,
+        )
+
+        with pytest.raises(SessionNotFound):
+            await session_service.execute_session(action)
+
+
+# ==================== Interrupt Tests ====================
+
+
+@pytest.mark.asyncio
+class TestInterrupt:
+    """Test cases for SessionService.interrupt"""
+
+    async def test_success(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        sample_session_data: SessionData,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test successfully interrupting session"""
+        mock_session = MagicMock()
+        mock_session.to_dataclass.return_value = sample_session_data
+        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
+        mock_agent_registry.interrupt_session = AsyncMock(return_value={})
+
+        from ai.backend.manager.services.session.actions.interrupt_session import (
+            InterruptSessionAction,
+            InterruptSessionActionResult,
+        )
+
+        action = InterruptSessionAction(
+            session_name="test-session",
+            owner_access_key=sample_access_key,
+        )
+        result = await session_service.interrupt(action)
+
+        assert isinstance(result, InterruptSessionActionResult)
+        assert result.session_data == sample_session_data
+        mock_session_repository.get_session_validated.assert_called_once()
+        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
+        mock_agent_registry.interrupt_session.assert_called_once_with(mock_session)
+
+    async def test_session_not_found(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test interrupting session when not found"""
+        mock_session_repository.get_session_validated = AsyncMock(
+            side_effect=SessionNotFound("Session not found")
+        )
+
+        from ai.backend.manager.services.session.actions.interrupt_session import (
+            InterruptSessionAction,
+        )
+
+        action = InterruptSessionAction(
+            session_name="nonexistent",
+            owner_access_key=sample_access_key,
+        )
+
+        with pytest.raises(SessionNotFound):
+            await session_service.interrupt(action)
+
+
+# ==================== ListFiles Tests ====================
+
+
+@pytest.mark.asyncio
+class TestListFiles:
+    """Test cases for SessionService.list_files"""
+
+    async def test_success(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        sample_session_data: SessionData,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test successfully listing files"""
+        expected_files = {"files": ["file1.txt", "file2.py"]}
+
+        mock_session = MagicMock()
+        mock_session.to_dataclass.return_value = sample_session_data
+        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
+        mock_agent_registry.list_files = AsyncMock(return_value=expected_files)
+
+        from ai.backend.manager.services.session.actions.list_files import (
+            ListFilesAction,
+            ListFilesActionResult,
+        )
+
+        action = ListFilesAction(
+            user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+            path="/home/work",
+            session_name="test-session",
+            owner_access_key=sample_access_key,
+        )
+        result = await session_service.list_files(action)
+
+        assert isinstance(result, ListFilesActionResult)
+        assert result.session_data == sample_session_data
+        assert result.result == expected_files
+        mock_session_repository.get_session_validated.assert_called_once()
+        mock_agent_registry.list_files.assert_called_once()
+
+    async def test_session_not_found(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test listing files when session not found"""
+        mock_session_repository.get_session_validated = AsyncMock(
+            side_effect=SessionNotFound("Session not found")
+        )
+
+        from ai.backend.manager.services.session.actions.list_files import (
+            ListFilesAction,
+        )
+
+        action = ListFilesAction(
+            user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+            path="/home/work",
+            session_name="nonexistent",
+            owner_access_key=sample_access_key,
+        )
+
+        with pytest.raises(SessionNotFound):
+            await session_service.list_files(action)
+
+
+# ==================== GetContainerLogs Tests ====================
+
+
+@pytest.mark.asyncio
+class TestGetContainerLogs:
+    """Test cases for SessionService.get_container_logs"""
+
+    async def test_success(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        sample_session_data: SessionData,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test successfully getting container logs"""
+        # get_logs_from_agent returns the logs directly
+        agent_logs = {"stdout": "Hello World\\n", "stderr": ""}
+
+        mock_session = MagicMock()
+        mock_session.status = SessionStatus.RUNNING  # Not in DEAD_SESSION_STATUSES
+        mock_session.to_dataclass.return_value = sample_session_data
+        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
+        mock_agent_registry.get_logs_from_agent = AsyncMock(return_value=agent_logs)
+
+        from ai.backend.manager.services.session.actions.get_container_logs import (
+            GetContainerLogsAction,
+            GetContainerLogsActionResult,
+        )
+
+        action = GetContainerLogsAction(
+            session_name="test-session",
+            owner_access_key=sample_access_key,
+            kernel_id=None,  # Optional - get logs from main kernel
+        )
+        result = await session_service.get_container_logs(action)
+
+        assert isinstance(result, GetContainerLogsActionResult)
+        assert result.session_data == sample_session_data
+        # Result is wrapped as {"result": {"logs": <agent_logs>}}
+        assert result.result["result"]["logs"] == agent_logs
+        mock_session_repository.get_session_validated.assert_called_once()
+        mock_agent_registry.get_logs_from_agent.assert_called_once()
+
+    async def test_session_not_found(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test getting logs when session not found"""
+        mock_session_repository.get_session_validated = AsyncMock(
+            side_effect=SessionNotFound("Session not found")
+        )
+
+        from ai.backend.manager.services.session.actions.get_container_logs import (
+            GetContainerLogsAction,
+        )
+
+        action = GetContainerLogsAction(
+            session_name="nonexistent",
+            owner_access_key=sample_access_key,
+            kernel_id=None,
+        )
+
+        with pytest.raises(SessionNotFound):
+            await session_service.get_container_logs(action)
