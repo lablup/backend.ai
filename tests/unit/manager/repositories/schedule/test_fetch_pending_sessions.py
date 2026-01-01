@@ -30,6 +30,7 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserRole
 from ai.backend.manager.models import (
+    AgentRow,
     DomainRow,
     GroupRow,
     KernelRow,
@@ -44,16 +45,41 @@ from ai.backend.manager.models import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
+from ai.backend.testutils.db import with_tables
+
+
+@pytest.fixture
+async def db_with_cleanup(
+    database_connection: ExtendedAsyncSAEngine,
+) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+    async with with_tables(
+        database_connection,
+        [
+            ScalingGroupRow,
+            DomainRow,
+            UserResourcePolicyRow,
+            ProjectResourcePolicyRow,
+            KeyPairResourcePolicyRow,
+            GroupRow,
+            UserRow,
+            KeyPairRow,
+            AgentRow,
+            SessionRow,
+            KernelRow,
+        ],
+    ):
+        yield database_connection
 
 
 @pytest.fixture
 async def minimal_setup(
-    database_engine: ExtendedAsyncSAEngine,
+    db_with_cleanup: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """Create minimal setup for testing _fetch_pending_sessions_join"""
     data: dict[str, Any] = {}
 
-    async with database_engine.begin_session() as db_sess:
+    async with db_with_cleanup.begin_session() as db_sess:
         # Create scaling group
         sg = ScalingGroupRow(
             name="test-sgroup",
@@ -219,20 +245,6 @@ async def minimal_setup(
 
     yield data
 
-    # Cleanup
-    async with database_engine.begin_session() as db_sess:
-        await db_sess.delete(kernel)
-        await db_sess.delete(session)
-        await db_sess.delete(keypair)
-        await db_sess.delete(user)
-        await db_sess.delete(group)
-        await db_sess.delete(kp_policy)
-        await db_sess.delete(project_policy)
-        await db_sess.delete(user_policy)
-        await db_sess.delete(domain)
-        await db_sess.delete(sg)
-        await db_sess.commit()
-
 
 @pytest.fixture
 def mock_valkey_stat_client() -> ValkeyStatClient:
@@ -256,13 +268,13 @@ def mock_config_provider() -> ManagerConfigProvider:
 
 @pytest.fixture
 async def schedule_repository(
-    database_engine: ExtendedAsyncSAEngine,
+    db_with_cleanup: ExtendedAsyncSAEngine,
     mock_valkey_stat_client: ValkeyStatClient,
     mock_config_provider: ManagerConfigProvider,
 ) -> ScheduleRepository:
     """Create ScheduleRepository instance"""
     return ScheduleRepository(
-        db=database_engine,
+        db=db_with_cleanup,
         valkey_stat=mock_valkey_stat_client,
         config_provider=mock_config_provider,
     )
@@ -275,13 +287,13 @@ class TestFetchPendingSessions:
         self,
         schedule_repository: ScheduleRepository,
         minimal_setup: dict[str, Any],
-        database_engine: ExtendedAsyncSAEngine,
-    ):
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
         """Test basic functionality of _fetch_pending_sessions_join"""
         scaling_group = minimal_setup["scaling_group"].name
 
         # Call the method directly
-        async with database_engine.begin_readonly_session() as db_sess:
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
             result = await schedule_repository._fetch_pending_sessions_join(db_sess, scaling_group)
 
         # Verify results
@@ -305,14 +317,14 @@ class TestFetchPendingSessions:
         self,
         schedule_repository: ScheduleRepository,
         minimal_setup: dict[str, Any],
-        database_engine: ExtendedAsyncSAEngine,
-    ):
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
         """Test that old sessions are still fetched (no timeout filtering)"""
         scaling_group = minimal_setup["scaling_group"].name
         session_id = minimal_setup["session"].id
 
         # First, update the session to be older
-        async with database_engine.begin_session() as db_sess:
+        async with db_with_cleanup.begin_session() as db_sess:
             # Query the session from DB to get it attached to this session
             stmt = (
                 sa.update(SessionRow)
@@ -323,7 +335,7 @@ class TestFetchPendingSessions:
             await db_sess.commit()
 
         # Call the method
-        async with database_engine.begin_readonly_session() as db_sess:
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
             result = await schedule_repository._fetch_pending_sessions_join(db_sess, scaling_group)
 
         # Should still return the session as there's no timeout filtering
@@ -333,13 +345,13 @@ class TestFetchPendingSessions:
     async def test_fetch_pending_sessions_join_no_sessions(
         self,
         schedule_repository: ScheduleRepository,
-        database_engine: ExtendedAsyncSAEngine,
-    ):
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
         """Test with non-existent scaling group"""
         scaling_group = "non-existent-sgroup"
 
         # Call the method
-        async with database_engine.begin_readonly_session() as db_sess:
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
             result = await schedule_repository._fetch_pending_sessions_join(db_sess, scaling_group)
 
         # Should return empty list

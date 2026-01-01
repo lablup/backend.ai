@@ -13,6 +13,12 @@ from ai.backend.common.types import (
     ResourceSlot,
     VFolderHostPermission,
 )
+from ai.backend.manager.models import (
+    DomainRow,
+    UserResourcePolicyRow,
+    UserRow,
+)
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
@@ -27,6 +33,7 @@ from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
     KeyPairResourcePolicyUpdaterSpec,
 )
 from ai.backend.manager.types import OptionalState, TriState
+from ai.backend.testutils.db import with_tables
 
 
 class TestKeypairResourcePolicyRepository:
@@ -35,33 +42,21 @@ class TestKeypairResourcePolicyRepository:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans keypair resource policy data after each test"""
-        # Get existing policy names to preserve
-        existing_policy_names: set[str] = set()
-        async with database_engine.begin_readonly_session() as db_sess:
-            result = await db_sess.execute(
-                sa.select(KeyPairResourcePolicyRow.name).select_from(KeyPairResourcePolicyRow)
-            )
-            existing_policy_names = {row[0] for row in result.fetchall()}
-
-        yield database_engine
-
-        # Cleanup only test-created policies
-        async with database_engine.begin_session() as db_sess:
-            result = await db_sess.execute(
-                sa.select(KeyPairResourcePolicyRow.name).select_from(KeyPairResourcePolicyRow)
-            )
-            current_policy_names = {row[0] for row in result.fetchall()}
-            test_created_names = current_policy_names - existing_policy_names
-
-            if test_created_names:
-                await db_sess.execute(
-                    sa.delete(KeyPairResourcePolicyRow).where(
-                        KeyPairResourcePolicyRow.name.in_(test_created_names)
-                    )
-                )
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents before children
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     def sample_resource_slots(self) -> ResourceSlot:
@@ -118,15 +113,15 @@ class TestKeypairResourcePolicyRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_creator: KeyPairResourcePolicyCreatorSpec,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create sample keypair resource policy directly in DB and return its name"""
         async with db_with_cleanup.begin_session() as db_sess:
             policy_row = sample_creator.build_row()
             db_sess.add(policy_row)
-            await db_sess.flush()
+            await db_sess.commit()
 
         assert sample_creator.name is not None
-        yield sample_creator.name
+        return sample_creator.name
 
     @pytest.fixture
     async def multiple_policies(
@@ -134,7 +129,7 @@ class TestKeypairResourcePolicyRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_resource_slots: ResourceSlot,
         sample_allowed_vfolder_hosts: dict[str, Any],
-    ) -> AsyncGenerator[list[str], None]:
+    ) -> list[str]:
         """Create multiple sample policies for testing"""
         policy_names: list[str] = []
         async with db_with_cleanup.begin_session() as db_sess:
@@ -159,9 +154,9 @@ class TestKeypairResourcePolicyRepository:
                 db_sess.add(policy_row)
                 assert spec.name is not None
                 policy_names.append(spec.name)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield policy_names
+        return policy_names
 
     @pytest.fixture
     def repository(

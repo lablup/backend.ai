@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import pytest
 import sqlalchemy as sa
@@ -24,12 +23,17 @@ from ai.backend.manager.models import (
     UserResourcePolicyRow,
     UserRow,
 )
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.group import ProjectType
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.kernel import KernelStatus
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.admin_repository import AdminDomainRepository
+from ai.backend.testutils.db import with_tables
 
 DEFAULT_ROLE = "main"
 
@@ -48,23 +52,43 @@ class TestAdminDomainRepository:
     """Test cases for AdminDomainRepository using real database"""
 
     @pytest.fixture
+    async def db_with_cleanup(
+        self, database_connection: ExtendedAsyncSAEngine
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents before children
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ScalingGroupRow,
+                AgentRow,
+                SessionRow,
+                KernelRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
     def admin_domain_repository(
-        self, database_engine: ExtendedAsyncSAEngine
+        self, db_with_cleanup: ExtendedAsyncSAEngine
     ) -> AdminDomainRepository:
         """Create AdminDomainRepository instance with real database"""
-        return AdminDomainRepository(db=database_engine)
+        return AdminDomainRepository(db=db_with_cleanup)
 
-    @asynccontextmanager
-    async def create_test_domain(
-        self,
-        database_engine: ExtendedAsyncSAEngine,
-        name: str = "test-domain",
-    ) -> AsyncGenerator[str, None]:
-        """Create a test domain and ensure cleanup"""
-        async with database_engine.begin_session() as session:
+    @pytest.fixture
+    async def sample_domain(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
+        """Create a test domain and return its name."""
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as session:
             domain = DomainRow(
-                name=name,
-                description=f"Test domain {name}",
+                name=domain_name,
+                description=f"Test domain {domain_name}",
                 is_active=True,
                 total_resource_slots=ResourceSlot.from_user_input({"cpu": "8", "mem": "16g"}, None),
                 allowed_vfolder_hosts={},
@@ -73,29 +97,29 @@ class TestAdminDomainRepository:
                 integration_id=None,
             )
             session.add(domain)
-            await session.flush()
+            await session.commit()
+        return domain_name
 
-        try:
-            yield name
-        finally:
-            async with database_engine.begin_session() as session:
-                await session.execute(sa.delete(KernelRow).where(KernelRow.domain_name == name))
-                await session.execute(sa.delete(SessionRow).where(SessionRow.domain_name == name))
-                await session.execute(sa.delete(UserRow).where(UserRow.domain_name == name))
-                await session.execute(sa.delete(GroupRow).where(GroupRow.domain_name == name))
-                await session.execute(sa.delete(DomainRow).where(DomainRow.name == name))
+    @pytest.fixture
+    async def domain_with_user(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
+        """Create a domain with a user and return domain name."""
+        domain_name = f"domain-with-user-{uuid.uuid4().hex[:8]}"
+        resource_policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
-    async def create_test_user(
-        self,
-        database_engine: ExtendedAsyncSAEngine,
-        domain_name: str,
-        email: str = "test@example.com",
-    ) -> str:
-        """Create a test user for the domain and return user UUID"""
-        user_uuid = uuid.uuid4()
-        resource_policy_name = f"test-policy-{uuid.uuid4()}"
+        async with db_with_cleanup.begin_session() as session:
+            # Create domain
+            domain = DomainRow(
+                name=domain_name,
+                description=f"Test domain {domain_name}",
+                is_active=True,
+                total_resource_slots=ResourceSlot.from_user_input({"cpu": "8", "mem": "16g"}, None),
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+                dotfiles=b"",
+                integration_id=None,
+            )
+            session.add(domain)
 
-        async with database_engine.begin_session() as session:
             # Create user resource policy
             user_resource_policy = UserResourcePolicyRow(
                 name=resource_policy_name,
@@ -108,9 +132,9 @@ class TestAdminDomainRepository:
 
             # Create user
             user = UserRow(
-                uuid=user_uuid,
-                username=email.split("@")[0],
-                email=email,
+                uuid=uuid.uuid4(),
+                username="testuser",
+                email="testuser@example.com",
                 password=create_test_password_info("test_password"),
                 need_password_change=False,
                 full_name="Test User",
@@ -122,21 +146,30 @@ class TestAdminDomainRepository:
                 resource_policy=resource_policy_name,
             )
             session.add(user)
-            await session.flush()
+            await session.commit()
 
-        return str(user_uuid)
+        return domain_name
 
-    async def create_test_group(
-        self,
-        database_engine: ExtendedAsyncSAEngine,
-        domain_name: str,
-        group_name: str = "test-group",
-    ) -> str:
-        """Create a test group for the domain and return group ID"""
-        group_id = uuid.uuid4()
-        resource_policy_name = f"test-policy-{uuid.uuid4()}"
+    @pytest.fixture
+    async def domain_with_group(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
+        """Create a domain with a group and return domain name."""
+        domain_name = f"domain-with-group-{uuid.uuid4().hex[:8]}"
+        resource_policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
-        async with database_engine.begin_session() as session:
+        async with db_with_cleanup.begin_session() as session:
+            # Create domain
+            domain = DomainRow(
+                name=domain_name,
+                description=f"Test domain {domain_name}",
+                is_active=True,
+                total_resource_slots=ResourceSlot.from_user_input({"cpu": "8", "mem": "16g"}, None),
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+                dotfiles=b"",
+                integration_id=None,
+            )
+            session.add(domain)
+
             # Create project resource policy
             project_resource_policy = ProjectResourcePolicyRow(
                 name=resource_policy_name,
@@ -148,8 +181,8 @@ class TestAdminDomainRepository:
 
             # Create group
             group = GroupRow(
-                id=group_id,
-                name=group_name,
+                id=uuid.uuid4(),
+                name="test-group",
                 description="Test group",
                 is_active=True,
                 domain_name=domain_name,
@@ -160,26 +193,37 @@ class TestAdminDomainRepository:
                 type=ProjectType.GENERAL,
             )
             session.add(group)
-            await session.flush()
+            await session.commit()
 
-        return str(group_id)
+        return domain_name
 
-    async def create_test_kernel(
-        self,
-        database_engine: ExtendedAsyncSAEngine,
-        domain_name: str,
-        status: KernelStatus = KernelStatus.RUNNING,
-    ) -> str:
-        """Create a test kernel for the domain and return session ID"""
+    @pytest.fixture
+    async def domain_with_kernel(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
+        """Create a domain with an active kernel and return domain name."""
+        domain_name = f"domain-with-kernel-{uuid.uuid4().hex[:8]}"
+        user_resource_policy_name = f"user-policy-{uuid.uuid4().hex[:8]}"
+        project_resource_policy_name = f"project-policy-{uuid.uuid4().hex[:8]}"
         session_id = uuid.uuid4()
         user_uuid = uuid.uuid4()
         group_id = uuid.uuid4()
-        resource_policy_name = f"test-policy-{uuid.uuid4()}"
 
-        async with database_engine.begin_session() as session:
+        async with db_with_cleanup.begin_session() as session:
+            # Create domain
+            domain = DomainRow(
+                name=domain_name,
+                description=f"Test domain {domain_name}",
+                is_active=True,
+                total_resource_slots=ResourceSlot.from_user_input({"cpu": "8", "mem": "16g"}, None),
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+                dotfiles=b"",
+                integration_id=None,
+            )
+            session.add(domain)
+
             # Create resource policies
             user_resource_policy = UserResourcePolicyRow(
-                name=resource_policy_name,
+                name=user_resource_policy_name,
                 max_vfolder_count=0,
                 max_quota_scope_size=-1,
                 max_session_count_per_model_session=10,
@@ -188,7 +232,7 @@ class TestAdminDomainRepository:
             session.add(user_resource_policy)
 
             project_resource_policy = ProjectResourcePolicyRow(
-                name=resource_policy_name,
+                name=project_resource_policy_name,
                 max_vfolder_count=0,
                 max_quota_scope_size=-1,
                 max_network_count=3,
@@ -198,21 +242,21 @@ class TestAdminDomainRepository:
             # Create group
             group = GroupRow(
                 id=group_id,
-                name=f"test-group-{uuid.uuid4()}",
+                name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=domain_name,
                 total_resource_slots={},
-                resource_policy=resource_policy_name,
+                resource_policy=project_resource_policy_name,
             )
             session.add(group)
 
             # Create user
             user = UserRow(
                 uuid=user_uuid,
-                email=f"test-{uuid.uuid4()}@example.com",
-                username=f"test-user-{uuid.uuid4()}",
+                email=f"test-{uuid.uuid4().hex[:8]}@example.com",
+                username=f"test-user-{uuid.uuid4().hex[:8]}",
                 password=create_test_password_info("test_password"),
                 domain_name=domain_name,
-                resource_policy=resource_policy_name,
+                resource_policy=user_resource_policy_name,
             )
             session.add(user)
 
@@ -228,14 +272,14 @@ class TestAdminDomainRepository:
             )
             session.add(sess)
 
-            # Create kernel
+            # Create kernel (RUNNING status)
             kernel = KernelRow(
                 session_id=str(session_id).replace("-", ""),
                 domain_name=domain_name,
                 group_id=str(group_id).replace("-", ""),
                 user_uuid=str(user_uuid).replace("-", ""),
                 cluster_role=DEFAULT_ROLE,
-                status=status,
+                status=KernelStatus.RUNNING,
                 occupied_slots={},
                 repl_in_port=0,
                 repl_out_port=0,
@@ -244,27 +288,27 @@ class TestAdminDomainRepository:
                 vfolder_mounts={},
             )
             session.add(kernel)
-            await session.flush()
+            await session.commit()
 
-        return str(session_id).replace("-", "")
+        return domain_name
 
     @pytest.mark.asyncio
     async def test_purge_domain_force_success_empty_domain(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         admin_domain_repository: AdminDomainRepository,
+        sample_domain: str,
     ) -> None:
         """Test successful purge of an empty domain (no users, groups, active kernels)"""
-        async with self.create_test_domain(database_engine, "empty-domain") as domain_name:
-            # Purge the domain
-            await admin_domain_repository.purge_domain_force(domain_name)
+        # Purge the domain
+        await admin_domain_repository.purge_domain_force(sample_domain)
 
-            # Verify domain is completely removed
-            async with database_engine.begin_session() as session:
-                result = await session.scalar(
-                    sa.select(DomainRow).where(DomainRow.name == domain_name)
-                )
-                assert result is None
+        # Verify domain is completely removed
+        async with db_with_cleanup.begin_session() as session:
+            result = await session.scalar(
+                sa.select(DomainRow).where(DomainRow.name == sample_domain)
+            )
+            assert result is None
 
     @pytest.mark.asyncio
     async def test_purge_domain_force_nonexistent_domain(
@@ -278,44 +322,29 @@ class TestAdminDomainRepository:
     @pytest.mark.asyncio
     async def test_purge_domain_force_fails_with_active_users(
         self,
-        database_engine: ExtendedAsyncSAEngine,
         admin_domain_repository: AdminDomainRepository,
+        domain_with_user: str,
     ) -> None:
         """Test purge raises DomainHasUsers when domain has users"""
-        async with self.create_test_domain(database_engine, "domain-with-users") as domain_name:
-            # Create a user in the domain
-            await self.create_test_user(database_engine, domain_name, "testuser@example.com")
-
-            # Attempt to purge should fail
-            with pytest.raises(DomainHasUsers):
-                await admin_domain_repository.purge_domain_force(domain_name)
+        with pytest.raises(DomainHasUsers):
+            await admin_domain_repository.purge_domain_force(domain_with_user)
 
     @pytest.mark.asyncio
     async def test_purge_domain_force_fails_with_active_groups(
         self,
-        database_engine: ExtendedAsyncSAEngine,
         admin_domain_repository: AdminDomainRepository,
+        domain_with_group: str,
     ) -> None:
         """Test purge raises DomainHasGroups when domain has groups"""
-        async with self.create_test_domain(database_engine, "domain-with-groups") as domain_name:
-            # Create a group in the domain
-            await self.create_test_group(database_engine, domain_name, "test-group")
-
-            # Attempt to purge should fail
-            with pytest.raises(DomainHasGroups):
-                await admin_domain_repository.purge_domain_force(domain_name)
+        with pytest.raises(DomainHasGroups):
+            await admin_domain_repository.purge_domain_force(domain_with_group)
 
     @pytest.mark.asyncio
     async def test_purge_domain_force_fails_with_active_kernels(
         self,
-        database_engine: ExtendedAsyncSAEngine,
         admin_domain_repository: AdminDomainRepository,
+        domain_with_kernel: str,
     ) -> None:
         """Test purge raises DomainHasActiveKernels when domain has active kernels"""
-        async with self.create_test_domain(database_engine, "domain-with-kernels") as domain_name:
-            # Create an active kernel in the domain
-            await self.create_test_kernel(database_engine, domain_name, KernelStatus.RUNNING)
-
-            # Attempt to purge should fail
-            with pytest.raises(DomainHasActiveKernels):
-                await admin_domain_repository.purge_domain_force(domain_name)
+        with pytest.raises(DomainHasActiveKernels):
+            await admin_domain_repository.purge_domain_force(domain_with_kernel)

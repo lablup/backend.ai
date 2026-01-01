@@ -6,10 +6,9 @@ Tests the repository layer with real database operations.
 from __future__ import annotations
 
 import uuid
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -17,6 +16,7 @@ from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.storage_namespace.repository import (
     StorageNamespaceRepository,
 )
+from ai.backend.testutils.db import with_tables
 
 
 class TestStorageNamespaceRepository:
@@ -29,14 +29,14 @@ class TestStorageNamespaceRepository:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans storage namespace data after each test"""
-        yield database_engine
-
-        # Cleanup all storage namespace data after test
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(StorageNamespaceRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [StorageNamespaceRow],
+        ):
+            yield database_connection
 
     @pytest.fixture
     def storage_namespace_repository(

@@ -15,7 +15,9 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
@@ -24,11 +26,13 @@ from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGro
 from ai.backend.manager.models.session import SessionId, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
+from ai.backend.testutils.db import with_tables
 
 
 class TestScalingGroupRepositoryDB:
@@ -37,14 +41,28 @@ class TestScalingGroupRepositoryDB:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans scaling group data after each test"""
-        yield database_engine
-
-        # Cleanup all scaling groups created during test
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(ScalingGroupRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents first
+                DomainRow,
+                ProjectResourcePolicyRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                ScalingGroupRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                SessionRow,
+                VFolderRow,
+                EndpointRow,
+                RoutingRow,
+            ],
+        ):
+            yield database_connection
 
     def _create_scaling_group_creator(
         self,

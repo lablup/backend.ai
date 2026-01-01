@@ -3,9 +3,11 @@ Tests for NotificationRepository query options (conditions and orders).
 Tests the filter and ordering functionality with real database operations.
 """
 
+from __future__ import annotations
+
 import uuid
+from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
-from typing import AsyncGenerator
 
 import pytest
 import sqlalchemy as sa
@@ -13,12 +15,16 @@ import sqlalchemy as sa
 from ai.backend.common.types import BinarySize
 from ai.backend.manager.data.notification import NotificationChannelType, NotificationRuleType
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.notification import (
     NotificationChannelRow,
     NotificationRuleRow,
     WebhookConfig,
 )
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    UserResourcePolicyRow,
+)
 from ai.backend.manager.models.user import (
     PasswordHashAlgorithm,
     PasswordInfo,
@@ -40,6 +46,7 @@ from ai.backend.manager.repositories.notification.options import (
     NotificationRuleConditions,
     NotificationRuleOrders,
 )
+from ai.backend.testutils.db import with_tables
 
 
 class TestNotificationOptions:
@@ -50,21 +57,29 @@ class TestNotificationOptions:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans notification data after each test"""
-        yield database_engine
-
-        # Cleanup all notification data after test
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(NotificationRuleRow))
-            await db_sess.execute(sa.delete(NotificationChannelRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents before children
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                NotificationChannelRow,
+                NotificationRuleRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -78,20 +93,15 @@ class TestNotificationOptions:
                 allowed_docker_registries=[],
             )
             db_sess.add(domain)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        try:
-            yield domain_name
-        finally:
-            # Cleanup
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
+        return domain_name
 
     @pytest.fixture
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test resource policy and return policy name"""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
@@ -104,18 +114,9 @@ class TestNotificationOptions:
                 max_customized_image_count=3,
             )
             db_sess.add(policy)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        try:
-            yield policy_name
-        finally:
-            # Cleanup
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_sess.execute(
-                    sa.delete(UserResourcePolicyRow).where(
-                        UserResourcePolicyRow.name == policy_name
-                    )
-                )
+        return policy_name
 
     @pytest.fixture
     async def test_user(
@@ -123,7 +124,7 @@ class TestNotificationOptions:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test user and return user UUID"""
         user_uuid = uuid.uuid4()
 
@@ -148,32 +149,26 @@ class TestNotificationOptions:
                 resource_policy=test_resource_policy_name,
             )
             db_sess.add(user)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        try:
-            yield user_uuid
-        finally:
-            # Cleanup
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
+        return user_uuid
 
     @pytest.fixture
-    async def notification_repository(
+    def notification_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[NotificationRepository, None]:
+    ) -> NotificationRepository:
         """Create NotificationRepository instance with database"""
-        repo = NotificationRepository(db=db_with_cleanup)
-        yield repo
+        return NotificationRepository(db=db_with_cleanup)
 
     @pytest.fixture
     async def sample_channels_for_filter(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> list[uuid.UUID]:
         """Create sample channels with various names and types for filter testing"""
-        channel_ids = []
+        channel_ids: list[uuid.UUID] = []
         async with db_with_cleanup.begin_session() as db_sess:
             channels_data = [
                 ("Test Channel", NotificationChannelType.WEBHOOK, True),
@@ -199,18 +194,18 @@ class TestNotificationOptions:
                 )
                 db_sess.add(channel)
                 channel_ids.append(channel_id)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield channel_ids
+        return channel_ids
 
     @pytest.fixture
     async def sample_channels_for_order(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> list[uuid.UUID]:
         """Create sample channels with different timestamps for order testing"""
-        channel_ids = []
+        channel_ids: list[uuid.UUID] = []
         base_time = datetime.now()
 
         async with db_with_cleanup.begin_session() as db_sess:
@@ -236,16 +231,16 @@ class TestNotificationOptions:
                 )
                 db_sess.add(channel)
                 channel_ids.append(channel_id)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield channel_ids
+        return channel_ids
 
     @pytest.fixture
     async def sample_channel_for_rules(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create a single channel for rule testing"""
         channel_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
@@ -262,9 +257,9 @@ class TestNotificationOptions:
                 updated_at=datetime.now(),
             )
             db_sess.add(channel)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield channel_id
+        return channel_id
 
     @pytest.fixture
     async def sample_rules_for_filter(
@@ -272,9 +267,9 @@ class TestNotificationOptions:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user: uuid.UUID,
         sample_channel_for_rules: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> list[uuid.UUID]:
         """Create sample rules with various names and types for filter testing"""
-        rule_ids = []
+        rule_ids: list[uuid.UUID] = []
         async with db_with_cleanup.begin_session() as db_sess:
             rules_data = [
                 ("Test Rule", NotificationRuleType.SESSION_STARTED, True),
@@ -300,9 +295,9 @@ class TestNotificationOptions:
                 )
                 db_sess.add(rule)
                 rule_ids.append(rule_id)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield rule_ids
+        return rule_ids
 
     @pytest.fixture
     async def sample_rules_for_order(
@@ -310,9 +305,9 @@ class TestNotificationOptions:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user: uuid.UUID,
         sample_channel_for_rules: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> list[uuid.UUID]:
         """Create sample rules with different timestamps for order testing"""
-        rule_ids = []
+        rule_ids: list[uuid.UUID] = []
         base_time = datetime.now()
 
         async with db_with_cleanup.begin_session() as db_sess:
@@ -338,9 +333,9 @@ class TestNotificationOptions:
                 )
                 db_sess.add(rule)
                 rule_ids.append(rule_id)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield rule_ids
+        return rule_ids
 
     # NotificationChannelConditions Tests
 
@@ -932,20 +927,29 @@ class TestNotificationCursorPagination:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans notification data after each test"""
-        yield database_engine
-
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(NotificationRuleRow))
-            await db_sess.execute(sa.delete(NotificationChannelRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents before children
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                NotificationChannelRow,
+                NotificationRuleRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -959,19 +963,15 @@ class TestNotificationCursorPagination:
                 allowed_docker_registries=[],
             )
             db_sess.add(domain)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        try:
-            yield domain_name
-        finally:
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
+        return domain_name
 
     @pytest.fixture
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test resource policy and return policy name"""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
@@ -984,17 +984,9 @@ class TestNotificationCursorPagination:
                 max_customized_image_count=3,
             )
             db_sess.add(policy)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        try:
-            yield policy_name
-        finally:
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_sess.execute(
-                    sa.delete(UserResourcePolicyRow).where(
-                        UserResourcePolicyRow.name == policy_name
-                    )
-                )
+        return policy_name
 
     @pytest.fixture
     async def test_user(
@@ -1002,7 +994,7 @@ class TestNotificationCursorPagination:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test user and return user UUID"""
         user_uuid = uuid.uuid4()
 
@@ -1027,34 +1019,29 @@ class TestNotificationCursorPagination:
                 resource_policy=test_resource_policy_name,
             )
             db_sess.add(user)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        try:
-            yield user_uuid
-        finally:
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
+        return user_uuid
 
     @pytest.fixture
-    async def notification_repository(
+    def notification_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[NotificationRepository, None]:
+    ) -> NotificationRepository:
         """Create NotificationRepository instance with database"""
-        repo = NotificationRepository(db=db_with_cleanup)
-        yield repo
+        return NotificationRepository(db=db_with_cleanup)
 
     @pytest.fixture
     async def channels_for_cursor_pagination(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> list[uuid.UUID]:
         """Create 5 channels with distinct created_at times for cursor pagination testing.
 
         Created order (oldest to newest): Channel-1, Channel-2, Channel-3, Channel-4, Channel-5
         """
-        channel_ids = []
+        channel_ids: list[uuid.UUID] = []
         base_time = datetime.now()
 
         async with db_with_cleanup.begin_session() as db_sess:
@@ -1075,9 +1062,9 @@ class TestNotificationCursorPagination:
                 )
                 db_sess.add(channel)
                 channel_ids.append(channel_id)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield channel_ids
+        return channel_ids
 
     @pytest.mark.asyncio
     async def test_forward_pagination_first_page_shows_newest_first(

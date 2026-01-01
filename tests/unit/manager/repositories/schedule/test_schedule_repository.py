@@ -47,15 +47,41 @@ from ai.backend.manager.models import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
+from ai.backend.testutils.db import with_tables
+
+
+@pytest.fixture
+async def db_with_cleanup(
+    database_connection: ExtendedAsyncSAEngine,
+) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+    async with with_tables(
+        database_connection,
+        [
+            ScalingGroupRow,
+            DomainRow,
+            UserResourcePolicyRow,
+            ProjectResourcePolicyRow,
+            KeyPairResourcePolicyRow,
+            GroupRow,
+            UserRow,
+            KeyPairRow,
+            AgentRow,
+            SessionRow,
+            KernelRow,
+            SessionDependencyRow,
+        ],
+    ):
+        yield database_connection
 
 
 @pytest.fixture
 async def sample_scaling_groups(
-    database_engine: ExtendedAsyncSAEngine,
+    db_with_cleanup: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[list[ScalingGroupRow], None]:
     """Create sample scaling groups for testing"""
     scaling_groups = []
-    async with database_engine.begin_session() as db_sess:
+    async with db_with_cleanup.begin_session() as db_sess:
         for i in range(2):
             sg = ScalingGroupRow(
                 name=f"test-sgroup-{i}",
@@ -79,21 +105,15 @@ async def sample_scaling_groups(
 
     yield scaling_groups
 
-    # Cleanup
-    async with database_engine.begin_session() as db_sess:
-        for sg in scaling_groups:
-            await db_sess.delete(sg)
-        await db_sess.commit()
-
 
 @pytest.fixture
 async def sample_agents(
-    database_engine: ExtendedAsyncSAEngine,
+    db_with_cleanup: ExtendedAsyncSAEngine,
     sample_scaling_groups: list[ScalingGroupRow],
 ) -> AsyncGenerator[list[AgentRow], None]:
     """Create sample agents for testing"""
     agents = []
-    async with database_engine.begin_session() as db_sess:
+    async with db_with_cleanup.begin_session() as db_sess:
         # Create agents for first scaling group
         for i in range(3):
             agent = AgentRow(
@@ -133,19 +153,13 @@ async def sample_agents(
 
     yield agents
 
-    # Cleanup
-    async with database_engine.begin_session() as db_sess:
-        for agent in agents:
-            await db_sess.delete(agent)
-        await db_sess.commit()
-
 
 @pytest.fixture
 async def sample_resource_policies(
-    database_engine: ExtendedAsyncSAEngine,
+    db_with_cleanup: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """Create sample resource policies for testing"""
-    async with database_engine.begin_session() as db_sess:
+    async with db_with_cleanup.begin_session() as db_sess:
         # Create user resource policy first (for foreign key)
         user_policy = UserResourcePolicyRow(
             name="test-keypair-policy",  # Same name for simplicity
@@ -189,17 +203,10 @@ async def sample_resource_policies(
         "user_policy": user_policy,
     }
 
-    # Cleanup
-    async with database_engine.begin_session() as db_sess:
-        await db_sess.delete(kp_policy)
-        await db_sess.delete(project_policy)
-        await db_sess.delete(user_policy)
-        await db_sess.commit()
-
 
 @pytest.fixture
 async def sample_sessions_and_kernels(
-    database_engine: ExtendedAsyncSAEngine,
+    db_with_cleanup: ExtendedAsyncSAEngine,
     sample_scaling_groups: list[ScalingGroupRow],
     sample_agents: list[AgentRow],
     sample_resource_policies: dict[str, Any],
@@ -215,7 +222,7 @@ async def sample_sessions_and_kernels(
         "dependencies": [],
     }
 
-    async with database_engine.begin_session() as db_sess:
+    async with db_with_cleanup.begin_session() as db_sess:
         # Create domain
         domain = DomainRow(
             name="test-domain",
@@ -353,25 +360,6 @@ async def sample_sessions_and_kernels(
 
     yield data
 
-    # Cleanup
-    async with database_engine.begin_session() as db_sess:
-        # Delete in reverse order of dependencies
-        for dep in data["dependencies"]:
-            await db_sess.delete(dep)
-        for kernel in data["kernels"]:
-            await db_sess.delete(kernel)
-        for session in data["sessions"]:
-            await db_sess.delete(session)
-        for keypair in data["keypairs"]:
-            await db_sess.delete(keypair)
-        for user in data["users"]:
-            await db_sess.delete(user)
-        for group in data["groups"]:
-            await db_sess.delete(group)
-        for domain in data["domains"]:
-            await db_sess.delete(domain)
-        await db_sess.commit()
-
 
 @pytest.fixture
 def mock_valkey_stat_client() -> ValkeyStatClient:
@@ -397,13 +385,13 @@ def mock_config_provider() -> ManagerConfigProvider:
 
 @pytest.fixture
 async def schedule_repository(
-    database_engine: ExtendedAsyncSAEngine,
+    db_with_cleanup: ExtendedAsyncSAEngine,
     mock_valkey_stat_client: ValkeyStatClient,
     mock_config_provider: ManagerConfigProvider,
 ) -> ScheduleRepository:
     """Create ScheduleRepository instance"""
     return ScheduleRepository(
-        db=database_engine,
+        db=db_with_cleanup,
         valkey_stat=mock_valkey_stat_client,
         config_provider=mock_config_provider,
     )

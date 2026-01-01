@@ -6,16 +6,16 @@ Tests the repository layer with real database operations.
 from __future__ import annotations
 
 import uuid
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.manager.errors.object_storage import ObjectStorageNotFoundError
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
+from ai.backend.testutils.db import with_tables
 
 
 class TestObjectStorageRepository:
@@ -28,14 +28,16 @@ class TestObjectStorageRepository:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans Object storage data after each test"""
-        yield database_engine
-
-        # Cleanup all Object storage data after test
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(ObjectStorageRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                ObjectStorageRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def sample_storage_id(

@@ -4,10 +4,9 @@ Tests the repository layer with real database operations.
 """
 
 import uuid
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import RouteStatus
@@ -38,6 +37,7 @@ from ai.backend.manager.repositories.scheduling_history.options import (
     RouteHistoryConditions,
     SessionSchedulingHistoryConditions,
 )
+from ai.backend.testutils.db import with_tables
 
 
 class TestSchedulingHistoryRepository:
@@ -46,16 +46,19 @@ class TestSchedulingHistoryRepository:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans scheduling history data after each test"""
-        yield database_engine
-
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(RouteHistoryRow))
-            await db_sess.execute(sa.delete(DeploymentHistoryRow))
-            await db_sess.execute(sa.delete(KernelSchedulingHistoryRow))
-            await db_sess.execute(sa.delete(SessionSchedulingHistoryRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                SessionSchedulingHistoryRow,
+                KernelSchedulingHistoryRow,
+                DeploymentHistoryRow,
+                RouteHistoryRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def scheduling_history_repository(

@@ -57,23 +57,23 @@ class TestQuerierIntPK:
     @pytest.fixture
     async def int_row_class(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[type[QuerierTestRowInt], None]:
         """Create ORM test table with integer PK and return row class."""
-        async with database_engine.begin() as conn:
+        async with database_connection.begin() as conn:
             await conn.run_sync(
                 lambda c: Base.metadata.create_all(c, [QuerierTestRowInt.__table__])
             )
 
         yield QuerierTestRowInt
 
-        async with database_engine.begin() as conn:
+        async with database_connection.begin() as conn:
             await conn.execute(sa.text("DROP TABLE IF EXISTS test_querier_int_pk CASCADE"))
 
     @pytest.fixture
     async def sample_data(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         int_row_class: type[QuerierTestRowInt],
     ) -> AsyncGenerator[list[dict[str, int | str]], None]:
         """Insert sample data and return list of inserted data."""
@@ -83,7 +83,7 @@ class TestQuerierIntPK:
             {"id": 3, "name": "item-3", "value": "value-3"},
         ]
 
-        async with database_engine.begin_session() as db_sess:
+        async with database_connection.begin_session() as db_sess:
             table = int_row_class.__table__
             await db_sess.execute(table.insert(), data)
 
@@ -91,12 +91,12 @@ class TestQuerierIntPK:
 
     async def test_query_by_int_pk(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         int_row_class: type[QuerierTestRowInt],
         sample_data: list[dict[str, int | str]],
     ) -> None:
         """Test querying a single row by integer primary key."""
-        async with database_engine.begin_session() as db_sess:
+        async with database_connection.begin_session() as db_sess:
             querier: Querier[QuerierTestRowInt] = Querier(
                 row_class=QuerierTestRowInt,
                 pk_value=2,
@@ -112,12 +112,12 @@ class TestQuerierIntPK:
 
     async def test_query_no_matching_row(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         int_row_class: type[QuerierTestRowInt],
         sample_data: list[dict[str, int | str]],
     ) -> None:
         """Test querying a non-existent row returns None."""
-        async with database_engine.begin_session() as db_sess:
+        async with database_connection.begin_session() as db_sess:
             querier: Querier[QuerierTestRowInt] = Querier(
                 row_class=QuerierTestRowInt,
                 pk_value=999,
@@ -134,23 +134,24 @@ class TestQuerierUUIDPK:
     @pytest.fixture
     async def uuid_row_class(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[type[QuerierTestRowUUID], None]:
         """Create ORM test table with UUID PK and return row class."""
-        async with database_engine.begin() as conn:
+        async with database_connection.begin() as conn:
+            await conn.execute(sa.text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
             await conn.run_sync(
                 lambda c: Base.metadata.create_all(c, [QuerierTestRowUUID.__table__])
             )
 
         yield QuerierTestRowUUID
 
-        async with database_engine.begin() as conn:
+        async with database_connection.begin() as conn:
             await conn.execute(sa.text("DROP TABLE IF EXISTS test_querier_uuid_pk CASCADE"))
 
     @pytest.fixture
     async def sample_data(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         uuid_row_class: type[QuerierTestRowUUID],
     ) -> AsyncGenerator[list[dict[str, UUID | str]], None]:
         """Insert sample data and return list of inserted data."""
@@ -160,7 +161,7 @@ class TestQuerierUUIDPK:
             {"id": uuid4(), "name": "item-3", "value": "value-3"},
         ]
 
-        async with database_engine.begin_session() as db_sess:
+        async with database_connection.begin_session() as db_sess:
             table = uuid_row_class.__table__
             await db_sess.execute(table.insert(), data)
 
@@ -168,14 +169,14 @@ class TestQuerierUUIDPK:
 
     async def test_query_by_uuid_pk(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         uuid_row_class: type[QuerierTestRowUUID],
         sample_data: list[dict[str, UUID | str]],
     ) -> None:
         """Test querying a single row by UUID primary key."""
         target_id = sample_data[1]["id"]
 
-        async with database_engine.begin_session() as db_sess:
+        async with database_connection.begin_session() as db_sess:
             querier: Querier[QuerierTestRowUUID] = Querier(
                 row_class=QuerierTestRowUUID,
                 pk_value=target_id,
@@ -191,14 +192,14 @@ class TestQuerierUUIDPK:
 
     async def test_query_no_matching_uuid(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         uuid_row_class: type[QuerierTestRowUUID],
         sample_data: list[dict[str, UUID | str]],
     ) -> None:
         """Test querying a non-existent UUID returns None."""
         non_existent_uuid = uuid4()
 
-        async with database_engine.begin_session() as db_sess:
+        async with database_connection.begin_session() as db_sess:
             querier: Querier[QuerierTestRowUUID] = Querier(
                 row_class=QuerierTestRowUUID,
                 pk_value=non_existent_uuid,
@@ -231,23 +232,23 @@ class TestBatchQuerierBasic:
     @pytest.fixture
     async def batch_row_class(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[type[BatchQuerierTestRow], None]:
         """Create ORM test table for batch querier and return row class."""
-        async with database_engine.begin() as conn:
+        async with database_connection.begin() as conn:
             await conn.run_sync(
                 lambda c: Base.metadata.create_all(c, [BatchQuerierTestRow.__table__])
             )
 
         yield BatchQuerierTestRow
 
-        async with database_engine.begin() as conn:
+        async with database_connection.begin() as conn:
             await conn.execute(sa.text("DROP TABLE IF EXISTS test_batch_querier_orm CASCADE"))
 
     @pytest.fixture
     async def sample_data(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         batch_row_class: type[BatchQuerierTestRow],
     ) -> AsyncGenerator[list[dict[str, int | str]], None]:
         """Insert sample data for batch querier tests."""
@@ -256,7 +257,7 @@ class TestBatchQuerierBasic:
             for i in range(1, 11)
         ]
 
-        async with database_engine.begin_session() as db_sess:
+        async with database_connection.begin_session() as db_sess:
             table = batch_row_class.__table__
             await db_sess.execute(table.insert(), data)
 
@@ -264,12 +265,12 @@ class TestBatchQuerierBasic:
 
     async def test_batch_query_with_pagination(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         batch_row_class: type[BatchQuerierTestRow],
         sample_data: list[dict[str, int | str]],
     ) -> None:
         """Test batch querier with offset pagination."""
-        async with database_engine.begin_session() as db_sess:
+        async with database_connection.begin_session() as db_sess:
             table = batch_row_class.__table__
             query = sa.select(table)
             querier = BatchQuerier(
@@ -286,12 +287,12 @@ class TestBatchQuerierBasic:
 
     async def test_batch_query_with_condition(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         batch_row_class: type[BatchQuerierTestRow],
         sample_data: list[dict[str, int | str]],
     ) -> None:
         """Test batch querier with filter condition."""
-        async with database_engine.begin_session() as db_sess:
+        async with database_connection.begin_session() as db_sess:
             table = batch_row_class.__table__
             query = sa.select(table)
             querier = BatchQuerier(
@@ -308,12 +309,12 @@ class TestBatchQuerierBasic:
 
     async def test_batch_query_empty_result(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         batch_row_class: type[BatchQuerierTestRow],
         sample_data: list[dict[str, int | str]],
     ) -> None:
         """Test batch querier with no matching rows."""
-        async with database_engine.begin_session() as db_sess:
+        async with database_connection.begin_session() as db_sess:
             table = batch_row_class.__table__
             query = sa.select(table)
             querier = BatchQuerier(

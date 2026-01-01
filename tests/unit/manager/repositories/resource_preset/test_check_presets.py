@@ -52,8 +52,11 @@ from ai.backend.manager.models import (
     UserRow,
     association_groups_users,
     sgroups_for_domains,
+    sgroups_for_groups,
+    sgroups_for_keypairs,
 )
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.resource_preset.repository import (
     ResourcePresetRepository,
@@ -61,6 +64,7 @@ from ai.backend.manager.repositories.resource_preset.repository import (
 from ai.backend.manager.repositories.resource_preset.types import (
     CheckPresetsResult,
 )
+from ai.backend.testutils.db import with_tables
 
 
 class TestCheckPresetsOccupiedSlots:
@@ -72,24 +76,32 @@ class TestCheckPresetsOccupiedSlots:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans test data after each test"""
-        yield database_engine
-
-        # Cleanup all test data after test
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(KernelRow))
-            await db_sess.execute(sa.delete(SessionRow))
-            await db_sess.execute(sa.delete(AgentRow))
-            await db_sess.execute(sa.delete(KeyPairRow))
-            await db_sess.execute(sa.delete(UserRow))
-            await db_sess.execute(sa.delete(GroupRow))
-            await db_sess.execute(sa.delete(ScalingGroupRow))
-            await db_sess.execute(sa.delete(DomainRow))
-            await db_sess.execute(sa.delete(KeyPairResourcePolicyRow))
-            await db_sess.execute(sa.delete(ProjectResourcePolicyRow))
-            await db_sess.execute(sa.delete(UserResourcePolicyRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents before children
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                ScalingGroupRow,
+                ResourcePresetRow,
+                sgroups_for_domains,  # association table
+                UserRow,
+                KeyPairRow,
+                sgroups_for_keypairs,  # association table
+                GroupRow,
+                sgroups_for_groups,  # association table
+                association_groups_users,  # association table
+                AgentRow,
+                SessionRow,
+                KernelRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def test_domain_name(
