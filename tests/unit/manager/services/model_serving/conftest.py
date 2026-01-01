@@ -1,26 +1,22 @@
-import uuid
-from contextlib import asynccontextmanager
-from datetime import datetime
-from typing import AsyncGenerator
+"""
+Mock-based fixtures for ModelServingService and AutoScalingService unit tests.
+
+Tests verify service layer business logic using mocked repositories.
+"""
+
+from __future__ import annotations
+
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.endpoint.types import EndpointStatus
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.models.endpoint import (
-    EndpointLifecycle,
-    EndpointRow,
-)
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderOwnershipType, VFolderRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.model_serving.admin_repository import (
     AdminModelServingRepository,
@@ -40,58 +36,61 @@ from ai.backend.manager.sokovan.scheduling_controller import SchedulingControlle
 
 
 @pytest.fixture
-def mock_redis_connection():
-    mock_redis_connection = MagicMock(spec=ValkeyStatClient)
-    return mock_redis_connection
+def mock_redis_connection() -> MagicMock:
+    """Mock ValkeyStatClient for testing."""
+    return MagicMock(spec=ValkeyStatClient)
 
 
 @pytest.fixture
-def mock_storage_manager():
-    mock_storage_manager = MagicMock(spec=StorageSessionManager)
-    return mock_storage_manager
+def mock_storage_manager() -> MagicMock:
+    """Mock StorageSessionManager for testing."""
+    return MagicMock(spec=StorageSessionManager)
 
 
 @pytest.fixture
-def mock_action_monitor():
-    mock_action_monitor = MagicMock(spec=ActionMonitor)
-    return mock_action_monitor
+def mock_action_monitor() -> MagicMock:
+    """Mock ActionMonitor for testing."""
+    return MagicMock(spec=ActionMonitor)
 
 
 @pytest.fixture
-def mock_event_dispatcher():
-    mock_event_dispatcher = MagicMock(spec=EventDispatcher)
-    mock_event_dispatcher.dispatch = AsyncMock()
-    return mock_event_dispatcher
+def mock_event_dispatcher() -> MagicMock:
+    """Mock EventDispatcher for testing."""
+    mock = MagicMock(spec=EventDispatcher)
+    mock.dispatch = AsyncMock()
+    return mock
 
 
 @pytest.fixture
-def mock_agent_registry():
-    mock_agent_registry = MagicMock(spec=AgentRegistry)
-    return mock_agent_registry
+def mock_agent_registry() -> MagicMock:
+    """Mock AgentRegistry for testing."""
+    return MagicMock(spec=AgentRegistry)
 
 
 @pytest.fixture
-def mock_config_provider():
-    mock_config_provider = MagicMock(spec=ManagerConfigProvider)
-    return mock_config_provider
+def mock_config_provider() -> MagicMock:
+    """Mock ManagerConfigProvider for testing."""
+    return MagicMock(spec=ManagerConfigProvider)
 
 
 @pytest.fixture
-def mock_repositories():
-    mock_repositories = MagicMock(spec=ModelServingRepositories)
-    mock_repositories.repository = MagicMock(spec=ModelServingRepository)
-    mock_repositories.admin_repository = MagicMock(spec=AdminModelServingRepository)
-    return mock_repositories
+def mock_repositories() -> MagicMock:
+    """Mock ModelServingRepositories for testing."""
+    mock = MagicMock(spec=ModelServingRepositories)
+    mock.repository = MagicMock(spec=ModelServingRepository)
+    mock.admin_repository = MagicMock(spec=AdminModelServingRepository)
+    return mock
 
 
 @pytest.fixture
-def mock_background_task_manager():
-    mock_background_task_manager = MagicMock(spec=BackgroundTaskManager)
-    return mock_background_task_manager
+def mock_background_task_manager() -> MagicMock:
+    """Mock BackgroundTaskManager for testing."""
+    return MagicMock(spec=BackgroundTaskManager)
 
 
 @pytest.fixture
-def mock_valkey_live():
+def mock_valkey_live() -> MagicMock:
+    """Mock valkey live client for testing."""
     mock = MagicMock()
     mock.store_live_data = AsyncMock()
     mock.get_live_data = AsyncMock()
@@ -100,43 +99,45 @@ def mock_valkey_live():
 
 
 @pytest.fixture
-def mock_deployment_controller():
-    mock_deployment_controller = MagicMock(spec=DeploymentController)
-    mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
-    return mock_deployment_controller
+def mock_deployment_controller() -> MagicMock:
+    """Mock DeploymentController for testing."""
+    mock = MagicMock(spec=DeploymentController)
+    mock.mark_lifecycle_needed = AsyncMock()
+    return mock
 
 
 @pytest.fixture
-def mock_event_hub():
-    mock_event_hub = MagicMock(spec=EventHub)
-    mock_event_hub.register_event_propagator = MagicMock()
-    mock_event_hub.unregister_event_propagator = MagicMock()
-    return mock_event_hub
+def mock_event_hub() -> MagicMock:
+    """Mock EventHub for testing."""
+    mock = MagicMock(spec=EventHub)
+    mock.register_event_propagator = MagicMock()
+    mock.unregister_event_propagator = MagicMock()
+    return mock
 
 
 @pytest.fixture
-def mock_scheduling_controller():
-    mock_scheduling_controller = MagicMock(spec=SchedulingController)
-    mock_scheduling_controller.enqueue_session = AsyncMock()
-    mock_scheduling_controller.mark_sessions_for_termination = AsyncMock()
-    return mock_scheduling_controller
+def mock_scheduling_controller() -> MagicMock:
+    """Mock SchedulingController for testing."""
+    mock = MagicMock(spec=SchedulingController)
+    mock.enqueue_session = AsyncMock()
+    mock.mark_sessions_for_termination = AsyncMock()
+    return mock
 
 
 @pytest.fixture
 def model_serving_service(
-    database_fixture,
-    database_engine,
-    mock_storage_manager,
-    mock_event_dispatcher,
-    mock_event_hub,
-    mock_agent_registry,
-    mock_background_task_manager,
-    mock_config_provider,
-    mock_valkey_live,
-    mock_repositories,
-    mock_deployment_controller,
-    mock_scheduling_controller,
+    mock_storage_manager: MagicMock,
+    mock_event_dispatcher: MagicMock,
+    mock_event_hub: MagicMock,
+    mock_agent_registry: MagicMock,
+    mock_background_task_manager: MagicMock,
+    mock_config_provider: MagicMock,
+    mock_valkey_live: MagicMock,
+    mock_repositories: MagicMock,
+    mock_deployment_controller: MagicMock,
+    mock_scheduling_controller: MagicMock,
 ) -> ModelServingService:
+    """Create ModelServingService with mock dependencies."""
     return ModelServingService(
         agent_registry=mock_agent_registry,
         background_task_manager=mock_background_task_manager,
@@ -154,11 +155,10 @@ def model_serving_service(
 
 @pytest.fixture
 def model_serving_processors(
-    database_fixture,
-    database_engine,
-    mock_action_monitor,
-    model_serving_service,
+    mock_action_monitor: MagicMock,
+    model_serving_service: ModelServingService,
 ) -> ModelServingProcessors:
+    """Create ModelServingProcessors with mock dependencies."""
     return ModelServingProcessors(
         service=model_serving_service,
         action_monitors=[mock_action_monitor],
@@ -167,8 +167,9 @@ def model_serving_processors(
 
 @pytest.fixture
 def auto_scaling_service(
-    mock_repositories,
-):
+    mock_repositories: MagicMock,
+) -> AutoScalingService:
+    """Create AutoScalingService with mock dependencies."""
     return AutoScalingService(
         repository=mock_repositories.repository,
         admin_repository=mock_repositories.admin_repository,
@@ -177,102 +178,11 @@ def auto_scaling_service(
 
 @pytest.fixture
 def auto_scaling_processors(
-    database_fixture,
-    database_engine,
-    mock_action_monitor,
-    auto_scaling_service,
+    mock_action_monitor: MagicMock,
+    auto_scaling_service: AutoScalingService,
 ) -> ModelServingAutoScalingProcessors:
+    """Create ModelServingAutoScalingProcessors with mock dependencies."""
     return ModelServingAutoScalingProcessors(
         service=auto_scaling_service,
         action_monitors=[mock_action_monitor],
     )
-
-
-@pytest.fixture
-def create_vfolder(
-    database_engine: ExtendedAsyncSAEngine,
-):
-    @asynccontextmanager
-    async def _create_vfolder(
-        vfolder_id: uuid.UUID,
-        name: str,
-        user_uuid: uuid.UUID,
-        domain_name: str,
-        ownership_type: VFolderOwnershipType = VFolderOwnershipType.USER,
-    ) -> AsyncGenerator[uuid.UUID, None]:
-        async with database_engine.begin_session() as session:
-            vfolder_data = {
-                "id": vfolder_id,
-                "name": name,
-                "user": user_uuid,
-                "domain_name": domain_name,
-                "ownership_type": ownership_type,
-                "max_files": 1000,
-                "max_size": 1073741824,  # 1GB
-                "num_files": 0,
-                "cur_size": 0,
-                "created_at": datetime.utcnow(),
-                "last_used": None,
-                "unmanaged_path": "",
-                "usage_mode": "general",
-                "permission": "rw",
-                "last_size_update": datetime.utcnow(),
-                "status": "ready",
-            }
-            await session.execute(sa.insert(VFolderRow).values(vfolder_data))
-        try:
-            yield vfolder_id
-        finally:
-            async with database_engine.begin_session() as session:
-                await session.execute(sa.delete(VFolderRow).where(VFolderRow.id == vfolder_id))
-
-    return _create_vfolder
-
-
-@pytest.fixture
-def create_endpoint(
-    database_engine: ExtendedAsyncSAEngine,
-):
-    @asynccontextmanager
-    async def _create_endpoint(
-        endpoint_id: uuid.UUID,
-        model_name: str,
-        model_version: str,
-        domain_name: str,
-        owner_uuid: uuid.UUID,
-        status: EndpointStatus = EndpointStatus.READY,
-        lifecycle_stage: EndpointLifecycle = EndpointLifecycle.CREATED,
-    ) -> AsyncGenerator[uuid.UUID, None]:
-        async with database_engine.begin_session() as session:
-            endpoint_data = {
-                "id": endpoint_id,
-                "name": f"{model_name}-{model_version}",
-                "model_name": model_name,
-                "model_version": model_version,
-                "domain": domain_name,
-                "project": None,
-                "owner": owner_uuid,
-                "url": f"https://api.example.com/v1/models/{model_name}/{model_version}",
-                "retries": 0,
-                "status": status,
-                "lifecycle_stage": lifecycle_stage,
-                "open_to_public": False,
-                "config": {},
-                "runtime_variant": "custom",
-                "resource_group": "default",
-                "tag": None,
-                "environ": {},
-                "bootstrap_script": None,
-                "callback_url": None,
-                "startup_command": None,
-                "created_at": datetime.utcnow(),
-                "destroyed_at": None,
-            }
-            await session.execute(sa.insert(EndpointRow).values(endpoint_data))
-        try:
-            yield endpoint_id
-        finally:
-            async with database_engine.begin_session() as session:
-                await session.execute(sa.delete(EndpointRow).where(EndpointRow.id == endpoint_id))
-
-    return _create_endpoint
