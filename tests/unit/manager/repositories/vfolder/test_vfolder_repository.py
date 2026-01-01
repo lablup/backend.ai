@@ -6,11 +6,10 @@ Tests the repository layer with real database operations.
 from __future__ import annotations
 
 import uuid
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, create_autospec
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.common.types import BinarySize, VFolderUsageMode
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -24,7 +23,9 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
@@ -37,6 +38,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.testutils.db import with_tables
 
 
 class TestVfolderRepository:
@@ -73,25 +75,24 @@ class TestVfolderRepository:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """
-        Database engine that auto-cleans all test data after each test.
-
-        Deletes all rows from tables in FK dependency order
-        (tables without FK constraints first).
-        """
-        yield database_engine
-
-        # Cleanup all test data in correct FK order
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(VFolderPermissionRow))
-            await db_sess.execute(sa.delete(VFolderRow))
-            await db_sess.execute(sa.delete(GroupRow))
-            await db_sess.execute(sa.delete(UserRow))
-            await db_sess.execute(sa.delete(ProjectResourcePolicyRow))
-            await db_sess.execute(sa.delete(UserResourcePolicyRow))
-            await db_sess.execute(sa.delete(DomainRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                VFolderRow,
+                VFolderPermissionRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def test_domain_name(

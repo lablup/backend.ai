@@ -48,24 +48,24 @@ class TestCreatorBasic:
     @pytest.fixture
     async def orm_table(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[sa.Table, None]:
         """Create ORM test table."""
-        async with database_engine.begin() as conn:
+        async with database_connection.begin() as conn:
             await conn.run_sync(lambda c: Base.metadata.create_all(c, [CreatorTestRow.__table__]))
 
         yield CreatorTestRow.__table__
 
-        async with database_engine.begin() as conn:
+        async with database_connection.begin() as conn:
             await conn.execute(sa.text("DROP TABLE IF EXISTS test_creator_orm CASCADE"))
 
     async def test_create_single_row(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         orm_table: sa.Table,
     ) -> None:
         """Test creating a single row with execute_creator."""
-        async with database_engine.begin_session() as db_sess:
+        async with database_connection.begin_session() as db_sess:
             # Verify table is empty
             result = await db_sess.execute(sa.select(sa.func.count()).select_from(orm_table))
             assert result.scalar() == 0
@@ -86,11 +86,11 @@ class TestCreatorBasic:
 
     async def test_create_row_with_null_value(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         orm_table: sa.Table,
     ) -> None:
         """Test creating a row with null optional field."""
-        async with database_engine.begin_session() as db_sess:
+        async with database_connection.begin_session() as db_sess:
             spec = SimpleCreatorSpec(name="null-value-item")
             creator: Creator[CreatorTestRow] = Creator(spec=spec)
 
@@ -102,11 +102,11 @@ class TestCreatorBasic:
 
     async def test_create_multiple_rows_sequentially(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         orm_table: sa.Table,
     ) -> None:
         """Test creating multiple rows in sequence."""
-        async with database_engine.begin_session() as db_sess:
+        async with database_connection.begin_session() as db_sess:
             for i in range(5):
                 spec = SimpleCreatorSpec(name=f"item-{i}", value=f"value-{i}")
                 creator: Creator[CreatorTestRow] = Creator(spec=spec)

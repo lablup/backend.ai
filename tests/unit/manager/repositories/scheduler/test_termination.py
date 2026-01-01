@@ -46,6 +46,7 @@ from ai.backend.manager.repositories.scheduler.db_source.db_source import Schedu
 from ai.backend.manager.repositories.scheduler.types.session import (
     KernelTerminationResult,
 )
+from ai.backend.testutils.db import with_tables
 
 
 class TestKernelTermination:
@@ -54,24 +55,27 @@ class TestKernelTermination:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans test data after each test"""
-        yield database_engine
-
-        # Cleanup all test data after test (reverse order of creation)
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(KernelRow))
-            await db_sess.execute(sa.delete(SessionRow))
-            await db_sess.execute(sa.delete(KeyPairRow))
-            await db_sess.execute(sa.delete(UserRow))
-            await db_sess.execute(sa.delete(AgentRow))
-            await db_sess.execute(sa.delete(GroupRow))
-            await db_sess.execute(sa.delete(ScalingGroupRow))
-            await db_sess.execute(sa.delete(DomainRow))
-            await db_sess.execute(sa.delete(KeyPairResourcePolicyRow))
-            await db_sess.execute(sa.delete(UserResourcePolicyRow))
-            await db_sess.execute(sa.delete(ProjectResourcePolicyRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents first
+                DomainRow,
+                ProjectResourcePolicyRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                ScalingGroupRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                AgentRow,
+                SessionRow,
+                KernelRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def test_domain_name(

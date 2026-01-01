@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
-from typing import Protocol
+from typing import Protocol, Union
 
 from sqlalchemy import Table, text
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -12,6 +12,10 @@ class HasTable(Protocol):
     """Protocol for SQLAlchemy ORM model classes with __table__ attribute."""
 
     __table__: Table
+
+
+# Type alias for items that can be passed to with_tables
+TableOrORM = Union[Table, type[HasTable]]
 
 
 def _create_tables_sync(conn, tables: list[Table]) -> None:
@@ -28,10 +32,17 @@ def _create_tables_sync(conn, tables: list[Table]) -> None:
         metadata.create_all(conn, tables=tables, checkfirst=True)
 
 
+def _to_table(item: TableOrORM) -> Table:
+    """Convert ORM class or Table to Table."""
+    if isinstance(item, Table):
+        return item
+    return item.__table__
+
+
 @asynccontextmanager
 async def with_tables(
     engine: AsyncEngine,
-    orms: Sequence[type[HasTable]],
+    orms: Sequence[TableOrORM],
 ) -> AsyncGenerator[None, None]:
     """
     Create specified tables on enter, TRUNCATE CASCADE on exit.
@@ -42,14 +53,23 @@ async def with_tables(
 
     Args:
         engine: SQLAlchemy async engine
-        orms: Sequence of SQLAlchemy ORM model classes (ordered by FK dependencies)
+        orms: Sequence of SQLAlchemy ORM model classes or Table objects
+              (ordered by FK dependencies)
 
     Example:
         async def test_something(database_connection):
             async with with_tables(database_connection, [DomainRow, UserRow, GroupRow]):
                 ...
+
+        # With association tables:
+        async with with_tables(database_connection, [
+            DomainRow,
+            ScalingGroupRow,
+            sgroups_for_domains,  # raw Table object
+        ]):
+            ...
     """
-    tables = [orm.__table__ for orm in orms]
+    tables = [_to_table(item) for item in orms]
 
     # Create required PostgreSQL extensions and tables
     async with engine.begin() as conn:

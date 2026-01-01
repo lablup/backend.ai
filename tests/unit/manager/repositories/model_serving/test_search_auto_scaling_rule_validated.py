@@ -11,7 +11,6 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
@@ -25,6 +24,8 @@ from ai.backend.manager.models import (
     DomainRow,
     GroupRow,
     ImageRow,
+    KeyPairResourcePolicyRow,
+    KeyPairRow,
     ProjectResourcePolicyRow,
     ScalingGroupRow,
     UserResourcePolicyRow,
@@ -41,8 +42,10 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
+from ai.backend.testutils.db import with_tables
 
 
 class TestSearchAutoScalingRulesValidated:
@@ -55,23 +58,29 @@ class TestSearchAutoScalingRulesValidated:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans all test data after each test"""
-        yield database_engine
-
-        # Cleanup in FK dependency order
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(EndpointAutoScalingRuleRow))
-            await db_sess.execute(sa.delete(EndpointRow))
-            await db_sess.execute(sa.delete(ImageRow))
-            await db_sess.execute(sa.delete(UserRow))
-            await db_sess.execute(sa.delete(GroupRow))
-            await db_sess.execute(sa.delete(ContainerRegistryRow))
-            await db_sess.execute(sa.delete(ScalingGroupRow))
-            await db_sess.execute(sa.delete(UserResourcePolicyRow))
-            await db_sess.execute(sa.delete(ProjectResourcePolicyRow))
-            await db_sess.execute(sa.delete(DomainRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents first
+                DomainRow,
+                ProjectResourcePolicyRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                ScalingGroupRow,
+                ContainerRegistryRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                EndpointAutoScalingRuleRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def test_scaling_group(
@@ -356,10 +365,10 @@ class TestSearchAutoScalingRulesValidated:
     @pytest.fixture
     async def model_serving_repository(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ModelServingRepository:
         """Create ModelServingRepository instance with real database"""
-        return ModelServingRepository(db=database_engine)
+        return ModelServingRepository(db=db_with_cleanup)
 
     # =========================================================================
     # Tests - Basic Search

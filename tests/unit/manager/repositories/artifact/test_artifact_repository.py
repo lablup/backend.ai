@@ -7,11 +7,10 @@ Only artifact-related tests. Revision tests are in artifact_revision/test_artifa
 from __future__ import annotations
 
 import uuid
+from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
-from typing import AsyncGenerator
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.data.artifact.types import (
@@ -29,6 +28,7 @@ from ai.backend.manager.repositories.artifact.updaters import ArtifactUpdaterSpe
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.types import TriState
+from ai.backend.testutils.db import with_tables
 
 
 class TestArtifactRepository:
@@ -41,15 +41,17 @@ class TestArtifactRepository:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans artifact data after each test"""
-        yield database_engine
-
-        # Cleanup all artifact data after test
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(ArtifactRevisionRow))
-            await db_sess.execute(sa.delete(ArtifactRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                ArtifactRow,
+                ArtifactRevisionRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     def test_registry_id(self) -> uuid.UUID:
