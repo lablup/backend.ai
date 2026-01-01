@@ -14,6 +14,20 @@ class HasTable(Protocol):
     __table__: Table
 
 
+def _create_tables_sync(conn, tables: list[Table]) -> None:
+    """
+    Sync function to create tables using MetaData.create_all().
+
+    This approach handles circular FK dependencies better than creating
+    tables individually, as SQLAlchemy can sort and defer constraints.
+    """
+    # Use the shared metadata from the first table to create all tables
+    # This handles circular FK dependencies via use_alter
+    if tables:
+        metadata = tables[0].metadata
+        metadata.create_all(conn, tables=tables, checkfirst=True)
+
+
 @asynccontextmanager
 async def with_tables(
     engine: AsyncEngine,
@@ -37,10 +51,11 @@ async def with_tables(
     """
     tables = [orm.__table__ for orm in orms]
 
-    # Create tables
+    # Create required PostgreSQL extensions and tables
     async with engine.begin() as conn:
-        for table in tables:
-            await conn.run_sync(table.create, checkfirst=True)
+        # Create uuid-ossp extension for uuid_generate_v4()
+        await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
+        await conn.run_sync(_create_tables_sync, tables)
 
     try:
         yield
