@@ -73,7 +73,9 @@ class AgentDBSource:
     async def get_by_id(self, agent_id: AgentId) -> AgentData:
         async with self._db.begin_readonly_session() as db_session:
             agent_row: Optional[AgentRow] = await db_session.scalar(
-                sa.select(AgentRow).where(AgentRow.id == agent_id)
+                sa.select(AgentRow)
+                .where(AgentRow.id == agent_id)
+                .options(selectinload(AgentRow.kernels))
             )
             if agent_row is None:
                 log.error("Agent with id {} not found", agent_id)
