@@ -22,8 +22,8 @@ from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
 from ai.backend.manager.models.session import SessionRow
 
-from ..defs import RESERVED_DOTFILES
-from .base import (
+from ...defs import RESERVED_DOTFILES
+from ..base import (
     Base,
     ForeignKeyIDColumn,
     mapper_registry,
