@@ -1,16 +1,17 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.domain.types import DomainData, DomainModifier, UserInfo
+from ai.backend.manager.data.domain.types import DomainData, UserInfo
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.domain.actions.base import DomainAction
 
 
 @dataclass
 class ModifyDomainAction(DomainAction):
-    domain_name: str
     user_info: UserInfo
-    modifier: DomainModifier = field(default_factory=DomainModifier)
+    updater: Updater[DomainRow]
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -21,16 +22,11 @@ class ModifyDomainAction(DomainAction):
     def operation_type(cls) -> str:
         return "modify"
 
-    def get_modified_fields(self):
-        return self.modifier.fields_to_update()
-
 
 @dataclass
 class ModifyDomainActionResult(BaseActionResult):
-    domain_data: Optional[DomainData]
-    success: bool = field(compare=False)
-    description: Optional[str] = field(compare=False)
+    domain_data: DomainData
 
     @override
     def entity_id(self) -> Optional[str]:
-        return self.domain_data.name if self.domain_data is not None else None
+        return self.domain_data.name

@@ -22,7 +22,10 @@ else:
 def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
     random_id = secrets.token_hex(16)
     key_filename = "id_container"
-    key_path = Path(f"~/.ssh/id_{random_id}").expanduser()
+    # Create ssh directory with recommended permissions if not exists
+    ssh_dir = Path("~/.ssh").expanduser()
+    ssh_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    key_path = ssh_dir / f"id_{random_id}"
     try:
         subprocess.run(
             [*CLI_EXECUTABLE, "session", "download", session_ref, key_filename],

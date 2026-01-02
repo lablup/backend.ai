@@ -43,7 +43,10 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from ai.backend.common import msgpack
 from ai.backend.common import typed_validators as tv
 from ai.backend.common import validators as tx
-from ai.backend.common.api_handlers import BaseFieldModel
+from ai.backend.common.api_handlers import (
+    BaseFieldModel,
+)
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
     VFolderHostPermission,
@@ -51,13 +54,12 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
-from ai.backend.manager.data.kernel.types import KernelStatus
-
-if TYPE_CHECKING:
-    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.resource import get_watcher_info
+from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
+from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.models.storage import StorageSessionManager
 
 from ..errors.api import InvalidAPIParameters
@@ -67,14 +69,16 @@ from ..errors.kernel import BackendAgentError
 from ..errors.service import ModelServiceDependencyNotCleared
 from ..errors.storage import (
     TooManyVFoldersFound,
+    VFolderAlreadyExists,
+    VFolderBadRequest,
     VFolderFilterStatusFailed,
     VFolderFilterStatusNotAvailable,
+    VFolderInvalidParameter,
     VFolderNotFound,
     VFolderOperationFailed,
 )
 from ..models import (
     ACTIVE_USER_STATUSES,
-    AgentStatus,
     EndpointRow,
     UserRole,
     UserStatus,
@@ -108,6 +112,8 @@ from ..models.vfolder import (
     is_unmanaged,
 )
 from ..models.vfolder import VFolderRow as VFolderDBRow
+from ..repositories.base.updater import Updater
+from ..repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
 from ..services.vfolder.actions.base import (
     CloneVFolderAction,
     CreateVFolderAction,
@@ -118,12 +124,12 @@ from ..services.vfolder.actions.base import (
     MoveToTrashVFolderAction,
     RestoreVFolderFromTrashAction,
     UpdateVFolderAttributeAction,
-    VFolderAttributeModifier,
 )
 from ..services.vfolder.actions.file import (
     CreateDownloadSessionAction,
     CreateUploadSessionAction,
     DeleteFilesAction,
+    DeleteFilesAsyncAction,
     ListFilesAction,
     MkdirAction,
     RenameFileAction,
@@ -134,14 +140,9 @@ from ..services.vfolder.actions.invite import (
     LeaveInvitedVFolderAction,
     ListInvitationAction,
     RejectInvitationAction,
+    RevokeInvitedVFolderAction,
     UpdateInvitationAction,
-)
-from ..services.vfolder.exceptions import (
-    ModelServiceDependencyNotCleared as VFolderMountedOnModelService,
-)
-from ..services.vfolder.exceptions import (
-    VFolderAlreadyExists,
-    VFolderInvalidParameter,
+    UpdateInvitedVFolderMountPermissionAction,
 )
 from ..types import OptionalState
 from .auth import admin_required, auth_required, superadmin_required
@@ -215,6 +216,8 @@ def with_vfolder_status_checked(
                 raise VFolderNotFound()
             row = folder_rows[0]
             await check_vfolder_status(row, status)
+            # Store vfolder_row in request for MiddlewareParam to access
+            request["vfolder_row"] = row
             return await handler(request, row, *args, **kwargs)
 
         return _wrapped
@@ -321,14 +324,17 @@ def with_vfolder_rows_resolved(
                 folder_name_or_id = uuid.UUID(piece)
             except ValueError:
                 folder_name_or_id = piece
+            vfolder_rows = await resolve_vfolder_rows(
+                request,
+                perm,
+                folder_name_or_id,
+                allow_privileged_access=allow_privileged_access,
+            )
+            # Store vfolder_rows in request for MiddlewareParam to access
+            request["vfolder_rows"] = vfolder_rows
             return await handler(
                 request,
-                await resolve_vfolder_rows(
-                    request,
-                    perm,
-                    folder_name_or_id,
-                    allow_privileged_access=allow_privileged_access,
-                ),
+                vfolder_rows,
                 *args,
                 **kwargs,
             )
@@ -430,6 +436,13 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
     folder_host = params.folder_host
     unmanaged_path = params.unmanaged_path
 
+    if group_id_or_name is not None:
+        scope_type = ScopeType.PROJECT
+        scope_id = str(group_id_or_name)
+    else:
+        scope_type = ScopeType.USER
+        scope_id = str(user_uuid)
+
     try:
         result = await root_ctx.processors.vfolder.create_vfolder.wait_for_complete(
             CreateVFolderAction(
@@ -445,6 +458,8 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
                 user_uuid=user_uuid,
                 user_role=user_role,
                 creator_email=request["user"]["email"],
+                _scope_type=scope_type,
+                _scope_id=scope_id,
             )
         )
     except (VFolderInvalidParameter, VFolderAlreadyExists) as e:
@@ -492,9 +507,18 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
         request["keypair"]["access_key"],
     )
     owner_user_uuid, owner_user_role = await get_user_scopes(request, params)
+    group_id = params["group_id"]
+    if group_id is not None:
+        scope_type = ScopeType.PROJECT
+        scope_id = str(group_id)
+    else:
+        scope_type = ScopeType.USER
+        scope_id = str(owner_user_uuid)
     result = await root_ctx.processors.vfolder.list_vfolder.wait_for_complete(
         ListVFolderAction(
             user_uuid=owner_user_uuid,
+            _scope_type=scope_type,
+            _scope_id=scope_id,
         )
     )
     resp = []
@@ -582,7 +606,6 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
     )
     domain_name = request["user"]["domain_name"]
     group_id = params["group_id"]
-    domain_admin = request["user"]["role"] == UserRole.ADMIN
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = (
         await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
@@ -596,7 +619,10 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
             allowed_hosts = allowed_hosts | allowed_hosts_by_user
         if "group" in allowed_vfolder_types:
             allowed_hosts_by_group = await get_allowed_vfolder_hosts_by_group(
-                conn, resource_policy, domain_name, group_id, domain_admin=domain_admin
+                conn,
+                resource_policy,
+                domain_name,
+                group_id,
             )
             allowed_hosts = allowed_hosts | allowed_hosts_by_group
     all_volumes = await root_ctx.storage_manager.get_all_volumes()
@@ -885,7 +911,10 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
             .where(vfolders.c.id == params["id"])
         )
         result = await conn.execute(query)
-        assert result.rowcount == 1
+        if result.rowcount != 1:
+            raise VFolderOperationFailed(
+                f"Failed to update vfolder quota: expected 1 row, got {result.rowcount}"
+            )
 
     return web.json_response({"size_bytes": quota}, status=HTTPStatus.OK)
 
@@ -948,8 +977,8 @@ class RenameRequestModel(LegacyBaseRequestModel):
         description="Name of the vfolder",
     )
 
-    def to_modifier(self) -> VFolderAttributeModifier:
-        return VFolderAttributeModifier(
+    def to_updater_spec(self) -> VFolderAttributeUpdaterSpec:
+        return VFolderAttributeUpdaterSpec(
             name=OptionalState[str].update(self.new_name),
         )
 
@@ -979,7 +1008,10 @@ async def rename_vfolder(
         UpdateVFolderAttributeAction(
             user_uuid=request["user"]["uuid"],
             vfolder_uuid=row["id"],
-            modifier=params.to_modifier(),
+            updater=Updater(
+                spec=params.to_updater_spec(),
+                pk_value=row["id"],
+            ),
         )
     )
     return web.Response(status=HTTPStatus.CREATED)
@@ -1020,9 +1052,12 @@ async def update_vfolder_options(
         UpdateVFolderAttributeAction(
             user_uuid=request["user"]["uuid"],
             vfolder_uuid=row["id"],
-            modifier=VFolderAttributeModifier(
-                cloneable=cloneable,
-                mount_permission=mount_permission,
+            updater=Updater(
+                spec=VFolderAttributeUpdaterSpec(
+                    cloneable=cloneable,
+                    mount_permission=mount_permission,
+                ),
+                pk_value=row["id"],
             ),
         )
     )
@@ -1226,6 +1261,44 @@ async def delete_files(request: web.Request, params: Any, row: VFolderRow) -> we
         )
     )
     return web.json_response({}, status=HTTPStatus.OK)
+
+
+@auth_required
+@server_status_required(READ_ALLOWED)
+@with_vfolder_rows_resolved(VFolderPermissionSetAlias.WRITABLE)
+@with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
+@check_api_params(
+    t.Dict({
+        t.Key("files"): t.List(t.String),
+        t.Key("recursive", default=False): t.Bool,
+    })
+)
+async def delete_files_async(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
+    """Delete files asynchronously within a vfolder."""
+    root_ctx: RootContext = request.app["_root.context"]
+    log.info(
+        "VFOLDER.DELETE_FILES_ASYNC (email:{}, ak:{}, vf:{} (resolved-from:{!r}), files:{}, recursive:{})",
+        request["user"]["email"],
+        request["keypair"]["access_key"],
+        row["id"],
+        request.match_info["name"],
+        params["files"],
+        params["recursive"],
+    )
+
+    result = await root_ctx.processors.vfolder_file.delete_files_async.wait_for_complete(
+        DeleteFilesAsyncAction(
+            user_uuid=request["user"]["uuid"],
+            vfolder_uuid=row["id"],
+            files=params["files"],
+            recursive=params["recursive"],
+        )
+    )
+
+    return web.json_response(
+        {"bgtask_id": str(result.task_id)},
+        status=HTTPStatus.ACCEPTED,
+    )
 
 
 @auth_required
@@ -1701,8 +1774,6 @@ async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.
         )
     except VFolderInvalidParameter as e:
         raise InvalidAPIParameters(str(e))
-    except VFolderMountedOnModelService:
-        raise ModelServiceDependencyNotCleared()
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -2100,21 +2171,18 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
         user_uuid,
         perm,
     )
-    async with root_ctx.db.begin() as conn:
-        if perm is not None:
-            query = (
-                sa.update(vfolder_permissions)
-                .values(permission=perm)
-                .where(vfolder_permissions.c.vfolder == vfolder_id)
-                .where(vfolder_permissions.c.user == user_uuid)
+    if perm is not None:
+        await root_ctx.processors.vfolder_invite.update_invited_vfolder_mount_permission.wait_for_complete(
+            UpdateInvitedVFolderMountPermissionAction(
+                vfolder_id=vfolder_id,
+                user_id=user_uuid,
+                permission=perm,
             )
-        else:
-            query = (
-                sa.delete(vfolder_permissions)
-                .where(vfolder_permissions.c.vfolder == vfolder_id)
-                .where(vfolder_permissions.c.user == user_uuid)
-            )
-        await conn.execute(query)
+        )
+    else:
+        await root_ctx.processors.vfolder_invite.revoke_invited_vfolder.wait_for_complete(
+            RevokeInvitedVFolderAction(vfolder_id=vfolder_id, shared_user_id=user_uuid)
+        )
     resp = {"msg": "shared vfolder permission updated"}
     return web.json_response(resp, status=HTTPStatus.OK)
 
@@ -2517,7 +2585,8 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
     if mount_prefix is None:
         mount_prefix = "/mnt"
     mountpoint = Path(mount_prefix) / params["name"]
-    assert Path(mount_prefix) != mountpoint
+    if Path(mount_prefix) == mountpoint:
+        raise VFolderBadRequest("Mount prefix and mountpoint cannot be the same")
 
     async with root_ctx.db.begin() as conn, conn.begin():
         # Prevent unmount if target host is mounted to running kernels.
@@ -2753,6 +2822,7 @@ def create_app(default_cors_options):
     app["folders.context"] = PrivateContext()
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route
+
     root_resource = cors.add(app.router.add_resource(r""))
     cors.add(root_resource.add_route("POST", create))
     cors.add(root_resource.add_route("GET", list_folders))
@@ -2776,6 +2846,7 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", r"/{name}/rename-file", rename_file))
     cors.add(add_route("POST", r"/{name}/delete-files", delete_files))
     cors.add(add_route("DELETE", r"/{name}/delete-files", delete_files))
+    cors.add(add_route("POST", r"/{name}/delete-files-async", delete_files_async))
     cors.add(add_route("POST", r"/{name}/rename_file", rename_file))  # legacy underbar
     cors.add(add_route("DELETE", r"/{name}/delete_files", delete_files))  # legacy underbar
     cors.add(add_route("GET", r"/{name}/files", list_files))

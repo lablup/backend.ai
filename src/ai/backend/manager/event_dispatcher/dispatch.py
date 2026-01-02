@@ -9,11 +9,13 @@ from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyS
 from ai.backend.common.events.dispatcher import (
     CoalescingOptions,
     EventDispatcher,
+    EventProducer,
 )
 from ai.backend.common.events.event_types.agent.anycast import (
     AgentErrorEvent,
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
+    AgentInstalledImagesRemoveEvent,
     AgentStartedEvent,
     AgentStatusHeartbeat,
     AgentTerminatedEvent,
@@ -22,6 +24,7 @@ from ai.backend.common.events.event_types.agent.anycast import (
 from ai.backend.common.events.event_types.artifact.anycast import (
     ModelImportDoneEvent,
     ModelMetadataFetchDoneEvent,
+    ModelVerifyingEvent,
 )
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
     DoScanReservoirRegistryEvent,
@@ -53,6 +56,9 @@ from ai.backend.common.events.event_types.kernel.anycast import (
 from ai.backend.common.events.event_types.model_serving.anycast import (
     ModelServiceStatusAnycastEvent,
     RouteCreatedAnycastEvent,
+)
+from ai.backend.common.events.event_types.notification.anycast import (
+    NotificationTriggeredEvent,
 )
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoCheckPrecondEvent,
@@ -120,6 +126,7 @@ from .handlers.idle_check import IdleCheckEventHandler
 from .handlers.image import ImageEventHandler
 from .handlers.kernel import KernelEventHandler
 from .handlers.model_serving import ModelServingEventHandler
+from .handlers.notification import NotificationEventHandler
 from .handlers.session import SessionEventHandler
 from .handlers.vfolder import VFolderEventHandler
 from .reporters import EventLogger
@@ -145,6 +152,7 @@ class DispatcherArgs:
     processors_factory: Callable[[], Processors]
     storage_manager: StorageSessionManager
     config_provider: ManagerConfigProvider
+    event_producer: EventProducer
     use_sokovan: bool = True
 
 
@@ -159,6 +167,7 @@ class Dispatchers:
     _session_event_handler: SessionEventHandler
     _vfolder_event_handler: VFolderEventHandler
     _idle_check_event_handler: IdleCheckEventHandler
+    _notification_event_handler: NotificationEventHandler
     _artifact_event_handler: ArtifactEventHandler
     _artifact_registry_event_handler: ArtifactRegistryEventHandler
 
@@ -169,7 +178,7 @@ class Dispatchers:
         self._db = args.db
         self._propagator_handler = PropagatorEventHandler(args.event_hub)
         self._agent_event_handler = AgentEventHandler(
-            args.agent_registry, args.db, args.event_dispatcher_plugin_ctx
+            args.agent_registry, args.db, args.event_dispatcher_plugin_ctx, args.processors_factory
         )
         self._image_event_handler = ImageEventHandler(
             args.agent_registry,
@@ -205,11 +214,13 @@ class Dispatchers:
         )
         self._vfolder_event_handler = VFolderEventHandler(args.db)
         self._idle_check_event_handler = IdleCheckEventHandler(args.idle_checker_host)
+        self._notification_event_handler = NotificationEventHandler(args.processors_factory)
         self._artifact_event_handler = ArtifactEventHandler(
             args.repositories.artifact.repository,
             args.repositories.huggingface_registry.repository,
             args.repositories.reservoir_registry.repository,
             args.config_provider,
+            args.event_producer,
         )
         self._artifact_registry_event_handler = ArtifactRegistryEventHandler(
             args.processors_factory,
@@ -217,7 +228,9 @@ class Dispatchers:
             args.repositories.artifact_registry.repository,
             args.repositories.reservoir_registry.repository,
             args.repositories.object_storage.repository,
+            args.repositories.vfs_storage.repository,
             args.storage_manager,
+            args.config_provider,
         )
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:
@@ -233,6 +246,7 @@ class Dispatchers:
         self._dispatch_session_events(event_dispatcher)
         self._dispatch_vfolder_events(event_dispatcher)
         self._dispatch_idle_check_events(event_dispatcher)
+        self._dispatch_notification_events(event_dispatcher)
         self._dispatch_artifact_events(event_dispatcher)
         self._dispatch_artifact_registry_events(event_dispatcher)
 
@@ -283,6 +297,11 @@ class Dispatchers:
         evd.consume(AgentTerminatedEvent, None, self._agent_event_handler.handle_agent_terminated)
         evd.consume(
             AgentImagesRemoveEvent, None, self._agent_event_handler.handle_agent_images_remove
+        )
+        evd.consume(
+            AgentInstalledImagesRemoveEvent,
+            None,
+            self._agent_event_handler.handle_agent_installed_images_remove,
         )
         evd.consume(
             AgentErrorEvent,
@@ -577,6 +596,11 @@ class Dispatchers:
             self._artifact_event_handler.handle_model_metadata_fetch_done,
         )
         evd.consume(
+            ModelVerifyingEvent,
+            None,
+            self._artifact_event_handler.handle_model_verifying,
+        )
+        evd.consume(
             ModelImportDoneEvent,
             None,
             self._artifact_event_handler.handle_model_import_done,
@@ -599,4 +623,15 @@ class Dispatchers:
             None,
             self._idle_check_event_handler.handle_do_idle_check,
             name="idle_check",
+        )
+
+    def _dispatch_notification_events(
+        self,
+        event_dispatcher: EventDispatcher,
+    ) -> None:
+        event_dispatcher.consume(
+            NotificationTriggeredEvent,
+            None,
+            self._notification_event_handler.handle_notification_triggered,
+            name="notification.triggered",
         )

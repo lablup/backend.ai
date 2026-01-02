@@ -11,6 +11,7 @@ from typing import (
 )
 
 import graphene
+import graphene_federation
 import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
@@ -18,10 +19,18 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
+from ai.backend.common.exception import (
+    GroupNotFound,
+    InvalidAPIParameters,
+)
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
+from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
+from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
 from ai.backend.manager.services.group.actions.create_group import CreateGroupAction
 from ai.backend.manager.services.group.actions.delete_group import (
     DeleteGroupAction,
@@ -81,6 +90,7 @@ __all__ = (
 )
 
 
+@graphene_federation.key("id")
 class GroupNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
@@ -231,6 +241,8 @@ class GroupNode(graphene.ObjectType):
         query = sa.select(GroupRow).where(GroupRow.id == group_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             group_row = (await db_session.scalars(query)).first()
+            if group_row is None:
+                raise GroupNotFound(f"Group not found: {group_id}")
             return cls.from_row(graph_ctx, group_row)
 
     @classmethod
@@ -298,6 +310,9 @@ class GroupNode(graphene.ObjectType):
                 result = [cls.from_row(graph_ctx, row) for row in group_rows]
 
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> GroupNode:
+        return await GroupNode.get_node(info, self.id)
 
 
 class GroupConnection(Connection):
@@ -424,10 +439,13 @@ class Group(graphene.ObjectType):
         group_ids: Sequence[uuid.UUID],
         *,
         domain_name: Optional[str] = None,
+        is_active: Optional[bool] = None,
     ) -> Sequence[Group | None]:
         query = sa.select([groups]).select_from(groups).where(groups.c.id.in_(group_ids))
         if domain_name is not None:
             query = query.where(groups.c.domain_name == domain_name)
+        if is_active is not None:
+            query = query.where(groups.c.is_active == is_active)
         async with graph_ctx.db.begin_readonly() as conn:
             return await batch_result(
                 graph_ctx,
@@ -445,10 +463,13 @@ class Group(graphene.ObjectType):
         group_names: Sequence[str],
         *,
         domain_name: Optional[str] = None,
+        is_active: Optional[bool] = None,
     ) -> Sequence[Sequence[Group | None]]:
         query = sa.select([groups]).select_from(groups).where(groups.c.name.in_(group_names))
         if domain_name is not None:
             query = query.where(groups.c.domain_name == domain_name)
+        if is_active is not None:
+            query = query.where(groups.c.is_active == is_active)
         async with graph_ctx.db.begin_readonly() as conn:
             return await batch_multiresult(
                 graph_ctx,
@@ -466,6 +487,7 @@ class Group(graphene.ObjectType):
         user_ids: Sequence[uuid.UUID],
         *,
         type: list[ProjectType] | None = None,
+        is_active: Optional[bool] = None,
     ) -> Sequence[Sequence[Group | None]]:
         if type is None:
             _type = [ProjectType.GENERAL]
@@ -481,6 +503,8 @@ class Group(graphene.ObjectType):
             .select_from(j)
             .where(association_groups_users.c.user_id.in_(user_ids) & (groups.c.type.in_(_type)))
         )
+        if is_active is not None:
+            query = query.where(groups.c.is_active == is_active)
         async with graph_ctx.db.begin_readonly() as conn:
             return await batch_multiresult(
                 graph_ctx,
@@ -550,17 +574,19 @@ class GroupInput(graphene.InputObjectType):
         container_registry_val = value_or_none(self.container_registry)
 
         return CreateGroupAction(
-            input=GroupCreator(
-                name=name,
-                domain_name=self.domain_name,
-                type=type_val,
-                description=description_val,
-                is_active=is_active_val,
-                total_resource_slots=total_resource_slots_val,
-                allowed_vfolder_hosts=allowed_vfolder_hosts_val,
-                integration_id=integration_id_val,
-                resource_policy=resource_policy_val,
-                container_registry=container_registry_val,
+            creator=Creator(
+                spec=GroupCreatorSpec(
+                    name=name,
+                    domain_name=self.domain_name,
+                    type=type_val,
+                    description=description_val,
+                    is_active=is_active_val,
+                    total_resource_slots=total_resource_slots_val,
+                    allowed_vfolder_hosts=allowed_vfolder_hosts_val,
+                    integration_id=integration_id_val,
+                    resource_policy=resource_policy_val,
+                    container_registry=container_registry_val,
+                )
             ),
         )
 
@@ -581,39 +607,39 @@ class ModifyGroupInput(graphene.InputObjectType):
     )
 
     def to_action(self, group_id: uuid.UUID) -> ModifyGroupAction:
-        return ModifyGroupAction(
-            group_id=group_id,
-            modifier=GroupModifier(
-                name=OptionalState[str].from_graphql(
-                    self.name,
-                ),
-                domain_name=OptionalState[str].from_graphql(
-                    self.domain_name,
-                ),
-                description=TriState[str].from_graphql(
-                    self.description,
-                ),
-                is_active=OptionalState[bool].from_graphql(
-                    self.is_active,
-                ),
-                total_resource_slots=OptionalState[ResourceSlot].from_graphql(
-                    self.total_resource_slots
-                    if (self.total_resource_slots is Undefined or self.total_resource_slots is None)
-                    else ResourceSlot.from_user_input(self.total_resource_slots, None),
-                ),
-                allowed_vfolder_hosts=OptionalState[dict[str, str]].from_graphql(
-                    self.allowed_vfolder_hosts,
-                ),
-                integration_id=OptionalState[str].from_graphql(
-                    self.integration_id,
-                ),
-                resource_policy=OptionalState[str].from_graphql(
-                    self.resource_policy,
-                ),
-                container_registry=TriState[dict[str, str]].from_graphql(
-                    self.container_registry,
-                ),
+        spec = GroupUpdaterSpec(
+            name=OptionalState[str].from_graphql(
+                self.name,
             ),
+            domain_name=OptionalState[str].from_graphql(
+                self.domain_name,
+            ),
+            description=TriState[str].from_graphql(
+                self.description,
+            ),
+            is_active=OptionalState[bool].from_graphql(
+                self.is_active,
+            ),
+            total_resource_slots=OptionalState[ResourceSlot].from_graphql(
+                self.total_resource_slots
+                if (self.total_resource_slots is Undefined or self.total_resource_slots is None)
+                else ResourceSlot.from_user_input(self.total_resource_slots, None),
+            ),
+            allowed_vfolder_hosts=OptionalState[dict[str, str]].from_graphql(
+                self.allowed_vfolder_hosts,
+            ),
+            integration_id=OptionalState[str].from_graphql(
+                self.integration_id,
+            ),
+            resource_policy=OptionalState[str].from_graphql(
+                self.resource_policy,
+            ),
+            container_registry=TriState[dict[str, str]].from_graphql(
+                self.container_registry,
+            ),
+        )
+        return ModifyGroupAction(
+            updater=Updater[GroupRow](spec=spec, pk_value=group_id),
             user_update_mode=OptionalState[str].from_graphql(
                 self.user_update_mode,
             ),
@@ -647,14 +673,17 @@ class CreateGroup(graphene.Mutation):
         props: GroupInput,
     ) -> CreateGroup:
         graph_ctx: GraphQueryContext = info.context
+        if name.strip() == "" or len(name) > 64:
+            raise InvalidAPIParameters(
+                "Group name cannot be empty or whitespace and must not exceed 64 characters."
+            )
 
         action = props.to_action(name)
         res = await graph_ctx.processors.group.create_group.wait_for_complete(action)
-
         return cls(
-            ok=res.success,
-            msg="success" if res.success else "failed",
-            group=Group.from_dto(res.data) if res.success else None,
+            ok=True,
+            msg="success",
+            group=Group.from_dto(res.data),
         )
 
 
@@ -685,11 +714,10 @@ class ModifyGroup(graphene.Mutation):
 
         action = props.to_action(gid)
         res = await graph_ctx.processors.group.modify_group.wait_for_complete(action)
-
         return cls(
-            ok=res.success,
-            msg="success" if res.success else "failed",
-            group=Group.from_dto(res.data) if res.success else None,
+            ok=True,
+            msg="success",
+            group=Group.from_dto(res.data) if res.data else None,
         )
 
 
@@ -713,9 +741,8 @@ class DeleteGroup(graphene.Mutation):
     )
     async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> DeleteGroup:
         ctx: GraphQueryContext = info.context
-        res = await ctx.processors.group.delete_group.wait_for_complete(DeleteGroupAction(gid))
-
-        return cls(ok=res.success, msg="success" if res.success else "failed")
+        await ctx.processors.group.delete_group.wait_for_complete(DeleteGroupAction(gid))
+        return cls(ok=True, msg="success")
 
 
 class PurgeGroup(graphene.Mutation):
@@ -743,9 +770,5 @@ class PurgeGroup(graphene.Mutation):
     async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> PurgeGroup:
         graph_ctx: GraphQueryContext = info.context
 
-        res = await graph_ctx.processors.group.purge_group.wait_for_complete(PurgeGroupAction(gid))
-
-        return cls(
-            ok=res.success,
-            msg="success" if res.success else "failed",
-        )
+        await graph_ctx.processors.group.purge_group.wait_for_complete(PurgeGroupAction(gid))
+        return cls(ok=True, msg="success")

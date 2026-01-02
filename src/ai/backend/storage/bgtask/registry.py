@@ -1,9 +1,17 @@
-from ai.backend.common.bgtask.task.registry import BackgroundTaskHandlerRegistry
-from ai.backend.common.events.dispatcher import EventProducer
+from __future__ import annotations
 
-from ..volumes.pool import VolumePool
+from typing import TYPE_CHECKING
+
+from ai.backend.common.bgtask.task.registry import BackgroundTaskHandlerRegistry
+
 from .tasks.clone import VFolderCloneTaskHandler
 from .tasks.delete import VFolderDeleteTaskHandler
+from .tasks.delete_files import FileDeleteTaskHandler
+
+if TYPE_CHECKING:
+    from ai.backend.common.events.dispatcher import EventProducer
+
+    from ..volumes.pool import VolumePool
 
 
 class BgtaskHandlerRegistryCreator:
@@ -15,5 +23,6 @@ class BgtaskHandlerRegistryCreator:
         registry = BackgroundTaskHandlerRegistry()
         registry.register(VFolderCloneTaskHandler(self._volume_pool, self._event_producer))
         registry.register(VFolderDeleteTaskHandler(self._volume_pool, self._event_producer))
+        registry.register(FileDeleteTaskHandler(self._volume_pool))
 
         return registry

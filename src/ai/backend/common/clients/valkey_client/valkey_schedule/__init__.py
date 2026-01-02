@@ -1,3 +1,13 @@
-from .client import HealthStatus, ValkeyScheduleClient
+from .client import (
+    HealthCheckStatus,
+    HealthStatus,
+    KernelStatus,
+    ValkeyScheduleClient,
+)
 
-__all__ = ["HealthStatus", "ValkeyScheduleClient"]
+__all__ = [
+    "HealthCheckStatus",
+    "HealthStatus",
+    "KernelStatus",
+    "ValkeyScheduleClient",
+]

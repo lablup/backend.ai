@@ -1,9 +1,12 @@
 """Cache source for schedule repository operations."""
 
+from __future__ import annotations
+
 import logging
 from typing import Optional
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import AccessKey
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -58,15 +61,36 @@ class ScheduleCacheSource:
             sftp_concurrency=sftp_concurrency,
         )
 
-    async def invalidate_keypair_concurrencies(self, access_keys: list[AccessKey]) -> None:
+    async def get_total_resource_slots(self) -> Optional[TotalResourceData]:
         """
-        Invalidate cache for multiple access keys by deleting their entries.
-        Removes both regular and SFTP concurrency values.
+        Get total resource slots data from cache.
 
-        :param access_keys: List of access keys to invalidate cache for
+        :return: TotalResourceData if cached, None if not in cache
         """
-        if not access_keys:
-            return
+        try:
+            return await self._valkey_stat.get_total_resource_slots()
+        except Exception as e:
+            log.warning("Failed to get total resource slots from cache: {}", e)
+            return None
 
-        # Convert AccessKey objects to strings and delete
-        await self._valkey_stat.delete_keypair_concurrencies([str(ak) for ak in access_keys])
+    async def set_total_resource_slots(self, total_resource_data: TotalResourceData) -> None:
+        """
+        Set total resource slots data in cache with 5 minute TTL.
+
+        :param total_resource_data: The TotalResourceData to cache
+        """
+        try:
+            # Set with 5 minute TTL (300 seconds)
+            await self._valkey_stat.set_total_resource_slots(total_resource_data, ttl_seconds=300)
+        except Exception as e:
+            log.warning("Failed to set total resource slots in cache: {}", e)
+            raise
+
+    async def invalidate_kernel_related_cache(self, access_keys: list[AccessKey]) -> None:
+        """
+        Invalidate caches related to kernel state changes affecting resource calculations.
+        """
+        try:
+            await self._valkey_stat.invalidate_kernel_related_cache(access_keys)
+        except Exception as e:
+            log.warning("Failed to invalidate kernel-related cache: {}", e)

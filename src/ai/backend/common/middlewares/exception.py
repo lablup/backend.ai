@@ -26,6 +26,9 @@ async def general_exception_middleware(
                 "Internal server error raised inside handlers: ({} {}): {}", method, endpoint, ex
             )
         raise
+    except ConnectionError as e:
+        log.warning("Connection error inside handlers ({} {}): {}", method, endpoint, e)
+        raise
     except asyncio.CancelledError:
         # The server is closing or the client has disconnected in the middle of
         # request.  Atomic requests are still executed to their ends.

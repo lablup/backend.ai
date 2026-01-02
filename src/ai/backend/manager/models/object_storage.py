@@ -7,11 +7,9 @@ from sqlalchemy.orm import foreign, relationship
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
-from ai.backend.manager.data.object_storage_namespace.types import ObjectStorageNamespaceData
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 
 from .base import (
-    GUID,
     Base,
     IDColumn,
 )
@@ -26,36 +24,9 @@ def _get_object_storage_association_artifact_join_cond():
 
 
 def _get_object_storage_namespace_join_cond():
-    return foreign(ObjectStorageNamespaceRow.storage_id) == ObjectStorageRow.id
+    from .storage_namespace import StorageNamespaceRow
 
-
-class ObjectStorageNamespaceRow(Base):
-    __tablename__ = "object_storage_namespace"
-    __table_args__ = (
-        # constraint
-        sa.UniqueConstraint("storage_id", "bucket", name="uq_storage_id_bucket"),
-    )
-
-    id = IDColumn("id")
-    storage_id = sa.Column(
-        "storage_id",
-        GUID,
-        nullable=False,
-    )
-    bucket = sa.Column("bucket", sa.String, nullable=False)
-
-    object_storage_row = relationship(
-        "ObjectStorageRow",
-        back_populates="namespace_rows",
-        primaryjoin=_get_object_storage_namespace_join_cond,
-    )
-
-    def to_dataclass(self) -> ObjectStorageNamespaceData:
-        return ObjectStorageNamespaceData(
-            id=self.id,
-            storage_id=self.storage_id,
-            bucket=self.bucket,
-        )
+    return foreign(StorageNamespaceRow.storage_id) == ObjectStorageRow.id
 
 
 class ObjectStorageRow(Base):
@@ -95,9 +66,10 @@ class ObjectStorageRow(Base):
         "AssociationArtifactsStorageRow",
         back_populates="object_storage_row",
         primaryjoin=_get_object_storage_association_artifact_join_cond,
+        overlaps="vfs_storage_row",
     )
     namespace_rows = relationship(
-        "ObjectStorageNamespaceRow",
+        "StorageNamespaceRow",
         back_populates="object_storage_row",
         primaryjoin=_get_object_storage_namespace_join_cond,
     )

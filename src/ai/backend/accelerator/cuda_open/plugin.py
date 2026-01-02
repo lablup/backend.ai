@@ -102,7 +102,7 @@ class CUDAPlugin(AbstractComputePlugin):
 
     docker_version: Tuple[int, ...] = (0, 0, 0)
 
-    device_mask: Sequence[DeviceId] = []
+    device_mask: Sequence[str] = []
     enabled: bool = True
 
     async def init(self, context: Optional[Any] = None) -> None:
@@ -135,9 +135,7 @@ class CUDAPlugin(AbstractComputePlugin):
 
         raw_device_mask = self.plugin_config.get("device_mask")
         if raw_device_mask is not None:
-            self.device_mask = [
-                *map(lambda dev_id: DeviceId(dev_id), raw_device_mask.split(",")),
-            ]
+            self.device_mask = [*raw_device_mask.split(",")]
         try:
             detected_devices = await self.list_devices()
             log.info("detected devices:\n" + pformat(detected_devices))
@@ -166,8 +164,6 @@ class CUDAPlugin(AbstractComputePlugin):
         all_devices = []
         num_devices = libcudart.get_device_count()
         for dev_id in map(lambda idx: DeviceId(str(idx)), range(num_devices)):
-            if dev_id in self.device_mask:
-                continue
             raw_info = libcudart.get_device_props(int(dev_id))
             sysfs_node_path = f"/sys/bus/pci/devices/{raw_info['pciBusID_str'].lower()}/numa_node"
             node: Optional[int]
@@ -180,6 +176,8 @@ class CUDAPlugin(AbstractComputePlugin):
                 dev_uuid = str(uuid.UUID(bytes=raw_dev_uuid))
             else:
                 dev_uuid = "00000000-0000-0000-0000-000000000000"
+            if dev_uuid in self.device_mask:
+                continue
             dev_info = CUDADevice(
                 device_id=DeviceId(dev_id),
                 hw_location=raw_info["pciBusID_str"],
@@ -428,7 +426,7 @@ class CUDAPlugin(AbstractComputePlugin):
 
     def get_metadata(self) -> AcceleratorMetadata:
         return {
-            "slot_name": self.slot_types[0][0],
+            "slot_name": str(self.slot_types[0][0]),
             "human_readable_name": "GPU",
             "description": "CUDA-capable GPU",
             "display_unit": "GPU",

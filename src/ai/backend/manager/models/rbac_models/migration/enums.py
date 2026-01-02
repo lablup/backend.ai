@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 
 from ai.backend.manager.data.permission.status import (
@@ -54,7 +56,7 @@ class OperationType(enum.StrEnum):
         return OriginalOperationType(self.value)
 
     @classmethod
-    def owner_operations(cls) -> set["OperationType"]:
+    def owner_operations(cls) -> set[OperationType]:
         """
         Returns a set of operations that are considered owner operations.
         Owner operations are those that allow full control over an entity.
@@ -62,7 +64,7 @@ class OperationType(enum.StrEnum):
         return {op for op in cls}
 
     @classmethod
-    def admin_operations(cls) -> set["OperationType"]:
+    def admin_operations(cls) -> set[OperationType]:
         """
         Returns a set of operations that are considered admin operations.
         Admin operations are those that allow management of entities, including creation and deletion.
@@ -70,10 +72,20 @@ class OperationType(enum.StrEnum):
         return {op for op in cls}
 
     @classmethod
-    def member_operations(cls) -> set["OperationType"]:
+    def member_operations(cls) -> set[OperationType]:
         """
         Returns a set of operations that are considered member operations.
         Member operations are those that allow read access.
+        """
+        return {
+            cls.READ,
+        }
+
+    @classmethod
+    def monitor_operations(cls) -> set[OperationType]:
+        """
+        Returns a set of operations that are considered monitor operations.
+        Monitor operations are those that allow read access.
         """
         return {
             cls.READ,
@@ -84,6 +96,8 @@ class ScopeType(enum.StrEnum):
     DOMAIN = "domain"
     PROJECT = "project"
     USER = "user"
+
+    GLOBAL = "global"
 
     def to_original(self) -> OriginalScopeType:
         return OriginalScopeType(self.value)
@@ -98,18 +112,25 @@ class EntityType(enum.StrEnum):
     IMAGE = "image"
     SESSION = "session"
 
+    ARTIFACT = "artifact"
+    ARTIFACT_REGISTRY = "artifact_registry"
+    APP_CONFIG = "app_config"
+    NOTIFICATION_CHANNEL = "notification_channel"
+    NOTIFICATION_RULE = "notification_rule"
+    MODEL_DEPLOYMENT = "model_deployment"
+
     def to_original(self) -> OriginalEntityType:
         return OriginalEntityType(self.value)
 
     @classmethod
-    def _scope_types(cls) -> set["EntityType"]:
+    def _scope_types(cls) -> set[EntityType]:
         """
         Returns a set of entity types that are considered scope types.
         """
         return {cls.USER, cls.PROJECT, cls.DOMAIN}
 
     @classmethod
-    def _resource_types(cls) -> set["EntityType"]:
+    def _resource_types(cls) -> set[EntityType]:
         """
         Returns a set of entity types that are considered resource types.
         """
@@ -117,24 +138,30 @@ class EntityType(enum.StrEnum):
             cls.VFOLDER,
             cls.IMAGE,
             cls.SESSION,
+            cls.ARTIFACT,
+            cls.ARTIFACT_REGISTRY,
+            cls.APP_CONFIG,
+            cls.NOTIFICATION_CHANNEL,
+            cls.NOTIFICATION_RULE,
+            cls.MODEL_DEPLOYMENT,
         }
 
     @classmethod
-    def owner_accessible_entity_types_in_user(cls) -> set["EntityType"]:
+    def owner_accessible_entity_types_in_user(cls) -> set[EntityType]:
         """
         Returns a set of entity types that are accessible by owner roles in user scope.
         """
         return cls._resource_types()
 
     @classmethod
-    def admin_accessible_entity_types_in_project(cls) -> set["EntityType"]:
+    def admin_accessible_entity_types_in_project(cls) -> set[EntityType]:
         """
         Returns a set of entity types that are accessible by admin roles.
         """
         return {*cls._resource_types(), cls.USER}
 
     @classmethod
-    def member_accessible_entity_types_in_project(cls) -> set["EntityType"]:
+    def member_accessible_entity_types_in_project(cls) -> set[EntityType]:
         """
         Returns a set of entity types that are accessible by member roles.
         """

@@ -7,12 +7,12 @@ import asyncio
 from collections.abc import Coroutine
 from http import HTTPStatus
 from typing import Optional
-from urllib.parse import quote_plus as urlquote
 from uuid import UUID
 
 import aiohttp
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
+from yarl import URL
 
 from ai.backend.common.data.config.types import HealthCheckConfig
 from ai.backend.common.etcd import AsyncEtcd
@@ -98,11 +98,14 @@ async def main(get_bootstrap_config_coro: Coroutine[None, None, BootstrapConfig]
 
     db_username = config.db.user
     db_password = config.db.password
-    db_addr = config.db.addr.to_legacy()
+    db_addr = config.db.addr
     db_name = config.db.name
-    engine = create_async_engine(
-        f"postgresql+asyncpg://{urlquote(db_username)}:{urlquote(db_password)}@{db_addr}/{db_name}",
-    )
+    db_url = URL(f"postgresql+asyncpg://{db_addr.host}/{db_name}")
+    db_url = db_url.with_port(db_addr.port)
+    db_url = db_url.with_user(db_username)
+    if db_password is not None:
+        db_url = db_url.with_password(db_password)
+    engine = create_async_engine(str(db_url))
 
     appproxy_info: dict[str, ScalingGroupRow] = {}
 

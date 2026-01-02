@@ -11,9 +11,6 @@ from sqlalchemy.orm import relationship
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
-from ai.backend.manager.services.resource_preset.types import (
-    ResourcePresetCreator,
-)
 
 from .base import (
     Base,
@@ -72,23 +69,6 @@ class ResourcePresetRow(Base):
             unique=True,
         ),
     )
-
-    @classmethod
-    async def create(
-        cls,
-        creator: ResourcePresetCreator,
-        *,
-        db_session: AsyncSession,
-    ) -> Optional[Self]:
-        to_store = creator.fields_to_store()
-        insert_stmt = sa.insert(ResourcePresetRow).values(to_store).returning(ResourcePresetRow)
-        stmt = sa.select(ResourcePresetRow).from_statement(insert_stmt)
-
-        try:
-            return await db_session.scalar(stmt)
-        except sa.exc.IntegrityError:
-            # A resource preset with the given name and scaling group name already exists
-            return None
 
     @classmethod
     async def update(

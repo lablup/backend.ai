@@ -18,23 +18,42 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import (
     ArtifactDataWithRevisions,
+    ArtifactFilterOptions,
     ArtifactRegistryType,
+    ArtifactRemoteStatus,
     ArtifactRevisionData,
+    ArtifactRevisionReadme,
+    ArtifactStatus,
     ArtifactType,
 )
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
-from ai.backend.manager.dto.request import SearchArtifactsReq
-from ai.backend.manager.dto.response import SearchArtifactsResponse
+from ai.backend.manager.data.common.types import StringFilterData
+from ai.backend.manager.dto.request import (
+    DelegateScanArtifactsReq,
+    SearchArtifactsReq,
+)
+from ai.backend.manager.dto.response import (
+    DelegateScanArtifactsResponse,
+    SearchArtifactsResponse,
+)
+from ai.backend.manager.errors.artifact import ArtifactRevisionNotFoundError
 from ai.backend.manager.errors.artifact_registry import (
     ArtifactRegistryBadScanRequestError,
+    RemoteReservoirScanError,
     ReservoirConnectionError,
 )
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
+)
+from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
+from ai.backend.manager.services.artifact.actions.delegate_scan import (
+    DelegateScanArtifactsAction,
+    DelegateScanArtifactsActionResult,
 )
 from ai.backend.manager.services.artifact.actions.delete_multi import (
     DeleteArtifactsAction,
@@ -47,10 +66,6 @@ from ai.backend.manager.services.artifact.actions.get import (
 from ai.backend.manager.services.artifact.actions.get_revisions import (
     GetArtifactRevisionsAction,
     GetArtifactRevisionsActionResult,
-)
-from ai.backend.manager.services.artifact.actions.list import (
-    ListArtifactsAction,
-    ListArtifactsActionResult,
 )
 from ai.backend.manager.services.artifact.actions.list_with_revisions import (
     ListArtifactsWithRevisionsAction,
@@ -72,6 +87,14 @@ from ai.backend.manager.services.artifact.actions.scan import (
     ScanArtifactsAction,
     ScanArtifactsActionResult,
 )
+from ai.backend.manager.services.artifact.actions.search import (
+    SearchArtifactsAction,
+    SearchArtifactsActionResult,
+)
+from ai.backend.manager.services.artifact.actions.search_with_revisions import (
+    SearchArtifactsWithRevisionsAction,
+    SearchArtifactsWithRevisionsActionResult,
+)
 from ai.backend.manager.services.artifact.actions.update import (
     UpdateArtifactAction,
     UpdateArtifactActionResult,
@@ -89,6 +112,7 @@ class ArtifactService:
     _artifact_repository: ArtifactRepository
     _artifact_registry_repository: ArtifactRegistryRepository
     _object_storage_repository: ObjectStorageRepository
+    _vfs_storage_repository: VFSStorageRepository
     _huggingface_registry_repository: HuggingFaceRepository
     _reservoir_registry_repository: ReservoirRegistryRepository
     _storage_manager: StorageSessionManager
@@ -99,6 +123,7 @@ class ArtifactService:
         artifact_repository: ArtifactRepository,
         artifact_registry_repository: ArtifactRegistryRepository,
         object_storage_repository: ObjectStorageRepository,
+        vfs_storage_repository: VFSStorageRepository,
         huggingface_registry_repository: HuggingFaceRepository,
         reservoir_registry_repository: ReservoirRegistryRepository,
         storage_manager: StorageSessionManager,
@@ -107,17 +132,28 @@ class ArtifactService:
         self._artifact_repository = artifact_repository
         self._artifact_registry_repository = artifact_registry_repository
         self._object_storage_repository = object_storage_repository
+        self._vfs_storage_repository = vfs_storage_repository
         self._huggingface_registry_repository = huggingface_registry_repository
         self._reservoir_registry_repository = reservoir_registry_repository
         self._storage_manager = storage_manager
         self._config_provider = config_provider
 
+    async def _get_storage_client(self, storage_name: str):
+        """Get storage client by trying object_storage first, then vfs_storage as fallback"""
+        try:
+            storage = await self._object_storage_repository.get_by_name(storage_name)
+            return self._storage_manager.get_manager_facing_client(storage.host)
+        except Exception:
+            vfs_storage = await self._vfs_storage_repository.get_by_name(storage_name)
+            return self._storage_manager.get_manager_facing_client(vfs_storage.host)
+
     async def scan(self, action: ScanArtifactsAction) -> ScanArtifactsActionResult:
         reservoir_config = self._config_provider.config.reservoir
-        storage = await self._object_storage_repository.get_by_name(reservoir_config.storage_name)
+        if reservoir_config is None:
+            raise ServerMisconfiguredError("Reservoir configuration is missing")
 
         # TODO: Abstract remote registry client layer (scan, import)
-        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
+        storage_proxy_client = await self._get_storage_client(reservoir_config.archive_storage)
 
         registry_meta = await self._resolve_artifact_registry_meta(
             action.artifact_type, action.registry_id
@@ -129,17 +165,18 @@ class ArtifactService:
 
         match registry_type:
             case ArtifactRegistryType.HUGGINGFACE:
-                registry_data = await self._huggingface_registry_repository.get_registry_data_by_id(
-                    registry_id
+                huggingface_registry_data = (
+                    await self._huggingface_registry_repository.get_registry_data_by_id(registry_id)
                 )
-                storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
 
                 if not (action.limit and action.order):
-                    raise ArtifactRegistryBadScanRequestError()
+                    raise ArtifactRegistryBadScanRequestError(
+                        "Invalid scan request, one of `limit` or `order` argument required"
+                    )
 
                 scan_result = await storage_proxy_client.scan_huggingface_models(
                     HuggingFaceScanModelsReq(
-                        registry_name=registry_data.name,
+                        registry_name=huggingface_registry_data.name,
                         limit=action.limit,
                         order=action.order,
                         search=action.search,
@@ -149,7 +186,7 @@ class ArtifactService:
                 # TODO: Mark artifacts which should be re-imported (updated from remote registry)?
                 scanned_models = await self._artifact_repository.upsert_huggingface_model_artifacts(
                     scan_result.models,
-                    registry_id=registry_data.id,
+                    registry_id=huggingface_registry_data.id,
                 )
             case ArtifactRegistryType.RESERVOIR:
                 registry_data = (
@@ -161,20 +198,32 @@ class ArtifactService:
 
                 # TODO: Apply client_decorator instead of retrying here
                 offset = 0
-                limit = 10
+                limit = 10  # Fetch 10 items per request
                 all_artifacts: list[ArtifactDataWithRevisions] = []
                 MAX_RETRIES = 3
 
-                while True:
+                # Use action.limit to determine total number of artifacts to fetch
+                total_limit = action.limit if action.limit is not None else float("inf")
+                fetched_count = 0
+
+                while fetched_count < total_limit:
                     retry_count = 0
                     client_resp = None
 
                     while retry_count < MAX_RETRIES:
                         try:
+                            # Create filters from action parameters
+                            filters = None
+                            if action.search is not None:
+                                filters = ArtifactFilterOptions(
+                                    name_filter=StringFilterData(contains=action.search)
+                                )
+
                             req = SearchArtifactsReq(
                                 pagination=PaginationOptions(
                                     offset=OffsetBasedPaginationOptions(offset=offset, limit=limit)
-                                )
+                                ),
+                                filters=filters,
                             )
                             client_resp = await remote_reservoir_client.search_artifacts(req)
                             break
@@ -206,6 +255,9 @@ class ArtifactService:
 
                     # Convert response data back to full data with readme
                     for response_artifact in parsed.artifacts:
+                        if fetched_count >= total_limit:
+                            break
+
                         # Convert response revisions back to full revisions
                         full_revisions = []
                         for response_revision in response_artifact.revisions:
@@ -215,14 +267,26 @@ class ArtifactService:
                                     response_revision.id
                                 )
                                 readme = readme_resp.readme
-                            except Exception as e:
-                                log.warning(
-                                    "Failed to fetch readme for artifact {} revision {}: {}",
-                                    response_revision.artifact_id,
-                                    response_revision.version,
-                                    e,
-                                )
+                            except Exception:
                                 readme = None
+
+                            # Determine remote_status based on remote artifact status
+                            # This allows delegate_import operations to be tracked properly
+                            remote_status = None
+                            try:
+                                # Try to get existing local revision to check current remote_status
+                                # If remote artifact is AVAILABLE and we were tracking it, update remote_status
+                                if response_revision.status in [
+                                    ArtifactStatus.AVAILABLE,
+                                    ArtifactStatus.SCANNED,
+                                    ArtifactStatus.FAILED,
+                                ]:
+                                    remote_status = ArtifactRemoteStatus(
+                                        response_revision.status.value
+                                    )
+                            except ArtifactRevisionNotFoundError:
+                                # New artifact revision - no remote_status to track
+                                pass
 
                             # Create full revision data with readme
                             full_revision = ArtifactRevisionData(
@@ -232,8 +296,11 @@ class ArtifactService:
                                 readme=readme,
                                 size=response_revision.size,
                                 status=response_revision.status,
+                                remote_status=remote_status,
                                 created_at=response_revision.created_at,
                                 updated_at=response_revision.updated_at,
+                                digest=response_revision.digest,
+                                verification_result=response_revision.verification_result,
                             )
                             full_revisions.append(full_revision)
 
@@ -251,11 +318,13 @@ class ArtifactService:
                             updated_at=response_artifact.updated_at,
                             readonly=response_artifact.readonly,
                             availability=response_artifact.availability,
+                            extra=response_artifact.extra,
                             revisions=full_revisions,
                         )
                         all_artifacts.append(full_artifact)
+                        fetched_count += 1
 
-                    if len(parsed.artifacts) < limit:
+                    if len(parsed.artifacts) < limit or fetched_count >= total_limit:
                         break
 
                     offset += limit
@@ -277,17 +346,21 @@ class ArtifactService:
         artifact = await self._artifact_repository.get_artifact_by_id(action.artifact_id)
         return GetArtifactActionResult(result=artifact)
 
-    async def list(self, action: ListArtifactsAction) -> ListArtifactsActionResult:
-        artifacts_data, total_count = await self._artifact_repository.list_artifacts_paginated(
-            pagination=action.pagination,
-            ordering=action.ordering,
-            filters=action.filters,
+    async def search(self, action: SearchArtifactsAction) -> SearchArtifactsActionResult:
+        result = await self._artifact_repository.search_artifacts(
+            querier=action.querier,
         )
-        return ListArtifactsActionResult(data=artifacts_data, total_count=total_count)
+        return SearchArtifactsActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def list_with_revisions(
         self, action: ListArtifactsWithRevisionsAction
     ) -> ListArtifactsWithRevisionsActionResult:
+        # Old-style pagination for REST API compatibility
         (
             artifacts_data,
             total_count,
@@ -298,6 +371,20 @@ class ArtifactService:
         )
         return ListArtifactsWithRevisionsActionResult(data=artifacts_data, total_count=total_count)
 
+    async def search_with_revisions(
+        self, action: SearchArtifactsWithRevisionsAction
+    ) -> SearchArtifactsWithRevisionsActionResult:
+        """Search artifacts with their revisions using BatchQuerier pattern."""
+        result = await self._artifact_repository.search_artifacts_with_revisions(
+            querier=action.querier,
+        )
+        return SearchArtifactsWithRevisionsActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
     async def get_revisions(
         self, action: GetArtifactRevisionsAction
     ) -> GetArtifactRevisionsActionResult:
@@ -305,9 +392,7 @@ class ArtifactService:
         return GetArtifactRevisionsActionResult(revisions=revisions)
 
     async def update(self, action: UpdateArtifactAction) -> UpdateArtifactActionResult:
-        updated_artifact = await self._artifact_repository.update_artifact(
-            action.artifact_id, action.modifier
-        )
+        updated_artifact = await self._artifact_repository.update_artifact(action.updater)
         return UpdateArtifactActionResult(result=updated_artifact)
 
     async def upsert_artifacts_with_revisions(
@@ -347,10 +432,11 @@ class ArtifactService:
             raise NotImplementedError("Only HuggingFace registry is supported for model retrieval")
 
         reservoir_config = self._config_provider.config.reservoir
-        storage = await self._object_storage_repository.get_by_name(reservoir_config.storage_name)
+        if reservoir_config is None:
+            raise ServerMisconfiguredError("Reservoir configuration is missing")
 
         # TODO: Abstract remote registry client layer (scan, import)
-        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
+        storage_proxy_client = await self._get_storage_client(reservoir_config.archive_storage)
 
         registry_data = await self._huggingface_registry_repository.get_registry_data_by_id(
             registry_id
@@ -379,10 +465,11 @@ class ArtifactService:
             raise NotImplementedError("Only HuggingFace registry is supported for model retrieval")
 
         reservoir_config = self._config_provider.config.reservoir
-        storage = await self._object_storage_repository.get_by_name(reservoir_config.storage_name)
+        if reservoir_config is None:
+            raise ServerMisconfiguredError("Reservoir configuration is missing")
 
         # TODO: Abstract remote registry client layer (scan, import)
-        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
+        storage_proxy_client = await self._get_storage_client(reservoir_config.archive_storage)
 
         registry_data = await self._huggingface_registry_repository.get_registry_data_by_id(
             registry_id
@@ -419,7 +506,11 @@ class ArtifactService:
     ) -> ArtifactRegistryData:
         if registry_id_or_none is None:
             # TODO: Handle `artifact_type` for other types
-            registry_name = self._config_provider.config.artifact_registry.model_registry
+            artifact_registry_cfg = self._config_provider.config.artifact_registry
+            if artifact_registry_cfg is None:
+                raise ServerMisconfiguredError("Artifact registry configuration is missing.")
+
+            registry_name = artifact_registry_cfg.model_registry
             registry_meta = (
                 await self._artifact_registry_repository.get_artifact_registry_data_by_name(
                     registry_name
@@ -432,3 +523,164 @@ class ArtifactService:
             )
 
         return registry_meta
+
+    async def delegate_scan_artifacts(
+        self, action: DelegateScanArtifactsAction
+    ) -> DelegateScanArtifactsActionResult:
+        # If this is a leaf node, perform local scan instead of delegation
+        reservoir_config = self._config_provider.config.reservoir
+        if reservoir_config is None:
+            raise ServerMisconfiguredError("Reservoir configuration is missing")
+
+        if not reservoir_config.use_delegation:
+            registry_id = None
+            if action.delegatee_target:
+                registry_id = action.delegatee_target.target_registry_id
+
+            registry_meta = await self._resolve_artifact_registry_meta(
+                action.artifact_type, registry_id
+            )
+            target_registry_id = registry_meta.registry_id
+
+            try:
+                scan_result = await self.scan(
+                    ScanArtifactsAction(
+                        artifact_type=action.artifact_type,
+                        registry_id=target_registry_id,
+                        limit=action.limit,
+                        order=action.order,
+                        search=action.search,
+                    )
+                )
+            except Exception as e:
+                raise RemoteReservoirScanError(
+                    f"Failed to scan artifacts from remote reservoir: {e}"
+                ) from e
+
+            readme_data = {
+                rev.id: ArtifactRevisionReadme(readme=rev.readme)
+                for artifact in scan_result.result
+                for rev in artifact.revisions
+            }
+            return DelegateScanArtifactsActionResult(
+                result=scan_result.result,
+                source_registry_id=target_registry_id,
+                source_registry_type=registry_meta.type,
+                readme_data=readme_data,
+            )
+
+        # If not a leaf node, perform delegation to remote reservoir
+        registry_meta = await self._resolve_artifact_registry_meta(
+            action.artifact_type, action.delegator_reservoir_id
+        )
+        registry_type = registry_meta.type
+        registry_id = registry_meta.registry_id
+
+        if registry_type != ArtifactRegistryType.RESERVOIR:
+            raise ArtifactRegistryBadScanRequestError(
+                "Only Reservoir type registry is supported for delegated scan"
+            )
+
+        registry_data = await self._reservoir_registry_repository.get_reservoir_registry_data_by_id(
+            registry_id
+        )
+
+        remote_reservoir_client = ReservoirRegistryClient(registry_data=registry_data)
+
+        if not (action.limit and action.order):
+            raise ArtifactRegistryBadScanRequestError(
+                "Invalid scan request, one of `limit` or `order` argument required"
+            )
+
+        # Pass delegatee_reservoir_id to delegator_reservoir_id
+        delegatee_reservoir_id = (
+            action.delegatee_target.delegatee_reservoir_id if action.delegatee_target else None
+        )
+        req = DelegateScanArtifactsReq(
+            delegator_reservoir_id=delegatee_reservoir_id,
+            delegatee_target=action.delegatee_target,
+            artifact_type=action.artifact_type,
+            limit=action.limit,
+            search=action.search,
+            order=action.order,
+        )
+        client_resp = await remote_reservoir_client.delegate_scan_artifacts(req)
+
+        if client_resp is None:
+            log.warning(
+                "Failed to connect to reservoir registry after {}",
+                registry_data.endpoint,
+            )
+            raise ReservoirConnectionError("Failed to connect to remote reservoir")
+
+        RespTypeAdapter = TypeAdapter(DelegateScanArtifactsResponse)
+        parsed_resp = RespTypeAdapter.validate_python(client_resp)
+
+        all_artifacts: list[ArtifactDataWithRevisions] = []
+
+        # Convert response data back to full data with readme
+        for response_artifact in parsed_resp.artifacts:
+            # Convert response revisions back to full revisions
+            full_revisions: list[ArtifactRevisionData] = []
+
+            for response_revision in response_artifact.revisions:
+                readme = parsed_resp.readme_data[response_revision.id]
+
+                remote_status = ArtifactRemoteStatus.SCANNED
+                if response_revision.status == ArtifactStatus.AVAILABLE:
+                    remote_status = ArtifactRemoteStatus.AVAILABLE
+
+                full_revision = ArtifactRevisionData(
+                    id=response_revision.id,
+                    artifact_id=response_revision.artifact_id,
+                    version=response_revision.version,
+                    readme=readme.readme,
+                    size=response_revision.size,
+                    status=ArtifactStatus.SCANNED,  # Reset status to SCANNED
+                    remote_status=remote_status,
+                    created_at=response_revision.created_at,
+                    updated_at=response_revision.updated_at,
+                    digest=response_revision.digest,
+                    verification_result=response_revision.verification_result,
+                )
+                full_revisions.append(full_revision)
+
+            # Create full artifact data
+            full_artifact = ArtifactDataWithRevisions(
+                id=response_artifact.id,
+                name=response_artifact.name,
+                type=response_artifact.type,
+                description=response_artifact.description,
+                registry_id=response_artifact.registry_id,
+                source_registry_id=response_artifact.source_registry_id,
+                registry_type=response_artifact.registry_type,
+                source_registry_type=response_artifact.source_registry_type,
+                scanned_at=response_artifact.scanned_at,
+                updated_at=response_artifact.updated_at,
+                readonly=response_artifact.readonly,
+                availability=response_artifact.availability,
+                extra=response_artifact.extra,
+                revisions=full_revisions,
+            )
+            all_artifacts.append(full_artifact)
+
+        scanned_models = []
+        if all_artifacts:
+            for artifact_data in all_artifacts:
+                # Override registry information
+                artifact_data.source_registry_id = parsed_resp.source_registry_id
+                artifact_data.source_registry_type = parsed_resp.source_registry_type
+                artifact_data.registry_id = registry_id
+                artifact_data.registry_type = ArtifactRegistryType.RESERVOIR
+
+            upsert_result = await self.upsert_artifacts_with_revisions(
+                UpsertArtifactsAction(data=all_artifacts)
+            )
+            scanned_models = upsert_result.result
+
+        return DelegateScanArtifactsActionResult(
+            result=scanned_models,
+            source_registry_id=parsed_resp.source_registry_id,
+            source_registry_type=parsed_resp.source_registry_type,
+            readme_data=parsed_resp.readme_data,
+        )

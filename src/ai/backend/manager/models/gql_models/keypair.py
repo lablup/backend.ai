@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Self, Sequence
 
 import graphene
 import sqlalchemy as sa
@@ -14,7 +14,7 @@ from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import Val
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.keypair.types import KeyPairCreator
+from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.models.gql_models.session import ComputeSession
 from ai.backend.manager.models.keypair import (
     keypairs,
@@ -133,6 +133,20 @@ class KeyPair(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader(ctx, "UserInfo.by_uuid")
         return await loader.load(self.user)
+
+    @classmethod
+    def from_data(cls, data: KeyPairData) -> Self:
+        return cls(
+            access_key=data.access_key,
+            secret_key=data.secret_key,
+            is_active=data.is_active,
+            is_admin=data.is_admin,
+            resource_policy=data.resource_policy_name,
+            created_at=data.created_at,
+            rate_limit=data.rate_limit,
+            user=data.user_id,
+            ssh_public_key=data.ssh_public_key,
+        )
 
     @classmethod
     def from_row(
@@ -283,8 +297,8 @@ class KeyPair(graphene.ObjectType):
 
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
-            .join(groups, association_groups_users.c.group_id == groups.c.id)
+            .outerjoin(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
+            .outerjoin(groups, association_groups_users.c.group_id == groups.c.id)
         )
         query = sa.select([sa.func.count()]).group_by(keypairs.c.access_key).select_from(j)
         if domain_name is not None:
@@ -318,8 +332,8 @@ class KeyPair(graphene.ObjectType):
 
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
-            .join(groups, association_groups_users.c.group_id == groups.c.id)
+            .outerjoin(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
+            .outerjoin(groups, association_groups_users.c.group_id == groups.c.id)
         )
         query = (
             sa.select([

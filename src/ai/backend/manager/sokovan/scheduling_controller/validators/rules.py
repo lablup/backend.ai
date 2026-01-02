@@ -1,15 +1,13 @@
 """Validator rules for session creation."""
 
-from typing import Mapping
+from typing import Mapping, override
 
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import SlotName, SlotTypes
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.kernel import QuotaExceeded
-from ai.backend.manager.models import PRIVATE_SESSION_TYPES
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
-    AllowedScalingGroup,
     SessionCreationContext,
     SessionCreationSpec,
 )
@@ -20,14 +18,15 @@ from .base import SessionValidatorRule
 class ContainerLimitRule(SessionValidatorRule):
     """Validates cluster size against resource policy limits."""
 
+    @override
     def name(self) -> str:
         return "container_limit"
 
+    @override
     def validate(
         self,
         spec: SessionCreationSpec,
         context: SessionCreationContext,
-        allowed_groups: list[AllowedScalingGroup],
     ) -> None:
         max_containers = spec.resource_policy.get("max_containers_per_session", 1)
         if spec.cluster_size > int(max_containers):
@@ -36,47 +35,18 @@ class ContainerLimitRule(SessionValidatorRule):
             )
 
 
-class ScalingGroupAccessRule(SessionValidatorRule):
-    """Validates that the scaling group is accessible."""
-
-    def name(self) -> str:
-        return "scaling_group_access"
-
-    def validate(
-        self,
-        spec: SessionCreationSpec,
-        context: SessionCreationContext,
-        allowed_groups: list[AllowedScalingGroup],
-    ) -> None:
-        if not spec.scaling_group:
-            # Should have been resolved already
-            return
-
-        public_sgroup_only = spec.session_type not in PRIVATE_SESSION_TYPES
-
-        # Find the scaling group in allowed list
-        for sg in allowed_groups:
-            if sg.name == spec.scaling_group:
-                if public_sgroup_only and sg.is_private:
-                    raise InvalidAPIParameters(
-                        f"Scaling group {spec.scaling_group} is not allowed for {spec.session_type} sessions"
-                    )
-                return
-
-        raise InvalidAPIParameters(f"Scaling group {spec.scaling_group} is not accessible")
-
-
 class ServicePortRule(SessionValidatorRule):
     """Validates preopen ports against service ports."""
 
+    @override
     def name(self) -> str:
         return "service_port"
 
+    @override
     def validate(
         self,
         spec: SessionCreationSpec,
         context: SessionCreationContext,
-        allowed_groups: list[AllowedScalingGroup],
     ) -> None:
         # Check preopen_ports from creation_config (applies to all kernels)
         creation_preopen_ports = spec.creation_spec.get("preopen_ports")
@@ -91,7 +61,10 @@ class ServicePortRule(SessionValidatorRule):
         # Validate for each kernel spec
         for kernel_spec in spec.kernel_specs:
             # Get preopen ports from kernel spec or fall back to creation config
-            preopen_ports = kernel_spec.get("preopen_ports") or creation_preopen_ports
+            preopen_ports = (
+                kernel_spec.get("creation_config", {}).get("preopen_ports")
+                or creation_preopen_ports
+            )
             if not preopen_ports:
                 continue
             if not isinstance(preopen_ports, list):
@@ -135,17 +108,18 @@ class ServicePortRule(SessionValidatorRule):
 class ResourceLimitRule(SessionValidatorRule):
     """Validates requested resources against image limits."""
 
+    @override
     def name(self) -> str:
         return "resource_limit"
 
     def __init__(self, known_slot_types: Mapping[SlotName, SlotTypes] | None = None):
         self._known_slot_types = known_slot_types
 
+    @override
     def validate(
         self,
         spec: SessionCreationSpec,
         context: SessionCreationContext,
-        allowed_groups: list[AllowedScalingGroup],
     ) -> None:
         # Note: This validation should ideally be done after resource calculation
         # For now, we'll validate what we can from the spec

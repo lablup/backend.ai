@@ -99,7 +99,7 @@ jobs:
           echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
     - name: Check out the revision with minimal required history
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
         lfs: false
@@ -126,7 +126,7 @@ jobs:
       # See: github.com/pantsbuild/actions/tree/main/init-pants/
       # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
       with:
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        named-caches-hash: ${{ github.sha }}
         cache-lmdb-store: 'true'
     - name: Check BUILD files
       run: pants tailor --check update-build-files --check '::'
@@ -149,7 +149,7 @@ jobs:
         fi
         pants lint --changed-since=$BASE_REF --changed-dependents=transitive
     - name: Upload pants log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: pants.lint.log
         path: .pants.d/workdir/pants.log
@@ -167,7 +167,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Check out the revision
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         lfs: false
     - name: Parse versions from config
@@ -193,7 +193,7 @@ jobs:
     - name: Bootstrap Pants
       uses: ./actions/init-pants
       with:
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        named-caches-hash: ${{ github.sha }}
         cache-lmdb-store: 'true'
     - name: Prepare DB
       run: docker compose -f docker-compose.halfstack-main.yml up -d backendai-half-db --wait
@@ -227,7 +227,7 @@ jobs:
           echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
     - name: Check out the revision with minimal required history
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
         lfs: false
@@ -252,7 +252,7 @@ jobs:
     - name: Bootstrap Pants
       uses: ./actions/init-pants
       with:
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        named-caches-hash: ${{ github.sha }}
         cache-lmdb-store: 'true'
     - name: Typecheck
       run: |
@@ -273,7 +273,7 @@ jobs:
         fi
         pants check --changed-since=$BASE_REF --changed-dependents=transitive
     - name: Upload pants log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: pants.check.log
         path: .pants.d/workdir/pants.log
@@ -284,7 +284,7 @@ jobs:
     if: |
       needs.optimize-ci.outputs.skip != 'true'
     needs: [optimize-ci]
-    runs-on: [ubuntu-latest-8-cores]
+    runs-on: ubuntu-latest-8-cores
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -294,7 +294,7 @@ jobs:
           echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
     - name: Check out the revision with minimal required history
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
         lfs: false
@@ -319,28 +319,40 @@ jobs:
     - name: Bootstrap Pants
       uses: ./actions/init-pants
       with:
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        named-caches-hash: ${{ github.sha }}
         cache-lmdb-store: 'true'
     - name: Test
-      timeout-minutes: 15
+      timeout-minutes: 60
+      env:
+        IS_RELEASE: ${{ needs.optimize-ci.outputs.release }}
       run: |
         # configure redis sentinel cluster hostnames for testing
         grep -q "127.0.0.1 node01" /etc/hosts || echo "127.0.0.1 node01" | sudo tee -a /etc/hosts
         grep -q "127.0.0.1 node02" /etc/hosts || echo "127.0.0.1 node02" | sudo tee -a /etc/hosts
         grep -q "127.0.0.1 node03" /etc/hosts || echo "127.0.0.1 node03" | sudo tee -a /etc/hosts
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
-          BASE_REF="origin/${BASE_REF_SHORT}"
-          git remote set-branches origin "$BASE_REF_SHORT"
-          BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
-          BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
-          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
+        # Run full tests for release, otherwise run changed tests only
+        if [ "$IS_RELEASE" == "true" ]; then
+          pants test :: -- -v
         else
-          BASE_REF="HEAD~1"
+          if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+            [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
+            BASE_REF="origin/${BASE_REF_SHORT}"
+            git remote set-branches origin "$BASE_REF_SHORT"
+            BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
+            BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
+            git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
+          else
+            BASE_REF="HEAD~1"
+          fi
+          # Use --changed-dependents=transitive only for merge_group to run broader tests
+          DEPENDENTS_OPT=""
+          if [ "$GITHUB_EVENT_NAME" == "merge_group" ]; then
+            DEPENDENTS_OPT="--changed-dependents=transitive"
+          fi
+          pants test --changed-since=$BASE_REF $DEPENDENTS_OPT -- -v
         fi
-        pants test --changed-since=$BASE_REF --changed-dependents=transitive -- -v
     - name: Upload pants log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: pants.test.log
         path: .pants.d/workdir/pants.log
@@ -354,16 +366,16 @@ jobs:
       fail-fast: false
       matrix:
         # ubuntu-22.04: x86-64
-        # ubuntu-22.04-arm64: aarch64
-        # macos-14-large: intel
+        # ubuntu-22.04-arm: aarch64
+        # macos-15-intel: intel
         # self-hosted-macos-14: apple silicon
-        os: [ubuntu-22.04, ubuntu-22.04-arm64, macos-14-large, self-hosted-macos-14]
+        os: [ubuntu-22.04, ubuntu-22.04-arm, macos-15-intel, self-hosted-macos-14]
     runs-on: ${{ matrix.os }}
     env:
       SCIENCE_AUTH_API_GITHUB_COM_BEARER: ${{ secrets.GITHUB_TOKEN }}
     steps:
     - name: Check out the revision
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Git LFS Pull
@@ -382,10 +394,9 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: "pip"
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v8
+      uses: ./actions/init-pants
       with:
-        gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        named-caches-hash: ${{ github.sha }}
         cache-lmdb-store: 'false'
     - name: Build both lazy and fat packages
       run: |
@@ -402,12 +413,12 @@ jobs:
         mv dist/checksum.txt dist/checksum-${platform_suffix}.txt
         rm dist/*.sha256
     - name: Upload scies
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: scies-${{ matrix.os }}
         path: dist/*
     - name: Upload pants log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: pants-${{ matrix.os }}.build-scies.log
         path: .pants.d/workdir/pants.log
@@ -420,7 +431,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out the revision
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Git LFS Pull
@@ -439,21 +450,20 @@ jobs:
       run: |
         pip install -U 'packaging>=21.3'
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v8
+      uses: ./actions/init-pants
       with:
-        gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        named-caches-hash: ${{ github.sha }}
         cache-lmdb-store: 'false'
     - name: Build wheel packages
       run: |
         ./scripts/build-wheels.sh
     - name: Upload wheels
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: wheels
         path: dist/*
     - name: Upload pants log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: pants.build-wheels.log
         path: .pants.d/workdir/pants.log
@@ -466,7 +476,7 @@ jobs:
     uses: ./.github/workflows/sbom.yml
 
   build-isla-sorna-image:
-    needs: [build-scies, build-wheels, build-sbom, optimize-ci]
+    needs: [build-scies, build-wheels, optimize-ci]
     if: needs.optimize-ci.outputs.release == 'true'
     runs-on: ubuntu-latest
 
@@ -481,14 +491,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT }}
 
   make-final-release:
-    needs: [build-scies, build-wheels, build-sbom, optimize-ci]
+    needs: [build-scies, build-wheels, optimize-ci]
     if: needs.optimize-ci.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     environment: deploy-to-pypi
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Extract Python version from pants.toml
@@ -507,12 +517,12 @@ jobs:
         python ./scripts/extract-release-changelog.py
         python ./scripts/determine-release-type.py
     - name: Download wheels
-      uses: actions/download-artifact@v5
+      uses: actions/download-artifact@v6
       with:
         name: wheels
         path: dist
     - name: Download scies
-      uses: actions/download-artifact@v5
+      uses: actions/download-artifact@v6
       with:
         pattern: scies-*
         path: dist
@@ -522,7 +532,8 @@ jobs:
         cat dist/checksum-*.txt > dist/checksum.txt
         sort -u -k2 dist/checksum.txt -o dist/checksum.txt
     - name: Download SBOM report
-      uses: actions/download-artifact@v5
+      continue-on-error: true
+      uses: actions/download-artifact@v6
       with:
         name: SBOM report
         path: dist
@@ -632,7 +643,7 @@ jobs:
 
     steps:
     - name: Check out the revision
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: Git LFS Pull
       run: git lfs pull
     - name: Extract Python version from pants.toml
@@ -659,7 +670,7 @@ jobs:
       with:
         activate-conda: false
     - name: Download wheels
-      uses: actions/download-artifact@v5
+      uses: actions/download-artifact@v6
       with:
         name: wheels
         path: dist

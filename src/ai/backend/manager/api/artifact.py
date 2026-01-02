@@ -7,7 +7,14 @@ from typing import Iterable, Tuple
 import aiohttp_cors
 from aiohttp import web
 
-from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, api_handler
+from ai.backend.common.api_handlers import (
+    APIResponse,
+    BodyParam,
+    PathParam,
+    api_handler,
+)
+from ai.backend.common.dto.storage.request import GetVerificationResultReq
+from ai.backend.common.dto.storage.response import GetVerificationResultResponse
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import ArtifactRevisionResponseData
 from ai.backend.manager.dto.context import ProcessorsCtx
@@ -16,6 +23,7 @@ from ai.backend.manager.dto.request import (
     CancelImportArtifactReq,
     CleanupArtifactsReq,
     GetArtifactRevisionReadmeReq,
+    GetDownloadProgressReqPathParam,
     ImportArtifactsReq,
     RejectArtifactRevisionReq,
     UpdateArtifactReqBodyParam,
@@ -27,6 +35,7 @@ from ai.backend.manager.dto.response import (
     CancelImportArtifactResponse,
     CleanupArtifactsResponse,
     GetArtifactRevisionReadmeResponse,
+    GetDownloadProgressResponse,
     ImportArtifactsResponse,
     RejectArtifactRevisionResponse,
     UpdateArtifactResponse,
@@ -41,8 +50,14 @@ from ai.backend.manager.services.artifact_revision.actions.cancel_import import 
 from ai.backend.manager.services.artifact_revision.actions.cleanup import (
     CleanupArtifactRevisionAction,
 )
+from ai.backend.manager.services.artifact_revision.actions.get_download_progress import (
+    GetDownloadProgressAction,
+)
 from ai.backend.manager.services.artifact_revision.actions.get_readme import (
     GetArtifactRevisionReadmeAction,
+)
+from ai.backend.manager.services.artifact_revision.actions.get_verification_result import (
+    GetArtifactRevisionVerificationResultAction,
 )
 from ai.backend.manager.services.artifact_revision.actions.import_revision import (
     ImportArtifactRevisionAction,
@@ -65,6 +80,15 @@ class APIHandler:
         body: BodyParam[CleanupArtifactsReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Clean up stored artifact revision data to free storage space.
+
+        Removes the downloaded files for the specified artifact revisions and
+        transitions them back to SCANNED status. The metadata remains, allowing
+        the artifacts to be re-imported later if needed.
+
+        Use this operation to manage storage usage by removing unused artifacts.
+        """
         processors = processors_ctx.processors
         cleaned_revisions = []
 
@@ -93,6 +117,12 @@ class APIHandler:
         body: BodyParam[CancelImportArtifactReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Cancel an in-progress artifact import operation.
+
+        Stops the download process for the specified artifact revision and
+        reverts its status back to SCANNED. The partially downloaded data is cleaned up.
+        """
         processors = processors_ctx.processors
         action_result = await processors.artifact_revision.cancel_import.wait_for_complete(
             CancelImportAction(
@@ -112,6 +142,12 @@ class APIHandler:
         path: PathParam[ApproveArtifactRevisionReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Approve an artifact revision for general use.
+
+        Admin-only operation to approve artifact revisions, typically used
+        in environments with approval workflows for artifact deployment.
+        """
         processors = processors_ctx.processors
         action_result = await processors.artifact_revision.approve.wait_for_complete(
             ApproveArtifactRevisionAction(
@@ -131,6 +167,12 @@ class APIHandler:
         path: PathParam[RejectArtifactRevisionReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Reject an artifact revision, preventing its use.
+
+        Admin-only operation to reject artifact revisions, typically used
+        in environments with approval workflows for artifact deployment.
+        """
         processors = processors_ctx.processors
         action_result = await processors.artifact_revision.reject.wait_for_complete(
             RejectArtifactRevisionAction(
@@ -150,6 +192,15 @@ class APIHandler:
         body: BodyParam[ImportArtifactsReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Import scanned artifact revisions from external registries.
+
+        Downloads the actual files for the specified artifact revisions, transitioning
+        them from SCANNED → PULLING → PULLED → AVAILABLE status.
+
+        Returns background tasks that can be monitored for import progress.
+        Once AVAILABLE, artifacts can be used by users in their sessions.
+        """
         processors = processors_ctx.processors
         imported_revisions = []
         tasks = []
@@ -183,11 +234,16 @@ class APIHandler:
         body: BodyParam[UpdateArtifactReqBodyParam],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Update artifact metadata properties.
+
+        Modifies artifact metadata such as readonly status and description.
+        This operation does not affect the actual artifact files or revisions.
+        """
         processors = processors_ctx.processors
         action_result = await processors.artifact.update.wait_for_complete(
             UpdateArtifactAction(
-                artifact_id=path.parsed.artifact_id,
-                modifier=body.parsed.to_modifier(),
+                updater=body.parsed.to_updater(path.parsed.artifact_id),
             )
         )
 
@@ -203,6 +259,12 @@ class APIHandler:
         path: PathParam[GetArtifactRevisionReadmeReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Retrieve the README content for a specific artifact revision.
+
+        Returns the README documentation associated with the artifact revision,
+        which typically contains usage instructions and model information.
+        """
         processors = processors_ctx.processors
         action_result = await processors.artifact_revision.get_readme.wait_for_complete(
             GetArtifactRevisionReadmeAction(
@@ -212,6 +274,59 @@ class APIHandler:
 
         resp = GetArtifactRevisionReadmeResponse(
             readme=action_result.readme_data.readme,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    @auth_required_for_method
+    @api_handler
+    async def get_artifact_revision_verification_result(
+        self,
+        path: PathParam[GetVerificationResultReq],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """
+        Retrieve the verification result for a specific artifact revision.
+
+        Returns the verification result data associated with the artifact revision,
+        which contains results from all verifiers that have been run on the artifact.
+        """
+        processors = processors_ctx.processors
+        action_result = (
+            await processors.artifact_revision.get_verification_result.wait_for_complete(
+                GetArtifactRevisionVerificationResultAction(
+                    artifact_revision_id=path.parsed.artifact_revision_id,
+                )
+            )
+        )
+
+        resp = GetVerificationResultResponse(
+            verification_result=action_result.verification_result,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    @auth_required_for_method
+    @api_handler
+    async def get_download_progress(
+        self,
+        path: PathParam[GetDownloadProgressReqPathParam],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """
+        Retrieve download progress for an artifact revision.
+
+        Returns detailed download progress information including artifact-level
+        and file-level progress data for the specified artifact revision.
+        Supports both local and remote download progress when delegation is enabled.
+        """
+        processors = processors_ctx.processors
+        action_result = await processors.artifact_revision.get_download_progress.wait_for_complete(
+            GetDownloadProgressAction(
+                artifact_revision_id=path.parsed.artifact_revision_id,
+            )
+        )
+
+        resp = GetDownloadProgressResponse(
+            download_progress=action_result.download_progress,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -248,6 +363,20 @@ def create_app(
             "GET",
             "/revisions/{artifact_revision_id}/readme",
             api_handler.get_artifact_revision_readme,
+        )
+    )
+    cors.add(
+        app.router.add_route(
+            "GET",
+            "/revisions/{artifact_revision_id}/verification-result",
+            api_handler.get_artifact_revision_verification_result,
+        )
+    )
+    cors.add(
+        app.router.add_route(
+            "GET",
+            "/revisions/{artifact_revision_id}/download-progress",
+            api_handler.get_download_progress,
         )
     )
 

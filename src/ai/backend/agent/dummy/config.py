@@ -1,8 +1,11 @@
+from functools import cache
 from pathlib import Path
+from typing import Any, Mapping
 
 import trafaret as t
 
 from ai.backend.common import validators as tx
+from ai.backend.common.config import read_from_file
 
 DEFAULT_CONFIG_PATH = Path.cwd() / "agent.dummy.toml"
 
@@ -65,3 +68,10 @@ dummy_local_config = t.Dict({
         }),
     }),
 }).allow_extra("*")
+
+
+@cache
+def read_dummy_config() -> Mapping[str, Any]:
+    raw_config, _ = read_from_file(DEFAULT_CONFIG_PATH, "dummy")
+    dummy_config = dummy_local_config.check(raw_config)
+    return dummy_config

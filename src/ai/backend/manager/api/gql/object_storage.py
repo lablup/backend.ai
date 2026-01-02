@@ -9,47 +9,30 @@ from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import to_global_id
-from ai.backend.manager.data.object_storage_namespace.creator import ObjectStorageNamespaceCreator
-from ai.backend.manager.data.object_storage_namespace.types import ObjectStorageNamespaceData
-from ai.backend.manager.services.object_storage.actions.get_buckets import (
-    GetBucketsAction,
-)
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
 )
 from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url import (
     GetUploadPresignedURLAction,
 )
-from ai.backend.manager.services.object_storage.actions.register_bucket import RegisterBucketAction
-from ai.backend.manager.services.object_storage.actions.unregister_bucket import (
-    UnregisterBucketAction,
+from ai.backend.manager.services.storage_namespace.actions.get_multi import (
+    GetNamespacesAction,
 )
 
-from ...data.object_storage.creator import ObjectStorageCreator
-from ...data.object_storage.modifier import ObjectStorageModifier
 from ...data.object_storage.types import ObjectStorageData
+from ...models.object_storage import ObjectStorageRow
+from ...repositories.base.creator import Creator
+from ...repositories.base.updater import Updater
+from ...repositories.object_storage import ObjectStorageCreatorSpec
+from ...repositories.object_storage.updaters import ObjectStorageUpdaterSpec
 from ...services.object_storage.actions.create import CreateObjectStorageAction
 from ...services.object_storage.actions.delete import DeleteObjectStorageAction
 from ...services.object_storage.actions.get import GetObjectStorageAction
 from ...services.object_storage.actions.list import ListObjectStorageAction
 from ...services.object_storage.actions.update import UpdateObjectStorageAction
 from ...types import OptionalState
+from .storage_namespace import StorageNamespace, StorageNamespaceConnection, StorageNamespaceEdge
 from .types import StrawberryGQLContext
-
-
-@strawberry.type(description="Added in 25.14.0")
-class ObjectStorageNamespace(Node):
-    id: NodeID[str]
-    storage_id: ID
-    bucket: str
-
-    @classmethod
-    def from_dataclass(cls, data: ObjectStorageNamespaceData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            storage_id=ID(str(data.storage_id)),
-            bucket=data.bucket,
-        )
 
 
 @strawberry.type(description="Added in 25.14.0")
@@ -84,21 +67,21 @@ class ObjectStorage(Node):
         last: Optional[int],
         limit: Optional[int],
         offset: Optional[int],
-    ) -> ObjectStorageNamespaceConnection:
+    ) -> StorageNamespaceConnection:
         # TODO: Support pagination
-        action_result = await info.context.processors.object_storage.get_buckets.wait_for_complete(
-            GetBucketsAction(uuid.UUID(self.id))
+        action_result = (
+            await info.context.processors.storage_namespace.get_namespaces.wait_for_complete(
+                GetNamespacesAction(uuid.UUID(self.id))
+            )
         )
 
-        nodes = [ObjectStorageNamespace.from_dataclass(bucket) for bucket in action_result.result]
+        nodes = [StorageNamespace.from_dataclass(bucket) for bucket in action_result.result]
         edges = [
-            ObjectStorageNamespaceEdge(
-                node=node, cursor=to_global_id(ObjectStorageNamespace, node.id)
-            )
+            StorageNamespaceEdge(node=node, cursor=to_global_id(StorageNamespace, node.id))
             for node in nodes
         ]
 
-        return ObjectStorageNamespaceConnection(
+        return StorageNamespaceConnection(
             edges=edges,
             page_info=strawberry.relay.PageInfo(
                 has_next_page=False,
@@ -110,18 +93,10 @@ class ObjectStorage(Node):
 
 
 ObjectStorageEdge = Edge[ObjectStorage]
-ObjectStorageNamespaceEdge = Edge[ObjectStorageNamespace]
 
 
 @strawberry.type(description="Added in 25.14.0")
 class ObjectStorageConnection(Connection[ObjectStorage]):
-    @strawberry.field
-    def count(self) -> int:
-        return len(self.edges)
-
-
-@strawberry.type(description="Added in 25.14.0")
-class ObjectStorageNamespaceConnection(Connection[ObjectStorageNamespace]):
     @strawberry.field
     def count(self) -> int:
         return len(self.edges)
@@ -178,14 +153,16 @@ class CreateObjectStorageInput:
     endpoint: str
     region: str
 
-    def to_creator(self) -> ObjectStorageCreator:
-        return ObjectStorageCreator(
-            name=self.name,
-            host=self.host,
-            access_key=self.access_key,
-            secret_key=self.secret_key,
-            endpoint=self.endpoint,
-            region=self.region,
+    def to_creator(self) -> Creator[ObjectStorageRow]:
+        return Creator(
+            spec=ObjectStorageCreatorSpec(
+                name=self.name,
+                host=self.host,
+                access_key=self.access_key,
+                secret_key=self.secret_key,
+                endpoint=self.endpoint,
+                region=self.region,
+            )
         )
 
 
@@ -199,8 +176,8 @@ class UpdateObjectStorageInput:
     endpoint: Optional[str] = UNSET
     region: Optional[str] = UNSET
 
-    def to_modifier(self) -> ObjectStorageModifier:
-        return ObjectStorageModifier(
+    def to_updater(self) -> Updater[ObjectStorageRow]:
+        spec = ObjectStorageUpdaterSpec(
             name=OptionalState[str].from_graphql(self.name),
             host=OptionalState[str].from_graphql(self.host),
             access_key=OptionalState[str].from_graphql(self.access_key),
@@ -208,6 +185,7 @@ class UpdateObjectStorageInput:
             endpoint=OptionalState[str].from_graphql(self.endpoint),
             region=OptionalState[str].from_graphql(self.region),
         )
+        return Updater(spec=spec, pk_value=uuid.UUID(self.id))
 
 
 @strawberry.input(description="Added in 25.14.0")
@@ -279,8 +257,7 @@ async def update_object_storage(
 
     action_result = await processors.object_storage.update.wait_for_complete(
         UpdateObjectStorageAction(
-            id=uuid.UUID(input.id),
-            modifier=input.to_modifier(),
+            updater=input.to_updater(),
         )
     )
 
@@ -337,62 +314,3 @@ async def get_presigned_upload_url(
     return GetPresignedUploadURLPayload(
         presigned_url=action_result.presigned_url, fields=json.dumps(action_result.fields)
     )
-
-
-@strawberry.input(description="Added in 25.14.0")
-class RegisterObjectStorageBucketInput:
-    storage_id: uuid.UUID
-    bucket_name: str
-
-    def to_creator(self) -> ObjectStorageNamespaceCreator:
-        return ObjectStorageNamespaceCreator(
-            storage_id=self.storage_id,
-            bucket=self.bucket_name,
-        )
-
-
-@strawberry.input(description="Added in 25.14.0")
-class UnregisterObjectStorageBucketInput:
-    storage_id: uuid.UUID
-    bucket_name: str
-
-
-@strawberry.type(description="Added in 25.14.0")
-class RegisterObjectStorageBucketPayload:
-    id: uuid.UUID
-
-
-@strawberry.type(description="Added in 25.14.0")
-class UnregisterObjectStorageBucketPayload:
-    id: uuid.UUID
-
-
-@strawberry.mutation(description="Added in 25.14.0")
-async def register_object_storage_bucket(
-    input: RegisterObjectStorageBucketInput, info: Info[StrawberryGQLContext]
-) -> RegisterObjectStorageBucketPayload:
-    processors = info.context.processors
-
-    action_result = await processors.object_storage.register_bucket.wait_for_complete(
-        RegisterBucketAction(
-            creator=input.to_creator(),
-        )
-    )
-
-    return RegisterObjectStorageBucketPayload(id=action_result.storage_id)
-
-
-@strawberry.mutation(description="Added in 25.14.0")
-async def unregister_object_storage_bucket(
-    input: UnregisterObjectStorageBucketInput, info: Info[StrawberryGQLContext]
-) -> UnregisterObjectStorageBucketPayload:
-    processors = info.context.processors
-
-    action_result = await processors.object_storage.unregister_bucket.wait_for_complete(
-        UnregisterBucketAction(
-            storage_id=input.storage_id,
-            bucket_name=input.bucket_name,
-        )
-    )
-
-    return UnregisterObjectStorageBucketPayload(id=action_result.storage_id)

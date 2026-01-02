@@ -34,6 +34,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.errors.resource import InvalidSchedulerState
 
 from ..models import AgentRow, KernelRow, SessionRow
 from ..models.scaling_group import ScalingGroupOpts
@@ -49,6 +50,9 @@ class ScheduleType(StrEnum):
 
     SCHEDULE = "schedule"  # Schedule pending sessions
     SWEEP = "sweep"  # Sweep stale sessions (maintenance operation)
+    SWEEP_LOST_AGENT_KERNELS = (
+        "sweep_lost_agent_kernels"  # Sweep kernels with lost or missing agents
+    )
     CHECK_PRECONDITION = "check_precondition"  # Check preconditions for scheduled sessions
     START = "start"  # Start prepared sessions
     TERMINATE = "terminate"  # Terminate sessions
@@ -61,6 +65,10 @@ class ScheduleType(StrEnum):
     )
     RETRY_PREPARING = "retry_preparing"  # Retry stuck PREPARING/PULLING sessions
     RETRY_CREATING = "retry_creating"  # Retry stuck CREATING sessions
+    SWEEP_STALE_KERNELS = "sweep_stale_kernels"  # Sweep kernels with stale presence status
+    CHECK_RUNNING_SESSION_TERMINATION = (
+        "check_running_session_termination"  # Check RUNNING sessions with all kernels TERMINATED
+    )
 
 
 def merge_resource(
@@ -144,7 +152,8 @@ class AbstractScheduler(ABC):
         if not pending_sessions:
             return -1, []
         priorities = {s.priority for s in pending_sessions}
-        assert len(priorities) > 0
+        if len(priorities) == 0:
+            raise InvalidSchedulerState("Priority set is empty despite having pending sessions")
         top_priority = max(priorities)
         return top_priority, [*filter(lambda s: s.priority == top_priority, pending_sessions)]
 

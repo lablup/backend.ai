@@ -15,15 +15,15 @@ from pydantic import AnyUrl, Field, FilePath, ValidationError, model_validator
 from ai.backend.appproxy.common.config import (
     BaseSchema,
     DebugConfig,
-    GroupID,
+    GroupIDValidator,
     HostPortPair,
     PermitHashConfig,
     ProfilingConfig,
     RedisConfig,
     SecretConfig,
-    UserID,
+    UserIDValidator,
 )
-from ai.backend.appproxy.common.exceptions import ConfigValidationError
+from ai.backend.appproxy.common.errors import ConfigValidationError
 from ai.backend.appproxy.common.types import (
     AppMode,
     EventLoopType,
@@ -36,7 +36,21 @@ from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import LogLevel
 from ai.backend.logging.config import LoggingConfig
 
-_file_perm = (Path(__file__).parent / "server.py").stat()
+
+def _get_default_uid() -> int:
+    """Get UID from server.py file in the same directory as config.py."""
+    server_file = Path(__file__).parent / "server.py"
+    if not server_file.exists():
+        raise ConfigValidationError(f"server.py not found at {server_file}")
+    return server_file.stat().st_uid
+
+
+def _get_default_gid() -> int:
+    """Get GID from server.py file in the same directory as config.py."""
+    server_file = Path(__file__).parent / "server.py"
+    if not server_file.exists():
+        raise ConfigValidationError(f"server.py not found at {server_file}")
+    return server_file.stat().st_gid
 
 
 class AppFilterConfig(BaseSchema):
@@ -176,13 +190,13 @@ class ProxyWorkerConfig(BaseSchema):
     )
     user: Annotated[
         int,
-        UserID(default_uid=_file_perm.st_uid),
-        Field(default=_file_perm.st_uid, description="Process owner."),
+        UserIDValidator,
+        Field(default_factory=_get_default_uid, ge=0, description="Process owner."),
     ]
     group: Annotated[
         int,
-        GroupID(default_gid=_file_perm.st_gid),
-        Field(default=_file_perm.st_uid, description="Process group."),
+        GroupIDValidator,
+        Field(default_factory=_get_default_gid, ge=0, description="Process group."),
     ]
 
     api_bind_addr: HostPortPair = Field(

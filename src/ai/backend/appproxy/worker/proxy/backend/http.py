@@ -14,7 +14,7 @@ from aiohttp import ClientConnectorError, web
 from multidict import CIMultiDict
 from yarl import URL
 
-from ai.backend.appproxy.common.exceptions import ContainerConnectionRefused, WorkerNotAvailable
+from ai.backend.appproxy.common.errors import ContainerConnectionRefused, WorkerNotAvailable
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
@@ -208,6 +208,16 @@ class HTTPBackend(BaseBackend):
                 finally:
                     await frontend_response.write_eof()
                 return frontend_response
+        except aiohttp.ServerDisconnectedError as e:
+            log.debug(
+                "Backend container disconnected unexpectedly: {}:{}, method={}, path={}, error={}",
+                route.current_kernel_host,
+                route.kernel_port,
+                frontend_request.method,
+                frontend_request.rel_url,
+                e,
+            )
+            raise
         except ConnectionResetError:
             raise asyncio.CancelledError()
         except aiohttp.ClientOSError as e:

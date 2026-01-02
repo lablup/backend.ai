@@ -47,6 +47,11 @@ Alias keys are also URL-quoted in the same way.
        + resources
          - group_resource_visibility: "true"  # return group resource status in check-presets
                                               # (default: false)
+     + jwt
+       - secret-key: "..."                     # JWT signing secret key (min 32 chars)
+       - algorithm: "HS256"                    # JWT signing algorithm (HS256, HS384, HS512)
+       - token-expiration-seconds: 900         # JWT token TTL in seconds (default: 15min)
+       - issuer: "backend.ai"                  # JWT issuer identifier (shared by manager & webserver)
      + docker
        + image
          - auto_pull: "digest" (default) | "tag" | "none"
@@ -181,7 +186,6 @@ from typing import Any, Literal, Optional, Union
 
 from pydantic import (
     AliasChoices,
-    BaseModel,
     ConfigDict,
     Field,
     FilePath,
@@ -190,8 +194,12 @@ from pydantic import (
     field_validator,
 )
 
+from ai.backend.common.config import BaseConfigSchema
+from ai.backend.common.configs.client import HttpTimeoutConfig
+from ai.backend.common.configs.jwt import SharedJWTConfig
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.data.config.types import EtcdConfigData
+from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.typed_validators import (
@@ -233,7 +241,7 @@ class DatabaseType(enum.StrEnum):
     postgresql = "postgresql"
 
 
-class DatabaseConfig(BaseModel):
+class DatabaseConfig(BaseConfigSchema):
     type: Literal["postgresql"] = Field(
         default="postgresql",
         description="""
@@ -339,8 +347,8 @@ class DatabaseConfig(BaseModel):
 
 
 class EventLoopType(enum.StrEnum):
-    asyncio = "asyncio"
-    uvloop = "uvloop"
+    ASYNCIO = "asyncio"
+    UVLOOP = "uvloop"
 
 
 class DistributedLockType(enum.StrEnum):
@@ -351,7 +359,7 @@ class DistributedLockType(enum.StrEnum):
     etcetra = "etcetra"
 
 
-class EtcdConfig(BaseModel):
+class EtcdConfig(BaseConfigSchema):
     namespace: str = Field(
         default="ETCD_NAMESPACE",
         description="""
@@ -404,7 +412,7 @@ class EtcdConfig(BaseModel):
         )
 
 
-class AuthConfig(BaseModel):
+class AuthConfig(BaseConfigSchema):
     max_password_age: Optional[TimeDuration] = Field(
         default=None,
         description="""
@@ -467,7 +475,7 @@ class AuthConfig(BaseModel):
     )
 
 
-class ManagerConfig(BaseModel):
+class ManagerConfig(BaseConfigSchema):
     ipc_base_path: AutoDirectoryPath = Field(
         default=AutoDirectoryPath("/tmp/backend.ai/ipc"),
         description="""
@@ -621,7 +629,7 @@ class ManagerConfig(BaseModel):
         serialization_alias="ssl-privkey",
     )
     event_loop: EventLoopType = Field(
-        default=EventLoopType.asyncio,
+        default=EventLoopType.ASYNCIO,
         description="""
         Event loop implementation to use.
         'asyncio' is the Python standard library implementation.
@@ -926,7 +934,7 @@ class ManagerConfig(BaseModel):
 
 
 # Deprecated: v20.09
-class DockerRegistryConfig(BaseModel):
+class DockerRegistryConfig(BaseConfigSchema):
     ssl_verify: bool = Field(
         default=True,
         description="""
@@ -939,7 +947,7 @@ class DockerRegistryConfig(BaseModel):
     )
 
 
-class PyroscopeConfig(BaseModel):
+class PyroscopeConfig(BaseConfigSchema):
     enabled: bool = Field(
         default=False,
         description="""
@@ -984,7 +992,7 @@ class PyroscopeConfig(BaseModel):
     )
 
 
-class SMTPReporterConfig(BaseModel):
+class SMTPReporterConfig(BaseConfigSchema):
     name: str = Field(
         description="""
         Name of the SMTP reporter.
@@ -1082,7 +1090,7 @@ class SMTPReporterConfig(BaseModel):
     )
 
 
-class ActionMonitorsConfig(BaseModel):
+class ActionMonitorsConfig(BaseConfigSchema):
     subscribed_actions: list[str] = Field(
         default=[],
         description="""
@@ -1101,7 +1109,7 @@ class ActionMonitorsConfig(BaseModel):
     )
 
 
-class ReporterConfig(BaseModel):
+class ReporterConfig(BaseConfigSchema):
     smtp: list[SMTPReporterConfig] = Field(
         default=[],
         description="""
@@ -1121,7 +1129,7 @@ class ReporterConfig(BaseModel):
     )
 
 
-class DebugConfig(BaseModel):
+class DebugConfig(BaseConfigSchema):
     enabled: bool = Field(
         default=False,
         description="""
@@ -1188,7 +1196,7 @@ class DebugConfig(BaseModel):
     )
 
 
-class SystemConfig(BaseModel):
+class SystemConfig(BaseConfigSchema):
     timezone: TimeZone = Field(
         default_factory=lambda: timezone.utc,
         description="""
@@ -1199,7 +1207,7 @@ class SystemConfig(BaseModel):
     )
 
 
-class ResourcesConfig(BaseModel):
+class ResourcesConfig(BaseConfigSchema):
     group_resource_visibility: bool = Field(
         default=False,
         description="""
@@ -1210,7 +1218,7 @@ class ResourcesConfig(BaseModel):
     )
 
 
-class APIConfig(BaseModel):
+class APIConfig(BaseConfigSchema):
     allow_origins: str = Field(
         default="*",
         description="""
@@ -1290,7 +1298,7 @@ class DockerImageAutoPullPolicy(enum.StrEnum):
     none = "none"
 
 
-class DockerImageConfig(BaseModel):
+class DockerImageConfig(BaseConfigSchema):
     auto_pull: DockerImageAutoPullPolicy = Field(
         default=DockerImageAutoPullPolicy.digest,
         description="""
@@ -1305,7 +1313,7 @@ class DockerImageConfig(BaseModel):
     )
 
 
-class DockerConfig(BaseModel):
+class DockerConfig(BaseConfigSchema):
     image: DockerImageConfig = Field(
         default_factory=DockerImageConfig,
         description="""
@@ -1315,7 +1323,7 @@ class DockerConfig(BaseModel):
     )
 
 
-class PluginsConfig(BaseModel):
+class PluginsConfig(BaseConfigSchema):
     accelerator: dict[str, Any] = Field(
         default_factory=dict,
         description="""
@@ -1354,7 +1362,7 @@ class PluginsConfig(BaseModel):
     )
 
 
-class InterContainerNetworkConfig(BaseModel):
+class InterContainerNetworkConfig(BaseConfigSchema):
     default_driver: Optional[str] = Field(
         default="overlay",
         description="""
@@ -1382,7 +1390,7 @@ class InterContainerNetworkConfig(BaseModel):
     )
 
 
-class SubnetNetworkConfig(BaseModel):
+class SubnetNetworkConfig(BaseConfigSchema):
     agent: IPvAnyNetwork = Field(
         default=IPv4Network("0.0.0.0/0"),
         description="""
@@ -1403,7 +1411,7 @@ class SubnetNetworkConfig(BaseModel):
     )
 
 
-class RpcConfig(BaseModel):
+class RpcConfig(BaseConfigSchema):
     keepalive_timeout: float = Field(
         default=60.0,
         # TODO: Write description
@@ -1415,7 +1423,7 @@ class RpcConfig(BaseModel):
     )
 
 
-class NetworkConfig(BaseModel):
+class NetworkConfig(BaseConfigSchema):
     inter_container: InterContainerNetworkConfig = Field(
         default_factory=InterContainerNetworkConfig,
         description="""
@@ -1439,7 +1447,7 @@ class NetworkConfig(BaseModel):
     )
 
 
-class WatcherConfig(BaseModel):
+class WatcherConfig(BaseConfigSchema):
     token: Optional[str] = Field(
         default=None,
         description="""
@@ -1462,7 +1470,7 @@ class WatcherConfig(BaseModel):
     )
 
 
-class HangToleranceThresholdConfig(BaseModel):
+class HangToleranceThresholdConfig(BaseConfigSchema):
     PREPARING: Optional[datetime] = Field(
         default=None,
         description="""
@@ -1483,7 +1491,7 @@ class HangToleranceThresholdConfig(BaseModel):
     )
 
 
-class HangToleranceConfig(BaseModel):
+class HangToleranceConfig(BaseConfigSchema):
     threshold: HangToleranceThresholdConfig = Field(
         default_factory=HangToleranceThresholdConfig,
         description="""
@@ -1493,7 +1501,7 @@ class HangToleranceConfig(BaseModel):
     )
 
 
-class SessionConfig(BaseModel):
+class SessionConfig(BaseConfigSchema):
     hang_tolerance: HangToleranceConfig = Field(
         default_factory=HangToleranceConfig,
         description="""
@@ -1505,7 +1513,7 @@ class SessionConfig(BaseModel):
     )
 
 
-class MetricConfig(BaseModel):
+class MetricConfig(BaseConfigSchema):
     address: HostPortPair = Field(
         default=HostPortPair(host="127.0.0.1", port=9090),
         description="""
@@ -1528,7 +1536,7 @@ class MetricConfig(BaseModel):
         return None if addr is None else f"{addr.host}:{addr.port}"
 
 
-class IdleCheckerConfig(BaseModel):
+class IdleCheckerConfig(BaseConfigSchema):
     enabled: str = Field(
         default="",
         description="""
@@ -1583,7 +1591,7 @@ class IdleCheckerConfig(BaseModel):
     )
 
 
-class VolumeTypeConfig(BaseModel):
+class VolumeTypeConfig(BaseConfigSchema):
     user: Optional[dict[str, Any] | str] = Field(
         default=None,
         description="""
@@ -1602,7 +1610,259 @@ class VolumeTypeConfig(BaseModel):
     )
 
 
-class VolumeProxyConfig(BaseModel):
+# Same as aiohttp default timeout settings
+_DEFAULT_TIMEOUT = HttpTimeoutConfig()
+
+
+class StorageProxyClientTimeoutConfig(BaseConfigSchema):
+    """
+    Per-method timeout configuration for StorageProxyManagerFacingClient.
+    Each field corresponds to a method in the client class.
+    If not specified, the default timeout (total=300s, sock_connect=30s) is used.
+    """
+
+    # Volume operations
+    get_volumes: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for get_volumes operation.",
+        validation_alias=AliasChoices("get-volumes", "get_volumes"),
+        serialization_alias="get-volumes",
+    )
+
+    # Folder operations
+    create_folder: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for create_folder operation.",
+        validation_alias=AliasChoices("create-folder", "create_folder"),
+        serialization_alias="create-folder",
+    )
+    delete_folder: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for delete_folder operation.",
+        validation_alias=AliasChoices("delete-folder", "delete_folder"),
+        serialization_alias="delete-folder",
+    )
+    clone_folder: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for clone_folder operation.",
+        validation_alias=AliasChoices("clone-folder", "clone_folder"),
+        serialization_alias="clone-folder",
+    )
+    get_mount_path: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for get_mount_path operation.",
+        validation_alias=AliasChoices("get-mount-path", "get_mount_path"),
+        serialization_alias="get-mount-path",
+    )
+
+    # Volume info operations
+    get_volume_hwinfo: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for get_volume_hwinfo operation.",
+        validation_alias=AliasChoices("get-volume-hwinfo", "get_volume_hwinfo"),
+        serialization_alias="get-volume-hwinfo",
+    )
+    get_volume_performance_metric: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for get_volume_performance_metric operation.",
+        validation_alias=AliasChoices(
+            "get-volume-performance-metric", "get_volume_performance_metric"
+        ),
+        serialization_alias="get-volume-performance-metric",
+    )
+    get_fs_usage: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for get_fs_usage operation.",
+        validation_alias=AliasChoices("get-fs-usage", "get_fs_usage"),
+        serialization_alias="get-fs-usage",
+    )
+
+    # Quota operations
+    get_volume_quota: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for get_volume_quota operation.",
+        validation_alias=AliasChoices("get-volume-quota", "get_volume_quota"),
+        serialization_alias="get-volume-quota",
+    )
+    update_volume_quota: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for update_volume_quota operation.",
+        validation_alias=AliasChoices("update-volume-quota", "update_volume_quota"),
+        serialization_alias="update-volume-quota",
+    )
+    get_quota_scope: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for get_quota_scope operation.",
+        validation_alias=AliasChoices("get-quota-scope", "get_quota_scope"),
+        serialization_alias="get-quota-scope",
+    )
+    update_quota_scope: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for update_quota_scope operation.",
+        validation_alias=AliasChoices("update-quota-scope", "update_quota_scope"),
+        serialization_alias="update-quota-scope",
+    )
+    delete_quota_scope_quota: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for delete_quota_scope_quota operation.",
+        validation_alias=AliasChoices("delete-quota-scope-quota", "delete_quota_scope_quota"),
+        serialization_alias="delete-quota-scope-quota",
+    )
+
+    # File operations
+    mkdir: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for mkdir operation.",
+    )
+    rename_file: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for rename_file operation.",
+        validation_alias=AliasChoices("rename-file", "rename_file"),
+        serialization_alias="rename-file",
+    )
+    delete_files: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for delete_files operation.",
+        validation_alias=AliasChoices("delete-files", "delete_files"),
+        serialization_alias="delete-files",
+    )
+    delete_files_async: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for delete_files_async operation.",
+        validation_alias=AliasChoices("delete-files-async", "delete_files_async"),
+        serialization_alias="delete-files-async",
+    )
+    move_file: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for move_file operation.",
+        validation_alias=AliasChoices("move-file", "move_file"),
+        serialization_alias="move-file",
+    )
+    upload_file: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for upload_file operation.",
+        validation_alias=AliasChoices("upload-file", "upload_file"),
+        serialization_alias="upload-file",
+    )
+    download_file: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for download_file operation.",
+        validation_alias=AliasChoices("download-file", "download_file"),
+        serialization_alias="download-file",
+    )
+    list_files: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for list_files operation.",
+        validation_alias=AliasChoices("list-files", "list_files"),
+        serialization_alias="list-files",
+    )
+    fetch_file: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for fetch_file operation.",
+        validation_alias=AliasChoices("fetch-file", "fetch_file"),
+        serialization_alias="fetch-file",
+    )
+
+    # Folder usage operations
+    get_folder_usage: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for get_folder_usage operation.",
+        validation_alias=AliasChoices("get-folder-usage", "get_folder_usage"),
+        serialization_alias="get-folder-usage",
+    )
+    get_used_bytes: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for get_used_bytes operation.",
+        validation_alias=AliasChoices("get-used-bytes", "get_used_bytes"),
+        serialization_alias="get-used-bytes",
+    )
+
+    # HuggingFace operations
+    scan_huggingface_models: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for scan_huggingface_models operation.",
+        validation_alias=AliasChoices("scan-huggingface-models", "scan_huggingface_models"),
+        serialization_alias="scan-huggingface-models",
+    )
+    retrieve_huggingface_models: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for retrieve_huggingface_models operation.",
+        validation_alias=AliasChoices("retrieve-huggingface-models", "retrieve_huggingface_models"),
+        serialization_alias="retrieve-huggingface-models",
+    )
+    retrieve_huggingface_model: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for retrieve_huggingface_model operation.",
+        validation_alias=AliasChoices("retrieve-huggingface-model", "retrieve_huggingface_model"),
+        serialization_alias="retrieve-huggingface-model",
+    )
+    import_huggingface_models: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for import_huggingface_models operation.",
+        validation_alias=AliasChoices("import-huggingface-models", "import_huggingface_models"),
+        serialization_alias="import-huggingface-models",
+    )
+    get_huggingface_model_commit_hash: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for get_huggingface_model_commit_hash operation.",
+        validation_alias=AliasChoices(
+            "get-huggingface-model-commit-hash", "get_huggingface_model_commit_hash"
+        ),
+        serialization_alias="get-huggingface-model-commit-hash",
+    )
+
+    # Reservoir operations
+    import_reservoir_models: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for import_reservoir_models operation.",
+        validation_alias=AliasChoices("import-reservoir-models", "import_reservoir_models"),
+        serialization_alias="import-reservoir-models",
+    )
+
+    # S3 operations
+    download_s3_file: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for download_s3_file operation.",
+        validation_alias=AliasChoices("download-s3-file", "download_s3_file"),
+        serialization_alias="download-s3-file",
+    )
+    get_s3_presigned_download_url: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for get_s3_presigned_download_url operation.",
+        validation_alias=AliasChoices(
+            "get-s3-presigned-download-url", "get_s3_presigned_download_url"
+        ),
+        serialization_alias="get-s3-presigned-download-url",
+    )
+    get_s3_presigned_upload_url: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for get_s3_presigned_upload_url operation.",
+        validation_alias=AliasChoices("get-s3-presigned-upload-url", "get_s3_presigned_upload_url"),
+        serialization_alias="get-s3-presigned-upload-url",
+    )
+    delete_s3_object: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for delete_s3_object operation.",
+        validation_alias=AliasChoices("delete-s3-object", "delete_s3_object"),
+        serialization_alias="delete-s3-object",
+    )
+
+    # VFS operations
+    download_vfs_file_streaming: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for download_vfs_file_streaming operation.",
+        validation_alias=AliasChoices("download-vfs-file-streaming", "download_vfs_file_streaming"),
+        serialization_alias="download-vfs-file-streaming",
+    )
+    list_vfs_files: HttpTimeoutConfig = Field(
+        default_factory=lambda: _DEFAULT_TIMEOUT,
+        description="Timeout for list_vfs_files operation.",
+        validation_alias=AliasChoices("list-vfs-files", "list_vfs_files"),
+        serialization_alias="list-vfs-files",
+    )
+
+
+class VolumeProxyConfig(BaseConfigSchema):
     client_api: str = Field(
         description="""
         Client-facing API endpoint URL of the volume proxy.
@@ -1652,9 +1912,16 @@ class VolumeProxyConfig(BaseModel):
         validation_alias=AliasChoices("sftp_scaling_groups", "sftp-scaling-groups"),
         serialization_alias="sftp_scaling_groups",
     )
+    timeouts: StorageProxyClientTimeoutConfig = Field(
+        default_factory=StorageProxyClientTimeoutConfig,
+        description="""
+        Per-method timeout configuration for storage proxy client operations.
+        Allows customizing timeout values for each API method individually.
+        """,
+    )
 
 
-class VolumesConfig(BaseModel):
+class VolumesConfig(BaseConfigSchema):
     types: VolumeTypeConfig = Field(
         default_factory=lambda: VolumeTypeConfig(user={}),
         description="""
@@ -1705,13 +1972,13 @@ class VolumesConfig(BaseModel):
 
 
 # TODO: Make this more precise type
-class ResourceSlotsConfig(BaseModel):
+class ResourceSlotsConfig(BaseConfigSchema):
     model_config = ConfigDict(
         extra="allow",
     )
 
 
-class OTELConfig(BaseModel):
+class OTELConfig(BaseConfigSchema):
     enabled: bool = Field(
         default=False,
         description="""
@@ -1740,7 +2007,7 @@ class OTELConfig(BaseModel):
     )
 
 
-class ServiceDiscoveryConfig(BaseModel):
+class ServiceDiscoveryConfig(BaseConfigSchema):
     type: ServiceDiscoveryType = Field(
         default=ServiceDiscoveryType.REDIS,
         description="""
@@ -1750,7 +2017,7 @@ class ServiceDiscoveryConfig(BaseModel):
     )
 
 
-class ReservoirObjectStorageConfig(BaseModel):
+class ReservoirObjectStorageConfig(BaseConfigSchema):
     storage_type: Literal["object_storage"] = Field(
         default="object_storage",
         description="""
@@ -1770,10 +2037,29 @@ class ReservoirObjectStorageConfig(BaseModel):
     )
 
 
-StorageSpecificConfig = Union[ReservoirObjectStorageConfig]
+class ReservoirVFSStorageConfig(BaseConfigSchema):
+    storage_type: Literal["vfs_storage"] = Field(
+        default="vfs_storage",
+        description="""
+        Type of the storage configuration.
+        This is used to identify the specific storage type.
+        """,
+        alias="type",
+    )
+    subpath: str = Field(
+        default="",
+        description="""
+        Subpath within the VFS storage for the reservoir.
+        This is appended to the VFS storage's base_path.
+        """,
+        examples=["artifacts", "models", ""],
+    )
 
 
-class ReservoirConfig(BaseModel):
+StorageSpecificConfig = Union[ReservoirObjectStorageConfig, ReservoirVFSStorageConfig]
+
+
+class ReservoirConfig(BaseConfigSchema):
     enable_approve_process: bool = Field(
         default=False,
         description="""
@@ -1784,11 +2070,23 @@ class ReservoirConfig(BaseModel):
         validation_alias=AliasChoices("enable-approve-process", "enable_approve_process"),
         serialization_alias="enable-approve-process",
     )
-    storage_name: str = Field(
-        default="RESERVOIR_STORAGE_NAME",
+    use_delegation: bool = Field(
+        default=False,
         description="""
-        Name of the reservoir storage configuration.
-        Used to identify this storage in the system.
+        Whether this reservoir is a leaf in a delegation hierarchy.
+        If true, it cannot delegate to other reservoirs.
+        """,
+        examples=[True, False],
+        validation_alias=AliasChoices("use-delegation", "use_delegation"),
+        serialization_alias="use-delegation",
+    )
+    storage_name: str = Field(
+        description="""
+        Name of the reservoir default storage.
+
+        You can specify the storage to be used for each step using storage_step_selection.
+        For steps not explicitly specified in storage_step_selection, the storage is designated by storage_name.
+        If you specify storage for all steps in storage_step_selection, there is no need to specify storage_name.
         """,
         examples=["minio-storage", "gitlfs-storage", "vfs-storage"],
         validation_alias=AliasChoices("storage-name", "storage_name"),
@@ -1801,11 +2099,44 @@ class ReservoirConfig(BaseModel):
         Configuration for the storage.
         """,
     )
+    storage_step_selection: dict[ArtifactStorageImportStep, str] = Field(
+        default_factory=dict,
+        description="""
+        Storage step selection configuration for artifact model imports.
+        Maps different import steps (download, archive) to specific storage backends.
+        Required for artifact model import operations.
+        """,
+        validation_alias=AliasChoices("storage_step_selection", "storage-step-selection"),
+        serialization_alias="storage-step-selection",
+    )
+
+    def resolve_storage_step_selection(self) -> dict[ArtifactStorageImportStep, str]:
+        """
+        Resolves the actual `storage_step_selection` to be passed to the storage proxy based on `storage_step_selection` and `storage_name`
+        """
+
+        _REQUIRED_STEPS = {ArtifactStorageImportStep.DOWNLOAD, ArtifactStorageImportStep.ARCHIVE}
+
+        resolved_selection: dict[ArtifactStorageImportStep, str] = (
+            self.storage_step_selection.copy()
+        )
+        for required_step in _REQUIRED_STEPS:
+            if required_step not in resolved_selection:
+                resolved_selection[required_step] = self.storage_name
+
+        return resolved_selection
+
+    @property
+    def archive_storage(self) -> str:
+        """
+        Resolve the storage backend for the `ARCHIVE` step.
+        If not explicitly specified, falls back to `storage_name`.
+        """
+        return self.storage_step_selection.get(ArtifactStorageImportStep.ARCHIVE, self.storage_name)
 
 
-class ModelRegistryConfig(BaseModel):
+class ArtifactRegistryConfig(BaseConfigSchema):
     model_registry: str = Field(
-        default="MODEL_REGISTRY_NAME",
         description="""
         Name of the Model registry configuration.
         Used to identify this registry in the system.
@@ -1816,7 +2147,26 @@ class ModelRegistryConfig(BaseModel):
     )
 
 
-class ManagerUnifiedConfig(BaseModel):
+class DeploymentConfig(BaseConfigSchema):
+    enable_model_definition_override: bool = Field(
+        default=False,
+        description="""
+        Enable model definition override from storage for non-CUSTOM runtime variants.
+        When enabled, after generating the model definition programmatically,
+        the system will attempt to fetch a custom model definition from storage
+        if model_definition_path is specified in the revision.
+        If the fetch succeeds, the custom definition overrides the generated one.
+        If the fetch fails, the generated definition is used as fallback.
+        """,
+        examples=[True, False],
+        validation_alias=AliasChoices(
+            "enable-model-definition-override", "enable_model_definition_override"
+        ),
+        serialization_alias="enable-model-definition-override",
+    )
+
+
+class ManagerUnifiedConfig(BaseConfigSchema):
     # From legacy local config
     db: DatabaseConfig = Field(
         default_factory=DatabaseConfig,
@@ -1948,6 +2298,14 @@ class ManagerUnifiedConfig(BaseModel):
         Controls password policies and other security measures.
         """,
     )
+    jwt: SharedJWTConfig = Field(
+        default_factory=SharedJWTConfig,
+        description="""
+        JWT authentication configuration.
+        Shared configuration for JWT token signing and verification.
+        Used by both manager and webserver for stateless authentication.
+        """,
+    )
     session: SessionConfig = Field(
         default_factory=SessionConfig,
         description="""
@@ -1990,18 +2348,25 @@ class ManagerUnifiedConfig(BaseModel):
         Controls how services are discovered and connected within the Backend.AI system.
         """,
     )
-    artifact_registry: ModelRegistryConfig = Field(
-        default_factory=ModelRegistryConfig,
+    artifact_registry: Optional[ArtifactRegistryConfig] = Field(
+        default=None,
         description="""
         Default artifact registry config.
         """,
         validation_alias=AliasChoices("artifact_registry", "artifact-registry"),
         serialization_alias="artifact-registry",
     )
-    reservoir: ReservoirConfig = Field(
-        default_factory=ReservoirConfig,
+    reservoir: Optional[ReservoirConfig] = Field(
+        default=None,
         description="""
         Reservoir configuration.
+        """,
+    )
+    deployment: DeploymentConfig = Field(
+        default_factory=DeploymentConfig,
+        description="""
+        Deployment and model serving configuration.
+        Controls behavior of model deployment features.
         """,
     )
 

@@ -1,49 +1,40 @@
-import logging
-from collections.abc import Mapping
-from dataclasses import dataclass
-from typing import Any, Self, override
+from __future__ import annotations
 
-from ai.backend.common.bgtask.reporter import ProgressReporter
-from ai.backend.common.bgtask.task.base import BaseBackgroundTaskArgs, BaseBackgroundTaskHandler
-from ai.backend.common.bgtask.types import TaskName
+import logging
+from typing import TYPE_CHECKING, override
+
+from pydantic import Field
+
+from ai.backend.common.bgtask.task.base import (
+    BaseBackgroundTaskHandler,
+    BaseBackgroundTaskManifest,
+)
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderCloneFailureEvent,
     VFolderCloneSuccessEvent,
 )
-from ai.backend.common.types import DispatchResult, VFolderID
+from ai.backend.common.type_adapters import VFolderIDField
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.bgtask.types import StorageBgtaskName
 
-from ...volumes.pool import VolumePool
+if TYPE_CHECKING:
+    from ...volumes.pool import VolumePool
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-@dataclass
-class VFolderCloneTaskArgs(BaseBackgroundTaskArgs):
-    volume: str
-    src_vfolder: VFolderID
-    dst_vfolder: VFolderID
+class VFolderCloneManifest(BaseBackgroundTaskManifest):
+    """
+    Manifest for cloning a virtual folder.
+    """
 
-    @override
-    def to_metadata_body(self) -> dict[str, Any]:
-        return {
-            "volume": self.volume,
-            "src_vfolder": str(self.src_vfolder),
-            "dst_vfolder": str(self.dst_vfolder),
-        }
-
-    @classmethod
-    @override
-    def from_metadata_body(cls, body: Mapping[str, Any]) -> Self:
-        return cls(
-            volume=body["volume"],
-            src_vfolder=VFolderID.from_str(body["src_vfolder"]),
-            dst_vfolder=VFolderID.from_str(body["dst_vfolder"]),
-        )
+    volume: str = Field(description="Volume name where the vfolders are located")
+    src_vfolder: VFolderIDField = Field(description="Source vfolder ID to clone from")
+    dst_vfolder: VFolderIDField = Field(description="Destination vfolder ID to clone to")
 
 
-class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneTaskArgs]):
+class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneManifest, None]):
     _volume_pool: VolumePool
     _event_producer: EventProducer
 
@@ -53,41 +44,38 @@ class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneTaskArgs]):
 
     @classmethod
     @override
-    def name(cls) -> TaskName:
-        return TaskName.CLONE_VFOLDER
-
-    @override
-    async def execute(
-        self, reporter: ProgressReporter, args: VFolderCloneTaskArgs
-    ) -> DispatchResult:
-        try:
-            async with self._volume_pool.get_volume_by_name(args.volume) as volume:
-                await volume.clone_vfolder(
-                    args.src_vfolder,
-                    args.dst_vfolder,
-                )
-        except Exception as e:
-            log.exception(
-                f"VFolder cloning task failed. (src_vfid:{args.src_vfolder}, dst_vfid:{args.dst_vfolder}, e:{str(e)})"
-            )
-            await self._event_producer.anycast_event(
-                VFolderCloneFailureEvent(
-                    args.src_vfolder,
-                    args.dst_vfolder,
-                    str(e),
-                )
-            )
-            return DispatchResult(errors=[str(e)])
-        else:
-            await self._event_producer.anycast_event(
-                VFolderCloneSuccessEvent(
-                    args.src_vfolder,
-                    args.dst_vfolder,
-                )
-            )
-        return DispatchResult()
+    def name(cls) -> StorageBgtaskName:
+        return StorageBgtaskName.CLONE_VFOLDER
 
     @classmethod
     @override
-    def args_type(cls) -> type[VFolderCloneTaskArgs]:
-        return VFolderCloneTaskArgs
+    def manifest_type(cls) -> type[VFolderCloneManifest]:
+        return VFolderCloneManifest
+
+    @override
+    async def execute(self, manifest: VFolderCloneManifest) -> None:
+        try:
+            async with self._volume_pool.get_volume_by_name(manifest.volume) as volume:
+                await volume.clone_vfolder(
+                    manifest.src_vfolder,
+                    manifest.dst_vfolder,
+                )
+        except Exception as e:
+            log.exception(
+                f"VFolder cloning task failed. (src_vfid:{manifest.src_vfolder}, dst_vfid:{manifest.dst_vfolder}, e:{str(e)})"
+            )
+            await self._event_producer.anycast_event(
+                VFolderCloneFailureEvent(
+                    manifest.src_vfolder,
+                    manifest.dst_vfolder,
+                    str(e),
+                )
+            )
+            raise e
+        else:
+            await self._event_producer.anycast_event(
+                VFolderCloneSuccessEvent(
+                    manifest.src_vfolder,
+                    manifest.dst_vfolder,
+                )
+            )

@@ -10,18 +10,38 @@ from glide import (
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
-    create_layer_aware_valkey_decorator,
     create_valkey_client,
 )
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.log.types import ContainerLogData
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience import (
+    BackoffStrategy,
+    MetricArgs,
+    MetricPolicy,
+    Resilience,
+    RetryArgs,
+    RetryPolicy,
+)
 from ai.backend.common.types import ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-# Layer-specific decorator for valkey_container_log client
-valkey_decorator = create_layer_aware_valkey_decorator(LayerType.VALKEY_CONTAINER_LOG)
+# Resilience instance for valkey_container_log layer
+valkey_container_log_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.VALKEY, layer=LayerType.VALKEY_CONTAINER_LOG)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=3,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class ValkeyContainerLogClient:
@@ -67,7 +87,7 @@ class ValkeyContainerLogClient:
         await client.connect()
         return cls(client=client)
 
-    @valkey_decorator()
+    @valkey_container_log_resilience.apply()
     async def close(self) -> None:
         """
         Close the ValkeyContainerLogClient connection.
@@ -78,6 +98,10 @@ class ValkeyContainerLogClient:
         self._closed = True
         await self._client.disconnect()
 
+    async def ping(self) -> None:
+        """Ping the Valkey server to check connection health."""
+        await self._client.ping()
+
     def _create_batch(self, is_atomic: bool = False) -> Batch:
         """
         Create a batch object for batch operations.
@@ -87,6 +111,7 @@ class ValkeyContainerLogClient:
         """
         return Batch(is_atomic=is_atomic)
 
+    @valkey_container_log_resilience.apply()
     async def enqueue_container_logs(
         self,
         container_id: str,
@@ -112,6 +137,7 @@ class ValkeyContainerLogClient:
         )
         await self._client.client.exec(tx, raise_on_error=True)
 
+    @valkey_container_log_resilience.apply()
     async def container_log_len(
         self,
         container_id: str,
@@ -126,6 +152,7 @@ class ValkeyContainerLogClient:
         key = self._container_log_key(container_id)
         return await self._client.client.llen(key)
 
+    @valkey_container_log_resilience.apply()
     async def pop_container_logs(
         self,
         container_id: str,
@@ -145,6 +172,7 @@ class ValkeyContainerLogClient:
 
         return [ContainerLogData.deserialize(log) for log in logs]
 
+    @valkey_container_log_resilience.apply()
     async def clear_container_logs(
         self,
         container_id: str,

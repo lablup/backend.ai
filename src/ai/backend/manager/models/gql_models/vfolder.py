@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
@@ -24,12 +25,18 @@ from ruamel.yaml.error import YAMLError
 from sqlalchemy.orm import joinedload
 
 from ai.backend.common.config import model_definition_iv
+from ai.backend.common.exception import VFolderNotFound
 from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.user.types import UserRole
 
+from ...errors.resource import DataTransformationFailed
 from ...errors.storage import (
+    ModelCardParseError,
+    VFolderBadRequest,
     VFolderOperationFailed,
 )
 from ..base import (
@@ -49,7 +56,6 @@ from ..rbac import (
 )
 from ..rbac.context import ClientContext
 from ..rbac.permission_defs import VFolderPermission as VFolderRBACPermission
-from ..user import UserRole
 from ..vfolder import (
     DEAD_VFOLDER_STATUSES,
     VFolderOperationStatus,
@@ -63,6 +69,8 @@ from ..vfolder import (
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class VFolderPermissionValueField(graphene.Scalar):
@@ -396,18 +404,19 @@ class VirtualFolderNode(graphene.ObjectType):
         ]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
+    async def __resolve_reference(
+        self, info: graphene.ResolveInfo, **kwargs
+    ) -> "VirtualFolderNode":
+        vfolder_node = await VirtualFolderNode.get_node(info, self.id)
+        if vfolder_node is None:
+            raise VFolderNotFound(f"Virtual folder not found: {self.id}")
+        return vfolder_node
+
 
 class VirtualFolderConnection(Connection):
     class Meta:
         node = VirtualFolderNode
         description = "Added in 24.03.4"
-
-
-class ModelCardProcessError(RuntimeError):
-    msg: str
-
-    def __init__(self, msg: str) -> None:
-        self.msg = msg
 
 
 class ModelCard(graphene.ObjectType):
@@ -528,7 +537,7 @@ class ModelCard(graphene.ObjectType):
         else:
             models = []
         try:
-            metadata = models[0]["metadata"]
+            metadata = models[0]["metadata"] or {}
             name = models[0]["name"]
         except (IndexError, KeyError):
             metadata = {}
@@ -557,14 +566,17 @@ class ModelCard(graphene.ObjectType):
         )
 
     @classmethod
-    async def from_row(cls, graph_ctx: GraphQueryContext, vfolder_row: VFolderRow) -> Self | None:
+    async def from_row(
+        cls, graph_ctx: GraphQueryContext, vfolder_row: VFolderRow
+    ) -> Optional[Self]:
         try:
             return await cls.parse_row(graph_ctx, vfolder_row)
         except Exception as e:
-            if isinstance(e, ModelCardProcessError):
-                error_msg = e.msg
-            else:
-                error_msg = "Unknown error"
+            log.exception(
+                "Failed to parse model card from vfolder (id: {}, error: {})",
+                vfolder_row.id,
+                repr(e),
+            )
             if (
                 graph_ctx.user["role"] in (UserRole.SUPERADMIN, UserRole.ADMIN)
                 or vfolder_row.creator == graph_ctx.user["email"]
@@ -574,13 +586,13 @@ class ModelCard(graphene.ObjectType):
                     row_id=vfolder_row.id,
                     name=vfolder_row.name,
                     author=vfolder_row.creator or "",
-                    error_msg=error_msg,
+                    error_msg=str(e),
                 )
             else:
                 return None
 
     @classmethod
-    async def parse_row(cls, graph_ctx: GraphQueryContext, vfolder_row: VFolderRow) -> Self | None:
+    async def parse_row(cls, graph_ctx: GraphQueryContext, vfolder_row: VFolderRow) -> Self:
         vfolder_row_id = vfolder_row.id
         quota_scope_id = vfolder_row.quota_scope_id
         host = vfolder_row.host
@@ -588,18 +600,13 @@ class ModelCard(graphene.ObjectType):
         proxy_name, volume_name = graph_ctx.storage_manager.get_proxy_and_volume(
             host, is_unmanaged(vfolder_row.unmanaged_path)
         )
-        try:
-            manager_facing_client = graph_ctx.storage_manager.get_manager_facing_client(proxy_name)
-            result = await manager_facing_client.list_files(
-                volume_name,
-                str(vfolder_id),
-                ".",
-            )
-            vfolder_files = result["items"]
-        except VFolderOperationFailed as e:
-            raise ModelCardProcessError(
-                f"Failed to fetch definition file from folder. (detail:{e.extra_msg})"
-            )
+        manager_facing_client = graph_ctx.storage_manager.get_manager_facing_client(proxy_name)
+        result = await manager_facing_client.list_files(
+            volume_name,
+            str(vfolder_id),
+            ".",
+        )
+        vfolder_files = result["items"]
 
         model_definition_filename: str | None = None
         readme_idx: int | None = None
@@ -613,31 +620,29 @@ class ModelCard(graphene.ObjectType):
                 readme_idx = idx
 
         if model_definition_filename:
-            try:
-                chunks = await manager_facing_client.fetch_file_content(
-                    volume_name,
-                    str(vfolder_id),
-                    f"./{model_definition_filename}",
-                )
-            except VFolderOperationFailed as e:
-                raise ModelCardProcessError(
-                    f"Failed to fetch model definition file (detail:{e.extra_msg})"
-                )
+            chunks = await manager_facing_client.fetch_file_content(
+                volume_name,
+                str(vfolder_id),
+                f"./{model_definition_filename}",
+            )
             model_definition_yaml = chunks.decode("utf-8")
             try:
                 yaml = YAML()
                 model_definition_dict = yaml.load(model_definition_yaml)
             except YAMLError as e:
-                raise ModelCardProcessError(
-                    f"Invalid YAML syntax (data:{model_definition_yaml}, detail:{str(e)})"
-                )
+                raise ModelCardParseError(
+                    extra_msg=f"Invalid YAML syntax (filename:{model_definition_filename}, detail:{str(e)})"
+                ) from e
             try:
                 model_definition = model_definition_iv.check(model_definition_dict)
             except t.DataError as e:
-                raise ModelCardProcessError(
-                    f"Failed to validate model definition file (data:{model_definition_dict}, detail:{str(e)})"
+                raise ModelCardParseError(
+                    extra_msg=f"Failed to validate model definition file (data:{model_definition_dict}, detail:{str(e)})"
                 )
-            assert model_definition is not None
+            if model_definition is None:
+                raise DataTransformationFailed(
+                    "Model definition validation returned None unexpectedly"
+                )
             model_definition["id"] = vfolder_row_id
         else:
             model_definition = None
@@ -650,7 +655,7 @@ class ModelCard(graphene.ObjectType):
                     str(vfolder_id),
                     f"./{readme_filename}",
                 )
-            except VFolderOperationFailed:
+            except (VFolderOperationFailed, VFolderBadRequest):
                 readme = "Failed to fetch README file."
                 readme_filetype = None
             else:

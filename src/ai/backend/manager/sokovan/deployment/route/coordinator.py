@@ -14,6 +14,7 @@ from ai.backend.common.events.event_types.schedule.anycast import (
     DoRouteLifecycleIfNeededEvent,
 )
 from ai.backend.common.leader.tasks import EventTaskSpec
+from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.repositories.deployment import DeploymentRepository
@@ -21,7 +22,9 @@ from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.handlers import (
     HealthCheckRouteHandler,
     ProvisioningRouteHandler,
+    RouteEvictionHandler,
     RouteHandler,
+    ServiceDiscoverySyncHandler,
     TerminatingRouteHandler,
 )
 from ai.backend.manager.sokovan.deployment.route.handlers.running import RunningRouteHandler
@@ -81,6 +84,7 @@ class RouteCoordinator:
         config_provider: ManagerConfigProvider,
         scheduling_controller: SchedulingController,
         client_pool: ClientPool,
+        service_discovery: ServiceDiscovery,
     ) -> None:
         """Initialize the route coordinator."""
         self._valkey_schedule = valkey_schedule
@@ -96,6 +100,7 @@ class RouteCoordinator:
             config_provider=self._config_provider,
             client_pool=client_pool,
             valkey_schedule=self._valkey_schedule,
+            service_discovery=service_discovery,
         )
         self._route_handlers = self._init_handlers(executor)
 
@@ -114,7 +119,15 @@ class RouteCoordinator:
                 route_executor=executor,
                 event_producer=self._event_producer,
             ),
+            RouteLifecycleType.ROUTE_EVICTION: RouteEvictionHandler(
+                route_executor=executor,
+                event_producer=self._event_producer,
+            ),
             RouteLifecycleType.TERMINATING: TerminatingRouteHandler(
+                route_executor=executor,
+                event_producer=self._event_producer,
+            ),
+            RouteLifecycleType.SERVICE_DISCOVERY_SYNC: ServiceDiscoverySyncHandler(
                 route_executor=executor,
                 event_producer=self._event_producer,
             ),
@@ -152,7 +165,7 @@ class RouteCoordinator:
 
             # Update route statuses for successful operations
             next_status = handler.next_status()
-            if next_status is not None:
+            if next_status is not None and result.successes:
                 await self._deployment_repository.update_route_status_bulk(
                     set([r.route_id for r in result.successes]),
                     handler.target_statuses(),
@@ -161,11 +174,20 @@ class RouteCoordinator:
 
             # Update route statuses for failed operations
             failure_status = handler.failure_status()
-            if failure_status is not None:
+            if failure_status is not None and result.errors:
                 await self._deployment_repository.update_route_status_bulk(
                     set([e.route_info.route_id for e in result.errors]),
                     handler.target_statuses(),
                     failure_status,
+                )
+
+            # Update route statuses for stale operations
+            stale_status = handler.stale_status()
+            if stale_status is not None and result.stale:
+                await self._deployment_repository.update_route_status_bulk(
+                    set([r.route_id for r in result.stale]),
+                    handler.target_statuses(),
+                    stale_status,
                 )
 
             try:
@@ -213,12 +235,26 @@ class RouteCoordinator:
                 long_interval=60.0,
                 initial_delay=20.0,
             ),
+            # Evict unhealthy routes based on scaling group config - moderate frequency
+            RouteTaskSpec(
+                RouteLifecycleType.ROUTE_EVICTION,
+                short_interval=None,  # No short-cycle for eviction
+                long_interval=60.0,  # Every 1 minute
+                initial_delay=30.0,
+            ),
             # Terminate routes - only long cycle
             RouteTaskSpec(
                 RouteLifecycleType.TERMINATING,
                 short_interval=None,  # No short-cycle for cleanup
                 long_interval=30.0,
                 initial_delay=15.0,
+            ),
+            # Service discovery sync - only long cycle
+            RouteTaskSpec(
+                RouteLifecycleType.SERVICE_DISCOVERY_SYNC,
+                short_interval=None,  # No short-cycle for sync
+                long_interval=60.0,
+                initial_delay=30.0,
             ),
         ]
 

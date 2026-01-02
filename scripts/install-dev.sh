@@ -778,6 +778,24 @@ append_to_profiles() {
   done
 }
 
+install_rover_cli() {
+  if command -v rover >/dev/null 2>&1; then
+    echo "✓ Rover CLI is already installed: $(rover --version)"
+    return 0
+  fi
+
+  curl -sSL https://rover.apollo.dev/nix/latest | sh
+
+  rover_settings='# Apollo Rover Settings
+export PATH="$HOME/.rover/bin:$PATH"
+export APOLLO_ELV2_LICENSE=accept'
+
+  append_to_profiles "$rover_settings"
+
+  export PATH="$HOME/.rover/bin:$PATH"
+  export APOLLO_ELV2_LICENSE=accept
+}
+
 setup_environment() {
   wait_for_docker
   # Install pyenv
@@ -807,6 +825,9 @@ setup_environment() {
 
   show_info "Configuring the standard git hooks..."
   install_git_hooks
+
+  show_info "Installing Rover CLI..."
+  install_rover_cli
 
   show_info "Installing Python..."
   install_python
@@ -840,11 +861,22 @@ setup_environment() {
     SOURCE_PROMETHEUS_PATH="configs/prometheus/prometheus-ha.yaml"
     SOURCE_GRAFANA_DASHBOARDS_PATH="configs/grafana/dashboards"
     SOURCE_GRAFANA_PROVISIONING_PATH="configs/grafana/provisioning"
+    SOURCE_OTEL_COLLECTOR_CONFIG_PATH="configs/otel/otel-collector-config.yaml"
+    SOURCE_LOKI_CONFIG_PATH="configs/loki/loki-config.yaml"
+    SOURCE_TEMPO_CONFIG_PATH="configs/tempo/tempo-config.yaml"
+    SOURCE_APOLLO_ROUTER_CONFIG_PATH="configs/graphql/gateway.config.ts"
+    SOURCE_SUPERGRAPH_PATH="docs/manager/graphql-reference/supergraph.graphql"
 
+    ./scripts/generate-graphql-schema.sh
     cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
     cp "${SOURCE_PROMETHEUS_PATH}" "prometheus.yaml"
     cp -r "${SOURCE_GRAFANA_DASHBOARDS_PATH}" "grafana-dashboards"
     cp -r "${SOURCE_GRAFANA_PROVISIONING_PATH}" "grafana-provisioning"
+    cp "${SOURCE_OTEL_COLLECTOR_CONFIG_PATH}" "otel-collector-config.yaml"
+    cp "${SOURCE_LOKI_CONFIG_PATH}" "loki-config.yaml"
+    cp "${SOURCE_TEMPO_CONFIG_PATH}" "tempo-config.yaml"
+    cp "${SOURCE_APOLLO_ROUTER_CONFIG_PATH}" "gateway.config.ts"
+    cp "${SOURCE_SUPERGRAPH_PATH}" "supergraph.graphql"
     sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
     sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
     sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
@@ -890,10 +922,22 @@ setup_environment() {
     SOURCE_PROMETHEUS_PATH="configs/prometheus/prometheus.yaml"
     SOURCE_GRAFANA_DASHBOARDS_PATH="configs/grafana/dashboards"
     SOURCE_GRAFANA_PROVISIONING_PATH="configs/grafana/provisioning"
+    SOURCE_OTEL_COLLECTOR_CONFIG_PATH="configs/otel/otel-collector-config.yaml"
+    SOURCE_LOKI_CONFIG_PATH="configs/loki/loki-config.yaml"
+    SOURCE_TEMPO_CONFIG_PATH="configs/tempo/tempo-config.yaml"
+    SOURCE_APOLLO_ROUTER_CONFIG_PATH="configs/graphql/gateway.config.ts"
+    SOURCE_SUPERGRAPH_PATH="docs/manager/graphql-reference/supergraph.graphql"
+
+    ./scripts/generate-graphql-schema.sh
     cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
     cp "${SOURCE_PROMETHEUS_PATH}" "prometheus.yaml"
     cp -r "${SOURCE_GRAFANA_DASHBOARDS_PATH}" "grafana-dashboards"
     cp -r "${SOURCE_GRAFANA_PROVISIONING_PATH}" "grafana-provisioning"
+    cp "${SOURCE_OTEL_COLLECTOR_CONFIG_PATH}" "otel-collector-config.yaml"
+    cp "${SOURCE_LOKI_CONFIG_PATH}" "loki-config.yaml"
+    cp "${SOURCE_TEMPO_CONFIG_PATH}" "tempo-config.yaml"
+    cp "${SOURCE_APOLLO_ROUTER_CONFIG_PATH}" "gateway.config.ts"
+    cp "${SOURCE_SUPERGRAPH_PATH}" "supergraph.graphql"
   fi
 
   sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
@@ -920,6 +964,9 @@ configure_backendai() {
   show_info "Creating docker compose \"halfstack\"..."
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see containers here.
+
+  # Install rover cli for Supergraph generation
+  install_rover_cli
 
   # Configure MinIO using separate configuration script
   source "$(dirname "$0")/configure-minio.sh"

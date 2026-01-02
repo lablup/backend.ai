@@ -18,7 +18,7 @@ from collections.abc import (
     MutableMapping,
     Sequence,
 )
-from contextlib import asynccontextmanager as actxmgr
+from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -45,6 +45,9 @@ from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
+from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+    ValkeyArtifactDownloadTrackingClient,
+)
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
@@ -74,7 +77,12 @@ from ai.backend.common.events.event_types.artifact_registry.anycast import (
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.exception import BackendAIError, ErrorCode
+from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
+from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
+from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
+from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.json import dump_json_str
+from ai.backend.common.jwt.validator import JWTValidator
 from ai.backend.common.leader.tasks.event_task import EventTaskSpec
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
@@ -111,32 +119,38 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
-from ai.backend.manager.config.bootstrap import BootstrapConfig
-from ai.backend.manager.config.loader.config_overrider import ConfigOverrider
-from ai.backend.manager.config.loader.etcd_loader import (
-    EtcdCommonConfigLoader,
-    EtcdManagerConfigLoader,
-)
-from ai.backend.manager.config.loader.legacy_etcd_loader import (
-    LegacyEtcdLoader,
-    LegacyEtcdVolumesLoader,
-)
-from ai.backend.manager.config.loader.loader_chain import LoaderChain
-from ai.backend.manager.config.loader.toml_loader import TomlConfigLoader
-from ai.backend.manager.config.loader.types import AbstractConfigLoader
-from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.config.watchers.etcd import EtcdConfigWatcher
-from ai.backend.manager.sokovan.deployment.deployment_controller import (
-    DeploymentController,
-    DeploymentControllerArgs,
-)
-from ai.backend.manager.sokovan.deployment.route.route_controller import (
-    RouteController,
-    RouteControllerArgs,
-)
+from ai.backend.manager.server_gql_ctx import gql_adapters_ctx
 
 from . import __version__
 from .api.context import RootContext
+from .config.bootstrap import BootstrapConfig
+from .config.loader.config_overrider import ConfigOverrider
+from .config.loader.etcd_loader import (
+    EtcdCommonConfigLoader,
+    EtcdManagerConfigLoader,
+)
+from .config.loader.legacy_etcd_loader import (
+    LegacyEtcdLoader,
+    LegacyEtcdVolumesLoader,
+)
+from .config.loader.loader_chain import LoaderChain
+from .config.loader.toml_loader import TomlConfigLoader
+from .config.loader.types import AbstractConfigLoader
+from .config.provider import ManagerConfigProvider
+from .config.unified import EventLoopType
+from .config.watchers.etcd import EtcdConfigWatcher
+from .errors.common import ServerMisconfiguredError
+from .errors.resource import ConfigurationLoadFailed
+from .health.database import DatabaseHealthChecker
+from .server_bgtask_ctx import manager_bgtask_registry_ctx
+from .sokovan.deployment.deployment_controller import (
+    DeploymentController,
+    DeploymentControllerArgs,
+)
+from .sokovan.deployment.route.route_controller import (
+    RouteController,
+    RouteControllerArgs,
+)
 from .types import DistributedLockFactory, SMTPTriggerPolicy
 
 if TYPE_CHECKING:
@@ -263,6 +277,10 @@ global_subapp_pkgs: Final[list[str]] = [
     ".groupconfig",
     ".logs",
     ".object_storage",
+    ".vfs_storage",
+    ".notification",
+    ".deployment",
+    ".rbac",
 ]
 
 global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
@@ -436,14 +454,16 @@ async def exception_middleware(
         return resp
 
 
-@actxmgr
+@asynccontextmanager
 async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncIterator[None]:
     root_ctx.etcd = AsyncEtcd.initialize(etcd_config)
-    yield
-    await root_ctx.etcd.close()
+    try:
+        yield
+    finally:
+        await root_ctx.etcd.close()
 
 
-@actxmgr
+@asynccontextmanager
 async def config_provider_ctx(
     root_ctx: RootContext,
     log_level: LogLevel,
@@ -479,24 +499,24 @@ async def config_provider_ctx(
     etcd_watcher = EtcdConfigWatcher(root_ctx.etcd)
 
     config_provider: Optional[ManagerConfigProvider] = None
-    try:
-        config_provider = await ManagerConfigProvider.create(
-            unified_config_loader,
-            etcd_watcher,
-            legacy_etcd_loader,
-        )
-        root_ctx.config_provider = config_provider
+    config_provider = await ManagerConfigProvider.create(
+        unified_config_loader,
+        etcd_watcher,
+        legacy_etcd_loader,
+    )
+    root_ctx.config_provider = config_provider
 
-        if config_provider.config.debug.enabled and root_ctx.pidx == 0:
-            print("== Manager configuration ==", file=sys.stderr)
-            print(pformat(config_provider.config), file=sys.stderr)
+    if config_provider.config.debug.enabled and root_ctx.pidx == 0:
+        print("== Manager configuration ==", file=sys.stderr)
+        print(pformat(config_provider.config), file=sys.stderr)
+    try:
         yield root_ctx.config_provider
     finally:
         if config_provider:
             await config_provider.terminate()
 
 
-@actxmgr
+@asynccontextmanager
 async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
     from .plugin.webapp import WebappPluginContext
 
@@ -516,11 +536,13 @@ async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
             log.info("Loading webapp plugin: {0}", plugin_name)
         subapp, global_middlewares = await plugin_instance.create_app(root_ctx.cors_options)
         _init_subapp(plugin_name, root_app, subapp, global_middlewares)
-    yield
-    await plugin_ctx.cleanup()
+    try:
+        yield
+    finally:
+        await plugin_ctx.cleanup()
 
 
-@actxmgr
+@asynccontextmanager
 async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .api import ManagerStatus
 
@@ -538,11 +560,16 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     yield
 
 
-@actxmgr
+@asynccontextmanager
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     valkey_profile_target = root_ctx.config_provider.config.redis.to_valkey_profile_target()
     root_ctx.valkey_profile_target = valkey_profile_target
 
+    root_ctx.valkey_artifact = await ValkeyArtifactDownloadTrackingClient.create(
+        valkey_profile_target.profile_target(RedisRole.STATISTICS),
+        db_id=REDIS_STATISTICS_DB,
+        human_readable_name="artifact",  # tracking artifact download progress
+    )
     root_ctx.valkey_container_log = await ValkeyContainerLogClient.create(
         valkey_profile_target.profile_target(RedisRole.CONTAINER_LOG),
         db_id=REDIS_CONTAINER_LOG,
@@ -582,17 +609,20 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.valkey_live.get_server_time()
     # ValkeyImageClient has its own connection handling
     # No need to ping it separately as it's already connected
-    yield
-    await root_ctx.valkey_container_log.close()
-    await root_ctx.valkey_image.close()
-    await root_ctx.valkey_stat.close()
-    await root_ctx.valkey_live.close()
-    await root_ctx.valkey_stream.close()
-    await root_ctx.valkey_schedule.close()
-    await root_ctx.valkey_bgtask.close()
+    try:
+        yield
+    finally:
+        await root_ctx.valkey_artifact.close()
+        await root_ctx.valkey_container_log.close()
+        await root_ctx.valkey_image.close()
+        await root_ctx.valkey_stat.close()
+        await root_ctx.valkey_live.close()
+        await root_ctx.valkey_stream.close()
+        await root_ctx.valkey_schedule.close()
+        await root_ctx.valkey_bgtask.close()
 
 
-@actxmgr
+@asynccontextmanager
 async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .models.utils import connect_database
 
@@ -646,7 +676,18 @@ def _make_action_reporters(
     return action_monitors
 
 
-@actxmgr
+@asynccontextmanager
+async def notification_center_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .notification import NotificationCenter
+
+    root_ctx.notification_center = NotificationCenter()
+    try:
+        yield
+    finally:
+        await root_ctx.notification_center.close()
+
+
+@asynccontextmanager
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .actions.monitors.audit_log import AuditLogMonitor
     from .actions.monitors.prometheus import PrometheusMonitor
@@ -674,6 +715,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 storage_manager=root_ctx.storage_manager,
                 valkey_stat_client=root_ctx.valkey_stat,
                 valkey_live=root_ctx.valkey_live,
+                valkey_artifact_client=root_ctx.valkey_artifact,
                 event_fetcher=root_ctx.event_fetcher,
                 background_task_manager=root_ctx.background_task_manager,
                 event_hub=root_ctx.event_hub,
@@ -684,6 +726,9 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 hook_plugin_ctx=root_ctx.hook_plugin_ctx,
                 scheduling_controller=root_ctx.scheduling_controller,
                 deployment_controller=root_ctx.deployment_controller,
+                event_producer=root_ctx.event_producer,
+                agent_cache=root_ctx.agent_cache,
+                notification_center=root_ctx.notification_center,
             )
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
@@ -691,20 +736,22 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     yield
 
 
-@actxmgr
+@asynccontextmanager
 async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.distributed_lock_factory = init_lock_factory(root_ctx)
     yield
 
 
-@actxmgr
+@asynccontextmanager
 async def event_hub_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.event_hub = EventHub()
-    yield
-    await root_ctx.event_hub.shutdown()
+    try:
+        yield
+    finally:
+        await root_ctx.event_hub.shutdown()
 
 
-@actxmgr
+@asynccontextmanager
 async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     sd_type = root_ctx.config_provider.config.service_discovery.type
     match sd_type:
@@ -744,18 +791,54 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             endpoint=root_ctx.config_provider.config.otel.endpoint,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
-    yield
-    root_ctx.sd_loop.close()
+    try:
+        yield
+    finally:
+        root_ctx.sd_loop.close()
 
 
-@actxmgr
+@asynccontextmanager
+async def health_probe_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    """Initialize and start health probe with all health checkers."""
+    probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
+    root_ctx.health_probe = probe
+
+    # Register health checkers using already-initialized resources
+    await probe.register(DatabaseHealthChecker(db=root_ctx.db))
+    await probe.register(EtcdHealthChecker(etcd=root_ctx.etcd))
+    await probe.register(
+        ValkeyHealthChecker(
+            clients={
+                ComponentId("artifact"): root_ctx.valkey_artifact,
+                ComponentId("container_log"): root_ctx.valkey_container_log,
+                ComponentId("live"): root_ctx.valkey_live,
+                ComponentId("stat"): root_ctx.valkey_stat,
+                ComponentId("image"): root_ctx.valkey_image,
+                ComponentId("stream"): root_ctx.valkey_stream,
+                ComponentId("schedule"): root_ctx.valkey_schedule,
+                ComponentId("bgtask"): root_ctx.valkey_bgtask,
+            }
+        )
+    )
+
+    # Start periodic health checking
+    await probe.start()
+    try:
+        yield
+    finally:
+        await probe.stop()
+
+
+@asynccontextmanager
 async def message_queue_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.message_queue = await _make_message_queue(root_ctx)
-    yield
-    await root_ctx.message_queue.close()
+    try:
+        yield
+    finally:
+        await root_ctx.message_queue.close()
 
 
-@actxmgr
+@asynccontextmanager
 async def event_producer_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.event_fetcher = EventFetcher(root_ctx.message_queue)
     root_ctx.event_producer = EventProducer(
@@ -763,12 +846,14 @@ async def event_producer_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         source=AGENTID_MANAGER,
         log_events=root_ctx.config_provider.config.debug.log_events,
     )
-    yield
-    await root_ctx.event_producer.close()
-    await asyncio.sleep(0.2)
+    try:
+        yield
+    finally:
+        await root_ctx.event_producer.close()
+        await asyncio.sleep(0.2)
 
 
-@actxmgr
+@asynccontextmanager
 async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .event_dispatcher.dispatch import DispatcherArgs, Dispatchers
 
@@ -797,13 +882,16 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             lambda: root_ctx.processors,
             root_ctx.storage_manager,
             root_ctx.config_provider,
+            root_ctx.event_producer,
             use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
         )
     )
     dispatchers.dispatch(root_ctx.event_dispatcher)
     await root_ctx.event_dispatcher.start()
-    yield
-    await root_ctx.event_dispatcher.close()
+    try:
+        yield
+    finally:
+        await root_ctx.event_dispatcher.close()
 
 
 async def _make_message_queue(
@@ -836,7 +924,7 @@ async def _make_message_queue(
     )
 
 
-@actxmgr
+@asynccontextmanager
 async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .idle import init_idle_checkers
 
@@ -847,20 +935,24 @@ async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.distributed_lock_factory,
     )
     await root_ctx.idle_checker_host.start()
-    yield
-    await root_ctx.idle_checker_host.shutdown()
+    try:
+        yield
+    finally:
+        await root_ctx.idle_checker_host.shutdown()
 
 
-@actxmgr
+@asynccontextmanager
 async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .models.storage import StorageSessionManager
 
     root_ctx.storage_manager = StorageSessionManager(root_ctx.config_provider.config.volumes)
-    yield
-    await root_ctx.storage_manager.aclose()
+    try:
+        yield
+    finally:
+        await root_ctx.storage_manager.aclose()
 
 
-@actxmgr
+@asynccontextmanager
 async def repositories_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .repositories.repositories import Repositories
     from .repositories.types import RepositoryArgs
@@ -873,13 +965,14 @@ async def repositories_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             valkey_stat_client=root_ctx.valkey_stat,
             valkey_live_client=root_ctx.valkey_live,
             valkey_schedule_client=root_ctx.valkey_schedule,
+            valkey_image_client=root_ctx.valkey_image,
         )
     )
     root_ctx.repositories = repositories
     yield
 
 
-@actxmgr
+@asynccontextmanager
 async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .plugin.network import NetworkPluginContext
 
@@ -894,11 +987,13 @@ async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         blocklist=root_ctx.config_provider.config.manager.disabled_plugins,
     )
     log.info("NetworkPluginContext initialized with plugins: {}", list(ctx.plugins.keys()))
-    yield
-    await ctx.cleanup()
+    try:
+        yield
+    finally:
+        await ctx.cleanup()
 
 
-@actxmgr
+@asynccontextmanager
 async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ctx = HookPluginContext(
         root_ctx.etcd,
@@ -917,11 +1012,13 @@ async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     if hook_result.status != PASSED:
         raise RuntimeError("Could not activate the manager instance.")
-    yield
-    await ctx.cleanup()
+    try:
+        yield
+    finally:
+        await ctx.cleanup()
 
 
-@actxmgr
+@asynccontextmanager
 async def event_dispatcher_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ctx = EventDispatcherPluginContext(
         root_ctx.etcd,
@@ -933,11 +1030,13 @@ async def event_dispatcher_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[No
         allowlist=root_ctx.config_provider.config.manager.allowed_plugins,
         blocklist=root_ctx.config_provider.config.manager.disabled_plugins,
     )
-    yield
-    await ctx.cleanup()
+    try:
+        yield
+    finally:
+        await ctx.cleanup()
 
 
-@actxmgr
+@asynccontextmanager
 async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from zmq.auth.certs import load_certificate
 
@@ -958,9 +1057,10 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             event_producer=root_ctx.event_producer,
             valkey_schedule=root_ctx.valkey_schedule,
             network_plugin_ctx=root_ctx.network_plugin_ctx,
+            hook_plugin_ctx=root_ctx.hook_plugin_ctx,
         )
     )
-    # Create deployment controller if Sokovan is enabled
+    # Create deployment controller
     root_ctx.deployment_controller = DeploymentController(
         DeploymentControllerArgs(
             scheduling_controller=root_ctx.scheduling_controller,
@@ -979,7 +1079,8 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     manager_pkey, manager_skey = load_certificate(
         root_ctx.config_provider.config.manager.rpc_auth_manager_keypair
     )
-    assert manager_skey is not None
+    if manager_skey is None:
+        raise ConfigurationLoadFailed("Failed to load manager secret key from certificate")
     manager_public_key = PublicKey(manager_pkey)
     manager_secret_key = SecretKey(manager_skey)
     root_ctx.agent_cache = AgentRPCCache(root_ctx.db, manager_public_key, manager_secret_key)
@@ -1002,11 +1103,13 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
     )
     await root_ctx.registry.init()
-    yield
-    await root_ctx.registry.shutdown()
+    try:
+        yield
+    finally:
+        await root_ctx.registry.shutdown()
 
 
-@actxmgr
+@asynccontextmanager
 async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .scheduler.dispatcher import SchedulerDispatcher
 
@@ -1020,11 +1123,13 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.valkey_stat,
         root_ctx.repositories.schedule.repository,
     )
-    yield
-    await root_ctx.scheduler_dispatcher.close()
+    try:
+        yield
+    finally:
+        await root_ctx.scheduler_dispatcher.close()
 
 
-@actxmgr
+@asynccontextmanager
 async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     """Initialize leader election for distributed coordination."""
     import socket
@@ -1060,14 +1165,17 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     task_specs = root_ctx.sokovan_orchestrator.create_task_specs()
 
     # Rescan reservoir registry periodically
-    task_specs.append(
-        EventTaskSpec(
-            name="reservoir_registry_scan",
-            event_factory=lambda: DoScanReservoirRegistryEvent(),
-            interval=3600,  # 1 hour
-            initial_delay=0,
+    reservoir_config = root_ctx.config_provider.config.reservoir
+
+    if reservoir_config and reservoir_config.use_delegation:
+        task_specs.append(
+            EventTaskSpec(
+                name="reservoir_registry_scan",
+                event_factory=lambda: DoScanReservoirRegistryEvent(),
+                interval=600,  # 10 minutes
+                initial_delay=0,
+            )
         )
-    )
 
     # Create event producer tasks from specs
     leader_tasks: list[PeriodicTask] = [
@@ -1082,13 +1190,14 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.leader_election.start()
     log.info(f"Leader election started for server {server_id}")
 
-    yield
+    try:
+        yield
+    finally:
+        # Cleanup leader election
+        await root_ctx.leader_election.stop()
 
-    # Cleanup leader election
-    await root_ctx.leader_election.stop()
 
-
-@actxmgr
+@asynccontextmanager
 async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .clients.agent import AgentPool
     from .sokovan.scheduler.factory import create_default_scheduler
@@ -1142,6 +1251,7 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         config_provider=root_ctx.config_provider,
         scheduling_controller=root_ctx.scheduling_controller,
         client_pool=client_pool,
+        service_discovery=root_ctx.service_discovery,
     )
 
     # Create sokovan orchestrator with lock factory for timers
@@ -1164,7 +1274,7 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         pass
 
 
-@actxmgr
+@asynccontextmanager
 async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
 
@@ -1188,13 +1298,15 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         init_success = True
         root_ctx.error_monitor = ectx
         root_ctx.stats_monitor = sctx
-    yield
-    if init_success:
-        await sctx.cleanup()
-        await ectx.cleanup()
+    try:
+        yield
+    finally:
+        if init_success:
+            await sctx.cleanup()
+            await ectx.cleanup()
 
 
-@actxmgr
+@asynccontextmanager
 async def services_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .service.base import ServicesContext
     from .service.container_registry.base import PerProjectRegistryQuotaRepository
@@ -1306,7 +1418,7 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
 
             redlock_config = root_ctx.config_provider.config.manager.redlock_config
             redis_profile_target = root_ctx.config_provider.config.redis.to_redis_profile_target()
-            redis_lock = redis_helper.get_redis_object(
+            redis_lock = redis_helper.get_redis_object_for_lock(
                 redis_profile_target.profile_target(RedisRole.STREAM_LOCK),
                 name="lock",  # distributed locks
                 db=REDIS_STREAM_LOCK,
@@ -1410,6 +1522,7 @@ def build_root_app(
             event_producer_ctx,
             storage_manager_ctx,
             repositories_ctx,
+            notification_center_ctx,
             hook_plugin_ctx,
             monitoring_ctx,
             network_plugin_ctx,
@@ -1417,6 +1530,7 @@ def build_root_app(
             idle_checker_ctx,
             agent_registry_ctx,
             sched_dispatcher_ctx,
+            service_discovery_ctx,
             sokovan_orchestrator_ctx,
             leader_election_ctx,
             event_dispatcher_ctx,
@@ -1424,34 +1538,34 @@ def build_root_app(
             stale_session_sweeper_ctx,
             stale_kernel_sweeper_ctx,
             processors_ctx,
-            service_discovery_ctx,
+            manager_bgtask_registry_ctx,
+            gql_adapters_ctx,
+            health_probe_ctx,
         ]
+    shutdown_context_instances = []
 
-    async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
+    async def _cleanup_context_wrapper(app: web.Application) -> AsyncIterator[None]:
         # aiohttp's cleanup contexts are just async generators, not async context managers.
-        cctx_instance = cctx(app["_root.context"])
-        app["_cctx_instances"].append(cctx_instance)
-        try:
-            async with cctx_instance:
-                yield
-        except Exception as e:
-            exc_info = (type(e), e, e.__traceback__)
-            log.error("Error initializing cleanup_contexts: {0}", cctx.__name__, exc_info=exc_info)
+        if cleanup_contexts is None:
+            raise ServerMisconfiguredError("cleanup_contexts is not initialized")
+        async with AsyncExitStack() as stack:
+            for cctx in cleanup_contexts:
+                cctx_instance = cctx(root_ctx)
+                if hasattr(cctx_instance, "shutdown"):
+                    shutdown_context_instances.append(cctx_instance)
+                await stack.enter_async_context(cctx_instance)
+            yield
 
-    async def _call_cleanup_context_shutdown_handlers(app: web.Application) -> None:
-        for cctx in app["_cctx_instances"]:
-            if hasattr(cctx, "shutdown"):
-                try:
-                    await cctx.shutdown()
-                except Exception:
-                    log.exception("error while shutting down a cleanup context")
+    async def _trigger_shutdown(app: web.Application) -> None:
+        # shutdown is triggered before cleanup, giving chances to close client connections first.
+        for cctx_instance in shutdown_context_instances:
+            try:
+                await cctx_instance.shutdown()
+            except Exception:
+                log.exception("error while shutting down a cleanup context")
 
-    app["_cctx_instances"] = []
-    app.on_shutdown.append(_call_cleanup_context_shutdown_handlers)
-    for cleanup_ctx in cleanup_contexts:
-        app.cleanup_ctx.append(
-            functools.partial(_cleanup_context_wrapper, cleanup_ctx),
-        )
+    app.on_shutdown.append(_trigger_shutdown)
+    app.cleanup_ctx.append(_cleanup_context_wrapper)
     cors = aiohttp_cors.setup(app, defaults=root_ctx.cors_options)
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", r"", hello))
@@ -1465,7 +1579,8 @@ def build_root_app(
         init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
 
     vendor_path = importlib.resources.files("ai.backend.manager.vendor")
-    assert isinstance(vendor_path, Path)
+    if not isinstance(vendor_path, Path):
+        raise ServerMisconfiguredError("vendor_path must be a Path instance")
     app.router.add_static("/static/vendor", path=vendor_path, name="static")
     return app
 
@@ -1480,6 +1595,7 @@ def build_prometheus_service_discovery_handler(
             resp.append({
                 "targets": [f"{service.endpoint.prometheus_address}"],
                 "labels": {
+                    **service.labels,
                     "service_id": service.id,
                     "service_group": service.service_group,
                     "display_name": service.display_name,
@@ -1497,8 +1613,12 @@ def build_prometheus_service_discovery_handler(
 
 
 def build_internal_app(root_ctx: RootContext) -> web.Application:
+    from .public_api.health import hello as health_hello
+
     app = web.Application()
+    app["_root.context"] = root_ctx
     metric_registry = CommonMetricRegistry.instance()
+    app.router.add_route("GET", r"/health", health_hello)
     app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
     app.router.add_route(
         "GET", r"/metrics/service_discovery", build_prometheus_service_discovery_handler(root_ctx)
@@ -1530,119 +1650,160 @@ class ServerMainArgs:
     log_level: LogLevel
 
 
-@actxmgr
+@asynccontextmanager
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
     args: ServerMainArgs,
 ) -> AsyncIterator[None]:
     boostrap_config = args.bootstrap_cfg
-
-    root_app = build_root_app(pidx, boostrap_config, subapp_pkgs=global_subapp_pkgs)
-    root_ctx: RootContext = root_app["_root.context"]
-    internal_app = build_internal_app(root_ctx)
-
-    # Start aiomonitor.
-    # Port is set by config (default=50100 + pidx).
     loop.set_debug(boostrap_config.debug.asyncio)
-    m = aiomonitor.Monitor(
-        loop,
-        termui_port=boostrap_config.manager.aiomonitor_termui_port + pidx,
-        webui_port=boostrap_config.manager.aiomonitor_webui_port + pidx,
-        console_enabled=False,
-        hook_task_factory=boostrap_config.debug.enhanced_aiomonitor_task_info,
-    )
-    m.prompt = f"monitor (manager[{pidx}@{os.getpid()}]) >>> "
-    # Add some useful console_locals for ease of debugging
-    m.console_locals["root_app"] = root_app
-    m.console_locals["root_ctx"] = root_ctx
-    aiomon_started = False
-    try:
-        m.start()
-        aiomon_started = True
-    except Exception as e:
-        log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
+    manager_init_stack = AsyncExitStack()
 
-    # Plugin webapps should be loaded before runner.setup(),
-    # which freezes on_startup event.
-    try:
-        async with (
-            etcd_ctx(root_ctx, boostrap_config.etcd.to_dataclass()),
-            config_provider_ctx(root_ctx, args.log_level, args.bootstrap_cfg_path),
-            webapp_plugin_ctx(root_app),
-        ):
-            ssl_ctx = None
-            if root_ctx.config_provider.config.manager.ssl_enabled:
-                ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-                ssl_ctx.load_cert_chain(
-                    str(root_ctx.config_provider.config.manager.ssl_cert),
-                    root_ctx.config_provider.config.manager.ssl_privkey,
-                )
+    @asynccontextmanager
+    async def aiomonitor_ctx() -> AsyncIterator[aiomonitor.Monitor]:
+        # Port is set by config where the defaults are:
+        # termui_port = 38100 + pidx
+        # webui_port = 39100 + pidx
+        m = aiomonitor.Monitor(
+            loop,
+            termui_port=boostrap_config.manager.aiomonitor_termui_port + pidx,
+            webui_port=boostrap_config.manager.aiomonitor_webui_port + pidx,
+            console_enabled=False,
+            hook_task_factory=boostrap_config.debug.enhanced_aiomonitor_task_info,
+        )
+        m.prompt = f"monitor (manager[{pidx}@{os.getpid()}]) >>> "
+        # Add some useful console_locals for ease of debugging
+        m.console_locals["root_app"] = root_app
+        m.console_locals["root_ctx"] = root_ctx
+        aiomon_started = False
+        # Start aiomonitor.
+        try:
+            m.start()
+            aiomon_started = True
+        except Exception as e:
+            log.warning(
+                "aiomonitor could not start but skipping this error to continue",
+                exc_info=e,
+            )
+        try:
+            yield m
+        finally:
+            if aiomon_started:
+                m.close()
 
-            runner = web.AppRunner(root_app, keepalive_timeout=30.0)
-            internal_runner = web.AppRunner(internal_app, keepalive_timeout=30.0)
-            await runner.setup()
-            await internal_runner.setup()
-            service_addr = root_ctx.config_provider.config.manager.service_addr
-            internal_addr = root_ctx.config_provider.config.manager.internal_addr
-            site = web.TCPSite(
-                runner,
+    @asynccontextmanager
+    async def webapp_ctx(root_app: web.Application) -> AsyncGenerator[None]:
+        root_ctx: RootContext = root_app["_root.context"]
+
+        runner = web.AppRunner(root_app, keepalive_timeout=30.0)
+
+        internal_app = build_internal_app(root_ctx)
+        internal_runner = web.AppRunner(internal_app, keepalive_timeout=30.0)
+
+        ssl_ctx = None
+        if root_ctx.config_provider.config.manager.ssl_enabled:
+            ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            ssl_ctx.load_cert_chain(
+                str(root_ctx.config_provider.config.manager.ssl_cert),
+                root_ctx.config_provider.config.manager.ssl_privkey,
+            )
+        await runner.setup()  # The cleanup context initialization happens here.
+        await internal_runner.setup()
+        service_addr = root_ctx.config_provider.config.manager.service_addr
+        internal_addr = root_ctx.config_provider.config.manager.internal_addr
+        site = web.TCPSite(
+            runner,
+            service_addr.host,
+            service_addr.port,
+            backlog=1024,
+            reuse_port=True,
+            ssl_context=ssl_ctx,
+        )
+        internal_site = web.TCPSite(
+            internal_runner,
+            internal_addr.host,
+            internal_addr.port,
+            backlog=1024,
+            reuse_port=True,
+        )
+        await site.start()
+        await internal_site.start()
+        log.info(
+            "started handling API requests at {}",
+            service_addr,
+        )
+
+        public_metrics_port = root_ctx.config_provider.config.manager.public_metrics_port
+        if public_metrics_port is not None:
+            public_metric_app = build_public_app(
+                root_ctx, subapp_pkgs=global_subapp_pkgs_for_public_metrics_app
+            )
+            public_metric_runner = web.AppRunner(public_metric_app, keepalive_timeout=30.0)
+            await public_metric_runner.setup()
+            public_metric_site = web.TCPSite(
+                public_metric_runner,
                 service_addr.host,
-                service_addr.port,
-                backlog=1024,
-                reuse_port=True,
-                ssl_context=ssl_ctx,
-            )
-            internal_site = web.TCPSite(
-                internal_runner,
-                internal_addr.host,
-                internal_addr.port,
+                public_metrics_port,
                 backlog=1024,
                 reuse_port=True,
             )
-            await site.start()
-            await internal_site.start()
-            public_metrics_port = root_ctx.config_provider.config.manager.public_metrics_port
-            if public_metrics_port is not None:
-                _app = build_public_app(
-                    root_ctx, subapp_pkgs=global_subapp_pkgs_for_public_metrics_app
-                )
-                _runner = web.AppRunner(_app, keepalive_timeout=30.0)
-                await _runner.setup()
-                _site = web.TCPSite(
-                    _runner,
-                    service_addr.host,
-                    public_metrics_port,
-                    backlog=1024,
-                    reuse_port=True,
-                )
-                await _site.start()
-                log.info(
-                    f"started handling public metric API requests at {service_addr.host}:{public_metrics_port}"
-                )
+            await public_metric_site.start()
+            log.info(
+                "started handling public metric API requests at {}:{}",
+                service_addr.host,
+                public_metrics_port,
+            )
 
-            if os.geteuid() == 0:
-                uid = root_ctx.config_provider.config.manager.user
-                gid = root_ctx.config_provider.config.manager.group
-                if uid is None or gid is None:
-                    raise ValueError("user/group must be specified when running as root")
+        try:
+            yield
+        finally:
+            await runner.cleanup()
 
-                os.setgroups([
-                    g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem
-                ])
-                os.setgid(gid)
-                os.setuid(uid)
-                log.info("changed process uid and gid to {}:{}", uid, gid)
-            log.info("started handling API requests at {}", service_addr)
+    await manager_init_stack.__aenter__()
+    try:
+        root_app = build_root_app(pidx, boostrap_config, subapp_pkgs=global_subapp_pkgs)
+        root_ctx: RootContext = root_app["_root.context"]
 
-            try:
-                yield
-            finally:
-                log.info("shutting down...")
-                await runner.cleanup()
+        await manager_init_stack.enter_async_context(aiomonitor_ctx())
+        await manager_init_stack.enter_async_context(
+            etcd_ctx(root_ctx, boostrap_config.etcd.to_dataclass())
+        )
+        await manager_init_stack.enter_async_context(
+            config_provider_ctx(root_ctx, args.log_level, args.bootstrap_cfg_path)
+        )
+
+        # Initialize JWT validator after config is loaded
+        jwt_config = root_ctx.config_provider.config.jwt.to_jwt_config()
+        root_ctx.jwt_validator = JWTValidator(jwt_config)
+
+        # Plugin webapps should be loaded before runner.setup() because root_app is frozen upon on_startup event.
+        await manager_init_stack.enter_async_context(webapp_plugin_ctx(root_app))
+        await manager_init_stack.enter_async_context(webapp_ctx(root_app))
+
+        if os.geteuid() == 0:
+            uid = root_ctx.config_provider.config.manager.user
+            gid = root_ctx.config_provider.config.manager.group
+            if uid is None or gid is None:
+                raise ValueError("user/group must be specified when running as root")
+
+            os.setgroups([
+                g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem
+            ])
+            os.setgid(gid)
+            os.setuid(uid)
+            log.info("changed process uid and gid to {}:{}", uid, gid)
+
+        log.info("Started the manager service.")
+    except Exception:
+        log.exception("Server initialization failure; triggering shutdown...")
+        loop.call_later(0.2, os.kill, 0, signal.SIGINT)
+
+    try:
+        yield
     finally:
-        if aiomon_started:
-            m.close()
+        log.info("shutting down...")
+        await manager_init_stack.__aexit__(None, None, None)
 
 
 @aiotools.server_context
@@ -1672,7 +1833,7 @@ async def server_main_logwrapper(
             async with server_main(loop, pidx, args):
                 yield
     except Exception:
-        traceback.print_exc()
+        traceback.print_exc(file=sys.stderr)
 
 
 @click.group(invoke_without_command=True)
@@ -1698,7 +1859,7 @@ async def server_main_logwrapper(
 @click.pass_context
 def main(
     ctx: click.Context,
-    config_path: Optional[Path],
+    config_path: Path | None,
     debug: bool,
     log_level: LogLevel,
 ) -> None:
@@ -1736,17 +1897,21 @@ def main(
                 log.info("runtime: {0}", env_info())
                 log_config = logging.getLogger("ai.backend.manager.config")
                 log_config.debug("debug mode enabled.")
-                if bootstrap_cfg.manager.event_loop == "uvloop":
-                    import uvloop
+                match bootstrap_cfg.manager.event_loop:
+                    case EventLoopType.UVLOOP:
+                        import uvloop
 
-                    uvloop.install()
-                    log.info("Using uvloop as the event loop backend")
+                        runner = uvloop.run
+                        log.info("Using uvloop as the event loop backend")
+                    case EventLoopType.ASYNCIO:
+                        runner = asyncio.run
                 try:
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=bootstrap_cfg.manager.num_proc,
                         args=(bootstrap_cfg, discovered_cfg_path, log_endpoint, log_level),
                         wait_timeout=5.0,
+                        runner=runner,
                     )
                 finally:
                     log.info("terminated.")

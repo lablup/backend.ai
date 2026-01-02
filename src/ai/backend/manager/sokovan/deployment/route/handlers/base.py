@@ -1,16 +1,16 @@
 """Base class for route lifecycle handlers."""
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import Optional
 
-from ai.backend.manager.data.model_serving.types import RouteStatus
+from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.types import RouteExecutionResult
 
 
-class RouteHandler:
+class RouteHandler(ABC):
     """Base class for route operation handlers."""
 
     @classmethod
@@ -58,6 +58,16 @@ class RouteHandler:
             The failure route status, or None if not applicable
         """
         raise NotImplementedError("Subclasses must implement failure_status()")
+
+    @classmethod
+    @abstractmethod
+    def stale_status(cls) -> Optional[RouteStatus]:
+        """Get the stale route status if applicable.
+
+        Returns:
+            The stale route status, or None if not applicable
+        """
+        raise NotImplementedError("Subclasses must implement stale_status()")
 
     @abstractmethod
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:

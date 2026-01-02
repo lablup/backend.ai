@@ -1,9 +1,7 @@
 import enum
-import os
 import pwd
 import types
 import typing
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -18,6 +16,13 @@ from pydantic import (
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
+from .errors import (
+    GroupNotFoundError,
+    InvalidGIDTypeError,
+    InvalidUIDTypeError,
+    MissingAnnotationError,
+    UserNotFoundError,
+)
 from .types import DigestModType
 
 # FIXME: merge majority of common definitions to ai.backend.common when ready
@@ -47,6 +52,13 @@ class PermitHashConfig(BaseSchema):
 class HostPortPair(BaseSchema):
     host: Annotated[str, Field(examples=["127.0.0.1"])]
     port: Annotated[int, Field(gt=0, lt=65536, examples=[8201])]
+
+    @property
+    def host_set_with_protocol(self) -> bool:
+        for protocol in ("http://", "https://"):
+            if self.host.startswith(protocol):
+                return True
+        return False
 
     def __repr__(self) -> str:
         return f"{self.host}:{self.port}"
@@ -98,7 +110,9 @@ class RedisConfig(BaseSchema):
     password: Annotated[
         str | None, Field(default=None, description="Redis password.", examples=["P@ssw0rd!"])
     ]
-    redis_helper_config: Annotated[RedisHelperConfig, Field(default=RedisHelperConfig())]
+    redis_helper_config: Annotated[
+        RedisHelperConfig, Field(default_factory=lambda: RedisHelperConfig())
+    ]
 
     def to_dict(self) -> dict[str, Any]:
         base = self.model_dump()
@@ -109,37 +123,25 @@ class RedisConfig(BaseSchema):
         return base
 
 
-@dataclass
-class UserID:
-    default_uid: int | None = None
-
+class UserIDValidator:
     @classmethod
     def uid_validator(
         cls,
-        value: int | str | None,
+        value: int | str,
     ) -> int:
-        if value is None:
-            assert cls.default_uid, "value is None but default_uid not provided"
-            return cls.default_uid
-        assert isinstance(value, (int, str)), "value must be an integer"
+        if not isinstance(value, (int, str)):
+            raise InvalidUIDTypeError("UID must be an integer or string")
         match value:
             case int():
-                if value == -1:
-                    return os.getuid()
-                else:
-                    return value
+                return value
             case str():
                 try:
-                    _value = int(value)
-                    if _value == -1:
-                        return os.getuid()
-                    else:
-                        return _value
+                    return int(value)
                 except ValueError:
                     try:
                         return pwd.getpwnam(value).pw_uid
                     except KeyError:
-                        assert False, f"no such user {value} in system"
+                        raise UserNotFoundError(f"No such user {value} in system")
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -181,36 +183,25 @@ class UserID:
         )
 
 
-@dataclass
-class GroupID:
-    default_gid: int | None = None
-
+class GroupIDValidator:
     @classmethod
     def uid_validator(
         cls,
-        value: int | str | None,
+        value: int | str,
     ) -> int:
-        if value is None:
-            assert cls.default_gid, "value is None but default_gid not provided"
-        assert isinstance(value, (int, str)), "value must be an integer"
+        if not isinstance(value, (int, str)):
+            raise InvalidGIDTypeError("GID must be an integer or string")
         match value:
             case int():
-                if value == -1:
-                    return os.getgid()
-                else:
-                    return value
+                return value
             case str():
                 try:
-                    _value = int(value)
-                    if _value == -1:
-                        return os.getgid()
-                    else:
-                        return _value
+                    return int(value)
                 except ValueError:
                     try:
                         return pwd.getpwnam(value).pw_gid
                     except KeyError:
-                        assert False, f"no such user {value} in system"
+                        raise GroupNotFoundError(f"No such group {value} in system")
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -454,7 +445,8 @@ def generate_example_json(
         res = {}
         for name, info in schema.model_fields.items():
             config_key = [*parent, name]
-            assert info.annotation
+            if not info.annotation:
+                raise MissingAnnotationError(f"Field '{name}' is missing type annotation")
             alternative_example = Undefined
             if info.examples:
                 res[name] = info.examples[0]

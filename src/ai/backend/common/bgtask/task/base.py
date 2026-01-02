@@ -1,50 +1,47 @@
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
-from typing import Any, Generic, Self, TypeVar
+from typing import Generic, Optional, TypeVar
 
-from ai.backend.common.types import DispatchResult
+from pydantic import BaseModel, ConfigDict
 
-from ..reporter import ProgressReporter
-from ..types import TaskName
+from ..types import BgtaskNameBase
 
 
-class BaseBackgroundTaskArgs(ABC):
-    @abstractmethod
-    def to_metadata_body(self) -> dict[str, Any]:
-        """
-        Convert the arguments to a metadata body dictionary.
-        This method should be implemented by subclasses to provide
-        the specific conversion logic.
-        """
-        raise NotImplementedError("Subclasses must implement this method")
+class BaseBackgroundTaskManifest(BaseModel):
+    """
+    Base class for background task manifests using Pydantic.
+    Provides automatic serialization/deserialization via model_dump() and model_validate().
+    """
 
+    model_config = ConfigDict(
+        # Allow custom types in manifests
+        arbitrary_types_allowed=True,
+        extra="forbid",
+        frozen=True,
+    )
+
+
+class BaseBackgroundTaskResult(BaseModel):
+    """
+    Base class for background task results using Pydantic.
+    Provides automatic serialization/deserialization via model_dump() and model_validate().
+    """
+
+    model_config = ConfigDict(
+        # Allow custom types in results (e.g., UUID, custom domain types)
+        arbitrary_types_allowed=True,
+        extra="forbid",
+        frozen=True,
+    )
+
+
+TManifest = TypeVar("TManifest", bound=BaseBackgroundTaskManifest)
+TResult = TypeVar("TResult", bound=Optional[BaseBackgroundTaskResult])
+
+
+class BaseBackgroundTaskHandler(Generic[TManifest, TResult], ABC):
     @classmethod
     @abstractmethod
-    def from_metadata_body(cls, body: Mapping[str, Any]) -> Self:
-        """
-        Create an instance from a metadata body dictionary.
-        This method should be implemented by subclasses to provide
-        the specific conversion logic.
-        """
-        raise NotImplementedError("Subclasses must implement this method")
-
-
-TFunctionArgs = TypeVar("TFunctionArgs", bound=BaseBackgroundTaskArgs)
-
-
-class BaseBackgroundTaskHandler(Generic[TFunctionArgs], ABC):
-    @abstractmethod
-    async def execute(self, reporter: ProgressReporter, args: TFunctionArgs) -> DispatchResult:
-        """
-        Execute the background task with the provided reporter and arguments.
-        This method should be implemented by subclasses to provide
-        the specific execution logic.
-        """
-        raise NotImplementedError("Subclasses must implement this method")
-
-    @classmethod
-    @abstractmethod
-    def name(cls) -> TaskName:
+    def name(cls) -> BgtaskNameBase:
         """
         Return the name of the background task.
         This method should be implemented by subclasses to provide
@@ -54,10 +51,20 @@ class BaseBackgroundTaskHandler(Generic[TFunctionArgs], ABC):
 
     @classmethod
     @abstractmethod
-    def args_type(cls) -> type[TFunctionArgs]:
+    def manifest_type(cls) -> type[TManifest]:
         """
-        Return the type of arguments that this task expects.
+        Return the type of manifest that this task expects.
         This method should be implemented by subclasses to provide
-        the specific argument type.
+        the specific manifest type.
+        """
+        raise NotImplementedError("Subclasses must implement this method")
+
+    @abstractmethod
+    async def execute(self, manifest: TManifest) -> TResult:
+        """
+        Execute the background task with the provided manifest.
+        Returns the result or None if no meaningful result is produced.
+        This method should be implemented by subclasses to provide
+        the specific execution logic.
         """
         raise NotImplementedError("Subclasses must implement this method")

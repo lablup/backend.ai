@@ -1,5 +1,7 @@
+import asyncio
 import logging
 from collections.abc import Collection, Iterable
+from typing import Callable, Optional
 
 import sqlalchemy as sa
 
@@ -7,11 +9,13 @@ from ai.backend.common.events.event_types.agent.anycast import (
     AgentErrorEvent,
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
+    AgentInstalledImagesRemoveEvent,
     AgentStartedEvent,
     AgentStatusHeartbeat,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
+from ai.backend.common.exception import ProcessorNotReadyError
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -22,6 +26,16 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.resource import InstanceNotFound
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.services.agent.actions.handle_heartbeat import HandleHeartbeatAction
+from ai.backend.manager.services.agent.actions.mark_agent_exit import MarkAgentExitAction
+from ai.backend.manager.services.agent.actions.mark_agent_running import MarkAgentRunningAction
+from ai.backend.manager.services.agent.actions.remove_agent_from_images import (
+    RemoveAgentFromImagesAction,
+)
+from ai.backend.manager.services.agent.actions.remove_agent_from_images_by_canonicals import (
+    RemoveAgentFromImagesByCanonicalsAction,
+)
+from ai.backend.manager.services.processors import Processors
 
 from ...models.agent import AgentStatus, agents
 from ...models.kernel import (
@@ -36,15 +50,38 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AgentEventHandler:
+    _registry: AgentRegistry
+    _db: ExtendedAsyncSAEngine
+    _event_dispatcher_plugin_ctx: EventDispatcherPluginContext
+    _processor_factory: Callable[[], Processors]
+    _processors: Optional[Processors]
+
     def __init__(
         self,
         registry: AgentRegistry,
         db: ExtendedAsyncSAEngine,
         event_dispatcher_plugin_ctx: EventDispatcherPluginContext,
+        processors_factory: Callable[[], Processors],
     ) -> None:
         self._registry = registry
         self._db = db
         self._event_dispatcher_plugin_ctx = event_dispatcher_plugin_ctx
+        self._processors = None
+        self._processor_factory = processors_factory
+
+    # Lazy initialization of processors as AgentEventHandler is created earlier than Processors
+    async def get_processors(self) -> Processors:
+        if self._processors is None:
+            for _ in range(5):
+                try:
+                    self._processors = self._processor_factory()
+                    return self._processors
+                except Exception:
+                    await asyncio.sleep(0.1)
+        if self._processors is None:
+            log.error("Agent processors not ready after multiple attempts.")
+            raise ProcessorNotReadyError("Agent processors not ready. Try again after a while.")
+        return self._processors
 
     async def handle_agent_started(
         self,
@@ -53,11 +90,12 @@ class AgentEventHandler:
         event: AgentStartedEvent,
     ) -> None:
         log.info("instance_lifecycle: ag:{0} joined (via event, {1})", source, event.reason)
-        await self._registry.update_instance(
-            source,
-            {
-                "status": AgentStatus.ALIVE,
-            },
+        processors = await self.get_processors()
+        await processors.agent.mark_agent_running.wait_for_complete(
+            MarkAgentRunningAction(
+                agent_id=source,
+                agent_status=AgentStatus.ALIVE,
+            )
         )
 
     async def handle_agent_terminated(
@@ -66,22 +104,31 @@ class AgentEventHandler:
         source: AgentId,
         event: AgentTerminatedEvent,
     ) -> None:
+        processors = await self.get_processors()
         if event.reason == "agent-lost":
-            await self._registry.mark_agent_terminated(source, AgentStatus.LOST)
-            self._registry.agent_cache.discard(source)
+            await processors.agent.mark_agent_exit.wait_for_complete(
+                MarkAgentExitAction(
+                    agent_id=source,
+                    agent_status=AgentStatus.LOST,
+                )
+            )
         elif event.reason == "agent-restart":
             log.info("agent@{0} restarting for maintenance.", source)
-            await self._registry.update_instance(
-                source,
-                {
-                    "status": AgentStatus.RESTARTING,
-                },
+            await processors.agent.mark_agent_running.wait_for_complete(
+                MarkAgentRunningAction(
+                    agent_id=source,
+                    agent_status=AgentStatus.RESTARTING,
+                )
             )
         else:
             # On normal instance termination, kernel_terminated events were already
             # triggered by the agent.
-            await self._registry.mark_agent_terminated(source, AgentStatus.TERMINATED)
-            self._registry.agent_cache.discard(source)
+            await processors.agent.mark_agent_exit.wait_for_complete(
+                MarkAgentExitAction(
+                    agent_id=source,
+                    agent_status=AgentStatus.TERMINATED,
+                )
+            )
 
     async def handle_agent_heartbeat(
         self,
@@ -89,15 +136,38 @@ class AgentEventHandler:
         source: AgentId,
         event: AgentHeartbeatEvent,
     ) -> None:
-        await self._registry.handle_heartbeat(source, event.agent_info)
+        processor = await self.get_processors()
+        await processor.agent.handle_heartbeat.wait_for_complete(
+            action=HandleHeartbeatAction(agent_id=source, agent_info=event.agent_info)
+        )
 
+    # For compatibility with redis key made with image canonical strings
+    # Use remove_agent_from_images_by_id instead of this if possible
     async def handle_agent_images_remove(
         self,
         context: None,
         source: AgentId,
         event: AgentImagesRemoveEvent,
     ) -> None:
-        await self._registry.handle_agent_images_remove(source, event.image_canonicals)
+        processor = await self.get_processors()
+        await processor.agent.remove_agent_from_images_by_canonicals.wait_for_complete(
+            action=RemoveAgentFromImagesByCanonicalsAction(
+                agent_id=source, image_canonicals=event.image_canonicals
+            )
+        )
+
+    async def handle_agent_installed_images_remove(
+        self,
+        context: None,
+        source: AgentId,
+        event: AgentInstalledImagesRemoveEvent,
+    ) -> None:
+        processor = await self.get_processors()
+        await processor.agent.remove_agent_from_images.wait_for_complete(
+            action=RemoveAgentFromImagesAction(
+                agent_id=source, scanned_images=dict(event.scanned_images)
+            )
+        )
 
     async def handle_check_agent_resource(
         self, context: None, source: AgentId, event: DoAgentResourceCheckEvent

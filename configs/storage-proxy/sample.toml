@@ -6,15 +6,8 @@
 #
 # Generated automatically from the StorageProxyUnifiedConfig schema.
 
-# List of object storage configurations.
-# Each configuration defines how to connect to and use an object storage
-# service.
-storages = []
-# List of artifact registry configurations.
-# Each configuration defines how to connect to and use an artifact registry
-# service.
-registries = []
-
+# Core storage-proxy service configuration.
+# Controls how the storage-proxy operates and communicates.
 [storage-proxy]
   # Base directory path for inter-process communication files.
   # Used for Unix domain sockets and other IPC mechanisms.
@@ -68,7 +61,14 @@ registries = []
   # Whether to use experimental Redis-based event dispatcher.
   # May provide better performance for event handling.
   use-experimental-redis-event-dispatcher = false
+  # Whether to allow automatic creation of quota scopes.
+  # If true, quota scopes will be created when creating VFolders in non-existent
+  # quota scopes.
+  # If false, VFolder creation will fail if the quota scope does not exist.
+  allow-auto-quota-scope-creation = true
 
+# Pyroscope profiling configuration.
+# Controls integration with the Pyroscope performance profiling tool.
 [pyroscope]
   # Whether to enable Pyroscope profiling.
   # When enabled, performance profiling data will be sent to a Pyroscope server.
@@ -87,6 +87,8 @@ registries = []
   # Balance based on your performance monitoring needs.
   ## sample-rate = 10
 
+# Logging system configuration.
+# Controls how logs are formatted, filtered, and stored.
 [logging]
   # The version used by logging.dictConfig().
   version = 1
@@ -96,9 +98,6 @@ registries = []
   disable-existing-loggers = false
   # The list of log drivers to activate.
   drivers = [ "console",]
-  ## file = "{ FileConfig }"
-  ## logstash = "{ LogstashConfig }"
-  ## graylog = "{ GraylogConfig }"
 
   # The mapping of log handler configurations.
   [logging.handlers]
@@ -112,10 +111,56 @@ registries = []
     # Determine verbosity of log.
     format = "verbose"
 
+  [logging.file]
+    # Path to store log.
+    path = "/var/log/backend.ai"
+    # Log file name.
+    filename = "wsproxy.log"
+    # Number of outdated log files to retain.
+    backup-count = 5
+    # Maximum size for a single log file.
+    ## rotation-size = "..."  # |     # min=0
+    # Determine verbosity of log.
+    format = "verbose"
+
+  [logging.logstash]
+    # Connection information of logstash node.
+    endpoint = { host = "127.0.0.1", port = 8001 }
+    # Protocol to communicate with logstash server.
+    protocol = "tcp"
+    # Use TLS to communicate with logstash server.
+    ssl-enabled = true
+    # Verify validity of TLS certificate when communicating with logstash.
+    ssl-verify = true
+
+  [logging.graylog]
+    # Graylog hostname.
+    host = "127.0.0.1"
+    # Graylog server port number.
+    port = 8000
+    # Log level.
+    level = "INFO"
+    # The custom source identifier. If not specified, fqdn will be used instead.
+    ## localname = "..."
+    # The fuly qualified domain name of the source.
+    ## fqdn = "..."
+    # Verify validity of TLS certificate when communicating with logstash.
+    ssl-verify = true
+    # Path to Root CA certificate file.
+    ## ca-certs = "/etc/ssl/ca.pem"
+    # Path to TLS private key file.
+    ## keyfile = "/etc/backend.ai/graylog/privkey.pem"
+    # Path to TLS certificate file.
+    ## certfile = "/etc/backend.ai/graylog/cert.pem"
+
   # Override default log level for specific scope of package
   [logging.pkg_ns]
 
+# API configuration for client and manager interfaces.
+# Controls how the storage-proxy serves requests.
 [api]
+  # Configuration for the client-facing API.
+  # Handles file operations requested by users.
   [api.client]
     # Network address and port where the client API service will listen.
     # This is the address accessible by clients for file operations.
@@ -130,6 +175,8 @@ registries = []
     # Required if ssl_enabled is True.
     ## ssl-privkey = "/etc/ssl/private/storage-proxy.key"
 
+  # Configuration for the manager-facing API.
+  # Handles control operations from manager services.
   [api.manager]
     # Network address and port where the manager API service will listen.
     # This is the address accessible by managers for control operations.
@@ -160,6 +207,8 @@ registries = []
 # Defines available storage backends and their settings.
 [volume]
 
+# Debugging options configuration.
+# Controls various debugging features and tools.
 [debug]
   # Master switch for debug mode.
   # When enabled, activates various debugging features.
@@ -176,10 +225,14 @@ registries = []
   # Very verbose, but useful for debugging event-related issues.
   log-events = false
 
+# Service discovery configuration.
+# Controls how services are discovered and connected.
 [service-discovery]
   # Type of service discovery to use.
   type = "redis"
 
+# OpenTelemetry configuration.
+# Controls how tracing and logging are handled.
 [otel]
   # Whether to enable OpenTelemetry for tracing or logging.
   # When enabled, traces or logs will be collected and sent to the configured OTLP
@@ -192,6 +245,8 @@ registries = []
   # Should include the protocol, host and port of the OTLP receiver.
   endpoint = "http://127.0.0.1:4317"
 
+# Etcd configuration settings.
+# Used for distributed coordination.
 [etcd]
   # Namespace prefix for etcd keys used by Backend.AI.
   # Allows multiple Backend.AI clusters to share the same etcd cluster.
@@ -209,3 +264,92 @@ registries = []
   # Optional if etcd doesn't require authentication.
   # Can be a direct password or environment variable reference.
   ## password = "develove"
+
+# Dictionary of artifact storage configurations keyed by name.
+# Each configuration defines how to connect to and use an artifact storage
+# service.
+[artifact-storages]
+
+# Dictionary of artifact registry configurations keyed by name.
+# Each configuration defines how to connect to and use an artifact registry
+# service.
+[artifact-registries]
+
+# Reservoir client configuration.
+# Controls timeout settings for HTTP client connections to reservoir registries.
+[reservoir-client]
+  # Total timeout for the entire request (in seconds).
+  # None means no timeout.
+  ## timeout-total = 300.0
+  # Timeout for acquiring a connection from the pool (in seconds).
+  # None means no timeout.
+  ## timeout-connect = 60.0
+  # Timeout for connecting to a peer for a new connection (in seconds).
+  # None means no timeout.
+  ## timeout-sock-connect = 30.0
+  # Timeout for reading a portion of data from a peer (in seconds).
+  # None means no timeout.
+  ## timeout-sock-read = 300.0
+
+# Deprecated, use `artifact_storages` instead.
+#
+# List of object storage configurations.
+# Each configuration defines how to connect to and use an object storage
+# service.
+[[storages]]
+# Add multiple [[storages]] sections as needed
+  # Endpoint URL for the object storage service.
+  # Should include the protocol (http or https) and port if non-standard.
+  endpoint = "http://localhost:9000"
+  # Access key for authenticating with the object storage service.
+  # Required for services that use access keys for authentication.
+  access-key = "my-access-key"
+  # Secret key for authenticating with the object storage service.
+  # Required for services that use secret keys for authentication.
+  secret-key = "my-secret-key"
+  # List of bucket names managed by this storage configuration.
+  buckets = "my-bucket"
+  # Region where the object storage service is located.
+  # Required for services that require region specification.
+  region = "us-west-1"
+  # Chunk size (in bytes) for uploading files to the object storage.
+  # Should be greater than or equal to 5 MiB due to S3 requirements.
+  upload-chunk-size = 5242880
+  # Chunk size (in bytes) for downloading files from the object storage.
+  download-chunk-size = 8192
+  # Chunk size (in bytes) for downloading files from the remote reservoir storage.
+  reservoir-download-chunk-size = 8192
+  # Name of the object storage configuration.
+  # Used to identify this storage in the system.
+  name = "s3-storage"
+
+  # Configuration for presigned upload URLs.
+  # Controls parameters like expiration time and size limits.
+  [storages.presigned-upload]
+    # Minimum file size for multipart uploads.
+    # If None, no minimum size limit is enforced.
+    ## min-size = 5242880
+    # Maximum file size for uploads.
+    # If None, no maximum size limit is enforced.
+    ## max-size = 5368709120
+    # Expiration time (in seconds) for presigned URLs.
+    expiration = 300
+
+  # Configuration for presigned download URLs.
+  # Controls parameters like expiration time.
+  [storages.presigned-download]
+    # Expiration time (in seconds) for presigned URLs.
+    expiration = 300
+
+# Deprecated, use `artifact_registries` instead.
+#
+# List of artifact registry configurations.
+# Each configuration defines how to connect to and use an artifact registry
+# service.
+[[registries]]
+# Add multiple [[registries]] sections as needed
+  # Name of the artifact registry configuration.
+  # Used to identify this registry in the system.
+  name = "huggingface"
+  # Configuration for the artifact registry.
+  config = "..."

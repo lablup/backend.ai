@@ -1,8 +1,9 @@
+import enum
 import functools
 import inspect
 import json
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from inspect import Signature
 from typing import (
@@ -26,6 +27,8 @@ from multidict import CIMultiDictProxy, MultiMapping
 from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import ValidationError
 
+from ai.backend.common.types import StreamReader
+
 from .exception import (
     InvalidAPIHandlerDefinition,
     InvalidAPIParameters,
@@ -33,6 +36,15 @@ from .exception import (
     MiddlewareParamParsingFailed,
     ParameterNotParsedError,
 )
+
+
+class Sentinel(enum.Enum):
+    """A sentinel value to represent an unset value."""
+
+    TOKEN = enum.auto()
+
+
+SENTINEL = Sentinel.TOKEN
 
 
 class BaseRequestModel(BaseModel):
@@ -189,7 +201,7 @@ class APIResponse:
 
 @dataclass
 class APIStreamResponse:
-    body: AsyncIterable[bytes]
+    body: StreamReader
     status: int
     headers: Mapping[str, str] = field(default_factory=dict)
 
@@ -492,11 +504,12 @@ def stream_api_handler(handler: StreamBaseHandler) -> ParsedRequestHandler:
 
         result: APIStreamResponse = await handler(first_arg, **kwargs)
 
-        body = result.body
+        body_stream = result.body
         status = result.status
         resp = web.StreamResponse(status=status, headers=result.headers)
 
-        body_iter = body.__aiter__()
+        body_iter = body_stream.read()
+
         # Send first chunk, and check if it raises an exception
         try:
             first_chunk = await body_iter.__anext__()

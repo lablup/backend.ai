@@ -3,12 +3,17 @@ import uuid
 import aiotools
 import sqlalchemy as sa
 
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import VFolderID
 from ai.backend.manager.errors.resource import (
-    GroupHasActiveEndpointsError,
-    GroupHasActiveKernelsError,
-    GroupHasVFoldersMountedError,
-    GroupNotFound,
+    ProjectHasActiveEndpointsError,
+    ProjectHasActiveKernelsError,
+    ProjectHasVFoldersMountedError,
+    ProjectNotFound,
 )
 from ai.backend.manager.errors.storage import VFolderOperationFailed
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
@@ -17,6 +22,20 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
+
+group_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.GROUP_REPOSITORY)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class AdminGroupRepository:
@@ -164,35 +183,49 @@ class AdminGroupRepository:
         # Check for active endpoints
         active_endpoints = [ep.id for ep in endpoints if ep.is_active]
         if len(active_endpoints) > 0:
-            raise GroupHasActiveEndpointsError()
+            raise ProjectHasActiveEndpointsError(f"project {group_id} has active endpoints")
 
         # Delete endpoint-related data
         endpoint_ids = [ep.id for ep in endpoints]
 
-        # Delete sessions associated with endpoints
-        await session.execute(
-            sa.delete(SessionRow).where(
-                SessionRow.id.in_(
-                    sa.select(RoutingRow.session).where(
-                        (RoutingRow.endpoint.in_(endpoint_ids)) & (RoutingRow.session.is_not(None))
-                    )
+        # Get session IDs before deleting endpoints
+        session_ids_result = await session.scalars(
+            sa.select(RoutingRow.session).where(
+                sa.and_(
+                    RoutingRow.endpoint.in_(endpoint_ids),
+                    RoutingRow.session.is_not(None),
                 )
             )
         )
+        session_ids = list(session_ids_result.unique().all())
 
-        # Delete routing entries and endpoints
-        await session.execute(sa.delete(RoutingRow).where(RoutingRow.endpoint.in_(endpoint_ids)))
-        await session.execute(sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoint_ids)))
+        # Delete endpoints (routings are CASCADE deleted automatically)
+        await session.execute(
+            sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoint_ids)),
+            execution_options={"synchronize_session": False},
+        )
 
+        # Delete sessions that were associated with endpoints
+        if session_ids:
+            await session.execute(
+                sa.delete(SessionRow).where(SessionRow.id.in_(session_ids)),
+                execution_options={"synchronize_session": False},
+            )
+
+    @group_repository_resilience.apply()
     async def purge_group_force(self, group_id: uuid.UUID) -> bool:
         """Completely remove a group and all its associated data."""
         async with self._db.begin_session() as session:
             # Pre-flight checks
             if await self._check_group_vfolders_mounted_to_active_kernels(session, group_id):
-                raise GroupHasVFoldersMountedError()
+                raise ProjectHasVFoldersMountedError(
+                    f"error on deleting project {group_id} with vfolders mounted to active kernels"
+                )
 
             if await self._check_group_has_active_kernels(session, group_id):
-                raise GroupHasActiveKernelsError()
+                raise ProjectHasActiveKernelsError(
+                    f"error on deleting project {group_id} with active kernels"
+                )
 
             # Delete associated resources
             await self._delete_group_endpoints(session, group_id)
@@ -213,4 +246,4 @@ class AdminGroupRepository:
 
             if result.rowcount > 0:
                 return True
-            raise GroupNotFound()
+            raise ProjectNotFound("project not found")

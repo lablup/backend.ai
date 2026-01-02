@@ -1,7 +1,10 @@
 from dataclasses import dataclass
 from typing import Optional, override
 
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.artifact.types import (
+    ArtifactRegistryType,
+    VerificationStepResult,
+)
 from ai.backend.common.events.types import (
     AbstractAnycastEvent,
     EventDomain,
@@ -29,7 +32,11 @@ class ModelMetadataInfo:
 
 
 @dataclass
-class ModelImportDoneEvent(BaseArtifactEvent):
+class ModelVerifyingEvent(BaseArtifactEvent):
+    """
+    Mark the model revision's status to verifying.
+    """
+
     model_id: str
     revision: str
     registry_type: ArtifactRegistryType
@@ -38,7 +45,7 @@ class ModelImportDoneEvent(BaseArtifactEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
-        return "model_import_done"
+        return "model_verifying"
 
     def serialize(self) -> tuple:
         return (self.model_id, self.revision, self.registry_type, self.registry_name)
@@ -50,6 +57,61 @@ class ModelImportDoneEvent(BaseArtifactEvent):
             revision=value[1],
             registry_type=value[2],
             registry_name=value[3],
+        )
+
+    @override
+    def domain_id(self) -> Optional[str]:
+        return None
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
+
+
+@dataclass
+class ModelImportDoneEvent(BaseArtifactEvent):
+    model_id: str
+    revision: str
+    registry_type: ArtifactRegistryType
+    registry_name: str
+    success: bool
+    digest: Optional[str]
+    verification_result: Optional[VerificationStepResult]
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "model_import_done"
+
+    def serialize(self) -> tuple:
+        verification_result = None
+        if self.verification_result is not None:
+            verification_result = self.verification_result.model_dump()
+
+        return (
+            self.model_id,
+            self.revision,
+            self.registry_type,
+            self.registry_name,
+            self.success,
+            self.digest,
+            verification_result,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        verification_result = None
+        if value[6] is not None:
+            verification_result = VerificationStepResult.model_validate(value[6])
+
+        return cls(
+            model_id=value[0],
+            revision=value[1],
+            registry_type=value[2],
+            registry_name=value[3],
+            success=value[4],
+            digest=value[5],
+            verification_result=verification_result,
         )
 
     @override

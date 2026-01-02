@@ -4,7 +4,6 @@ from pathlib import Path
 import click
 import humanize
 
-from ai.backend.cli.main import main
 from ai.backend.cli.params import (
     ByteSizeParamCheckType,
     ByteSizeParamType,
@@ -22,7 +21,7 @@ from .pretty import print_done
 from .types import CLIContext
 
 
-@main.group()
+@click.group()
 def model():
     """Set of model operations"""
 

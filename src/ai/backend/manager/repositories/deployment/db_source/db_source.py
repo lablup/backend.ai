@@ -1,12 +1,12 @@
 """Database source implementation for deployment repository."""
 
 import uuid
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncIterator, Optional, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -21,42 +21,97 @@ from ai.backend.common.types import (
     RuntimeVariant,
     SessionId,
 )
-from ai.backend.manager.data.deployment.creator import DeploymentCreator
-from ai.backend.manager.data.deployment.modifier import DeploymentModifier
-from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
-from ai.backend.manager.data.deployment.scale_modifier import AutoScalingRuleModifier
+from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.deployment.creator import DeploymentCreator, DeploymentPolicyConfig
+from ai.backend.manager.data.deployment.scale import (
+    AutoScalingRule,
+    AutoScalingRuleCreator,
+    ModelDeploymentAutoScalingRuleCreator,
+)
+from ai.backend.manager.data.deployment.scale_modifier import (
+    AutoScalingRuleModifier,
+    ModelDeploymentAutoScalingRuleModifier,
+)
 from ai.backend.manager.data.deployment.types import (
+    AccessTokenSearchResult,
+    AutoScalingRuleSearchResult,
     DeploymentInfo,
+    DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
     EndpointLifecycle,
+    ModelDeploymentAccessTokenData,
+    ModelDeploymentAutoScalingRuleData,
+    ModelRevisionData,
+    RevisionSearchResult,
     RouteInfo,
+    RouteSearchResult,
     RouteStatus,
-    ScaleOutDecision,
+    ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderLocation
-from ai.backend.manager.errors.resource import GroupNotFound, ScalingGroupProxyTargetNotFound
+from ai.backend.manager.errors.deployment import (
+    DeploymentHasNoTargetRevision,
+    DeploymentRevisionNotFound,
+    UserNotFoundInDeployment,
+)
+from ai.backend.manager.errors.resource import ProjectNotFound, ScalingGroupProxyTargetNotFound
 from ai.backend.manager.errors.service import (
+    AutoScalingPolicyNotFound,
     AutoScalingRuleNotFound,
+    DeploymentPolicyNotFound,
     EndpointNotFound,
     NoUpdatesToApply,
 )
 from ai.backend.manager.errors.storage import VFolderNotFound
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import (
+    DeploymentAutoScalingPolicyData,
+    DeploymentAutoScalingPolicyRow,
+)
+from ai.backend.manager.models.deployment_policy import (
+    DeploymentPolicyData,
+    DeploymentPolicyRow,
+)
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
+    EndpointTokenRow,
     ModelServiceHelper,
 )
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scaling_group import scaling_groups
+from ai.backend.manager.models.scaling_group import ScalingGroupRow, scaling_groups
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+    execute_batch_querier,
+    execute_creator,
+)
+from ai.backend.manager.repositories.base.purger import (
+    Purger,
+    PurgerResult,
+    execute_purger,
+)
+from ai.backend.manager.repositories.base.updater import (
+    BatchUpdater,
+    Updater,
+    execute_batch_updater,
+    execute_updater,
+)
+from ai.backend.manager.repositories.deployment.creators import (
+    DeploymentCreatorSpec,
+    DeploymentPolicyCreatorSpec,
+)
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ContainerUserContext,
     DeploymentContext,
@@ -67,6 +122,7 @@ from ai.backend.manager.utils import query_userinfo_from_session
 
 from ..types import (
     RouteData,
+    RouteServiceDiscoveryInfo,
 )
 
 
@@ -150,14 +206,77 @@ class DeploymentDBSource:
 
     async def create_endpoint(
         self,
+        creator: Creator[EndpointRow],
+        policy_config: DeploymentPolicyConfig | None = None,
+    ) -> DeploymentInfo:
+        """Create a new endpoint in the database and return DeploymentInfo.
+
+        Args:
+            creator: Creator containing DeploymentCreatorSpec with resolved image_id
+            policy_config: Optional deployment policy configuration
+
+        Returns:
+            DeploymentInfo for the created endpoint
+        """
+        spec = cast(DeploymentCreatorSpec, creator.spec)
+        async with self._begin_session_read_committed() as db_sess:
+            await self._check_group_exists(db_sess, spec.metadata.domain, spec.metadata.project_id)
+            endpoint = spec.build_row()
+            db_sess.add(endpoint)
+            await db_sess.flush()
+
+            # Create deployment policy if provided
+            if policy_config is not None:
+                policy_spec = DeploymentPolicyCreatorSpec(
+                    endpoint_id=endpoint.id,
+                    strategy=policy_config.strategy,
+                    strategy_spec=policy_config.strategy_spec,
+                    rollback_on_failure=policy_config.rollback_on_failure,
+                )
+                policy_row = policy_spec.build_row()
+                db_sess.add(policy_row)
+                await db_sess.flush()
+
+            stmt = (
+                sa.select(EndpointRow)
+                .where(EndpointRow.id == endpoint.id)
+                .options(selectinload(EndpointRow.image_row))
+            )
+            result = await db_sess.execute(stmt)
+            endpoint_result: EndpointRow = result.scalar_one()
+            deployment_info = endpoint_result.to_deployment_info()
+        return deployment_info
+
+    async def create_endpoint_legacy(
+        self,
         creator: DeploymentCreator,
     ) -> DeploymentInfo:
-        """Create a new endpoint in the database and return DeploymentInfo."""
+        """Create a new endpoint using legacy DeploymentCreator.
+
+        This is for backward compatibility with legacy deployment creation flow.
+
+        Args:
+            creator: Legacy DeploymentCreator with ImageIdentifier
+
+        Returns:
+            DeploymentInfo for the created endpoint
+        """
         async with self._begin_session_read_committed() as db_sess:
             await self._check_group_exists(db_sess, creator.domain, creator.project)
             endpoint = await EndpointRow.from_deployment_creator(db_sess, creator)
             db_sess.add(endpoint)
             await db_sess.flush()
+
+            # Create deployment policy if provided
+            if creator.policy is not None:
+                policy_row = DeploymentPolicyRow(
+                    endpoint=endpoint.id,
+                    strategy=creator.policy.strategy,
+                    strategy_spec=creator.policy.strategy_spec.model_dump(),
+                    rollback_on_failure=creator.policy.rollback_on_failure,
+                )
+                db_sess.add(policy_row)
+                await db_sess.flush()
 
             stmt = (
                 sa.select(EndpointRow)
@@ -188,7 +307,7 @@ class DeploymentDBSource:
 
         result = await db_sess.execute(query)
         if result.first() is None:
-            raise GroupNotFound(f"Group {group_id} not found in domain {domain_name}")
+            raise ProjectNotFound(f"Project {group_id} not found in domain {domain_name}")
 
     async def get_endpoint(
         self,
@@ -203,7 +322,12 @@ class DeploymentDBSource:
             query = (
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
-                .options(selectinload(EndpointRow.image_row))
+                .options(
+                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                )
             )
             result = await db_sess.execute(query)
             row: Optional[EndpointRow] = result.scalar_one_or_none()
@@ -230,12 +354,56 @@ class DeploymentDBSource:
                         EndpointRow.lifecycle_stage.in_(EndpointLifecycle.active_states()),
                     )
                 )
-                .options(selectinload(EndpointRow.image_row))
+                .options(
+                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                )
             )
             result = await db_sess.execute(query)
             rows: Sequence[EndpointRow] = result.scalars().all()
 
             return [row.to_deployment_info() for row in rows]
+
+    async def get_scaling_group_cleanup_configs(
+        self, scaling_group_names: Sequence[str]
+    ) -> dict[str, ScalingGroupCleanupConfig]:
+        """
+        Get route cleanup target statuses configuration for scaling groups.
+
+        Args:
+            scaling_group_names: List of scaling group names to query
+
+        Returns:
+            Mapping of scaling group name to ScalingGroupCleanupConfig
+        """
+        if not scaling_group_names:
+            return {}
+
+        async with self._db.begin_readonly_session() as db_sess:
+            stmt = sa.select(ScalingGroupRow.name, ScalingGroupRow.scheduler_opts).where(
+                ScalingGroupRow.name.in_(scaling_group_names)
+            )
+            result = await db_sess.execute(stmt)
+
+            cleanup_configs: dict[str, ScalingGroupCleanupConfig] = {}
+            for row in result:
+                # Convert str to RouteStatus
+                status_strs = row.scheduler_opts.route_cleanup_target_statuses
+                statuses = []
+                for status_str in status_strs:
+                    try:
+                        statuses.append(RouteStatus(status_str))
+                    except ValueError:
+                        # Skip invalid status strings
+                        pass
+
+                cleanup_configs[row.name] = ScalingGroupCleanupConfig(
+                    scaling_group_name=row.name, cleanup_target_statuses=statuses
+                )
+
+            return cleanup_configs
 
     async def get_endpoints_by_statuses(
         self, statuses: list[EndpointLifecycle]
@@ -255,7 +423,10 @@ class DeploymentDBSource:
         query = (
             sa.select(EndpointRow)
             .where(EndpointRow.lifecycle_stage.in_(statuses))
-            .options(selectinload(EndpointRow.image_row))
+            .options(
+                selectinload(EndpointRow.image_row),
+                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
+            )
         )
         result = await db_sess.execute(query)
         return result.scalars().all()
@@ -304,13 +475,13 @@ class DeploymentDBSource:
     async def get_modified_endpoint(
         self,
         endpoint_id: uuid.UUID,
-        modifier: DeploymentModifier,
+        updater: Updater[EndpointRow],
     ) -> DeploymentInfo:
         """Get modified endpoint without applying changes.
 
         Args:
             endpoint_id: ID of the endpoint to modify
-            modifier: Deployment modifier containing partial updates
+            updater: Updater containing spec with partial updates
 
         Returns:
             DeploymentInfo: Modified deployment information
@@ -331,51 +502,30 @@ class DeploymentDBSource:
             if not existing_row:
                 raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
 
-            # Apply modifier to get updated values
-            updates = modifier.fields_to_update()
-            for field, value in updates.items():
-                setattr(existing_row, field, value)
+            # Apply spec to get updated values
+            updater.spec.apply_to_row(existing_row)
             return existing_row.to_deployment_info()
 
-    async def update_endpoint_with_modifier(
+    async def update_endpoint_with_spec(
         self,
-        endpoint_id: uuid.UUID,
-        modifier: DeploymentModifier,
+        updater: Updater[EndpointRow],
     ) -> DeploymentInfo:
-        """Update endpoint using a deployment modifier.
+        """Update endpoint using an Updater.
 
         Args:
-            endpoint_id: ID of the endpoint to update
-            modifier: Deployment modifier containing partial updates
+            updater: Updater containing spec and endpoint_id
 
         Returns:
             DeploymentInfo: Updated deployment information
 
         Raises:
-            NoUpdatesToApply: If there are no updates to apply
             EndpointNotFound: If the endpoint does not exist
         """
-        # Extract updates from the modifier
-        updates = modifier.fields_to_update()
-
-        if not updates:
-            raise NoUpdatesToApply(f"No updates to apply for endpoint {endpoint_id}")
-
         async with self._begin_session_read_committed() as db_sess:
-            # Directly use the updates since fields_to_update returns column-ready values
-            query = (
-                sa.update(EndpointRow)
-                .where(EndpointRow.id == endpoint_id)
-                .values(**updates)
-                .returning(EndpointRow)
-            )
-            result = await db_sess.execute(query)
-            updated_row = result.scalar_one_or_none()
-
-            if not updated_row:
-                raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
-
-            return updated_row.to_deployment_info()
+            result = await execute_updater(db_sess, updater)
+            if result is None:
+                raise EndpointNotFound(f"Endpoint {updater.pk_value} not found")
+            return result.row.to_deployment_info()
 
     async def update_endpoint_lifecycle_bulk(
         self,
@@ -488,38 +638,88 @@ class DeploymentDBSource:
             result = await db_sess.execute(query)
             return result.rowcount > 0
 
+    # New Model Deployment Auto-scaling Rule methods (using new types)
+
+    async def create_model_deployment_autoscaling_rule(
+        self,
+        creator: ModelDeploymentAutoScalingRuleCreator,
+    ) -> ModelDeploymentAutoScalingRuleData:
+        """Create a new autoscaling rule using ModelDeployment types."""
+        async with self._begin_session_read_committed() as db_sess:
+            # First get the endpoint to ensure it exists
+            query = sa.select(EndpointRow).where(EndpointRow.id == creator.model_deployment_id)
+            result = await db_sess.execute(query)
+            endpoint = result.scalar_one_or_none()
+            if not endpoint:
+                raise EndpointNotFound(f"Endpoint {creator.model_deployment_id} not found")
+
+            row = EndpointAutoScalingRuleRow.from_model_deployment_creator(creator)
+            db_sess.add(row)
+            await db_sess.flush()
+            return row.to_model_deployment_data()
+
+    async def update_model_deployment_autoscaling_rule(
+        self,
+        rule_id: uuid.UUID,
+        modifier: ModelDeploymentAutoScalingRuleModifier,
+    ) -> ModelDeploymentAutoScalingRuleData:
+        """Update an autoscaling rule using ModelDeployment types."""
+        async with self._begin_session_read_committed() as db_sess:
+            query = sa.select(EndpointAutoScalingRuleRow).where(
+                EndpointAutoScalingRuleRow.id == rule_id
+            )
+            result = await db_sess.execute(query)
+            row = result.scalar_one_or_none()
+
+            if not row:
+                raise AutoScalingRuleNotFound(f"Autoscaling rule {rule_id} not found")
+
+            row.apply_model_deployment_modifier(modifier)
+            await db_sess.flush()
+            return row.to_model_deployment_data()
+
+    async def list_model_deployment_autoscaling_rules(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> list[ModelDeploymentAutoScalingRuleData]:
+        """List all autoscaling rules for an endpoint using ModelDeployment types."""
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(EndpointAutoScalingRuleRow).where(
+                EndpointAutoScalingRuleRow.endpoint == endpoint_id
+            )
+            result = await db_sess.execute(query)
+            rows = result.scalars().all()
+            return [row.to_model_deployment_data() for row in rows]
+
+    async def get_model_deployment_autoscaling_rule(
+        self,
+        rule_id: uuid.UUID,
+    ) -> ModelDeploymentAutoScalingRuleData:
+        """Get a single autoscaling rule by ID using ModelDeployment types."""
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(EndpointAutoScalingRuleRow).where(
+                EndpointAutoScalingRuleRow.id == rule_id
+            )
+            result = await db_sess.execute(query)
+            row = result.scalar_one_or_none()
+            if not row:
+                raise AutoScalingRuleNotFound(f"Autoscaling rule {rule_id} not found")
+            return row.to_model_deployment_data()
+
     # Route operations
 
     async def create_route(
         self,
-        endpoint_id: uuid.UUID,
-        traffic_ratio: float,
+        creator: Creator[RoutingRow],
     ) -> uuid.UUID:
-        """Create a new route for an endpoint."""
-        route_id = uuid.uuid4()
+        """Create a new route using the provided creator.
 
+        The Creator is built at the upper layer (service/action) and injected here.
+        This method only executes the creator.
+        """
         async with self._begin_session_read_committed() as db_sess:
-            # First get the endpoint to get owner, domain, and project info
-            query = sa.select(EndpointRow).where(EndpointRow.id == endpoint_id)
-            result = await db_sess.execute(query)
-            endpoint = result.scalar_one_or_none()
-
-            if not endpoint:
-                raise ValueError(f"Endpoint {endpoint_id} not found")
-
-            route = RoutingRow(
-                id=route_id,
-                endpoint=endpoint_id,
-                session=None,
-                session_owner=endpoint.created_user,
-                domain=endpoint.domain,
-                project=endpoint.project,
-                status=RouteStatus.PROVISIONING,
-                traffic_ratio=traffic_ratio,
-            )
-            db_sess.add(route)
-
-        return route_id
+            result = await execute_creator(db_sess, creator)
+            return result.row.id
 
     async def get_routes_by_endpoint(
         self,
@@ -558,6 +758,19 @@ class DeploymentDBSource:
             )
             result = await db_sess.execute(query)
             return result.rowcount > 0
+
+    async def update_route(
+        self,
+        updater: Updater[RoutingRow],
+    ) -> bool:
+        """Update a route using the provided updater.
+
+        The Updater is built at the upper layer (service/action) and injected here.
+        This method only executes the updater.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            result = await execute_updater(db_sess, updater)
+            return result is not None
 
     async def update_route_status(
         self,
@@ -600,6 +813,86 @@ class DeploymentDBSource:
             result = await db_sess.execute(query)
             return result.rowcount > 0
 
+    async def search_routes(
+        self,
+        querier: BatchQuerier,
+    ) -> RouteSearchResult:
+        """Search routes with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination
+
+        Returns:
+            RouteSearchResult with items, total_count, and pagination info
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(RoutingRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.RoutingRow.to_route_info() for row in result.rows]
+
+            return RouteSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def get_route(
+        self,
+        route_id: uuid.UUID,
+    ) -> Optional[RouteInfo]:
+        """Get a route by ID.
+
+        Args:
+            route_id: ID of the route (replica)
+
+        Returns:
+            RouteInfo if found, None otherwise
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(RoutingRow).where(RoutingRow.id == route_id)
+            result = await db_sess.execute(query)
+            row = result.scalar_one_or_none()
+            if row is None:
+                return None
+            return row.to_route_info()
+
+    async def search_endpoints(
+        self,
+        querier: BatchQuerier,
+    ) -> DeploymentInfoSearchResult:
+        """Search endpoints with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination
+
+        Returns:
+            DeploymentInfoSearchResult with items, total_count, and pagination info
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(EndpointRow).options(selectinload(EndpointRow.revisions))
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.EndpointRow.to_deployment_info() for row in result.rows]
+
+            return DeploymentInfoSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
     async def get_endpoint_id_by_session(
         self,
         session_id: uuid.UUID,
@@ -619,15 +912,95 @@ class DeploymentDBSource:
             endpoint_id = result.scalar_one_or_none()
             return endpoint_id
 
+    async def fetch_route_service_discovery_info(
+        self,
+        route_ids: set[uuid.UUID],
+    ) -> list[RouteServiceDiscoveryInfo]:
+        """Fetch service discovery information for routes.
+
+        Joins routes with kernels and endpoints to get all necessary information
+        for service discovery registration (kernel host/port, endpoint name, etc).
+
+        Args:
+            route_ids: Set of route IDs to fetch information for
+
+        Returns:
+            List of RouteServiceDiscoveryInfo containing kernel host/port and endpoint details
+        """
+        if not route_ids:
+            return []
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            # Join route -> session -> kernel -> endpoint to get all needed info
+            query = (
+                sa.select(
+                    RoutingRow.id.label("route_id"),
+                    RoutingRow.endpoint.label("endpoint_id"),
+                    EndpointRow.name.label("endpoint_name"),
+                    EndpointRow.runtime_variant.label("runtime_variant"),
+                    KernelRow.kernel_host,
+                    KernelRow.service_ports,
+                )
+                .select_from(RoutingRow)
+                .join(EndpointRow, RoutingRow.endpoint == EndpointRow.id)
+                .join(
+                    KernelRow,
+                    sa.and_(
+                        KernelRow.session_id == RoutingRow.session,
+                        KernelRow.cluster_role == "main",
+                    ),
+                )
+                .where(RoutingRow.id.in_(route_ids))
+            )
+
+            result = await db_sess.execute(query)
+            rows = result.all()
+
+            # Process results
+            discovery_infos: list[RouteServiceDiscoveryInfo] = []
+            for row in rows:
+                # Extract inference port from service_ports
+                inference_port: Optional[int] = None
+                if row.service_ports:
+                    for port_info in row.service_ports:
+                        if port_info.get("is_inference", False):
+                            host_ports = port_info.get("host_ports", [])
+                            if host_ports:
+                                inference_port = host_ports[0]
+                            break
+
+                if not inference_port:
+                    # Skip routes without inference port
+                    continue
+
+                discovery_infos.append(
+                    RouteServiceDiscoveryInfo(
+                        route_id=row.route_id,
+                        endpoint_id=row.endpoint_id,
+                        endpoint_name=row.endpoint_name,
+                        runtime_variant=row.runtime_variant.value,
+                        kernel_host=row.kernel_host,
+                        kernel_port=inference_port,
+                    )
+                )
+
+            return discovery_infos
+
     async def _delete_routes_and_endpoint(
         self,
         db_sess: SASession,
         endpoint_id: uuid.UUID,
     ) -> bool:
-        """Private method to delete routes and endpoint in a single transaction."""
+        """Private method to delete routes, policy, and endpoint in a single transaction."""
         # First delete all routes for this endpoint
         routes_query = sa.delete(RoutingRow).where(RoutingRow.endpoint == endpoint_id)
         await db_sess.execute(routes_query)
+
+        # Delete the deployment policy if exists
+        policy_query = sa.delete(DeploymentPolicyRow).where(
+            DeploymentPolicyRow.endpoint == endpoint_id
+        )
+        await db_sess.execute(policy_query)
 
         # Then delete the endpoint itself
         endpoint_query = sa.delete(EndpointRow).where(EndpointRow.id == endpoint_id)
@@ -896,25 +1269,17 @@ class DeploymentDBSource:
 
     async def scale_routes(
         self,
-        scale_outs: Sequence[ScaleOutDecision],
-        scale_ins: Sequence[RouteInfo],
+        scale_out_creators: Sequence[Creator[RoutingRow]],
+        scale_in_updater: BatchUpdater[RoutingRow] | None,
     ) -> None:
-        """Scale out/in routes based on provided mappings."""
+        """Scale out/in routes based on provided creators and updater."""
         async with self._begin_session_read_committed() as db_sess:
             # Scale out routes
-            new_routes = []
-            for scale_out in scale_outs:
-                for _ in range(scale_out.new_replica_count):
-                    route = RoutingRow.by_deployment_info(scale_out.deployment_info)
-                    new_routes.append(route)
-            db_sess.add_all(new_routes)
+            for creator in scale_out_creators:
+                await execute_creator(db_sess, creator)
             # Scale in routes
-            query = (
-                sa.update(RoutingRow)
-                .where(RoutingRow.id.in_([route.route_id for route in scale_ins]))
-                .values(traffic_ratio=0.0, status=RouteStatus.TERMINATING)
-            )
-            await db_sess.execute(query)
+            if scale_in_updater:
+                await execute_batch_updater(db_sess, scale_in_updater)
 
     # Route operations
 
@@ -1106,7 +1471,9 @@ class DeploymentDBSource:
             created_user_result = await db_sess.execute(created_user_query)
             created_user_row = created_user_result.first()
             if not created_user_row:
-                raise ValueError(f"Created user {deployment_info.metadata.created_user} not found")
+                raise UserNotFoundInDeployment(
+                    f"Created user {deployment_info.metadata.created_user} not found"
+                )
 
             # Fetch session owner info if different
             if deployment_info.metadata.session_owner != deployment_info.metadata.created_user:
@@ -1118,7 +1485,7 @@ class DeploymentDBSource:
                 session_owner_result = await db_sess.execute(session_owner_query)
                 session_owner_row = session_owner_result.first()
                 if not session_owner_row:
-                    raise ValueError(
+                    raise UserNotFoundInDeployment(
                         f"Session owner {deployment_info.metadata.session_owner} not found"
                     )
             else:
@@ -1143,7 +1510,7 @@ class DeploymentDBSource:
             # Resolve image
             target_revision = deployment_info.target_revision()
             if not target_revision:
-                raise ValueError("Deployment has no target revision")
+                raise DeploymentHasNoTargetRevision("Deployment has no target revision")
 
             image_row = await ImageRow.resolve(
                 db_sess,
@@ -1285,7 +1652,451 @@ class DeploymentDBSource:
                             max_retries=health_check_info.get("max_retries"),
                             max_wait_time=health_check_info.get("max_wait_time"),
                             expected_status_code=health_check_info.get("expected_status_code"),
+                            initial_delay=health_check_info.get("initial_delay"),
                         )
                         break
 
             return _info
+
+    async def get_default_architecture_from_scaling_group(
+        self, scaling_group_name: str
+    ) -> Optional[str]:
+        """
+        Get the default (most common) architecture from active agents in a scaling group.
+        Returns None if no active agents exist.
+        """
+        async with self._db.begin_readonly_session() as session:
+            query = sa.select(AgentRow.architecture).where(
+                sa.and_(
+                    AgentRow.scaling_group == scaling_group_name,
+                    AgentRow.status == AgentStatus.ALIVE,
+                    AgentRow.schedulable == sa.true(),
+                )
+            )
+            result = await session.execute(query)
+            architectures = [row.architecture for row in result]
+
+            if not architectures:
+                return None
+
+            architecture_counts = Counter(architectures)
+            most_common_architecture, _ = architecture_counts.most_common(1)[0]
+            return most_common_architecture
+
+    # Deployment Revision Methods
+
+    async def get_latest_revision_number(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> Optional[int]:
+        """Get the latest revision number for an endpoint.
+
+        Returns None if no revisions exist for the endpoint.
+        Service layer should call this to calculate next revision_number.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(sa.func.max(DeploymentRevisionRow.revision_number)).where(
+                DeploymentRevisionRow.endpoint == endpoint_id
+            )
+            result = await db_sess.execute(query)
+            return result.scalar()
+
+    async def create_revision(
+        self,
+        creator: Creator[DeploymentRevisionRow],
+    ) -> ModelRevisionData:
+        """Create a new deployment revision for an endpoint.
+
+        The Creator must contain a spec with revision_number already set.
+        Service layer should calculate revision_number using get_latest_revision_number()
+        before calling this method.
+
+        If a unique constraint violation occurs, the caller should retry.
+
+        TODO: Implement revision history pruning (similar to K8s revisionHistoryLimit).
+        After creating a new revision, old revisions beyond the limit should be deleted.
+        This requires adding a `revision_history_limit` column to EndpointRow.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            result = await execute_creator(db_sess, creator)
+            return result.row.to_data()
+
+    async def get_revision(
+        self,
+        revision_id: uuid.UUID,
+    ) -> ModelRevisionData:
+        """Get a deployment revision by ID.
+
+        Raises:
+            DeploymentRevisionNotFound: If the revision does not exist.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(DeploymentRevisionRow).where(DeploymentRevisionRow.id == revision_id)
+            result = await db_sess.execute(query)
+            row = result.scalar_one_or_none()
+            if row is None:
+                raise DeploymentRevisionNotFound(f"Deployment revision {revision_id} not found")
+            return row.to_data()
+
+    async def get_revision_by_route_id(
+        self,
+        route_id: uuid.UUID,
+    ) -> ModelRevisionData:
+        """Get a deployment revision by route (replica) ID.
+
+        Args:
+            route_id: ID of the route (replica)
+
+        Raises:
+            RouteNotFound: If the route does not exist.
+            DeploymentRevisionNotFound: If the route has no revision linked.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            route_query = sa.select(RoutingRow.revision).where(RoutingRow.id == route_id)
+            result = await db_sess.execute(route_query)
+            revision_id = result.scalar_one_or_none()
+            if revision_id is None:
+                raise DeploymentRevisionNotFound(f"Route {route_id} has no revision linked")
+
+            revision_query = sa.select(DeploymentRevisionRow).where(
+                DeploymentRevisionRow.id == revision_id
+            )
+            revision_result = await db_sess.execute(revision_query)
+            row = revision_result.scalar_one_or_none()
+            if row is None:
+                raise DeploymentRevisionNotFound(f"Deployment revision {revision_id} not found")
+            return row.to_data()
+
+    async def get_current_revision(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> ModelRevisionData:
+        """Get the current revision of a deployment.
+
+        Args:
+            endpoint_id: ID of the deployment endpoint
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist.
+            DeploymentRevisionNotFound: If the endpoint has no current revision.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            endpoint_query = sa.select(EndpointRow.current_revision).where(
+                EndpointRow.id == endpoint_id
+            )
+            result = await db_sess.execute(endpoint_query)
+            current_revision_id = result.scalar_one_or_none()
+            if current_revision_id is None:
+                raise DeploymentRevisionNotFound(f"Endpoint {endpoint_id} has no current revision")
+
+            revision_query = sa.select(DeploymentRevisionRow).where(
+                DeploymentRevisionRow.id == current_revision_id
+            )
+            revision_result = await db_sess.execute(revision_query)
+            row = revision_result.scalar_one_or_none()
+            if row is None:
+                raise DeploymentRevisionNotFound(
+                    f"Deployment revision {current_revision_id} not found"
+                )
+            return row.to_data()
+
+    async def search_revisions(
+        self,
+        querier: BatchQuerier,
+    ) -> RevisionSearchResult:
+        """Search deployment revisions with pagination and filtering."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(DeploymentRevisionRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.DeploymentRevisionRow.to_data() for row in result.rows]
+
+            return RevisionSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def update_endpoint(
+        self,
+        updater: Updater[EndpointRow],
+    ) -> DeploymentInfo:
+        """Update an endpoint using the provided updater spec.
+
+        Returns:
+            DeploymentInfo: The updated endpoint information.
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            result = await execute_updater(db_sess, updater)
+            if result is None:
+                raise EndpointNotFound(f"Endpoint {updater.pk_value} not found")
+
+            # Query the updated endpoint with related objects in the same session
+            query = (
+                sa.select(EndpointRow)
+                .where(EndpointRow.id == updater.pk_value)
+                .options(
+                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                )
+            )
+            query_result = await db_sess.execute(query)
+            row: EndpointRow = query_result.scalar_one()
+
+            return row.to_deployment_info()
+
+    async def update_current_revision(
+        self,
+        endpoint_id: uuid.UUID,
+        revision_id: uuid.UUID,
+    ) -> uuid.UUID | None:
+        """Update the current_revision of an endpoint and return the previous revision ID."""
+        async with self._begin_session_read_committed() as db_sess:
+            # Get current revision first
+            query = sa.select(EndpointRow.current_revision).where(EndpointRow.id == endpoint_id)
+            result = await db_sess.execute(query)
+            row = result.scalar_one_or_none()
+            previous_revision_id = row
+
+            # Update to new revision
+            update_query = (
+                sa.update(EndpointRow)
+                .where(EndpointRow.id == endpoint_id)
+                .values(current_revision=revision_id)
+            )
+            await db_sess.execute(update_query)
+
+            return previous_revision_id
+
+    # -------------------------------------------------------------------------
+    # Auto-Scaling Policy Methods (DeploymentAutoScalingPolicyRow)
+    # -------------------------------------------------------------------------
+
+    async def create_auto_scaling_policy(
+        self,
+        creator: Creator[DeploymentAutoScalingPolicyRow],
+    ) -> DeploymentAutoScalingPolicyData:
+        """Create a new auto-scaling policy for an endpoint.
+
+        Each endpoint can have at most one auto-scaling policy (1:1 relationship).
+        If a policy already exists for the endpoint, the database will raise a
+        unique constraint violation.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            result = await execute_creator(db_sess, creator)
+            return result.row.to_data()
+
+    async def get_auto_scaling_policy(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> DeploymentAutoScalingPolicyData:
+        """Get the auto-scaling policy for an endpoint.
+
+        Raises:
+            AutoScalingPolicyNotFound: If no policy exists for the endpoint.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(DeploymentAutoScalingPolicyRow).where(
+                DeploymentAutoScalingPolicyRow.endpoint == endpoint_id
+            )
+            result = await db_sess.execute(query)
+            row = result.scalar_one_or_none()
+            if row is None:
+                raise AutoScalingPolicyNotFound(
+                    f"Auto-scaling policy for endpoint {endpoint_id} not found"
+                )
+            return row.to_data()
+
+    async def update_auto_scaling_policy(
+        self,
+        updater: Updater[DeploymentAutoScalingPolicyRow],
+    ) -> DeploymentAutoScalingPolicyData:
+        """Update an auto-scaling policy using the provided updater spec.
+
+        The updater's pk_value should be the policy ID (primary key).
+
+        Raises:
+            AutoScalingPolicyNotFound: If the policy does not exist.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            result = await execute_updater(db_sess, updater)
+            if result is None:
+                raise AutoScalingPolicyNotFound(f"Auto-scaling policy {updater.pk_value} not found")
+            return result.row.to_data()
+
+    async def delete_auto_scaling_policy(
+        self,
+        purger: Purger[DeploymentAutoScalingPolicyRow],
+    ) -> PurgerResult[DeploymentAutoScalingPolicyRow] | None:
+        """Delete the auto-scaling policy by primary key.
+
+        Args:
+            purger: Purger containing the policy ID (primary key) to delete.
+
+        Returns:
+            PurgerResult containing the deleted row, or None if no policy existed.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            return await execute_purger(db_sess, purger)
+
+    async def create_deployment_policy(
+        self,
+        creator: Creator[DeploymentPolicyRow],
+    ) -> DeploymentPolicyData:
+        """Create a new deployment policy for an endpoint.
+
+        Each endpoint can have at most one deployment policy (1:1 relationship).
+        If a policy already exists for the endpoint, the database will raise a
+        unique constraint violation.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            result = await execute_creator(db_sess, creator)
+            return result.row.to_data()
+
+    async def get_deployment_policy(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> DeploymentPolicyData:
+        """Get the deployment policy for an endpoint.
+
+        Raises:
+            DeploymentPolicyNotFound: If no policy exists for the endpoint.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(DeploymentPolicyRow).where(
+                DeploymentPolicyRow.endpoint == endpoint_id
+            )
+            result = await db_sess.execute(query)
+            row = result.scalar_one_or_none()
+            if row is None:
+                raise DeploymentPolicyNotFound(
+                    f"Deployment policy for endpoint {endpoint_id} not found"
+                )
+            return row.to_data()
+
+    async def update_deployment_policy(
+        self,
+        updater: Updater[DeploymentPolicyRow],
+    ) -> DeploymentPolicyData:
+        """Update a deployment policy using the provided updater spec.
+
+        The updater's pk_value should be the policy ID (primary key).
+
+        Raises:
+            DeploymentPolicyNotFound: If the policy does not exist.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            result = await execute_updater(db_sess, updater)
+            if result is None:
+                raise DeploymentPolicyNotFound(f"Deployment policy {updater.pk_value} not found")
+            return result.row.to_data()
+
+    async def delete_deployment_policy(
+        self,
+        purger: Purger[DeploymentPolicyRow],
+    ) -> PurgerResult[DeploymentPolicyRow] | None:
+        """Delete the deployment policy by primary key.
+
+        Args:
+            purger: Purger containing the policy ID (primary key) to delete.
+
+        Returns:
+            PurgerResult containing the deleted row, or None if no policy existed.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            return await execute_purger(db_sess, purger)
+
+    # ========== Access Token Operations ==========
+
+    async def create_access_token(
+        self,
+        creator: Creator[EndpointTokenRow],
+    ) -> EndpointTokenRow:
+        """Create a new access token for a model deployment.
+
+        Args:
+            creator: Creator containing the EndpointTokenCreatorSpec.
+
+        Returns:
+            Created EndpointTokenRow.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            result = await execute_creator(db_sess, creator)
+            return result.row
+
+    # ========== Additional Search Operations ==========
+
+    async def search_auto_scaling_rules(
+        self,
+        querier: BatchQuerier,
+    ) -> AutoScalingRuleSearchResult:
+        """Search auto-scaling rules with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            AutoScalingRuleSearchResult with items, total_count, and pagination info.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(EndpointAutoScalingRuleRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            return AutoScalingRuleSearchResult(
+                items=[row.to_model_deployment_data() for row in result.rows],
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_access_tokens(
+        self,
+        querier: BatchQuerier,
+    ) -> AccessTokenSearchResult:
+        """Search access tokens with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            AccessTokenSearchResult with items, total_count, and pagination info.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(EndpointTokenRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            return AccessTokenSearchResult(
+                items=[
+                    ModelDeploymentAccessTokenData(
+                        id=row.id,
+                        token=row.token,
+                        valid_until=row.valid_until,
+                        created_at=row.created_at,
+                    )
+                    for row in result.rows
+                ],
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )

@@ -32,11 +32,11 @@ from kubernetes.client.models import V1Service, V1ServicePort
 from kubernetes_asyncio import client as kube_client
 from kubernetes_asyncio import config as kube_config
 
+from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef, KernelFeatures
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
-from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
@@ -54,6 +54,7 @@ from ai.backend.common.types import (
     MountPermission,
     MountTypes,
     ResourceSlot,
+    Sentinel,
     SlotName,
     VFolderMount,
     current_resource_slots,
@@ -64,11 +65,17 @@ from ..agent import (
     ACTIVE_STATUS_SET,
     AbstractAgent,
     AbstractKernelCreationContext,
+    AgentClass,
     ScanImagesResult,
 )
 from ..config.unified import AgentUnifiedConfig, ScratchType
 from ..exception import K8sError, UnsupportedResource
-from ..kernel import AbstractKernel
+from ..kernel import AbstractKernel, KernelRegistry
+from ..kernel_registry.recovery.kubernetes_recovery import (
+    KubernetesKernelRegistryRecovery,
+    KubernetesKernelRegistryRecoveryArgs,
+)
+from ..kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ..resources import (
     AbstractComputePlugin,
     ComputerContext,
@@ -90,7 +97,6 @@ from .kube_object import (
     PersistentVolumeClaim,
     Service,
 )
-from .resources import load_resources, scan_available_resources
 
 if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
@@ -121,7 +127,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         distro: str,
         local_config: AgentUnifiedConfig,
         agent_sockpath: Path,
-        computers: MutableMapping[DeviceName, ComputerContext],
+        computers: Mapping[DeviceName, ComputerContext],
         workers: Mapping[str, Mapping[str, str]],
         static_pvc_name: str,
         restarting: bool = False,
@@ -163,9 +169,11 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         self.config_maps = []
 
+    @override
     async def get_extra_envs(self) -> Mapping[str, str]:
         return {}
 
+    @override
     async def prepare_resource_spec(self) -> Tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
         loop = current_loop()
         if self.restarting:
@@ -181,8 +189,10 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         else:
             slots = ResourceSlot.from_json(self.kernel_config["resource_slots"])
             # Ensure that we have intrinsic slots.
-            assert SlotName("cpu") in slots
-            assert SlotName("mem") in slots
+            if SlotName("cpu") not in slots:
+                raise UnsupportedResource("cpu slot is required")
+            if SlotName("mem") not in slots:
+                raise UnsupportedResource("mem slot is required")
             # accept unknown slot type with zero values
             # but reject if they have non-zero values.
             for st, sv in slots.items():
@@ -193,13 +203,14 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             slots = slots.normalize_slots(ignore_unknown=True)
             resource_spec = KernelResourceSpec(
                 allocations={},
-                slots={**slots},  # copy
+                slots=slots.copy(),
                 mounts=[],
                 scratch_disk_size=0,  # TODO: implement (#70)
             )
             resource_opts = self.kernel_config.get("resource_opts", {})
         return resource_spec, resource_opts
 
+    @override
     async def prepare_scratch(self) -> None:
         loop = current_loop()
         await kube_config.load_kube_config()
@@ -276,6 +287,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
             await loop.run_in_executor(None, _clone_dotfiles)
 
+    @override
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
         mounts: List[Mount] = [
             # Mount scratch directory
@@ -329,9 +341,11 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         # NOTE: Currently K8s does not support binding container ports to 127.0.0.1 when using NodePort.
         return ()
 
+    @override
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         pass
 
+    @override
     async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
         sshkey = cluster_info["ssh_keypair"]
         if sshkey is None:
@@ -341,7 +355,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         core_api = kube_client.CoreV1Api()
 
         # Get hash of public key
-        enc = hashlib.md5()
+        enc = hashlib.md5(usedforsecurity=False)
         enc.update(sshkey["public_key"].encode("ascii"))
         hash = enc.digest().decode("utf-8")
 
@@ -384,6 +398,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             ),
         ])
 
+    @override
     async def process_mounts(self, mounts: Sequence[Mount]):
         for i, mount in zip(range(len(mounts)), mounts):
             if mount.type == MountTypes.K8S_GENERIC:
@@ -414,9 +429,11 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     mount.type,
                 )
 
+    @override
     def resolve_krunner_filepath(self, filename: str) -> Path:
         return Path(filename)
 
+    @override
     def get_runner_mount(
         self,
         type: MountTypes,
@@ -442,6 +459,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     ) -> None:
         self.volumes += volumes
 
+    @override
     async def mount_vfolders(
         self,
         vfolders: Sequence[VFolderMount],
@@ -475,6 +493,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             ])
             resource_spec.mounts.append(mount)
 
+    @override
     async def apply_accelerator_allocation(self, computer, device_alloc) -> None:
         # update_nested_dict(
         #     self.computer_docker_args,
@@ -482,6 +501,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         # TODO: add support for accelerator allocation
         pass
 
+    @override
     async def generate_accelerator_mounts(
         self,
         computer: AbstractComputePlugin,
@@ -530,6 +550,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             },
         }
 
+    @override
     async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
@@ -667,6 +688,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         )
         return kernel_obj
 
+    @override
     async def start_container(
         self,
         kernel_obj: AbstractKernel,
@@ -743,7 +765,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             log.exception("Error while rollup: {}", e)
             raise
 
-        assert expose_service_api_response.spec is not None
+        if expose_service_api_response.spec is None:
+            raise K8sError("expose_service_api_response.spec is None")
         node_ports: List[V1ServicePort] = expose_service_api_response.spec.ports
         arguments.append((
             None,
@@ -822,13 +845,17 @@ class KubernetesAgent(
 
     def __init__(
         self,
-        etcd: AsyncEtcd,
+        etcd: AgentEtcdClientView,
         local_config: AgentUnifiedConfig,
         *,
         stats_monitor: StatsPluginContext,
         error_monitor: ErrorPluginContext,
         skip_initial_scan: bool = False,
         agent_public_key: Optional[PublicKey],
+        kernel_registry: KernelRegistry,
+        computers: Mapping[DeviceName, ComputerContext],
+        slots: Mapping[SlotName, Decimal],
+        agent_class: AgentClass,
     ) -> None:
         super().__init__(
             etcd,
@@ -837,12 +864,25 @@ class KubernetesAgent(
             error_monitor=error_monitor,
             skip_initial_scan=skip_initial_scan,
             agent_public_key=agent_public_key,
+            kernel_registry=kernel_registry,
+            computers=computers,
+            slots=slots,
+            agent_class=agent_class,
+        )
+        self._kernel_recovery = KubernetesKernelRegistryRecovery.create(
+            KubernetesKernelRegistryRecoveryArgs(
+                scratch_root=self.local_config.container.scratch_root,
+                ipc_base_path=self.local_config.agent.ipc_base_path,
+                var_base_path=self.local_config.agent.var_base_path,
+                agent_id=self.id,
+                local_instance_id=self.local_instance_id,
+            )
         )
 
     async def __ainit__(self) -> None:
         await super().__ainit__()
         ipc_base_path = self.local_config.agent.ipc_base_path
-        self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.local_instance_id}.sock"
+        self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.id}.sock"
 
         await self.check_krunner_pv_status()
         await self.fetch_workers()
@@ -956,6 +996,18 @@ class KubernetesAgent(
             pass
 
     @override
+    async def _load_kernel_registry_from_recovery(self) -> MutableMapping[KernelId, AbstractKernel]:
+        return await self._kernel_recovery.load_kernel_registry()
+
+    @override
+    async def _write_kernel_registry_to_recovery(
+        self,
+        kernel_registry: MutableMapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+    ) -> None:
+        await self._kernel_recovery.save_kernel_registry(kernel_registry, metadata)
+
+    @override
     def get_cgroup_path(self, controller: str, container_id: str) -> Path:
         # Not implemented yet for K8s Agent
         return Path()
@@ -965,18 +1017,11 @@ class KubernetesAgent(
         # Not implemented yet for K8s Agent
         return ""
 
-    async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
-        return await load_resources(self.etcd, self.local_config.model_dump(by_alias=True))
+    @override
+    async def extract_image_command(self, image: str) -> str | None:
+        raise NotImplementedError
 
-    async def scan_available_resources(self) -> Mapping[SlotName, Decimal]:
-        return await scan_available_resources(
-            self.local_config.model_dump(by_alias=True),
-            {name: cctx.instance for name, cctx in self.computers.items()},
-        )
-
-    async def extract_command(self, image_ref: str) -> str | None:
-        return None
-
+    @override
     async def enumerate_containers(
         self,
         status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,
@@ -1017,6 +1062,7 @@ class KubernetesAgent(
         await asyncio.gather(*fetch_tasks, return_exceptions=True)
         return result
 
+    @override
     async def resolve_image_distro(self, image: ImageConfig) -> str:
         image_labels = image["labels"]
         distro = image_labels.get("ai.backend.base-distro")
@@ -1024,14 +1070,26 @@ class KubernetesAgent(
             return distro
         raise NotImplementedError
 
+    @override
     async def scan_images(self) -> ScanImagesResult:
         # Retrieving image label from registry api is not possible
         return ScanImagesResult(scanned_images={}, removed_images={})
+
+    @override
+    async def push_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None | Sentinel = Sentinel.TOKEN,
+    ) -> None:
+        raise NotImplementedError
 
     async def handle_agent_socket(self):
         # TODO: Add support for remote agent socket mechanism
         pass
 
+    @override
     async def pull_image(
         self,
         image_ref: ImageRef,
@@ -1042,10 +1100,12 @@ class KubernetesAgent(
         # TODO: Add support for appropriate image pulling mechanism on K8s
         pass
 
+    @override
     async def purge_images(self, request: PurgeImagesReq) -> PurgeImagesResp:
         # TODO: Add support for appropriate image purging mechanism on K8s
         return PurgeImagesResp([])
 
+    @override
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
     ) -> bool:
@@ -1053,6 +1113,7 @@ class KubernetesAgent(
         # Just mark all images as 'pulled' since we can't manually initiate image pull on each kube node
         return True
 
+    @override
     async def init_kernel_context(
         self,
         ownership_data: KernelOwnershipData,
@@ -1077,6 +1138,7 @@ class KubernetesAgent(
             restarting=restarting,
         )
 
+    @override
     async def destroy_kernel(
         self, kernel_id: KernelId, container_id: Optional[ContainerId]
     ) -> None:
@@ -1101,6 +1163,7 @@ class KubernetesAgent(
         except Exception:
             log.warning("_destroy({0}) kernel missing (already dead?)", kernel_id)
 
+    @override
     async def clean_kernel(
         self,
         kernel_id: KernelId,
@@ -1112,12 +1175,15 @@ class KubernetesAgent(
             scratch_dir = self.local_config.container.scratch_root / str(kernel_id)
             await loop.run_in_executor(None, shutil.rmtree, str(scratch_dir))
 
+    @override
     async def create_local_network(self, network_name: str) -> None:
         raise NotImplementedError
 
+    @override
     async def destroy_local_network(self, network_name: str) -> None:
         raise NotImplementedError
 
+    @override
     async def restart_kernel__load_config(
         self,
         kernel_id: KernelId,
@@ -1131,6 +1197,7 @@ class KubernetesAgent(
             (config_dir / name).read_bytes,
         )
 
+    @override
     async def restart_kernel__store_config(
         self,
         kernel_id: KernelId,

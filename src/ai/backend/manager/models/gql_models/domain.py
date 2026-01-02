@@ -12,6 +12,7 @@ from typing import (
 )
 
 import graphene
+import graphene_federation
 import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
@@ -20,14 +21,18 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ai.backend.common.exception import (
+    DomainNotFound,
+)
 from ai.backend.common.types import ResourceSlot, Sentinel
 from ai.backend.manager.data.domain.types import (
-    DomainCreator,
     DomainData,
-    DomainModifier,
-    DomainNodeModifier,
     UserInfo,
 )
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
+from ai.backend.manager.repositories.domain.updaters import DomainNodeUpdaterSpec, DomainUpdaterSpec
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.create_domain_node import (
     CreateDomainNodeAction,
@@ -68,7 +73,7 @@ from ..rbac.permission_defs import DomainPermission, ScalingGroupPermission
 from ..scaling_group import get_scaling_groups
 from ..user import UserRole
 from .base import Bytes
-from .scaling_group import ScalingGroup, ScalinGroupConnection
+from .scaling_group import ScalingGroup, ScalingGroupConnection
 
 if TYPE_CHECKING:
     from ..domain import DomainModel
@@ -130,6 +135,7 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
 }
 
 
+@graphene_federation.key("id")
 class DomainNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
@@ -147,7 +153,7 @@ class DomainNode(graphene.ObjectType):
     integration_id = graphene.String()
 
     # Dynamic fields.
-    scaling_groups = PaginatedConnectionField(ScalinGroupConnection)
+    scaling_groups = PaginatedConnectionField(ScalingGroupConnection)
 
     @classmethod
     def from_rbac_model(
@@ -314,6 +320,12 @@ class DomainNode(graphene.ObjectType):
                 )
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> DomainNode:
+        domain_node = await DomainNode.get_node(info, self.id)
+        if domain_node is None:
+            raise DomainNotFound(f"Domain not found: {self.id}")
+        return domain_node
+
 
 class DomainConnection(Connection):
     class Meta:
@@ -362,17 +374,21 @@ class CreateDomainNodeInput(graphene.InputObjectType):
             return value if value is not graphql.Undefined else None
 
         return CreateDomainNodeAction(
-            creator=DomainCreator(
-                name=self.name,
-                description=value_or_none(self.description),
-                is_active=value_or_none(self.is_active),
-                total_resource_slots=ResourceSlot.from_user_input(self.total_resource_slots, None)
-                if self.total_resource_slots is not graphql.Undefined
-                else None,
-                allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
-                allowed_docker_registries=value_or_none(self.allowed_docker_registries),
-                integration_id=value_or_none(self.integration_id),
-                dotfiles=value_or_none(self.dotfiles),
+            creator=Creator(
+                spec=DomainCreatorSpec(
+                    name=self.name,
+                    description=value_or_none(self.description),
+                    is_active=value_or_none(self.is_active),
+                    total_resource_slots=ResourceSlot.from_user_input(
+                        self.total_resource_slots, None
+                    )
+                    if self.total_resource_slots is not graphql.Undefined
+                    else None,
+                    allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
+                    allowed_docker_registries=value_or_none(self.allowed_docker_registries),
+                    integration_id=value_or_none(self.integration_id),
+                    dotfiles=value_or_none(self.dotfiles),
+                )
             ),
             user_info=user_info,
             scaling_groups=value_or_none(self.scaling_groups),
@@ -414,11 +430,7 @@ class CreateDomainNode(graphene.Mutation):
             )
         )
 
-        domain_data: Optional[DomainData] = res.domain_data
-
-        return CreateDomainNode(
-            ok=True, msg="", item=DomainNode.from_dto(domain_data) if domain_data else None
-        )
+        return CreateDomainNode(ok=True, msg="", item=DomainNode.from_dto(res.domain_data))
 
 
 class ModifyDomainNodeInput(graphene.InputObjectType):
@@ -447,32 +459,32 @@ class ModifyDomainNodeInput(graphene.InputObjectType):
         return field_value
 
     def to_action(self, name: str, user_info: UserInfo) -> ModifyDomainNodeAction:
-        return ModifyDomainNodeAction(
-            name=name,
-            user_info=user_info,
-            modifier=DomainNodeModifier(
-                description=TriState[str].from_graphql(
-                    self.description,
-                ),
-                is_active=OptionalState[bool].from_graphql(self.is_active),
-                total_resource_slots=TriState[ResourceSlot].from_graphql(
-                    graphql.Undefined
-                    if self.total_resource_slots is graphql.Undefined
-                    else ResourceSlot.from_user_input(self.total_resource_slots, None),
-                ),
-                allowed_vfolder_hosts=OptionalState[dict[str, list[str]]].from_graphql(
-                    self.allowed_vfolder_hosts,
-                ),
-                allowed_docker_registries=OptionalState[list[str]].from_graphql(
-                    self.allowed_vfolder_hosts,
-                ),
-                integration_id=TriState[str].from_graphql(
-                    self.integration_id,
-                ),
-                dotfiles=OptionalState[bytes].from_graphql(
-                    self.dotfiles,
-                ),
+        spec = DomainNodeUpdaterSpec(
+            description=TriState[str].from_graphql(
+                self.description,
             ),
+            is_active=OptionalState[bool].from_graphql(self.is_active),
+            total_resource_slots=TriState[ResourceSlot].from_graphql(
+                graphql.Undefined
+                if self.total_resource_slots is graphql.Undefined
+                else ResourceSlot.from_user_input(self.total_resource_slots, None),
+            ),
+            allowed_vfolder_hosts=OptionalState[dict[str, list[str]]].from_graphql(
+                self.allowed_vfolder_hosts,
+            ),
+            allowed_docker_registries=OptionalState[list[str]].from_graphql(
+                self.allowed_vfolder_hosts,
+            ),
+            integration_id=TriState[str].from_graphql(
+                self.integration_id,
+            ),
+            dotfiles=OptionalState[bytes].from_graphql(
+                self.dotfiles,
+            ),
+        )
+        return ModifyDomainNodeAction(
+            user_info=user_info,
+            updater=Updater(spec=spec, pk_value=name),
             sgroups_to_add=set(self.sgroups_to_add)
             if self.sgroups_to_add is not Undefined
             else None,
@@ -515,10 +527,8 @@ class ModifyDomainNode(graphene.Mutation):
             )
         )
 
-        domain_data: Optional[DomainData] = res.domain_data
-
         return ModifyDomainNode(
-            item=DomainNode.from_dto(domain_data) if domain_data else None,
+            item=DomainNode.from_dto(res.domain_data),
             client_mutation_id=input.get("client_mutation_id"),
         )
 
@@ -631,14 +641,16 @@ class DomainInput(graphene.InputObjectType):
             return value if value is not Undefined else None
 
         return CreateDomainAction(
-            creator=DomainCreator(
-                name=domain_name,
-                description=value_or_none(self.description),
-                is_active=value_or_none(self.is_active),
-                total_resource_slots=value_or_none(self.total_resource_slots),
-                allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
-                allowed_docker_registries=value_or_none(self.allowed_docker_registries),
-                integration_id=value_or_none(self.integration_id),
+            creator=Creator(
+                spec=DomainCreatorSpec(
+                    name=domain_name,
+                    description=value_or_none(self.description),
+                    is_active=value_or_none(self.is_active),
+                    total_resource_slots=value_or_none(self.total_resource_slots),
+                    allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
+                    allowed_docker_registries=value_or_none(self.allowed_docker_registries),
+                    integration_id=value_or_none(self.integration_id),
+                )
             ),
             user_info=user_info,
         )
@@ -663,30 +675,30 @@ class ModifyDomainInput(graphene.InputObjectType):
         return field_value
 
     def to_action(self, domain_name: str, user_info: UserInfo) -> ModifyDomainAction:
-        return ModifyDomainAction(
-            domain_name=domain_name,
-            user_info=user_info,
-            modifier=DomainModifier(
-                name=OptionalState[str].from_graphql(self.name),
-                description=TriState[str].from_graphql(
-                    self.description,
-                ),
-                is_active=OptionalState[bool].from_graphql(
-                    self.is_active,
-                ),
-                total_resource_slots=TriState[ResourceSlot].from_graphql(
-                    Undefined
-                    if self.total_resource_slots is Undefined
-                    else ResourceSlot.from_user_input(self.total_resource_slots, None),
-                ),
-                allowed_vfolder_hosts=OptionalState[dict[str, list[str]]].from_graphql(
-                    self.allowed_vfolder_hosts,
-                ),
-                allowed_docker_registries=OptionalState[list[str]].from_graphql(
-                    self.allowed_docker_registries,
-                ),
-                integration_id=TriState[str].from_graphql(self.integration_id),
+        spec = DomainUpdaterSpec(
+            name=OptionalState[str].from_graphql(self.name),
+            description=TriState[str].from_graphql(
+                self.description,
             ),
+            is_active=OptionalState[bool].from_graphql(
+                self.is_active,
+            ),
+            total_resource_slots=TriState[ResourceSlot].from_graphql(
+                Undefined
+                if self.total_resource_slots is Undefined
+                else ResourceSlot.from_user_input(self.total_resource_slots, None),
+            ),
+            allowed_vfolder_hosts=OptionalState[dict[str, list[str]]].from_graphql(
+                self.allowed_vfolder_hosts,
+            ),
+            allowed_docker_registries=OptionalState[list[str]].from_graphql(
+                self.allowed_docker_registries,
+            ),
+            integration_id=TriState[str].from_graphql(self.integration_id),
+        )
+        return ModifyDomainAction(
+            user_info=user_info,
+            updater=Updater(spec=spec, pk_value=domain_name),
         )
 
 
@@ -719,13 +731,10 @@ class CreateDomain(graphene.Mutation):
 
         action: CreateDomainAction = props.to_action(name, user_info)
         res = await ctx.processors.domain.create_domain.wait_for_complete(action)
-
-        domain_data: Optional[DomainData] = res.domain_data
-
         return cls(
-            ok=res.success,
-            msg=res.description,
-            domain=Domain.from_data(domain_data) if domain_data else None,
+            ok=True,
+            msg="domain creation succeed",
+            domain=Domain.from_data(res.domain_data),
         )
 
 
@@ -758,13 +767,10 @@ class ModifyDomain(graphene.Mutation):
 
         action = props.to_action(name, user_info)
         res = await ctx.processors.domain.modify_domain.wait_for_complete(action)
-
-        domain_data: Optional[DomainData] = res.domain_data
-
         return cls(
-            ok=res.success,
-            msg=res.description,
-            domain=Domain.from_data(domain_data) if domain_data else None,
+            ok=True,
+            msg="domain modification succeed",
+            domain=Domain.from_data(res.domain_data),
         )
 
 
@@ -792,9 +798,8 @@ class DeleteDomain(graphene.Mutation):
         )
 
         action = DeleteDomainAction(name, user_info)
-        res = await ctx.processors.domain.delete_domain.wait_for_complete(action)
-
-        return cls(ok=res.success, msg=res.description)
+        await ctx.processors.domain.delete_domain.wait_for_complete(action)
+        return cls(ok=True, msg=f"domain {action.name} deleted successfully")
 
 
 class PurgeDomain(graphene.Mutation):
@@ -824,6 +829,5 @@ class PurgeDomain(graphene.Mutation):
         )
 
         action = PurgeDomainAction(name, user_info)
-        res = await ctx.processors.domain.purge_domain.wait_for_complete(action)
-
-        return cls(ok=res.success, msg=res.description)
+        await ctx.processors.domain.purge_domain.wait_for_complete(action)
+        return cls(ok=True, msg=f"domain {name} purged successfully")

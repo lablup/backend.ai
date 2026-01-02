@@ -36,5 +36,7 @@ LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]'
 ./backend.ai storage config generate-sample --overwrite
 ./backend.ai web config generate-sample --overwrite
 
+./scripts/generate-graphql-schema.sh
+
 git add -A
 git commit -m "release: $TARGET_VERSION"

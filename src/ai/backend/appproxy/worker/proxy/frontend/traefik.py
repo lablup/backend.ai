@@ -11,11 +11,12 @@ import aiotools
 from aiohttp import web
 
 from ai.backend.appproxy.common.config import get_default_redis_key_ttl
-from ai.backend.appproxy.common.exceptions import ServerMisconfiguredError
+from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.proxy.backend.traefik import TraefikBackend
 from ai.backend.logging import BraceStyleAdapter
 
+from ...errors import InvalidFrontendTypeError, MissingTraefikConfigError
 from ...types import (
     LAST_USED_MARKER_SOCKET_NAME,
     Circuit,
@@ -58,7 +59,8 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend,
         self.runner = web.AppRunner(app, access_log=None)
 
     async def start(self) -> None:
-        assert self.root_context.local_config.proxy_worker.traefik
+        if not self.root_context.local_config.proxy_worker.traefik:
+            raise MissingTraefikConfigError("Traefik configuration is required")
         path = (
             self.root_context.local_config.proxy_worker.traefik.last_used_time_marker_directory
             / LAST_USED_MARKER_SOCKET_NAME
@@ -80,7 +82,8 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend,
         )
 
     async def stop(self) -> None:
-        assert self.root_context.local_config.proxy_worker.traefik
+        if not self.root_context.local_config.proxy_worker.traefik:
+            raise MissingTraefikConfigError("Traefik configuration is required")
 
         await self.runner.cleanup()
 
@@ -104,7 +107,6 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend,
             log.debug("Wrote {} keys", len(keys))
         except Exception:
             log.exception("_last_used_time_marker_writer():")
-            raise
 
     async def mark_last_used_time(self, request: web.Request) -> web.StreamResponse:
         key = request.match_info["key"]
@@ -120,7 +122,10 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend,
 
     async def mark_inactive(self, request: web.Request) -> web.StreamResponse:
         key = request.match_info["key"]
-        self.active_circuits.remove(uuid.UUID(key))
+        try:
+            self.active_circuits.remove(uuid.UUID(key))
+        except KeyError:
+            log.warning("mark_inactive(): key {!r} not found in active circuits", key)
 
         return web.StreamResponse(status=204)
 
@@ -135,7 +140,6 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend,
                     self.redis_keys.update(keys)
         except Exception:
             log.exception("_active_circuit_writer():")
-            raise
 
     async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> TraefikBackend:
         return TraefikBackend(self.root_context, circuit, routes)
@@ -156,17 +160,26 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend,
 
 class TraefikPortFrontend(AbstractTraefikFrontend[int]):
     def get_circuit_key(self, circuit: Circuit) -> int:
-        assert isinstance(circuit.frontend, PortFrontendInfo)
+        if not isinstance(circuit.frontend, PortFrontendInfo):
+            raise InvalidFrontendTypeError(
+                f"Expected PortFrontendInfo, got {type(circuit.frontend).__name__}"
+            )
         return circuit.frontend.port
 
 
 class TraefikSubdomainFrontend(AbstractTraefikFrontend[str]):
     def get_circuit_key(self, circuit: Circuit) -> str:
-        assert isinstance(circuit.frontend, SubdomainFrontendInfo)
+        if not isinstance(circuit.frontend, SubdomainFrontendInfo):
+            raise InvalidFrontendTypeError(
+                f"Expected SubdomainFrontendInfo, got {type(circuit.frontend).__name__}"
+            )
         return circuit.frontend.subdomain
 
 
 class TraefikTCPFrontend(AbstractTraefikFrontend[int]):
     def get_circuit_key(self, circuit: Circuit) -> int:
-        assert isinstance(circuit.frontend, PortFrontendInfo)
+        if not isinstance(circuit.frontend, PortFrontendInfo):
+            raise InvalidFrontendTypeError(
+                f"Expected PortFrontendInfo, got {type(circuit.frontend).__name__}"
+            )
         return circuit.frontend.port

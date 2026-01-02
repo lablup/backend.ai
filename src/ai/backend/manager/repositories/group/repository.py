@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import copy
 import logging
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Optional, Sequence, cast
 from uuid import UUID
 
@@ -9,27 +12,49 @@ import msgpack
 import sqlalchemy as sa
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import (
+    BackendAIError,
+    InvalidAPIParameters,
+)
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
-from ai.backend.manager.decorators.repository_decorator import (
-    create_layer_aware_repository_decorator,
-)
-from ai.backend.manager.errors.resource import GroupNotFound
+from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.errors.resource import InvalidUserUpdateMode, ProjectNotFound
+from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import GroupRow, association_groups_users, groups
 from ai.backend.manager.models.kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, kernels
+from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 
 from ..permission_controller.role_manager import RoleManager
 
-# Layer-specific decorator for group repository
-repository_decorator = create_layer_aware_repository_decorator(LayerType.GROUP)
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+group_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.GROUP_REPOSITORY)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class GroupRepository:
@@ -54,40 +79,75 @@ class GroupRepository:
         result = await session.execute(sa.select(GroupRow).where(groups.c.id == group_id))
         return result.scalar_one_or_none()
 
-    @repository_decorator()
-    async def create(self, creator: GroupCreator) -> GroupData:
+    @group_repository_resilience.apply()
+    async def create(self, creator: Creator[GroupRow]) -> GroupData:
         """Create a new group."""
+        spec = cast(GroupCreatorSpec, creator.spec)
         async with self._db.begin_session() as db_session:
-            row = GroupRow.from_creator(creator)
-            db_session.add(row)
-            await db_session.flush()
-            await db_session.refresh(row)
+            # Validate domain exists
+            domain_exists = await db_session.scalar(
+                sa.select(sa.exists().where(domains.c.name == spec.domain_name))
+            )
+            if not domain_exists:
+                raise InvalidAPIParameters(
+                    f"Cannot create group: Domain '{spec.domain_name}' does not exist"
+                )
 
+            # Validate resource policy exists
+            policy_exists = await db_session.scalar(
+                sa.select(
+                    sa.exists().where(keypair_resource_policies.c.name == spec.resource_policy)
+                )
+            )
+            if not policy_exists:
+                raise InvalidAPIParameters(
+                    f"Cannot create group: Resource policy '{spec.resource_policy}' does not exist"
+                )
+
+            # Check if group already exists
+            check_stmt = sa.select(GroupRow).where(
+                sa.and_(
+                    GroupRow.name == spec.name,
+                    GroupRow.domain_name == spec.domain_name,
+                )
+            )
+            existing_group = await db_session.scalar(check_stmt)
+            if existing_group is not None:
+                raise InvalidAPIParameters(
+                    f"Group with name '{spec.name}' already exists in domain '{spec.domain_name}'"
+                )
+
+            # Create the group
+            creator_result = await execute_creator(db_session, creator)
+            row = creator_result.row
             data = row.to_data()
             # Create RBAC role and permissions for the group
             await self._role_manager.create_system_role(db_session, data)
 
             return data
 
-    @repository_decorator()
+    @group_repository_resilience.apply()
     async def modify_validated(
         self,
-        group_id: uuid.UUID,
-        modifier: GroupModifier,
+        updater: Updater[GroupRow],
         user_role: UserRole,
         user_update_mode: Optional[str] = None,
         user_uuids: Optional[list[uuid.UUID]] = None,
     ) -> Optional[GroupData]:
         """Modify a group with validation."""
-        data = modifier.fields_to_update()
+        group_id = updater.pk_value
 
         if user_update_mode not in (None, "add", "remove"):
-            raise ValueError("invalid user_update_mode")
-
-        if not data and user_update_mode is None:
-            return None
+            raise InvalidUserUpdateMode("invalid user_update_mode")
 
         async with self._db.begin_session() as session:
+            # First verify the group exists
+            existing_group = await session.scalar(
+                sa.select(groups.c.id).where(groups.c.id == group_id)
+            )
+            if existing_group is None:
+                raise ProjectNotFound(f"Group not found: {group_id}")
+
             # Handle user addition/removal
             if user_uuids and user_update_mode:
                 if user_update_mode == "add":
@@ -103,30 +163,16 @@ class GroupRepository:
                         ),
                     )
 
-            # Update group data if provided
-            if data:
-                update_stmt = (
-                    sa.update(GroupRow)
-                    .values(data)
-                    .where(GroupRow.id == group_id)
-                    .returning(GroupRow)
-                )
-                query_stmt = (
-                    sa.select(GroupRow)
-                    .from_statement(update_stmt)
-                    .execution_options(populate_existing=True)
-                )
-                row = await session.scalar(query_stmt)
-                row = cast(Optional[GroupRow], row)
-                if row is not None:
-                    return row.to_data()
-                raise GroupNotFound()
+            # Update group data (execute_updater returns None if no values to update)
+            result = await execute_updater(session, updater)
+            if result is not None:
+                return result.row.to_data()
 
-            # If only user updates were performed, return None
+            # No group updates or only user updates were performed
             return None
 
-    @repository_decorator()
-    async def mark_inactive(self, group_id: uuid.UUID) -> bool:
+    @group_repository_resilience.apply()
+    async def mark_inactive(self, group_id: uuid.UUID) -> None:
         """Mark a group as inactive (soft delete)."""
         async with self._db.begin_session() as session:
             result = await session.execute(
@@ -138,10 +184,10 @@ class GroupRepository:
                 .where(groups.c.id == group_id)
             )
             if result.rowcount > 0:
-                return True
-            raise GroupNotFound()
+                return
+            raise ProjectNotFound(f"Group not found: {group_id}")
 
-    @repository_decorator()
+    @group_repository_resilience.apply()
     async def get_container_stats_for_period(
         self,
         start_date: datetime,
@@ -231,19 +277,18 @@ class GroupRepository:
                     + 1
                 )
             device_type = set()
-            smp = 0
+            gpu_smp_allocated = 0
             gpu_mem_allocated = 0
             if row.attached_devices and row.attached_devices.get("cuda"):
                 for dev_info in row.attached_devices["cuda"]:
                     if dev_info.get("model_name"):
                         device_type.add(dev_info["model_name"])
-                    smp += int(nmget(dev_info, "data.smp", 0))
+                    gpu_smp_allocated += int(nmget(dev_info, "data.smp", 0))
                     gpu_mem_allocated += int(nmget(dev_info, "data.mem", 0))
-            gpu_allocated = 0
-            if "cuda.devices" in row.occupied_slots:
-                gpu_allocated = row.occupied_slots["cuda.devices"]
-            if "cuda.shares" in row.occupied_slots:
-                gpu_allocated = row.occupied_slots["cuda.shares"]
+            gpu_allocated = Decimal(0)
+            for key, value in row.occupied_slots.items():
+                if SlotName(key).is_accelerator():
+                    gpu_allocated += value
             c_info = {
                 "id": str(row["id"]),
                 "session_id": str(row["session_id"]),
@@ -268,9 +313,9 @@ class GroupRepository:
                 "used_time": used_time,
                 "used_days": used_days,
                 "device_type": list(device_type),
-                "smp": float(smp),
+                "smp": float(gpu_smp_allocated),
                 "gpu_mem_allocated": float(gpu_mem_allocated),
-                "gpu_allocated": float(gpu_allocated),  # devices or shares
+                "gpu_allocated": float(gpu_allocated),
                 "nfs": nfs,
                 "image_id": row["image"],  # TODO: image id
                 "image_name": row["image"],
@@ -323,7 +368,7 @@ class GroupRepository:
                 objs_per_group[group_id]["c_infos"].append(c_info)
         return list(objs_per_group.values())
 
-    @repository_decorator()
+    @group_repository_resilience.apply()
     async def fetch_project_resource_usage(
         self,
         start_date: datetime,

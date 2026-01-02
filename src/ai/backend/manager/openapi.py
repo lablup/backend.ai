@@ -346,7 +346,12 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
 
             route_def["parameters"] = parameters
             route_def["description"] = "\n".join(description)
-            type_hints = get_type_hints(route.handler)
+            try:
+                type_hints = get_type_hints(route.handler)
+            except (NameError, AttributeError):
+                # Skip type hint extraction for handlers with unresolvable forward references
+                # (e.g., GraphQLView subclasses)
+                type_hints = {}
             if (
                 (ret_type := type_hints.get("return"))
                 and (response_cls := getattr(ret_type, "__origin__", ret_type))

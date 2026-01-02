@@ -133,9 +133,9 @@ class ErrorDomain(enum.StrEnum):
     API = "api"
     ARTIFACT = "artifact"
     ARTIFACT_REGISTRY = "artifact-registry"
-    ARTIFACT_REVISION = "artifact-revision"
     ARTIFACT_ASSOCIATION = "artifact-association"
     OBJECT_STORAGE = "object-storage"
+    VFS_STORAGE = "vfs-storage"
     STORAGE_NAMESPACE = "storage-namespace"
     PLUGIN = "plugin"
     BGTASK = "bgtask"
@@ -157,15 +157,28 @@ class ErrorDomain(enum.StrEnum):
     ROUTE = "route"
     DOTFILE = "dotfile"
     VFOLDER = "vfolder"
+    QUOTA_SCOPE = "quota-scope"
     VFOLDER_INVITATION = "vfolder-invitation"
+    MODEL_CARD = "model-card"
     MODEL_SERVICE = "model-service"
+    MODEL_DEPLOYMENT = "model-deployment"
     RESOURCE_PRESET = "resource-preset"
     STORAGE = "storage"
+    WATCHER = "watcher"
     AGENT = "agent"
+    KERNEL_REGISTRY = "kernel-registry"
     PERMISSION = "permission"
+    ROLE = "role"
     METRIC = "metric"
     STORAGE_PROXY = "storage-proxy"
     MESSAGE_QUEUE = "message-queue"
+    NOTIFICATION = "notification"
+    HEALTH_CHECK = "health-check"
+    KEYPAIR_RESOURCE_POLICY = "keypair-resource-policy"
+    DATABASE = "database"
+    USER_RESOURCE_POLICY = "user-resource-policy"
+
+    EXTERNAL_SYSTEM = "external-system"  # Errors from external systems
 
 
 class ErrorOperation(enum.StrEnum):
@@ -228,6 +241,7 @@ class ErrorDetail(enum.StrEnum):
     # For example, the user has not completed a 2FA setup or any verification.
     INCOMPLETE_USER_PROFILE = "incomplete-user-profile"
     NOT_READY = "not-ready"  # The resource is not ready to be used.
+    INVALID_DATA_FORMAT = "invalid-data-format"  # The data format is invalid.
 
     # Server Error
     INTERNAL_ERROR = (
@@ -246,6 +260,9 @@ class ErrorDetail(enum.StrEnum):
     # MISMATCH means the current state of the server does not match the expected state.
     # MISMATCH is used when the server is in a state that is not expected.
     MISMATCH = "mismatch"
+    # TIMEOUT
+    TIMEOUT = "timeout"
+    CONTENT_TYPE_MISMATCH = "content-type-mismatch"
 
 
 @dataclass
@@ -285,6 +302,27 @@ class ErrorCode:
 
     def __str__(self) -> str:
         return f"{self.domain}_{self.operation}_{self.error_detail}"
+
+    @classmethod
+    def from_str(cls, code_str: str) -> Self:
+        """
+        Parses an error code string and returns an ErrorCode instance.
+
+        :param code_str: The error code string to parse.
+        :return: An ErrorCode instance.
+        :raises InvalidErrorCode: If the code_str is not in the correct format.
+        """
+        parts = code_str.split("_")
+        if len(parts) != 3:
+            raise InvalidErrorCode(f"Invalid error code format: {code_str}")
+        domain_str, operation_str, error_detail_str = parts
+        try:
+            domain = ErrorDomain(domain_str)
+            operation = ErrorOperation(operation_str)
+            error_detail = ErrorDetail(error_detail_str)
+        except ValueError as e:
+            raise InvalidErrorCode(f"Invalid error code value. Err: {e}") from e
+        return cls(domain=domain, operation=operation, error_detail=error_detail)
 
 
 class BackendAIError(web.HTTPError, ABC):
@@ -347,9 +385,8 @@ class BackendAIError(web.HTTPError, ABC):
             self.__dict__,
         )
 
-    @classmethod
     @abstractmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         """
         Returns the error code for this error.
         This is used in the API response to indicate the type of error.
@@ -360,12 +397,23 @@ class BackendAIError(web.HTTPError, ABC):
         raise NotImplementedError("Subclasses must implement error_code() method.")
 
 
+class InvalidErrorCode(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/invalid-error-code"
+    error_title = "Invalid error code in the raised exception."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class MalformedRequestBody(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "Malformed request body."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
             operation=ErrorOperation.PARSING,
@@ -377,8 +425,7 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "Invalid or Missing API Parameters."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
             operation=ErrorOperation.PARSING,
@@ -390,8 +437,7 @@ class ResourcePresetConflict(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/duplicate-resource"
     error_title = "Duplicate Resource Preset"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.RESOURCE_PRESET,
             operation=ErrorOperation.GENERIC,
@@ -403,8 +449,7 @@ class MiddlewareParamParsingFailed(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/internal-server-error"
     error_title = "Middleware parameter parsing failed."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
             operation=ErrorOperation.PARSING,
@@ -416,8 +461,7 @@ class ParameterNotParsedError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/internal-server-error"
     error_title = "Parameter Not Parsed Error"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
             operation=ErrorOperation.PARSING,
@@ -429,8 +473,7 @@ class BgtaskNotRegisteredError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/bgtask-not-registered"
     error_title = "Background Task Not Registered"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BGTASK,
             operation=ErrorOperation.EXECUTE,
@@ -438,12 +481,11 @@ class BgtaskNotRegisteredError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-class BgtaskNotFoundError(BackendAIError, web.HTTPNotFound):
+class BgtaskNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/bgtask-not-found"
     error_title = "Background Task Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BGTASK,
             operation=ErrorOperation.READ,
@@ -455,8 +497,7 @@ class BgtaskFailedError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/bgtask-failed"
     error_title = "Background Task Failed"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BGTASK,
             operation=ErrorOperation.EXECUTE,
@@ -468,8 +509,7 @@ class BgtaskCancelledError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/bgtask-cancelled"
     error_title = "Background Task Cancelled"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BGTASK,
             operation=ErrorOperation.EXECUTE,
@@ -481,8 +521,7 @@ class UnreachableError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/unreachable"
     error_title = "Unreachable"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.GENERIC,
@@ -494,8 +533,7 @@ class PermissionDeniedError(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/permission-denied"
     error_title = "Permission Denied."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
             operation=ErrorOperation.AUTH,
@@ -507,8 +545,7 @@ class SessionWithInvalidStateError(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/session-invalid-state"
     error_title = "Session with Invalid State"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.GENERIC,
@@ -517,11 +554,10 @@ class SessionWithInvalidStateError(BackendAIError, web.HTTPConflict):
 
 
 class StorageNamespaceNotFoundError(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/object-storage-not-found"
-    error_title = "Artifact Storage Not Found"
+    error_type = "https://api.backend.ai/probs/storage-namespace-not-found"
+    error_title = "Storage Namespace Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_NAMESPACE,
             operation=ErrorOperation.READ,
@@ -533,8 +569,7 @@ class InvalidCursorTypeError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-cursor-type"
     error_title = "Invalid Cursor Type"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.REQUEST,
@@ -546,8 +581,7 @@ class RelationNotLoadedError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/relation-not-loaded"
     error_title = "Relation Not Loaded"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.GENERIC,
@@ -559,10 +593,391 @@ class ArtifactDefaultRevisionResolveError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/artifact-revision-resolve-failed"
     error_title = "Cannot Resolve Artifact Default Revision"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class RuntimeVariantNotSupportedError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/runtime-variant-not-supported"
+    error_title = "Runtime Variant Not Supported"
+
+    def __init__(self, runtime_variant: str) -> None:
+        super().__init__(extra_msg=f"Runtime variant '{runtime_variant}' is not supported.")
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class GenericNotImplementedError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/not-implemented"
+    error_title = "Not Implemented"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.NOT_IMPLEMENTED,
+        )
+
+
+class ObjectStorageBucketNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/object-storage-bucket-not-found"
+    error_title = "Object Storage Bucket Not Found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.OBJECT_STORAGE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class InvalidConfigError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/invalid-configuration"
+    error_title = "Invalid Configuration"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class ProcessorNotReadyError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/processor-not-ready"
+    error_title = "Processor Not Ready"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class AgentNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/agent-not-found"
+    error_title = "Agent Not Found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ScalingGroupNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/scaling-group-not-found"
+    error_title = "Scaling Group Not Found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SCALING_GROUP,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ScalingGroupConflict(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/duplicate-scaling-group"
+    error_title = "Duplicate Scaling Group"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SCALING_GROUP,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
+class VFolderNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/vfolder-not-found"
+    error_title = "Virtual Folder Not Found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class UserNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/user-not-found"
+    error_title = "User Not Found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class GroupNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/group-not-found"
+    error_title = "Project Not Found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class DomainNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/domain-not-found"
+    error_title = "Domain Not Found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DOMAIN,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ModelDeploymentNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/model-deployment-not-found"
+    error_title = "Model Deployment Not Found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ModelDeploymentUnavailable(BackendAIError, web.HTTPServiceUnavailable):
+    error_type = "https://api.backend.ai/probs/model-deployment-unavailable"
+    error_title = "Model Deployment Unavailable"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
+class ModelRevisionNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/model-revision-not-found"
+    error_title = "Model Revision Not Found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class PassthroughError(BackendAIError):
+    """
+    Wraps and forwards errors from requests with original status code and message.
+    This allows transparent error propagation from requests to API clients.
+    """
+
+    error_type = "https://api.backend.ai/probs/forwarded-error"
+    error_title = "Forwarded Error from Downstream Service"
+
+    def __init__(
+        self,
+        status_code: int,
+        error_code: ErrorCode,
+        error_message: Optional[str] = None,
+    ) -> None:
+        self.status_code = status_code
+        self._error_code = error_code
+        extra_msg = error_message or f"An error occurred with status code {status_code}"
+        super().__init__(extra_msg=extra_msg)
+
+    def error_code(self) -> ErrorCode:
+        return self._error_code
+
+
+class ClientNotConnectedError(BackendAIError, web.HTTPServiceUnavailable):
+    """
+    Raised when attempting to use a client that is not connected.
+    """
+
+    error_type = "https://api.backend.ai/probs/client-not-connected"
+    error_title = "Client Not Connected"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
+class ValkeySentinelMasterNotFound(BackendAIError, web.HTTPServiceUnavailable):
+    """
+    Raised when Sentinel cannot find the master for a service.
+    """
+
+    error_type = "https://api.backend.ai/probs/valkey-sentinel-master-not-found"
+    error_title = "Valkey Sentinel Master Not Found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
+class DatabaseError(BackendAIError, web.HTTPServiceUnavailable):
+    """
+    Raised when a database operation fails.
+    """
+
+    error_type = "https://api.backend.ai/probs/database-error"
+    error_title = "Database Error"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.HEALTH_CHECK,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
+class UserResourcePolicyNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/user-resource-policy-not-found"
+    error_title = "User Resource Policy Not Found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER_RESOURCE_POLICY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class KeypairResourcePolicyNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/keypair-resource-policy-not-found"
+    error_title = "Keypair Resource Policy Not Found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KEYPAIR_RESOURCE_POLICY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class BaseNFSMountCheckFailed(BackendAIError):
+    pass
+
+
+class ShowmountFailed(BaseNFSMountCheckFailed, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/showmount-failed"
+    error_title = "showmount command failed"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.EXTERNAL_SYSTEM,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class ShowmountNotFound(BaseNFSMountCheckFailed, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/showmount-not-found"
+    error_title = "showmount command not found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.EXTERNAL_SYSTEM,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ExportPathNotFound(BaseNFSMountCheckFailed, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/nfs-export-path-not-found"
+    error_title = "NFS export path not found on the server"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.EXTERNAL_SYSTEM,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class NFSTimeoutError(BaseNFSMountCheckFailed, web.HTTPRequestTimeout):
+    error_type = "https://api.backend.ai/probs/nfs-timeout"
+    error_title = "NFS server is not reachable (timeout)"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.EXTERNAL_SYSTEM,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.TIMEOUT,
+        )
+
+
+class NFSUnexpectedError(BaseNFSMountCheckFailed, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/nfs-unexpected-error"
+    error_title = "Unexpected NFS error"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.EXTERNAL_SYSTEM,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class AgentWatcherResponseError(BackendAIError, web.HTTPServiceUnavailable):
+    """
+    Wraps and forwards errors from agent watcher requests with original status code and message.
+    This allows transparent error propagation from requests to API clients.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent-watcher-response-error"
+    error_title = "Agent Watcher Response Error"
+
+    def __init__(
+        self,
+        status_code: int,
+        error_code: ErrorCode,
+        error_message: Optional[str] = None,
+    ) -> None:
+        self.status_code = status_code
+        self._error_code = error_code
+        extra_msg = (
+            error_message
+            or f"An error occurred while processing agent watcher request with status code {status_code}"
+        )
+        super().__init__(extra_msg=extra_msg)
+
+    def error_code(self) -> ErrorCode:
+        return self._error_code
+
+
+class ContainerRegistryGroupsAlreadyAssociated(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/container-registry/groups-already-associated"
+    error_title = "Container registry groups already associated."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.CONTAINER_REGISTRY,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.ALREADY_EXISTS,
         )

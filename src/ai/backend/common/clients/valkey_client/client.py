@@ -1,12 +1,10 @@
 import asyncio
-import functools
 import logging
-import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Iterable, Optional, ParamSpec, Self, TypeVar, cast
+from typing import Any, Final, Iterable, Optional, Self
 
-import glide
+from aiotools import cancel_and_wait
 from glide import (
     AdvancedGlideClientConfiguration,
     GlideClient,
@@ -17,14 +15,10 @@ from glide import (
     ServerCredentials,
     TlsAdvancedConfiguration,
 )
+from glide.exceptions import ClosingError
 from redis.asyncio.sentinel import Sentinel
 
-from ai.backend.common.exception import BackendAIError, UnreachableError
-from ai.backend.common.metrics.metric import (
-    DomainType,
-    LayerMetricObserver,
-    LayerType,
-)
+from ai.backend.common.exception import ClientNotConnectedError, ValkeySentinelMasterNotFound
 from ai.backend.common.utils import addr_to_hostport_pair
 from ai.backend.logging import BraceStyleAdapter
 
@@ -33,7 +27,12 @@ from ...types import ValkeyTarget
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-_DEFAULT_REQUEST_TIMEOUT = 1_000  # Default request timeout in milliseconds
+_DEFAULT_REQUEST_TIMEOUT: Final[int] = 1_000  # Default request timeout in milliseconds
+_MONITOR_REQUEST_TIMEOUT: Final[int] = 3_000  # Fixed timeout for monitor client in milliseconds
+_DEFAULT_CONSECUTIVE_FAILURE_THRESHOLD: Final[int] = (
+    3  # Number of consecutive failures before reconnection
+)
+_DEFAULT_MONITOR_INTERVAL: Final[float] = 10.0  # Interval between ping attempts in seconds
 
 Logger.init(LogLevel.OFF)  # Disable Glide logging by default
 
@@ -110,6 +109,26 @@ class AbstractValkeyClient(ABC):
     async def disconnect(self) -> None:
         pass
 
+    @abstractmethod
+    async def ping(self) -> None:
+        """
+        Ping the server to check if the connection is alive.
+
+        Raises:
+            Exception: If the ping fails or connection is not available
+        """
+        pass
+
+    @abstractmethod
+    async def need_reconnect(self) -> bool:
+        """
+        Check if reconnection is needed.
+
+        For Sentinel clients, this checks if the master address has changed.
+        For standalone clients, this returns True only if the client is not connected.
+        """
+        raise NotImplementedError
+
 
 class ValkeyStandaloneClient(AbstractValkeyClient):
     _target: ValkeyStandaloneTarget
@@ -117,7 +136,6 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
     _db_id: int
     _pubsub_channels: Optional[set[str]]
     _human_readable_name: str
-    _monitor_task: Optional[asyncio.Task[None]]
 
     def __init__(
         self,
@@ -131,12 +149,11 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
         self._db_id = db_id
         self._human_readable_name = human_readable_name
         self._pubsub_channels = pubsub_channels
-        self._monitor_task = None
 
     @property
     def client(self) -> GlideClient:
         if self._valkey_client is None:
-            raise RuntimeError("ValkeyStandaloneClient not connected. Call connect() first.")
+            raise ClientNotConnectedError("ValkeyStandaloneClient is not connected")
         return self._valkey_client
 
     async def connect(self) -> None:
@@ -144,17 +161,8 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
             return
 
         await self._create_valkey_client()
-        self._monitor_task = asyncio.create_task(self._monitor_connection())
 
     async def disconnect(self) -> None:
-        if self._monitor_task:
-            self._monitor_task.cancel()
-            try:
-                await self._monitor_task
-            except asyncio.CancelledError:
-                pass
-            self._monitor_task = None
-
         if self._valkey_client:
             await self._valkey_client.close(err_message="ValkeyStandaloneClient is closed.")
             self._valkey_client = None
@@ -192,84 +200,27 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
         glide_client = await GlideClient.create(config)
         self._valkey_client = glide_client
 
-        log.info(
+        log.debug(
             "Created ValkeyClient for standalone at {}:{} for database {}",
             target_host,
             target_port,
             self._human_readable_name,
         )
 
-    async def _ping(self) -> bool:
+    async def ping(self) -> None:
         """
         Ping the server to check if the connection is alive.
+
+        Raises:
+            ClientNotConnectedError: If the client is not connected
+            Exception: If the ping fails
         """
         if self._valkey_client is None:
-            return False
-        try:
-            await self._valkey_client.ping()
-            return True
-        except glide.ClosingError as e:
-            target_host, target_port = addr_to_hostport_pair(self._target.address)
-            log.warning(
-                "Valkey client is closed for standalone at {}:{}, human readable name '{}': {}",
-                target_host,
-                target_port,
-                self._human_readable_name,
-                e,
-            )
-            return False
-        except Exception as e:
-            log.debug(
-                "Failed to ping to service '{}', human readable name '{}', but cannot check if the connection is alive: {}",
-                self._target.address,
-                self._human_readable_name,
-                e,
-            )
-            return True
+            raise ClientNotConnectedError("ValkeyStandaloneClient is not connected")
+        await self._valkey_client.ping()
 
-    async def _check_connection(self) -> bool:
-        """
-        Check if the current connection is alive.
-        If not, return False to trigger reconnection.
-        """
-        if not await self._ping():
-            target_host, target_port = addr_to_hostport_pair(self._target.address)
-            log.warning(
-                "Connection to standalone server {}:{} is down, attempting to reconnect",
-                target_host,
-                target_port,
-            )
-            return False
-        return True
-
-    async def _monitor_connection(self) -> None:
-        while True:
-            try:
-                await asyncio.sleep(10.0)
-                if await self._check_connection():
-                    continue
-                target_host, target_port = addr_to_hostport_pair(self._target.address)
-                log.info(
-                    "Reconnecting to standalone server at {}:{}",
-                    target_host,
-                    target_port,
-                )
-                await self._reconnect()
-
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                log.exception("Error in connection monitoring: {}", e)
-
-    async def _reconnect(self) -> None:
-        if self._valkey_client:
-            try:
-                await self._valkey_client.close()
-            except Exception as e:
-                log.warning("Error closing old client: {}", e)
-            self._valkey_client = None
-
-        await self._create_valkey_client()
+    async def need_reconnect(self) -> bool:
+        return self._valkey_client is None
 
 
 class ValkeySentinelClient(AbstractValkeyClient):
@@ -280,7 +231,6 @@ class ValkeySentinelClient(AbstractValkeyClient):
     _pubsub_channels: Optional[set[str]]
     _valkey_client: Optional[GlideClient]
     _master_address: Optional[tuple[str, int]]
-    _monitor_task: Optional[asyncio.Task[None]]
 
     def __init__(
         self,
@@ -309,12 +259,11 @@ class ValkeySentinelClient(AbstractValkeyClient):
         self._pubsub_channels = pubsub_channels
         self._valkey_client = None
         self._master_address = None
-        self._monitor_task = None
 
     @property
     def client(self) -> GlideClient:
         if self._valkey_client is None:
-            raise RuntimeError("ValkeySentinelClient not connected. Call connect() first.")
+            raise ClientNotConnectedError("ValkeySentinelClient is not connected")
         return self._valkey_client
 
     async def connect(self) -> None:
@@ -322,17 +271,8 @@ class ValkeySentinelClient(AbstractValkeyClient):
             return
 
         await self._create_valkey_client()
-        self._monitor_task = asyncio.create_task(self._monitor_connction())
 
     async def disconnect(self) -> None:
-        if self._monitor_task:
-            self._monitor_task.cancel()
-            try:
-                await self._monitor_task
-            except asyncio.CancelledError:
-                pass
-            self._monitor_task = None
-
         if self._valkey_client:
             await self._valkey_client.close(err_message="ValkeySentinelClient is closed.")
             self._valkey_client = None
@@ -340,8 +280,8 @@ class ValkeySentinelClient(AbstractValkeyClient):
     async def _create_valkey_client(self) -> None:
         master_address = await self._get_master_address()
         if master_address is None:
-            raise RuntimeError(
-                f"Cannot find master for service '{self._target.service_name}' in {self._human_readable_name}"
+            raise ValkeySentinelMasterNotFound(
+                f"Cannot find master for service '{self._target.service_name}'"
             )
 
         self._master_address = master_address
@@ -393,81 +333,47 @@ class ValkeySentinelClient(AbstractValkeyClient):
             )
             return None
 
-    async def _ping(self) -> bool:
+    async def ping(self) -> None:
         """
         Ping the current master to check if the connection is alive.
+
+        Raises:
+            ClientNotConnectedError: If the client is not connected
+            Exception: If the ping fails
         """
         if self._valkey_client is None:
-            return False
-        try:
-            await self._valkey_client.ping()
-            return True
-        except glide.ClosingError as e:
-            log.warning(
-                "Valkey client is closed for service '{}', human readable name '{}': {}",
-                self._target.service_name,
-                self._human_readable_name,
-                e,
-            )
-            return False
-        except Exception as e:
-            log.debug(
-                "Failed to ping to service '{}', human readable name '{}', but cannot check if the connection is alive: {}",
-                self._target.service_name,
-                self._human_readable_name,
-                e,
-            )
+            raise ClientNotConnectedError("ValkeySentinelClient is not connected")
+        await self._valkey_client.ping()
+
+    async def need_reconnect(self) -> bool:
+        """Check if reconnection is needed (client disconnected or master changed)."""
+        if self._valkey_client is None:
             return True
 
-    async def _check_connection(self) -> bool:
-        """
-        Check if the current master connection is alive.
-        If not, attempt to reconnect.
-        """
-        if not await self._ping():
-            log.warning(
-                "Connection to master {}:{} is down, attempting to reconnect",
-                self._master_address[0] if self._master_address else "unregistered",
-                self._master_address[1] if self._master_address else "unregistered",
-            )
-            return False
+        if self._master_address is None:
+            return True
+
         current_master = await self._get_master_address()
-        if current_master is None or current_master == self._master_address:
-            return True
-        log.warning(
-            "Master change detected for service '{}': {}:{} -> {}:{} in {}",
-            self._target.service_name,
-            self._master_address[0] if self._master_address else "unregistered",
-            self._master_address[1] if self._master_address else "unregistered",
-            current_master[0],
-            current_master[1],
-            self._human_readable_name,
-        )
-        return False
+        if current_master is None:
+            return False
 
-    async def _monitor_connction(self) -> None:
-        while True:
-            try:
-                await asyncio.sleep(10.0)
-                if await self._check_connection():
-                    continue
-                log.info("Reconnecting to new master for service '{}'", self._target.service_name)
-                await self._reconnect_to_new_master()
+        return current_master != self._master_address
 
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                log.exception("Error in master monitoring: {}", e)
 
-    async def _reconnect_to_new_master(self) -> None:
-        if self._valkey_client:
-            try:
-                await self._valkey_client.close()
-            except Exception as e:
-                log.warning("Error closing old client: {}", e)
-            self._valkey_client = None
-
-        await self._create_valkey_client()
+def _create_valkey_client_internal(
+    valkey_target: ValkeyTarget,
+    db_id: int,
+    human_readable_name: str,
+    pubsub_channels: Optional[set[str]] = None,
+) -> AbstractValkeyClient:
+    """
+    Internal helper to create a basic Valkey client (Standalone or Sentinel).
+    """
+    if valkey_target.sentinel:
+        sentinel_target = ValkeySentinelTarget.from_valkey_target(valkey_target)
+        return ValkeySentinelClient(sentinel_target, db_id, human_readable_name, pubsub_channels)
+    standalone_target = ValkeyStandaloneTarget.from_valkey_target(valkey_target)
+    return ValkeyStandaloneClient(standalone_target, db_id, human_readable_name, pubsub_channels)
 
 
 def create_valkey_client(
@@ -478,253 +384,182 @@ def create_valkey_client(
 ) -> AbstractValkeyClient:
     """
     Factory function to create a Valkey client based on the target type.
+
+    Returns MonitoringValkeyClient that wraps separate work and monitor clients
+    for improved reliability with long-running operations.
     """
-    if valkey_target.sentinel:
-        sentinel_target = ValkeySentinelTarget.from_valkey_target(valkey_target)
-        return ValkeySentinelClient(sentinel_target, db_id, human_readable_name, pubsub_channels)
-    standalone_target = ValkeyStandaloneTarget.from_valkey_target(valkey_target)
-    return ValkeyStandaloneClient(standalone_target, db_id, human_readable_name, pubsub_channels)
+    # Create operation client with user-specified timeout
+    operation_client = _create_valkey_client_internal(
+        valkey_target, db_id, human_readable_name, pubsub_channels
+    )
+
+    # Create monitor client with fixed 3-second timeout
+    monitor_target = ValkeyTarget(
+        addr=valkey_target.addr,
+        sentinel=valkey_target.sentinel,
+        service_name=valkey_target.service_name,
+        password=valkey_target.password,
+        request_timeout=_MONITOR_REQUEST_TIMEOUT,
+        use_tls=valkey_target.use_tls,
+        tls_skip_verify=valkey_target.tls_skip_verify,
+    )
+    monitor_client = _create_valkey_client_internal(
+        monitor_target, db_id, f"{human_readable_name}-monitor", None
+    )
+
+    return MonitoringValkeyClient(operation_client, monitor_client)
 
 
-P = ParamSpec("P")
-R = TypeVar("R")
-
-
-def create_layer_aware_valkey_decorator(
-    layer: LayerType,
-    default_retry_count: int = 3,
-    default_retry_delay: float = 0.1,
-):
+class MonitoringValkeyClient(AbstractValkeyClient):
     """
-    Factory function to create layer-aware valkey decorators.
+    Valkey client wrapper with separated monitor client for health checks.
 
-    Args:
-        layer: The layer type for metric observation
-        default_retry_count: Default number of retries for valkey operations
-        default_retry_delay: Default delay between retries in seconds
+    This client wraps two separate Valkey clients:
+    - operation_client: For actual operations (user-specified timeout)
+    - monitor_client: For health checks only (fixed 3-second timeout)
 
-    Returns:
-        A valkey_decorator function configured for the specified layer
+    This separation prevents timeout issues when performing long-running operations
+    like stream reads while maintaining connection health monitoring.
     """
 
-    def valkey_decorator(
-        *,
-        retry_count: int = default_retry_count,
-        retry_delay: float = default_retry_delay,
-    ) -> Callable[
-        [Callable[P, Awaitable[R]]],
-        Callable[P, Awaitable[R]],
-    ]:
+    _operation_client: AbstractValkeyClient
+    _monitor_client: AbstractValkeyClient
+    _monitor_task: Optional[asyncio.Task[None]]
+    _reconnectable_exceptions: tuple[type[Exception], ...]
+    _consecutive_failure_threshold: int
+    _consecutive_failure_count: int
+
+    def __init__(
+        self,
+        operation_client: AbstractValkeyClient,
+        monitor_client: AbstractValkeyClient,
+        reconnectable_exceptions: tuple[type[Exception], ...] = (
+            ClosingError,
+            ClientNotConnectedError,
+        ),
+        consecutive_failure_threshold: int = _DEFAULT_CONSECUTIVE_FAILURE_THRESHOLD,
+    ) -> None:
+        self._operation_client = operation_client
+        self._monitor_client = monitor_client
+        self._monitor_task = None
+        self._reconnectable_exceptions = reconnectable_exceptions
+        self._consecutive_failure_threshold = consecutive_failure_threshold
+        self._consecutive_failure_count = 0
+        self._closed = False
+
+    @property
+    def client(self) -> GlideClient:
+        return self._operation_client.client
+
+    async def connect(self) -> None:
+        await self._operation_client.connect()
+        await self._monitor_client.connect()
+        self._monitor_task = asyncio.create_task(self._monitor_connection())
+
+    async def disconnect(self) -> None:
+        self._closed = True
+        if self._monitor_task:
+            await cancel_and_wait(self._monitor_task)
+            self._monitor_task = None
+
+        await self._monitor_client.disconnect()
+        await self._operation_client.disconnect()
+
+    async def ping(self) -> None:
         """
-        Decorator for Valkey client operations that adds retry logic and metrics.
+        Ping the server to check if the connection is alive.
+        Uses the monitor client to avoid interfering with operation tasks.
 
-        Note: This decorator should only be applied to public methods that are exposed
-        to external users. Internal/private methods should not use this decorator.
+        Raises:
+            ClientNotConnectedError: If the client is not connected
+            Exception: If the ping fails
         """
+        await self._monitor_client.ping()
 
-        def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
-            observer = LayerMetricObserver.instance()
-            operation = func.__name__
+    async def need_reconnect(self) -> bool:
+        return await self._monitor_client.need_reconnect()
 
-            async def wrapper(*args, **kwargs) -> R:
-                log.trace("Calling {}", operation)
-                start = time.perf_counter()
-                for attempt in range(retry_count):
-                    try:
-                        observer.observe_layer_operation_triggered(
-                            domain=DomainType.VALKEY,
-                            layer=layer,
-                            operation=operation,
-                        )
-                        res = await func(*args, **kwargs)
-                        observer.observe_layer_operation(
-                            domain=DomainType.VALKEY,
-                            layer=layer,
-                            operation=operation,
-                            success=True,
-                            duration=time.perf_counter() - start,
-                        )
-                        return res
-                    except BackendAIError as e:
-                        log.exception(
-                            "Error in valkey request method {}, args: {}, kwargs: {}, retry_count: {}, error: {}",
-                            operation,
-                            args,
-                            kwargs,
-                            retry_count,
-                            e,
-                        )
-                        observer.observe_layer_operation(
-                            domain=DomainType.VALKEY,
-                            layer=layer,
-                            operation=operation,
-                            success=False,
-                            duration=time.perf_counter() - start,
-                        )
-                        # If it's a BackendAIError, this error is intended to be handled by the caller.
-                        raise e
-                    except glide.TimeoutError as e:
-                        if attempt < retry_count - 1:
-                            observer.observe_layer_retry(
-                                domain=DomainType.VALKEY,
-                                layer=layer,
-                                operation=operation,
-                            )
-                            await asyncio.sleep(retry_delay)
-                            continue
-                        log.warning(
-                            "Timeout in {}, args: {}, kwargs: {}, retry_count: {}, error: {}",
-                            operation,
-                            args,
-                            kwargs,
-                            retry_count,
-                            e,
-                        )
-                        observer.observe_layer_operation(
-                            domain=DomainType.VALKEY,
-                            layer=layer,
-                            operation=operation,
-                            success=False,
-                            duration=time.perf_counter() - start,
-                        )
-                        raise e
-                    except Exception as e:
-                        if attempt < retry_count - 1:
-                            log.debug(
-                                "Retrying {} due to error: {} (attempt {}/{})",
-                                operation,
-                                e,
-                                attempt + 1,
-                                retry_count,
-                            )
-                            observer.observe_layer_retry(
-                                domain=DomainType.VALKEY,
-                                layer=layer,
-                                operation=operation,
-                            )
-                            await asyncio.sleep(retry_delay)
-                            continue
-                        log.exception(
-                            "Error in {}, args: {}, kwargs: {}, retry_count: {}, error: {}",
-                            operation,
-                            args,
-                            kwargs,
-                            retry_count,
-                            e,
-                        )
-                        observer.observe_layer_operation(
-                            domain=DomainType.VALKEY,
-                            layer=layer,
-                            operation=operation,
-                            success=False,
-                            duration=time.perf_counter() - start,
-                        )
-                        raise e
-                raise UnreachableError(
-                    f"Reached unreachable code in {operation} after {retry_count} attempts"
+    async def _check_ping(self) -> bool:
+        """
+        Ping the monitor client and determine if reconnection is needed.
+
+        Returns:
+            True if reconnection is needed, False otherwise.
+        """
+        reconnectable_exceptions = self._reconnectable_exceptions
+        try:
+            await self._monitor_client.ping()
+            self._consecutive_failure_count = 0
+            return False
+        except reconnectable_exceptions as e:
+            log.warning("Connection error: {}, reconnecting immediately...", e)
+            self._consecutive_failure_count = 0
+            return True
+        except Exception as e:
+            self._consecutive_failure_count += 1
+            log.warning(
+                "Error in connection monitoring (consecutive failures: {}/{}): {}",
+                self._consecutive_failure_count,
+                self._consecutive_failure_threshold,
+                e,
+            )
+            if self._consecutive_failure_count >= self._consecutive_failure_threshold:
+                log.warning(
+                    "Consecutive failure threshold reached ({}), reconnecting...",
+                    self._consecutive_failure_threshold,
                 )
+                self._consecutive_failure_count = 0
+                return True
+            return False
 
-            return wrapper
-
-        return decorator
-
-    return valkey_decorator
-
-
-def create_layer_aware_valkey_decorator_with_default(
-    layer: LayerType,
-):
-    """
-    Factory function to create layer-aware valkey decorators.
-
-    Args:
-        layer: The layer type for metric observation
-
-    Returns:
-        A valkey_decorator function configured for the specified layer
-    """
-
-    def valkey_decorator(
-        *,
-        retry_count: int = 1,
-        retry_delay: float = 0.1,
-        default_return: R,
-    ) -> Callable[
-        [Callable[P, Awaitable[R]]],
-        Callable[P, Awaitable[R]],
-    ]:
+    async def _check_connection(self) -> bool:
         """
-        Decorator for Valkey client operations that adds retry logic and metrics.
-        If `default_return` is set (even to None), it will be returned on final failure.
+        Check if reconnection is needed by ping and need_reconnect.
+
+        Returns:
+            True if reconnection is needed, False otherwise.
         """
+        if await self._check_ping():
+            return True
 
-        def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
-            observer = LayerMetricObserver.instance()
+        if await self._monitor_client.need_reconnect():
+            log.info("Reconnection needed (master changed), reconnecting...")
+            return True
 
-            @functools.wraps(func)
-            async def wrapper(*args, **kwargs) -> R:
-                log.trace("Calling {}", func.__name__)
-                start = time.perf_counter()
+        return False
 
-                for attempt in range(retry_count):
-                    try:
-                        observer.observe_layer_operation_triggered(
-                            domain=DomainType.VALKEY,
-                            layer=layer,
-                            operation=func.__name__,
-                        )
-                        res = await func(*args, **kwargs)
-                        observer.observe_layer_operation(
-                            domain=DomainType.VALKEY,
-                            layer=layer,
-                            operation=func.__name__,
-                            success=True,
-                            duration=time.perf_counter() - start,
-                        )
-                        return res
-                    except BackendAIError as e:
-                        log.exception(
-                            "Handled BackendAIError in {}, args: {}, kwargs: {}, retry: {}, error: {}",
-                            func.__name__,
-                            args,
-                            kwargs,
-                            retry_count,
-                            e,
-                        )
-                        observer.observe_layer_operation(
-                            domain=DomainType.VALKEY,
-                            layer=layer,
-                            operation=func.__name__,
-                            success=False,
-                            duration=time.perf_counter() - start,
-                        )
-                        break
-                    except Exception as e:
-                        if attempt < retry_count - 1:
-                            await asyncio.sleep(retry_delay)
-                            continue
-                        log.exception(
-                            "Unhandled error in {}, args: {}, kwargs: {}, retry: {}, error: {}",
-                            func.__name__,
-                            args,
-                            kwargs,
-                            retry_count,
-                            e,
-                        )
-                        observer.observe_layer_operation(
-                            domain=DomainType.VALKEY,
-                            layer=layer,
-                            operation=func.__name__,
-                            success=False,
-                            duration=time.perf_counter() - start,
-                        )
-                        break
+    async def _monitor_connection(self) -> None:
+        log.info("Starting Valkey connection monitor task...")
+        try:
+            while True:
+                try:
+                    await asyncio.sleep(_DEFAULT_MONITOR_INTERVAL)
+                    if await self._check_connection():
+                        log.info("Reconnecting Valkey clients...")
+                        await self._reconnect()
+                except asyncio.CancelledError:
+                    # Normal shutdown - don't log as error
+                    raise
+                except Exception as e:
+                    if not self._closed:
+                        log.exception("Error in Valkey connection monitor: {}", e)
+                        continue
+                    raise
+        finally:
+            log.info("Valkey connection monitor task stopped. Client closed: {}", self._closed)
 
-                log.warning("Returning default value from {} after failure", func.__name__)
-                return cast(R, default_return)
+    async def _reconnect(self) -> None:
+        # Disconnect both clients
+        try:
+            await self._monitor_client.disconnect()
+        except Exception as e:
+            log.warning("Error disconnecting monitor client: {}", e)
 
-            return wrapper
+        try:
+            await self._operation_client.disconnect()
+        except Exception as e:
+            log.warning("Error disconnecting operation client: {}", e)
 
-        return decorator
-
-    return valkey_decorator
+        # Reconnect both clients
+        await self._operation_client.connect()
+        await self._monitor_client.connect()

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import enum
 import logging
 import math
@@ -75,6 +74,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.types import SessionStatus
 
 from .defs import DEFAULT_ROLE, LockID
+from .errors.kernel import IdlePolicyNotFound
 from .models.kernel import LIVE_STATUS, kernels
 from .models.keypair import keypairs
 from .models.resource_policy import keypair_resource_policies
@@ -320,21 +320,24 @@ class IdleCheckerHost:
                     )
                     result = await conn.execute(query)
                     policy = result.first()
-                    assert policy is not None
+                    if policy is None:
+                        raise IdlePolicyNotFound(
+                            f"Resource policy not found for access_key={kernel['access_key']}"
+                        )
                     policy_cache[kernel["access_key"]] = policy
 
-                check_task = [
+                check_tasks = [
                     checker.check_idleness(kernel, conn, policy, grace_period_end=grace_period_end)
                     for checker in self._checkers
                 ]
-                check_results = await asyncio.gather(*check_task, return_exceptions=True)
+                check_results = await aiotools.gather_safe(check_tasks)
                 terminated = False
-                errors = []
+                errors: list[BaseException] = []
                 for checker, result in zip(self._checkers, check_results):
-                    if isinstance(result, aiotools.TaskGroupError):
-                        errors.extend(result.__errors__)
+                    if isinstance(result, BaseExceptionGroup):
+                        errors.extend(result.exceptions)
                         continue
-                    elif isinstance(result, Exception):
+                    elif isinstance(result, BaseException):
                         # mark to be destroyed afterwards
                         errors.append(result)
                         continue
@@ -995,7 +998,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
         self, redis_obj: ValkeyLiveClient, session_id: SessionId
     ) -> Optional[dict[str, Any]]:
         key = self.get_extra_info_key(session_id)
-        assert key is not None
+        if key is None:
+            raise IdlePolicyNotFound(f"extra_info_key not defined for session {session_id}")
         data = await redis_obj.get_live_data(key)
         return msgpack.unpackb(data) if data is not None else None
 
@@ -1087,8 +1091,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         # Register requested resources.
         requested_resource_names: set[str] = set()
-        for slot_name, val in requested_slots.items():
-            if Decimal(val) == 0:
+        for slot_name, slot_val in requested_slots.items():
+            if Decimal(slot_val) == 0:
                 # The resource is not allocated to this session.
                 continue
             _slot_name = cast(str, slot_name)
@@ -1137,10 +1141,10 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         do_idle_check: bool = True
 
-        for metric_key, val in current_utilizations.items():
+        for metric_key, util_val in current_utilizations.items():
             if metric_key not in util_series:
                 util_series[metric_key] = []
-            util_series[metric_key].append(val)
+            util_series[metric_key].append(util_val)
             if len(util_series[metric_key]) > window_size:
                 util_series[metric_key].pop(0)
             else:
@@ -1177,7 +1181,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
             "resources": util_avg_thresholds.to_dict(),
         }
         _key = self.get_extra_info_key(session_id)
-        assert _key is not None
+        if _key is None:
+            raise IdlePolicyNotFound(f"extra_info_key not defined for session {session_id}")
         await self._redis_live.store_live_data(
             _key,
             msgpack.packb(report),

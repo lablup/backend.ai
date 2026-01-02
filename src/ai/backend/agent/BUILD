@@ -42,6 +42,7 @@ python_distribution(
     name="dist",
     dependencies=[
         ":src",
+        ":src-watcher",
         "src/ai/backend/kernel:src",  # included only in binary dists
         "!!stubs/trafaret:stubs",
     ],
@@ -53,7 +54,7 @@ python_distribution(
     entry_points={
         "backendai_cli_v10": {
             "ag": "ai.backend.agent.cli.__main__:main",
-            "ag.start-server": "ai.backend.agent.server:main",
+            "ag.start-server": "ai.backend.agent.cli.start_server:main",
         },
         "backendai_network_agent_v1": {
             "overlay": "ai.backend.agent.docker.intrinsic:OverlayNetworkPlugin",

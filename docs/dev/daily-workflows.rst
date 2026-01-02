@@ -319,17 +319,19 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
    let g:ale_fixers = {'python': ['ruff']}
    let g:ale_fix_on_save = 1
 
-When using CoC, run ``:CocInstall coc-pyright @yaegassy/coc-ruff`` and ``:CocLocalConfig`` after opening a file
-in the local working copy to initialize Pyright functionalities.
+When using CoC, run ``:CocInstall coc-basedpyright @yaegassy/coc-ruff`` and ``:CocLocalConfig`` after opening a file
+in the local working copy to initialize basedpyright functionalities.
 In the local configuration file (``.vim/coc-settings.json``), you may put the linter/formatter configurations
-just like VSCode (see `the official reference <https://www.npmjs.com/package/coc-pyright>`_).
+just like VSCode (see `the official reference <https://www.npmjs.com/package/coc-pyright>`_,
+as basedpyright shares most configurations with pyright).
 
 .. code-block:: json5
 
    {
-     "coc.preferences.formatOnType": false,
-     "coc.preferences.willSaveHandlerTimeout": 5000,
+     "coc.preferences.formatOnType": true,
+     "coc.preferences.formatOnSaveFiletypes": ["python"],
      "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.13.7/bin/python",
+     "python.analysis.extraPaths": ["dist/export/python/virtualenvs/pytest/3.13.7/lib/python3.13/site-packages"],
      "python.linting.mypyEnabled": true,
      "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.13.7/bin/mypy",
      "python.linting.ruffEnabled": true,
@@ -341,15 +343,19 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
 .. code-block:: json5
 
    {
-     "coc.preferences.formatOnType": false,
-     "coc.preferences.willSaveHandlerTimeout": 5000,
+     "coc.preferences.formatOnType": true,
+     "coc.preferences.formatOnSaveFiletypes": ["python"],
      "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.13.7/bin/python",
+     "python.analysis.extraPaths": ["dist/export/python/virtualenvs/pytest/3.13.7/lib/python3.13/site-packages"],
      "python.linting.mypyEnabled": true,
      "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.13.7/bin/mypy",
-     "python.linting.ruffEnabled": false,
-     // when using @yaegassy/coc-ruff extension
+     "python.linting.ruffEnabled": false,  // delegate to coc-ruff
+     "python.formatting.provider": "none",  // delegate to coc-ruff
+     "pyright.organizeimports.provider": "none",  // delegate to coc-ruff
+     // configuration for @yaegassy/coc-ruff extension
      "ruff.enabled": true,
      "ruff.autoFixOnSave": true,
+     "ruff.useDetectRuffCommand": false,
      "ruff.path": "/abs/path/to/dist/export/bin/ruff",  // absolute path
      "ruff.nativeServer": true,
    }

@@ -1,46 +1,39 @@
-import logging
-from collections.abc import Mapping
-from dataclasses import dataclass
-from typing import Any, Self, override
+from __future__ import annotations
 
-from ai.backend.common.bgtask.reporter import ProgressReporter
-from ai.backend.common.bgtask.task.base import BaseBackgroundTaskArgs, BaseBackgroundTaskHandler
-from ai.backend.common.bgtask.types import TaskName
+import logging
+from typing import TYPE_CHECKING, override
+
+from pydantic import Field
+
+from ai.backend.common.bgtask.task.base import (
+    BaseBackgroundTaskHandler,
+    BaseBackgroundTaskManifest,
+)
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
-from ai.backend.common.types import DispatchResult, VFolderID
+from ai.backend.common.type_adapters import VFolderIDField
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.bgtask.types import StorageBgtaskName
 
-from ...volumes.pool import VolumePool
+if TYPE_CHECKING:
+    from ...volumes.pool import VolumePool
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-@dataclass
-class VFolderDeleteTaskArgs(BaseBackgroundTaskArgs):
-    volume: str
-    vfolder_id: VFolderID
+class VFolderDeleteManifest(BaseBackgroundTaskManifest):
+    """
+    Manifest for deleting a virtual folder.
+    """
 
-    @override
-    def to_metadata_body(self) -> dict[str, Any]:
-        return {
-            "volume": self.volume,
-            "vfolder_id": str(self.vfolder_id),
-        }
-
-    @classmethod
-    @override
-    def from_metadata_body(cls, body: Mapping[str, Any]) -> Self:
-        return cls(
-            volume=body["volume"],
-            vfolder_id=VFolderID.from_str(body["vfolder_id"]),
-        )
+    volume: str = Field(description="Volume name where the vfolder is located")
+    vfolder_id: VFolderIDField = Field(description="VFolder ID to delete")
 
 
-class VFolderDeleteTaskHandler(BaseBackgroundTaskHandler[VFolderDeleteTaskArgs]):
+class VFolderDeleteTaskHandler(BaseBackgroundTaskHandler[VFolderDeleteManifest, None]):
     _volume_pool: VolumePool
     _event_producer: EventProducer
 
@@ -50,39 +43,36 @@ class VFolderDeleteTaskHandler(BaseBackgroundTaskHandler[VFolderDeleteTaskArgs])
 
     @classmethod
     @override
-    def name(cls) -> TaskName:
-        return TaskName.DELETE_VFOLDER
+    def name(cls) -> StorageBgtaskName:
+        return StorageBgtaskName.DELETE_VFOLDER
 
     @override
-    async def execute(
-        self, reporter: ProgressReporter, args: VFolderDeleteTaskArgs
-    ) -> DispatchResult:
+    async def execute(self, manifest: VFolderDeleteManifest) -> None:
         try:
-            async with self._volume_pool.get_volume_by_name(args.volume) as volume:
-                await volume.delete_vfolder(args.vfolder_id)
+            async with self._volume_pool.get_volume_by_name(manifest.volume) as volume:
+                await volume.delete_vfolder(manifest.vfolder_id)
         except Exception as e:
             log.exception(
                 "Failed to delete vfolder (volume=%s, vfolder=%s): %s",
-                args.volume,
-                args.vfolder_id,
+                manifest.volume,
+                manifest.vfolder_id,
                 e,
             )
             await self._event_producer.anycast_event(
                 VFolderDeletionFailureEvent(
-                    args.vfolder_id,
+                    manifest.vfolder_id,
                     str(e),
                 )
             )
-            return DispatchResult(errors=[str(e)])
+            raise e
         else:
             await self._event_producer.anycast_event(
                 VFolderDeletionSuccessEvent(
-                    args.vfolder_id,
+                    manifest.vfolder_id,
                 )
             )
-        return DispatchResult()
 
     @classmethod
     @override
-    def args_type(cls) -> type[VFolderDeleteTaskArgs]:
-        return VFolderDeleteTaskArgs
+    def manifest_type(cls) -> type[VFolderDeleteManifest]:
+        return VFolderDeleteManifest

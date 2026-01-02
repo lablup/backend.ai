@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import uuid
-from typing import Self
+from typing import TYPE_CHECKING, Optional, Self
 
 import sqlalchemy as sa
+from sqlalchemy.orm import relationship
 
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.permission_group import (
     PermissionGroupCreator,
     PermissionGroupData,
+    PermissionGroupExtendedData,
 )
 from ai.backend.manager.data.permission.types import (
     ScopeType,
@@ -20,6 +22,11 @@ from ...base import (
     IDColumn,
     StrEnumType,
 )
+
+if TYPE_CHECKING:
+    from ..association_scopes_entities import AssociationScopesEntitiesRow
+    from ..role import RoleRow
+    from .permission import PermissionRow
 
 
 class PermissionGroupRow(Base):
@@ -35,6 +42,25 @@ class PermissionGroupRow(Base):
         "scope_id", sa.String(64), nullable=False
     )  # e.g., "project_id", "user_id" etc.
 
+    role_row: Optional[RoleRow] = relationship(
+        "RoleRow",
+        back_populates="permission_group_rows",
+        primaryjoin="RoleRow.id == foreign(PermissionGroupRow.role_id)",
+    )
+    mapped_entities: list[AssociationScopesEntitiesRow] = relationship(
+        "AssociationScopesEntitiesRow",
+        primaryjoin="PermissionGroupRow.scope_id == foreign(AssociationScopesEntitiesRow.scope_id)",
+        viewonly=True,
+    )
+    permission_rows: list[PermissionRow] = relationship(
+        "PermissionRow",
+        back_populates="permission_group_row",
+        primaryjoin="PermissionGroupRow.id == foreign(PermissionRow.permission_group_id)",
+    )
+
+    def parsed_scope_id(self) -> ScopeId:
+        return ScopeId(scope_type=self.scope_type, scope_id=self.scope_id)
+
     @classmethod
     def from_input(cls, input: PermissionGroupCreator) -> Self:
         return cls(
@@ -48,4 +74,12 @@ class PermissionGroupRow(Base):
             id=self.id,
             role_id=self.role_id,
             scope_id=ScopeId(scope_type=self.scope_type, scope_id=self.scope_id),
+        )
+
+    def to_extended_data(self) -> PermissionGroupExtendedData:
+        return PermissionGroupExtendedData(
+            id=self.id,
+            role_id=self.role_id,
+            scope_id=ScopeId(scope_type=self.scope_type, scope_id=self.scope_id),
+            permissions=[permission.to_data() for permission in self.permission_rows],
         )

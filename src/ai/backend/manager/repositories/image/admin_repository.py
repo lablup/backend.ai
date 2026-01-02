@@ -4,6 +4,11 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import ImageAlias
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.errors.image import (
@@ -15,6 +20,20 @@ from ai.backend.manager.models.image import (
     ImageRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
+image_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.IMAGE_REPOSITORY)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class AdminImageRepository:
@@ -43,6 +62,7 @@ class AdminImageRepository:
             raise ImageNotFound()
         return image_row
 
+    @image_repository_resilience.apply()
     async def soft_delete_image_force(
         self, identifiers: list[ImageAlias | ImageRef | ImageIdentifier]
     ) -> ImageData:
@@ -56,6 +76,7 @@ class AdminImageRepository:
             data = row.to_dataclass()
         return data
 
+    @image_repository_resilience.apply()
     async def soft_delete_image_by_id_force(self, image_id: UUID) -> ImageData:
         """
         Marks an image as deleted by its ID without checking ownership.
@@ -67,6 +88,7 @@ class AdminImageRepository:
             data = image_row.to_dataclass()
         return data
 
+    @image_repository_resilience.apply()
     async def delete_image_with_aliases_force(self, image_id: UUID) -> ImageData:
         """
         Deletes an image and all its aliases without checking ownership.
@@ -83,6 +105,7 @@ class AdminImageRepository:
         except DBAPIError as e:
             raise PurgeImageActionByIdObjectDBError(str(e))
 
+    @image_repository_resilience.apply()
     async def untag_image_from_registry_force(self, image_id: UUID) -> ImageData:
         """
         Untags an image from registry without ownership check.

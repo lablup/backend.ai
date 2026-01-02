@@ -9,11 +9,13 @@ import ipaddress
 import logging
 import os
 import pwd
+import signal
 import ssl
 import sys
 import traceback
 import uuid
-from contextlib import asynccontextmanager as actxmgr
+from collections.abc import AsyncGenerator
+from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncIterator, Final, Iterable, Mapping, Sequence, cast
 
@@ -36,14 +38,7 @@ from ai.backend.appproxy.common.defs import (
     APPPROXY_ANYCAST_STREAM_KEY,
     APPPROXY_BROADCAST_CHANNEL,
 )
-from ai.backend.appproxy.common.events import (
-    AppProxyCircuitCreatedEvent,
-    AppProxyCircuitRemovedEvent,
-    AppProxyCircuitRouteUpdatedEvent,
-    AppProxyWorkerCircuitAddedEvent,
-)
-from ai.backend.appproxy.common.exceptions import (
-    BackendError,
+from ai.backend.appproxy.common.errors import (
     CoordinatorConnectionError,
     GenericBadRequest,
     GenericForbidden,
@@ -51,8 +46,15 @@ from ai.backend.appproxy.common.exceptions import (
     MethodNotAllowed,
     URLNotFound,
 )
+from ai.backend.appproxy.common.events import (
+    AppProxyCircuitCreatedEvent,
+    AppProxyCircuitRemovedEvent,
+    AppProxyCircuitRouteUpdatedEvent,
+    AppProxyWorkerCircuitAddedEvent,
+)
 from ai.backend.appproxy.common.types import (
     AppCreator,
+    EventLoopType,
     FrontendMode,
     FrontendServerMode,
     ProxyProtocol,
@@ -72,7 +74,12 @@ from ai.backend.common.defs import (
     REDIS_STREAM_DB,
     RedisRole,
 )
+from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
 from ai.backend.common.events.dispatcher import EventDispatcher, EventHandler, EventProducer
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
+from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
+from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
@@ -101,6 +108,13 @@ from .coordinator_client import (
     list_worker_circuits,
     ping_worker,
     register_worker,
+)
+from .errors import (
+    CleanupContextNotInitializedError,
+    MissingAnnounceAddressError,
+    MissingPortProxyConfigError,
+    MissingProfilingConfigError,
+    MissingTraefikConfigError,
 )
 from .metrics import collect_inference_metric
 from .proxy.frontend import (
@@ -169,7 +183,7 @@ async def exception_middleware(
 
     try:
         resp = await handler(request)
-    except BackendError as ex:
+    except BackendAIError as ex:
         if ex.status_code == 500:
             log.exception("Internal server error raised inside handlers")
         if mime_match(request.headers.get("accept", "text/html"), "application/json", strict=True):
@@ -234,7 +248,7 @@ async def last_used_time_marker(root_ctx: RootContext) -> None:
             log.exception("last_used_time_marker(): error while handling request:")
 
 
-@actxmgr
+@asynccontextmanager
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     redis_profile_target = RedisProfileTarget.from_dict(root_ctx.local_config.redis.to_dict())
 
@@ -253,16 +267,49 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     last_used_time_marker_task = asyncio.create_task(last_used_time_marker(root_ctx))
     request_counter_marker_task = asyncio.create_task(request_counter_marker(root_ctx))
+    try:
+        yield
+    finally:
+        last_used_time_marker_task.cancel()
+        await last_used_time_marker_task
+        request_counter_marker_task.cancel()
+        await request_counter_marker_task
 
-    yield
+        await root_ctx.valkey_live.close()
+        await root_ctx.valkey_stat.close()
 
-    last_used_time_marker_task.cancel()
-    await last_used_time_marker_task
-    request_counter_marker_task.cancel()
-    await request_counter_marker_task
 
-    await root_ctx.valkey_live.close()
-    await root_ctx.valkey_stat.close()
+@asynccontextmanager
+async def http_client_pool_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from functools import partial
+
+    import aiohttp
+
+    from ai.backend.common.clients.http_client.client_pool import (
+        ClientPool,
+        tcp_client_session_factory,
+    )
+
+    client_timeout = aiohttp.ClientTimeout(
+        total=None,
+        connect=10.0,
+        sock_connect=10.0,
+        sock_read=None,
+    )
+    cleanup_interval = root_ctx.local_config.proxy_worker.client_pool_cleanup_interval
+
+    root_ctx.http_client_pool = ClientPool(
+        partial(
+            tcp_client_session_factory,
+            timeout=client_timeout,
+            ssl=True,  # SSL verification per endpoint via ClientKey
+        ),
+        cleanup_interval_seconds=cleanup_interval,
+    )
+    try:
+        yield
+    finally:
+        await root_ctx.http_client_pool.close()
 
 
 async def _make_message_queue(
@@ -299,7 +346,7 @@ async def _make_message_queue(
         )
 
 
-@actxmgr
+@asynccontextmanager
 async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     mq = await _make_message_queue(root_ctx)
     root_ctx.event_producer = EventProducer(
@@ -313,15 +360,15 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         event_observer=root_ctx.metrics.event,
     )
     await root_ctx.event_dispatcher.start()
+    try:
+        yield
+    finally:
+        await root_ctx.event_producer.close()
+        await asyncio.sleep(0.2)
+        await root_ctx.event_dispatcher.close()
 
-    yield
 
-    await root_ctx.event_producer.close()
-    await asyncio.sleep(0.2)
-    await root_ctx.event_dispatcher.close()
-
-
-@actxmgr
+@asynccontextmanager
 async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     handlers: list[EventHandler] = [
         root_ctx.event_dispatcher.subscribe(
@@ -333,29 +380,37 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             AppProxyCircuitRemovedEvent,
         )
     ]
-    yield
-    for handler in handlers:
-        root_ctx.event_dispatcher.unsubscribe(handler)
+    try:
+        yield
+    finally:
+        for handler in handlers:
+            root_ctx.event_dispatcher.unsubscribe(handler)
 
 
-@actxmgr
+@asynccontextmanager
 async def proxy_frontend_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     match (
         root_ctx.local_config.proxy_worker.protocol,
         root_ctx.local_config.proxy_worker.frontend_mode,
     ):
         case (ProxyProtocol.HTTP, FrontendServerMode.TRAEFIK):
-            assert root_ctx.local_config.proxy_worker.traefik
+            if not root_ctx.local_config.proxy_worker.traefik:
+                raise MissingTraefikConfigError(
+                    "Traefik configuration is required for TRAEFIK mode"
+                )
             match root_ctx.local_config.proxy_worker.traefik.frontend_mode:
                 case FrontendMode.PORT:
                     root_ctx.proxy_frontend = TraefikPortFrontend(root_ctx)
                 case FrontendMode.WILDCARD_DOMAIN:
                     root_ctx.proxy_frontend = TraefikSubdomainFrontend(root_ctx)
         case (ProxyProtocol.TCP, FrontendServerMode.TRAEFIK):
-            assert (
+            if not (
                 root_ctx.local_config.proxy_worker.traefik
                 and root_ctx.local_config.proxy_worker.traefik.port_proxy
-            )
+            ):
+                raise MissingPortProxyConfigError(
+                    "Traefik and port proxy configuration are required for TCP TRAEFIK mode"
+                )
             root_ctx.proxy_frontend = TraefikTCPFrontend(root_ctx)
         case (ProxyProtocol.HTTP, FrontendServerMode.PORT):
             root_ctx.proxy_frontend = HTTPPortFrontend(root_ctx)
@@ -371,18 +426,20 @@ async def proxy_frontend_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             log.error("Unsupported protocol {}", root_ctx.local_config.proxy_worker.protocol)
     await root_ctx.proxy_frontend.start()
     log.debug("started proxy protocol {}", root_ctx.proxy_frontend.__class__.__name__)
-    yield
-    await root_ctx.proxy_frontend.terminate_all_circuits()
     try:
-        await root_ctx.proxy_frontend.stop()
-    except CleanupError as ee:
-        if all([isinstance(e, asyncio.CancelledError) for e in ee.exceptions]):
-            raise asyncio.CancelledError()
-        else:
-            raise ee
+        yield
+    finally:
+        await root_ctx.proxy_frontend.terminate_all_circuits()
+        try:
+            await root_ctx.proxy_frontend.stop()
+        except CleanupError as ee:
+            if all([isinstance(e, asyncio.CancelledError) for e in ee.exceptions]):
+                raise asyncio.CancelledError()
+            else:
+                raise ee
 
 
-@actxmgr
+@asynccontextmanager
 async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     async for attempt in AsyncRetrying(
         wait=wait_exponential(multiplier=1, min=4, max=10),
@@ -421,24 +478,50 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             log.warning("Failed to ping coordinator: {}", str(e))
 
     timer = aiotools.create_timer(_heartbeat, root_ctx.local_config.proxy_worker.heartbeat_period)
-    yield
-    timer.cancel()
-    await timer
-    await deregister_worker(root_ctx, str(uuid.uuid4()))
+    try:
+        yield
+    finally:
+        await aiotools.cancel_and_wait(timer)
+        await deregister_worker(root_ctx, str(uuid.uuid4()))
 
 
-@actxmgr
+@asynccontextmanager
 async def inference_metric_collection_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     timer = aiotools.create_timer(
         functools.partial(collect_inference_metric, root_ctx),
         root_ctx.local_config.proxy_worker.inference_metric_collection_interval,
     )
-    yield
-    timer.cancel()
-    await timer
+    try:
+        yield
+    finally:
+        await aiotools.cancel_and_wait(timer)
 
 
-@actxmgr
+@asynccontextmanager
+async def health_probe_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    """Initialize and start health probe with all health checkers."""
+    probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
+    root_ctx.health_probe = probe
+
+    # Register health checkers using already-initialized resources
+    await probe.register(
+        ValkeyHealthChecker(
+            clients={
+                ComponentId("live"): root_ctx.valkey_live,
+                ComponentId("stat"): root_ctx.valkey_stat,
+            }
+        )
+    )
+
+    # Start periodic health checking
+    await probe.start()
+    try:
+        yield
+    finally:
+        await probe.stop()
+
+
+@asynccontextmanager
 async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     sd_type = root_ctx.local_config.service_discovery.type
     service_discovery: ServiceDiscovery
@@ -456,7 +539,8 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     # Determine announce addresses
     announce_addr = root_ctx.local_config.proxy_worker.announce_addr
-    assert announce_addr is not None  # auto-populated if None
+    if announce_addr is None:
+        raise MissingAnnounceAddressError("Announce address is not configured")
     sd_loop = ServiceDiscoveryLoop(
         sd_type,
         service_discovery,
@@ -484,8 +568,10 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             endpoint=root_ctx.local_config.otel.endpoint,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
-    yield
-    sd_loop.close()
+    try:
+        yield
+    finally:
+        sd_loop.close()
 
 
 async def metrics(request: web.Request) -> web.Response:
@@ -511,12 +597,17 @@ async def metrics(request: web.Request) -> web.Response:
 
 
 async def hello(request: web.Request) -> web.Response:
-    """
-    Returns the API version number.
-    """
-    return web.json_response({
-        "proxy-worker": __version__,
-    })
+    """Health check endpoint with dependency connectivity status"""
+    request["do_not_print_access_log"] = True
+    root_ctx: RootContext = request.app["_root.context"]
+    connectivity = await root_ctx.health_probe.get_connectivity_status()
+    response = HealthResponse(
+        status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
+        version=__version__,
+        component="appproxy-worker",
+        connectivity=connectivity,
+    )
+    return web.json_response(response.model_dump(mode="json"))
 
 
 async def status(request: web.Request) -> web.Response:
@@ -655,6 +746,8 @@ def build_root_app(
             cleanup_contexts = [
                 proxy_frontend_ctx,
                 redis_ctx,
+                http_client_pool_ctx,
+                health_probe_ctx,
                 service_discovery_ctx,
                 worker_registration_ctx,
                 inference_metric_collection_ctx,
@@ -663,38 +756,38 @@ def build_root_app(
             cleanup_contexts = [
                 proxy_frontend_ctx,
                 redis_ctx,
+                http_client_pool_ctx,
                 event_dispatcher_ctx,
                 event_handler_ctx,
+                health_probe_ctx,
                 service_discovery_ctx,
                 worker_registration_ctx,
                 inference_metric_collection_ctx,
             ]
+    shutdown_context_instances = []
 
-    async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
+    async def _cleanup_context_wrapper(app: web.Application) -> AsyncIterator[None]:
         # aiohttp's cleanup contexts are just async generators, not async context managers.
-        cctx_instance = cctx(app["_root.context"])
-        app["_cctx_instances"].append(cctx_instance)
-        try:
-            async with cctx_instance:
-                yield
-        except Exception as e:
-            exc_info = (type(e), e, e.__traceback__)
-            log.error("Error initializing cleanup_contexts: {0}", cctx.__name__, exc_info=exc_info)
+        if cleanup_contexts is None:
+            raise CleanupContextNotInitializedError("Cleanup contexts are not initialized")
+        async with AsyncExitStack() as stack:
+            for cctx in cleanup_contexts:
+                cctx_instance = cctx(root_ctx)
+                if hasattr(cctx_instance, "shutdown"):
+                    shutdown_context_instances.append(cctx_instance)
+                await stack.enter_async_context(cctx_instance)
+            yield
 
-    async def _call_cleanup_context_shutdown_handlers(app: web.Application) -> None:
-        for cctx in app["_cctx_instances"]:
-            if hasattr(cctx, "shutdown"):
-                try:
-                    await cctx.shutdown()
-                except Exception:
-                    log.exception("error while shutting down a cleanup context")
+    async def _trigger_shutdown(app: web.Application) -> None:
+        # shutdown is triggered before cleanup, giving chances to close client connections first.
+        for cctx_instance in shutdown_context_instances:
+            try:
+                await cctx_instance.shutdown()
+            except Exception:
+                log.exception("error while shutting down a cleanup context")
 
-    app["_cctx_instances"] = []
-    app.on_shutdown.append(_call_cleanup_context_shutdown_handlers)
-    for cleanup_ctx in cleanup_contexts:
-        app.cleanup_ctx.append(
-            functools.partial(_cleanup_context_wrapper, cleanup_ctx),
-        )
+    app.on_shutdown.append(_trigger_shutdown)
+    app.cleanup_ctx.append(_cleanup_context_wrapper)
     cors = aiohttp_cors.setup(app, defaults=root_ctx.cors_options)
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", r"", hello))
@@ -711,53 +804,60 @@ def build_root_app(
     return app
 
 
-@actxmgr
+@asynccontextmanager
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    _args: tuple[ServerConfig, str],
+    _args: Sequence[Any],
 ) -> AsyncIterator[None]:
-    root_app = build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
-    root_ctx: RootContext = root_app["_root.context"]
+    local_config: ServerConfig = _args[0]
+    loop.set_debug(local_config.debug.asyncio)
+    root_app = build_root_app(pidx, local_config, subapp_pkgs=global_subapp_pkgs)
 
-    # Start aiomonitor.
-    # Port is set by config (default=50100 + pidx).
-    loop.set_debug(root_ctx.local_config.debug.asyncio)
-    m = aiomonitor.Monitor(
-        loop,
-        host="0.0.0.0",
-        termui_port=root_ctx.local_config.proxy_worker.aiomonitor_termui_port + pidx,
-        webui_port=root_ctx.local_config.proxy_worker.aiomonitor_webui_port + pidx,
-        console_enabled=False,
-        hook_task_factory=root_ctx.local_config.debug.enhanced_aiomonitor_task_info,
-    )
-    m.prompt = f"monitor (proxy-worker[{pidx}@{os.getpid()}]) >>> "
-    # Add some useful console_locals for ease of debugging
-    m.console_locals["root_app"] = root_app
-    m.console_locals["root_ctx"] = root_ctx
-    aiomon_started = False
-    try:
-        m.start()
-        aiomon_started = True
-    except Exception as e:
-        log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
+    @asynccontextmanager
+    async def aiomonitor_ctx() -> AsyncGenerator[None]:
+        # Start aiomonitor.
+        m = aiomonitor.Monitor(
+            loop,
+            host="0.0.0.0",
+            termui_port=local_config.proxy_worker.aiomonitor_termui_port + pidx,
+            webui_port=local_config.proxy_worker.aiomonitor_webui_port + pidx,
+            console_enabled=False,
+            hook_task_factory=local_config.debug.enhanced_aiomonitor_task_info,
+        )
+        m.prompt = f"monitor (proxy-worker[{pidx}@{os.getpid()}]) >>> "
+        # Add some useful console_locals for ease of debugging
+        m.console_locals["root_app"] = root_app
+        m.console_locals["root_ctx"] = root_app["_root.context"]
+        aiomon_started = False
+        try:
+            m.start()
+            aiomon_started = True
+        except Exception as e:
+            log.warning(
+                "aiomonitor could not start but skipping this error to continue", exc_info=e
+            )
+        try:
+            yield
+        finally:
+            if aiomon_started:
+                m.close()
 
-    # Plugin webapps should be loaded before runner.setup(),
-    # which freezes on_startup event.
-    try:
+    @asynccontextmanager
+    async def webapp_ctx() -> AsyncGenerator[None]:
         ssl_ctx = None
-        if root_ctx.local_config.proxy_worker.tls_listen:
+        if local_config.proxy_worker.tls_listen:
             ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
             ssl_ctx.load_cert_chain(
-                str(root_ctx.local_config.proxy_worker.tls_cert),
-                str(root_ctx.local_config.proxy_worker.tls_privkey),
+                str(local_config.proxy_worker.tls_cert),
+                str(local_config.proxy_worker.tls_privkey),
             )
 
         runner = web.AppRunner(
             root_app, keepalive_timeout=30.0, access_log_class=BackendAIAccessLogger
         )
         await runner.setup()
-        service_addr = root_ctx.local_config.proxy_worker.api_bind_addr
+        service_addr = local_config.proxy_worker.api_bind_addr
         site = web.TCPSite(
             runner,
             str(service_addr.host),
@@ -767,34 +867,44 @@ async def server_main(
             ssl_context=ssl_ctx,
         )
         await site.start()
+        try:
+            yield
+        finally:
+            await runner.cleanup()
+
+    worker_init_stack = AsyncExitStack()
+    await worker_init_stack.__aenter__()
+    try:
+        await worker_init_stack.enter_async_context(aiomonitor_ctx())
+        await worker_init_stack.enter_async_context(webapp_ctx())
 
         if os.geteuid() == 0:
-            uid = root_ctx.local_config.proxy_worker.user
-            gid = root_ctx.local_config.proxy_worker.group
+            uid = local_config.proxy_worker.user
+            gid = local_config.proxy_worker.group
             os.setgroups([
                 g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem
             ])
             os.setgid(gid)
             os.setuid(uid)
             log.info("changed process uid and gid to {}:{}", uid, gid)
-        log.info("started handling API requests at {}", service_addr)
 
-        try:
-            yield
-        finally:
-            await runner.cleanup()
+        log.info("Started the app-proxy worker service.")
+    except Exception:
+        log.exception("Server initialization failure; triggering shutdown...")
+        loop.call_later(0.2, os.kill, 0, signal.SIGINT)
+    try:
+        yield
     finally:
-        if aiomon_started:
-            m.close()
-        log.debug("The number of leftover asyncio tasks: {}", len(asyncio.all_tasks()))
+        log.info("shutting down...")
+        await worker_init_stack.__aexit__(None, None, None)
 
 
-@actxmgr
+@aiotools.server_context
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    _args: tuple[ServerConfig, str],
-) -> AsyncIterator[None]:
+    _args: Sequence[Any],
+) -> AsyncGenerator[None, signal.Signals]:
     setproctitle(f"backend.ai: proxy-worker worker-{pidx}")
     local_config: ServerConfig = _args[0]
     log_endpoint: str = _args[1]
@@ -812,7 +922,7 @@ async def server_main_logwrapper(
             async with server_main(loop, pidx, _args):
                 yield
     except Exception:
-        traceback.print_exc()
+        traceback.print_exc(file=sys.stderr)
 
 
 @click.group(invoke_without_command=True)
@@ -848,7 +958,10 @@ def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel
     if ctx.invoked_subcommand is None:
         tracker: memray.Tracker | None = None
         if server_config.profiling.enable_pyroscope:
-            assert server_config.profiling.pyroscope_config
+            if not server_config.profiling.pyroscope_config:
+                raise MissingProfilingConfigError(
+                    "Pyroscope configuration is required when enable_pyroscope is True"
+                )
             pyroscope.configure(**server_config.profiling.pyroscope_config.model_dump())
         if server_config.profiling.enable_memray:
             tracker = memray.Tracker(
@@ -882,17 +995,21 @@ def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel
                     log.info("Memray tracing enabled")
                 log_config = logging.getLogger("ai.backend.appproxy.worker.config")
                 log_config.debug("debug mode enabled.")
-                if server_config.proxy_worker.event_loop == "uvloop":
-                    import uvloop
+                match server_config.proxy_worker.event_loop:
+                    case EventLoopType.UVLOOP:
+                        import uvloop
 
-                    uvloop.install()
-                    log.info("Using uvloop as the event loop backend")
+                        runner = uvloop.run
+                        log.info("Using uvloop as the event loop backend")
+                    case EventLoopType.ASYNCIO:
+                        runner = asyncio.run
                 try:
                     aiotools.start_server(
-                        server_main_logwrapper,  # type: ignore
+                        server_main_logwrapper,
                         num_workers=1,
                         args=(server_config, log_endpoint),
                         wait_timeout=5.0,
+                        runner=runner,
                     )
                 finally:
                     log.info("terminated.")

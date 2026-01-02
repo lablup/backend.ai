@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import enum
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Optional, Self, TypeAlias, cast, override
+from typing import Optional, Self, TypeAlias, cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -12,7 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, load_only, relationship, selectinload, with_loader_criteria
 from sqlalchemy.sql.expression import false, true
 
-from ai.backend.common.types import AccessKey, AgentId, ResourceSlot
+from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SlotName, SlotTypes
+from ai.backend.manager.data.agent.types import (
+    AgentData,
+    AgentDataForHeartbeatUpdate,
+    AgentStatus,
+)
+from ai.backend.manager.data.kernel.types import KernelStatus
 
 from .base import (
     Base,
@@ -40,36 +45,9 @@ from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 __all__: Sequence[str] = (
     "agents",
     "AgentRow",
-    "AgentStatus",
     "recalc_agent_resource_occupancy",
     "list_schedulable_agents_by_sgroup",
 )
-
-
-class AgentStatus(enum.Enum):
-    ALIVE = 0
-    LOST = 1
-    RESTARTING = 2
-    TERMINATED = 3
-
-    @override
-    @classmethod
-    def _missing_(cls, value: Any) -> Optional[AgentStatus]:
-        if isinstance(value, int):
-            for member in cls:
-                if member.value == value:
-                    return member
-        if isinstance(value, str):
-            match value.upper():
-                case "ALIVE":
-                    return cls.ALIVE
-                case "LOST":
-                    return cls.LOST
-                case "RESTARTING":
-                    return cls.RESTARTING
-                case "TERMINATED":
-                    return cls.TERMINATED
-        return None
 
 
 agents = sa.Table(
@@ -115,6 +93,57 @@ class AgentRow(Base):
     kernels = relationship("KernelRow", back_populates="agent_row")
     scaling_group_row = relationship("ScalingGroupRow", back_populates="agents")
 
+    def actual_occupied_slots(self) -> ResourceSlot:
+        resource_occupied_kernel_rows = cast(
+            list[KernelRow],
+            [
+                kernel
+                for kernel in self.kernels
+                if kernel.status in KernelStatus.resource_occupied_statuses()
+            ],
+        )
+        actual_occupied_slots = sum(
+            (kernel.occupied_slots for kernel in resource_occupied_kernel_rows), ResourceSlot()
+        )
+        return actual_occupied_slots
+
+    def to_data(self) -> AgentData:
+        return AgentData(
+            id=self.id,
+            status=self.status,
+            status_changed=self.status_changed,
+            region=self.region,
+            scaling_group=self.scaling_group,
+            schedulable=self.schedulable,
+            available_slots=self.available_slots,
+            cached_occupied_slots=self.occupied_slots,
+            actual_occupied_slots=self.actual_occupied_slots(),
+            addr=self.addr,
+            public_host=self.public_host,
+            first_contact=self.first_contact,
+            lost_at=self.lost_at,
+            version=self.version,
+            architecture=self.architecture,
+            compute_plugins=self.compute_plugins,
+            public_key=self.public_key,
+            auto_terminate_abusing_kernel=self.auto_terminate_abusing_kernel,
+        )
+
+    def to_heartbeat_update_data(self) -> AgentDataForHeartbeatUpdate:
+        return AgentDataForHeartbeatUpdate(
+            status=self.status,
+            status_changed=self.status_changed,
+            scaling_group=self.scaling_group,
+            available_slots=self.available_slots,
+            addr=self.addr,
+            public_host=self.public_host,
+            version=self.version,
+            architecture=self.architecture,
+            compute_plugins=self.compute_plugins,
+            public_key=self.public_key,
+            auto_terminate_abusing_kernel=self.auto_terminate_abusing_kernel,
+        )
+
     @classmethod
     async def get_agents_by_condition(
         cls, conditions: Sequence[QueryCondition], *, db: ExtendedAsyncSAEngine
@@ -141,6 +170,26 @@ class AgentRow(Base):
             ],
             db=db,
         )
+
+    @classmethod
+    async def get_occupied_slots(
+        cls,
+        db: ExtendedAsyncSAEngine,
+        agent_id: AgentId,
+        known_slot_types: Mapping[SlotName, SlotTypes],
+    ) -> ResourceSlot:
+        async with db.begin_readonly_session() as db_session:
+            query = sa.select(KernelRow.occupied_slots).where(
+                sa.and_(
+                    KernelRow.agent == agent_id,
+                    KernelRow.status == KernelStatus.RUNNING,
+                )
+            )
+            kernel_slots = (await db_session.scalars(query)).all()
+            occupied_slots = ResourceSlot.from_known_slots(known_slot_types)
+            for slots in kernel_slots:
+                occupied_slots += slots
+            return occupied_slots
 
 
 def by_scaling_group(

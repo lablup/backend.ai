@@ -7,6 +7,7 @@ from typing import (
     override,
 )
 
+from ai.backend.common.bgtask.types import TaskID
 from ai.backend.common.types import ResultSet
 from ai.backend.manager.actions.action import BaseActionResult
 
@@ -155,6 +156,34 @@ class DeleteFilesAction(VFolderAction):
 @dataclass
 class DeleteFilesActionResult(BaseActionResult):
     vfolder_uuid: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
+
+
+@dataclass
+class DeleteFilesAsyncAction(VFolderAction):
+    user_uuid: uuid.UUID
+    vfolder_uuid: uuid.UUID
+
+    files: list[str]
+    recursive: bool
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "delete_files_async"
+
+
+@dataclass
+class DeleteFilesAsyncActionResult(BaseActionResult):
+    vfolder_uuid: uuid.UUID
+    task_id: TaskID
 
     @override
     def entity_id(self) -> Optional[str]:

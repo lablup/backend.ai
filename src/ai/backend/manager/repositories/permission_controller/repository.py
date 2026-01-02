@@ -1,163 +1,251 @@
 import uuid
-from typing import Optional, cast
+from collections.abc import Mapping, Sequence
+from typing import Optional
 
-import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 
-from ai.backend.common.metrics.metric import LayerType
-
-from ...data.permission.id import (
-    ObjectId,
-)
+from ...data.permission.id import ObjectId
+from ...data.permission.object_permission import ObjectPermissionData
+from ...data.permission.permission import PermissionData
+from ...data.permission.permission_group import PermissionGroupData
 from ...data.permission.role import (
-    PermissionCheckInput,
-    RoleCreateInput,
+    AssignedUserListResult,
+    BatchEntityPermissionCheckInput,
     RoleData,
-    RoleDataWithPermissions,
-    RoleDeleteInput,
-    RoleUpdateInput,
+    RoleDetailData,
+    RoleListResult,
+    RolePermissionsUpdateInput,
+    ScopePermissionCheckInput,
+    SingleEntityPermissionCheckInput,
+    UserRoleAssignmentData,
     UserRoleAssignmentInput,
+    UserRoleRevocationData,
+    UserRoleRevocationInput,
 )
-from ...data.permission.status import (
-    RoleStatus,
-)
-from ...decorators.repository_decorator import (
-    create_layer_aware_repository_decorator,
-)
-from ...errors.common import ObjectNotFound
-from ...models.rbac_models.object_permission import ObjectPermissionRow
+from ...models.rbac_models.permission.object_permission import ObjectPermissionRow
+from ...models.rbac_models.permission.permission import PermissionRow
+from ...models.rbac_models.permission.permission_group import PermissionGroupRow
 from ...models.rbac_models.role import RoleRow
-from ...models.rbac_models.scope_permission import ScopePermissionRow
-from ...models.rbac_models.user_role import UserRoleRow
 from ...models.utils import ExtendedAsyncSAEngine
+from ...repositories.base.creator import Creator
+from ...repositories.base.purger import Purger
+from ...repositories.base.querier import BatchQuerier
+from ...repositories.base.updater import Updater
+from .db_source.db_source import CreateRoleInput, PermissionDBSource
 
-# Layer-specific decorator for user repository
-repository_decorator = create_layer_aware_repository_decorator(LayerType.PERMISSION_CONTROL)
+permission_controller_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(
+            MetricArgs(
+                domain=DomainType.REPOSITORY, layer=LayerType.PERMISSION_CONTROLLER_REPOSITORY
+            )
+        ),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class PermissionControllerRepository:
-    _db: ExtendedAsyncSAEngine
+    _db_source: PermissionDBSource
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db = db
+        self._db_source = PermissionDBSource(db)
 
-    @repository_decorator()
-    async def create_role(self, data: RoleCreateInput) -> RoleData:
+    @permission_controller_repository_resilience.apply()
+    async def create_role(self, input_data: CreateRoleInput) -> RoleData:
         """
         Create a new role in the database.
 
-        Returns the ID of the created role.
+        Returns the created role data.
         """
-        async with self._db.begin_session() as db_session:
-            role_row = RoleRow.from_input(data)
-            db_session.add(role_row)  # type: ignore[arg-type]
-            await db_session.flush()
-            role_id = role_row.id
-            for scope_permission in data.scope_permissions:
-                scope_permission_row = ScopePermissionRow(
-                    role_id=role_id,
-                    entity_type=scope_permission.entity_type,
-                    operation=scope_permission.operation,
-                )
-                db_session.add(scope_permission_row)  # type: ignore[arg-type]
-            for object_permission in data.object_permissions:
-                object_permission_row = ObjectPermissionRow(
-                    role_id=role_id,
-                    entity_type=object_permission.object_id.entity_type,
-                    entity_id=object_permission.object_id.entity_id,
-                    operation=object_permission.operation,
-                )
-                db_session.add(object_permission_row)  # type: ignore[arg-type]
-            await db_session.commit()
+        role_row = await self._db_source.create_role(input_data)
         return role_row.to_data()
 
-    async def _get_role(self, role_id: uuid.UUID, db_session: SASession) -> Optional[RoleRow]:
-        stmt = sa.select(RoleRow).where(RoleRow.id == role_id)
-        role_row = await db_session.scalar(stmt)
-        return cast(Optional[RoleRow], role_row)
+    @permission_controller_repository_resilience.apply()
+    async def create_permission_group(
+        self,
+        creator: Creator[PermissionGroupRow],
+        permissions: Sequence[Creator[PermissionRow]] = tuple(),
+    ) -> PermissionGroupData:
+        """
+        Create a new permission group in the database.
 
-    @repository_decorator()
-    async def update_role(self, data: RoleUpdateInput) -> RoleData:
-        to_update = data.fields_to_update()
-        async with self._db.begin_session() as db_session:
-            stmt = sa.update(RoleRow).where(RoleRow.id == data.id).values(**to_update)
-            await db_session.execute(stmt)
-            role_row = await self._get_role(data.id, db_session)
-            if role_row is None:
-                raise ObjectNotFound(f"Role with ID {data.id} does not exist.")
-            return role_row.to_data()
+        Args:
+            creator: Permission group creator defining the group to create
+            permissions: Optional sequence of permission creators to add to the group
 
-    @repository_decorator()
-    async def delete_role(self, data: RoleDeleteInput) -> RoleData:
-        async with self._db.begin_session() as db_session:
-            role_row = await self._get_role(data.id, db_session)
-            if role_row is None:
-                raise ObjectNotFound(f"Role with ID {data.id} does not exist.")
-            role_row.status = RoleStatus.DELETED
-            role_data = role_row.to_data()
-        return role_data
+        Returns:
+            Created permission group data.
+        """
+        row = await self._db_source.create_permission_group(creator, permissions)
+        return row.to_data()
 
-    @repository_decorator()
-    async def assign_role(self, data: UserRoleAssignmentInput):
-        async with self._db.begin_session() as db_session:
-            user_role_row = UserRoleRow.from_input(data)
-            db_session.add(user_role_row)
-        return user_role_row.to_data()
+    @permission_controller_repository_resilience.apply()
+    async def create_permission(
+        self,
+        creator: Creator[PermissionRow],
+    ) -> PermissionData:
+        """
+        Create a new permission in the database.
 
-    @repository_decorator()
-    async def get_role(self, role_id: uuid.UUID) -> Optional[RoleData]:
-        async with self._db.begin_readonly_session() as db_session:
-            result = await self._get_role(role_id, db_session)
-            if result is None:
-                return None
-            return result.to_data()
+        Returns the created permission data.
+        """
+        row = await self._db_source.create_permission(creator)
+        return row.to_data()
 
-    @repository_decorator()
-    async def get_active_roles(self, user_id: uuid.UUID) -> list[RoleDataWithPermissions]:
-        async with self._db.begin_readonly_session() as db_session:
-            query = (
-                sa.select(RoleRow)
-                .join(UserRoleRow, RoleRow.id == UserRoleRow.role_id)
-                .where(
-                    sa.and_(
-                        RoleRow.status == RoleStatus.ACTIVE,
-                        UserRoleRow.user_id == user_id,
-                    )
-                )
-                .options(
-                    selectinload(RoleRow.scope_permission_rows).options(
-                        selectinload(ScopePermissionRow.mapped_entity_rows)
-                    ),
-                    selectinload(RoleRow.object_permission_rows),
-                )
-            )
-            result = await db_session.scalars(query)
-            result = cast(list[RoleRow], result)
-            return [role.to_data_with_permissions() for role in result]
+    @permission_controller_repository_resilience.apply()
+    async def delete_permission(
+        self,
+        purger: Purger[PermissionRow],
+    ) -> PermissionData:
+        """
+        Delete a permission from the database.
 
-    @repository_decorator()
-    async def check_permission(self, data: PermissionCheckInput) -> bool:
-        roles = await self.get_active_roles(data.user_id)
-        target_object_id = ObjectId(
-            entity_type=data.target_entity_type,
-            entity_id=data.target_entity_id,
+        Returns the deleted permission data.
+
+        Raises:
+            ObjectNotFound: If permission does not exist.
+        """
+        row = await self._db_source.delete_permission(purger)
+        return row.to_data()
+
+    @permission_controller_repository_resilience.apply()
+    async def create_object_permission(
+        self,
+        creator: Creator[ObjectPermissionRow],
+    ) -> ObjectPermissionData:
+        """
+        Create a new object permission in the database.
+
+        Returns the created object permission data.
+        """
+        row = await self._db_source.create_object_permission(creator)
+        return row.to_data()
+
+    @permission_controller_repository_resilience.apply()
+    async def delete_object_permission(
+        self,
+        purger: Purger[ObjectPermissionRow],
+    ) -> ObjectPermissionData | None:
+        """
+        Delete an object permission from the database.
+
+        Returns the deleted object permission data, or None if not found.
+        """
+        row = await self._db_source.delete_object_permission(purger)
+        return row.to_data() if row else None
+
+    @permission_controller_repository_resilience.apply()
+    async def update_role(self, updater: Updater[RoleRow]) -> RoleData:
+        result = await self._db_source.update_role(updater)
+        return result.to_data()
+
+    @permission_controller_repository_resilience.apply()
+    async def update_role_permissions(
+        self, input_data: RolePermissionsUpdateInput
+    ) -> RoleDetailData:
+        """Update role permissions using batch update."""
+        result = await self._db_source.update_role_permissions(input_data=input_data)
+        return result.to_detail_data_without_users()
+
+    @permission_controller_repository_resilience.apply()
+    async def delete_role(self, updater: Updater[RoleRow]) -> RoleData:
+        result = await self._db_source.delete_role(updater)
+        return result.to_data()
+
+    @permission_controller_repository_resilience.apply()
+    async def purge_role(self, purger: Purger[RoleRow]) -> RoleData:
+        result = await self._db_source.purge_role(purger)
+        return result.to_data()
+
+    @permission_controller_repository_resilience.apply()
+    async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleAssignmentData:
+        result = await self._db_source.assign_role(data)
+        return result.to_data()
+
+    @permission_controller_repository_resilience.apply()
+    async def revoke_role(self, data: UserRoleRevocationInput) -> UserRoleRevocationData:
+        user_role_id = await self._db_source.revoke_role(data)
+        return UserRoleRevocationData(
+            user_role_id=user_role_id, user_id=data.user_id, role_id=data.role_id
         )
+
+    @permission_controller_repository_resilience.apply()
+    async def get_role(self, role_id: uuid.UUID) -> Optional[RoleData]:
+        result = await self._db_source.get_role(role_id)
+        return result.to_data() if result else None
+
+    @permission_controller_repository_resilience.apply()
+    async def check_permission_of_entity(self, data: SingleEntityPermissionCheckInput) -> bool:
+        target_object_id = data.target_object_id
+        roles = await self._db_source.get_user_roles(data.user_id)
+        associated_scopes = await self._db_source.get_entity_mapped_scopes(target_object_id)
+        associated_scopes_set = set([row.parsed_scope_id() for row in associated_scopes])
         for role in roles:
-            for scope_perm in role.scope_permissions:
-                if scope_perm.operation != data.operation:
-                    continue
-                for entity in scope_perm.mapped_entities:
-                    obj_id = ObjectId(
-                        entity_type=scope_perm.entity_type,
-                        entity_id=entity.entity_id,
-                    )
-                    if obj_id == target_object_id:
-                        return True
-            for object_perm in role.object_permissions:
+            for object_perm in role.object_permission_rows:
                 if object_perm.operation != data.operation:
                     continue
-                if object_perm.object_id == target_object_id:
+                if object_perm.object_id() == target_object_id:
                     return True
 
+            for permission_group in role.permission_group_rows:
+                if permission_group.parsed_scope_id() not in associated_scopes_set:
+                    continue
+                for permission in permission_group.permission_rows:
+                    if permission.operation == data.operation:
+                        return True
         return False
+
+    @permission_controller_repository_resilience.apply()
+    async def check_permission_in_scope(self, data: ScopePermissionCheckInput) -> bool:
+        return await self._db_source.check_scope_permission_exist(
+            data.user_id, data.target_scope_id, data.operation
+        )
+
+    @permission_controller_repository_resilience.apply()
+    async def check_permission_of_entities(
+        self,
+        data: BatchEntityPermissionCheckInput,
+    ) -> Mapping[ObjectId, bool]:
+        """
+        Check if the user has the requested operation permission on the given entity IDs.
+        Returns a mapping of entity ID to a boolean indicating permission.
+        """
+        return await self._db_source.check_batch_object_permission_exist(
+            data.user_id, data.target_object_ids, data.operation
+        )
+
+    @permission_controller_repository_resilience.apply()
+    async def search_roles(
+        self,
+        querier: BatchQuerier,
+    ) -> RoleListResult:
+        """Searches roles with pagination and filtering."""
+        return await self._db_source.search_roles(querier=querier)
+
+    @permission_controller_repository_resilience.apply()
+    async def get_role_with_permissions(self, role_id: uuid.UUID) -> RoleDetailData:
+        """Get role with all permission details (without users)."""
+        result = await self._db_source.get_role_with_permissions(role_id)
+        return result.to_detail_data_without_users()
+
+    @permission_controller_repository_resilience.apply()
+    async def search_users_assigned_to_role(
+        self,
+        querier: BatchQuerier,
+    ) -> AssignedUserListResult:
+        """Searches users assigned to a specific role with pagination and filtering."""
+        return await self._db_source.search_users_assigned_to_role(
+            querier=querier,
+        )

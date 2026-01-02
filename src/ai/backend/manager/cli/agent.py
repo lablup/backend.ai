@@ -10,6 +10,7 @@ from alembic.config import Config
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.utils import enforce_debug_logging
+from ai.backend.manager.errors.resource import ConfigurationLoadFailed
 
 if TYPE_CHECKING:
     from .context import CLIContext
@@ -64,7 +65,8 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
         manager_public_key, manager_secret_key = load_certificate(
             bootstrap_config.manager.rpc_auth_manager_keypair
         )
-        assert manager_secret_key is not None
+        if manager_secret_key is None:
+            raise ConfigurationLoadFailed("Manager secret key is not available in the keypair")
         alembic_cfg = Config(alembic_config)
         sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
         db = create_async_engine(sa_url)

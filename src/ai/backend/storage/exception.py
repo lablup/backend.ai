@@ -97,9 +97,22 @@ class QuotaScopeNotFoundError(BackendAIError, web.HTTPNotFound):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.STORAGE_PROXY,
+            domain=ErrorDomain.QUOTA_SCOPE,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class QuotaScopeRequiredError(BackendAIError, web.HTTPPreconditionRequired):
+    error_type = "https://api.backend.ai/probs/storage/quota/scope/required"
+    error_title = "Quota Scope Required"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.QUOTA_SCOPE,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.NOT_READY,
         )
 
 
@@ -263,7 +276,20 @@ class StorageNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class StorageBucketNotFoundError(BackendAIError, web.HTTPNotFound):
+class StorageTypeInvalidError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/storage/object-type-invalid"
+    error_title = "Storage Config Invalid Type"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class ObjectStorageBucketNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/bucket/object-not-found"
     error_title = "Storage Bucket Not Found"
 
@@ -390,4 +416,56 @@ class ArtifactImportError(BackendAIError, web.HTTPInternalServerError):
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class NotImplementedAPI(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/storage/api/not-implemented"
+    error_title = "API Not Implemented"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.NOT_IMPLEMENTED,
+        )
+
+
+class ObjectStorageObjectDeletionError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/storage/object/deletion/failed"
+    error_title = "Object Deletion Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.OBJECT_STORAGE,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class StorageTransferError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/storage/transfer/failed"
+    error_title = "Storage Transfer Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class StorageStepRequiredStepNotProvided(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/storage/step-mapping-not-provided"
+    error_title = "Storage Step Mapping Not Provided"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.BAD_REQUEST,
         )

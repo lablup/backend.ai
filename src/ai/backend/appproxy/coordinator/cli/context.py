@@ -1,13 +1,15 @@
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Optional, Self
+from typing import TYPE_CHECKING, Any, Optional, Self
 
 import click
 
-from ai.backend.common.config import find_config_file
-from ai.backend.logging import AbstractLogger, LocalLogger, LogLevel
+if TYPE_CHECKING:
+    from ai.backend.logging import AbstractLogger
+    from ai.backend.logging.types import LogLevel
 
-from ..config import ServerConfig
-from ..config import load as load_config
+    from ..config import ServerConfig
 
 
 class CLIContext:
@@ -21,6 +23,10 @@ class CLIContext:
 
     @property
     def local_config(self) -> ServerConfig:
+        from ai.backend.common.config import find_config_file
+
+        from ..config import load as load_config
+
         # Lazy-load the configuration only when requested.
         if self.config_path is None:
             self.config_path = find_config_file("app-proxy-coordinator")
@@ -29,6 +35,8 @@ class CLIContext:
         return self._local_config
 
     def __enter__(self) -> Self:
+        from ai.backend.logging import LocalLogger
+
         # The "start-server" command is injected by ai.backend.cli from the entrypoint
         # and it has its own multi-process-aware logging initialization.
         # If we duplicate the local logging with it, the process termination may hang.
@@ -38,7 +46,7 @@ class CLIContext:
             self._logger.__enter__()
         return self
 
-    def __exit__(self, *exc_info) -> None:
+    def __exit__(self, *exc_info: Any) -> None:
         click_ctx = click.get_current_context()
         if click_ctx.invoked_subcommand != "start-server":
             self._logger.__exit__()

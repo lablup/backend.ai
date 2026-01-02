@@ -30,28 +30,36 @@ import yarl
 from async_timeout import timeout
 from pydantic import BaseModel
 
-if TYPE_CHECKING:
-    from decimal import Decimal
-
-    from aiofiles.threadpool.text import AsyncTextIOWrapper
-
 # It is a bad practice to keep all "miscellaneous" stuffs
 # into the single "utils" module.
 # Let's categorize them by purpose and domain, and keep
 # refactoring to use the proper module names.
-
 from .asyncio import (  # for legacy imports  # noqa
     AsyncBarrier,
     cancel_tasks,
     current_loop,
     run_through,
 )
+from .defs import DEFAULT_FILE_IO_TIMEOUT
 from .enum_extension import StringSetFlag  # for legacy imports  # noqa
+from .exception import (
+    BaseNFSMountCheckFailed,
+    ExportPathNotFound,
+    NFSTimeoutError,
+    NFSUnexpectedError,
+    ShowmountFailed,
+    ShowmountNotFound,
+    VolumeMountFailed,
+    VolumeUnmountFailed,
+)
 from .files import AsyncFileWriter  # for legacy imports  # noqa
 from .networking import curl, find_free_port  # for legacy imports  # noqa
 from .types import BinarySize
-from .exception import VolumeMountFailed, VolumeUnmountFailed
-from .defs import DEFAULT_FILE_IO_TIMEOUT
+
+if TYPE_CHECKING:
+    from decimal import Decimal
+
+    from aiofiles.threadpool.text import AsyncTextIOWrapper
 
 KT = TypeVar("KT")
 VT = TypeVar("VT")
@@ -126,6 +134,49 @@ def get_random_seq(length: float, num_points: int, min_distance: float) -> Itera
     for s in spacing:
         cumulative_sum += s
         yield cumulative_sum - min_distance
+
+
+def pprint_with_type(
+    data: dict[Any, Any] | list[Any] | set[Any],
+    depth: int = 0,
+) -> None:
+    """
+    A pprint-like function that explicitly prints out the types of all objects.
+    It is useful to debug JSON serialization errors due to hidden str-compatible keys
+    in a nested dict.
+    """
+    indent = "  " * depth
+    match data:
+        case dict():  # dict
+            for k, v in data.items():
+                if isinstance(v, dict):
+                    print(f"{indent}{k!r} ({type(k)=}): {{...: ...}}")
+                    pprint_with_type(v, depth=depth + 1)
+                    continue
+                if isinstance(v, list):
+                    print(f"{indent}{k!r} ({type(k)=}): [...]")
+                    pprint_with_type(v, depth=depth + 1)
+                    continue
+                if isinstance(v, set):
+                    print(f"{indent}{k!r} ({type(k)=}): {{...}}")
+                    pprint_with_type(v, depth=depth + 1)
+                    continue
+                print(f"{indent}{k!r} ({type(k)=}): {v!r} ({type(v)=})")
+        case list() | set():  # list, set
+            for v in data:
+                if isinstance(v, dict):
+                    print(f"{indent}- {{...: ...}}")
+                    pprint_with_type(v, depth=depth + 1)
+                    continue
+                if isinstance(v, list):
+                    print(f"{indent}- [...]")
+                    pprint_with_type(v, depth=depth + 1)
+                    continue
+                if isinstance(v, set):
+                    print(f"{indent}- {{...}}")
+                    pprint_with_type(v, depth=depth + 1)
+                    continue
+                print(f"{indent}- {v!r} ({type(v)=})")
 
 
 def nmget(
@@ -313,6 +364,66 @@ class Fstab:
         return False
 
 
+async def check_nfs_remote_server(
+    server: str,
+    export_path: str,
+) -> None:
+    """
+    Check if NFS export is available on the remote server.
+
+    Args:
+        server: NFS server hostname or IP address
+        export_path: Export directory path to check (e.g., '/export')
+    """
+    try:
+        # Execute showmount command to list exports
+        process = await asyncio.create_subprocess_exec(
+            "showmount",
+            "-e",
+            server,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        # Wait for command completion with timeout
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=10.0)
+
+        # Check if command succeeded
+        if process.returncode != 0:
+            error_msg = stderr.decode().strip()
+            raise ShowmountFailed(f"showmount command failed: {error_msg}")
+
+        # Parse output to find the export path
+        output = stdout.decode().strip()
+        lines = output.split("\n")
+
+        # Skip header line (usually "Export list for server:")
+        export_lines = [line for line in lines[1:] if line.strip()]
+
+        # Check if the requested export path exists
+        for line in export_lines:
+            # Format is typically: /export  192.168.1.0/24
+            # or: /export  *
+            parts = line.split()
+            if parts and parts[0] == export_path:
+                # Export path found
+                return
+
+        # Export path not found
+        raise ExportPathNotFound(f"Export '{export_path}' not found on server '{server}'.")
+    except BaseNFSMountCheckFailed:
+        raise
+
+    except asyncio.TimeoutError:
+        raise NFSTimeoutError(f"Timeout: No response from {server} within 10 seconds")
+
+    except FileNotFoundError:
+        raise ShowmountNotFound("showmount command not found. Install nfs-common package.")
+
+    except Exception as e:
+        raise NFSUnexpectedError(f"Unexpected error: {str(e)}") from e
+
+
 async def mount(
     mount_path: str,
     fs_location: str,
@@ -457,10 +568,35 @@ def b64encode(s: str) -> str:
 T = TypeVar("T", bound=BaseModel)
 
 
+def _deep_merge_lists(base: list[Any], override: list[Any]) -> list[Any]:
+    """
+    Merge two lists by index. If both elements at the same index are Mappings,
+    deep merge them. If both are lists, recursively merge them.
+    Otherwise, override element takes precedence.
+    """
+    result: list[Any] = []
+    max_len = max(len(base), len(override))
+    for i in range(max_len):
+        if i >= len(base):
+            result.append(override[i])
+        elif i >= len(override):
+            result.append(base[i])
+        elif isinstance(base[i], Mapping) and isinstance(override[i], Mapping):
+            result.append(deep_merge(base[i], override[i]))
+        elif isinstance(base[i], list) and isinstance(override[i], list):
+            result.append(_deep_merge_lists(base[i], override[i]))
+        elif override[i] is not None:
+            result.append(override[i])
+        else:
+            result.append(base[i])
+    return result
+
+
 def deep_merge(*args: Mapping[str, Any]) -> Mapping[str, Any]:
     """
     Recursively merge any number of mappings.
     Later mappings override earlier ones on key conflicts.
+    For lists, merge elements at the same index if both are Mappings.
 
     Example
     -------
@@ -468,6 +604,10 @@ def deep_merge(*args: Mapping[str, Any]) -> Mapping[str, Any]:
     ...            {"b": {"y": 2}, "c": 3},
     ...            {"b": {"x": 10}})
     {'a': 1, 'b': {'x': 10, 'y': 2}, 'c': 3}
+
+    >>> deep_merge({"items": [{"name": "a", "value": 1}]},
+    ...            {"items": [{"name": "a", "extra": 2}]})
+    {'items': [{'name': 'a', 'value': 1, 'extra': 2}]}
     """
     merged: dict[str, Any] = {}
     for m in args:
@@ -475,8 +615,13 @@ def deep_merge(*args: Mapping[str, Any]) -> Mapping[str, Any]:
             va = merged.get(k)
             if isinstance(va, Mapping) and isinstance(vb, Mapping):
                 merged[k] = deep_merge(va, vb)
-            else:
+            elif isinstance(va, list) and isinstance(vb, list):
+                merged[k] = _deep_merge_lists(va, vb)
+            elif vb is not None:
                 merged[k] = vb
+            else:
+                merged[k] = va
+
     return merged
 
 

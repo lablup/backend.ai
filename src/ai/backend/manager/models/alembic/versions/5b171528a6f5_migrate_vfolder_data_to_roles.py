@@ -316,6 +316,10 @@ class EntityMapper:
 
 
 def upgrade() -> None:
+    op.execute("""
+        ALTER TABLE association_scopes_entities
+        DROP CONSTRAINT IF EXISTS uq_scope_id_entity_id
+    """)
     conn = op.get_bind()
     PermissionCreator.add_vfolder_entity_type_permission_to_permission_groups(conn)
     PermissionCreator.add_vfolder_object_permissions(conn)

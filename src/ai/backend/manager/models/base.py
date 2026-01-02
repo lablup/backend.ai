@@ -40,6 +40,7 @@ from aiotools import apartial
 from dateutil.parser import isoparse
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
+from graphene_federation import shareable
 from graphql import Undefined
 from graphql.language.ast import IntValueNode
 from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
@@ -72,6 +73,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 
 from ..errors.api import InvalidAPIParameters
 from ..errors.common import GenericForbidden
+from ..errors.resource import DataTransformationFailed
 from .gql_relay import (
     AsyncListConnectionField,
     AsyncNode,
@@ -797,6 +799,7 @@ class DataLoaderManager(Generic[TContext, TLoaderKey, TLoaderResult]):
         return loader
 
 
+@shareable
 class ResourceLimit(graphene.ObjectType):
     key = graphene.String()
     min = graphene.String()
@@ -805,6 +808,7 @@ class ResourceLimit(graphene.ObjectType):
     )
 
 
+@shareable
 class KVPair(graphene.ObjectType):
     key = graphene.String()
     value = graphene.String()
@@ -1354,11 +1358,15 @@ async def populate_fixture(
         if table_name.startswith("__"):
             # skip reserved names like "__mode"
             continue
-        assert not isinstance(rows, str)
+        if isinstance(rows, str):
+            raise DataTransformationFailed(
+                f"Invalid fixture data for table {table_name}: expected sequence, got string"
+            )
 
         table: sa.Table = metadata.tables.get(table_name)
 
-        assert isinstance(table, sa.Table)
+        if not isinstance(table, sa.Table):
+            raise DataTransformationFailed(f"Table {table_name} not found in metadata")
         if not rows:
             return
         log.debug("Loading the fixture table {0} (mode:{1})", table_name, op_mode.name)
@@ -1750,14 +1758,14 @@ class DecimalType(TypeDecorator, Decimal):
         value: Optional[Decimal],
         dialect: Dialect,
     ) -> Optional[str]:
-        return f"{value:f}" if value else None
+        return f"{value:f}" if value is not None else None
 
     def process_result_value(
         self,
         value: str,
         dialect: Dialect,
     ) -> Optional[Decimal]:
-        return Decimal(value) if value else None
+        return Decimal(value) if value is not None else None
 
     @property
     def python_type(self) -> type[Decimal]:

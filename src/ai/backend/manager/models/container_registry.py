@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Mapping, MutableMapping, Optional, Self, cast
+from urllib.parse import urlparse
 
 import graphene
 import sqlalchemy as sa
@@ -16,6 +19,10 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.exception import UnknownImageRegistry
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.errors.container_registry import (
+    InvalidContainerRegistryProject,
+    InvalidContainerRegistryURL,
+)
 
 from ..defs import PASSWORD_PLACEHOLDER
 from .base import (
@@ -41,11 +48,65 @@ __all__: Sequence[str] = (
 )
 
 
+@dataclass
+class ContainerRegistryValidatorArgs:
+    url: str
+    type: ContainerRegistryType
+    project: Optional[str]
+
+
+# TODO: Refactor this using inheritance
+class ContainerRegistryValidator:
+    """
+    Validator for container registry configuration.
+    """
+
+    _url: str
+    _type: ContainerRegistryType
+    _project: Optional[str]
+
+    def __init__(self, args: ContainerRegistryValidatorArgs) -> None:
+        self._url = args.url
+        self._type = args.type
+        self._project = args.project
+
+    def _is_valid_url(self, url: str):
+        try:
+            url = url.strip()
+            if not url.startswith("http://") and not url.startswith("https://"):
+                url = "http://" + url
+            result = urlparse(url)
+            return all([result.scheme, result.netloc])
+        except Exception:
+            return False
+
+    def validate(self) -> None:
+        """
+        Validate container registry configuration.
+        """
+        # Validate URL format
+        if not self._is_valid_url(self._url):
+            raise InvalidContainerRegistryURL(f"Invalid URL format: {self._url}")
+
+        # Validate project name for Harbor
+        match self._type:
+            case ContainerRegistryType.HARBOR | ContainerRegistryType.HARBOR2:
+                if self._project is None:
+                    raise InvalidContainerRegistryProject("Project name is required for Harbor.")
+                if not (1 <= len(self._project) <= 255):
+                    raise InvalidContainerRegistryProject("Invalid project name length.")
+                pattern = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
+                if not pattern.match(self._project):
+                    raise InvalidContainerRegistryProject("Invalid project name format.")
+            case _:
+                pass
+
+
 class ContainerRegistryRow(Base):
     __tablename__ = "container_registries"
     id = IDColumn()
     url = sa.Column("url", sa.String(length=512), index=True, nullable=False)
-    registry_name = sa.Column("registry_name", sa.String(length=50), index=True, nullable=False)
+    registry_name = sa.Column("registry_name", sa.String(length=255), index=True, nullable=False)
     type = sa.Column(
         "type",
         StrEnumType(ContainerRegistryType),
@@ -79,6 +140,7 @@ class ContainerRegistryRow(Base):
 
     def __init__(
         self,
+        id: uuid.UUID,
         url: str,
         registry_name: str,
         type: ContainerRegistryType,
@@ -89,6 +151,7 @@ class ContainerRegistryRow(Base):
         is_global: Optional[bool] = None,
         extra: Optional[dict] = None,
     ) -> None:
+        self.id = id
         self.url = url
         self.registry_name = registry_name
         self.type = type
@@ -178,6 +241,7 @@ class ContainerRegistryRow(Base):
     @classmethod
     def from_dataclass(cls, data: ContainerRegistryData) -> Self:
         instance = cls(
+            id=data.id,
             url=data.url,
             registry_name=data.registry_name,
             type=data.type,
@@ -331,7 +395,7 @@ class CreateContainerRegistry(graphene.Mutation):
         set_if_set(props, input_config, "is_global")
 
         async with ctx.db.begin_session() as db_session:
-            reg_row = ContainerRegistryRow(**input_config)
+            reg_row = ContainerRegistryRow(id=uuid.uuid4(), **input_config)
             db_session.add(reg_row)
             await db_session.flush()
             await db_session.refresh(reg_row)

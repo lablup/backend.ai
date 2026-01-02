@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from http import HTTPStatus
 from typing import TYPE_CHECKING
 
@@ -18,8 +19,11 @@ from ai.backend.common.dto.storage.response import (
     ReservoirImportModelsResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.config.unified import ReservoirConfig
-from ai.backend.storage.services.artifacts.reservoir import ReservoirService, ReservoirServiceArgs
+from ai.backend.storage.services.artifacts.reservoir import (
+    ReservoirService,
+    ReservoirServiceArgs,
+    create_reservoir_import_pipeline,
+)
 
 from ....utils import log_client_api_entry
 
@@ -48,11 +52,26 @@ class ReservoirRegistryAPIHandler:
         """
         await log_client_api_entry(log, "import_models", None)
 
+        # Create import pipeline based on storage step mappings
+        pipeline = create_reservoir_import_pipeline(
+            storage_pool=self._reservoir_service._storage_pool,
+            registry_configs=self._reservoir_service._reservoir_registry_configs,
+            storage_step_mappings=body.parsed.storage_step_mappings,
+            transfer_manager=self._reservoir_service._transfer_manager,
+            artifact_verifier_ctx=self._reservoir_service._artifact_verifier_ctx,
+            event_producer=self._reservoir_service._event_producer,
+            manager_client_pool=self._reservoir_service._manager_client_pool,
+            redis_client=self._reservoir_service._redis_client,
+        )
+
         task_id = await self._reservoir_service.import_models_batch(
             registry_name=body.parsed.registry_name,
             models=body.parsed.models,
-            storage_name=body.parsed.storage_name,
-            bucket_name=body.parsed.bucket_name,
+            storage_step_mappings=body.parsed.storage_step_mappings,
+            pipeline=pipeline,
+            artifact_revision_ids=[
+                uuid.UUID(rev_id) for rev_id in body.parsed.artifact_revision_ids
+            ],
         )
 
         return APIResponse.build(
@@ -66,16 +85,15 @@ def create_app(ctx: RootContext) -> web.Application:
     app["ctx"] = ctx
     app["prefix"] = "v1/registries/reservoir"
 
-    reservoir_registry_configs: list[ReservoirConfig] = [
-        r.config for r in ctx.local_config.registries if isinstance(r.config, ReservoirConfig)
-    ]
-
     reservoir_service = ReservoirService(
         ReservoirServiceArgs(
             background_task_manager=ctx.background_task_manager,
             event_producer=ctx.event_producer,
-            storage_configs=ctx.local_config.storages,
-            reservoir_registry_configs=reservoir_registry_configs,
+            storage_pool=ctx.storage_pool,
+            reservoir_registry_configs=ctx.manager_client_pool.registry_configs,
+            artifact_verifier_ctx=ctx.artifact_verifier_ctx,
+            manager_client_pool=ctx.manager_client_pool,
+            redis_client=ctx.valkey_artifact_client,
         )
     )
     reservoir_api_handler = ReservoirRegistryAPIHandler(

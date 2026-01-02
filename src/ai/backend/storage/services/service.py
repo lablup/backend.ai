@@ -16,13 +16,14 @@ from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import QuotaConfig, VFolderID, VolumeID
 from ai.backend.logging.utils import BraceStyleAdapter
 
-from ..exception import (
+from ..errors import (
     ExternalStorageServiceError,
     InvalidQuotaConfig,
     InvalidQuotaScopeError,
     InvalidSubpathError,
     QuotaScopeAlreadyExists,
     QuotaScopeNotFoundError,
+    ServiceNotInitializedError,
     VFolderNotFoundError,
 )
 from ..utils import log_manager_api_entry_new
@@ -78,7 +79,8 @@ class VolumeService:
         vfolder_id = vfolder_key.vfolder_id
 
         current_task = asyncio.current_task()
-        assert current_task is not None
+        if current_task is None:
+            raise ServiceNotInitializedError("No current asyncio task available")
         self._deletion_tasks[vfolder_id] = current_task
 
         try:
@@ -173,7 +175,8 @@ class VolumeService:
                         quota_scope_id=quota_scope_id, options=options, extra_args=None
                     )
                 else:
-                    assert options is not None
+                    if options is None:
+                        raise InvalidQuotaConfig("options is required for updating quota scope")
                     try:
                         await volume.quota_model.update_quota_scope(
                             quota_scope_id=quota_scope_id,

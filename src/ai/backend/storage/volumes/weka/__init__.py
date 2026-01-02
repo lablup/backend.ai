@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
@@ -13,6 +15,7 @@ from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
+from ...errors import VolumeNotInitializedError
 from ...types import CapacityUsage, FSPerfMetric, QuotaUsage
 from ...watcher import WatcherClient
 from ..abc import CAP_FAST_FS_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
@@ -49,7 +52,8 @@ class WekaQuotaModel(BaseQuotaModel):
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         await aiofiles.os.makedirs(qspath)
-        assert self.fs_uid is not None
+        if self.fs_uid is None:
+            raise VolumeNotInitializedError("Weka filesystem UID is not initialized")
         if options is not None:
             await self.update_quota_scope(quota_scope_id, options)
 
@@ -70,9 +74,19 @@ class WekaQuotaModel(BaseQuotaModel):
 
         inode_id = await self._get_inode_id(qspath)
         quota = await self.api_client.get_quota(self.fs_uid, inode_id)
+        used_bytes = quota.used_bytes if quota.used_bytes is not None else -1
+        limit_bytes = quota.hard_limit if quota.hard_limit is not None else -1
+        if used_bytes < 0 or limit_bytes < 0:
+            log.warning(
+                "Data from Weka API negative values in used_bytes({}) or limit_bytes({}) for quota scope {}: response from Weka API = {}",
+                used_bytes,
+                limit_bytes,
+                quota_scope_id,
+                quota.to_json(),
+            )
         return QuotaUsage(
-            used_bytes=quota.used_bytes if quota.used_bytes is not None else -1,
-            limit_bytes=quota.hard_limit if quota.hard_limit is not None else -1,
+            used_bytes=used_bytes,
+            limit_bytes=limit_bytes,
         )
 
     async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
@@ -145,7 +159,8 @@ class WekaVolume(BaseVolume):
         return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_METRIC, CAP_FAST_FS_SIZE])
 
     async def get_hwinfo(self) -> HardwareMetadata:
-        assert self._fs_uid is not None
+        if self._fs_uid is None:
+            raise VolumeNotInitializedError("Weka filesystem UID is not initialized")
         health_status = (await self.api_client.check_health()).lower()
         if health_status == "ok":
             health_status = "healthy"
@@ -168,7 +183,8 @@ class WekaVolume(BaseVolume):
             }
 
     async def get_fs_usage(self) -> CapacityUsage:
-        assert self._fs_uid is not None
+        if self._fs_uid is None:
+            raise VolumeNotInitializedError("Weka filesystem UID is not initialized")
         fs = await self.api_client.get_fs(self._fs_uid)
         return CapacityUsage(
             capacity_bytes=fs.total_budget,

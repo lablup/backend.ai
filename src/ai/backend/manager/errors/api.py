@@ -19,8 +19,7 @@ class NotImplementedAPI(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/not-implemented"
     error_title = "This API is not implemented."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
             operation=ErrorOperation.GENERIC,
@@ -32,8 +31,7 @@ class DeprecatedAPI(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/deprecated"
     error_title = "This API is deprecated."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
             operation=ErrorOperation.GENERIC,
@@ -45,8 +43,7 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-api-params"
     error_title = "Missing or invalid API parameters."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
             operation=ErrorOperation.GENERIC,
@@ -58,8 +55,7 @@ class GraphQLError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/graphql-error"
     error_title = "GraphQL-generated error."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
             operation=ErrorOperation.GENERIC,
@@ -71,10 +67,33 @@ class RateLimitExceeded(BackendAIError, web.HTTPTooManyRequests):
     error_type = "https://api.backend.ai/probs/rate-limit-exceeded"
     error_title = "You have reached your API query rate limit."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
+class InvalidGraphQLParameters(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-graphql-params"
+    error_title = "Invalid GraphQL parameters."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class InvalidCursor(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-cursor"
+    error_title = "Invalid cursor format."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )

@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.27.0"
+pants_version = "2.29.0"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 backend_packages = [
     "pants.backend.python",
@@ -12,6 +12,7 @@ backend_packages = [
     "pants.backend.plugin_development",
     "setupgen",
     "platform_resources",
+    "accelerator_wheels",
 ]
 pants_ignore = [
     ".*/",
@@ -42,6 +43,7 @@ root_patterns = [
 [test]
 extra_env_vars = ["BACKEND_BUILD_ROOT=%(buildroot)s", "HOME"]
 attempts_default = 3
+timeout_default = 180
 
 [python]
 enable_resolves = true
@@ -103,12 +105,13 @@ known_versions = [
 install_from_resolve = "black"
 
 [ruff]
-version = "0.12.9"
+version = "0.14.0"
+# take tar.gz files and their checksums from the GitHub release (darwin and linux-musl)
 known_versions = [
-    "0.12.9|macos_arm64|68cb47f9a98e17c59e861c3b635b32c5212defd21a4ec0b5c1d56950d06076e5|11720090",
-    "0.12.9|macos_x86_64|cc8195f89146268086e99225316b4214100eb78010aa84b9e650f8322d5790f0|12507867",
-    "0.12.9|linux_arm64|dca567860383bb6a7b021dab76c616b02ed9a268516a0a1a1dce56ee482740d7|11764382",
-    "0.12.9|linux_x86_64|c177d59d4c6347abbf08c8943eff919432d5c70229a0dd6390e5697d393a9c05|13029104",
+    "0.14.0|macos_arm64|0b7c193d5c45eda02226720eb75239fabeca995d5a0eb3830fd2973caa3030ec|12364514",
+    "0.14.0|macos_x86_64|880ae046b435eb306cd557a7481eed6da463b85f283ba1f2c1e2ad7c139ed6c5|13149751",
+    "0.14.0|linux_arm64|34a25398f03e7d32a4ec406c5c841c6e183fa0a96fbdd40b7e7eec1f177b360e|12465179",
+    "0.14.0|linux_x86_64|ed6d1b8407a1d228dc332fb19057e86e04a6cd3c2beacdb324ad6ff2a3f9071b|13647531",
 ]
 
 [pytest]

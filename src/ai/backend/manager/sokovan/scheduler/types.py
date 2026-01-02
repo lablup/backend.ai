@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -21,14 +23,17 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.manager.data.session.types import SessionInfo
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.kernel import MainKernelNotFound, TooManyKernelsFound
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.kernel import KernelStatus
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.session import SessionStatus
 
 if TYPE_CHECKING:
-    from ai.backend.manager.sokovan.scheduler.selectors.selector import (
+    from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
         AgentSelection,
         AgentSelectionCriteria,
     )
@@ -231,7 +236,7 @@ class SessionWorkload:
             AgentSelectionCriteria for agent selection
         """
         # Import here to avoid circular dependency
-        from ai.backend.manager.sokovan.scheduler.selectors.selector import (
+        from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
             AgentSelectionCriteria,
             KernelResourceSpec,
             SessionMetadata,
@@ -546,6 +551,7 @@ class SessionDataForStart:
     user_uuid: UUID
     user_email: str
     user_name: str
+    environ: dict[str, str]
     network_type: Optional[NetworkType] = None
     network_id: Optional[str] = None
 
@@ -671,6 +677,7 @@ class KernelCreationInfo:
     stdin_port: Optional[int] = None
     stdout_port: Optional[int] = None
     service_ports: list[int] = field(default_factory=list)
+    kernel_host: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "KernelCreationInfo":
@@ -684,6 +691,7 @@ class KernelCreationInfo:
             stdin_port=data.get("stdin_port"),
             stdout_port=data.get("stdout_port"),
             service_ports=data.get("service_ports", []),
+            kernel_host=data.get("kernel_host"),
         )
 
     def get_resource_allocations(self) -> ResourceSlot:
@@ -804,9 +812,9 @@ class SessionTransitionData:
         """Get the main kernel (kernel with DEFAULT_ROLE as cluster_role)."""
         main_kernels = [k for k in self.kernels if k.cluster_role == DEFAULT_ROLE]
         if len(main_kernels) > 1:
-            raise ValueError(f"Session {self.session_id} has more than 1 main kernel")
+            raise TooManyKernelsFound(f"Session {self.session_id} has more than 1 main kernel")
         if len(main_kernels) == 0:
-            raise ValueError(f"Session {self.session_id} has no main kernel")
+            raise MainKernelNotFound(f"Session {self.session_id} has no main kernel")
         return main_kernels[0]
 
 
@@ -819,3 +827,58 @@ class SessionRunningData:
 
     session_id: SessionId
     occupying_slots: ResourceSlot
+
+
+# ============================================================================
+# New types for scheduler refactoring
+# ============================================================================
+
+
+@dataclass
+class SessionWithKernels:
+    """
+    Bundles a session with its associated kernels.
+
+    This is the primary data unit for scheduler operations,
+    representing a session and all its kernels as an atomic unit.
+    """
+
+    session_info: SessionInfo
+    kernel_infos: list[KernelInfo]
+
+
+@dataclass
+class SchedulerExecutionError:
+    """
+    Represents a failed scheduler operation.
+
+    Steps/history are managed separately via RecorderContext at coordinator level.
+    """
+
+    session_with_kernels: SessionWithKernels
+    reason: str
+    error_detail: str
+
+
+@dataclass
+class SchedulerExecutionResult:
+    """
+    Result of a scheduler handler execution.
+
+    Follows the deployment pattern with successes, errors, and skipped lists.
+    Steps/history are managed separately via RecorderContext at coordinator level.
+    """
+
+    successes: list[SessionWithKernels] = field(default_factory=list)
+    errors: list[SchedulerExecutionError] = field(default_factory=list)
+    skipped: list[SessionWithKernels] = field(default_factory=list)
+
+    @property
+    def has_failures(self) -> bool:
+        """Check if there are any failed operations."""
+        return len(self.errors) > 0
+
+    @property
+    def has_successes(self) -> bool:
+        """Check if there are any successful operations."""
+        return len(self.successes) > 0

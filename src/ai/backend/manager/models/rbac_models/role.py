@@ -5,7 +5,6 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Optional,
-    Self,
 )
 
 import sqlalchemy as sa
@@ -14,8 +13,8 @@ from sqlalchemy.orm import (
 )
 
 from ai.backend.manager.data.permission.role import (
-    RoleCreateInput,
     RoleData,
+    RoleDetailData,
 )
 from ai.backend.manager.data.permission.status import (
     RoleStatus,
@@ -29,6 +28,8 @@ from ..base import (
 )
 
 if TYPE_CHECKING:
+    from .permission.object_permission import ObjectPermissionRow
+    from .permission.permission_group import PermissionGroupRow
     from .user_role import UserRoleRow
 
 
@@ -68,6 +69,16 @@ class RoleRow(Base):
         back_populates="role_row",
         primaryjoin="RoleRow.id == foreign(UserRoleRow.role_id)",
     )
+    object_permission_rows: list[ObjectPermissionRow] = relationship(
+        "ObjectPermissionRow",
+        back_populates="role_row",
+        primaryjoin="RoleRow.id == foreign(ObjectPermissionRow.role_id)",
+    )
+    permission_group_rows: list[PermissionGroupRow] = relationship(
+        "PermissionGroupRow",
+        back_populates="role_row",
+        primaryjoin="RoleRow.id == foreign(PermissionGroupRow.role_id)",
+    )
 
     def to_data(self) -> RoleData:
         return RoleData(
@@ -76,15 +87,22 @@ class RoleRow(Base):
             source=self.source,
             status=self.status,
             created_at=self.created_at,
-            updated_at=self.updated_at,
+            updated_at=self.updated_at or self.created_at,
             deleted_at=self.deleted_at,
             description=self.description,
         )
 
-    @classmethod
-    def from_input(cls, data: RoleCreateInput) -> Self:
-        return cls(
-            name=data.name,
-            status=data.status,
-            description=data.description,
+    def to_detail_data_without_users(self) -> RoleDetailData:
+        """Convert to detail data without assigned users."""
+        return RoleDetailData(
+            id=self.id,
+            name=self.name,
+            source=self.source,
+            status=self.status,
+            created_at=self.created_at,
+            updated_at=self.updated_at or self.created_at,
+            deleted_at=self.deleted_at,
+            description=self.description,
+            permission_groups=[pg_row.to_extended_data() for pg_row in self.permission_group_rows],
+            object_permissions=[op_row.to_data() for op_row in self.object_permission_rows],
         )

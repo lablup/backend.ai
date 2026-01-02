@@ -1,9 +1,14 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import StrEnum
 from functools import lru_cache
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
+
+from pydantic import BaseModel
 
 from ai.backend.common.data.vfolder.types import VFolderMountData
 from ai.backend.common.types import (
@@ -16,7 +21,9 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.models.network import NetworkType
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.network import NetworkType
 
 
 class SessionStatus(CIStrEnum):
@@ -60,6 +67,23 @@ class SessionStatus(CIStrEnum):
                 cls.PENDING,
                 cls.TERMINATED,
                 cls.CANCELLED,
+            )
+        )
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def terminatable_statuses(cls) -> frozenset["SessionStatus"]:
+        """Return statuses that can transition to TERMINATING."""
+        return frozenset(
+            status
+            for status in cls
+            if status
+            not in (
+                cls.PENDING,
+                cls.TERMINATING,
+                cls.TERMINATED,
+                cls.CANCELLED,
+                cls.ERROR,
             )
         )
 
@@ -230,3 +254,53 @@ class SessionInfo:
     lifecycle: SessionLifecycle
     metrics: SessionMetrics
     network: SessionNetwork
+
+
+# ========== Scheduling History Types ==========
+
+
+class SchedulingResult(StrEnum):
+    SUCCESS = "SUCCESS"
+    FAILURE = "FAILURE"
+    SKIPPED = "SKIPPED"
+
+
+class SubStepResult(BaseModel):
+    """Sub-step result for scheduling history."""
+
+    step: str
+    result: SchedulingResult
+    error_code: Optional[str] = None
+    message: Optional[str] = None
+
+
+@dataclass
+class SessionSchedulingHistoryData:
+    """Domain model for session scheduling history."""
+
+    id: UUID
+    session_id: SessionId
+
+    phase: str  # ScheduleType value
+    from_status: Optional[SessionStatus]
+    to_status: Optional[SessionStatus]
+
+    result: SchedulingResult
+    error_code: Optional[str]
+    message: str
+
+    sub_steps: Optional[list[SubStepResult]]
+
+    attempts: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class SessionSchedulingHistoryListResult:
+    """Search result with pagination for session scheduling history."""
+
+    items: list[SessionSchedulingHistoryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool

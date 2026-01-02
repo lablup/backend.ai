@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, tzinfo
+from decimal import Decimal
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 from uuid import UUID
@@ -10,6 +11,7 @@ import msgpack
 import sqlalchemy as sa
 from sqlalchemy.orm import joinedload, load_only
 
+from ai.backend.common.types import SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.manager.data.kernel.types import KernelStatus
 
@@ -65,7 +67,6 @@ class ResourceUsage:
                 "ResourceUsage should only be added to `ResourceUsage` type,"
                 f" not `{type(other)}` type."
             )
-        assert isinstance(other, ResourceUsage)
         self.nfs |= other.nfs  # Is this correct??
         self.device_type |= other.device_type
         self.cpu_allocated += other.cpu_allocated
@@ -463,11 +464,10 @@ def parse_resource_usage(
                 device_type.add(model_name)
             smp += int(nmget(dev_info, "data.smp", 0))
             gpu_mem_allocated += int(nmget(dev_info, "data.mem", 0))
-    gpu_allocated = 0
-    if "cuda.devices" in kernel.occupied_slots:
-        gpu_allocated = kernel.occupied_slots["cuda.devices"]
-    if "cuda.shares" in kernel.occupied_slots:
-        gpu_allocated = kernel.occupied_slots["cuda.shares"]
+    gpu_allocated = Decimal(0)
+    for key, value in kernel.occupied_slots.items():
+        if SlotName(key).is_accelerator():
+            gpu_allocated += value
 
     return ResourceUsage(
         agent_ids={kernel.agent},

@@ -29,6 +29,10 @@ from graphene.types.objecttype import ObjectTypeMeta
 from graphene.types.utils import get_type
 from graphql_relay.utils import base64, unbase64
 
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import ServerMisconfiguredError
+from ai.backend.manager.errors.resource import DataTransformationFailed
+
 
 def get_edge_class(
     connection_class: type[Connection],
@@ -163,7 +167,8 @@ class AsyncNode(Node):
         graphene_type = graphene_type.graphene_type
 
         if only_type:
-            assert graphene_type == only_type, f"Must receive a {only_type._meta.name} id."
+            if graphene_type != only_type:
+                raise InvalidAPIParameters(f"Must receive a {only_type._meta.name} id.")
 
         if cls not in graphene_type._meta.interfaces:
             raise Exception(f'ObjectType "{_type}" does not implement the "{cls}" interface.')
@@ -189,18 +194,25 @@ class Connection(graphene.ObjectType):
     ):
         if not _meta:
             _meta = ConnectionOptions(cls)
-        assert node, f"You have to provide a node in {cls.__name__}.Meta"
-        assert isinstance(node, graphene.NonNull) or issubclass(
-            node,
-            (
-                graphene.Scalar,
-                graphene.Enum,
-                graphene.ObjectType,
-                graphene.Interface,
-                graphene.Union,
-                graphene.NonNull,
-            ),
-        ), f'Received incompatible node "{node}" for Connection {cls.__name__}.'
+        if not node:
+            raise ServerMisconfiguredError(f"You have to provide a node in {cls.__name__}.Meta")
+        if not (
+            isinstance(node, graphene.NonNull)
+            or issubclass(
+                node,
+                (
+                    graphene.Scalar,
+                    graphene.Enum,
+                    graphene.ObjectType,
+                    graphene.Interface,
+                    graphene.Union,
+                    graphene.NonNull,
+                ),
+            )
+        ):
+            raise ServerMisconfiguredError(
+                f'Received incompatible node "{node}" for Connection {cls.__name__}.'
+            )
 
         base_name = re.sub("Connection$", "", name or cls.__name__) or node._meta.name
         if not name:
@@ -281,10 +293,11 @@ class AsyncListConnectionField(IterableConnectionField):
         if is_node(connection_type):
             raise Exception("ConnectionFields now need a explicit ConnectionType for Nodes.")
 
-        assert issubclass(connection_type, Connection), (
-            f"{self.__class__.__name__} type has to be a subclass of"
-            f' ai.backend.manager.models.gql_relay.Connection. Received "{connection_type}".'
-        )
+        if not issubclass(connection_type, Connection):
+            raise ServerMisconfiguredError(
+                f"{self.__class__.__name__} type has to be a subclass of"
+                f' ai.backend.manager.models.gql_relay.Connection. Received "{connection_type}".'
+            )
         return type_
 
     @classmethod
@@ -302,10 +315,11 @@ class AsyncListConnectionField(IterableConnectionField):
         if isinstance(resolved, Connection):
             return resolved
 
-        assert isinstance(resolved, list), (
-            "Resolved value from the connection field has to be a list or instance of"
-            f' {connection_type}. Received "{resolved}"'
-        )
+        if not isinstance(resolved, list):
+            raise DataTransformationFailed(
+                "Resolved value from the connection field has to be a list or instance of"
+                f' {connection_type}. Received "{resolved}"'
+            )
 
         orig_resolved_len = len(resolved)
         if page_size is not None:

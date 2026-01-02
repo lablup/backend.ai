@@ -1,3 +1,6 @@
+from pathlib import PurePosixPath
+
+from ai.backend.common.dto.storage.request import FileDeleteAsyncRequest
 from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderID,
@@ -18,6 +21,8 @@ from ..actions.file import (
     CreateUploadSessionActionResult,
     DeleteFilesAction,
     DeleteFilesActionResult,
+    DeleteFilesAsyncAction,
+    DeleteFilesAsyncActionResult,
     ListFilesAction,
     ListFilesActionResult,
     MkdirAction,
@@ -251,6 +256,44 @@ class VFolderFileService:
             action.recursive,
         )
         return DeleteFilesActionResult(vfolder_uuid=action.vfolder_uuid)
+
+    async def delete_files_async(
+        self, action: DeleteFilesAsyncAction
+    ) -> DeleteFilesAsyncActionResult:
+        # Get user info and check VFolder access using repository
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
+        )
+
+        if not vfolder_data:
+            raise VFolderInvalidParameter("The specified vfolder is not accessible.")
+
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
+        )
+
+        # Create VFolderID from data
+        vfolder_id = VFolderID(
+            quota_scope_id=vfolder_data.quota_scope_id,
+            folder_id=vfolder_data.id,
+        )
+
+        # Create request DTO
+        request = FileDeleteAsyncRequest(
+            volume=volume_name,
+            vfid=vfolder_id,
+            relpaths=[PurePosixPath(file) for file in action.files],
+            recursive=action.recursive,
+        )
+
+        # Call storage proxy client
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        response = await manager_client.delete_files_async(request)
+
+        return DeleteFilesAsyncActionResult(
+            vfolder_uuid=action.vfolder_uuid, task_id=response.bgtask_id
+        )
 
     async def mkdir(self, action: MkdirAction) -> MkdirActionResult:
         if isinstance(action.path, list) and len(action.path) > 50:

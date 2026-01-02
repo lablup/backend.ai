@@ -23,6 +23,26 @@ from ai.backend.manager.services.image.actions.forget_image_by_id import (
     ForgetImageByIdAction,
     ForgetImageByIdActionResult,
 )
+from ai.backend.manager.services.image.actions.get_all_images import (
+    GetAllImagesAction,
+    GetAllImagesActionResult,
+)
+from ai.backend.manager.services.image.actions.get_image_by_id import (
+    GetImageByIdAction,
+    GetImageByIdActionResult,
+)
+from ai.backend.manager.services.image.actions.get_image_by_identifier import (
+    GetImageByIdentifierAction,
+    GetImageByIdentifierActionResult,
+)
+from ai.backend.manager.services.image.actions.get_image_installed_agents import (
+    GetImageInstalledAgentsAction,
+    GetImageInstalledAgentsActionResult,
+)
+from ai.backend.manager.services.image.actions.get_images_by_canonicals import (
+    GetImagesByCanonicalsAction,
+    GetImagesByCanonicalsActionResult,
+)
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageActionResult,
@@ -76,8 +96,30 @@ class ImageProcessors(AbstractProcessorPackage):
         ClearImageCustomResourceLimitAction,
         ClearImageCustomResourceLimitActionResult,
     ]
+    get_image_by_id: ActionProcessor[GetImageByIdAction, GetImageByIdActionResult]
+    get_image_by_identifier: ActionProcessor[
+        GetImageByIdentifierAction, GetImageByIdentifierActionResult
+    ]
+    get_images_by_canonicals: ActionProcessor[
+        GetImagesByCanonicalsAction, GetImagesByCanonicalsActionResult
+    ]
+    get_image_installed_agents: ActionProcessor[
+        GetImageInstalledAgentsAction, GetImageInstalledAgentsActionResult
+    ]
+    get_all_images: ActionProcessor[GetAllImagesAction, GetAllImagesActionResult]
 
     def __init__(self, service: ImageService, action_monitors: list[ActionMonitor]) -> None:
+        self.get_image_installed_agents = ActionProcessor(
+            service.get_image_installed_agents, action_monitors
+        )
+        self.get_all_images = ActionProcessor(service.get_all_images, action_monitors)
+        self.get_images_by_canonicals = ActionProcessor(
+            service.get_images_by_canonicals, action_monitors
+        )
+        self.get_image_by_identifier = ActionProcessor(
+            service.get_image_by_identifier, action_monitors
+        )
+        self.get_image_by_id = ActionProcessor(service.get_image_by_id, action_monitors)
         self.forget_image = ActionProcessor(service.forget_image, action_monitors)
         self.forget_image_by_id = ActionProcessor(service.forget_image_by_id, action_monitors)
         self.purge_image_by_id = ActionProcessor(service.purge_image_by_id, action_monitors)

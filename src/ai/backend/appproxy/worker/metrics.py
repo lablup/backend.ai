@@ -5,13 +5,14 @@ from decimal import Decimal
 from typing import Any, Final
 from uuid import UUID
 
-import aiohttp
 from prometheus_client.parser import text_string_to_metric_families
 
 from ai.backend.appproxy.common.types import RouteInfo
+from ai.backend.common.clients.http_client.client_pool import ClientKey, ClientPool
 from ai.backend.common.types import MetricKey, ModelServiceStatus, RuntimeVariant
 from ai.backend.logging import BraceStyleAdapter
 
+from .errors import InvalidAppInfoTypeError, InvalidMatrixSizeError
 from .types import (
     Circuit,
     HistogramMeasurement,
@@ -35,7 +36,8 @@ def add_matrices(*ms: tuple[float | int | Decimal, ...]) -> tuple[Decimal, ...]:
         return tuple()
     matrix_size = len(ms[0])
     for m in ms:
-        assert len(m) == matrix_size, "Inconsistent matrix size"
+        if len(m) != matrix_size:
+            raise InvalidMatrixSizeError("Inconsistent matrix size")
     base = [Decimal()] * matrix_size
     for m in ms:
         for i in range(matrix_size):
@@ -44,7 +46,9 @@ def add_matrices(*ms: tuple[float | int | Decimal, ...]) -> tuple[Decimal, ...]:
 
 
 async def gather_prometheus_inference_measures(
-    routes: list[RouteInfo], request_path="/metrics"
+    client_pool: ClientPool,
+    routes: list[RouteInfo],
+    request_path: str = "/metrics",
 ) -> list[InferenceMeasurement]:
     histogram_metrics_labels: dict[str, tuple[str, ...]] = {}  # [metric name: (bucket label, ...)]
 
@@ -64,6 +68,7 @@ async def gather_prometheus_inference_measures(
         lambda: defaultdict(Decimal)
     )  # [metric name: [route ID: value]]
 
+    # Use ClientPool to reuse sessions per kernel host:port
     for route in routes:
         if not route.route_id:
             continue
@@ -72,41 +77,50 @@ async def gather_prometheus_inference_measures(
         if route.health_status and route.health_status != ModelServiceStatus.HEALTHY:
             log.debug("Skipping metrics collection for unhealthy route {}", route.route_id)
             continue
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"http://{route.current_kernel_host}:{route.kernel_port}/metrics"
-            ) as resp:
-                resp.raise_for_status()
-                metrics_text = await resp.text()
-                metric_families = text_string_to_metric_families(metrics_text)
-                for metric_family in metric_families:
-                    metric_name = metric_family.name
-                    match metric_family.type:
-                        case "histogram":
-                            labels: list[str] = []
-                            values: list[Decimal] = []
-                            for sample in metric_family.samples:
-                                if sample.name.endswith("_bucket"):
-                                    labels.append(sample.labels["le"])
-                                    values.append(Decimal(sample.value))
-                                elif sample.name.endswith("_count"):
-                                    histogram_count_metrics[metric_name][route.route_id] = int(
-                                        sample.value
-                                    )
-                                elif sample.name.endswith("_sum"):
-                                    histogram_sum_metrics[metric_name][route.route_id] = Decimal(
-                                        sample.value
-                                    )
-                            histogram_metrics_labels[metric_name] = tuple(labels)
-                            histogram_bucket_metrics[metric_name][route.route_id] = tuple(values)
-                        case "gauge":
-                            gauge_metrics[metric_name][route.route_id] = Decimal(
-                                metric_family.samples[0].value
-                            )
-                        case "counter":
-                            counter_metrics[metric_name][route.route_id] = Decimal(
-                                metric_family.samples[0].value
-                            )
+
+        # Create a client key for each kernel endpoint
+        client_key = ClientKey(
+            endpoint=f"http://{route.current_kernel_host}:{route.kernel_port}",
+            domain=str(route.route_id),
+        )
+        client_session = client_pool.load_client_session(client_key)
+
+        async with client_session.get(request_path) as resp:
+            resp.raise_for_status()
+            metrics_text = await resp.text()
+            metric_families = text_string_to_metric_families(metrics_text)
+            for metric_family in metric_families:
+                metric_name = metric_family.name
+                match metric_family.type:
+                    case "histogram":
+                        labels: list[str] = []
+                        values: list[Decimal] = []
+                        for sample in metric_family.samples:
+                            if sample.name.endswith("_bucket"):
+                                labels.append(sample.labels["le"])
+                                values.append(Decimal(sample.value))
+                            elif sample.name.endswith("_count"):
+                                histogram_count_metrics[metric_name][route.route_id] = int(
+                                    sample.value
+                                )
+                            elif sample.name.endswith("_sum"):
+                                histogram_sum_metrics[metric_name][route.route_id] = Decimal(
+                                    sample.value
+                                )
+                        histogram_metrics_labels[metric_name] = tuple(labels)
+                        histogram_bucket_metrics[metric_name][route.route_id] = tuple(values)
+                    case "gauge":
+                        try:
+                            value = metric_family.samples[0].value
+                        except IndexError:
+                            continue
+                        gauge_metrics[metric_name][route.route_id] = Decimal(value)
+                    case "counter":
+                        try:
+                            value = metric_family.samples[0].value
+                        except IndexError:
+                            continue
+                        counter_metrics[metric_name][route.route_id] = Decimal(value)
 
     measures: list[InferenceMeasurement] = []
     for metric_name, per_route_histogram_metrics in histogram_bucket_metrics.items():
@@ -185,13 +199,21 @@ async def gather_prometheus_inference_measures(
     return measures
 
 
-async def gather_inference_measures(circuit: Circuit) -> list[InferenceMeasurement] | None:
-    assert isinstance(circuit.app_info, InferenceAppInfo)
+async def gather_inference_measures(
+    client_pool: ClientPool, circuit: Circuit
+) -> list[InferenceMeasurement] | None:
+    if not isinstance(circuit.app_info, InferenceAppInfo):
+        raise InvalidAppInfoTypeError(
+            f"Expected InferenceAppInfo, got {type(circuit.app_info).__name__}"
+        )
+    measures: list[InferenceMeasurement] = []
+
     match circuit.app_info.runtime_variant:
         case RuntimeVariant.VLLM:
-            raw_measures = await gather_prometheus_inference_measures(circuit.route_info)
+            raw_measures = await gather_prometheus_inference_measures(
+                client_pool, circuit.route_info
+            )
 
-            measures: list[InferenceMeasurement] = []
             for measure in raw_measures:
                 if not measure.key.startswith("vllm:"):
                     continue
@@ -205,7 +227,41 @@ async def gather_inference_measures(circuit: Circuit) -> list[InferenceMeasureme
                 )
             return measures
         case RuntimeVariant.HUGGINGFACE_TGI:
-            return await gather_prometheus_inference_measures(circuit.route_info)
+            return await gather_prometheus_inference_measures(client_pool, circuit.route_info)
+        case RuntimeVariant.SGLANG:
+            raw_measures = await gather_prometheus_inference_measures(
+                client_pool, circuit.route_info
+            )
+
+            for measure in raw_measures:
+                if not measure.key.startswith("sglang:"):
+                    continue
+                measures.append(
+                    InferenceMeasurement(
+                        key=MetricKey(measure.key.replace("sglang:", "sglang_")),
+                        type=MetricTypes.GAUGE,
+                        per_app=measure.per_app,
+                        per_replica=measure.per_replica,
+                    )
+                )
+            return measures
+        case RuntimeVariant.MODULAR_MAX:
+            raw_measures = await gather_prometheus_inference_measures(
+                client_pool, circuit.route_info
+            )
+
+            for measure in raw_measures:
+                if not measure.key.startswith("max:"):
+                    continue
+                measures.append(
+                    InferenceMeasurement(
+                        key=MetricKey(measure.key.replace("max:", "max_")),
+                        type=MetricTypes.GAUGE,
+                        per_app=measure.per_app,
+                        per_replica=measure.per_replica,
+                    )
+                )
+            return measures
         case _:
             return None
 
@@ -222,7 +278,8 @@ async def collect_inference_metric(root_ctx: RootContext, interval: float) -> No
         # to keep methods of other plugins running when a plugin raises an error
         # instead of cancelling them.
         _tasks: list[asyncio.Task[list[InferenceMeasurement] | None]] = [
-            asyncio.create_task(gather_inference_measures(c)) for c in inference_circuits
+            asyncio.create_task(gather_inference_measures(root_ctx.http_client_pool, c))
+            for c in inference_circuits
         ]
 
         results = await asyncio.gather(*_tasks, return_exceptions=True)

@@ -36,7 +36,7 @@ python_distribution(
     entry_points={
         "backendai_cli_v10": {
             "mgr": "ai.backend.manager.cli.__main__:main",
-            "mgr.start-server": "ai.backend.manager.server:main",
+            "mgr.start-server": "ai.backend.manager.cli.start_server:main",
         },
         "backendai_scheduler_v10": {
             "fifo": "ai.backend.manager.scheduler.fifo:FIFOSlotScheduler",
@@ -114,6 +114,7 @@ resources(
     ],
     sources=[
         "**/py.typed",
+        "**/*.yaml",
         "models/alembic/script.py.mako",
         "models/alembic/revision_history/*.json",
     ],

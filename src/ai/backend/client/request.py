@@ -17,6 +17,7 @@ from typing import (
     AsyncIterator,
     Awaitable,
     Callable,
+    Iterable,
     List,
     Mapping,
     Optional,
@@ -362,7 +363,9 @@ class Request:
 
         return FetchContextManager(self.session, _rqst_ctx_builder, self._session_mode, **kwargs)
 
-    def connect_websocket(self, **kwargs) -> WebSocketContextManager:
+    def connect_websocket(
+        self, protocols: Iterable[str] = tuple(), **kwargs
+    ) -> WebSocketContextManager:
         """
         Creates a WebSocket connection.
 
@@ -391,7 +394,11 @@ class Request:
             else:
                 request_url = full_url.relative()
             return self.session.aiohttp_session.ws_connect(
-                str(request_url), autoping=True, heartbeat=30.0, headers=self.headers
+                str(request_url),
+                autoping=True,
+                heartbeat=30.0,
+                headers=self.headers,
+                protocols=protocols,
             )
 
         return WebSocketContextManager(self.session, _ws_ctx_builder, **kwargs)

@@ -396,32 +396,62 @@ class DomainType(enum.StrEnum):
     VALKEY = "valkey"
     REPOSITORY = "repository"
     CLIENT = "client"
+    DB_SOURCE = "db_source"
+    CACHE_SOURCE = "cache_source"
 
 
 class LayerType(enum.StrEnum):
-    # Repository layers
-    AGENT = "agent"
-    AUTH = "auth"
-    ARTIFACT = "artifact"
-    ARTIFACT_REGISTRY = "artifact_registry"
-    CONTAINER_REGISTRY = "container_registry"
-    DOMAIN = "domain"
-    GROUP = "group"
-    IMAGE = "image"
-    KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
-    METRIC = "metric"
-    MODEL_SERVING = "model_serving"
-    PROJECT_RESOURCE_POLICY = "project_resource_policy"
-    RESOURCE_PRESET = "resource_preset"
-    SCHEDULE = "schedule"
-    SESSION = "session"
-    USER = "user"
-    USER_RESOURCE_POLICY = "user_resource_policy"
-    VFOLDER = "vfolder"
-    PERMISSION_CONTROL = "permission_control"
-    OBJECT_STORAGE = "object_storage"
+    # Repository layers with _REPOSITORY suffix
+    AGENT_REPOSITORY = "agent_repository"
+    AUTH_REPOSITORY = "auth_repository"
+    ARTIFACT_REPOSITORY = "artifact_repository"
+    ARTIFACT_REGISTRY_REPOSITORY = "artifact_registry_repository"
+    CONTAINER_REGISTRY_REPOSITORY = "container_registry_repository"
+    DEPLOYMENT_REPOSITORY = "deployment_repository"
+    DOMAIN_REPOSITORY = "domain_repository"
+    GROUP_REPOSITORY = "group_repository"
+    HUGGINGFACE_REGISTRY_REPOSITORY = "huggingface_registry_repository"
+    IMAGE_REPOSITORY = "image_repository"
+    KEYPAIR_RESOURCE_POLICY_REPOSITORY = "keypair_resource_policy_repository"
+    METRIC_REPOSITORY = "metric_repository"
+    MODEL_SERVING_REPOSITORY = "model_serving_repository"
+    NOTIFICATION_REPOSITORY = "notification_repository"
+    OBJECT_STORAGE_REPOSITORY = "object_storage_repository"
+    PERMISSION_CONTROLLER_REPOSITORY = "permission_controller_repository"
+    PROJECT_RESOURCE_POLICY_REPOSITORY = "project_resource_policy_repository"
+    RESERVOIR_REGISTRY_REPOSITORY = "reservoir_registry_repository"
+    RESOURCE_PRESET_REPOSITORY = "resource_preset_repository"
+    SCALING_GROUP_REPOSITORY = "scaling_group_repository"
+    SCHEDULE_REPOSITORY = "schedule_repository"
+    SCHEDULER_REPOSITORY = "scheduler_repository"
+    SCHEDULING_HISTORY_REPOSITORY = "scheduling_history_repository"
+    SESSION_REPOSITORY = "session_repository"
+    STORAGE_NAMESPACE_REPOSITORY = "storage_namespace_repository"
+    USER_REPOSITORY = "user_repository"
+    USER_RESOURCE_POLICY_REPOSITORY = "user_resource_policy_repository"
+    VFOLDER_REPOSITORY = "vfolder_repository"
+    VFS_STORAGE_REPOSITORY = "vfs_storage_repository"
+
+    # DB Source layers
+    AUTH_DB_SOURCE = "auth_db_source"
+    AGENT_DB_SOURCE = "agent_db_source"
+    DEPLOYMENT_DB_SOURCE = "deployment_db_source"
+    PERMISSION_CONTROLLER_DB_SOURCE = "permission_controller_db_source"
+    RESOURCE_PRESET_DB_SOURCE = "resource_preset_db_source"
+    SCHEDULE_DB_SOURCE = "schedule_db_source"
+    SCHEDULER_DB_SOURCE = "scheduler_db_source"
+    USER_RESOURCE_POLICY_DB_SOURCE = "user_resource_policy_db_source"
+    KEYPAIR_RESOURCE_POLICY_DB_SOURCE = "keypair_resource_policy_db_source"
+
+    # Cache Source layers
+    AGENT_CACHE_SOURCE = "agent_cache_source"
+    RESOURCE_PRESET_CACHE_SOURCE = "resource_preset_cache_source"
+    SCHEDULE_CACHE_SOURCE = "schedule_cache_source"
+    SCHEDULER_CACHE_SOURCE = "scheduler_cache_source"
 
     # Valkey client layers
+    VALKEY_ARTIFACT = "valkey_artifact"
+    VALKEY_ARTIFACT_REGISTRIES = "valkey_artifact_registries"
     VALKEY_CONTAINER_LOG = "valkey_container_log"
     VALKEY_IMAGE = "valkey_image"
     VALKEY_LIVE = "valkey_live"
@@ -447,6 +477,7 @@ class LayerMetricObserver:
 
     _layer_operation_triggered_count: Gauge
     _layer_operation_count: Counter
+    _layer_operation_error_count: Counter
     _layer_retry_count: Counter
     _layer_operation_duration_sec: Histogram
 
@@ -460,6 +491,11 @@ class LayerMetricObserver:
             name="backendai_layer_operation_count",
             documentation="Total number of layer operations",
             labelnames=["domain", "layer", "operation", "success"],
+        )
+        self._layer_operation_error_count = Counter(
+            name="backendai_layer_operation_error_count",
+            documentation="Total number of layer operation errors",
+            labelnames=["domain", "layer", "operation", "error_code"],
         )
         self._layer_retry_count = Counter(
             name="backendai_layer_retry_count",
@@ -511,9 +547,10 @@ class LayerMetricObserver:
         domain: DomainType,
         layer: LayerType,
         operation: str,
-        success: bool,
         duration: float,
+        exception: Optional[BaseException] = None,
     ) -> None:
+        success = exception is None
         self._layer_operation_triggered_count.labels(
             domain=domain,
             layer=layer,
@@ -525,6 +562,17 @@ class LayerMetricObserver:
             operation=operation,
             success=str(success),
         ).inc()
+        if not success:
+            self._layer_operation_error_count.labels(
+                domain=domain,
+                layer=layer,
+                operation=operation,
+                error_code=(
+                    exception.error_code()
+                    if isinstance(exception, BackendAIError)
+                    else "internal_error"
+                ),
+            ).inc()
         self._layer_operation_duration_sec.labels(
             domain=domain,
             layer=layer,

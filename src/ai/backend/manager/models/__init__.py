@@ -1,5 +1,6 @@
 from . import acl as _acl
 from . import agent as _agent
+from . import app_config as _app_config
 from . import artifact as _artifact
 from . import artifact_registries as _artifact_registries
 from . import artifact_revision as _artifact_revision
@@ -7,6 +8,9 @@ from . import association_artifacts_storages as _association_artifacts_storages
 from . import association_container_registries_groups as _association_container_registries_groups
 from . import audit_log as _auditlog
 from . import container_registry as _container_registry
+from . import deployment_auto_scaling_policy as _deployment_auto_scaling_policy
+from . import deployment_policy as _deployment_policy
+from . import deployment_revision as _deployment_revision
 from . import domain as _domain
 from . import dotfile as _dotfile
 from . import endpoint as _endpoint
@@ -19,6 +23,7 @@ from . import image as _image
 from . import kernel as _kernel
 from . import keypair as _keypair
 from . import network as _network
+from . import notification as _notification
 from . import object_storage as _object_storage
 from . import rbac as _rbac
 from . import rbac_models as _rbac_models
@@ -28,11 +33,14 @@ from . import resource_preset as _rpreset
 from . import resource_usage as _rusage
 from . import routing as _routing
 from . import scaling_group as _sgroup
+from . import scheduling_history as _scheduling_history
 from . import session as _session
 from . import session_template as _sessiontemplate
 from . import storage as _storage
+from . import storage_namespace as _storage_namespace
 from . import user as _user
 from . import vfolder as _vfolder
+from . import vfs_storage as _vfs_storage
 from .base import metadata
 from .gql_models import agent as _relay_agent
 from .gql_models import kernel as _relay_kernel
@@ -41,6 +49,7 @@ from .gql_models import session as _relay_session
 __all__ = (
     "metadata",
     *_acl.__all__,
+    *_app_config.__all__,
     *_artifact_registries.__all__,
     *_auditlog.__all__,
     *_agent.__all__,
@@ -49,6 +58,9 @@ __all__ = (
     *_association_artifacts_storages.__all__,
     *_association_container_registries_groups.__all__,
     *_container_registry.__all__,
+    *_deployment_auto_scaling_policy.__all__,
+    *_deployment_policy.__all__,
+    *_deployment_revision.__all__,
     *_domain.__all__,
     *_endpoint.__all__,
     *_group.__all__,
@@ -58,6 +70,7 @@ __all__ = (
     *_kernel.__all__,
     *_keypair.__all__,
     *_network.__all__,
+    *_notification.__all__,
     *_object_storage.__all__,
     *_user.__all__,
     *_vfolder.__all__,
@@ -69,9 +82,12 @@ __all__ = (
     *_rpreset.__all__,
     *_routing.__all__,
     *_sgroup.__all__,
+    *_scheduling_history.__all__,
     *_session.__all__,
     *_sessiontemplate.__all__,
     *_storage.__all__,
+    *_storage_namespace.__all__,
+    *_vfs_storage.__all__,
     *_errorlogs.__all__,
     *_eventlog.__all__,
     *_relay_agent.__all__,
@@ -81,6 +97,7 @@ __all__ = (
 )
 
 from .acl import *  # noqa
+from .app_config import *  # noqa
 from .artifact_registries import *  # noqa
 from .audit_log import *  # noqa
 from .artifact import *  # noqa
@@ -89,6 +106,9 @@ from .agent import *  # noqa
 from .association_artifacts_storages import *  # noqa
 from .association_container_registries_groups import *  # noqa
 from .container_registry import *  # noqa
+from .deployment_auto_scaling_policy import *  # noqa
+from .deployment_policy import *  # noqa
+from .deployment_revision import *  # noqa
 from .domain import *  # noqa
 from .dotfile import *  # noqa
 from .endpoint import *  # noqa
@@ -100,18 +120,22 @@ from .image import *  # noqa
 from .kernel import *  # noqa
 from .keypair import *  # noqa
 from .network import *  # noqa
+from .notification import *  # noqa
 from .object_storage import *  # noqa
 from .resource_policy import *  # noqa
 from .resource_preset import *  # noqa
 from .resource_usage import *  # noqa
 from .routing import *  # noqa
 from .scaling_group import *  # noqa
+from .scheduling_history import *  # noqa
 from .huggingface_registry import *  # noqa
 from .session import *  # noqa
 from .session_template import *  # noqa
 from .storage import *  # noqa
+from .storage_namespace import *  # noqa
 from .user import *  # noqa
 from .vfolder import *  # noqa
+from .vfs_storage import *  # noqa
 from .rbac_models import *  # noqa
 from .gql_models.agent import *  # noqa
 from .gql_models.kernel import *  # noqa

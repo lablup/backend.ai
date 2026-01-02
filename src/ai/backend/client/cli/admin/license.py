@@ -5,8 +5,6 @@ from tabulate import tabulate
 
 from ai.backend.cli.types import ExitCode
 
-from ...request import Request
-from ...session import AsyncSession
 from ..pretty import print_done, print_error, print_warn
 from . import admin
 
@@ -23,6 +21,8 @@ def show():
     """
     Show the license information (enterprise editions only).
     """
+    from ...request import Request
+    from ...session import AsyncSession
 
     async def _show_license():
         async with AsyncSession():

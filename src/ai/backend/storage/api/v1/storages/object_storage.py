@@ -26,9 +26,7 @@ from ai.backend.common.dto.storage.request import (
     UploadObjectReq,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.config.unified import (
-    ObjectStorageConfig,
-)
+from ai.backend.storage.types import MultipartFileUploadStreamReader
 
 from ....services.storages.object_storage import ObjectStorageService
 from ....utils import log_client_api_entry
@@ -38,17 +36,15 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_DEFAULT_UPLOAD_FILE_CHUNKS = 8192  # Default chunk size for streaming uploads
-
 
 class ObjectStorageAPIHandler:
-    _storage_configs: list[ObjectStorageConfig]
+    _object_storage_service: ObjectStorageService
 
     def __init__(
         self,
-        storage_configs: list[ObjectStorageConfig],
+        object_storage_service: ObjectStorageService,
     ) -> None:
-        self._storage_configs = storage_configs
+        self._object_storage_service = object_storage_service
 
     @api_handler
     async def upload_object(
@@ -69,30 +65,15 @@ class ObjectStorageAPIHandler:
 
         await log_client_api_entry(log, "upload_object", req)
 
-        storage_service = ObjectStorageService(self._storage_configs)
-
-        file_part = await file_reader.next()
-        while file_part and not getattr(file_part, "filename", None):
-            await file_part.release()
-            file_part = await file_reader.next()
-
-        if file_part is None:
-            raise web.HTTPBadRequest(reason='No file part found (expected field "file")')
-
-        async def data_stream():
-            while True:
-                chunk = await file_part.read_chunk(_DEFAULT_UPLOAD_FILE_CHUNKS)
-                if not chunk:
-                    break
-                yield chunk
-
         # Determine content type: use header if available, otherwise guess from filename
         content_type = multipart_ctx.content_type
         if not content_type:
             content_type, _ = mimetypes.guess_type(filepath)
 
-        await storage_service.stream_upload(
-            storage_name, bucket_name, filepath, content_type, data_stream()
+        upload_stream = MultipartFileUploadStreamReader(file_reader, content_type)
+
+        await self._object_storage_service.stream_upload(
+            storage_name, bucket_name, filepath, upload_stream
         )
 
         return APIResponse.no_content(
@@ -115,11 +96,12 @@ class ObjectStorageAPIHandler:
         bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "download_file", req)
-        storage_service = ObjectStorageService(self._storage_configs)
-        download_stream = storage_service.stream_download(storage_name, bucket_name, filepath)
+        file_stream = await self._object_storage_service.stream_download(
+            storage_name, bucket_name, filepath
+        )
 
         return APIStreamResponse(
-            body=download_stream,
+            body=file_stream,
             status=HTTPStatus.OK,
             headers={
                 "Content-Type": "application/octet-stream",
@@ -141,8 +123,7 @@ class ObjectStorageAPIHandler:
         bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "presigned_upload_url", req)
-        storage_service = ObjectStorageService(self._storage_configs)
-        response = await storage_service.generate_presigned_upload_url(
+        response = await self._object_storage_service.generate_presigned_upload_url(
             storage_name, bucket_name, req.key
         )
 
@@ -167,8 +148,7 @@ class ObjectStorageAPIHandler:
         bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "presigned_download_url", req)
-        storage_service = ObjectStorageService(self._storage_configs)
-        response = await storage_service.generate_presigned_download_url(
+        response = await self._object_storage_service.generate_presigned_download_url(
             storage_name, bucket_name, filepath
         )
 
@@ -194,8 +174,9 @@ class ObjectStorageAPIHandler:
 
         await log_client_api_entry(log, "get_object_meta", req)
 
-        storage_service = ObjectStorageService(self._storage_configs)
-        response = await storage_service.get_object_info(storage_name, bucket_name, filepath)
+        response = await self._object_storage_service.get_object_info(
+            storage_name, bucket_name, filepath
+        )
 
         return APIResponse.build(
             status_code=HTTPStatus.OK,
@@ -218,9 +199,8 @@ class ObjectStorageAPIHandler:
         bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "delete_object", req)
-        storage_service = ObjectStorageService(self._storage_configs)
 
-        await storage_service.delete_object(storage_name, bucket_name, prefix)
+        await self._object_storage_service.delete_object(storage_name, bucket_name, prefix)
 
         return APIResponse.no_content(
             status_code=HTTPStatus.NO_CONTENT,
@@ -232,8 +212,9 @@ def create_app(ctx: RootContext) -> web.Application:
     app["ctx"] = ctx
     app["prefix"] = "v1/storages/s3"
 
+    object_storage_service = ObjectStorageService(ctx.storage_pool)
     api_handler = ObjectStorageAPIHandler(
-        storage_configs=ctx.local_config.storages,
+        object_storage_service=object_storage_service,
     )
     app.router.add_route(
         "GET", "/{storage_name}/buckets/{bucket_name}/object/meta", api_handler.get_object_meta

@@ -259,6 +259,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "Image",
         "ComputeSession",
         "SessionTemplate",
+        "Deployment",
         "Domain",
         "Group",
         "Auth",
@@ -278,6 +279,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "QuotaScope",
         "Network",
         "UserResourcePolicy",
+        "Notification",
     )
 
     aiohttp_session: aiohttp.ClientSession
@@ -304,6 +306,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.auth import Auth
         from .func.bgtask import BackgroundTask
         from .func.container_registry import ContainerRegistry
+        from .func.deployment import Deployment
         from .func.domain import Domain
         from .func.dotfile import Dotfile
         from .func.etcd import EtcdConfig
@@ -314,6 +317,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.manager import Manager
         from .func.model import Model
         from .func.network import Network
+        from .func.notification import Notification
         from .func.quota_scope import QuotaScope
         from .func.resource import Resource
         from .func.scaling_group import ScalingGroup
@@ -337,6 +341,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.BackgroundTask = BackgroundTask
         self.ContainerRegistry = ContainerRegistry
         self.EtcdConfig = EtcdConfig
+        self.Deployment = Deployment
         self.Domain = Domain
         self.Group = Group
         self.Image = Image
@@ -358,6 +363,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.QuotaScope = QuotaScope
         self.Network = Network
         self.UserResourcePolicy = UserResourcePolicy
+        self.Notification = Notification
 
     @property
     def proxy_mode(self) -> bool:

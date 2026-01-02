@@ -28,6 +28,7 @@ from ai.backend.common.types import DeviceId, DeviceName, SlotName, SlotTypes
 from ai.backend.logging import BraceStyleAdapter
 
 from .affinity_map import AffinityHint, AffinityPolicy
+from .errors import ResourceAllocationError
 from .exception import (
     FractionalResourceFragmented,
     InsufficientResource,
@@ -114,8 +115,8 @@ class AbstractAllocMap(metaclass=ABCMeta):
             return True
         for t in self.exclusive_slot_types:
             if "*" in t:
-                a_in_exclusive_set = a_in_exclusive_set or fnmatch.fnmatchcase(a, t)
-                b_in_exclusive_set = b_in_exclusive_set or fnmatch.fnmatchcase(b, t)
+                a_in_exclusive_set = a_in_exclusive_set or fnmatch.fnmatchcase(str(a), str(t))
+                b_in_exclusive_set = b_in_exclusive_set or fnmatch.fnmatchcase(str(b), str(t))
         return a_in_exclusive_set and b_in_exclusive_set
 
     def format_current_allocations(self) -> str:
@@ -359,7 +360,11 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
             # fill up starting from the most free devices considering affinity hint
             for dev_id, current_alloc in sorted_dev_allocs:
                 current_alloc = self.allocations[slot_name][dev_id]
-                assert slot_name == self.device_slots[dev_id].slot_name
+                if slot_name != self.device_slots[dev_id].slot_name:
+                    raise ResourceAllocationError(
+                        f"Slot name mismatch: expected {slot_name}, "
+                        f"got {self.device_slots[dev_id].slot_name} for device {dev_id}."
+                    )
                 total_allocatable += int(self.device_slots[dev_id].amount - current_alloc)
             if total_allocatable < requested_alloc:
                 raise InsufficientResource(
@@ -629,7 +634,11 @@ class FractionAllocMap(AbstractAllocMap):
 
             for dev_id, current_alloc in sorted_dev_allocs:
                 current_alloc = self.allocations[slot_name][dev_id]
-                assert slot_name == self.device_slots[dev_id].slot_name
+                if slot_name != self.device_slots[dev_id].slot_name:
+                    raise ResourceAllocationError(
+                        f"Slot name mismatch: expected {slot_name}, "
+                        f"got {self.device_slots[dev_id].slot_name} for device {dev_id}."
+                    )
                 total_allocatable += self.device_slots[dev_id].amount - current_alloc
             if total_allocatable < alloc:
                 raise InsufficientResource(
@@ -713,7 +722,7 @@ class FractionAllocMap(AbstractAllocMap):
         def allocate_across_devices(
             dev_allocs: list[tuple[DeviceId, Decimal]],
             remaining_alloc: Decimal,
-            slot_name: str,
+            slot_name: SlotName,
         ) -> dict[DeviceId, Decimal]:
             slot_allocation: dict[DeviceId, Decimal] = {}
             n_devices = len(dev_allocs)

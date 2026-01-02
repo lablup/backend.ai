@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Optional, cast
 
 import attrs
 import graphene
+import graphene_federation
 import sqlalchemy as sa
 from graphene.types.inputobjecttype import set_input_object_type_default_value
 from graphql import GraphQLError, OperationType, Undefined
@@ -92,6 +93,7 @@ if TYPE_CHECKING:
     from ..idle import IdleCheckerHost
     from ..models.utils import ExtendedAsyncSAEngine
     from ..registry import AgentRegistry
+    from ..repositories.agent.repository import AgentRepository
     from ..repositories.scheduler.repository import SchedulerRepository
     from ..repositories.user.repository import UserRepository
     from .storage import StorageSessionManager
@@ -330,6 +332,7 @@ class GraphQueryContext:
     processors: Processors
     scheduler_repository: SchedulerRepository
     user_repository: UserRepository
+    agent_repository: AgentRepository
 
 
 class Mutation(graphene.ObjectType):
@@ -511,7 +514,7 @@ class Mutation(graphene.ObjectType):
 class Query(graphene.ObjectType):
     """
     All available GraphQL queries.
-    Type name changed from 'Queries' to 'Query' in 25.13.0
+    Type name changed from 'Queries' to 'Query' in 25.14.0
     """
 
     node = AsyncNode.Field()
@@ -1672,9 +1675,9 @@ class Query(graphene.ObjectType):
             loader = ctx.dataloader_manager.get_loader(
                 ctx,
                 "Group.by_user",
+                is_active=is_active,
             )
-            client_groups = await loader.load(client_user_id)
-            return client_groups
+            return await loader.load(client_user_id)
         else:
             raise InvalidAPIParameters("Unknown client role")
         return await Group.load_all(
@@ -1741,11 +1744,11 @@ class Query(graphene.ObjectType):
         else:
             raise InvalidAPIParameters("Unknown client role")
         return [
-            ImageNode.from_legacy_image(i)
-            for i in items
+            ImageNode.from_legacy_image(item)
+            for item in items
             # access scope to each customized image has already been
             # evaluated at Image.load_all()
-            if "ai.backend.customized-image.owner" in i.raw_labels
+            if item.is_customized_image
         ]
 
     @staticmethod
@@ -3382,3 +3385,11 @@ class GQLMetricMiddleware:
             )
             raise e
         return res
+
+
+graphene_schema = graphene_federation.build_schema(
+    query=Query,
+    mutation=Mutation,
+    auto_camelcase=False,
+    federation_version=graphene_federation.LATEST_VERSION,
+)

@@ -3,14 +3,13 @@ from datetime import datetime
 
 import click
 
-from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 
 from ..session import Session
 from .pretty import print_error
 
 
-@main.group()
+@click.group()
 def server_logs():
     """Provides operations related to server logs."""
 

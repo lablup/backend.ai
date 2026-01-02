@@ -11,7 +11,7 @@ from tenacity import AsyncRetrying, TryAgain, retry_if_exception_type, wait_expo
 from tenacity.stop import stop_after_attempt
 
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
-from ai.backend.appproxy.common.exceptions import (
+from ai.backend.appproxy.common.errors import (
     InvalidAPIParameters,
     ServerMisconfiguredError,
 )
@@ -32,6 +32,7 @@ from ..config import (
     WildcardDomainConfig,
 )
 from ..coordinator_client import get_circuit_info
+from ..errors import MissingPortConfigError
 from ..types import FrontendServerMode, InteractiveAppInfo, RootContext
 
 
@@ -42,16 +43,27 @@ def generate_proxy_url(
     | TraefikWildcardDomainConfig,
     protocol: str,
     circuit: Circuit,
+    redirect_path: str | None = None,
 ) -> str:
+    # Generate base URL based on config type
     match config:
         case PortProxyConfig():
-            return f"{protocol}://{config.advertised_host or config.bind_host}:{circuit.port}"
+            base_url = f"{protocol}://{config.advertised_host or config.bind_host}:{circuit.port}"
         case TraefikPortProxyConfig():
-            return f"{protocol}://{config.advertised_host}:{circuit.port}"
+            base_url = f"{protocol}://{config.advertised_host}:{circuit.port}"
         case WildcardDomainConfig():
-            return f"{protocol}://{circuit.subdomain}{config.domain}:{config.advertised_port or config.bind_addr.port}"
+            base_url = f"{protocol}://{circuit.subdomain}{config.domain}:{config.advertised_port or config.bind_addr.port}"
         case TraefikWildcardDomainConfig():
-            return f"{protocol}://{circuit.subdomain}{config.domain}:{config.advertised_port}"
+            base_url = f"{protocol}://{circuit.subdomain}{config.domain}:{config.advertised_port}"
+
+    # Append redirect path if provided
+    if redirect_path:
+        # Ensure redirect path starts with /
+        if not redirect_path.startswith("/"):
+            redirect_path = f"/{redirect_path}"
+        return f"{base_url}{redirect_path}"
+
+    return base_url
 
 
 async def ensure_traefik_route_set_up(traefik_api_port: int, circuit: Circuit) -> None:
@@ -132,7 +144,8 @@ async def setup(
             raise ServerMisconfiguredError(
                 f"proxy_worker: Invalid root-level 'frontend_mode': {config.frontend_mode}"
             )
-    assert port_config is not None
+    if port_config is None:
+        raise MissingPortConfigError("Port configuration is required")
 
     use_tls = config.tls_advertised or config.tls_listen
     if not isinstance(circuit.app_info, InteractiveAppInfo):
@@ -148,9 +161,9 @@ async def setup(
     match circuit.protocol:
         case ProxyProtocol.HTTP:
             protocol = "https" if use_tls else "http"
-            response = web.HTTPPermanentRedirect(
-                generate_proxy_url(port_config, protocol, circuit), headers=cors_headers
-            )
+            redirect_path = jwt_body.get("redirect", "")
+            proxy_url = generate_proxy_url(port_config, protocol, circuit, redirect_path)
+            response = web.HTTPPermanentRedirect(proxy_url, headers=cors_headers)
             cookie_domain = None
             if circuit.frontend_mode == FrontendMode.WILDCARD_DOMAIN:
                 wildcard_info = config.wildcard_domain
@@ -161,6 +174,10 @@ async def setup(
                 PERMIT_COOKIE_NAME,
                 calculate_permit_hash(root_ctx.local_config.permit_hash, circuit.app_info.user_id),
                 domain=cookie_domain,
+                httponly=True,
+                secure=use_tls,
+                samesite="Lax",
+                max_age=604800,  # 7 days
             )
             return response
         case ProxyProtocol.TCP:
@@ -169,7 +186,7 @@ async def setup(
                 "directTCP": "true",
                 "auth": params.token,
                 "proto": protocol,
-                "gateway": generate_proxy_url(port_config, protocol, circuit),
+                "gateway": generate_proxy_url(port_config, protocol, circuit, redirect_path=None),
             }
             if jwt_body["redirect"]:
                 return web.HTTPPermanentRedirect(

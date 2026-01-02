@@ -21,6 +21,7 @@ import attrs
 from prometheus_client import generate_latest
 from pydantic import AliasChoices, BaseModel, Field, TypeAdapter
 
+from ai.backend.appproxy.common.errors import ServerMisconfiguredError, ServiceUnavailable
 from ai.backend.appproxy.common.etcd import TraefikEtcd, convert_to_etcd_dict
 from ai.backend.appproxy.common.events import (
     AppProxyCircuitCreatedEvent,
@@ -28,12 +29,13 @@ from ai.backend.appproxy.common.events import (
     AppProxyCircuitRouteUpdatedEvent,
     AppProxyWorkerCircuitAddedEvent,
 )
-from ai.backend.appproxy.common.exceptions import ServerMisconfiguredError, ServiceUnavailable
 from ai.backend.appproxy.common.types import ProxyProtocol, RouteInfo, SerializableCircuit
 from ai.backend.appproxy.coordinator.health_checker import HealthCheckEngine
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.health_checker.probe import HealthProbe
+from ai.backend.common.leader import ValkeyLeaderElection
 from ai.backend.common.lock import AbstractDistributedLock
 from ai.backend.common.metrics.metric import (
     APIMetricObserver,
@@ -171,32 +173,6 @@ class CircuitManager:
         worker_authority = circuit.worker_row.authority
         etcd_prefix = f"worker_{worker_authority}/{circuit.protocol.value.lower()}"
 
-        old = set(
-            RouteInfo(**{
-                **r.model_dump(),
-                "health_status": None,
-                "last_health_check": None,
-                "consecutive_failures": 0,
-            })
-            for r in old_routes
-        )
-        new = set(
-            RouteInfo(**{
-                **r.model_dump(),
-                "health_status": None,
-                "last_health_check": None,
-                "consecutive_failures": 0,
-            })
-            for r in circuit.healthy_routes
-        )
-        intersect = old & new
-        routes_to_delete = old - intersect
-        routes_to_create = new - intersect
-
-        if len(routes_to_delete) == 0 and len(routes_to_create) == 0:
-            # Nothing to update
-            return
-
         # Use health-aware services configuration
         new_route_keys = {
             f"bai_session_{r.session_id}_{circuit.id}" for r in circuit.healthy_routes
@@ -208,7 +184,7 @@ class CircuitManager:
         }
 
         # clear old routes
-        for route in routes_to_delete:
+        for route in old_routes:
             log.debug(
                 "traefik_etcd.delete_prefix {}",
                 f"{etcd_prefix}/services/bai_session_{route.session_id}_{circuit.id}",
@@ -315,6 +291,8 @@ class RootContext:
     health_engine: HealthCheckEngine
 
     metrics: CoordinatorMetricRegistry
+    health_probe: HealthProbe
+    leader_election: ValkeyLeaderElection
 
 
 CleanupContext: TypeAlias = Callable[["RootContext"], AsyncContextManager[None]]

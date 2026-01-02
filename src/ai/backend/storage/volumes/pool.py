@@ -11,7 +11,7 @@ from ai.backend.common.types import VolumeID
 from ai.backend.logging import BraceStyleAdapter
 
 from ..config.unified import StorageProxyUnifiedConfig, VolumeInfoConfig
-from ..exception import InvalidVolumeError
+from ..errors import InvalidVolumeError
 from ..plugin import StoragePluginContext
 from ..types import VolumeInfo
 from .abc import AbstractVolume
@@ -19,6 +19,8 @@ from .cephfs import CephFSVolume
 from .ddn import EXAScalerFSVolume
 from .dellemc import DellEMCOneFSVolume
 from .gpfs import GPFSVolume
+from .hammerspace.volume.base import BaseHammerspaceVolume
+from .hammerspace.volume.extended import HammerspaceVolume
 from .netapp import NetAppVolume
 from .purestorage import FlashBladeVolume
 from .vast import VASTVolume
@@ -42,6 +44,8 @@ _DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     CephFSVolume.name: CephFSVolume,
     VASTVolume.name: VASTVolume,
     EXAScalerFSVolume.name: EXAScalerFSVolume,
+    HammerspaceVolume.name: HammerspaceVolume,
+    BaseHammerspaceVolume.name: BaseHammerspaceVolume,
 }
 
 

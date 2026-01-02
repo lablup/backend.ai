@@ -10,8 +10,11 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import ArtifactStatus
 from ai.backend.manager.errors.artifact import ArtifactNotApproved, ArtifactReadonly
+from ai.backend.manager.errors.common import ServerMisconfiguredError
+from ai.backend.manager.errors.object_storage import ObjectStorageOperationNotSupported
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
+from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
 from ai.backend.manager.services.object_storage.actions.create import (
     CreateObjectStorageAction,
     CreateObjectStorageActionResult,
@@ -23,14 +26,6 @@ from ai.backend.manager.services.object_storage.actions.delete import (
 from ai.backend.manager.services.object_storage.actions.get import (
     GetObjectStorageAction,
     GetObjectStorageActionResult,
-)
-from ai.backend.manager.services.object_storage.actions.get_all_buckets import (
-    GetAllBucketsAction,
-    GetAllBucketsActionResult,
-)
-from ai.backend.manager.services.object_storage.actions.get_buckets import (
-    GetBucketsAction,
-    GetBucketsActionResult,
 )
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
@@ -44,13 +39,9 @@ from ai.backend.manager.services.object_storage.actions.list import (
     ListObjectStorageAction,
     ListObjectStorageActionResult,
 )
-from ai.backend.manager.services.object_storage.actions.register_bucket import (
-    RegisterBucketAction,
-    RegisterBucketActionResult,
-)
-from ai.backend.manager.services.object_storage.actions.unregister_bucket import (
-    UnregisterBucketAction,
-    UnregisterBucketActionResult,
+from ai.backend.manager.services.object_storage.actions.search import (
+    SearchObjectStoragesAction,
+    SearchObjectStoragesActionResult,
 )
 from ai.backend.manager.services.object_storage.actions.update import (
     UpdateObjectStorageAction,
@@ -63,6 +54,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 class ObjectStorageService:
     _artifact_repository: ArtifactRepository
     _object_storage_repository: ObjectStorageRepository
+    _storage_namespace_repository: StorageNamespaceRepository
     _storage_manager: StorageSessionManager
     _config_provider: ManagerConfigProvider
 
@@ -70,11 +62,13 @@ class ObjectStorageService:
         self,
         artifact_repository: ArtifactRepository,
         object_storage_repository: ObjectStorageRepository,
+        storage_namespace_repository: StorageNamespaceRepository,
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
     ) -> None:
         self._artifact_repository = artifact_repository
         self._object_storage_repository = object_storage_repository
+        self._storage_namespace_repository = storage_namespace_repository
         self._storage_manager = storage_manager
         self._config_provider = config_provider
 
@@ -82,7 +76,7 @@ class ObjectStorageService:
         """
         Create a new object storage.
         """
-        log.info("Creating object storage with data: {}", action.creator.fields_to_store())
+        log.info("Creating object storage with data: {}", action.creator)
         storage_data = await self._object_storage_repository.create(action.creator)
         return CreateObjectStorageActionResult(result=storage_data)
 
@@ -90,8 +84,8 @@ class ObjectStorageService:
         """
         Update an existing object storage.
         """
-        log.info("Updating object storage with data: {}", action.modifier.fields_to_update())
-        storage_data = await self._object_storage_repository.update(action.id, action.modifier)
+        log.info("Updating object storage with id: {}", action.updater.pk_value)
+        storage_data = await self._object_storage_repository.update(action.updater)
         return UpdateObjectStorageActionResult(result=storage_data)
 
     async def delete(self, action: DeleteObjectStorageAction) -> DeleteObjectStorageActionResult:
@@ -119,6 +113,18 @@ class ObjectStorageService:
         storage_data_list = await self._object_storage_repository.list_object_storages()
         return ListObjectStorageActionResult(data=storage_data_list)
 
+    async def search(self, action: SearchObjectStoragesAction) -> SearchObjectStoragesActionResult:
+        """Searches Object storages."""
+        result = await self._object_storage_repository.search(
+            querier=action.querier,
+        )
+        return SearchObjectStoragesActionResult(
+            storages=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
     async def get_presigned_download_url(
         self, action: GetDownloadPresignedURLAction
     ) -> GetDownloadPresignedURLActionResult:
@@ -131,10 +137,20 @@ class ObjectStorageService:
         )
 
         reservoir_config = self._config_provider.config.reservoir
-        storage_name = reservoir_config.storage_name
+        if reservoir_config is None:
+            raise ServerMisconfiguredError("Reservoir configuration is missing")
+
+        storage_name = reservoir_config.archive_storage
+
+        # Only object storage is supported for presigned URLs
+        if reservoir_config.config.storage_type != "object_storage":
+            raise ObjectStorageOperationNotSupported(
+                "Presigned URLs are only supported for object storage"
+            )
+
         bucket_name = reservoir_config.config.bucket_name
         storage_data = await self._object_storage_repository.get_by_name(storage_name)
-        storage_namespace = await self._object_storage_repository.get_storage_namespace(
+        storage_namespace = await self._storage_namespace_repository.get_by_storage_and_namespace(
             storage_data.id, bucket_name
         )
         revision_data = await self._artifact_repository.get_artifact_revision_by_id(
@@ -154,7 +170,7 @@ class ObjectStorageService:
 
         result = await storage_proxy_client.get_s3_presigned_download_url(
             storage_data.name,
-            storage_namespace.bucket,
+            storage_namespace.namespace,
             PresignedDownloadObjectReq(key=str(object_path), expiration=action.expiration),
         )
 
@@ -174,10 +190,20 @@ class ObjectStorageService:
         )
 
         reservoir_config = self._config_provider.config.reservoir
-        storage_name = reservoir_config.storage_name
+        if reservoir_config is None:
+            raise ServerMisconfiguredError("Reservoir configuration is missing")
+
+        storage_name = reservoir_config.archive_storage
+
+        # Only object storage is supported for presigned URLs
+        if reservoir_config.config.storage_type != "object_storage":
+            raise ObjectStorageOperationNotSupported(
+                "Presigned URLs are only supported for object storage"
+            )
+
         bucket_name = reservoir_config.config.bucket_name
         storage_data = await self._object_storage_repository.get_by_name(storage_name)
-        storage_namespace = await self._object_storage_repository.get_storage_namespace(
+        storage_namespace = await self._storage_namespace_repository.get_by_storage_and_namespace(
             storage_data.id, bucket_name
         )
 
@@ -198,7 +224,7 @@ class ObjectStorageService:
 
         result = await storage_proxy_client.get_s3_presigned_upload_url(
             storage_data.name,
-            storage_namespace.bucket,
+            storage_namespace.namespace,
             PresignedUploadObjectReq(
                 key=str(object_path),
             ),
@@ -207,27 +233,3 @@ class ObjectStorageService:
         return GetUploadPresignedURLActionResult(
             storage_id=storage_data.id, presigned_url=result.url, fields=result.fields
         )
-
-    async def register_bucket(self, action: RegisterBucketAction) -> RegisterBucketActionResult:
-        log.info("Registering object storage bucket")
-        storage_namespace = await self._object_storage_repository.register_bucket(action.creator)
-        return RegisterBucketActionResult(storage_id=storage_namespace.id, result=storage_namespace)
-
-    async def unregister_bucket(
-        self, action: UnregisterBucketAction
-    ) -> UnregisterBucketActionResult:
-        log.info("Unregistering object storage bucket")
-        storage_id = await self._object_storage_repository.unregister_bucket(
-            action.storage_id, action.bucket_name
-        )
-        return UnregisterBucketActionResult(storage_id=storage_id)
-
-    async def get_buckets(self, action: GetBucketsAction) -> GetBucketsActionResult:
-        log.info("Getting object storage buckets for storage: {}", action.storage_id)
-        buckets = await self._object_storage_repository.get_buckets(action.storage_id)
-        return GetBucketsActionResult(result=buckets)
-
-    async def get_all_buckets(self, action: GetAllBucketsAction) -> GetAllBucketsActionResult:
-        log.info("Getting all buckets grouped by storage")
-        buckets_by_storage = await self._object_storage_repository.get_all_buckets_by_storage()
-        return GetAllBucketsActionResult(result=buckets_by_storage)

@@ -10,9 +10,9 @@ import re
 import secrets
 import time
 import uuid
-import zlib
 from collections import defaultdict
 from collections.abc import (
+    Coroutine,
     Iterable,
     Mapping,
     MutableMapping,
@@ -51,7 +51,6 @@ from sqlalchemy.orm.exc import NoResultFound
 from typeguard import check_type
 from yarl import URL
 
-from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.clients.http_client.client_pool import (
@@ -63,15 +62,12 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.agent.anycast import (
-    AgentHeartbeatEvent,
-    AgentImagesRemoveEvent,
-    AgentStartedEvent,
-    AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
 from ai.backend.common.events.event_types.image.anycast import (
@@ -149,17 +145,17 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
     SlotName,
-    SlotTypes,
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.clients.wsproxy.types import (
+from ai.backend.manager.clients.appproxy.types import (
     CreateEndpointRequestBody,
     EndpointTagsModel,
     SessionTagsModel,
     TagsModel,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointData
@@ -172,18 +168,27 @@ from ai.backend.manager.utils import query_userinfo
 
 from .agent_cache import AgentRPCCache
 from .clients.agent.client import AgentClient
-from .clients.wsproxy.client import AppProxyClient
+from .clients.appproxy.client import AppProxyClient
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
 from .errors.api import InvalidAPIParameters
 from .errors.common import GenericForbidden, RejectedByHook
 from .errors.image import ImageNotFound
 from .errors.kernel import (
+    InvalidKernelConfig,
     QuotaExceeded,
     SessionAlreadyExists,
     SessionNotFound,
     TooManySessionsMatched,
 )
-from .errors.resource import InstanceNotFound, ScalingGroupNotFound
+from .errors.resource import (
+    AgentNotAllocated,
+    DatabaseConnectionUnavailable,
+    InstanceNotFound,
+    NoCurrentTaskContext,
+    ScalingGroupNotFound,
+    ScalingGroupSessionTypeNotAllowed,
+    SessionNotAllocated,
+)
 from .exceptions import MultiAgentError
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -193,7 +198,6 @@ from .models import (
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     AgentRow,
-    AgentStatus,
     EndpointRow,
     ImageRow,
     KernelLoadingStrategy,
@@ -225,7 +229,6 @@ from .models.container_registry import ContainerRegistryRow
 from .models.image import bulk_get_image_configs
 from .models.session import (
     SESSION_KERNEL_STATUS_MAPPING,
-    SESSION_PRIORITY_DEFAULT,
     ConcurrencyUsed,
     SessionLifecycleManager,
 )
@@ -472,7 +475,8 @@ class AgentRegistry:
         resp: MutableMapping[str, Any] = {}
 
         current_task = asyncio.current_task()
-        assert current_task is not None
+        if current_task is None:
+            raise NoCurrentTaskContext("No current task context")
 
         mount_id_map = config.get("mount_id_map")
         mount_map = config.get("mount_map")
@@ -607,7 +611,8 @@ class AgentRegistry:
 
         async with self.db.begin_readonly_session() as db_session:
             conn = await db_session.connection()
-            assert conn
+            if conn is None:
+                raise DatabaseConnectionUnavailable("Database connection not available")
             # check if network exists
             if _network_id := config.get("attach_network"):
                 network = await NetworkRow.get(db_session, _network_id)
@@ -751,7 +756,8 @@ class AgentRegistry:
         resp: MutableMapping[str, Any] = {}
 
         current_task = asyncio.current_task()
-        assert current_task is not None
+        if current_task is None:
+            raise NoCurrentTaskContext("No current task context")
 
         # Check existing (access_key, session) kernel instance
         try:
@@ -873,7 +879,8 @@ class AgentRegistry:
         session_creation_id = secrets.token_urlsafe(16)
         kernel_id: Optional[KernelId] = None
         current_task = asyncio.current_task()
-        assert current_task is not None
+        if current_task is None:
+            raise NoCurrentTaskContext("No current task context")
 
         if attach_network:
             async with self.db.begin_readonly_session() as db_sess:
@@ -1086,9 +1093,11 @@ class AgentRegistry:
         session_id = SessionId(uuid.uuid4())
 
         kernel_enqueue_configs = session_enqueue_configs["kernel_configs"]
-        assert len(kernel_enqueue_configs) >= 1
+        if len(kernel_enqueue_configs) < 1:
+            raise InvalidKernelConfig("At least one kernel configuration is required")
         main_kernel_config = kernel_enqueue_configs[0]
-        assert main_kernel_config["cluster_role"] == DEFAULT_ROLE
+        if main_kernel_config["cluster_role"] != DEFAULT_ROLE:
+            raise InvalidKernelConfig("Main kernel must have the default cluster role")
         session_creation_config: Mapping = session_enqueue_configs["creation_config"]
 
         # Check keypair resource limit
@@ -1100,7 +1109,8 @@ class AgentRegistry:
 
         async with self.db.begin_readonly_session() as sess:
             conn = await sess.connection()
-            assert conn
+            if conn is None:
+                raise DatabaseConnectionUnavailable("Database connection not available")
             checked_scaling_group = await check_scaling_group(
                 conn,
                 scaling_group,
@@ -1575,7 +1585,8 @@ class AgentRegistry:
                 - keys are image names as strings
                 - values are background task IDs
         """
-        assert agent_alloc_ctx.agent_id is not None
+        if agent_alloc_ctx.agent_id is None:
+            raise AgentNotAllocated("Agent ID is not allocated")
 
         agent_client = self._get_agent_client(agent_alloc_ctx.agent_id)
         resp = await agent_client.check_and_pull(image_configs)
@@ -1728,8 +1739,10 @@ class AgentRegistry:
                 ):
                     network_name = f"bai-singlenode-{scheduled_session.id}"
                     agent_alloc_ctx = kernel_agent_bindings[0].agent_alloc_ctx
-                    assert agent_alloc_ctx.agent_id is not None
-                    assert scheduled_session.id is not None
+                    if agent_alloc_ctx.agent_id is None:
+                        raise AgentNotAllocated("Agent ID is not allocated")
+                    if scheduled_session.id is None:
+                        raise SessionNotAllocated("Session ID is not available")
                     try:
                         agent_client = self._get_agent_client(
                             agent_alloc_ctx.agent_id,
@@ -1772,7 +1785,8 @@ class AgentRegistry:
                         key=keyfunc,
                     ):
                         for index, item in enumerate(group_iterator):
-                            assert item.agent_alloc_ctx.agent_id is not None
+                            if item.agent_alloc_ctx.agent_id is None:
+                                raise AgentNotAllocated("Agent ID is not allocated")
                             agent_client = self._get_agent_client(
                                 item.agent_alloc_ctx.agent_id,
                                 order_key=str(scheduled_session.id),
@@ -1854,7 +1868,7 @@ class AgentRegistry:
         })
 
         # Aggregate by agents to minimize RPC calls
-        per_agent_tasks = []
+        per_agent_coros: list[Coroutine[Any, Any, None]] = []
         keyfunc = lambda binding: binding.agent_alloc_ctx.agent_id
         for agent_id, group_iterator in itertools.groupby(
             sorted(kernel_agent_bindings, key=keyfunc),
@@ -1863,37 +1877,30 @@ class AgentRegistry:
             items = [*group_iterator]
             # Within a group, agent_alloc_ctx are same.
             agent_alloc_ctx = items[0].agent_alloc_ctx
-            per_agent_tasks.append(
-                (
+            per_agent_coros.append(
+                self._create_kernels_in_one_agent(
                     agent_alloc_ctx,
-                    self._create_kernels_in_one_agent(
-                        agent_alloc_ctx,
-                        scheduled_session,
-                        items,
-                        img_configs,
-                        cluster_info,
-                        idle_timeout,
-                    ),
+                    scheduled_session,
+                    items,
+                    img_configs,
+                    cluster_info,
+                    idle_timeout,
                 ),
             )
-        if per_agent_tasks:
-            agent_errors = []
-            results = await asyncio.gather(
-                *[item[1] for item in per_agent_tasks],
-                return_exceptions=True,
+        agent_errors: list[BaseException] = []
+        async for task in aiotools.as_completed_safe(per_agent_coros):
+            try:
+                await task
+            except ExceptionGroup as e:
+                agent_errors.extend(e.exceptions)
+            except Exception as e:
+                agent_errors.append(e)
+        if agent_errors:
+            raise MultiAgentError(
+                "agent(s) raise errors during kernel creation",
+                agent_errors,
             )
-            for agent_alloc_tx, result in zip((item[0] for item in per_agent_tasks), results):
-                if isinstance(result, aiotools.TaskGroupError):
-                    agent_errors.extend(result.__errors__)
-                elif isinstance(result, Exception):
-                    # mark to be destroyed afterwards
-                    agent_errors.append(result)
-            if agent_errors:
-                raise MultiAgentError(
-                    "agent(s) raise errors during kernel creation",
-                    agent_errors,
-                )
-            await self.settle_agent_alloc(kernel_agent_bindings)
+        await self.settle_agent_alloc(kernel_agent_bindings)
 
     def convert_resource_spec_to_resource_slot(
         self,
@@ -1927,8 +1934,10 @@ class AgentRegistry:
         cluster_info: ClusterInfo,
         idle_timeout: float | int,
     ) -> None:
-        assert agent_alloc_ctx.agent_id is not None
-        assert scheduled_session.id is not None
+        if agent_alloc_ctx.agent_id is None:
+            raise AgentNotAllocated("Agent ID is not allocated")
+        if scheduled_session.id is None:
+            raise SessionNotAllocated("Session ID is not available")
 
         async def _update_kernel() -> None:
             async with self.db.begin_session() as db_sess:
@@ -3116,214 +3125,6 @@ class AgentRegistry:
         # noop for performance reasons
         pass
 
-    async def handle_heartbeat(self, agent_id, agent_info):
-        now = datetime.now(tzutc())
-        slot_key_and_units = {
-            SlotName(k): SlotTypes(v[0]) for k, v in agent_info["resource_slots"].items()
-        }
-        available_slots = ResourceSlot({
-            SlotName(k): Decimal(v[1]) for k, v in agent_info["resource_slots"].items()
-        })
-        current_addr = agent_info["addr"]
-        sgroup = agent_info.get("scaling_group", "default")
-        auto_terminate_abusing_kernel = agent_info.get("auto_terminate_abusing_kernel", False)
-        async with self.heartbeat_lock:
-            instance_rejoin = False
-
-            # Update "last seen" timestamp for liveness tracking
-            await self.valkey_live.update_agent_last_seen(agent_id, now.timestamp())
-
-            # Check and update status of the agent record in DB
-            async def _update() -> None:
-                nonlocal instance_rejoin
-                async with self.db.begin() as conn:
-                    fetch_query = (
-                        sa.select([
-                            agents.c.status,
-                            agents.c.addr,
-                            agents.c.public_host,
-                            agents.c.public_key,
-                            agents.c.scaling_group,
-                            agents.c.available_slots,
-                            agents.c.version,
-                            agents.c.compute_plugins,
-                            agents.c.architecture,
-                            agents.c.auto_terminate_abusing_kernel,
-                        ])
-                        .select_from(agents)
-                        .where(agents.c.id == agent_id)
-                        .with_for_update()
-                    )
-                    result = await conn.execute(fetch_query)
-                    row = result.first()
-
-                    if row is None or row["status"] is None:
-                        # new agent detected!
-                        log.info("instance_lifecycle: agent {0} joined (via heartbeat)!", agent_id)
-                        await self.config_provider.legacy_etcd_config_loader.update_resource_slots(
-                            slot_key_and_units
-                        )
-                        self.agent_cache.update(
-                            agent_id,
-                            current_addr,
-                            agent_info["public_key"],
-                        )
-                        insert_query = sa.insert(agents).values({
-                            "id": agent_id,
-                            "status": AgentStatus.ALIVE,
-                            "region": agent_info["region"],
-                            "scaling_group": sgroup,
-                            "available_slots": available_slots,
-                            "occupied_slots": {},
-                            "addr": agent_info["addr"],
-                            "public_host": agent_info["public_host"],
-                            "public_key": agent_info["public_key"],
-                            "first_contact": now,
-                            "lost_at": sa.null(),
-                            "version": agent_info["version"],
-                            "compute_plugins": agent_info["compute_plugins"],
-                            "architecture": agent_info.get("architecture", "x86_64"),
-                            "auto_terminate_abusing_kernel": auto_terminate_abusing_kernel,
-                        })
-                        result = await conn.execute(insert_query)
-                        assert result.rowcount == 1
-                    elif row["status"] == AgentStatus.ALIVE:
-                        updates = {}
-                        invalidate_agent_cache = False
-                        if row["available_slots"] != available_slots:
-                            updates["available_slots"] = available_slots
-                        if row["scaling_group"] != sgroup:
-                            updates["scaling_group"] = sgroup
-                        if row["addr"] != current_addr:
-                            updates["addr"] = current_addr
-                            invalidate_agent_cache = True
-                        if row["public_host"] != agent_info["public_host"]:
-                            updates["public_host"] = agent_info["public_host"]
-                        if row["public_key"] != agent_info["public_key"]:
-                            updates["public_key"] = agent_info["public_key"]
-                            invalidate_agent_cache = True
-                        if row["version"] != agent_info["version"]:
-                            updates["version"] = agent_info["version"]
-                        if row["compute_plugins"] != agent_info["compute_plugins"]:
-                            updates["compute_plugins"] = agent_info["compute_plugins"]
-                        if row["architecture"] != agent_info["architecture"]:
-                            updates["architecture"] = agent_info["architecture"]
-                        if row["auto_terminate_abusing_kernel"] != auto_terminate_abusing_kernel:
-                            updates["auto_terminate_abusing_kernel"] = auto_terminate_abusing_kernel
-                        # occupied_slots are updated when kernels starts/terminates
-                        if invalidate_agent_cache:
-                            self.agent_cache.update(
-                                agent_id,
-                                current_addr,
-                                agent_info["public_key"],
-                            )
-                        if updates:
-                            await self.config_provider.legacy_etcd_config_loader.update_resource_slots(
-                                slot_key_and_units
-                            )
-                            update_query = (
-                                sa.update(agents).values(updates).where(agents.c.id == agent_id)
-                            )
-                            await conn.execute(update_query)
-                    elif row["status"] in (AgentStatus.LOST, AgentStatus.TERMINATED):
-                        await self.config_provider.legacy_etcd_config_loader.update_resource_slots(
-                            slot_key_and_units
-                        )
-                        instance_rejoin = True
-                        self.agent_cache.update(
-                            agent_id,
-                            current_addr,
-                            agent_info["public_key"],
-                        )
-                        update_query = (
-                            sa.update(agents)
-                            .values({
-                                "status": AgentStatus.ALIVE,
-                                "region": agent_info["region"],
-                                "scaling_group": sgroup,
-                                "addr": agent_info["addr"],
-                                "public_host": agent_info["public_host"],
-                                "public_key": agent_info["public_key"],
-                                "lost_at": sa.null(),
-                                "available_slots": available_slots,
-                                "version": agent_info["version"],
-                                "compute_plugins": agent_info["compute_plugins"],
-                                "architecture": agent_info["architecture"],
-                                "auto_terminate_abusing_kernel": auto_terminate_abusing_kernel,
-                            })
-                            .where(agents.c.id == agent_id)
-                        )
-                        await conn.execute(update_query)
-                    else:
-                        log.error("should not reach here! {0}", type(row["status"]))
-
-            try:
-                await execute_with_retry(_update)
-            except sa.exc.IntegrityError:
-                log.error("Scaling group named [{}] does not exist.", sgroup)
-                return
-
-            if instance_rejoin:
-                await self.event_producer.anycast_event(
-                    AgentStartedEvent("revived"),
-                    source_override=agent_id,
-                )
-
-            # Update the mapping of kernel images to agents.
-            images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
-            image_canonicals = set(img_info[0] for img_info in images)
-
-            await self.valkey_image.add_agent_to_images(agent_id, image_canonicals)
-
-        await self.hook_plugin_ctx.notify(
-            "POST_AGENT_HEARTBEAT",
-            (agent_id, sgroup, available_slots),
-        )
-
-    async def handle_agent_images_remove(
-        self, agent_id: AgentId, image_canonicals: list[str]
-    ) -> None:
-        await self.valkey_image.remove_agent_from_images(agent_id, image_canonicals)
-
-    async def mark_agent_terminated(self, agent_id: AgentId, status: AgentStatus) -> None:
-        await self.valkey_live.remove_agent_last_seen(agent_id)
-
-        async def _update() -> None:
-            async with self.db.begin() as conn:
-                fetch_query = (
-                    sa.select([
-                        agents.c.status,
-                        agents.c.addr,
-                    ])
-                    .select_from(agents)
-                    .where(agents.c.id == agent_id)
-                    .with_for_update()
-                )
-                result = await conn.execute(fetch_query)
-                row = result.first()
-                prev_status = row["status"]
-                if prev_status in (None, AgentStatus.LOST, AgentStatus.TERMINATED):
-                    return
-
-                if status == AgentStatus.LOST:
-                    log.warning("agent {0} heartbeat timeout detected.", agent_id)
-                elif status == AgentStatus.TERMINATED:
-                    log.info("agent {0} has terminated.", agent_id)
-                now = datetime.now(tzutc())
-                update_query = (
-                    sa.update(agents)
-                    .values({
-                        "status": status,
-                        "status_changed": now,
-                        "lost_at": now,
-                    })
-                    .where(agents.c.id == agent_id)
-                )
-                await conn.execute(update_query)
-
-        await self.valkey_image.remove_agent_from_all_images(agent_id)
-        await execute_with_retry(_update)
-
     async def sync_kernel_stats(
         self,
         kernel_ids: Sequence[KernelId],
@@ -3761,7 +3562,9 @@ class AgentRegistry:
 
         if _path := MODEL_SERVICE_RUNTIME_PROFILES[endpoint.runtime_variant].health_check_endpoint:
             _info = ModelHealthCheck(path=_path)
-        elif endpoint.runtime_variant == RuntimeVariant.CUSTOM:
+
+        if endpoint.runtime_variant == RuntimeVariant.CUSTOM:
+            # CUSTOM: full validation required
             model_definition_path = await ModelServiceHelper.validate_model_definition_file_exists(
                 self.storage_manager,
                 model.host,
@@ -3783,8 +3586,59 @@ class AgentRegistry:
                         max_retries=health_check_info["max_retries"],
                         max_wait_time=health_check_info["max_wait_time"],
                         expected_status_code=health_check_info["expected_status_code"],
+                        initial_delay=health_check_info.get("initial_delay"),
                     )
                     break
+        elif (
+            self.config_provider.config.deployment.enable_model_definition_override
+            and endpoint.model_definition_path
+        ):
+            # non-CUSTOM with override: read raw definition and override non-None values only
+            try:
+                model_definition_path = (
+                    await ModelServiceHelper.validate_model_definition_file_exists(
+                        self.storage_manager,
+                        model.host,
+                        model.vfid,
+                        endpoint.model_definition_path,
+                    )
+                )
+                raw_model_definition = await ModelServiceHelper._read_model_definition(
+                    self.storage_manager,
+                    model.host,
+                    model.vfid,
+                    model_definition_path,
+                )
+
+                for model_info in raw_model_definition.get("models", []):
+                    if health_check_info := model_info.get("service", {}).get("health_check"):
+                        if _info is None:
+                            _info = ModelHealthCheck(path=health_check_info["path"])
+                        override_kwargs: dict[str, float | int | str] = {}
+                        if health_check_info.get("path") is not None:
+                            override_kwargs["path"] = health_check_info["path"]
+                        if health_check_info.get("interval") is not None:
+                            override_kwargs["interval"] = health_check_info["interval"]
+                        if health_check_info.get("max_retries") is not None:
+                            override_kwargs["max_retries"] = health_check_info["max_retries"]
+                        if health_check_info.get("max_wait_time") is not None:
+                            override_kwargs["max_wait_time"] = health_check_info["max_wait_time"]
+                        if health_check_info.get("expected_status_code") is not None:
+                            override_kwargs["expected_status_code"] = health_check_info[
+                                "expected_status_code"
+                            ]
+                        if health_check_info.get("initial_delay") is not None:
+                            override_kwargs["initial_delay"] = health_check_info["initial_delay"]
+                        if override_kwargs:
+                            _info = _info.model_copy(update=override_kwargs)
+                        break
+            except Exception:
+                log.debug(
+                    "Failed to read health check override from model definition for endpoint {}, "
+                    "using default health check settings",
+                    endpoint.id,
+                    exc_info=True,
+                )
         return _info
 
     async def create_appproxy_endpoint(
@@ -4253,54 +4107,6 @@ async def handle_batch_result(
     await invoke_session_callback(context, source, event)
 
 
-async def handle_agent_lifecycle(
-    context: AgentRegistry,
-    source: AgentId,
-    event: AgentStartedEvent | AgentTerminatedEvent,
-) -> None:
-    if isinstance(event, AgentStartedEvent):
-        log.info("instance_lifecycle: ag:{0} joined (via event, {1})", source, event.reason)
-        await context.update_instance(
-            source,
-            {
-                "status": AgentStatus.ALIVE,
-            },
-        )
-    if isinstance(event, AgentTerminatedEvent):
-        if event.reason == "agent-lost":
-            await context.mark_agent_terminated(source, AgentStatus.LOST)
-            context.agent_cache.discard(source)
-        elif event.reason == "agent-restart":
-            log.info("agent@{0} restarting for maintenance.", source)
-            await context.update_instance(
-                source,
-                {
-                    "status": AgentStatus.RESTARTING,
-                },
-            )
-        else:
-            # On normal instance termination, kernel_terminated events were already
-            # triggered by the agent.
-            await context.mark_agent_terminated(source, AgentStatus.TERMINATED)
-            context.agent_cache.discard(source)
-
-
-async def handle_agent_heartbeat(
-    context: AgentRegistry,
-    source: AgentId,
-    event: AgentHeartbeatEvent,
-) -> None:
-    await context.handle_heartbeat(source, event.agent_info)
-
-
-async def handle_agent_images_remove(
-    context: AgentRegistry,
-    source: AgentId,
-    event: AgentImagesRemoveEvent,
-) -> None:
-    await context.handle_agent_images_remove(source, event.image_canonicals)
-
-
 async def handle_route_creation(
     context: AgentRegistry,
     source: AgentId,
@@ -4477,24 +4283,27 @@ async def check_scaling_group(
                 f"No scaling groups accept the session type '{session_type}'.",
             )
     else:
-        err_msg = (
-            f"The scaling group '{scaling_group}' does not exist "
-            f"or you do not have access to the scaling group '{scaling_group}'."
-        )
+        scaling_group_found = False
         for sgroup in candidates:
             if scaling_group == sgroup["name"]:
                 # scaling_group's unique key is 'name' field for now,
                 # but we will change scaling_group's unique key to new 'id' field.
+                scaling_group_found = True
                 allowed_session_types = sgroup["scheduler_opts"].allowed_session_types
                 if stype in allowed_session_types:
                     break
-                err_msg = (
-                    f"The scaling group '{scaling_group}' does not accept "
-                    f"the session type '{session_type}'. "
-                )
         else:
-            raise ScalingGroupNotFound(err_msg)
-    assert scaling_group is not None
+            if scaling_group_found:
+                raise ScalingGroupSessionTypeNotAllowed(
+                    f"The scaling group '{scaling_group}' does not accept "
+                    f"the session type '{session_type}'."
+                )
+            raise ScalingGroupNotFound(
+                f"The scaling group '{scaling_group}' does not exist "
+                f"or you do not have access to the scaling group '{scaling_group}'."
+            )
+    if scaling_group is None:
+        raise ScalingGroupNotFound("Scaling group not found")
     return scaling_group
 
 

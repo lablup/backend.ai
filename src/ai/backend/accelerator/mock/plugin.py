@@ -179,14 +179,15 @@ class MockPlugin(AbstractComputePlugin):
         for format_name, format in self.mock_config["formats"].items():
             self.device_formats[format_name] = _format_config_iv.check(format)
 
-        if self._mode == AllocationModes.DISCRETE:
-            self.slot_types.append((f"{self.key}.device", "count"))  # type: ignore  # (only updated here)
-        elif self._mode == AllocationModes.FRACTIONAL:
-            self.slot_types.append((f"{self.key}.shares", "count"))  # type: ignore  # (only updated here)
-        else:
-            log.error("Invalid allocation mode: {}", self._mode)
-            self.enabled = False
-            return
+        match self._mode:
+            case AllocationModes.DISCRETE:
+                self.slot_types.append((SlotName(f"{self.key}.device"), SlotTypes.COUNT))
+            case AllocationModes.FRACTIONAL:
+                self.slot_types.append((SlotName(f"{self.key}.shares"), SlotTypes.COUNT))
+            case _:
+                log.error("Invalid allocation mode: {}", self._mode)
+                self.enabled = False
+                return
 
         if self.key == DeviceName("cuda"):  # CUDA specific setups
             self.exclusive_slot_types = {"cuda.device:*-mig", "cuda.device", "cuda.shares"}

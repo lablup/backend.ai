@@ -32,9 +32,11 @@ from ai.backend.appproxy.common.types import (
     FrontendMode,
     SerializableCircuit,
 )
+from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.health_checker.probe import HealthProbe
 from ai.backend.common.metrics.metric import (
     APIMetricObserver,
     EventMetricObserver,
@@ -46,6 +48,8 @@ from ai.backend.common.types import (
     MovingStatValue,
     RuntimeVariant,
 )
+
+from .errors import InvalidCircuitDataError, InvalidFrontendTypeError
 
 if TYPE_CHECKING:
     from .config import ServerConfig
@@ -309,12 +313,14 @@ class RootContext:
     event_producer: EventProducer
     valkey_live: ValkeyLiveClient
     valkey_stat: ValkeyStatClient
+    http_client_pool: ClientPool
     worker_id: UUID
     local_config: ServerConfig
     last_used_time_marker_redis_queue: asyncio.Queue[tuple[list[str], float]]
     request_counter_redis_queue: asyncio.Queue[str]
     cors_options: dict[str, aiohttp_cors.ResourceOptions]
     metrics: WorkerMetricRegistry
+    health_probe: HealthProbe
 
 
 CleanupContext: TypeAlias = Callable[["RootContext"], AsyncContextManager[None]]
@@ -376,10 +382,12 @@ class Circuit(SerializableCircuit):
 
         match circuit.app_mode:
             case AppMode.INTERACTIVE:
-                assert circuit.user_id
+                if not circuit.user_id:
+                    raise InvalidCircuitDataError("User ID is required for interactive app mode")
                 app_info = InteractiveAppInfo(circuit.user_id)
             case AppMode.INFERENCE:
-                assert circuit.endpoint_id
+                if not circuit.endpoint_id:
+                    raise InvalidCircuitDataError("Endpoint ID is required for inference app mode")
                 app_info = InferenceAppInfo(
                     circuit.endpoint_id,
                     RuntimeVariant(circuit.runtime_variant)
@@ -389,10 +397,14 @@ class Circuit(SerializableCircuit):
 
         match circuit.frontend_mode:
             case FrontendMode.PORT:
-                assert circuit.port is not None
+                if circuit.port is None:
+                    raise InvalidFrontendTypeError("Port is required for PORT frontend mode")
                 frontend = PortFrontendInfo(circuit.port)
             case FrontendMode.WILDCARD_DOMAIN:
-                assert circuit.subdomain is not None
+                if circuit.subdomain is None:
+                    raise InvalidFrontendTypeError(
+                        "Subdomain is required for WILDCARD_DOMAIN frontend mode"
+                    )
                 frontend = SubdomainFrontendInfo(circuit.subdomain)
 
         return cls(frontend=frontend, app_info=app_info, **circuit.model_dump())

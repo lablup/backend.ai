@@ -8,11 +8,11 @@ from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
+from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
-    Final,
     List,
     Optional,
     Self,
@@ -41,6 +41,7 @@ from sqlalchemy.orm import (
 )
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.events.dispatcher import (
     EventProducer,
 )
@@ -211,9 +212,6 @@ USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
 )
 
 PRIVATE_SESSION_TYPES = (SessionTypes.SYSTEM,)
-SESSION_PRIORITY_DEFAULT: Final = 10
-SESSION_PRIORITY_MIN: Final = 0
-SESSION_PRIORITY_MAX: Final = 100
 
 OP_EXC = {
     "create_session": KernelCreationFailed,
@@ -853,10 +851,11 @@ class SessionRow(Base):
         ),
         sa.Index("ix_sessions_vfolder_mounts", "vfolder_mounts", postgresql_using="gin"),
         sa.Index("ix_session_status_with_priority", "status", "priority"),
-        # Unique index for session names excluding terminal statuses
+        # Unique index for session names per user excluding terminal statuses
         sa.Index(
-            "ix_sessions_unique_name_nonterminal",
+            "ix_sessions_unique_name_per_user_nonterminal",
             "name",
+            "user_uuid",
             unique=True,
             postgresql_where=sa.text("status NOT IN ('ERROR', 'TERMINATED', 'CANCELLED')"),
         ),
@@ -1329,9 +1328,9 @@ class SessionRow(Base):
 
         if isinstance(session_reference, list):
             query_list = [
-                aiotools.apartial(
+                partial(
                     _match_sessions_by_id,
-                    session_id_or_list=session_reference,
+                    session_id_or_list=[SessionId(item) for item in session_reference],
                     allow_prefix=False,
                 )
             ]

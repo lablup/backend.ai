@@ -21,8 +21,10 @@ from typing import (
     Any,
     Dict,
     FrozenSet,
+    Iterator,
     List,
     Literal,
+    MutableMapping,
     NotRequired,
     Optional,
     Set,
@@ -30,6 +32,7 @@ from typing import (
     TypedDict,
     Union,
     cast,
+    overload,
 )
 
 import zmq
@@ -62,7 +65,17 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from .exception import InvalidSocket, UnsupportedBaseDistroError
+from .errors import (
+    KernelRunnerNotInitializedError,
+    OutputQueueMismatchError,
+    OutputQueueNotInitializedError,
+    RunIdNotSetError,
+)
+from .exception import (
+    InvalidArgumentError,
+    InvalidSocket,
+    UnsupportedBaseDistroError,
+)
 from .resources import KernelResourceSpec
 from .types import AgentEventData, KernelLifecycleStatus, KernelOwnershipData
 
@@ -407,7 +420,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     async def ping(self) -> dict[str, float] | None:
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         return await self.runner.ping()
 
     async def execute(
@@ -420,7 +434,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         api_version: int,
         flush_timeout: float,
     ) -> NextResult:
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         try:
             log.info(
                 "kernel.execute(k:{0}, run_id:{1}, mode:{2}, opts:{3})",
@@ -450,6 +465,102 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         except asyncio.CancelledError:
             await self.runner.close()
             raise
+
+
+@dataclass(frozen=True)
+class AgentKernelRegistryKey:
+    agent_id: AgentId
+    kernel_id: KernelId
+
+
+class KernelRegistryAgentMapping(MutableMapping[KernelId, AbstractKernel]):
+    _registry: KernelRegistry
+    _agent_id: AgentId
+
+    def __init__(self, kernel_registry: KernelRegistry, agent_id: AgentId) -> None:
+        super().__init__()
+
+        self._registry = kernel_registry
+        self._agent_id = agent_id
+
+    def __getitem__(self, key: KernelId) -> AbstractKernel:
+        return self._registry[AgentKernelRegistryKey(self._agent_id, key)]
+
+    def __setitem__(self, key: KernelId, value: AbstractKernel) -> None:
+        self._registry[AgentKernelRegistryKey(self._agent_id, key)] = value
+
+    def __delitem__(self, key: KernelId) -> None:
+        del self._registry[AgentKernelRegistryKey(self._agent_id, key)]
+
+    def __iter__(self) -> Iterator[KernelId]:
+        for registry_key in self._registry:
+            if registry_key.agent_id == self._agent_id:
+                yield registry_key.kernel_id
+
+    def __len__(self) -> int:
+        return sum(1 for key in self._registry if key.agent_id == self._agent_id)
+
+
+class KernelRegistryGlobalView(Mapping[KernelId, AbstractKernel]):
+    _registry: KernelRegistry
+
+    def __init__(self, kernel_registry: KernelRegistry) -> None:
+        super().__init__()
+
+        self._registry = kernel_registry
+
+    def __getitem__(self, key: KernelId) -> AbstractKernel:
+        return self._registry[key]
+
+    def __iter__(self) -> Iterator[KernelId]:
+        for registry_key in self._registry:
+            yield registry_key.kernel_id
+
+    def __len__(self) -> int:
+        return len(self._registry)
+
+
+class KernelRegistry(MutableMapping[AgentKernelRegistryKey, AbstractKernel]):
+    _registry: MutableMapping[AgentKernelRegistryKey, AbstractKernel]
+    _global_registry: MutableMapping[KernelId, AbstractKernel]
+
+    def __init__(self) -> None:
+        super().__init__()
+
+        self._registry = {}
+        self._global_registry = {}
+
+    def agent_mapping(self, agent_id: AgentId) -> KernelRegistryAgentMapping:
+        return KernelRegistryAgentMapping(self, agent_id)
+
+    def global_view(self) -> KernelRegistryGlobalView:
+        return KernelRegistryGlobalView(self)
+
+    @overload
+    def __getitem__(self, key: KernelId) -> AbstractKernel: ...
+
+    @overload
+    def __getitem__(self, key: AgentKernelRegistryKey) -> AbstractKernel: ...
+
+    def __getitem__(self, key: KernelId | AgentKernelRegistryKey) -> AbstractKernel:
+        if isinstance(key, AgentKernelRegistryKey):
+            return self._registry[key]
+        else:
+            return self._global_registry[key]
+
+    def __setitem__(self, key: AgentKernelRegistryKey, value: AbstractKernel) -> None:
+        self._registry[key] = value
+        self._global_registry[key.kernel_id] = value
+
+    def __delitem__(self, key: AgentKernelRegistryKey) -> None:
+        del self._registry[key]
+        del self._global_registry[key.kernel_id]
+
+    def __iter__(self) -> Iterator[AgentKernelRegistryKey]:
+        return iter(self._registry)
+
+    def __len__(self) -> int:
+        return len(self._registry)
 
 
 _zctx = None
@@ -949,7 +1060,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         records = []
         result: NextResult
         try:
-            assert self.output_queue is not None
+            if self.output_queue is None:
+                raise OutputQueueNotInitializedError
             with timeout(flush_timeout if has_continuation else None):
                 while True:
                     rec = await self.output_queue.get()
@@ -1042,7 +1154,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         # Context: per API request
         if run_id is None:
             run_id = secrets.token_hex(16)
-        assert run_id is not None
+        if run_id is None:
+            raise InvalidArgumentError("run_id cannot be None")
         if run_id not in self.pending_queues:
             q: asyncio.Queue[ResultRecord] = asyncio.Queue(maxsize=4096)
             activated = asyncio.Event()
@@ -1067,7 +1180,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 await activated.wait()
                 activated.clear()
         self.current_run_id = run_id
-        assert self.output_queue is q
+        if self.output_queue is not q:
+            raise OutputQueueMismatchError
 
     def resume_output_queue(self) -> None:
         """
@@ -1086,7 +1200,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         """
         Use this to conclude get_next_result() when we have finished a "run".
         """
-        assert self.current_run_id is not None
+        if self.current_run_id is None:
+            raise RunIdNotSetError
         self.pending_queues.pop(self.current_run_id, None)
         self.current_run_id = None
         if len(self.pending_queues) > 0:

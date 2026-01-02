@@ -5,7 +5,6 @@ from uuid import UUID
 
 import click
 
-from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.cli.session.execute import (
     prepare_env_arg,
@@ -59,7 +58,7 @@ def get_service_id(session: Session, name_or_id: str) -> UUID:
         return UUID(name_or_id)
 
 
-@main.group()
+@click.group()
 def service() -> None:
     """Set of service operations"""
 

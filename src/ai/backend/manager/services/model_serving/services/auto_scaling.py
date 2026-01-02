@@ -1,12 +1,13 @@
 import decimal
 import logging
-from typing import Any
 
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.model_serving.types import RequesterCtx
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.model_serving.admin_repository import (
     AdminModelServingRepository,
 )
+from ai.backend.manager.repositories.model_serving.options import EndpointConditions
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
@@ -24,15 +25,16 @@ from ai.backend.manager.services.model_serving.actions.scale_service_replicas im
     ScaleServiceReplicasAction,
     ScaleServiceReplicasActionResult,
 )
+from ai.backend.manager.services.model_serving.actions.search_auto_scaling_rules import (
+    SearchAutoScalingRulesAction,
+    SearchAutoScalingRulesActionResult,
+)
 from ai.backend.manager.services.model_serving.exceptions import (
     EndpointAutoScalingRuleNotFound,
     EndpointNotFound,
     GenericForbidden,
     InvalidAPIParameters,
     ModelServiceNotFound,
-)
-from ai.backend.manager.services.model_serving.types import (
-    RequesterCtx,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -141,17 +143,14 @@ class AutoScalingService:
     async def modify_endpoint_auto_scaling_rule(
         self, action: ModifyEndpointAutoScalingRuleAction
     ) -> ModifyEndpointAutoScalingRuleActionResult:
-        fields_to_update: dict[str, Any] = action.modifier.fields_to_update()
-
         # Update auto scaling rule with access validation
         if action.requester_ctx.user_role == UserRole.SUPERADMIN:
             updated_rule = await self._admin_repository.update_auto_scaling_rule_force(
-                action.id, fields_to_update
+                action.updater
             )
         else:
             updated_rule = await self._repository.update_auto_scaling_rule_validated(
-                action.id,
-                fields_to_update,
+                action.updater,
                 action.requester_ctx.user_id,
                 action.requester_ctx.user_role,
                 action.requester_ctx.domain_name,
@@ -184,4 +183,36 @@ class AutoScalingService:
 
         return DeleteEndpointAutoScalingRuleActionResult(
             success=True,
+        )
+
+    async def search_auto_scaling_rules(
+        self, action: SearchAutoScalingRulesAction
+    ) -> SearchAutoScalingRulesActionResult:
+        """Searches endpoint auto scaling rules."""
+        await self.check_requester_access(action.requester_ctx)
+
+        if action.requester_ctx.user_role == UserRole.SUPERADMIN:
+            result = await self._admin_repository.search_auto_scaling_rules_force(
+                querier=action.querier,
+            )
+        else:
+            user_id = action.requester_ctx.user_id
+            user_role = action.requester_ctx.user_role
+            domain_name = action.requester_ctx.domain_name
+
+            match user_role:
+                case UserRole.ADMIN:
+                    action.querier.conditions.append(EndpointConditions.by_domain(domain_name))
+                case UserRole.USER | UserRole.MONITOR:
+                    action.querier.conditions.append(EndpointConditions.by_session_owner(user_id))
+
+            result = await self._repository.search_auto_scaling_rules_validated(
+                querier=action.querier,
+            )
+
+        return SearchAutoScalingRulesActionResult(
+            rules=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )

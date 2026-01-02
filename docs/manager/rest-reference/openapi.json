@@ -3,7 +3,7 @@
   "info": {
     "title": "Backend.AI Manager API",
     "description": "Backend.AI Manager REST API specification",
-    "version": "25.14.3",
+    "version": "25.19.0",
     "contact": {
       "name": "Lablup Inc.",
       "url": "https://docs.backend.ai",
@@ -51,7 +51,8 @@
           "gitlab",
           "ecr",
           "ecr-public",
-          "local"
+          "local",
+          "ocp"
         ],
         "title": "ContainerRegistryType",
         "type": "string"
@@ -808,6 +809,8 @@
           "nim",
           "cmd",
           "huggingface-tgi",
+          "sglang",
+          "modular-max",
           "custom"
         ],
         "title": "RuntimeVariant",
@@ -884,16 +887,24 @@
             "type": "string"
           },
           "resources": {
-            "additionalProperties": {
-              "anyOf": [
-                {
-                  "type": "string"
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ]
                 },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "examples": [
               {
                 "cpu": 4,
@@ -901,8 +912,7 @@
                 "mem": "32g"
               }
             ],
-            "title": "Resources",
-            "type": "object"
+            "title": "Resources"
           },
           "resource_opts": {
             "additionalProperties": {
@@ -940,6 +950,9 @@
         "properties": {
           "name": {
             "description": "Name of the service",
+            "maxLength": 24,
+            "minLength": 4,
+            "pattern": "^\\w[\\w-]*\\w$",
             "title": "Name",
             "type": "string"
           },
@@ -949,12 +962,20 @@
             "type": "integer"
           },
           "lang": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
             "description": "String reference of the image which will be used to create session",
             "examples": [
               "cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3"
             ],
-            "title": "Lang",
-            "type": "string"
+            "title": "Lang"
           },
           "runtime_variant": {
             "$ref": "#/components/schemas/RuntimeVariant",
@@ -962,10 +983,17 @@
             "description": "Type of the inference runtime the image will try to load."
           },
           "arch": {
-            "default": "x86_64",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
             "description": "Image architecture",
-            "title": "Arch",
-            "type": "string"
+            "title": "Arch"
           },
           "group": {
             "default": "default",
@@ -1065,7 +1093,6 @@
         "required": [
           "name",
           "desired_session_count",
-          "lang",
           "config"
         ],
         "title": "NewServiceRequestModel",
@@ -1712,7 +1739,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nClean up stored artifact revision data to free storage space.\n\nRemoves the downloaded files for the specified artifact revisions and\ntransitions them back to SCANNED status. The metadata remains, allowing\nthe artifacts to be re-imported later if needed.\n\nUse this operation to manage storage usage by removing unused artifacts.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifacts/revisions/{artifact_revision_id}/approval": {
@@ -1741,7 +1768,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nApprove an artifact revision for general use.\n\nAdmin-only operation to approve artifact revisions, typically used\nin environments with approval workflows for artifact deployment.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifacts/revisions/{artifact_revision_id}/rejection": {
@@ -1770,7 +1797,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nReject an artifact revision, preventing its use.\n\nAdmin-only operation to reject artifact revisions, typically used\nin environments with approval workflows for artifact deployment.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifacts/task/cancel": {
@@ -1790,7 +1817,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nCancel an in-progress artifact import operation.\n\nStops the download process for the specified artifact revision and\nreverts its status back to SCANNED. The partially downloaded data is cleaned up.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifacts/import": {
@@ -1810,7 +1837,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nImport scanned artifact revisions from external registries.\n\nDownloads the actual files for the specified artifact revisions, transitioning\nthem from SCANNED → PULLING → PULLED → AVAILABLE status.\n\nReturns background tasks that can be monitored for import progress.\nOnce AVAILABLE, artifacts can be used by users in their sessions.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifacts/{artifact_id}": {
@@ -1839,7 +1866,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nUpdate artifact metadata properties.\n\nModifies artifact metadata such as readonly status and description.\nThis operation does not affect the actual artifact files or revisions.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifacts/revisions/{artifact_revision_id}/readme": {
@@ -1868,12 +1895,110 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nRetrieve the README content for a specific artifact revision.\n\nReturns the README documentation associated with the artifact revision,\nwhich typically contains usage instructions and model information.\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/artifacts/revisions/{artifact_revision_id}/verification-result": {
+      "get": {
+        "operationId": "artifacts.get_artifact_revision_verification_result",
+        "tags": [
+          "artifacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nRetrieve the verification result for a specific artifact revision.\n\nReturns the verification result data associated with the artifact revision,\nwhich contains results from all verifiers that have been run on the artifact.\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/artifacts/revisions/{artifact_revision_id}/download-progress": {
+      "get": {
+        "operationId": "artifacts.get_download_progress",
+        "tags": [
+          "artifacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nRetrieve download progress for an artifact revision.\n\nReturns detailed download progress information including artifact-level\nand file-level progress data for the specified artifact revision.\nSupports both local and remote download progress when delegation is enabled.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifact-registries/scan": {
       "post": {
         "operationId": "artifact-registries.scan_artifacts",
+        "tags": [
+          "artifact-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\nScan external registries to discover available artifacts.\n\nSearches HuggingFace or Reservoir registries for artifacts matching the specified\ncriteria and registers them in the system with SCANNED status. The artifacts\nbecome available for import but are not downloaded until explicitly imported.\n\nThis is the first step in the artifact workflow: Scan → Import → Use.\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/artifact-registries/delegation/scan": {
+      "post": {
+        "operationId": "artifact-registries.delegate_scan_artifacts",
+        "tags": [
+          "artifact-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/artifact-registries/delegation/import": {
+      "post": {
+        "operationId": "artifact-registries.delegate_import_artifacts",
         "tags": [
           "artifact-registries"
         ],
@@ -1908,7 +2033,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nSearch registered artifacts with cursor-based pagination.\n\nReturns artifacts that have been previously scanned and registered in the system.\nSupports efficient pagination for browsing through large datasets of artifacts\nwith their revision information.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifact-registries/model/{model_id}": {
@@ -1937,7 +2062,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nScan a single model and retrieve detailed information immediately.\n\nPerforms immediate detailed scanning of a specified model including\nREADME content and file sizes. This provides complete metadata\nfor the model, ready for import or direct use.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifact-registries/models/batch": {
@@ -1957,7 +2082,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nPerform batch scanning of specific models from external registries.\n\nScans multiple specified models and retrieves detailed information.\nThe README content and file sizes are processed in the background,\nunlike single model scanning which retrieves this information immediately.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/config/resource-slots": {
@@ -3569,6 +3694,60 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
+    "/folders/{name}/delete-files-async": {
+      "post": {
+        "operationId": "folders.delete_files_async",
+        "tags": [
+          "folders"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "recursive": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "files",
+                  "recursive"
+                ]
+              },
+              "examples": {}
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Delete files asynchronously within a vfolder.\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+      }
+    },
     "/folders/{name}/rename_file": {
       "post": {
         "operationId": "folders.rename_file.2",
@@ -4986,8 +5165,8 @@
       }
     },
     "//gql/strawberry": {
-      "post": {
-        "operationId": "root.handle_gql_strawberry",
+      "get": {
+        "operationId": "root.handle_graphql_strawberry",
         "tags": [
           "root"
         ],
@@ -5002,7 +5181,25 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nGraphQL endpoint using Strawberry schema.\n\nSupports both query/mutation via POST and subscriptions via WebSocket.\n\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "post": {
+        "operationId": "root.handle_graphql_strawberry.2",
+        "tags": [
+          "root"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\nGraphQL endpoint using Strawberry schema.\n\nSupports both query/mutation via POST and subscriptions via WebSocket.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/spec/graphiql": {
@@ -9481,7 +9678,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nGenerate a presigned URL for uploading artifact files.\n\nCreates a time-limited, secure URL that allows direct upload of files\nto object storage without exposing storage credentials. Includes\nadditional form fields required for the upload operation.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/object-storages/presigned/download": {
@@ -9501,7 +9698,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nGenerate a presigned URL for safely downloading artifact files.\n\nCreates a time-limited, secure URL that allows direct download of specific\nartifact files from object storage without exposing storage credentials.\nUsed to provide secure access to AVAILABLE artifact files.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/object-storages/buckets": {
@@ -9521,7 +9718,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nRetrieve all storage namespaces (buckets) across all storage systems.\n\nReturns a mapping of storage systems to their available namespaces.\nThis provides an overview of all available storage compartments\nwhere artifacts can be stored.\n\nNote: This API is deprecated. Use /storage-namespaces instead.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/object-storages/{storage_id}/buckets": {
@@ -9550,7 +9747,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nRetrieve storage namespaces (buckets) for a specific storage system.\n\nReturns the list of available namespaces within the specified storage\nsystem where artifacts can be organized and stored.\n\nNote: This API is deprecated. Use /storage-namespaces instead.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/object-storages/": {
@@ -9570,7 +9767,1030 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nList all configured object storage systems.\n\nReturns information about all available storage systems that can be\nused for storing artifacts, including their configuration and capabilities.\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/vfs-storages/{storage_name}/download": {
+      "post": {
+        "operationId": "vfs-storages.download_file",
+        "tags": [
+          "vfs-storages"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "storage_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nDownload artifact directory from VFS storage via storage proxy streaming.\n\nArgs:\n    path: Path parameters including storage name\n    body: Request body with file path\n\nReturns:\n    APIStreamResponse with StreamReader body\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/vfs-storages/{storage_name}/files": {
+      "get": {
+        "operationId": "vfs-storages.list_files",
+        "tags": [
+          "vfs-storages"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "storage_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nList files recursively in a VFS storage directory via storage proxy.\n\nArgs:\n    path: Path parameters including storage name\n    body: Request body with directory path\n\nReturns:\n    APIResponse with list of files\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/vfs-storages/{storage_name}": {
+      "get": {
+        "operationId": "vfs-storages.get_storage",
+        "tags": [
+          "vfs-storages"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "storage_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nGet VFS storage information by storage name.\n\nArgs:\n    path: Path parameters including storage name\n\nReturns:\n    APIResponse with storage information\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/vfs-storages/": {
+      "get": {
+        "operationId": "vfs-storages.list_storages",
+        "tags": [
+          "vfs-storages"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\nList all VFS storages.\n\nReturns:\n    APIResponse with storage information\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/channels": {
+      "post": {
+        "operationId": "notifications.create_channel",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Create a new notification channel.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/channels/search": {
+      "post": {
+        "operationId": "notifications.search_channels",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search notification channels with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/channels/{channel_id}": {
+      "get": {
+        "operationId": "notifications.get_channel",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific notification channel.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "notifications.update_channel",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an existing notification channel.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "notifications.delete_channel",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Delete a notification channel.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/channels/{channel_id}/validate": {
+      "post": {
+        "operationId": "notifications.validate_channel",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Validate a notification channel by sending a test webhook.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/rule-types": {
+      "get": {
+        "operationId": "notifications.list_rule_types",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "List all available notification rule types.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/rule-types/{rule_type}/schema": {
+      "get": {
+        "operationId": "notifications.get_rule_type_schema",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get JSON schema for a notification rule type's message format.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/rules": {
+      "post": {
+        "operationId": "notifications.create_rule",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Create a new notification rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/rules/search": {
+      "post": {
+        "operationId": "notifications.search_rules",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search notification rules with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/rules/{rule_id}": {
+      "get": {
+        "operationId": "notifications.get_rule",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific notification rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "notifications.update_rule",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an existing notification rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "notifications.delete_rule",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Delete a notification rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/rules/{rule_id}/validate": {
+      "post": {
+        "operationId": "notifications.validate_rule",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Validate a notification rule by rendering its template with test data.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/deployments/": {
+      "post": {
+        "operationId": "deployments.create_deployment",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Create a new deployment.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/deployments/search": {
+      "post": {
+        "operationId": "deployments.search_deployments",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search deployments with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/deployments/{deployment_id}": {
+      "get": {
+        "operationId": "deployments.get_deployment",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific deployment.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "deployments.update_deployment",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an existing deployment.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "deployments.destroy_deployment",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Destroy a deployment.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/deployments/{deployment_id}/revisions": {
+      "post": {
+        "operationId": "deployments.create_revision",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Create a new revision for a deployment.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/deployments/{deployment_id}/revisions/search": {
+      "post": {
+        "operationId": "deployments.search_revisions",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Search revisions for a deployment with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/deployments/{deployment_id}/revisions/{revision_id}": {
+      "get": {
+        "operationId": "deployments.get_revision",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific revision.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/deployments/{deployment_id}/revisions/{revision_id}/activate": {
+      "post": {
+        "operationId": "deployments.activate_revision",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Activate a revision to make it the current active revision.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/deployments/{deployment_id}/revisions/{revision_id}/deactivate": {
+      "post": {
+        "operationId": "deployments.deactivate_revision",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Deactivate a revision.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/deployments/{deployment_id}/routes/search": {
+      "post": {
+        "operationId": "deployments.search_routes",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Search routes for a deployment with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/deployments/{deployment_id}/routes/{route_id}/traffic-status": {
+      "patch": {
+        "operationId": "deployments.update_route_traffic_status",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update traffic status of a route.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles": {
+      "post": {
+        "operationId": "v2.0.create_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Create a new role.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/search": {
+      "post": {
+        "operationId": "v2.0.search_roles",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search roles with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/{role_id}": {
+      "get": {
+        "operationId": "v2.0.get_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific role with details.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "v2.0.update_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an existing role.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/delete": {
+      "post": {
+        "operationId": "v2.0.delete_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Delete a role (soft delete).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/purge": {
+      "post": {
+        "operationId": "v2.0.purge_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Delete a role (soft delete).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/assign": {
+      "post": {
+        "operationId": "v2.0.assign_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Assign a role to a user.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/revoke": {
+      "post": {
+        "operationId": "v2.0.revoke_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Revoke a role from a user.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/{role_id}/assigned-users/search": {
+      "post": {
+        "operationId": "v2.0.search_assigned_users",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Search users assigned to a specific role with filters and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     }
   }

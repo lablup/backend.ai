@@ -25,7 +25,6 @@ from typing import (
     override,
 )
 
-import aiohttp
 import aiotools
 import graphene
 import sqlalchemy as sa
@@ -59,6 +58,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
 )
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
+from ai.backend.manager.errors.storage import QuotaScopeNotFoundError
 
 from ..defs import (
     RESERVED_VFOLDER_PATTERNS,
@@ -68,6 +68,7 @@ from ..defs import (
 from ..errors.api import InvalidAPIParameters
 from ..errors.common import ObjectNotFound
 from ..errors.storage import (
+    InsufficientStoragePermission,
     VFolderGone,
     VFolderNotFound,
     VFolderOperationFailed,
@@ -88,7 +89,7 @@ from .base import (
     batch_result_in_scalar_stream,
     metadata,
 )
-from .group import GroupRow
+from .group import AssocGroupUserRow, GroupRow
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .rbac import (
@@ -710,7 +711,6 @@ async def get_allowed_vfolder_hosts_by_group(
     resource_policy,
     domain_name: str,
     group_id: Optional[uuid.UUID] = None,
-    domain_admin: bool = False,
 ) -> VFolderHostPermissionMap:
     """
     Union `allowed_vfolder_hosts` from domain, group, and keypair_resource_policy.
@@ -736,13 +736,6 @@ async def get_allowed_vfolder_hosts_by_group(
         )
         if values := await conn.scalar(query):
             allowed_hosts = allowed_hosts | values
-    elif domain_admin:
-        query = sa.select([groups.c.allowed_vfolder_hosts]).where(
-            (groups.c.domain_name == domain_name) & (groups.c.is_active),
-        )
-        if rows := (await conn.execute(query)).fetchall():
-            for row in rows:
-                allowed_hosts = allowed_hosts | row.allowed_vfolder_hosts
     # Keypair Resource Policy's allowed_vfolder_hosts
     allowed_hosts = allowed_hosts | resource_policy["allowed_vfolder_hosts"]
     return allowed_hosts
@@ -963,16 +956,28 @@ async def prepare_vfolder_mounts(
     for requested_key, vfolder_name in requested_vfolder_names.items():
         if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
-        await ensure_host_permission_allowed(
-            conn,
-            vfolder["host"],
-            allowed_vfolder_types=allowed_vfolder_types,
-            user_uuid=user_scope.user_uuid,
-            resource_policy=resource_policy,
-            domain_name=user_scope.domain_name,
-            group_id=user_scope.group_id,
-            permission=VFolderHostPermission.MOUNT_IN_SESSION,
-        )
+        try:
+            await ensure_host_permission_allowed(
+                conn,
+                vfolder["host"],
+                allowed_vfolder_types=allowed_vfolder_types,
+                user_uuid=user_scope.user_uuid,
+                resource_policy=resource_policy,
+                domain_name=user_scope.domain_name,
+                group_id=user_scope.group_id,
+                permission=VFolderHostPermission.MOUNT_IN_SESSION,
+            )
+        except InsufficientStoragePermission as e:
+            if vfolder["name"].startswith("."):
+                log.warning(
+                    "Skipping auto-mount VFolder '{}' due to insufficient permission",
+                    vfolder["name"],
+                )
+                continue
+            raise InsufficientStoragePermission(
+                f"Permission denied to mount VFolder '{vfolder_name}' on host '{vfolder['host']}'. {e.extra_msg}",
+                e.extra_data,
+            ) from e
         if unmanaged_path := cast(Optional[str], vfolder["unmanaged_path"]):
             vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
             vfsubpath = PurePosixPath(".")
@@ -1174,7 +1179,9 @@ async def ensure_host_permission_allowed(
         group_id=group_id,
     )
     if folder_host not in allowed_hosts or permission not in allowed_hosts[folder_host]:
-        raise InvalidAPIParameters(f"`{permission}` Not allowed in vfolder host(`{folder_host}`)")
+        raise InsufficientStoragePermission(
+            f"`{permission}` Not allowed in vfolder host(`{folder_host}`)"
+        )
 
 
 async def filter_host_allowed_permission(
@@ -1189,7 +1196,7 @@ async def filter_host_allowed_permission(
     allowed_hosts = VFolderHostPermissionMap()
     if "user" in allowed_vfolder_types:
         allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
-            db_conn, resource_policy, domain_name, user_uuid
+            db_conn, resource_policy, domain_name, user_uuid, group_id
         )
         allowed_hosts = allowed_hosts | allowed_hosts_by_user
     if "group" in allowed_vfolder_types and group_id is not None:
@@ -1292,13 +1299,13 @@ async def ensure_quota_scope_accessible_by_user(
 
     # Lookup user table to match if quota is scoped to the user
     query = sa.select(UserRow).where(UserRow.uuid == quota_scope.scope_id)
-    quota_scope_user = await conn.scalar(query)
+    quota_scope_user: Optional[UserRow] = await conn.scalar(query)
     if quota_scope_user:
         match user["role"]:
             case UserRole.SUPERADMIN:
                 return
             case UserRole.ADMIN:
-                if quota_scope_user.domain == user["domain"]:
+                if quota_scope_user.domain_name == user["domain_name"]:
                     return
             case _:
                 if quota_scope_user.uuid == user["uuid"]:
@@ -1307,13 +1314,13 @@ async def ensure_quota_scope_accessible_by_user(
 
     # Lookup group table to match if quota is scoped to the group
     query = sa.select(GroupRow).where(GroupRow.id == quota_scope.scope_id)
-    quota_scope_group = await conn.scalar(query)
+    quota_scope_group: Optional[GroupRow] = await conn.scalar(query)
     if quota_scope_group:
         match user["role"]:
             case UserRole.SUPERADMIN:
                 return
             case UserRole.ADMIN:
-                if quota_scope_group.domain == user["domain"]:
+                if quota_scope_group.domain_name == user["domain_name"]:
                     return
             case _:
                 query = (
@@ -1999,7 +2006,7 @@ class QuotaScope(graphene.ObjectType):
                 hard_limit_bytes=quota_config["limit_bytes"] or None,
                 usage_count=None,  # TODO: Implement
             )
-        except aiohttp.ClientResponseError:
+        except QuotaScopeNotFoundError:
             qsid = QuotaScopeID.parse(self.quota_scope_id)
             async with graph_ctx.db.begin_readonly_session() as sess:
                 await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
@@ -2377,9 +2384,19 @@ class VFolderPermissionContextBuilder(
     ) -> VFolderPermissionContext:
         result = VFolderPermissionContext()
 
+        j = sa.join(
+            GroupRow,
+            AssocGroupUserRow,
+            GroupRow.id == AssocGroupUserRow.group_id,
+        )
         _project_stmt = (
             sa.select(GroupRow)
-            .where(GroupRow.domain_name == domain_name)
+            .select_from(j)
+            .where(
+                sa.and_(
+                    GroupRow.domain_name == domain_name, AssocGroupUserRow.user_id == ctx.user_id
+                )
+            )
             .options(load_only(GroupRow.id))
         )
         for row in await self.db_session.scalars(_project_stmt):

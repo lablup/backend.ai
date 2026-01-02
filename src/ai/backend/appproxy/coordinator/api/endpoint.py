@@ -12,13 +12,12 @@ from aiohttp import web
 from pydantic import AnyUrl, BaseModel, Field
 from yarl import URL
 
-from ai.backend.appproxy.common.exceptions import ObjectNotFound
+from ai.backend.appproxy.common.errors import ObjectNotFound
 from ai.backend.appproxy.common.types import (
     AppMode,
     CORSOptions,
     EndpointConfig,
     FrontendMode,
-    HealthCheckConfig,
     ProxyProtocol,
     PydanticResponse,
     WebMiddleware,
@@ -27,7 +26,9 @@ from ai.backend.appproxy.common.utils import (
     pydantic_api_handler,
     pydantic_api_response_handler,
 )
+from ai.backend.appproxy.coordinator.errors import InvalidCircuitStateError, InvalidURLError
 from ai.backend.appproxy.coordinator.models.worker import add_circuit
+from ai.backend.common.config import ModelHealthCheck
 
 from ..models import Circuit, Endpoint, Worker
 from ..models.utils import execute_with_txn_retry
@@ -72,7 +73,7 @@ class EndpointCreationRequestModel(BaseModel):
     ] = None
 
     health_check: Annotated[
-        HealthCheckConfig | None,
+        ModelHealthCheck | None,
         Field(
             default=None,
             description=textwrap.dedent(
@@ -138,7 +139,8 @@ async def create_or_update_endpoint(
         # supported for subdomain based workers only
         matched_worker_id: UUID | None = None
         if _url := params.tags.endpoint.existing_url:
-            assert _url.host
+            if not _url.host:
+                raise InvalidURLError("URL is missing host component.")
             domain = "." + ".".join(_url.host.split(".")[1:])
 
             query = sa.select(Worker).where(
@@ -153,7 +155,8 @@ async def create_or_update_endpoint(
             if matched_worker:
                 params.subdomain = _url.host.split(".")[0]
             else:
-                assert _url.port
+                if not _url.port:
+                    raise InvalidURLError("URL is missing port component for port-based worker.")
                 query = sa.select(Worker).where(
                     (
                         Worker.accepted_traffics.contains([AppMode.INFERENCE])
@@ -237,14 +240,14 @@ async def remove_endpoint(request: web.Request) -> PydanticResponse[StubResponse
     return PydanticResponse(StubResponseModel(success=True))
 
 
-class UpdateHealthCheckConfigRequestModel(BaseModel):
-    health_check: HealthCheckConfig | None
+class UpdateModelHealthCheckRequestModel(BaseModel):
+    health_check: ModelHealthCheck | None
 
 
 @auth_required("manager")
-@pydantic_api_handler(UpdateHealthCheckConfigRequestModel)
+@pydantic_api_handler(UpdateModelHealthCheckRequestModel)
 async def inject_health_check_information(
-    request: web.Request, params: UpdateHealthCheckConfigRequestModel
+    request: web.Request, params: UpdateModelHealthCheckRequestModel
 ) -> PydanticResponse[StubResponseModel]:
     """
     Creates and returns API token required for execution of model service apps hosted by AppProxy.
@@ -259,7 +262,8 @@ async def inject_health_check_information(
         if circuit.app_mode != AppMode.INFERENCE:
             raise ObjectNotFound(object_name="inference-circuit")
 
-        assert circuit.endpoint_row
+        if not circuit.endpoint_row:
+            raise InvalidCircuitStateError("Endpoint row is not loaded for circuit")
         circuit.endpoint_row.health_check_enabled = params.health_check is not None
         circuit.endpoint_row.health_check_config = params.health_check
 

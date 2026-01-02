@@ -365,10 +365,10 @@ class HiRedisQueue(AbstractMessageQueue):
 
 
 def _generate_consumer_id(node_id: Optional[str]) -> str:
-    h = hashlib.sha1()
+    h = hashlib.sha1(usedforsecurity=False)
     h.update(str(node_id or socket.getfqdn()).encode("utf8"))
     hostname_hash = h.hexdigest()
-    h = hashlib.sha1()
+    h = hashlib.sha1(usedforsecurity=False)
     h.update(__file__.encode("utf8"))
     installation_path_hash = h.hexdigest()
     pidx = process_index.get(0)

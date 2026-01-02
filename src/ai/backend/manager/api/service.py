@@ -36,21 +36,29 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentMetadata,
     DeploymentNetworkSpec,
     ExecutionSpec,
-    ModelRevisionSpec,
+    ImageIdentifierDraft,
+    ModelRevisionSpecDraft,
     MountMetadata,
     ReplicaSpec,
-    ResourceSpec,
+    ResourceSpecDraft,
 )
-from ai.backend.manager.data.image.types import ImageIdentifier
-from ai.backend.manager.services.deployment.actions.create_deployment import (
-    CreateDeploymentAction,
-    CreateDeploymentActionResult,
+from ai.backend.manager.data.model_serving.creator import ModelServiceCreator
+from ai.backend.manager.data.model_serving.types import (
+    ModelServicePrepareCtx,
+    MountOption,
+    RequesterCtx,
+    ServiceConfig,
+    ServiceInfo,
+)
+from ai.backend.manager.services.deployment.actions.create_legacy_deployment import (
+    CreateLegacyDeploymentAction,
+    CreateLegacyDeploymentActionResult,
 )
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
@@ -83,17 +91,9 @@ from ai.backend.manager.services.model_serving.actions.scale_service_replicas im
     ScaleServiceReplicasAction,
 )
 from ai.backend.manager.services.model_serving.actions.update_route import UpdateRouteAction
-from ai.backend.manager.services.model_serving.types import (
-    ModelServiceCreator,
-    ModelServicePrepareCtx,
-    MountOption,
-    RequesterCtx,
-    ServiceConfig,
-    ServiceInfo,
-)
 
-from ..defs import DEFAULT_IMAGE_ARCH
 from ..errors.api import InvalidAPIParameters
+from ..errors.auth import InvalidAuthParameters
 from ..errors.storage import VFolderNotFound
 from ..models import (
     ModelServiceHelper,
@@ -370,7 +370,9 @@ class ServiceConfigModel(LegacyBaseRequestModel):
         examples=["nvidia-H100"],
         alias="scalingGroup",
     )
-    resources: dict[str, str | int] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
+    resources: Optional[dict[str, str | int]] = Field(
+        examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}]
+    )
     resource_opts: dict[str, str | int | bool] = Field(examples=[{"shmem": "2g"}], default={})
 
     def to_dataclass(self) -> ServiceConfig:
@@ -410,27 +412,31 @@ class ValidationResult:
 
 
 class NewServiceRequestModel(LegacyBaseRequestModel):
-    service_name: tv.SessionName = Field(
+    service_name: str = Field(
         description="Name of the service",
         validation_alias=AliasChoices("name", "clientSessionToken"),
+        pattern=r"^\w[\w-]*\w$",
+        min_length=4,
+        max_length=tv.SESSION_NAME_MAX_LENGTH,
     )
     replicas: int = Field(
         description="Number of sessions to serve traffic. Replacement of `desired_session_count` (or `desiredSessionCount`).",
         validation_alias=AliasChoices("desired_session_count", "desiredSessionCount"),
     )
-    image: str = Field(
+    image: Optional[str] = Field(
         description="String reference of the image which will be used to create session",
         examples=["cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3"],
         alias="lang",
+        default=None,
     )
     runtime_variant: RuntimeVariant = Field(
         description="Type of the inference runtime the image will try to load.",
         default=RuntimeVariant.CUSTOM,
     )
-    architecture: str = Field(
+    architecture: Optional[str] = Field(
         description="Image architecture",
-        default=DEFAULT_IMAGE_ARCH,
         alias="arch",
+        default=None,
     )
     group_name: str = Field(
         description="Name of project to spawn session",
@@ -524,6 +530,11 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
         request_user_id: uuid.UUID,
         sudo_session_enabled: bool,
     ) -> DryRunModelServiceAction:
+        # TODO: Implement service definition override in dry-run
+        if self.image is None or self.architecture is None or self.config.resources is None:
+            raise InvalidAPIParameters(
+                "Image, architecture, and resources must be specified for dry-run service creation"
+            )
         return DryRunModelServiceAction(
             service_name=self.service_name,
             replicas=self.replicas,
@@ -557,18 +568,18 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
             ),
         )
 
-    def to_image_identifier(self) -> ImageIdentifier:
+    def to_image_identifier(self) -> ImageIdentifierDraft:
         """Convert to ImageIdentifier for deployment."""
-        return ImageIdentifier(
+        return ImageIdentifierDraft(
             canonical=self.image,
             architecture=self.architecture,
         )
 
-    def to_model_revision(self, validation_result: ValidationResult) -> ModelRevisionSpec:
+    def to_model_revision(self, validation_result: ValidationResult) -> ModelRevisionSpecDraft:
         """Convert to ModelRevisionSpec for deployment."""
-        return ModelRevisionSpec(
+        return ModelRevisionSpecDraft(
             image_identifier=self.to_image_identifier(),
-            resource_spec=ResourceSpec(
+            resource_spec=ResourceSpecDraft(
                 cluster_mode=ClusterMode(self.cluster_mode),
                 cluster_size=self.cluster_size,
                 resource_slots=self.config.resources,
@@ -620,7 +631,8 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         )
         query = sa.select([UserRow.role]).where(UserRow.uuid == owner_uuid)
         owner_role = (await conn.execute(query)).scalar()
-        assert owner_role
+        if not owner_role:
+            raise InvalidAuthParameters("Owner role is required to create a model service")
 
         allowed_vfolder_types = (
             await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
@@ -735,8 +747,8 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
         and root_ctx.processors.deployment is not None
     ):
         # Create deployment using the new deployment controller
-        deployment_action = CreateDeploymentAction(
-            creator=DeploymentCreator(
+        deployment_action = CreateLegacyDeploymentAction(
+            draft=DeploymentCreationDraft(
                 metadata=DeploymentMetadata(
                     name=params.service_name,
                     domain=params.domain_name,
@@ -745,19 +757,20 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
                     created_user=request["user"]["uuid"],
                     session_owner=validation_result.owner_uuid,
                     created_at=None,  # Will be set by controller
+                    revision_history_limit=10,
                     tag=params.tag,
                 ),
                 replica_spec=ReplicaSpec(
                     replica_count=params.replicas,
                 ),
-                model_revision=params.to_model_revision(validation_result),
+                draft_model_revision=params.to_model_revision(validation_result),
                 network=DeploymentNetworkSpec(
                     open_to_public=params.open_to_public,
                 ),
             )
         )
-        deployment_result: CreateDeploymentActionResult = (
-            await root_ctx.processors.deployment.create_deployment.wait_for_complete(
+        deployment_result: CreateLegacyDeploymentActionResult = (
+            await root_ctx.processors.deployment.create_legacy_deployment.wait_for_complete(
                 deployment_action
             )
         )

@@ -6,7 +6,7 @@ from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.model_serving.types import RouteStatus
+from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -35,13 +35,18 @@ class RunningRouteHandler(RouteHandler):
 
     @property
     def lock_id(self) -> Optional[LockID]:
-        """No lock needed for checking running routes."""
-        return None
+        """Lock for checking running routes."""
+        return LockID.LOCKID_DEPLOYMENT_RUNNING_ROUTES
 
     @classmethod
     def target_statuses(cls) -> list[RouteStatus]:
         """Get the target route statuses for this handler."""
-        return [RouteStatus.HEALTHY, RouteStatus.UNHEALTHY, RouteStatus.FAILED_TO_START]
+        return [
+            RouteStatus.DEGRADED,
+            RouteStatus.HEALTHY,
+            RouteStatus.UNHEALTHY,
+            RouteStatus.FAILED_TO_START,
+        ]
 
     @classmethod
     def next_status(cls) -> Optional[RouteStatus]:
@@ -51,6 +56,11 @@ class RunningRouteHandler(RouteHandler):
     def failure_status(cls) -> Optional[RouteStatus]:
         """Get the failure route status if applicable."""
         return RouteStatus.TERMINATING
+
+    @classmethod
+    def stale_status(cls) -> Optional[RouteStatus]:
+        """Get the stale route status if applicable."""
+        return None
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute health check for running routes."""

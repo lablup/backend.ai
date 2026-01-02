@@ -1,10 +1,18 @@
 """Repository pattern implementation for schedule operations."""
 
+from __future__ import annotations
+
 import logging
 from typing import Mapping, Optional
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -35,9 +43,11 @@ from .db_source.db_source import ScheduleDBSource
 from .types.base import SchedulingSpec
 from .types.scheduling import SchedulingData
 from .types.session import (
+    KernelTerminationResult,
     MarkTerminatingResult,
     SessionTerminationResult,
     SweptSessionInfo,
+    TerminatingKernelWithAgentData,
     TerminatingSessionData,
 )
 from .types.session_creation import (
@@ -48,6 +58,22 @@ from .types.session_creation import (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+scheduler_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(
+            MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.SCHEDULER_REPOSITORY)
+        ),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=3,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class SchedulerRepository:
@@ -69,6 +95,7 @@ class SchedulerRepository:
         self._cache_source = ScheduleCacheSource(valkey_stat)
         self._config_provider = config_provider
 
+    @scheduler_repository_resilience.apply()
     async def get_scheduling_data(self, scaling_group: str) -> Optional[SchedulingData]:
         """
         Get scheduling data from database.
@@ -88,6 +115,7 @@ class SchedulerRepository:
 
         return scheduling_data
 
+    @scheduler_repository_resilience.apply()
     async def allocate_sessions(
         self, allocation_batch: AllocationBatch
     ) -> list[ScheduledSessionData]:
@@ -100,6 +128,7 @@ class SchedulerRepository:
         """
         return await self._db_source.allocate_sessions(allocation_batch)
 
+    @scheduler_repository_resilience.apply()
     async def get_pending_timeout_sessions(self) -> list[SweptSessionInfo]:
         """
         Get sessions that have exceeded their pending timeout.
@@ -107,6 +136,7 @@ class SchedulerRepository:
         """
         return await self._db_source.get_pending_timeout_sessions()
 
+    @scheduler_repository_resilience.apply()
     async def batch_update_terminated_status(
         self,
         session_results: list[SessionTerminationResult],
@@ -120,6 +150,22 @@ class SchedulerRepository:
 
         await self._db_source.batch_update_terminated_status(session_results)
 
+    @scheduler_repository_resilience.apply()
+    async def batch_update_kernels_terminated(
+        self,
+        kernel_results: list[KernelTerminationResult],
+        reason: str,
+    ) -> None:
+        """
+        Update kernel statuses to TERMINATED without updating session status.
+        Agent occupied slots are synced directly in the DB.
+        """
+        if not kernel_results:
+            return
+
+        await self._db_source.batch_update_kernels_terminated(kernel_results, reason)
+
+    @scheduler_repository_resilience.apply()
     async def mark_sessions_terminating(
         self, session_ids: list[SessionId], reason: str = "USER_REQUESTED"
     ) -> MarkTerminatingResult:
@@ -129,6 +175,7 @@ class SchedulerRepository:
         # Delegate to DB source
         return await self._db_source.mark_sessions_terminating(session_ids, reason)
 
+    @scheduler_repository_resilience.apply()
     async def get_schedulable_scaling_groups(self) -> list[str]:
         """
         Get list of scaling groups that have schedulable agents.
@@ -136,12 +183,23 @@ class SchedulerRepository:
         """
         return await self._db_source.get_schedulable_scaling_groups()
 
+    @scheduler_repository_resilience.apply()
     async def get_terminating_sessions(self) -> list[TerminatingSessionData]:
         """
         Get sessions with TERMINATING status.
         For sokovan scheduler compatibility.
         """
         return await self._db_source.get_terminating_sessions()
+
+    @scheduler_repository_resilience.apply()
+    async def get_terminating_kernels_with_lost_agents(
+        self,
+    ) -> list[TerminatingKernelWithAgentData]:
+        """
+        Get kernels in TERMINATING sessions that have lost or missing agents.
+        For lost agent cleanup operations.
+        """
+        return await self._db_source.get_terminating_kernels_with_lost_agents()
 
     async def _get_known_slot_types(self) -> Mapping[SlotName, SlotTypes]:
         """
@@ -158,6 +216,7 @@ class SchedulerRepository:
         )
         return int(raw_value) if raw_value else None
 
+    @scheduler_repository_resilience.apply()
     async def enqueue_session(
         self,
         session_data: SessionEnqueueData,
@@ -173,6 +232,7 @@ class SchedulerRepository:
         """
         return await self._db_source.enqueue_session(session_data)
 
+    @scheduler_repository_resilience.apply()
     async def fetch_session_creation_data(
         self,
         spec: SessionCreationSpec,
@@ -196,6 +256,7 @@ class SchedulerRepository:
             spec, scaling_group_name, storage_manager, allowed_vfolder_types
         )
 
+    @scheduler_repository_resilience.apply()
     async def fetch_session_creation_context(
         self,
         spec: SessionCreationSpec,
@@ -214,6 +275,7 @@ class SchedulerRepository:
         """
         return await self._db_source.fetch_session_creation_context(spec, scaling_group_name)
 
+    @scheduler_repository_resilience.apply()
     async def query_allowed_scaling_groups(
         self,
         domain_name: str,
@@ -233,6 +295,7 @@ class SchedulerRepository:
         """
         return await self._db_source.query_allowed_scaling_groups(domain_name, group_id, access_key)
 
+    @scheduler_repository_resilience.apply()
     async def prepare_vfolder_mounts(
         self,
         storage_manager,
@@ -256,6 +319,7 @@ class SchedulerRepository:
             requested_mount_options,
         )
 
+    @scheduler_repository_resilience.apply()
     async def prepare_dotfiles(
         self,
         user_scope,
@@ -271,6 +335,7 @@ class SchedulerRepository:
             vfolder_mounts,
         )
 
+    @scheduler_repository_resilience.apply()
     async def check_available_image(
         self, image_identifier: ImageIdentifier, domain: str, user_uuid: UUID
     ) -> None:
@@ -280,12 +345,14 @@ class SchedulerRepository:
         """
         await self._db_source.check_available_image(image_identifier, domain, user_uuid)
 
+    @scheduler_repository_resilience.apply()
     async def update_sessions_to_prepared(self, session_ids: list[SessionId]) -> None:
         """
         Update sessions from PULLING or PREPARING to PREPARED state.
         """
         await self._db_source.update_sessions_to_prepared(session_ids)
 
+    @scheduler_repository_resilience.apply()
     async def get_sessions_ready_to_run(self) -> list[SessionId]:
         """
         Get sessions in CREATING state where all kernels are RUNNING.
@@ -293,6 +360,7 @@ class SchedulerRepository:
         """
         return await self._db_source.get_sessions_ready_to_run()
 
+    @scheduler_repository_resilience.apply()
     async def get_sessions_for_transition(
         self,
         session_statuses: list[SessionStatus],
@@ -307,12 +375,14 @@ class SchedulerRepository:
         """
         return await self._db_source.get_sessions_for_transition(session_statuses, kernel_statuses)
 
+    @scheduler_repository_resilience.apply()
     async def update_sessions_to_running(self, sessions_data: list[SessionRunningData]) -> None:
         """
         Update sessions from CREATING to RUNNING state with occupying_slots.
         """
         await self._db_source.update_sessions_to_running(sessions_data)
 
+    @scheduler_repository_resilience.apply()
     async def get_sessions_ready_to_terminate(self) -> list[SessionId]:
         """
         Get sessions in TERMINATING state where all kernels are TERMINATED.
@@ -320,12 +390,14 @@ class SchedulerRepository:
         """
         return await self._db_source.get_sessions_ready_to_terminate()
 
+    @scheduler_repository_resilience.apply()
     async def update_sessions_to_terminated(self, session_ids: list[SessionId]) -> None:
         """
         Update sessions from TERMINATING to TERMINATED state.
         """
         await self._db_source.update_sessions_to_terminated(session_ids)
 
+    @scheduler_repository_resilience.apply()
     async def update_kernels_to_pulling_for_image(
         self, agent_id: AgentId, image: str, image_ref: Optional[str] = None
     ) -> int:
@@ -339,6 +411,7 @@ class SchedulerRepository:
         """
         return await self._db_source.update_kernels_to_pulling_for_image(agent_id, image, image_ref)
 
+    @scheduler_repository_resilience.apply()
     async def update_kernels_to_prepared_for_image(
         self, agent_id: AgentId, image: str, image_ref: Optional[str] = None
     ) -> int:
@@ -355,6 +428,7 @@ class SchedulerRepository:
             agent_id, image, image_ref
         )
 
+    @scheduler_repository_resilience.apply()
     async def cancel_kernels_for_failed_image(
         self, agent_id: AgentId, image: str, error_msg: str, image_ref: Optional[str] = None
     ) -> set[SessionId]:
@@ -378,6 +452,7 @@ class SchedulerRepository:
 
         return affected_session_ids
 
+    @scheduler_repository_resilience.apply()
     async def check_and_cancel_session_if_needed(self, session_id: SessionId) -> bool:
         """
         Check if a session should be cancelled when all its kernels are cancelled.
@@ -387,38 +462,51 @@ class SchedulerRepository:
         """
         return await self._db_source.check_and_cancel_session_if_needed(session_id)
 
+    @scheduler_repository_resilience.apply()
     async def update_kernel_status_pulling(self, kernel_id: UUID, reason: str) -> bool:
         """Update kernel status to PULLING."""
         return await self._db_source.update_kernel_status_pulling(kernel_id, reason)
 
+    @scheduler_repository_resilience.apply()
     async def update_kernel_status_creating(self, kernel_id: UUID, reason: str) -> bool:
         """Update kernel status to CREATING."""
         return await self._db_source.update_kernel_status_creating(kernel_id, reason)
 
+    @scheduler_repository_resilience.apply()
     async def update_kernel_status_running(
         self, kernel_id: UUID, reason: str, creation_info: KernelCreationInfo
     ) -> bool:
         """Update kernel status to RUNNING."""
         return await self._db_source.update_kernel_status_running(kernel_id, reason, creation_info)
 
+    @scheduler_repository_resilience.apply()
     async def update_kernel_status_preparing(self, kernel_id: UUID) -> bool:
         """Update kernel status to PREPARING."""
         return await self._db_source.update_kernel_status_preparing(kernel_id)
 
+    @scheduler_repository_resilience.apply()
     async def update_kernel_status_cancelled(self, kernel_id: UUID, reason: str) -> bool:
         """Update kernel status to CANCELLED."""
         return await self._db_source.update_kernel_status_cancelled(kernel_id, reason)
 
+    @scheduler_repository_resilience.apply()
     async def update_kernel_status_terminated(
         self, kernel_id: UUID, reason: str, exit_code: Optional[int] = None
     ) -> bool:
         """Update kernel status to TERMINATED."""
         return await self._db_source.update_kernel_status_terminated(kernel_id, reason, exit_code)
 
+    @scheduler_repository_resilience.apply()
+    async def update_kernels_to_terminated(self, kernel_ids: list[str], reason: str) -> int:
+        """Update multiple kernels to TERMINATED status."""
+        return await self._db_source.update_kernels_to_terminated(kernel_ids, reason)
+
+    @scheduler_repository_resilience.apply()
     async def update_kernel_heartbeat(self, kernel_id: UUID) -> bool:
         """Update kernel heartbeat timestamp."""
         return await self._db_source.update_kernel_heartbeat(kernel_id)
 
+    @scheduler_repository_resilience.apply()
     async def get_sessions_for_pull(
         self,
         statuses: list[SessionStatus],
@@ -434,6 +522,7 @@ class SchedulerRepository:
         """
         return await self._db_source.get_sessions_for_pull(statuses, kernel_statuses)
 
+    @scheduler_repository_resilience.apply()
     async def get_sessions_for_start(
         self,
         session_statuses: list[SessionStatus],
@@ -449,18 +538,21 @@ class SchedulerRepository:
         """
         return await self._db_source.get_sessions_for_start(session_statuses, kernel_statuses)
 
+    @scheduler_repository_resilience.apply()
     async def update_sessions_to_preparing(self, session_ids: list[SessionId]) -> None:
         """
         Update sessions from SCHEDULED to PREPARING status.
         """
         await self._db_source.update_sessions_to_preparing(session_ids)
 
+    @scheduler_repository_resilience.apply()
     async def update_sessions_and_kernels_to_creating(self, session_ids: list[SessionId]) -> None:
         """
         Update sessions and kernels from PREPARED to CREATING status.
         """
         await self._db_source.update_sessions_and_kernels_to_creating(session_ids)
 
+    @scheduler_repository_resilience.apply()
     async def mark_session_cancelled(
         self, session_id: SessionId, error_info: ErrorStatusInfo, reason: str = "FAILED_TO_START"
     ) -> None:
@@ -469,6 +561,7 @@ class SchedulerRepository:
         """
         await self._db_source.mark_session_cancelled(session_id, error_info, reason)
 
+    @scheduler_repository_resilience.apply()
     async def get_container_info_for_kernels(
         self, session_id: SessionId
     ) -> dict[UUID, Optional[str]]:
@@ -477,6 +570,7 @@ class SchedulerRepository:
         """
         return await self._db_source.get_container_info_for_kernels(session_id)
 
+    @scheduler_repository_resilience.apply()
     async def batch_update_stuck_session_retries(
         self, session_ids: list[SessionId], max_retries: int = 5
     ) -> list[SessionId]:
@@ -490,6 +584,7 @@ class SchedulerRepository:
         """
         return await self._db_source.batch_update_stuck_session_retries(session_ids, max_retries)
 
+    @scheduler_repository_resilience.apply()
     async def update_session_error_info(
         self, session_id: SessionId, error_info: ErrorStatusInfo
     ) -> None:
@@ -502,6 +597,7 @@ class SchedulerRepository:
         """
         await self._db_source.update_session_error_info(session_id, error_info)
 
+    @scheduler_repository_resilience.apply()
     async def get_keypair_concurrency(self, access_key: AccessKey, is_sftp: bool = False) -> int:
         """
         Get keypair concurrency with cache-through pattern.
@@ -543,15 +639,16 @@ class SchedulerRepository:
         # Return the requested value
         return concurrency_data.sftp_count if is_sftp else concurrency_data.regular_count
 
-    async def invalidate_keypair_concurrency_cache(self, access_keys: list[AccessKey]) -> None:
+    @scheduler_repository_resilience.apply()
+    async def invalidate_kernel_related_cache(self, access_keys: list[AccessKey]) -> None:
         """
-        Invalidate concurrency cache for multiple access keys.
-        This removes cached values, forcing the next read to fetch from database.
+        Invalidate caches related to kernel state changes affecting resource calculations.
 
-        :param access_keys: List of access keys to invalidate cache for
+        :param access_keys: List of access keys whose related caches should be invalidated
         """
-        await self._cache_source.invalidate_keypair_concurrencies(access_keys)
+        await self._cache_source.invalidate_kernel_related_cache(access_keys)
 
+    @scheduler_repository_resilience.apply()
     async def update_session_network_id(
         self,
         session_id: SessionId,
@@ -566,3 +663,31 @@ class SchedulerRepository:
             session_id,
             network_id,
         )
+
+    @scheduler_repository_resilience.apply()
+    async def get_total_resource_slots(self) -> TotalResourceData:
+        """
+        Get total resource slots from all agents.
+        Uses cache-through pattern: checks cache first, falls back to DB calculation,
+        and updates cache.
+
+        :return: TotalResourceData with total used, free, and capable slots
+        """
+        # Try to get from cache first
+        try:
+            cached_data = await self._cache_source.get_total_resource_slots()
+            if cached_data is not None:
+                return cached_data
+        except Exception as e:
+            log.warning("Failed to get total resource slots from cache: {}", e)
+
+        # Cache miss - calculate from DB
+        total_resource_data = await self._db_source.calculate_total_resource_slots()
+
+        # Update cache with calculated value
+        try:
+            await self._cache_source.set_total_resource_slots(total_resource_data)
+        except Exception as e:
+            log.warning("Failed to update total resource slots cache: {}", e)
+
+        return total_resource_data

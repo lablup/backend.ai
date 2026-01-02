@@ -13,8 +13,7 @@ class ArtifactNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/artifact-not-found"
     error_title = "Artifact Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.READ,
@@ -26,8 +25,7 @@ class ArtifactNotVerified(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/artifact-not-verified"
     error_title = "Artifact Not Verified"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.ACCESS,
@@ -39,8 +37,7 @@ class ArtifactUpdateError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/artifact-update-failed"
     error_title = "Artifact Update Failed"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.UPDATE,
@@ -52,8 +49,7 @@ class ArtifactDeletionBadRequestError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/artifact-deletion-failed"
     error_title = "Artifact Deletion Bad Request"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.HARD_DELETE,
@@ -65,8 +61,7 @@ class ArtifactDeletionError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/artifact-deletion-failed"
     error_title = "Artifact Deletion Failed"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.HARD_DELETE,
@@ -78,8 +73,7 @@ class ArtifactAssociationCreationError(BackendAIError, web.HTTPInternalServerErr
     error_type = "https://api.backend.ai/probs/artifact-association-creation-failed"
     error_title = "Artifact Association Creation Failed"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT_ASSOCIATION,
             operation=ErrorOperation.CREATE,
@@ -91,8 +85,7 @@ class ArtifactAssociationDeletionError(BackendAIError, web.HTTPInternalServerErr
     error_type = "https://api.backend.ai/probs/artifact-association-deletion-failed"
     error_title = "Artifact Association Deletion Failed"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT_ASSOCIATION,
             operation=ErrorOperation.HARD_DELETE,
@@ -104,8 +97,7 @@ class ArtifactAssociationNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/artifact-association-not-found"
     error_title = "Artifact Association Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT_ASSOCIATION,
             operation=ErrorOperation.READ,
@@ -117,8 +109,7 @@ class ArtifactNotApproved(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/artifact-not-approved"
     error_title = "Artifact Not Approved"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.ACCESS,
@@ -130,8 +121,7 @@ class ArtifactReadonly(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/artifact-readonly"
     error_title = "You cannot upload files to readonly artifact storage"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.UPDATE,
@@ -143,8 +133,7 @@ class InvalidArtifactModifierTypeError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-modifier-type"
     error_title = "Invalid Artifact Modifier Type"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.UPDATE,
@@ -156,8 +145,7 @@ class ArtifactRevisionNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/artifact-revision-not-found"
     error_title = "Artifact Revision Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.READ,
@@ -169,10 +157,45 @@ class ArtifactScanLimitExceededError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/artifact-scan-limit-exceeded"
     error_title = "Artifact Scan Limit Exceeded"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class ArtifactImportBadRequestError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/artifact-bad-import-request"
+    error_title = "Artifact Bad Import Request"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class ArtifactImportDelegationError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/artifact-import-delegation-failed"
+    error_title = "Artifact Import Delegation Failed"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class RemoteReservoirArtifactImportError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/remote-reservoir-artifact-import-error"
+    error_title = "Remote Reservoir Artifact Import Error"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )

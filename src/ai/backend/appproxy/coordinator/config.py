@@ -12,22 +12,36 @@ from pydantic import Field, FilePath, ValidationError
 from ai.backend.appproxy.common.config import (
     BaseSchema,
     DebugConfig,
-    GroupID,
+    GroupIDValidator,
     HostPortPair,
     PermitHashConfig,
     ProfilingConfig,
     RedisConfig,
     SecretConfig,
-    UserID,
+    UserIDValidator,
 )
-from ai.backend.appproxy.common.exceptions import ConfigValidationError
+from ai.backend.appproxy.common.errors import ConfigValidationError
 from ai.backend.appproxy.common.types import EventLoopType
 from ai.backend.common import config
 from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import LogLevel
 from ai.backend.logging.config import LoggingConfig
 
-_file_perm = (Path(__file__).parent / "server.py").stat()
+
+def _get_default_uid() -> int:
+    """Get UID from server.py file in the same directory as config.py."""
+    server_file = Path(__file__).parent / "server.py"
+    if not server_file.exists():
+        raise ConfigValidationError(f"server.py not found at {server_file}")
+    return server_file.stat().st_uid
+
+
+def _get_default_gid() -> int:
+    """Get GID from server.py file in the same directory as config.py."""
+    server_file = Path(__file__).parent / "server.py"
+    if not server_file.exists():
+        raise ConfigValidationError(f"server.py not found at {server_file}")
+    return server_file.stat().st_gid
 
 
 class DBType(enum.StrEnum):
@@ -140,13 +154,13 @@ class ProxyCoordinatorConfig(BaseSchema):
     id: Annotated[str, Field(default=f"i-{socket.gethostname()}", description="Node id.")]
     user: Annotated[
         int,
-        UserID(default_uid=_file_perm.st_uid),
-        Field(default=_file_perm.st_uid, description="Process owner."),
+        UserIDValidator,
+        Field(default_factory=_get_default_uid, ge=0, description="Process owner."),
     ]
     group: Annotated[
         int,
-        GroupID(default_gid=_file_perm.st_gid),
-        Field(default=_file_perm.st_uid, description="Process group."),
+        GroupIDValidator,
+        Field(default_factory=_get_default_gid, ge=0, description="Process group."),
     ]
 
     bind_addr: Annotated[
@@ -172,7 +186,8 @@ class ProxyCoordinatorConfig(BaseSchema):
         ),
     ]
     redlock_config: Annotated[
-        RedisLockConfig, Field(default=RedisLockConfig(), description="Redis lock configuration")
+        RedisLockConfig,
+        Field(default_factory=lambda: RedisLockConfig(), description="Redis lock configuration"),
     ]
 
     tls_listen: Annotated[bool, Field(default=False, description="Opt in to HTTPS setup.")]
@@ -272,6 +287,21 @@ class ProxyCoordinatorConfig(BaseSchema):
             description=("Manually set the announced address for service discovery. "),
         ),
     ]
+
+    @property
+    def advertise_base_url(self) -> str:
+        """
+        Generate the full advertise URL with protocol.
+        Uses advertised_addr if set, otherwise falls back to bind_addr.
+        Protocol is determined by tls_advertised or tls_listen flags.
+        """
+        connection_info = (
+            self.advertised_addr if self.advertised_addr is not None else self.bind_addr
+        )
+        if connection_info.host_set_with_protocol:
+            return f"{connection_info.host}:{connection_info.port}"
+        protocol = "https" if (self.tls_advertised or self.tls_listen) else "http"
+        return f"{protocol}://{connection_info.host}:{connection_info.port}"
 
 
 class ServerConfig(BaseSchema):

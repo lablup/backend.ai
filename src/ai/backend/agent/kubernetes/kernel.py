@@ -23,6 +23,7 @@ from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
+from ..errors import KernelRunnerNotInitializedError
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
 from ..types import AgentEventData, KernelOwnershipData
@@ -60,9 +61,11 @@ class KubernetesKernel(AbstractKernel):
 
         self.deployment_name = f"kernel-{ownership_data.kernel_id}"
 
+    @override
     async def close(self) -> None:
         await self.scale(0)
 
+    @override
     async def create_code_runner(
         self, event_producer: EventProducer, *, client_features: FrozenSet[str], api_version: int
     ) -> AbstractCodeRunner:
@@ -153,16 +156,21 @@ class KubernetesKernel(AbstractKernel):
                     return False
         return True
 
+    @override
     async def get_completions(self, text: str, opts: Mapping[str, Any]) -> CodeCompletionResp:
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         result = await self.runner.feed_and_get_completion(text, opts)
         return CodeCompletionResp(result=result)
 
+    @override
     async def check_status(self):
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         result = await self.runner.feed_and_get_status()
         return result
 
+    @override
     async def get_logs(self):
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
@@ -170,13 +178,17 @@ class KubernetesKernel(AbstractKernel):
         result = await core_api.read_namespaced_pod_log(self.kernel_id, "backend-ai")
         return {"logs": result.data.decode("utf-8")}
 
+    @override
     async def interrupt_kernel(self):
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_interrupt()
         return {"status": "finished"}
 
+    @override
     async def start_service(self, service: str, opts: Mapping[str, Any]):
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         if self.data.get("block_service_ports", False):
             return {
                 "status": "failed",
@@ -196,24 +208,32 @@ class KubernetesKernel(AbstractKernel):
         })
         return result
 
+    @override
     async def start_model_service(self, model_service: Mapping[str, Any]):
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         result = await self.runner.feed_start_model_service(model_service)
         return result
 
+    @override
     async def shutdown_service(self, service: str):
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_shutdown_service(service)
 
+    @override
     async def get_service_apps(self):
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         result = await self.runner.feed_service_apps()
         return result
 
+    @override
     async def check_duplicate_commit(self, kernel_id, subdir):
         log.error("Committing in Kubernetes is not supported yet.")
         raise NotImplementedError
 
+    @override
     async def commit(
         self,
         kernel_id,
@@ -343,6 +363,7 @@ class KubernetesKernel(AbstractKernel):
 
         return {"files": "", "errors": "", "abspath": str(container_path)}
 
+    @override
     async def notify_event(self, evdata: AgentEventData):
         raise NotImplementedError
 
@@ -375,9 +396,11 @@ class KubernetesCodeRunner(AbstractCodeRunner):
         self.repl_in_port = repl_in_port
         self.repl_out_port = repl_out_port
 
+    @override
     async def get_repl_in_addr(self) -> str:
         return f"tcp://{self.kernel_host}:{self.repl_in_port}"
 
+    @override
     async def get_repl_out_addr(self) -> str:
         return f"tcp://{self.kernel_host}:{self.repl_out_port}"
 

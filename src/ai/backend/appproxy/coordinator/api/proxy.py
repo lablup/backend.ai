@@ -9,7 +9,7 @@ import jwt
 from aiohttp import web
 from pydantic import AnyUrl, BaseModel, Field
 
-from ai.backend.appproxy.common.exceptions import (
+from ai.backend.appproxy.common.errors import (
     InvalidCredentials,
     ObjectNotFound,
 )
@@ -24,6 +24,7 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.appproxy.common.utils import mime_match, pydantic_api_handler
 from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
+from ai.backend.appproxy.coordinator.errors import CircuitCreationError
 from ai.backend.logging import BraceStyleAdapter
 
 from ..models import Circuit, Token, Worker, add_circuit
@@ -78,11 +79,7 @@ async def add(request: web.Request, params: AddRequestModel) -> PydanticResponse
     root_ctx: RootContext = request.app["_root.context"]
 
     coordinator_config = root_ctx.local_config.proxy_coordinator
-    if coordinator_config.advertised_addr:
-        connection_info = coordinator_config.advertised_addr
-    else:
-        connection_info = coordinator_config.bind_addr
-    base_url = f"{'https' if coordinator_config.tls_advertised or coordinator_config.tls_listen else 'http'}://{connection_info.host}:{connection_info.port}"
+    base_url = coordinator_config.advertise_base_url
     qdict = {
         **params.model_dump(mode="json", exclude_defaults=True),
         "token": request.match_info["token"],
@@ -195,11 +192,10 @@ async def proxy(
             )
         log.debug("created new circuit {}", circuit.id)
 
-    assert circuit and worker
+    if not circuit or not worker:
+        raise CircuitCreationError("Failed to create circuit and worker.")
 
     await root_ctx.circuit_manager.initialize_circuits([circuit])
-
-    assert circuit
     log.debug("Circuit is set (id:{})", str(circuit.id))
     token_to_generate_body = {
         "id": str(token.id),

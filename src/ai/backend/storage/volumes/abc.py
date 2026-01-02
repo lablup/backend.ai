@@ -21,7 +21,7 @@ from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
-from ..exception import InvalidSubpathError, VFolderNotFoundError
+from ..errors import InvalidSubpathError, VFolderNotFoundError
 from ..types import (
     CapacityUsage,
     DirEntry,

@@ -24,10 +24,6 @@ from ai.backend.common.dto.manager.response import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import ProcessorsCtx
-from ai.backend.manager.services.object_storage.actions.get_all_buckets import GetAllBucketsAction
-from ai.backend.manager.services.object_storage.actions.get_buckets import (
-    GetBucketsAction,
-)
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
 )
@@ -37,6 +33,8 @@ from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url
 from ai.backend.manager.services.object_storage.actions.list import (
     ListObjectStorageAction,
 )
+from ai.backend.manager.services.storage_namespace.actions.get_all import GetAllNamespacesAction
+from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
 
 from .auth import auth_required_for_method
 from .types import CORSOptions, WebMiddleware
@@ -52,6 +50,13 @@ class APIHandler:
         body: BodyParam[GetPresignedDownloadURLReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Generate a presigned URL for safely downloading artifact files.
+
+        Creates a time-limited, secure URL that allows direct download of specific
+        artifact files from object storage without exposing storage credentials.
+        Used to provide secure access to AVAILABLE artifact files.
+        """
         processors = processors_ctx.processors
 
         action_result = (
@@ -74,6 +79,13 @@ class APIHandler:
         body: BodyParam[GetPresignedUploadURLReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Generate a presigned URL for uploading artifact files.
+
+        Creates a time-limited, secure URL that allows direct upload of files
+        to object storage without exposing storage credentials. Includes
+        additional form fields required for the upload operation.
+        """
         processors = processors_ctx.processors
 
         action_result = await processors.object_storage.get_presigned_upload_url.wait_for_complete(
@@ -95,9 +107,18 @@ class APIHandler:
         self,
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Retrieve all storage namespaces (buckets) across all storage systems.
+
+        Returns a mapping of storage systems to their available namespaces.
+        This provides an overview of all available storage compartments
+        where artifacts can be stored.
+
+        Note: This API is deprecated. Use /storage-namespaces instead.
+        """
         processors = processors_ctx.processors
-        action_result = await processors.object_storage.get_all_buckets.wait_for_complete(
-            GetAllBucketsAction()
+        action_result = await processors.storage_namespace.get_all_namespaces.wait_for_complete(
+            GetAllNamespacesAction()
         )
 
         resp = ObjectStorageAllBucketsResponse(buckets_by_storage=action_result.result)
@@ -110,14 +131,22 @@ class APIHandler:
         path: PathParam[ObjectStoragePathParam],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Retrieve storage namespaces (buckets) for a specific storage system.
+
+        Returns the list of available namespaces within the specified storage
+        system where artifacts can be organized and stored.
+
+        Note: This API is deprecated. Use /storage-namespaces instead.
+        """
         processors = processors_ctx.processors
         storage_id: uuid.UUID = path.parsed.storage_id
 
-        action_result = await processors.object_storage.get_buckets.wait_for_complete(
-            GetBucketsAction(storage_id=storage_id)
+        action_result = await processors.storage_namespace.get_namespaces.wait_for_complete(
+            GetNamespacesAction(storage_id=storage_id)
         )
 
-        bucket_names = [namespace_data.bucket for namespace_data in action_result.result]
+        bucket_names = [namespace_data.namespace for namespace_data in action_result.result]
         resp = ObjectStorageBucketsResponse(buckets=bucket_names)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -127,6 +156,12 @@ class APIHandler:
         self,
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        List all configured object storage systems.
+
+        Returns information about all available storage systems that can be
+        used for storing artifacts, including their configuration and capabilities.
+        """
         processors = processors_ctx.processors
 
         action_result = await processors.object_storage.list_storages.wait_for_complete(
@@ -155,6 +190,7 @@ def create_app(
     cors.add(
         app.router.add_route("POST", "/presigned/download", api_handler.get_presigned_download_url)
     )
+    # TODO: deprecate these APIs, and use /storage-namespaces instead
     cors.add(app.router.add_route("GET", "/buckets", api_handler.get_all_buckets))
     cors.add(app.router.add_route("GET", "/{storage_id}/buckets", api_handler.get_buckets))
     cors.add(app.router.add_route("GET", "/", api_handler.list_object_storages))

@@ -3,18 +3,21 @@ from __future__ import annotations
 import enum
 import os
 from pathlib import Path, PurePath
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal, Optional, Self, Union
 
 from pydantic import (
     AliasChoices,
-    BaseModel,
     ConfigDict,
     Field,
     FilePath,
+    model_validator,
 )
 
+from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.config.types import EtcdConfigData
+from ai.backend.common.data.storage.types import ArtifactStorageType
+from ai.backend.common.exception import GenericNotImplementedError, InvalidConfigError
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     GroupID,
@@ -37,11 +40,11 @@ except IOError:
 
 
 class EventLoopType(enum.StrEnum):
-    asyncio = "asyncio"
-    uvloop = "uvloop"
+    ASYNCIO = "asyncio"
+    UVLOOP = "uvloop"
 
 
-class VolumeInfoConfig(BaseModel):
+class VolumeInfoConfig(BaseConfigSchema):
     backend: str = Field(
         description="""
         Storage backend type to use for this volume.
@@ -82,7 +85,7 @@ class VolumeInfoConfig(BaseModel):
         )
 
 
-class EtcdConfig(BaseModel):
+class EtcdConfig(BaseConfigSchema):
     namespace: str = Field(
         default="ETCD_NAMESPACE",
         description="""
@@ -135,7 +138,7 @@ class EtcdConfig(BaseModel):
         )
 
 
-class PyroscopeConfig(BaseModel):
+class PyroscopeConfig(BaseConfigSchema):
     enabled: bool = Field(
         default=False,
         description="""
@@ -180,7 +183,7 @@ class PyroscopeConfig(BaseModel):
     )
 
 
-class ClientAPIConfig(BaseModel):
+class ClientAPIConfig(BaseConfigSchema):
     service_addr: HostPortPair = Field(
         default=HostPortPair(host="127.0.0.1", port=6021),
         description="""
@@ -221,7 +224,7 @@ class ClientAPIConfig(BaseModel):
     )
 
 
-class ManagerAPIConfig(BaseModel):
+class ManagerAPIConfig(BaseConfigSchema):
     service_addr: HostPortPair = Field(
         default=HostPortPair(host="127.0.0.1", port=6022),
         description="""
@@ -296,7 +299,7 @@ class ManagerAPIConfig(BaseModel):
     )
 
 
-class APIConfig(BaseModel):
+class APIConfig(BaseConfigSchema):
     client: ClientAPIConfig = Field(
         description="""
         Configuration for the client-facing API.
@@ -311,7 +314,7 @@ class APIConfig(BaseModel):
     )
 
 
-class DebugConfig(BaseModel):
+class DebugConfig(BaseConfigSchema):
     enabled: bool = Field(
         default=False,
         description="""
@@ -354,7 +357,7 @@ class DebugConfig(BaseModel):
     )
 
 
-class OTELConfig(BaseModel):
+class OTELConfig(BaseConfigSchema):
     enabled: bool = Field(
         default=False,
         description="""
@@ -383,7 +386,7 @@ class OTELConfig(BaseModel):
     )
 
 
-class ServiceDiscoveryConfig(BaseModel):
+class ServiceDiscoveryConfig(BaseConfigSchema):
     type: ServiceDiscoveryType = Field(
         default=ServiceDiscoveryType.REDIS,
         description="""
@@ -393,7 +396,7 @@ class ServiceDiscoveryConfig(BaseModel):
     )
 
 
-class StorageProxyConfig(BaseModel):
+class StorageProxyConfig(BaseConfigSchema):
     ipc_base_path: AutoDirectoryPath = Field(
         default=AutoDirectoryPath("/tmp/backend.ai/ipc"),
         description="""
@@ -436,7 +439,7 @@ class StorageProxyConfig(BaseModel):
         serialization_alias="pid-file",
     )
     event_loop: EventLoopType = Field(
-        default=EventLoopType.asyncio,
+        default=EventLoopType.ASYNCIO,
         description="""
         Event loop implementation to use.
         'asyncio' is the standard library implementation.
@@ -567,9 +570,22 @@ class StorageProxyConfig(BaseModel):
         ),
         serialization_alias="use-experimental-redis-event-dispatcher",
     )
+    auto_quota_scope_creation: bool = Field(
+        default=True,
+        description="""
+        Whether to allow automatic creation of quota scopes.
+        If true, quota scopes will be created when creating VFolders in non-existent quota scopes.
+        If false, VFolder creation will fail if the quota scope does not exist.
+        """,
+        examples=[True, False],
+        validation_alias=AliasChoices(
+            "allow-auto-quota-scope-creation", "auto_quota_scope_creation"
+        ),
+        serialization_alias="allow-auto-quota-scope-creation",
+    )
 
 
-class PresignedUploadConfig(BaseModel):
+class PresignedUploadConfig(BaseConfigSchema):
     min_size: Optional[int] = Field(
         default=None,
         description="""
@@ -599,7 +615,7 @@ class PresignedUploadConfig(BaseModel):
     )
 
 
-class PresignedDownloadConfig(BaseModel):
+class PresignedDownloadConfig(BaseConfigSchema):
     expiration: int = Field(
         default=60 * 5,  # 5 minutes
         description="""
@@ -609,13 +625,68 @@ class PresignedDownloadConfig(BaseModel):
     )
 
 
-# TODO: Remove this after migrating this to database
-class ObjectStorageConfig(BaseModel):
-    name: str = Field(
+class VFSStorageConfig(BaseConfigSchema):
+    base_path: Path = Field(
         description="""
-        Name of the storage configuration.
+        Base filesystem path for VFS storage.
+        This directory will serve as the root for all VFS operations.
         """,
+        examples=["/data/ai-models", "/shared/datasets"],
+        validation_alias=AliasChoices("base-path", "base_path"),
+        serialization_alias="base-path",
     )
+    subpath: Optional[str] = Field(
+        default=None,
+        description="""
+        Optional subdirectory path appended to base_path.
+        Used to further organize storage within the base directory.
+        """,
+        examples=["models", "datasets", "user-data"],
+    )
+    temporary: bool = Field(
+        default=False,
+        description="""
+        If True, all files in the storage will be cleared when the server starts.
+        Useful for temporary storage that should be cleaned up on restart.
+        """,
+        examples=[True, False],
+    )
+    upload_chunk_size: int = Field(
+        default=65536,  # 64KB
+        ge=1024,  # Minimum 1KB
+        description="""
+        Chunk size (in bytes) for streaming file upload operations.
+        Controls how data is buffered during file uploads.
+        """,
+        examples=[8192, 65536, 1048576],
+        validation_alias=AliasChoices("upload-chunk-size", "upload_chunk_size"),
+        serialization_alias="upload-chunk-size",
+    )
+    download_chunk_size: int = Field(
+        default=65536,  # 64KB
+        ge=1024,  # Minimum 1KB
+        description="""
+        Chunk size (in bytes) for streaming file download operations.
+        Controls how data is buffered during file downloads.
+        """,
+        examples=[8192, 65536, 1048576],
+        validation_alias=AliasChoices("download-chunk-size", "download_chunk_size"),
+        serialization_alias="download-chunk-size",
+    )
+    max_file_size: Optional[int] = Field(
+        default=None,
+        description="""
+        Maximum file size (in bytes) allowed for uploads.
+        If None, no size limit is enforced.
+        """,
+        examples=[1073741824, 10737418240],  # 1GB, 10GB
+        validation_alias=AliasChoices("max-file-size", "max_file_size"),
+        serialization_alias="max-file-size",
+    )
+
+
+# TODO: Remove this after migrating this to database
+class ObjectStorageConfig(BaseConfigSchema):
     endpoint: str = Field(
         description="""
         Endpoint URL for the object storage service.
@@ -706,14 +777,17 @@ class ObjectStorageConfig(BaseModel):
     )
 
 
-class HuggingfaceConfig(BaseModel):
-    registry_type: Literal["huggingface"] = Field(
+class LegacyObjectStorageConfig(ObjectStorageConfig):
+    name: str = Field(
         description="""
-        Type of the registry configuration.
-        This is used to identify the specific registry type.
+        Name of the object storage configuration.
+        Used to identify this storage in the system.
         """,
-        alias="type",
+        examples=["s3-storage", "minio-storage"],
     )
+
+
+class HuggingfaceConfig(BaseConfigSchema):
     endpoint: str = Field(
         default="https://huggingface.co",
         description="""
@@ -741,14 +815,18 @@ class HuggingfaceConfig(BaseModel):
     )
 
 
-class ReservoirConfig(BaseModel):
-    registry_type: Literal["reservoir"] = Field(
+# TODO: Remove legacy config classes
+class LegacyHuggingfaceConfig(HuggingfaceConfig):
+    registry_type: Literal["huggingface"] = Field(
         description="""
         Type of the registry configuration.
         This is used to identify the specific registry type.
         """,
         alias="type",
     )
+
+
+class ReservoirConfig(BaseConfigSchema):
     endpoint: str = Field(
         default="https://huggingface.co",
         description="""
@@ -781,11 +859,154 @@ class ReservoirConfig(BaseModel):
         serialization_alias="object-storage-region",
     )
 
+    manager_endpoint: Optional[str] = Field(
+        default=None,
+        description="""
+        Custom endpoint for the reservoir manager API.
+        Required if the remote reservoir registry use vfs storage.
+        """,
+        examples=["https://manager.reservoir.ai"],
+        validation_alias=AliasChoices("manager-endpoint", "manager_endpoint"),
+        serialization_alias="manager-endpoint",
+    )
+    manager_access_key: Optional[str] = Field(
+        default=None,
+        description="""
+        Access key for authenticating with the reservoir manager API.
+        Required if the remote reservoir registry use vfs storage.
+        """,
+        validation_alias=AliasChoices("manager-access-key", "manager_access_key"),
+        serialization_alias="manager-access-key",
+    )
+    manager_secret_key: Optional[str] = Field(
+        default=None,
+        description="""
+        Secret key for authenticating with the reservoir manager API.
+        Required if the remote reservoir registry use vfs storage.
+        """,
+        validation_alias=AliasChoices("manager-secret-key", "manager_secret_key"),
+        serialization_alias="manager-secret-key",
+    )
+    manager_api_version: Optional[str] = Field(
+        default=None,
+        description="""
+        API version for the reservoir manager API.
+        Required if the remote reservoir registry use vfs storage.
+        """,
+        examples=["v1"],
+        validation_alias=AliasChoices("manager-api-version", "manager_api_version"),
+        serialization_alias="manager-api-version",
+    )
+    storage_name: Optional[str] = Field(
+        default=None,
+        description="""
+        Name of the object storage configuration to use with the reservoir registry.
+        Required if the remote reservoir registry use vfs storage.
+        """,
+        examples=["s3-storage", "vfs-storage"],
+        validation_alias=AliasChoices("storage-name", "storage_name"),
+        serialization_alias="storage-name",
+    )
 
-RegistrySpecificConfig = Union[HuggingfaceConfig, ReservoirConfig]
+
+class LegacyReservoirConfig(ReservoirConfig):
+    registry_type: Literal["reservoir"] = Field(
+        description="""
+        Type of the registry configuration.
+        This is used to identify the specific registry type.
+        """,
+        alias="type",
+    )
 
 
-class ArtifactRegistryConfig(BaseModel):
+class ReservoirClientConfig(BaseConfigSchema):
+    timeout_total: Optional[float] = Field(
+        default=300.0,
+        description="""
+        Total timeout for the entire request (in seconds).
+        None means no timeout.
+        """,
+        examples=[300.0],
+        validation_alias=AliasChoices("timeout-total", "timeout_total"),
+        serialization_alias="timeout-total",
+    )
+    timeout_connect: Optional[float] = Field(
+        default=None,
+        description="""
+        Timeout for acquiring a connection from the pool (in seconds).
+        None means no timeout.
+        """,
+        examples=[60.0],
+        validation_alias=AliasChoices("timeout-connect", "timeout_connect"),
+        serialization_alias="timeout-connect",
+    )
+    timeout_sock_connect: Optional[float] = Field(
+        default=30.0,
+        description="""
+        Timeout for connecting to a peer for a new connection (in seconds).
+        None means no timeout.
+        """,
+        examples=[60.0],
+        validation_alias=AliasChoices("timeout-sock-connect", "timeout_sock_connect"),
+        serialization_alias="timeout-sock-connect",
+    )
+    timeout_sock_read: Optional[float] = Field(
+        default=None,
+        description="""
+        Timeout for reading a portion of data from a peer (in seconds).
+        None means no timeout.
+        """,
+        examples=[300.0],
+        validation_alias=AliasChoices("timeout-sock-read", "timeout_sock_read"),
+        serialization_alias="timeout-sock-read",
+    )
+
+
+class ArtifactRegistryStorageConfig(BaseConfigSchema):
+    storage_type: ArtifactStorageType = Field(
+        description="""
+        Type of the artifact storage.
+        Determines how to interact with the storage service.
+        """,
+        examples=[typ.value for typ in ArtifactStorageType],
+        alias="type",
+    )
+    object_storage: Optional[ObjectStorageConfig] = Field(
+        default=None,
+        description="""
+        Object storage configuration.
+        """,
+        validation_alias=AliasChoices("object-storage", "object_storage"),
+        serialization_alias="object-storage",
+    )
+    vfs_storage: Optional[VFSStorageConfig] = Field(
+        default=None,
+        description="""
+        VFS storage configuration.
+        """,
+    )
+
+    @model_validator(mode="after")
+    def _validate_storage_config(self) -> Self:
+        match self.storage_type:
+            case ArtifactStorageType.OBJECT_STORAGE:
+                if self.object_storage is None:
+                    raise InvalidConfigError(
+                        "object_storage config is required when storage_type is 'object_storage'"
+                    )
+            case ArtifactStorageType.VFS_STORAGE:
+                if self.vfs_storage is None:
+                    raise InvalidConfigError("vfs config is required when storage_type is 'vfs'")
+            case ArtifactStorageType.GIT_LFS:
+                raise GenericNotImplementedError("git_lfs is not supported yet")
+
+        return self
+
+
+LegacyRegistrySpecificConfig = Union[LegacyHuggingfaceConfig, LegacyReservoirConfig]
+
+
+class LegacyArtifactRegistryConfig(BaseConfigSchema):
     name: str = Field(
         description="""
         Name of the artifact registry configuration.
@@ -793,7 +1014,7 @@ class ArtifactRegistryConfig(BaseModel):
         """,
         examples=[typ.value for typ in ArtifactRegistryType],
     )
-    config: RegistrySpecificConfig = Field(
+    config: LegacyRegistrySpecificConfig = Field(
         discriminator="registry_type",
         description="""
         Configuration for the artifact registry.
@@ -801,7 +1022,46 @@ class ArtifactRegistryConfig(BaseModel):
     )
 
 
-class StorageProxyUnifiedConfig(BaseModel):
+class ArtifactRegistryConfig(BaseConfigSchema):
+    registry_type: ArtifactRegistryType = Field(
+        description="""
+        Type of the artifact registry.
+        Determines how to interact with the registry service.
+        """,
+        examples=[typ.value for typ in ArtifactRegistryType],
+        alias="type",
+    )
+    huggingface: Optional[HuggingfaceConfig] = Field(
+        default=None,
+        description="""
+        HuggingFace registry configuration.
+        """,
+    )
+    reservoir: Optional[ReservoirConfig] = Field(
+        default=None,
+        description="""
+        Reservoir registry configuration.
+        """,
+    )
+
+    @model_validator(mode="after")
+    def _validate_registry_config(self) -> Self:
+        match self.registry_type:
+            case ArtifactRegistryType.HUGGINGFACE:
+                if self.huggingface is None:
+                    raise InvalidConfigError(
+                        "huggingface config is required when registry_type is 'huggingface'"
+                    )
+            case ArtifactRegistryType.RESERVOIR:
+                if self.reservoir is None:
+                    raise InvalidConfigError(
+                        "reservoir config is required when registry_type is 'reservoir'"
+                    )
+
+        return self
+
+
+class StorageProxyUnifiedConfig(BaseConfigSchema):
     storage_proxy: StorageProxyConfig = Field(
         description="""
         Core storage-proxy service configuration.
@@ -866,19 +1126,51 @@ class StorageProxyUnifiedConfig(BaseModel):
         Used for distributed coordination.
         """,
     )
-    storages: list[ObjectStorageConfig] = Field(
+    storages: list[LegacyObjectStorageConfig] = Field(
         default_factory=list,
         description="""
+        Deprecated, use `artifact_storages` instead.
+
         List of object storage configurations.
         Each configuration defines how to connect to and use an object storage service.
         """,
     )
-    registries: list[ArtifactRegistryConfig] = Field(
+    registries: list[LegacyArtifactRegistryConfig] = Field(
         default_factory=list,
         description="""
+        Deprecated, use `artifact_registries` instead.
+
         List of artifact registry configurations.
         Each configuration defines how to connect to and use an artifact registry service.
         """,
+    )
+
+    artifact_storages: dict[str, ArtifactRegistryStorageConfig] = Field(
+        default_factory=dict,
+        description="""
+        Dictionary of artifact storage configurations keyed by name.
+        Each configuration defines how to connect to and use an artifact storage service.
+        """,
+        validation_alias=AliasChoices("artifact-storages", "artifact_storages"),
+        serialization_alias="artifact-storages",
+    )
+    artifact_registries: dict[str, ArtifactRegistryConfig] = Field(
+        default_factory=dict,
+        description="""
+        Dictionary of artifact registry configurations keyed by name.
+        Each configuration defines how to connect to and use an artifact registry service.
+        """,
+        validation_alias=AliasChoices("artifact-registries", "artifact_registries"),
+        serialization_alias="artifact-registries",
+    )
+    reservoir_client: ReservoirClientConfig = Field(
+        default_factory=ReservoirClientConfig,
+        description="""
+        Reservoir client configuration.
+        Controls timeout settings for HTTP client connections to reservoir registries.
+        """,
+        validation_alias=AliasChoices("reservoir-client", "reservoir_client"),
+        serialization_alias="reservoir-client",
     )
 
     # TODO: Remove me after changing config injection logic

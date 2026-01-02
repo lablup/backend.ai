@@ -3,12 +3,9 @@ from typing import Optional, override
 
 from ai.backend.common.types import EndpointId
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.model_serving.types import EndpointAutoScalingRuleData
+from ai.backend.manager.data.model_serving.creator import EndpointAutoScalingRuleCreator
+from ai.backend.manager.data.model_serving.types import EndpointAutoScalingRuleData, RequesterCtx
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
-from ai.backend.manager.services.model_serving.types import (
-    EndpointAutoScalingRuleCreator,
-    RequesterCtx,
-)
 
 
 @dataclass

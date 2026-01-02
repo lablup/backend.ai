@@ -13,6 +13,7 @@ from typing import (
 )
 
 import graphene
+import graphene_federation
 import graphql
 import more_itertools
 import sqlalchemy as sa
@@ -20,9 +21,10 @@ import trafaret as t
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common import validators as tx
+from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORITY_MIN
 from ai.backend.common.exception import SessionWithInvalidStateError
 from ai.backend.common.types import (
     ClusterMode,
@@ -32,21 +34,22 @@ from ai.backend.common.types import (
     SessionResult,
     VFolderMount,
 )
+from ai.backend.manager.api.gql.base import resolve_global_id
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.idle import ReportInfo
 from ai.backend.manager.models.gql_models.user import UserNode
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.utils import agg_to_array
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
 )
-from ai.backend.manager.services.session.actions.modify_session import (
-    ModifySessionAction,
-    SessionModifier,
-)
+from ai.backend.manager.services.session.actions.modify_session import ModifySessionAction
 from ai.backend.manager.types import OptionalState
 
+from ...errors.resource import DataTransformationFailed
 from ..base import (
     BigInt,
     FilterExprArg,
@@ -74,8 +77,6 @@ from ..rbac.permission_defs import ComputeSessionPermission
 from ..rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from ..session import (
     DEFAULT_SESSION_ORDERING,
-    SESSION_PRIORITY_MAX,
-    SESSION_PRIORITY_MIN,
     SessionDependencyRow,
     SessionRow,
     SessionTypes,
@@ -190,6 +191,7 @@ class SessionPermissionValueField(graphene.Scalar):
         return ComputeSessionPermission(value)
 
 
+@graphene_federation.key("id")
 class ComputeSessionNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
@@ -276,6 +278,23 @@ class ComputeSessionNode(graphene.ObjectType):
         "ai.backend.manager.models.gql_models.session.ComputeSessionConnection",
         description="Added in 24.09.0.",
     )
+
+    @classmethod
+    async def get_node(
+        cls,
+        info: graphene.ResolveInfo,
+        id: str,
+    ) -> Optional[Self]:
+        graphene_ctx: GraphQueryContext = info.context
+        _, raw_session_id = AsyncNode.resolve_global_id(info, id)
+        async with graphene_ctx.db.begin_readonly_session() as db_session:
+            stmt = (
+                sa.select(SessionRow)
+                .where(SessionRow.id == uuid.UUID(raw_session_id))
+                .options(selectinload(SessionRow.kernels), joinedload(SessionRow.user))
+            )
+            query_result = await db_session.scalar(stmt)
+            return cls.from_row(graphene_ctx, query_result) if query_result is not None else None
 
     @classmethod
     def _add_basic_options_to_query(
@@ -430,6 +449,16 @@ class ComputeSessionNode(graphene.ObjectType):
         result.permissions = [] if permissions is None else permissions
         return result
 
+    async def __resolve_reference(
+        self, info: graphene.ResolveInfo, **kwargs
+    ) -> Optional["ComputeSessionNode"]:
+        # TODO: Confirm if scope and permsission are correct
+        # Parse the global ID from Federation (converts base64 encoded string to tuple)
+        resolved_id = resolve_global_id(self.id)
+        return await ComputeSessionNode.get_accessible_node(
+            info, resolved_id, SystemScope(), ComputeSessionPermission.READ_ATTRIBUTE
+        )
+
     async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> dict[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader_by_func(
@@ -481,6 +510,12 @@ class ComputeSessionNode(graphene.ObjectType):
         return ConnectionResolverResult(
             kernel_nodes, None, None, None, total_count=len(kernel_nodes)
         )
+
+    async def resolve_resource_opts(self, info: graphene.ResolveInfo) -> dict[str, Any]:
+        ctx: GraphQueryContext = info.context
+        loader = ctx.dataloader_manager.get_loader(ctx, "KernelNode.by_session_id")
+        kernels = await loader.load(self.row_id)
+        return {kernel.cluster_hostname: kernel.resource_opts for kernel in kernels}
 
     async def resolve_dependees(
         self,
@@ -820,9 +855,12 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         result = await graph_ctx.processors.session.modify_session.wait_for_complete(
             ModifySessionAction(
                 session_id=session_id,
-                modifier=SessionModifier(
-                    name=OptionalState[str].from_graphql(name),
-                    priority=OptionalState[int].from_graphql(priority),
+                updater=Updater(
+                    spec=SessionUpdaterSpec(
+                        name=OptionalState[str].from_graphql(name),
+                        priority=OptionalState[int].from_graphql(priority),
+                    ),
+                    pk_value=session_id,
                 ),
             )
         )
@@ -960,7 +998,8 @@ class ComputeSession(graphene.ObjectType):
 
     @classmethod
     def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
-        assert row is not None
+        if row is None:
+            raise DataTransformationFailed("Session row cannot be None")
         email = getattr(row, "email")
         full_name = getattr(row, "full_name")
         group_name = getattr(row, "group_name")

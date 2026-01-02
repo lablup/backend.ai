@@ -40,9 +40,11 @@ from ai.backend.common.types import (
     MetricValue,
     MovingStatValue,
     SessionId,
+    SlotName,
 )
 from ai.backend.logging import BraceStyleAdapter
 
+from .errors import InvalidContainerMeasurementError
 from .metrics.metric import UtilizationMetricObserver
 from .metrics.types import (
     CAPACITY_METRIC_KEY,
@@ -56,6 +58,8 @@ from .utils import remove_exponent
 if TYPE_CHECKING:
     from .agent import AbstractAgent
     from .kernel import AbstractKernel
+    from .resources import AbstractComputePlugin
+
 
 __all__ = (
     "StatContext",
@@ -130,6 +134,12 @@ class MetricTypes(enum.Enum):
 class Measurement:
     value: Decimal
     capacity: Optional[Decimal] = None
+
+    def apply_scale_factor(self, scale_factor: Decimal) -> "Measurement":
+        return Measurement(
+            value=self.value * scale_factor,
+            capacity=self.capacity * scale_factor if self.capacity is not None else None,
+        )
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -405,7 +415,25 @@ class StatContext:
             )
         )
 
-    async def collect_node_stat(self) -> None:
+    async def remove_kernel_metric(self, kernel_id: KernelId) -> None:
+        log.info("Removing metrics for kernel {}", kernel_id)
+        known_metrics = self.kernel_metrics.get(kernel_id)
+        log.debug("Known metrics for kernel {}: {}", kernel_id, known_metrics)
+        if known_metrics is None:
+            return
+        metric_keys = list(known_metrics.keys())
+        agent_id = self.agent.id
+        session_id, owner_user_id, project_id = self._get_ownership_info_from_kernel(kernel_id)
+        await self._utilization_metric_observer.lazy_remove_container_metric(
+            agent_id=agent_id,
+            kernel_id=kernel_id,
+            session_id=session_id,
+            owner_user_id=owner_user_id,
+            project_id=project_id,
+            keys=metric_keys,
+        )
+
+    async def collect_node_stat(self, resource_scaling_factors: Mapping[SlotName, Decimal]) -> None:
         """
         Collect the per-node, per-device, and per-container statistics.
 
@@ -419,9 +447,14 @@ class StatContext:
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
             # instead of cancelling them.
-            _tasks: list[asyncio.Task[Sequence[NodeMeasurement]]] = []
-            for computer in self.agent.computers.values():
-                _tasks.append(asyncio.create_task(computer.instance.gather_node_measures(self)))
+            async def gather_node_measures_with_slots(instance: "AbstractComputePlugin"):
+                result = await instance.gather_node_measures(self)
+                return [slot_name for slot_name, _ in instance.slot_types], result
+
+            _tasks = [
+                asyncio.create_task(gather_node_measures_with_slots(computer.instance))
+                for computer in self.agent.computers.values()
+            ]
             self._stage_observer.observe_stage(
                 stage="before_gather_measures",
                 upper_layer="collect_node_stat",
@@ -431,28 +464,34 @@ class StatContext:
                 stage="before_observe",
                 upper_layer="collect_node_stat",
             )
-            for result in results:
-                if isinstance(result, BaseException):
-                    log.error("collect_node_stat(): gather_node_measures() error", exc_info=result)
+            for res in results:
+                if isinstance(res, BaseException):
+                    log.error("collect_node_stat(): gather_node_measures() error", exc_info=res)
                     continue
+                slot_names, result = res
                 for node_measure in result:
                     metric_key = node_measure.key
                     # update node metric
+                    slot_scale_factor = self._extract_slot_measurement_scale_factor(
+                        resource_scaling_factors, slot_names, metric_key
+                    )
+                    per_node = node_measure.per_node.apply_scale_factor(slot_scale_factor)
                     if metric_key not in self.node_metrics:
                         self.node_metrics[metric_key] = Metric(
                             metric_key,
                             node_measure.type,
-                            current=node_measure.per_node.value,
-                            capacity=node_measure.per_node.capacity,
+                            current=per_node.value,
+                            capacity=per_node.capacity,
                             unit_hint=node_measure.unit_hint,
-                            stats=MovingStatistics(node_measure.per_node.value),
+                            stats=MovingStatistics(per_node.value),
                             stats_filter=frozenset(node_measure.stats_filter),
                             current_hook=node_measure.current_hook,
                         )
                     else:
-                        self.node_metrics[metric_key].update(node_measure.per_node)
+                        self.node_metrics[metric_key].update(per_node)
                     # update per-device metric
                     for dev_id, measure in node_measure.per_device.items():
+                        measure = measure.apply_scale_factor(slot_scale_factor)
                         self.observe_node_metric(
                             device_id=dev_id,
                             metric_key=metric_key,
@@ -537,6 +576,36 @@ class StatContext:
             agent_id, serialized_agent_updates, expire_sec=self.cache_lifespan
         )
 
+    def _extract_slot_measurement_scale_factor(
+        self,
+        resource_scaling_factors: Mapping[SlotName, Decimal],
+        slot_names: Sequence[SlotName],
+        metric_key: MetricKey,
+    ) -> Decimal:
+        match slot_names:
+            case []:
+                return Decimal(1)
+            case [slot_name]:
+                return resource_scaling_factors[slot_name]
+            case _:
+                log.warning(
+                    "Plugin defines more than 1 device slot info. Attempting best-effort match with metric key..."
+                )
+                slot_names_with_same_prefix_as_metric_key = [
+                    slot_name
+                    for slot_name in slot_names
+                    if metric_key.startswith(slot_name.device_name)
+                ]
+                if len(slot_names_with_same_prefix_as_metric_key) == 1:
+                    slot_name = slot_names_with_same_prefix_as_metric_key[0]
+                    log.info(f"Found slot name {slot_name} with same prefix as {metric_key}")
+                    return resource_scaling_factors[slot_name]
+                else:
+                    raise ValueError(
+                        f"Plugin defines more than 1 device slots {slot_names}, "
+                        f"and matching with metric key {metric_key} yielded no results."
+                    )
+
     def observe_container_metric(
         self,
         kernel_id: KernelId,
@@ -620,7 +689,10 @@ class StatContext:
                     )
                     continue
                 for ctnr_measure in result:
-                    assert isinstance(ctnr_measure, ContainerMeasurement)
+                    if not isinstance(ctnr_measure, ContainerMeasurement):
+                        raise InvalidContainerMeasurementError(
+                            f"Expected ContainerMeasurement, got {type(ctnr_measure).__name__}."
+                        )
                     metric_key = ctnr_measure.key
                     # update per-container metric
                     for cid, measure in ctnr_measure.per_container.items():

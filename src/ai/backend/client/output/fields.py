@@ -6,6 +6,7 @@ from .formatters import (
     CustomizedImageOutputFormatter,
     DependencyListFormatter,
     GroupListFormatter,
+    ImageObjectFormatter,
     InlineRoutingFormatter,
     KernelStatFormatter,
     SubFieldOutputFormatter,
@@ -374,12 +375,19 @@ permission_fields = FieldSet([
 service_fields = FieldSet([
     FieldSpec("endpoint_id"),
     FieldSpec("image"),
+    FieldSpec(
+        "image_object { name }",
+        "Image",
+        alt_name="image_object",
+        formatter=ImageObjectFormatter(),
+    ),
     FieldSpec("domain"),
     FieldSpec("project"),
     FieldSpec("resource_group"),
     FieldSpec("resource_slots", formatter=nested_dict_formatter),
     FieldSpec("url"),
     FieldSpec("model"),
+    FieldSpec("model_definition_path"),
     FieldSpec("model_mount_destination"),
     FieldSpec("created_user"),
     FieldSpec("session_owner"),
@@ -394,10 +402,16 @@ service_fields = FieldSet([
     FieldSpec("cluster_mode"),
     FieldSpec("cluster_size"),
     FieldSpec("open_to_public"),
+    FieldSpec("runtime_variant"),
+    FieldSpec("created_at"),
+    FieldSpec("destroyed_at"),
     FieldSpec(
         "routings { routing_id session status traffic_ratio }",
         formatter=InlineRoutingFormatter(),
     ),
+    FieldSpec("retries"),
+    FieldSpec("status"),
+    FieldSpec("lifecycle_stage"),
 ])
 
 

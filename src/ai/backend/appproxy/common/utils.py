@@ -35,7 +35,7 @@ from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.logging import BraceStyleAdapter
 
 from .config import HostPortPair, PermitHashConfig
-from .exceptions import InvalidAPIParameters
+from .errors import InvalidAPIParameters
 
 # FIXME: merge majority of common definitions to ai.backend.common when ready
 

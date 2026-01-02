@@ -96,8 +96,9 @@ class AliasGroupMixin(click.Group):
 
     def group(self, *args, **kwargs):
         aliases = kwargs.pop("aliases", [])
-        # keep the same class type
-        kwargs["cls"] = type(self)
+        # keep the same class type unless explicitly specified
+        if "cls" not in kwargs:
+            kwargs["cls"] = type(self)
         decorator = super().group(*args, **kwargs)
         if not aliases:
             return decorator

@@ -95,12 +95,16 @@ REMOVE_VENVS=1
 REMOVE_CONTAINERS=1
 REMOVE_DB=1
 
+FORCE_YES=0
+FORCE_NO=0
+
 while [ $# -gt 0 ]; do
   case $1 in
     -h | --help)           usage; exit 1 ;;
     --skip-venvs)          REMOVE_VENVS=0 ;;
     --skip-containers)     REMOVE_CONTAINERS=0 ;;
     --skip-db)             REMOVE_DB=0 ;;
+    -y | --yes)            FORCE_YES=1 ;;
     *)
       echo "Unknown option: $1"
       echo "Run '$0 --help' for usage."
@@ -108,6 +112,20 @@ while [ $# -gt 0 ]; do
   esac
   shift 1
 done
+
+# Confirm before deleting all resources
+if [ $FORCE_YES -eq 1 ]; then
+  show_info "Proceeding without confirmation (--yes flag)."
+else
+  echo ""
+  echo -n "Are you sure you want to delete all development resources? [y/N]: "
+  read -r confirm
+  confirm=$(echo "$confirm" | tr '[:upper:]' '[:lower:]')
+  if [ "$confirm" != "y" ] && [ "$confirm" != "yes" ]; then
+    show_warning "Deletion cancelled."
+    exit 0
+  fi
+fi
 
 if [ $REMOVE_VENVS -eq 1 ]; then
   show_info "Removing the unified and temporary venvs..."

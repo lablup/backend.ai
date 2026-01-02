@@ -44,12 +44,15 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.creator import DeploymentCreator
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingAction,
     AutoScalingCondition,
     AutoScalingRule,
     AutoScalingRuleCreator,
+    ModelDeploymentAutoScalingRuleCreator,
+)
+from ai.backend.manager.data.deployment.scale_modifier import (
+    ModelDeploymentAutoScalingRuleModifier,
 )
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
@@ -57,6 +60,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     DeploymentState,
     ExecutionSpec,
+    ModelDeploymentAutoScalingRuleData,
     ModelRevisionSpec,
     MountMetadata,
     ReplicaSpec,
@@ -66,7 +70,6 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.session.types import SessionStatus
 
 from ..config.loader.legacy_etcd_loader import LegacyEtcdLoader
-from ..data.model_serving.creator import EndpointCreator
 from ..data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointData,
@@ -75,6 +78,7 @@ from ..data.model_serving.types import (
 )
 from ..errors.api import InvalidAPIParameters
 from ..errors.common import ObjectNotFound, ServiceUnavailable
+from ..errors.resource import DataTransformationFailed
 from ..models.storage import StorageSessionManager
 from ..types import MountOptionModel, UserScope
 from .base import (
@@ -97,7 +101,9 @@ from .vfolder import prepare_vfolder_mounts
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+    from ai.backend.manager.data.deployment.creator import DeploymentCreator
 
+    from .deployment_revision import DeploymentRevisionRow
     from .gql import GraphQueryContext
 
 __all__ = (
@@ -233,6 +239,16 @@ class EndpointRow(Base):
         nullable=True,
     )
 
+    # Revision management columns
+    current_revision = sa.Column("current_revision", GUID, nullable=True)
+    deploying_revision = sa.Column("deploying_revision", GUID, nullable=True)
+    revision_history_limit = sa.Column(
+        "revision_history_limit",
+        sa.Integer,
+        nullable=False,
+        server_default=sa.text("10"),
+    )
+
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     tokens = relationship(
         "EndpointTokenRow",
@@ -261,6 +277,26 @@ class EndpointRow(Base):
         back_populates="owned_endpoints",
         foreign_keys=[session_owner],
         primaryjoin=lambda: foreign(EndpointRow.session_owner) == UserRow.uuid,
+    )
+
+    revisions = relationship(
+        "DeploymentRevisionRow",
+        back_populates="endpoint_row",
+        primaryjoin="EndpointRow.id == foreign(DeploymentRevisionRow.endpoint)",
+    )
+
+    auto_scaling_policy = relationship(
+        "DeploymentAutoScalingPolicyRow",
+        back_populates="endpoint_row",
+        primaryjoin="EndpointRow.id == foreign(DeploymentAutoScalingPolicyRow.endpoint)",
+        uselist=False,
+    )
+
+    deployment_policy = relationship(
+        "DeploymentPolicyRow",
+        back_populates="endpoint_row",
+        primaryjoin="EndpointRow.id == foreign(DeploymentPolicyRow.endpoint)",
+        uselist=False,
     )
 
     @classmethod
@@ -529,6 +565,12 @@ class EndpointRow(Base):
         session_id_to_route_map = {r.session: r for r in active_routes}
         connection_info: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
         for kernel in running_main_kernels:
+            if kernel.service_ports is None:
+                log.debug(
+                    "generate_route_info(): Kernel {} has no service ports defined. Skipping.",
+                    kernel.id,
+                )
+                continue
             num_inference_ports = len([*filter(lambda x: x["is_inference"], kernel.service_ports)])
             if num_inference_ports > 1:
                 log.warning(
@@ -584,37 +626,6 @@ class EndpointRow(Base):
             runtime_variant=self.runtime_variant,
             extra_mounts=self.extra_mounts,
             routings=[routing.to_data() for routing in self.routings] if self.routings else None,
-        )
-
-    @classmethod
-    def from_creator(cls, creator: EndpointCreator) -> Self:
-        """
-        Create an EndpointRow instance from an EndpointCreator instance.
-        """
-        return cls(
-            name=creator.name,
-            model_definition_path=creator.model_definition_path,
-            created_user=creator.created_user,
-            session_owner=creator.session_owner,
-            replicas=creator.replicas,
-            image=creator.image,
-            model=creator.model,
-            domain=creator.domain,
-            project=creator.project,
-            resource_group=creator.resource_group,
-            resource_slots=creator.resource_slots,
-            cluster_mode=creator.cluster_mode,
-            cluster_size=creator.cluster_size,
-            extra_mounts=creator.extra_mounts,
-            runtime_variant=creator.runtime_variant,
-            model_mount_destination=creator.model_mount_destination,
-            tag=creator.tag,
-            startup_command=creator.startup_command,
-            bootstrap_script=creator.bootstrap_script,
-            callback_url=creator.callback_url,
-            environ=creator.environ,
-            resource_opts=creator.resource_opts,
-            open_to_public=creator.open_to_public,
         )
 
     @classmethod
@@ -675,16 +686,93 @@ class EndpointRow(Base):
             # Fields not in creator - use defaults
             lifecycle_stage=EndpointLifecycle.PENDING,
             retries=0,
+            revision_history_limit=creator.metadata.revision_history_limit,
         )
 
     def to_deployment_info(self) -> DeploymentInfo:
         """
         Convert EndpointRow to DeploymentInfo dataclass.
 
-        If image_row is loaded (via selectinload), ImageIdentifier will be populated.
-        Otherwise, ImageIdentifier will be None.
+        If current_revision is set and revisions are loaded, uses revision data.
+        Otherwise, falls back to endpoint-level fields for legacy compatibility.
         """
-        # Create ImageIdentifier only if image_row is loaded
+        # Try to use current revision if available
+        if self.current_revision and hasattr(self, "revisions") and self.revisions:
+            current_rev = next(
+                (r for r in self.revisions if r.id == self.current_revision),
+                None,
+            )
+            if current_rev:
+                return self._to_deployment_info_from_revision(current_rev)
+
+        # Fallback: use endpoint-level fields (legacy)
+        return self._to_deployment_info_legacy()
+
+    def _to_deployment_info_from_revision(
+        self,
+        revision: DeploymentRevisionRow,
+    ) -> DeploymentInfo:
+        """Build DeploymentInfo using revision data."""
+        # Get image identifier from revision's image_row
+        image_identifier = ImageIdentifier(
+            canonical=revision.image_row.name,
+            architecture=revision.image_row.architecture,
+        )
+        return DeploymentInfo(
+            id=self.id,
+            metadata=DeploymentMetadata(
+                name=self.name,
+                domain=self.domain,
+                project=self.project,
+                resource_group=self.resource_group,
+                created_user=self.created_user,
+                session_owner=self.session_owner,
+                created_at=self.created_at,
+                revision_history_limit=self.revision_history_limit,
+                tag=self.tag,
+            ),
+            state=DeploymentState(
+                lifecycle=self.lifecycle_stage,
+                retry_count=self.retries,
+            ),
+            replica_spec=ReplicaSpec(
+                replica_count=self.replicas,
+                desired_replica_count=self.desired_replicas,
+            ),
+            network=DeploymentNetworkSpec(
+                open_to_public=self.open_to_public,
+                url=self.url,
+            ),
+            model_revisions=[
+                ModelRevisionSpec(
+                    image_identifier=image_identifier,
+                    resource_spec=ResourceSpec(
+                        cluster_mode=ClusterMode(revision.cluster_mode),
+                        cluster_size=revision.cluster_size,
+                        resource_slots=revision.resource_slots,
+                        resource_opts=revision.resource_opts,
+                    ),
+                    mounts=MountMetadata(
+                        model_vfolder_id=revision.model,
+                        model_definition_path=revision.model_definition_path,
+                        model_mount_destination=revision.model_mount_destination,
+                        extra_mounts=revision.extra_mounts or [],
+                    ),
+                    execution=ExecutionSpec(
+                        startup_command=revision.startup_command,
+                        bootstrap_script=revision.bootstrap_script,
+                        environ=revision.environ,
+                        runtime_variant=revision.runtime_variant,
+                        callback_url=revision.callback_url,
+                    ),
+                ),
+            ],
+            current_revision_id=self.current_revision,
+        )
+
+    def _to_deployment_info_legacy(self) -> DeploymentInfo:
+        """Build DeploymentInfo using endpoint-level fields (legacy fallback)."""
+        # Create ImageIdentifier from endpoint's image_row
         image_identifier = ImageIdentifier(
             canonical=self.image_row.name,
             architecture=self.image_row.architecture,
@@ -699,6 +787,7 @@ class EndpointRow(Base):
                 created_user=self.created_user,
                 session_owner=self.session_owner,
                 created_at=self.created_at,
+                revision_history_limit=self.revision_history_limit,
                 tag=self.tag,
             ),
             state=DeploymentState(
@@ -737,6 +826,7 @@ class EndpointRow(Base):
                     ),
                 ),
             ],
+            current_revision_id=self.current_revision,
         )
 
 
@@ -982,6 +1072,96 @@ class EndpointAutoScalingRuleRow(Base):
             last_triggered_at=self.last_triggered_at,
         )
 
+    # New type conversion methods for Model Deployment
+
+    @classmethod
+    def from_model_deployment_creator(cls, creator: ModelDeploymentAutoScalingRuleCreator) -> Self:
+        """Create from ModelDeploymentAutoScalingRuleCreator (new type)."""
+        # Map min/max threshold to single threshold + comparator
+        # If max_threshold is set, use it with GREATER_THAN (scale down when above)
+        # If only min_threshold is set, use it with LESS_THAN (scale up when below)
+        if creator.max_threshold is not None:
+            threshold = creator.max_threshold
+            comparator = AutoScalingMetricComparator.GREATER_THAN
+        elif creator.min_threshold is not None:
+            threshold = creator.min_threshold
+            comparator = AutoScalingMetricComparator.LESS_THAN
+        else:
+            # Default: no threshold means no scaling trigger
+            threshold = Decimal("0")
+            comparator = AutoScalingMetricComparator.GREATER_THAN
+
+        return cls(
+            id=uuid4(),
+            endpoint=creator.model_deployment_id,
+            metric_source=creator.metric_source,
+            metric_name=creator.metric_name,
+            threshold=threshold,
+            comparator=comparator,
+            step_size=creator.step_size,
+            cooldown_seconds=creator.time_window,  # Map time_window to cooldown_seconds
+            min_replicas=creator.min_replicas,
+            max_replicas=creator.max_replicas,
+        )
+
+    def to_model_deployment_data(self) -> ModelDeploymentAutoScalingRuleData:
+        """Convert to ModelDeploymentAutoScalingRuleData (new type)."""
+        # Map threshold + comparator back to min/max threshold
+        min_threshold: Optional[Decimal] = None
+        max_threshold: Optional[Decimal] = None
+
+        if self.comparator == AutoScalingMetricComparator.GREATER_THAN:
+            max_threshold = self.threshold
+        elif self.comparator == AutoScalingMetricComparator.LESS_THAN:
+            min_threshold = self.threshold
+        else:
+            # For other comparators (EQUAL, etc.), default to max_threshold
+            max_threshold = self.threshold
+
+        return ModelDeploymentAutoScalingRuleData(
+            id=self.id,
+            model_deployment_id=self.endpoint,
+            metric_source=self.metric_source,
+            metric_name=self.metric_name,
+            min_threshold=min_threshold,
+            max_threshold=max_threshold,
+            step_size=self.step_size,
+            time_window=self.cooldown_seconds,  # Map cooldown_seconds to time_window
+            min_replicas=self.min_replicas,
+            max_replicas=self.max_replicas,
+            created_at=self.created_at,
+            last_triggered_at=self.last_triggered_at,
+        )
+
+    def apply_model_deployment_modifier(
+        self, modifier: ModelDeploymentAutoScalingRuleModifier
+    ) -> None:
+        """Apply ModelDeploymentAutoScalingRuleModifier to update fields.
+
+        Uses OptionalState pattern where optional_value() returns the value to update
+        or None if no update should be performed.
+        """
+        if (metric_source := modifier.metric_source.optional_value()) is not None:
+            self.metric_source = metric_source
+        if (metric_name := modifier.metric_name.optional_value()) is not None:
+            self.metric_name = metric_name
+        if (step_size := modifier.step_size.optional_value()) is not None:
+            self.step_size = step_size
+        if (time_window := modifier.time_window.optional_value()) is not None:
+            self.cooldown_seconds = time_window
+        if (min_replicas := modifier.min_replicas.optional_value()) is not None:
+            self.min_replicas = min_replicas
+        if (max_replicas := modifier.max_replicas.optional_value()) is not None:
+            self.max_replicas = max_replicas
+
+        # Update threshold and comparator based on min/max threshold
+        if (max_threshold := modifier.max_threshold.optional_value()) is not None:
+            self.threshold = max_threshold
+            self.comparator = AutoScalingMetricComparator.GREATER_THAN
+        elif (min_threshold := modifier.min_threshold.optional_value()) is not None:
+            self.threshold = min_threshold
+            self.comparator = AutoScalingMetricComparator.LESS_THAN
+
 
 class ModelServiceHelper:
     @staticmethod
@@ -1185,7 +1365,8 @@ class ModelServiceHelper:
 
         try:
             model_definition = model_definition_iv.check(raw_model_definition)
-            assert model_definition is not None
+            if model_definition is None:
+                raise DataTransformationFailed("Model definition validation returned None")
             return model_definition
         except t.DataError as e:
             raise InvalidAPIParameters(

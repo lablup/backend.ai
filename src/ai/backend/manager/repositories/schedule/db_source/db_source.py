@@ -21,13 +21,13 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models import (
     AgentRow,
-    AgentStatus,
     DefaultForUnspecified,
     DomainRow,
     GroupRow,
@@ -655,7 +655,7 @@ class ScheduleDBSource:
     async def _mark_sessions_as_terminating(
         self, db_sess: SASession, session_ids: list[SessionId], reason: str, now: datetime
     ) -> list[SessionId]:
-        """Mark resource-occupying sessions and their kernels as terminating."""
+        """Mark terminatable sessions and their kernels as terminating."""
         # Mark sessions as terminating
         terminating_stmt = (
             sa.update(SessionRow)
@@ -671,7 +671,7 @@ class ScheduleDBSource:
             .where(
                 sa.and_(
                     SessionRow.id.in_(session_ids),
-                    SessionRow.status.in_(SessionStatus.resource_occupied_statuses()),
+                    SessionRow.status.in_(SessionStatus.terminatable_statuses()),
                 )
             )
             .returning(SessionRow.id)
@@ -692,7 +692,12 @@ class ScheduleDBSource:
                         {KernelStatus.TERMINATING.name: now.isoformat()},
                     ),
                 )
-                .where(KernelRow.session_id.in_(terminating_sessions))
+                .where(
+                    sa.and_(
+                        KernelRow.session_id.in_(terminating_sessions),
+                        KernelRow.status.in_(KernelStatus.terminatable_statuses()),
+                    )
+                )
             )
 
         return terminating_sessions
