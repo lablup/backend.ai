@@ -920,6 +920,8 @@ class Endpoint(graphene.ObjectType):
                     unhealthy_service_count = len([
                         r for r in self.routings if r.status == RouteStatus.UNHEALTHY.name
                     ])
+                    if healthy_service_count == 0:
+                        return EndpointStatus.UNHEALTHY
                     if unhealthy_service_count > 0:
                         return EndpointStatus.DEGRADED
                 return EndpointStatus.PROVISIONING

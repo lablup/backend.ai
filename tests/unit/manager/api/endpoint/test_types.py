@@ -1,0 +1,28 @@
+from __future__ import annotations
+
+from unittest.mock import Mock
+
+from ai.backend.common.data.endpoint.types import EndpointLifecycle, EndpointStatus
+from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.models.gql_models.endpoint import Endpoint
+
+
+class TestEndpointType:
+    async def test_status_unhealthy_when_no_healthy_routes(self) -> None:
+        """
+        Regression test: When all routes are unhealthy, status should be UNHEALTHY.
+
+        Previously, the code returned DEGRADED even when no healthy routes existed,
+        making it impossible to determine endpoint accessibility from status alone.
+        See: https://github.com/lablup/backend.ai/issues/7688
+        """
+        mock_endpoint = Mock(spec=Endpoint)
+        mock_endpoint.lifecycle_stage = EndpointLifecycle.READY.name
+        mock_endpoint.retries = 0
+
+        unhealthy_route = Mock()
+        unhealthy_route.status = RouteStatus.UNHEALTHY.name
+        mock_endpoint.routings = [unhealthy_route, unhealthy_route]
+
+        result = await Endpoint.resolve_status(mock_endpoint, info=Mock())
+        assert result == EndpointStatus.UNHEALTHY
