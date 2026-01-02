@@ -26,6 +26,7 @@ from ai.backend.manager.data.user.types import UserData, UserRole, UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 
+from ...errors.common import ObjectNotFound
 from ..base import (
     Base,
     EnumValueType,
@@ -33,7 +34,6 @@ from ..base import (
     IPColumn,
     mapper_registry,
 )
-from ..exceptions import ObjectNotFound
 from ..hasher import PasswordHasherFactory
 from ..types import (
     QueryCondition,

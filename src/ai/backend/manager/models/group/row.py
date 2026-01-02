@@ -34,6 +34,7 @@ from ai.backend.manager.models.association_container_registries_groups import (
 )
 
 from ...defs import RESERVED_DOTFILES
+from ...errors.common import ObjectNotFound
 from ..base import (
     GUID,
     Base,
@@ -45,7 +46,6 @@ from ..base import (
     VFolderHostPermissionColumn,
     mapper_registry,
 )
-from ..exceptions import ObjectNotFound
 from ..rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
