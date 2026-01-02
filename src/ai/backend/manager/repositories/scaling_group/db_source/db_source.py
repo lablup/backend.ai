@@ -209,3 +209,21 @@ class ScalingGroupDBSource:
         """Disassociates a single scaling group from a keypair."""
         async with self._db.begin_session() as session:
             await execute_batch_purger(session, purger)
+
+    async def is_scaling_group_associated_with_keypair(
+        self,
+        scaling_group_name: str,
+        access_key: str,
+    ) -> bool:
+        """Checks if a scaling group is associated with a keypair."""
+        async with self._db.begin_readonly_session() as session:
+            query = sa.select(
+                sa.exists().where(
+                    sa.and_(
+                        ScalingGroupForKeypairsRow.scaling_group == scaling_group_name,
+                        ScalingGroupForKeypairsRow.access_key == access_key,
+                    )
+                )
+            )
+            result = await session.execute(query)
+            return result.scalar() or False

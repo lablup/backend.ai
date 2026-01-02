@@ -994,7 +994,6 @@ class TestScalingGroupRepositoryDB:
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_purge: str,
         sample_keypair: AccessKey,
-        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Test associating a scaling group with a keypair."""
         # Given: A scaling group and a keypair
@@ -1010,19 +1009,11 @@ class TestScalingGroupRepositoryDB:
         )
         await scaling_group_repository.associate_scaling_group_with_keypair(creator)
 
-        # Then: Association should exist in the database
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            query = sa.select(ScalingGroupForKeypairsRow).where(
-                sa.and_(
-                    ScalingGroupForKeypairsRow.scaling_group == sgroup_name,
-                    ScalingGroupForKeypairsRow.access_key == access_key,
-                )
-            )
-            result = await db_sess.execute(query)
-            row = result.scalar_one_or_none()
-            assert row is not None
-            assert row.scaling_group == sgroup_name
-            assert row.access_key == access_key
+        # Then: Association should exist
+        is_associated = await scaling_group_repository.is_scaling_group_associated_with_keypair(
+            sgroup_name, access_key
+        )
+        assert is_associated is True
 
     async def test_disassociate_scaling_group_with_keypair_success(
         self,
@@ -1052,17 +1043,11 @@ class TestScalingGroupRepositoryDB:
         )
         await scaling_group_repository.disassociate_scaling_group_with_keypair(purger)
 
-        # Then: Association should no longer exist in the database
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            query = sa.select(ScalingGroupForKeypairsRow).where(
-                sa.and_(
-                    ScalingGroupForKeypairsRow.scaling_group == sgroup_name,
-                    ScalingGroupForKeypairsRow.access_key == access_key,
-                )
-            )
-            result = await db_sess.execute(query)
-            row = result.scalar_one_or_none()
-            assert row is None
+        # Then: Association should no longer exist
+        is_associated = await scaling_group_repository.is_scaling_group_associated_with_keypair(
+            sgroup_name, access_key
+        )
+        assert is_associated is False
 
     async def test_disassociate_nonexistent_scaling_group_with_keypair(
         self,
