@@ -1,3 +1,5 @@
+from ai.backend.common.container_registry import ContainerRegistryType
+
 from .row import (
     ContainerRegistry,
     ContainerRegistryRow,
@@ -11,6 +13,7 @@ from .row import (
 __all__ = (
     "ContainerRegistry",
     "ContainerRegistryRow",
+    "ContainerRegistryType",
     "ContainerRegistryValidator",
     "ContainerRegistryValidatorArgs",
     "CreateContainerRegistry",

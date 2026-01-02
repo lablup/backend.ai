@@ -1,4 +1,4 @@
-from ai.backend.common.types import SessionTypes
+from ai.backend.common.types import SessionId, SessionResult, SessionTypes
 from ai.backend.manager.data.session.types import SessionStatus
 
 from ..types import QueryCondition, QueryOption
@@ -42,6 +42,8 @@ __all__ = (
     "QueryOption",
     "SESSION_KERNEL_STATUS_MAPPING",
     "SESSION_STATUS_TRANSITION_MAP",
+    "SessionId",
+    "SessionResult",
     "SessionStatus",
     "SessionTypes",
     "USER_RESOURCE_OCCUPYING_SESSION_STATUSES",

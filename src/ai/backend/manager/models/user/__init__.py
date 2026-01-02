@@ -1,3 +1,5 @@
+from ai.backend.manager.models.hasher.types import PasswordInfo
+
 from .row import (
     ACTIVE_USER_STATUSES,
     INACTIVE_USER_STATUSES,
@@ -20,6 +22,7 @@ __all__ = (
     "INACTIVE_USER_STATUSES",
     "PasswordColumn",
     "PasswordHashAlgorithm",
+    "PasswordInfo",
     "UserRole",
     "UserRow",
     "UserStatus",
