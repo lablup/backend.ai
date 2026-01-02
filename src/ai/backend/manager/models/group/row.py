@@ -33,8 +33,8 @@ from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
 
-from ..defs import RESERVED_DOTFILES
-from .base import (
+from ...defs import RESERVED_DOTFILES
+from ..base import (
     GUID,
     Base,
     EnumValueType,
@@ -45,8 +45,8 @@ from .base import (
     VFolderHostPermissionColumn,
     mapper_registry,
 )
-from .exceptions import ObjectNotFound
-from .rbac import (
+from ..exceptions import ObjectNotFound
+from ..rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -57,17 +57,17 @@ from .rbac import (
     get_predefined_roles_in_scope,
     required_permission,
 )
-from .rbac.context import ClientContext
-from .rbac.permission_defs import ProjectPermission
-from .types import (
+from ..rbac.context import ClientContext
+from ..rbac.permission_defs import ProjectPermission
+from ..types import (
     QueryCondition,
     QueryOption,
     load_related_field,
 )
-from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
+from ..utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
-    from .rbac import ContainerRegistryScope
+    from ..rbac import ContainerRegistryScope
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -584,7 +584,7 @@ class ProjectPermissionContextBuilder(
         self,
         ctx: ClientContext,
     ) -> ProjectPermissionContext:
-        from .domain import DomainRow
+        from ..domain import DomainRow
 
         perm_ctx = ProjectPermissionContext()
         _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
