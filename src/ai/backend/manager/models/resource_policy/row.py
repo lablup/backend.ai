@@ -22,7 +22,7 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.types import OptionalState, TriState
 
-from .base import (
+from ..base import (
     Base,
     BigInt,
     EnumType,
@@ -31,8 +31,8 @@ from .base import (
     batch_result,
     mapper_registry,
 )
-from .keypair import keypairs
-from .user import UserRole
+from ..keypair import keypairs
+from ..user import UserRole
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.keypair_resource_policy.creators import (
@@ -54,7 +54,7 @@ if TYPE_CHECKING:
         UserResourcePolicyUpdaterSpec,
     )
 
-    from .gql import GraphQueryContext
+    from ..gql import GraphQueryContext
 
 
 def _get_keypair_resource_policy_creator_spec() -> type[KeyPairResourcePolicyCreatorSpec]:

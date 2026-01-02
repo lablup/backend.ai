@@ -60,22 +60,22 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
 from ai.backend.manager.errors.storage import QuotaScopeNotFoundError
 
-from ..defs import (
+from ...defs import (
     RESERVED_VFOLDER_PATTERNS,
     RESERVED_VFOLDERS,
     VFOLDER_DSTPATHS_MAP,
 )
-from ..errors.api import InvalidAPIParameters
-from ..errors.common import ObjectNotFound
-from ..errors.storage import (
+from ...errors.api import InvalidAPIParameters
+from ...errors.common import ObjectNotFound
+from ...errors.storage import (
     InsufficientStoragePermission,
     VFolderGone,
     VFolderNotFound,
     VFolderOperationFailed,
     VFolderPermissionError,
 )
-from ..types import UserScope
-from .base import (
+from ...types import UserScope
+from ..base import (
     GUID,
     Base,
     BigInt,
@@ -89,10 +89,10 @@ from .base import (
     batch_result_in_scalar_stream,
     metadata,
 )
-from .group import AssocGroupUserRow, GroupRow
-from .minilang.ordering import OrderSpecItem, QueryOrderParser
-from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
-from .rbac import (
+from ..group import AssocGroupUserRow, GroupRow
+from ..minilang.ordering import OrderSpecItem, QueryOrderParser
+from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ..rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -101,22 +101,27 @@ from .rbac import (
     StorageHost,
     get_predefined_roles_in_scope,
 )
-from .rbac import (
+from ..rbac import (
     UserScope as UserRBACScope,
 )
-from .rbac.context import ClientContext
-from .rbac.exceptions import NotEnoughPermission
-from .rbac.permission_defs import StorageHostPermission
-from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
-from .session import DEAD_SESSION_STATUSES, SessionRow
-from .storage import PermissionContext as StorageHostPermissionContext
-from .storage import PermissionContextBuilder as StorageHostPermissionContextBuilder
-from .user import UserRole, UserRow
-from .utils import ExtendedAsyncSAEngine, execute_with_retry, execute_with_txn_retry, sql_json_merge
+from ..rbac.context import ClientContext
+from ..rbac.exceptions import NotEnoughPermission
+from ..rbac.permission_defs import StorageHostPermission
+from ..rbac.permission_defs import VFolderPermission as VFolderRBACPermission
+from ..session import DEAD_SESSION_STATUSES, SessionRow
+from ..storage import PermissionContext as StorageHostPermissionContext
+from ..storage import PermissionContextBuilder as StorageHostPermissionContextBuilder
+from ..user import UserRole, UserRow
+from ..utils import (
+    ExtendedAsyncSAEngine,
+    execute_with_retry,
+    execute_with_txn_retry,
+    sql_json_merge,
+)
 
 if TYPE_CHECKING:
-    from .gql import GraphQueryContext
-    from .storage import StorageSessionManager
+    from ..gql import GraphQueryContext
+    from ..storage import StorageSessionManager
 
 __all__: Sequence[str] = (
     "vfolders",
@@ -718,7 +723,7 @@ async def get_allowed_vfolder_hosts_by_group(
     If `group_id` is not None, `allowed_vfolder_hosts` from the group is also merged.
     If the requester is a domain admin, gather all `allowed_vfolder_hosts` of the domain groups.
     """
-    from . import domains, groups
+    from .. import domains, groups
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
@@ -753,7 +758,7 @@ async def get_allowed_vfolder_hosts_by_user(
 
     All available `allowed_vfolder_hosts` of groups which requester associated will be merged.
     """
-    from . import association_groups_users, domains, groups
+    from .. import association_groups_users, domains, groups
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
@@ -1545,7 +1550,7 @@ class VirtualFolder(graphene.ObjectType):
         user_id: Optional[uuid.UUID] = None,
         filter: Optional[str] = None,
     ) -> int:
-        from .group import groups
+        from ..group import groups
         from .user import users
 
         j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
@@ -1578,7 +1583,7 @@ class VirtualFolder(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> Sequence[VirtualFolder]:
-        from .group import groups
+        from ..group import groups
         from .user import users
 
         j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
@@ -1777,7 +1782,7 @@ class VirtualFolder(graphene.ObjectType):
     ) -> int:
         from ai.backend.manager.models import association_groups_users as agus
 
-        from .group import groups
+        from ..group import groups
 
         query = sa.select([agus.c.group_id]).select_from(agus).where(agus.c.user_id == user_id)
 
@@ -1813,7 +1818,7 @@ class VirtualFolder(graphene.ObjectType):
     ) -> list[VirtualFolder]:
         from ai.backend.manager.models import association_groups_users as agus
 
-        from .group import groups
+        from ..group import groups
 
         query = sa.select([agus.c.group_id]).select_from(agus).where(agus.c.user_id == user_id)
         async with graph_ctx.db.begin_readonly() as conn:

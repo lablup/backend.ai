@@ -24,18 +24,18 @@ from ai.backend.manager.errors.container_registry import (
     InvalidContainerRegistryURL,
 )
 
-from ..defs import PASSWORD_PLACEHOLDER
-from .base import (
+from ...defs import PASSWORD_PLACEHOLDER
+from ..base import (
     Base,
     IDColumn,
     StrEnumType,
     set_if_set,
 )
-from .gql_relay import AsyncNode
-from .user import UserRole
+from ..gql_relay import AsyncNode
+from ..user import UserRole
 
 if TYPE_CHECKING:
-    from .gql import GraphQueryContext
+    from ..gql import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 

@@ -35,13 +35,13 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 
-from .base import (
+from ..base import (
     Base,
     IDColumn,
     StructuredJSONObjectColumn,
 )
-from .group import resolve_group_name_or_id, resolve_groups
-from .rbac import (
+from ..group import resolve_group_name_or_id, resolve_groups
+from ..rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -51,11 +51,11 @@ from .rbac import (
     UserScope,
     get_predefined_roles_in_scope,
 )
-from .rbac.context import ClientContext
-from .rbac.permission_defs import ScalingGroupPermission
-from .types import QueryCondition
-from .user import UserRole
-from .utils import ExtendedAsyncSAEngine
+from ..rbac.context import ClientContext
+from ..rbac.permission_defs import ScalingGroupPermission
+from ..types import QueryCondition
+from ..user import UserRole
+from ..utils import ExtendedAsyncSAEngine
 
 __all__: Sequence[str] = (
     # table defs

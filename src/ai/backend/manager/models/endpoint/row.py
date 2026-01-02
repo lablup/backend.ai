@@ -69,19 +69,11 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.session.types import SessionStatus
 
-from ..config.loader.legacy_etcd_loader import LegacyEtcdLoader
-from ..data.model_serving.types import (
-    EndpointAutoScalingRuleData,
-    EndpointData,
-    EndpointLifecycle,
-    EndpointTokenData,
-)
-from ..errors.api import InvalidAPIParameters
-from ..errors.common import ObjectNotFound, ServiceUnavailable
-from ..errors.resource import DataTransformationFailed
-from ..models.storage import StorageSessionManager
-from ..types import MountOptionModel, UserScope
-from .base import (
+from ...errors.api import InvalidAPIParameters
+from ...errors.common import ObjectNotFound, ServiceUnavailable
+from ...errors.resource import DataTransformationFailed
+from ...types import MountOptionModel, UserScope
+from ..base import (
     GUID,
     Base,
     DecimalType,
@@ -93,18 +85,26 @@ from .base import (
     StructuredJSONObjectListColumn,
     URLColumn,
 )
-from .image import ImageRow
-from .routing import RouteStatus
-from .scaling_group import scaling_groups
-from .user import UserRow
-from .vfolder import prepare_vfolder_mounts
+from ..config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ..data.model_serving.types import (
+    EndpointAutoScalingRuleData,
+    EndpointData,
+    EndpointLifecycle,
+    EndpointTokenData,
+)
+from ..image import ImageRow
+from ..routing import RouteStatus
+from ..scaling_group import scaling_groups
+from ..storage import StorageSessionManager
+from ..user import UserRow
+from ..vfolder import prepare_vfolder_mounts
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
     from ai.backend.manager.data.deployment.creator import DeploymentCreator
 
-    from .deployment_revision import DeploymentRevisionRow
-    from .gql import GraphQueryContext
+    from ..deployment_revision import DeploymentRevisionRow
+    from ..gql import GraphQueryContext
 
 __all__ = (
     "EndpointRow",

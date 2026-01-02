@@ -57,10 +57,9 @@ from ai.backend.manager.data.image.types import (
 )
 from ai.backend.manager.defs import INTRINSIC_SLOTS, INTRINSIC_SLOTS_MIN
 
-from ..container_registry import get_container_registry_cls
-from ..errors.image import ImageNotFound
-from ..models.container_registry import ContainerRegistryRow
-from .base import (
+from ...container_registry import get_container_registry_cls
+from ...errors.image import ImageNotFound
+from ..base import (
     GUID,
     Base,
     ForeignKeyIDColumn,
@@ -68,7 +67,8 @@ from .base import (
     StrEnumType,
     StructuredJSONColumn,
 )
-from .rbac import (
+from ..container_registry import ContainerRegistryRow
+from ..rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -77,11 +77,11 @@ from .rbac import (
     UserScope,
     get_predefined_roles_in_scope,
 )
-from .rbac.context import ClientContext
-from .rbac.exceptions import InvalidScope
-from .rbac.permission_defs import ImagePermission
-from .user import UserRole, UserRow
-from .utils import ExtendedAsyncSAEngine
+from ..rbac.context import ClientContext
+from ..rbac.exceptions import InvalidScope
+from ..rbac.permission_defs import ImagePermission
+from ..user import UserRole, UserRow
+from ..utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask.bgtask import ProgressReporter
@@ -1303,7 +1303,7 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scope: UserScope,
     ) -> list[ProjectScope]:
-        from .group import AssocGroupUserRow
+        from ..group import AssocGroupUserRow
 
         get_assoc_group_ids_stmt = sa.select(AssocGroupUserRow.group_id).where(
             AssocGroupUserRow.user_id == scope.user_id
@@ -1317,7 +1317,7 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scope: DomainScope,
     ) -> list[ProjectScope]:
-        from .group import GroupRow
+        from ..group import GroupRow
 
         stmt = sa.select(GroupRow.id).where(GroupRow.domain_name == scope.domain_name)
         project_ids = await self.db_session.scalars(stmt)
@@ -1326,7 +1326,7 @@ class ImagePermissionContextBuilder(
     async def _verify_project_scope_and_calculate_permission(
         self, ctx: ClientContext, scope: ProjectScope
     ) -> frozenset[ImagePermission]:
-        from .group import GroupRow
+        from ..group import GroupRow
 
         group_query_stmt = sa.select(GroupRow).where(GroupRow.id == scope.project_id)
         group_row = cast(Optional[GroupRow], await self.db_session.scalar(group_query_stmt))

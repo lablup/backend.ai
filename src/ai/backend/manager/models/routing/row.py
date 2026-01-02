@@ -21,8 +21,8 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.model_serving.types import RoutingData
 
-from ..errors.service import RoutingNotFound
-from .base import (
+from ...errors.service import RoutingNotFound
+from ..base import (
     GUID,
     Base,
     EnumValueType,
@@ -34,9 +34,9 @@ from .base import (
 )
 
 if TYPE_CHECKING:
-    from .deployment_revision import DeploymentRevisionRow
-    from .endpoint import EndpointRow
-    from .gql import GraphQueryContext
+    from ..deployment_revision import DeploymentRevisionRow
+    from ..endpoint import EndpointRow
+    from ..gql import GraphQueryContext
 
 
 __all__ = ("RoutingRow", "Routing", "RoutingList", "RouteStatus")
