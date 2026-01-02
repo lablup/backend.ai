@@ -21,7 +21,7 @@ from ai.backend.manager.repositories.resource_preset.creators import ResourcePre
 from ai.backend.manager.repositories.resource_preset.updaters import ResourcePresetUpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
-from ..base import (
+from .base import (
     BigInt,
     batch_result,
     batch_result_in_scalar_stream,
@@ -29,7 +29,7 @@ from ..base import (
 from .user import UserRole
 
 if TYPE_CHECKING:
-    from ..gql import GraphQueryContext
+    from .schema import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models"))
 

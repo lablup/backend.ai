@@ -24,14 +24,14 @@ from ai.backend.manager.errors.container_registry import (
     InvalidContainerRegistryURL,
 )
 
+from ...api.gql_legacy.base import set_if_set
+from ...api.gql_legacy.gql_relay import AsyncNode
 from ...defs import PASSWORD_PLACEHOLDER
 from ..base import (
     Base,
     IDColumn,
     StrEnumType,
-    set_if_set,
 )
-from ..gql_relay import AsyncNode
 from ..user import UserRole
 
 if TYPE_CHECKING:

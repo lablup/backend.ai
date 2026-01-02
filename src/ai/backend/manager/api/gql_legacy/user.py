@@ -47,7 +47,19 @@ from ai.backend.manager.services.user.actions.purge_user import (
 )
 from ai.backend.manager.types import OptionalState, TriState
 
-from ..base import (
+from ...models.group import AssocGroupUserRow, GroupRow, groups
+from ...models.group import association_groups_users as agus
+from ...models.minilang.ordering import OrderSpecItem, QueryOrderParser
+from ...models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ...models.user import (
+    ACTIVE_USER_STATUSES,
+    INACTIVE_USER_STATUSES,
+    UserRole,
+    UserRow,
+    UserStatus,
+    users,
+)
+from .base import (
     FilterExprArg,
     Item,
     OrderExprArg,
@@ -57,23 +69,11 @@ from ..base import (
     batch_result,
     generate_sql_info_for_gql_connection,
 )
-from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
-from ..group import AssocGroupUserRow, GroupRow, groups
-from ..group import association_groups_users as agus
-from ..minilang.ordering import OrderSpecItem, QueryOrderParser
-from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
-from ..user import (
-    ACTIVE_USER_STATUSES,
-    INACTIVE_USER_STATUSES,
-    UserRole,
-    UserRow,
-    UserStatus,
-    users,
-)
+from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 
 if TYPE_CHECKING:
-    from ..gql import GraphQueryContext
     from .group import GroupNode
+    from .schema import GraphQueryContext
 
 
 __all__ = (
@@ -416,7 +416,7 @@ class UserNode(graphene.ObjectType):
         before: Optional[str] = None,
         last: Optional[int] = None,
     ) -> ConnectionResolverResult[GroupNode]:
-        from ..group import AssocGroupUserRow, GroupRow
+        from ...models.group import AssocGroupUserRow, GroupRow
         from .group import GroupNode
 
         graph_ctx: GraphQueryContext = info.context

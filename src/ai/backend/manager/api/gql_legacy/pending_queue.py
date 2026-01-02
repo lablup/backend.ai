@@ -1,4 +1,4 @@
-from ..gql_relay import (
+from .gql_relay import (
     Connection,
 )
 from .session import ComputeSessionNode

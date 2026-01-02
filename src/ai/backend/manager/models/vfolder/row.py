@@ -60,6 +60,13 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
 from ai.backend.manager.errors.storage import QuotaScopeNotFoundError
 
+from ...api.gql_legacy.base import (
+    BigInt,
+    Item,
+    PaginatedList,
+    batch_multiresult,
+    batch_result_in_scalar_stream,
+)
 from ...defs import (
     RESERVED_VFOLDER_PATTERNS,
     RESERVED_VFOLDERS,
@@ -78,15 +85,10 @@ from ...types import UserScope
 from ..base import (
     GUID,
     Base,
-    BigInt,
     EnumValueType,
     IDColumn,
-    Item,
-    PaginatedList,
     QuotaScopeIDType,
     StrEnumType,
-    batch_multiresult,
-    batch_result_in_scalar_stream,
     metadata,
 )
 from ..group import AssocGroupUserRow, GroupRow

@@ -73,7 +73,16 @@ from ...errors.service import (
     EndpointNotFound,
     EndpointTokenNotFound,
 )
-from ..base import (
+from ...models.endpoint import (
+    EndpointAutoScalingRuleRow,
+    EndpointLifecycle,
+    EndpointRow,
+    EndpointTokenRow,
+)
+from ...models.minilang.ordering import OrderSpecItem, QueryOrderParser
+from ...models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ...models.user import UserRole, UserRow
+from .base import (
     FilterExprArg,
     InferenceSessionError,
     Item,
@@ -81,19 +90,10 @@ from ..base import (
     PaginatedList,
     generate_sql_info_for_gql_connection,
 )
-from ..endpoint import (
-    EndpointAutoScalingRuleRow,
-    EndpointLifecycle,
-    EndpointRow,
-    EndpointTokenRow,
-)
-from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
-from ..minilang.ordering import OrderSpecItem, QueryOrderParser
-from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
-from ..user import UserRole, UserRow
+from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 
 if TYPE_CHECKING:
-    from ..gql import GraphQueryContext
+    from .schema import GraphQueryContext
 
 
 AutoScalingMetricSourceGQLEnum = graphene.Enum.from_enum(

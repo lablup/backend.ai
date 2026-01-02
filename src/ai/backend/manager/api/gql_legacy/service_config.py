@@ -8,13 +8,12 @@ from ai.backend.common.lock import EtcdLock
 from ai.backend.common.utils import deep_merge
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
-from ai.backend.manager.models.gql_relay import AsyncNode
 from ai.backend.manager.models.user import UserRole
 
-from ..gql_relay import Connection, ConnectionResolverResult
+from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 
 if TYPE_CHECKING:
-    from ..gql import GraphQueryContext
+    from .schema import GraphQueryContext
 
 _PREFIX: Final[str] = "ai/backend/config"
 

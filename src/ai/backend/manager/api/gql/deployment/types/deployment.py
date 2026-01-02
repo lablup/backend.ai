@@ -56,6 +56,9 @@ from ai.backend.manager.api.gql.domain import Domain
 from ai.backend.manager.api.gql.project import Project
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.user import User
+from ai.backend.manager.api.gql_legacy.domain import DomainNode
+from ai.backend.manager.api.gql_legacy.group import GroupNode
+from ai.backend.manager.api.gql_legacy.user import UserNode
 from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig, NewDeploymentCreator
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
@@ -68,9 +71,6 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.errors.service import DeploymentPolicyNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.gql_models.domain import DomainNode
-from ai.backend.manager.models.gql_models.group import GroupNode
-from ai.backend.manager.models.gql_models.user import UserNode
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,

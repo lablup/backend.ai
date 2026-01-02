@@ -84,33 +84,31 @@ from ai.backend.manager.types import OptionalState, TriState
 
 from ...data.image.types import ImageData, ImageStatus, ImageType, ImageWithAgentInstallStatus
 from ...defs import DEFAULT_IMAGE_ARCH
-from ..base import (
-    FilterExprArg,
-    OrderExprArg,
-    batch_multiresult_in_scalar_stream,
-    generate_sql_info_for_gql_connection,
-)
-from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult, ResolvedGlobalID
-from ..image import (
+from ...models.image import (
     ImageIdentifier,
     ImageLoadFilter,
     ImageRow,
     get_permission_ctx,
 )
-from ..rbac import ScopeType
-from ..user import UserRole
+from ...models.rbac import ScopeType
+from ...models.user import UserRole
 from .base import (
     BigInt,
+    FilterExprArg,
     ImageRefType,
     KVPair,
     KVPairInput,
+    OrderExprArg,
     ResourceLimit,
     ResourceLimitInput,
+    batch_multiresult_in_scalar_stream,
     extract_object_uuid,
+    generate_sql_info_for_gql_connection,
 )
+from .gql_relay import AsyncNode, Connection, ConnectionResolverResult, ResolvedGlobalID
 
 if TYPE_CHECKING:
-    from ..gql import GraphQueryContext
+    from .schema import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -313,7 +311,7 @@ class Image(graphene.ObjectType):
         items: Sequence[Image],
         domain_name: str,
     ) -> Sequence[Image]:
-        from ..domain import domains
+        from ...models.domain import domains
 
         async with ctx.db.begin() as conn:
             query = (

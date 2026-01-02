@@ -23,22 +23,22 @@ from ai.backend.manager.services.container_registry.actions.modify_container_reg
 )
 from ai.backend.manager.types import OptionalState, TriState
 
-from ..container_registry import (
+from ...models.container_registry import (
     ContainerRegistryRow,
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
-from ..gql_relay import AsyncNode
-from ..user import UserRole
+from ...models.user import UserRole
+from ...repositories.container_registry.updaters import handle_allowed_groups_update
 from .container_registry import (
     AllowedGroups,
     ContainerRegistryNode,
     ContainerRegistryTypeField,
-    handle_allowed_groups_update,
 )
+from .gql_relay import AsyncNode
 
 if TYPE_CHECKING:
-    from ..gql import GraphQueryContext
+    from .schema import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
@@ -119,7 +119,11 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):
                 await db_session.refresh(reg_row)
 
                 if props.allowed_groups:
-                    await handle_allowed_groups_update(db_session, reg_row.id, props.allowed_groups)
+                    allowed_groups_model = AllowedGroupsModel(
+                        add=props.allowed_groups.add or [],
+                        remove=props.allowed_groups.remove or [],
+                    )
+                    await handle_allowed_groups_update(db_session, reg_row.id, allowed_groups_model)
 
             return cls(
                 container_registry=ContainerRegistryNode.from_row(ctx, reg_row),

@@ -28,23 +28,16 @@ from ai.backend.common.exception import (
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.models.gql_models.audit_log import (
-    AuditLogConnection,
-    AuditLogNode,
-    AuditLogSchema,
-)
-from ai.backend.manager.models.gql_models.service_config import (
-    AvailableServiceConnection,
-    AvailableServiceNode,
-    ModifyServiceConfigNode,
-    ServiceConfigConnection,
-    ServiceConfigNode,
-)
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.services.processors import Processors
 
-from .gql_models.container_registry import (
+from .audit_log import (
+    AuditLogConnection,
+    AuditLogNode,
+    AuditLogSchema,
+)
+from .container_registry import (
     ContainerRegistryConnection,
     ContainerRegistryNode,
     ContainerRegistryScopeField,
@@ -52,30 +45,37 @@ from .gql_models.container_registry import (
     DeleteContainerRegistryNode,
     ModifyContainerRegistryNode,
 )
-from .gql_models.container_registry_v2 import (
+from .container_registry_v2 import (
     CreateContainerRegistryNodeV2,
     DeleteContainerRegistryNodeV2,
     ModifyContainerRegistryNodeV2,
+)
+from .service_config import (
+    AvailableServiceConnection,
+    AvailableServiceNode,
+    ModifyServiceConfigNode,
+    ServiceConfigConnection,
+    ServiceConfigNode,
 )
 
 set_input_object_type_default_value(Undefined)
 
 from ai.backend.common.types import QuotaScopeID, SessionId
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
-from ai.backend.manager.models.gql_relay import (
+from ai.backend.manager.models.session import SessionRow
+
+from ...models.container_registry.row import (
+    ContainerRegistry,
+    CreateContainerRegistry,
+    DeleteContainerRegistry,
+    ModifyContainerRegistry,
+)
+from .gql_relay import (
     AsyncListConnectionField,
     AsyncNode,
     ConnectionResolverResult,
     GlobalIDField,
     ResolvedGlobalID,
-)
-from ai.backend.manager.models.session import SessionRow
-
-from .container_registry import (
-    ContainerRegistry,
-    CreateContainerRegistry,
-    DeleteContainerRegistry,
-    ModifyContainerRegistry,
 )
 from .rbac import ContainerRegistryScope
 
@@ -98,6 +98,25 @@ if TYPE_CHECKING:
     from ..repositories.user.repository import UserRepository
     from .storage import StorageSessionManager
 
+from ...models.image.row import (
+    ImageLoadFilter,
+    PublicImageLoadFilter,
+)
+from ...models.scaling_group.row import (
+    ScalingGroupRow,
+    and_names,
+    query_allowed_sgroups,
+)
+from ...models.vfolder.row import (
+    QuotaScope,
+    SetQuotaScope,
+    UnsetQuotaScope,
+    VirtualFolder,
+    VirtualFolderList,
+    VirtualFolderPermission,
+    VirtualFolderPermissionList,
+    ensure_quota_scope_accessible_by_user,
+)
 from ..data.image.types import ImageStatus
 from ..errors.api import InvalidAPIParameters
 from ..errors.auth import InsufficientPrivilege
@@ -105,8 +124,7 @@ from ..errors.common import ObjectNotFound
 from ..errors.image import ImageNotFound
 from ..errors.kernel import TooManyKernelsFound
 from .acl import PredefinedAtomicPermission
-from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
-from .gql_models.agent import (
+from .agent import (
     Agent,
     AgentConnection,
     AgentList,
@@ -116,12 +134,13 @@ from .gql_models.agent import (
     ModifyAgent,
     RescanGPUAllocMaps,
 )
-from .gql_models.container_registry import (
+from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
+from .container_registry import (
     CreateContainerRegistryQuota,
     DeleteContainerRegistryQuota,
     UpdateContainerRegistryQuota,
 )
-from .gql_models.domain import (
+from .domain import (
     CreateDomain,
     CreateDomainNode,
     DeleteDomain,
@@ -133,7 +152,7 @@ from .gql_models.domain import (
     ModifyDomainNode,
     PurgeDomain,
 )
-from .gql_models.endpoint import (
+from .endpoint import (
     CreateEndpointAutoScalingRuleNode,
     DeleteEndpointAutoScalingRuleNode,
     Endpoint,
@@ -145,8 +164,8 @@ from .gql_models.endpoint import (
     ModifyEndpoint,
     ModifyEndpointAutoScalingRuleNode,
 )
-from .gql_models.fields import AgentPermissionField, ScopeField
-from .gql_models.group import (
+from .fields import AgentPermissionField, ScopeField
+from .group import (
     CreateGroup,
     DeleteGroup,
     Group,
@@ -154,9 +173,10 @@ from .gql_models.group import (
     GroupNode,
     GroupPermissionField,
     ModifyGroup,
+    ProjectType,
     PurgeGroup,
 )
-from .gql_models.image import (
+from .image import (
     AliasImage,
     ClearImageCustomResourceLimit,
     ClearImages,
@@ -176,78 +196,17 @@ from .gql_models.image import (
     UnloadImage,
     UntagImageFromRegistry,
 )
-from .gql_models.kernel import (
+from .kernel import (
     ComputeContainer,
     ComputeContainerList,
     LegacyComputeSession,
     LegacyComputeSessionList,
 )
-from .gql_models.keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
-from .gql_models.metric.base import ContainerUtilizationMetricMetadata
-from .gql_models.metric.user import UserUtilizationMetric, UserUtilizationMetricQueryInput
-from .gql_models.pending_queue import SessionPendingQueueConnection
-from .gql_models.resource_preset import (
-    CreateResourcePreset,
-    DeleteResourcePreset,
-    ModifyResourcePreset,
-    ResourcePreset,
-)
-from .gql_models.scaling_group import (
-    AssociateScalingGroupsWithDomain,
-    AssociateScalingGroupsWithKeyPair,
-    AssociateScalingGroupsWithUserGroup,
-    AssociateScalingGroupWithDomain,
-    AssociateScalingGroupWithKeyPair,
-    AssociateScalingGroupWithUserGroup,
-    CreateScalingGroup,
-    DeleteScalingGroup,
-    DisassociateAllScalingGroupsWithDomain,
-    DisassociateAllScalingGroupsWithGroup,
-    DisassociateScalingGroupsWithDomain,
-    DisassociateScalingGroupsWithKeyPair,
-    DisassociateScalingGroupsWithUserGroup,
-    DisassociateScalingGroupWithDomain,
-    DisassociateScalingGroupWithKeyPair,
-    DisassociateScalingGroupWithUserGroup,
-    ModifyScalingGroup,
-    ScalingGroup,
-)
-from .gql_models.session import (
-    CheckAndTransitStatus,
-    ComputeSession,
-    ComputeSessionConnection,
-    ComputeSessionList,
-    ComputeSessionNode,
-    ModifyComputeSession,
-    SessionPermissionValueField,
-    TotalResourceSlot,
-)
-from .gql_models.user import (
-    CreateUser,
-    DeleteUser,
-    ModifyUser,
-    PurgeUser,
-    User,
-    UserConnection,
-    UserList,
-    UserNode,
-)
-from .gql_models.vfolder import (
-    ModelCard,
-    ModelCardConnection,
-    VFolderPermissionValueField,
-    VirtualFolderConnection,
-    VirtualFolderNode,
-)
-from .gql_models.viewer import Viewer
-from .group import (
-    ProjectType,
-)
-from .image import (
-    ImageLoadFilter,
-    PublicImageLoadFilter,
-)
+from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
+from .metric.base import ContainerUtilizationMetricMetadata
+from .metric.user import UserUtilizationMetric, UserUtilizationMetricQueryInput
 from .network import CreateNetwork, DeleteNetwork, ModifyNetwork, NetworkConnection, NetworkNode
+from .pending_queue import SessionPendingQueueConnection
 from .rbac import ProjectScope, ScopeType, SystemScope
 from .rbac.permission_defs import (
     AgentPermission,
@@ -271,30 +230,65 @@ from .resource_policy import (
     ProjectResourcePolicy,
     UserResourcePolicy,
 )
+from .resource_preset import (
+    CreateResourcePreset,
+    DeleteResourcePreset,
+    ModifyResourcePreset,
+    ResourcePreset,
+)
 from .routing import Routing, RoutingList
 from .scaling_group import (
-    ScalingGroupRow,
-    and_names,
-    query_allowed_sgroups,
+    AssociateScalingGroupsWithDomain,
+    AssociateScalingGroupsWithKeyPair,
+    AssociateScalingGroupsWithUserGroup,
+    AssociateScalingGroupWithDomain,
+    AssociateScalingGroupWithKeyPair,
+    AssociateScalingGroupWithUserGroup,
+    CreateScalingGroup,
+    DeleteScalingGroup,
+    DisassociateAllScalingGroupsWithDomain,
+    DisassociateAllScalingGroupsWithGroup,
+    DisassociateScalingGroupsWithDomain,
+    DisassociateScalingGroupsWithKeyPair,
+    DisassociateScalingGroupsWithUserGroup,
+    DisassociateScalingGroupWithDomain,
+    DisassociateScalingGroupWithKeyPair,
+    DisassociateScalingGroupWithUserGroup,
+    ModifyScalingGroup,
+    ScalingGroup,
 )
 from .session import (
+    CheckAndTransitStatus,
+    ComputeSession,
+    ComputeSessionConnection,
+    ComputeSessionList,
+    ComputeSessionNode,
+    ModifyComputeSession,
+    SessionPermissionValueField,
     SessionStatus,
+    TotalResourceSlot,
 )
 from .storage import StorageVolume, StorageVolumeList
 from .user import (
+    CreateUser,
+    DeleteUser,
+    ModifyUser,
+    PurgeUser,
+    User,
+    UserConnection,
+    UserList,
+    UserNode,
     UserRole,
     UserStatus,
 )
 from .vfolder import (
-    QuotaScope,
-    SetQuotaScope,
-    UnsetQuotaScope,
-    VirtualFolder,
-    VirtualFolderList,
-    VirtualFolderPermission,
-    VirtualFolderPermissionList,
-    ensure_quota_scope_accessible_by_user,
+    ModelCard,
+    ModelCardConnection,
+    VFolderPermissionValueField,
+    VirtualFolderConnection,
+    VirtualFolderNode,
 )
+from .viewer import Viewer
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

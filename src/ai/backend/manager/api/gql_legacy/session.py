@@ -50,32 +50,14 @@ from ai.backend.manager.services.session.actions.modify_session import ModifySes
 from ai.backend.manager.types import OptionalState
 
 from ...errors.resource import DataTransformationFailed
-from ..base import (
-    BigInt,
-    FilterExprArg,
-    Item,
-    OrderExprArg,
-    PaginatedConnectionField,
-    PaginatedList,
-    batch_multiresult_in_session,
-    batch_result_in_session,
-    generate_sql_info_for_gql_connection,
-)
-from ..gql_relay import (
-    AsyncNode,
-    Connection,
-    ConnectionResolverResult,
-    GlobalIDField,
-    ResolvedGlobalID,
-)
-from ..minilang import ArrayFieldItem, JSONFieldItem, ORMFieldItem
-from ..minilang.ordering import ColumnMapType, QueryOrderParser
-from ..minilang.queryfilter import FieldSpecType, QueryFilterParser
-from ..rbac import ScopeType, SystemScope
-from ..rbac.context import ClientContext
-from ..rbac.permission_defs import ComputeSessionPermission
-from ..rbac.permission_defs import VFolderPermission as VFolderRBACPermission
-from ..session import (
+from ...models.minilang import ArrayFieldItem, JSONFieldItem, ORMFieldItem
+from ...models.minilang.ordering import ColumnMapType, QueryOrderParser
+from ...models.minilang.queryfilter import FieldSpecType, QueryFilterParser
+from ...models.rbac import ScopeType, SystemScope
+from ...models.rbac.context import ClientContext
+from ...models.rbac.permission_defs import ComputeSessionPermission
+from ...models.rbac.permission_defs import VFolderPermission as VFolderRBACPermission
+from ...models.session import (
     DEFAULT_SESSION_ORDERING,
     SessionDependencyRow,
     SessionRow,
@@ -86,21 +68,39 @@ from ..session import (
     by_status,
     get_permission_ctx,
 )
-from ..types import (
+from ...models.types import (
     QueryCondition,
     QueryOption,
     join_by_related_field,
     load_related_field,
 )
-from ..user import UserRole, UserRow
-from ..vfolder import VFolderRow
-from ..vfolder import get_permission_ctx as get_vfolder_permission_ctx
+from ...models.user import UserRole, UserRow
+from ...models.vfolder import VFolderRow
+from ...models.vfolder import get_permission_ctx as get_vfolder_permission_ctx
+from .base import (
+    BigInt,
+    FilterExprArg,
+    Item,
+    OrderExprArg,
+    PaginatedConnectionField,
+    PaginatedList,
+    batch_multiresult_in_session,
+    batch_result_in_session,
+    generate_sql_info_for_gql_connection,
+)
+from .gql_relay import (
+    AsyncNode,
+    Connection,
+    ConnectionResolverResult,
+    GlobalIDField,
+    ResolvedGlobalID,
+)
 from .group import GroupRow
 from .kernel import ComputeContainer, KernelConnection, KernelNode
 from .vfolder import VirtualFolderConnection, VirtualFolderNode
 
 if TYPE_CHECKING:
-    from ..gql import GraphQueryContext
+    from .schema import GraphQueryContext
 
 __all__ = (
     "ComputeSessionNode",
@@ -553,7 +553,7 @@ class ComputeSessionNode(graphene.ObjectType):
         self,
         info: graphene.ResolveInfo,
     ) -> ConnectionResolverResult[Self]:
-        from ..session import SessionDependencyRow, SessionRow
+        from ...models.session import SessionDependencyRow, SessionRow
 
         ctx: GraphQueryContext = info.context
 
@@ -604,7 +604,7 @@ class ComputeSessionNode(graphene.ObjectType):
     async def batch_load_by_dependee_id(
         cls, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
     ) -> Sequence[Sequence[Self]]:
-        from ..session import SessionDependencyRow, SessionRow
+        from ...models.session import SessionDependencyRow, SessionRow
 
         async with ctx.db.begin_readonly_session() as db_sess:
             j = sa.join(
@@ -628,7 +628,7 @@ class ComputeSessionNode(graphene.ObjectType):
     async def batch_load_by_dependent_id(
         cls, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
     ) -> Sequence[Sequence[Self]]:
-        from ..session import SessionDependencyRow, SessionRow
+        from ...models.session import SessionDependencyRow, SessionRow
 
         async with ctx.db.begin_readonly_session() as db_sess:
             j = sa.join(

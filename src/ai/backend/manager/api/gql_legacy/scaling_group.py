@@ -35,18 +35,7 @@ from ai.backend.manager.services.scaling_group.actions.purge_scaling_group impor
     PurgeScalingGroupAction,
 )
 
-from ..base import (
-    batch_multiresult,
-    batch_multiresult_in_scalar_stream,
-    batch_result,
-    set_if_set,
-    simple_db_mutate,
-)
-from ..gql_relay import (
-    AsyncNode,
-    Connection,
-)
-from ..scaling_group import (
+from ...models.scaling_group import (
     ScalingGroupForDomainRow,
     ScalingGroupForKeypairsRow,
     ScalingGroupForProjectRow,
@@ -57,9 +46,20 @@ from ..scaling_group import (
     sgroups_for_groups,
     sgroups_for_keypairs,
 )
+from .base import (
+    batch_multiresult,
+    batch_multiresult_in_scalar_stream,
+    batch_result,
+    set_if_set,
+    simple_db_mutate,
+)
+from .gql_relay import (
+    AsyncNode,
+    Connection,
+)
 
 if TYPE_CHECKING:
-    from ..gql import GraphQueryContext
+    from .schema import GraphQueryContext
 
 __all__ = (
     "ScalingGroup",
@@ -331,7 +331,7 @@ class ScalingGroup(graphene.ObjectType):
     async def resolve_resource_allocation_limit_for_sessions(
         self, info: graphene.ResolveInfo
     ) -> dict[str, Any]:
-        from ..agent import AgentRow
+        from ...models.agent import AgentRow
 
         # TODO: Allow admins to set which value to return here among "min", "max", "custom"
         graph_ctx: GraphQueryContext = info.context
@@ -357,7 +357,7 @@ class ScalingGroup(graphene.ObjectType):
     async def resolve_own_session_occupied_resource_slots(
         self, info: graphene.ResolveInfo
     ) -> Mapping[str, Any]:
-        from ..kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
+        from ...models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
         from .agent import AgentRow
 
         graph_ctx: GraphQueryContext = info.context

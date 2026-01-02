@@ -29,43 +29,42 @@ from ai.backend.manager.data.agent.types import AgentData
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
 
-from ..agent import (
+from ...models.agent import (
     ADMIN_PERMISSIONS,
     AgentRow,
     AgentStatus,
     agents,
     get_permission_ctx,
 )
-from ..base import (
+from ...models.group import AssocGroupUserRow
+from ...models.kernel import KernelRow
+from ...models.keypair import keypairs
+from ...models.minilang.ordering import OrderSpecItem, QueryOrderParser
+from ...models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ...models.rbac import (
+    ScopeType,
+)
+from ...models.rbac.context import ClientContext
+from ...models.rbac.permission_defs import AgentPermission
+from ...models.user import UserRole, users
+from .base import (
     FilterExprArg,
     Item,
     OrderExprArg,
     PaginatedConnectionField,
     PaginatedList,
+    UUIDFloatMap,
     generate_sql_info_for_gql_connection,
     privileged_mutation,
     set_if_set,
     simple_db_mutate,
 )
-from ..gql_models.kernel import ComputeContainer
-from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
-from ..group import AssocGroupUserRow
-from ..kernel import KernelRow
-from ..keypair import keypairs
-from ..minilang.ordering import OrderSpecItem, QueryOrderParser
-from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
-from ..rbac import (
-    ScopeType,
-)
-from ..rbac.context import ClientContext
-from ..rbac.permission_defs import AgentPermission
-from ..user import UserRole, users
-from .base import UUIDFloatMap
 from .fields import AgentPermissionField
-from .kernel import KernelConnection, KernelNode
+from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
+from .kernel import ComputeContainer, KernelConnection, KernelNode
 
 if TYPE_CHECKING:
-    from ..gql import GraphQueryContext
+    from .schema import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -654,7 +653,7 @@ async def _append_sgroup_from_clause(
     domain_name: str | None,
     scaling_group: str | None = None,
 ) -> sa.sql.Select:
-    from ..scaling_group import query_allowed_sgroups
+    from ...models.scaling_group import query_allowed_sgroups
 
     if scaling_group is not None:
         query = query.where(AgentRow.scaling_group == scaling_group)

@@ -39,24 +39,16 @@ from ...errors.storage import (
     VFolderBadRequest,
     VFolderOperationFailed,
 )
-from ..base import (
-    BigInt,
-    FilterExprArg,
-    OrderExprArg,
-    batch_multiresult_in_scalar_stream,
-    generate_sql_info_for_gql_connection,
-)
-from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
-from ..group import GroupRow, ProjectType
-from ..minilang.ordering import OrderSpecItem, QueryOrderParser
-from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
-from ..rbac import (
+from ...models.group import GroupRow, ProjectType
+from ...models.minilang.ordering import OrderSpecItem, QueryOrderParser
+from ...models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ...models.rbac import (
     ScopeType,
     SystemScope,
 )
-from ..rbac.context import ClientContext
-from ..rbac.permission_defs import VFolderPermission as VFolderRBACPermission
-from ..vfolder import (
+from ...models.rbac.context import ClientContext
+from ...models.rbac.permission_defs import VFolderPermission as VFolderRBACPermission
+from ...models.vfolder import (
     DEAD_VFOLDER_STATUSES,
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -66,9 +58,17 @@ from ..vfolder import (
     get_permission_ctx,
     is_unmanaged,
 )
+from .base import (
+    BigInt,
+    FilterExprArg,
+    OrderExprArg,
+    batch_multiresult_in_scalar_stream,
+    generate_sql_info_for_gql_connection,
+)
+from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 
 if TYPE_CHECKING:
-    from ..gql import GraphQueryContext
+    from .schema import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

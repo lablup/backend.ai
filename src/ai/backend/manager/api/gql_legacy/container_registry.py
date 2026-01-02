@@ -9,16 +9,10 @@ import graphene
 import graphql
 import sqlalchemy as sa
 from graphql import Undefined, UndefinedType
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
-from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
-from ai.backend.manager.models.association_container_registries_groups import (
-    AssociationContainerRegistriesGroupsRow,
-)
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
     ContainerRegistryValidator,
@@ -45,21 +39,21 @@ from ai.backend.manager.services.container_registry.actions.modify_container_reg
 from ai.backend.manager.types import OptionalState, TriState
 
 from ...defs import PASSWORD_PLACEHOLDER
-from ..base import (
+from ...models.minilang.ordering import OrderSpecItem, QueryOrderParser
+from ...models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from .base import (
     BigInt,
     FilterExprArg,
     OrderExprArg,
     PaginatedConnectionField,
     generate_sql_info_for_gql_connection,
 )
-from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
-from ..minilang.ordering import OrderSpecItem, QueryOrderParser
-from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from .group import GroupConnection, GroupNode
 
 if TYPE_CHECKING:
-    from ..gql import GraphQueryContext
-from ..user import UserRole
+    from .schema import GraphQueryContext
+from ...models.user import UserRole
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
@@ -298,40 +292,6 @@ class AllowedGroups(graphene.InputObjectType):
         default_value=[],
         description="List of group_ids to remove associations. Added in 25.3.0.",
     )
-
-
-async def handle_allowed_groups_update(
-    session: SASession,
-    registry_id: uuid.UUID,
-    allowed_group_updates: AllowedGroups | AllowedGroupsModel,
-):
-    if allowed_group_updates.add:
-        insert_values = [
-            {"registry_id": registry_id, "group_id": group_id}
-            for group_id in allowed_group_updates.add
-        ]
-
-        try:
-            insert_query = sa.insert(AssociationContainerRegistriesGroupsRow).values(insert_values)
-            await session.execute(insert_query)
-        except sa.exc.IntegrityError:
-            raise ContainerRegistryGroupsAlreadyAssociated(
-                f"Already associated groups for registry_id: {registry_id}, group_ids: {allowed_group_updates.add}"
-            )
-
-    if allowed_group_updates.remove:
-        delete_query = (
-            sa.delete(AssociationContainerRegistriesGroupsRow)
-            .where(AssociationContainerRegistriesGroupsRow.registry_id == registry_id)
-            .where(
-                AssociationContainerRegistriesGroupsRow.group_id.in_(allowed_group_updates.remove)
-            )
-        )
-        result = await session.execute(delete_query)
-        if result.rowcount == 0:
-            raise ContainerRegistryGroupsAssociationNotFound(
-                f"Tried to remove non-existing associations for registry_id: {registry_id}, group_ids: {allowed_group_updates.remove}"
-            )
 
 
 class CreateContainerRegistryNode(graphene.Mutation):

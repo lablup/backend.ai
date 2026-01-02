@@ -22,7 +22,7 @@ from ai.backend.manager.models.keypair import (
 )
 
 if TYPE_CHECKING:
-    from ..gql import GraphQueryContext
+    from .schema import GraphQueryContext
     from .vfolder import VirtualFolder
 
 __all__ = (
@@ -36,7 +36,11 @@ __all__ = (
     "DeleteKeyPair",
 )
 
-from ..base import (
+from ...models.minilang.ordering import OrderSpecItem, QueryOrderParser
+from ...models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ...models.user import UserRole
+from ...models.utils import agg_to_array
+from .base import (
     Item,
     PaginatedList,
     batch_multiresult,
@@ -45,10 +49,6 @@ from ..base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from ..minilang.ordering import OrderSpecItem, QueryOrderParser
-from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
-from ..user import UserRole
-from ..utils import agg_to_array
 
 
 class UserInfo(graphene.ObjectType):

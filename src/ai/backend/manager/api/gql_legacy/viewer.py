@@ -14,7 +14,7 @@ from ai.backend.common.contexts.user import current_user
 from .user import UserNode
 
 if TYPE_CHECKING:
-    from ..gql import GraphQueryContext
+    from .schema import GraphQueryContext
 
 
 __all__ = ("Viewer",)

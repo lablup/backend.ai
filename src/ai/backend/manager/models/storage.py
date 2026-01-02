@@ -32,7 +32,7 @@ from ai.backend.manager.clients.storage_proxy.session_manager import (
     VolumeInfo,
 )  # For compatibility with existing code
 
-from .base import Item, PaginatedList
+from ..api.gql_legacy.base import Item, PaginatedList
 from .rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,

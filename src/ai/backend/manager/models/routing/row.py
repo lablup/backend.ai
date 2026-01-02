@@ -21,15 +21,17 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.model_serving.types import RoutingData
 
+from ...api.gql_legacy.base import (
+    InferenceSessionError,
+    Item,
+    PaginatedList,
+)
 from ...errors.service import RoutingNotFound
 from ..base import (
     GUID,
     Base,
     EnumValueType,
     IDColumn,
-    InferenceSessionError,
-    Item,
-    PaginatedList,
     StrEnumType,
 )
 

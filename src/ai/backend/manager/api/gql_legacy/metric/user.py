@@ -19,7 +19,7 @@ from ai.backend.manager.services.metric.types import (
 from .base import ContainerUtilizationMetric, MetricResultValue
 
 if TYPE_CHECKING:
-    from ...gql import GraphQueryContext
+    from ..schema import GraphQueryContext
 
 
 class UserUtilizationMetricQueryInput(graphene.InputObjectType):

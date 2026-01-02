@@ -32,7 +32,7 @@ import pkgutil
 import ai.backend.manager.models
 
 # Subpackages to skip (not containing Row definitions)
-_SKIP_SUBPACKAGES = {"alembic", "gql_models", "hasher", "minilang", "rbac"}
+_SKIP_SUBPACKAGES = {"alembic", "hasher", "minilang", "rbac"}
 
 for module_info in pkgutil.iter_modules(ai.backend.manager.models.__path__):
     if module_info.ispkg:

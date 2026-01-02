@@ -9,20 +9,19 @@ from ai.backend.manager.models.audit_log import (
     AuditLogEntityType,
     AuditLogRow,
 )
-from ai.backend.manager.models.base import (
-    FilterExprArg,
-    OrderExprArg,
-    generate_sql_info_for_gql_connection,
-)
-from ai.backend.manager.models.gql_relay import AsyncNode, ConnectionResolverResult
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 
-from ..gql_relay import Connection
+from .base import (
+    FilterExprArg,
+    OrderExprArg,
+    generate_sql_info_for_gql_connection,
+)
+from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 
 if TYPE_CHECKING:
-    from ..gql import GraphQueryContext
+    from .schema import GraphQueryContext
 
 
 class AuditLogSchema(graphene.ObjectType):

@@ -22,13 +22,15 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.types import OptionalState, TriState
 
+from ...api.gql_legacy.base import (
+    BigInt,
+    batch_result,
+)
 from ..base import (
     Base,
-    BigInt,
     EnumType,
     ResourceSlotColumn,
     VFolderHostPermissionColumn,
-    batch_result,
     mapper_registry,
 )
 from ..keypair import keypairs

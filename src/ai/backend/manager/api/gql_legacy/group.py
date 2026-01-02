@@ -41,7 +41,19 @@ from ai.backend.manager.services.group.actions.purge_group import (
 )
 from ai.backend.manager.types import OptionalState, TriState
 
-from ..base import (
+from ...models.group import (
+    AssocGroupUserRow,
+    GroupRow,
+    ProjectType,
+    association_groups_users,
+    get_permission_ctx,
+    groups,
+)
+from ...models.minilang.ordering import OrderSpecItem, QueryOrderParser
+from ...models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ...models.rbac.context import ClientContext
+from ...models.rbac.permission_defs import ProjectPermission
+from .base import (
     BigInt,
     FilterExprArg,
     OrderExprArg,
@@ -51,29 +63,17 @@ from ..base import (
     generate_sql_info_for_gql_connection,
     privileged_mutation,
 )
-from ..gql_relay import (
+from .gql_relay import (
     AsyncNode,
     Connection,
     ConnectionResolverResult,
 )
-from ..group import (
-    AssocGroupUserRow,
-    GroupRow,
-    ProjectType,
-    association_groups_users,
-    get_permission_ctx,
-    groups,
-)
-from ..minilang.ordering import OrderSpecItem, QueryOrderParser
-from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
-from ..rbac.context import ClientContext
-from ..rbac.permission_defs import ProjectPermission
 from .user import UserConnection, UserNode
 
 if TYPE_CHECKING:
-    from ..gql import GraphQueryContext
-    from ..rbac import ContainerRegistryScope, ScopeType
+    from ...models.rbac import ContainerRegistryScope, ScopeType
     from .scaling_group import ScalingGroup
+    from .schema import GraphQueryContext
 
 
 __all__ = (
@@ -181,7 +181,7 @@ class GroupNode(graphene.ObjectType):
         before: str | None = None,
         last: int | None = None,
     ) -> ConnectionResolverResult[Self]:
-        from ..user import UserRow
+        from ...models.user import UserRow
 
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (

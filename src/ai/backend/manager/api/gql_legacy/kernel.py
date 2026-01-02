@@ -28,13 +28,6 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.models.base import (
-    Item,
-    PaginatedList,
-    batch_multiresult,
-    batch_multiresult_in_scalar_stream,
-    batch_result,
-)
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.minilang import JSONFieldItem
@@ -45,22 +38,27 @@ from ai.backend.manager.models.minilang.queryfilter import (
 )
 
 from ...defs import DEFAULT_ROLE
-from ..gql_relay import AsyncNode, Connection
-from ..kernel import (
+from ...models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEFAULT_KERNEL_ORDERING,
     LIVE_STATUS,
     KernelRow,
     kernels,
 )
-from ..user import UserRole, users
+from ...models.user import UserRole, users
 from .base import (
     BigInt,
+    Item,
+    PaginatedList,
+    batch_multiresult,
+    batch_multiresult_in_scalar_stream,
+    batch_result,
 )
+from .gql_relay import AsyncNode, Connection
 from .image import ImageNode
 
 if TYPE_CHECKING:
-    from ..gql import GraphQueryContext
+    from .schema import GraphQueryContext
 
 __all__ = (
     "KernelNode",

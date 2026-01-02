@@ -47,38 +47,38 @@ from ai.backend.manager.services.domain.actions.modify_domain_node import (
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
 from ai.backend.manager.types import OptionalState, TriState
 
-from ..base import (
+from ...models.domain import DomainRow, domains, get_permission_ctx
+from ...models.minilang.ordering import OrderSpecItem, QueryOrderParser
+from ...models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ...models.rbac import (
+    ClientContext,
+    ScopeType,
+    SystemScope,
+)
+from ...models.rbac.permission_defs import DomainPermission, ScalingGroupPermission
+from ...models.scaling_group import get_scaling_groups
+from ...models.user import UserRole
+from .base import (
+    Bytes,
     FilterExprArg,
     OrderExprArg,
     PaginatedConnectionField,
     batch_result,
     generate_sql_info_for_gql_connection,
 )
-from ..domain import DomainRow, domains, get_permission_ctx
-from ..gql_relay import (
+from .gql_relay import (
     AsyncNode,
     Connection,
     ConnectionResolverResult,
     GlobalIDField,
     ResolvedGlobalID,
 )
-from ..minilang.ordering import OrderSpecItem, QueryOrderParser
-from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
-from ..rbac import (
-    ClientContext,
-    ScopeType,
-    SystemScope,
-)
-from ..rbac.permission_defs import DomainPermission, ScalingGroupPermission
-from ..scaling_group import get_scaling_groups
-from ..user import UserRole
-from .base import Bytes
 from .scaling_group import ScalingGroup, ScalingGroupConnection
 
 if TYPE_CHECKING:
-    from ..domain import DomainModel
-    from ..gql import GraphQueryContext
+    from ...models.domain import DomainModel
     from .scaling_group import ScalingGroupNode
+    from .schema import GraphQueryContext
 
 
 __all__ = (
@@ -231,7 +231,7 @@ class DomainNode(graphene.ObjectType):
         id: str,
         permission: DomainPermission = DomainPermission.READ_ATTRIBUTE,
     ) -> Optional[Self]:
-        from ..domain import DomainModel
+        from ...models.domain import DomainModel
 
         graph_ctx: GraphQueryContext = info.context
         _, domain_name = AsyncNode.resolve_global_id(info, id)
@@ -263,7 +263,7 @@ class DomainNode(graphene.ObjectType):
         before: Optional[str] = None,
         last: Optional[int] = None,
     ) -> ConnectionResolverResult[Self]:
-        from ..domain import DomainModel
+        from ...models.domain import DomainModel
 
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (

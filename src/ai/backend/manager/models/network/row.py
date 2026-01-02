@@ -15,19 +15,21 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.logging import BraceStyleAdapter
 
-from ...errors.common import GenericForbidden, ObjectNotFound, ServerMisconfiguredError
-from ..base import (
-    GUID,
-    Base,
+from ...api.gql_legacy.base import (
     FilterExprArg,
-    IDColumn,
     OrderExprArg,
-    SlugType,
     generate_sql_info_for_gql_connection,
     gql_mutation_wrapper,
     orm_set_if_set,
 )
-from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
+from ...api.gql_legacy.gql_relay import AsyncNode, Connection, ConnectionResolverResult
+from ...errors.common import GenericForbidden, ObjectNotFound, ServerMisconfiguredError
+from ..base import (
+    GUID,
+    Base,
+    IDColumn,
+    SlugType,
+)
 from ..group import AssocGroupUserRow, GroupRow
 from ..minilang import FieldSpecItem, OrderSpecItem
 from ..minilang.ordering import QueryOrderParser

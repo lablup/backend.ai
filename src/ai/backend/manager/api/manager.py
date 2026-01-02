@@ -49,7 +49,7 @@ from .utils import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.gql import GraphQueryContext
+    from ai.backend.manager.api.gql_legacy.schema import GraphQueryContext
 
     from .context import RootContext
 
