@@ -117,10 +117,10 @@ class IntFilter:
 
 @strawberry.input(description="Added in 26.1.0. Filter for UUID fields.")
 class UUIDFilter:
-    equals: Optional[str] = None
-    not_equals: Optional[str] = strawberry.field(name="notEquals", default=None)
-    in_: Optional[list[str]] = strawberry.field(name="in", default=None)
-    not_in: Optional[list[str]] = strawberry.field(name="notIn", default=None)
+    equals: Optional[uuid.UUID] = None
+    not_equals: Optional[uuid.UUID] = strawberry.field(name="notEquals", default=None)
+    in_: Optional[list[uuid.UUID]] = strawberry.field(name="in", default=None)
+    not_in: Optional[list[uuid.UUID]] = strawberry.field(name="notIn", default=None)
 
     @staticmethod
     def _negate_condition(condition: QueryCondition) -> QueryCondition:
@@ -133,14 +133,14 @@ class UUIDFilter:
 
     def build_query_condition(
         self,
-        equals_factory: Callable[[str], QueryCondition],
-        in_factory: Callable[[list[str]], QueryCondition],
+        equals_factory: Callable[[uuid.UUID], QueryCondition],
+        in_factory: Callable[[list[uuid.UUID]], QueryCondition],
     ) -> Optional[QueryCondition]:
         """Build a query condition from this filter using the provided factory callables.
 
         Args:
-            equals_factory: Factory function that takes a single ID and returns QueryCondition for equality check
-            in_factory: Factory function that takes a list of IDs and returns QueryCondition for membership check
+            equals_factory: Factory function that takes a single UUID and returns QueryCondition for equality check
+            in_factory: Factory function that takes a list of UUIDs and returns QueryCondition for membership check
 
         Returns:
             QueryCondition if any filter field is set, None otherwise
