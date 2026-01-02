@@ -90,8 +90,8 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
 )
 
-from ..defs import DEFAULT_ROLE
-from ..errors.kernel import (
+from ...defs import DEFAULT_ROLE
+from ...errors.kernel import (
     KernelCreationFailed,
     KernelDestructionFailed,
     KernelExecutionFailed,
@@ -102,8 +102,8 @@ from ..errors.kernel import (
     TooManyKernelsFound,
     TooManySessionsMatched,
 )
-from ..exceptions import AgentError
-from .base import (
+from ...exceptions import AgentError
+from ..base import (
     GUID,
     Base,
     EnumType,
@@ -114,12 +114,12 @@ from .base import (
     StructuredJSONObjectListColumn,
     URLColumn,
 )
-from .group import GroupRow
-from .image import ImageRow
-from .kernel import KernelRow
-from .minilang.queryfilter import FieldSpecType, QueryFilterParser
-from .network import NetworkRow, NetworkType
-from .rbac import (
+from ..group import GroupRow
+from ..image import ImageRow
+from ..kernel import KernelRow
+from ..minilang.queryfilter import FieldSpecType, QueryFilterParser
+from ..network import NetworkRow, NetworkType
+from ..rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -127,17 +127,17 @@ from .rbac import (
     ScopeType,
     get_predefined_roles_in_scope,
 )
-from .rbac import (
+from ..rbac import (
     UserScope as UserRBACScope,
 )
-from .rbac.context import ClientContext
-from .rbac.permission_defs import ComputeSessionPermission
-from .routing import RouteStatus, RoutingRow
-from .types import (
+from ..rbac.context import ClientContext
+from ..rbac.permission_defs import ComputeSessionPermission
+from ..routing import RouteStatus, RoutingRow
+from ..types import (
     QueryCondition,
     QueryOption,
 )
-from .utils import (
+from ..utils import (
     ExtendedAsyncSAEngine,
     JSONCoalesceExpr,
     execute_with_retry,
@@ -146,7 +146,7 @@ from .utils import (
 )
 
 if TYPE_CHECKING:
-    from ..registry import AgentRegistry
+    from ...registry import AgentRegistry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
