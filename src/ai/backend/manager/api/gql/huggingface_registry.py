@@ -8,7 +8,7 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.api.gql.base import to_global_id
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
@@ -119,10 +119,7 @@ async def huggingface_registries(
     )
 
     nodes = [HuggingFaceRegistry.from_dataclass(data) for data in action_result.data]
-    edges = [
-        HuggingFaceRegistryEdge(node=node, cursor=to_global_id(HuggingFaceRegistry, node.id))
-        for node in nodes
-    ]
+    edges = [HuggingFaceRegistryEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
     return HuggingFaceRegistryConnection(
         edges=edges,
