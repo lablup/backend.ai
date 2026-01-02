@@ -116,6 +116,53 @@ class IntFilter:
 
 
 @strawberry.input
+class IDFilter:
+    """Filter for ID/UUID fields.
+
+    IDs are typically UUID values serialized as strings in GraphQL.
+    Operations are evaluated in precedence order: equals > not_equals > in > not_in.
+    """
+
+    equals: Optional[str] = None
+    not_equals: Optional[str] = strawberry.field(name="notEquals", default=None)
+    in_: Optional[list[str]] = strawberry.field(name="in", default=None)
+    not_in: Optional[list[str]] = strawberry.field(name="notIn", default=None)
+
+    @staticmethod
+    def _negate_condition(condition: QueryCondition) -> QueryCondition:
+        """Negate a QueryCondition by wrapping it with NOT operator."""
+
+        def inner():
+            return ~condition()
+
+        return inner
+
+    def build_query_condition(
+        self,
+        equals_factory: Callable[[str], QueryCondition],
+        in_factory: Callable[[list[str]], QueryCondition],
+    ) -> Optional[QueryCondition]:
+        """Build a query condition from this filter using the provided factory callables.
+
+        Args:
+            equals_factory: Factory function that takes a single ID and returns QueryCondition for equality check
+            in_factory: Factory function that takes a list of IDs and returns QueryCondition for membership check
+
+        Returns:
+            QueryCondition if any filter field is set, None otherwise
+        """
+        if self.equals:
+            return equals_factory(self.equals)
+        elif self.not_equals:
+            return self._negate_condition(equals_factory(self.not_equals))
+        elif self.in_:
+            return in_factory(self.in_)
+        elif self.not_in:
+            return self._negate_condition(in_factory(self.not_in))
+        return None
+
+
+@strawberry.input
 class DateTimeFilter:
     """Filter for datetime fields."""
 
