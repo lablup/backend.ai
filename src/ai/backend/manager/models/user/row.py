@@ -26,24 +26,24 @@ from ai.backend.manager.data.user.types import UserData, UserRole, UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 
-from .base import (
+from ..base import (
     Base,
     EnumValueType,
     IDColumn,
     IPColumn,
     mapper_registry,
 )
-from .exceptions import ObjectNotFound
-from .hasher import PasswordHasherFactory
-from .types import (
+from ..exceptions import ObjectNotFound
+from ..hasher import PasswordHasherFactory
+from ..types import (
     QueryCondition,
     QueryOption,
     load_related_field,
 )
-from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
+from ..utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
-    from .keypair import KeyPairRow
+    from ..keypair import KeyPairRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -166,7 +166,7 @@ def _get_kernel_row_join_condition():
 
 class UserRow(Base):
     __table__ = users
-    # from .keypair import KeyPairRow
+    # from ..keypair import KeyPairRow
 
     sessions = relationship(
         "SessionRow",
@@ -212,13 +212,13 @@ class UserRow(Base):
 
     @classmethod
     def load_keypairs(cls) -> Callable:
-        from .keypair import KeyPairRow
+        from ..keypair import KeyPairRow
 
         return selectinload(UserRow.keypairs).options(joinedload(KeyPairRow.resource_policy_row))
 
     @classmethod
     def load_main_keypair(cls) -> Callable:
-        from .keypair import KeyPairRow
+        from ..keypair import KeyPairRow
 
         return joinedload(UserRow.main_keypair).options(joinedload(KeyPairRow.resource_policy_row))
 
@@ -294,7 +294,7 @@ class UserRow(Base):
 
     def get_main_keypair_row(self) -> Optional[KeyPairRow]:
         # `cast()` requires import of KeyPairRow
-        from .keypair import KeyPairRow
+        from ..keypair import KeyPairRow
 
         keypair_candidate: Optional[KeyPairRow] = None
         main_keypair_row = cast(Optional[KeyPairRow], self.main_keypair)
