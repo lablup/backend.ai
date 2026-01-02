@@ -44,6 +44,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingAction,
     AutoScalingCondition,
@@ -67,6 +68,12 @@ from ai.backend.manager.data.deployment.types import (
     ResourceSpec,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.model_serving.types import (
+    EndpointAutoScalingRuleData,
+    EndpointData,
+    EndpointLifecycle,
+    EndpointTokenData,
+)
 from ai.backend.manager.data.session.types import SessionStatus
 
 from ...errors.api import InvalidAPIParameters
@@ -84,13 +91,6 @@ from ..base import (
     StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
-)
-from ..config.loader.legacy_etcd_loader import LegacyEtcdLoader
-from ..data.model_serving.types import (
-    EndpointAutoScalingRuleData,
-    EndpointData,
-    EndpointLifecycle,
-    EndpointTokenData,
 )
 from ..image import ImageRow
 from ..routing import RouteStatus

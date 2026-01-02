@@ -305,7 +305,7 @@ MEMBER_PERMISSIONS: frozenset[AgentPermission] = frozenset([
 
 @dataclass
 class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow, AgentId]):
-    from .scaling_group import ScalingGroupPermissionContext
+    from ..scaling_group import ScalingGroupPermissionContext
 
     sgroup_permission_ctx: Optional[ScalingGroupPermissionContext] = None
 
