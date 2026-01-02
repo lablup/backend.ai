@@ -15,13 +15,13 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForKeypairsRow,
     ScalingGroupOpts,
