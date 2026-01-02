@@ -56,8 +56,8 @@ if TYPE_CHECKING:
 
 from ai.backend.common.exception import BackendAIError
 
-from ..defs import DEFAULT_ROLE
-from ..errors.kernel import (
+from ...defs import DEFAULT_ROLE
+from ...errors.kernel import (
     KernelCreationFailed,
     KernelDestructionFailed,
     KernelExecutionFailed,
@@ -65,9 +65,9 @@ from ..errors.kernel import (
     KernelRestartFailed,
     SessionNotFound,
 )
-from ..errors.resource import DataTransformationFailed
-from ..exceptions import AgentError
-from .base import (
+from ...errors.resource import DataTransformationFailed
+from ...exceptions import AgentError
+from ..base import (
     GUID,
     Base,
     EnumType,
@@ -78,9 +78,9 @@ from .base import (
     StructuredJSONObjectListColumn,
     URLColumn,
 )
-from .types import QueryCondition
-from .user import users
-from .utils import (
+from ..types import QueryCondition
+from ..user import users
+from ..utils import (
     ExtendedAsyncSAEngine,
     JSONCoalesceExpr,
     execute_with_retry,
@@ -89,7 +89,7 @@ from .utils import (
 )
 
 if TYPE_CHECKING:
-    from .gql import GraphQueryContext
+    from ..gql import GraphQueryContext
 
 __all__ = (
     "get_user_email",
@@ -623,7 +623,7 @@ class KernelRow(Base):
     async def get_kernel(
         db: ExtendedAsyncSAEngine, kern_id: uuid.UUID, allow_stale: bool = False
     ) -> KernelRow:
-        from .agent import AgentStatus
+        from ..agent import AgentStatus
 
         async def _query():
             async with db.begin_readonly_session() as db_sess:
@@ -1034,7 +1034,7 @@ async def recalc_concurrency_used(
     access_key: AccessKey,
 ) -> None:
     concurrency_used: int
-    from .session import PRIVATE_SESSION_TYPES
+    from ..session import PRIVATE_SESSION_TYPES
 
     async with db_sess.begin_nested():
         result = await db_sess.execute(
