@@ -941,7 +941,7 @@ class TestScalingGroupRepositoryDB:
     # Associate/Disassociate with Keypair Tests
 
     @pytest.fixture
-    async def test_keypair(
+    async def sample_keypair(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
@@ -993,13 +993,13 @@ class TestScalingGroupRepositoryDB:
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_purge: str,
-        test_keypair: AccessKey,
+        sample_keypair: AccessKey,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Test associating a scaling group with a keypair."""
         # Given: A scaling group and a keypair
         sgroup_name = sample_scaling_group_for_purge
-        access_key = test_keypair
+        access_key = sample_keypair
 
         # When: Associate the scaling group with the keypair
         creator = Creator(
@@ -1028,13 +1028,13 @@ class TestScalingGroupRepositoryDB:
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_purge: str,
-        test_keypair: AccessKey,
+        sample_keypair: AccessKey,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Test disassociating a scaling group from a keypair."""
         # Given: A scaling group associated with a keypair
         sgroup_name = sample_scaling_group_for_purge
-        access_key = test_keypair
+        access_key = sample_keypair
 
         # First, associate the scaling group with the keypair
         async with db_with_cleanup.begin_session() as db_sess:
@@ -1068,12 +1068,12 @@ class TestScalingGroupRepositoryDB:
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_purge: str,
-        test_keypair: AccessKey,
+        sample_keypair: AccessKey,
     ) -> None:
         """Test disassociating a non-existent association does not raise error."""
         # Given: A scaling group that is NOT associated with a keypair
         sgroup_name = sample_scaling_group_for_purge
-        access_key = test_keypair
+        access_key = sample_keypair
 
         # When: Disassociate (even though no association exists)
         purger = create_scaling_group_for_keypairs_purger(
