@@ -19,16 +19,16 @@ from ai.backend.manager.data.agent.types import (
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
 
-from .base import (
+from ..base import (
     Base,
     CurvePublicKeyColumn,
     EnumType,
     ResourceSlotColumn,
     mapper_registry,
 )
-from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
-from .keypair import KeyPairRow
-from .rbac import (
+from ..kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
+from ..keypair import KeyPairRow
+from ..rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -37,10 +37,10 @@ from .rbac import (
     UserScope,
     get_predefined_roles_in_scope,
 )
-from .rbac.context import ClientContext
-from .rbac.permission_defs import AgentPermission, ScalingGroupPermission
-from .types import QueryCondition
-from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
+from ..rbac.context import ClientContext
+from ..rbac.permission_defs import AgentPermission, ScalingGroupPermission
+from ..types import QueryCondition
+from ..utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 __all__: Sequence[str] = (
     "agents",
