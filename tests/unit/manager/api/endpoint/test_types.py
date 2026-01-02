@@ -2,15 +2,12 @@ from __future__ import annotations
 
 from unittest.mock import Mock
 
-import pytest
-
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, EndpointStatus
 from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.models.gql_models.endpoint import Endpoint
 
 
 class TestEndpointType:
-    @pytest.mark.asyncio
     async def test_status_unhealthy_when_no_healthy_routes(self) -> None:
         """
         Regression test: When all routes are unhealthy, status should be UNHEALTHY.
