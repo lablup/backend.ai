@@ -27,15 +27,15 @@ from ai.backend.common.types import VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.domain.types import DomainData
 
-from ..defs import RESERVED_DOTFILES
-from .base import (
+from ...defs import RESERVED_DOTFILES
+from ..base import (
     Base,
     ResourceSlotColumn,
     SlugType,
     VFolderHostPermissionColumn,
     mapper_registry,
 )
-from .rbac import (
+from ..rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -46,8 +46,8 @@ from .rbac import (
     get_predefined_roles_in_scope,
     required_permission,
 )
-from .rbac.context import ClientContext
-from .rbac.permission_defs import DomainPermission
+from ..rbac.context import ClientContext
+from ..rbac.permission_defs import DomainPermission
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -298,8 +298,6 @@ class DomainPermissionContextBuilder(
         self,
         ctx: ClientContext,
     ) -> DomainPermissionContext:
-        from .domain import DomainRow
-
         perm_ctx = DomainPermissionContext()
         _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
         for row in await self.db_session.scalars(_domain_query_stmt):
