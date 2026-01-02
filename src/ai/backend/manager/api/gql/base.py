@@ -115,14 +115,8 @@ class IntFilter:
         )
 
 
-@strawberry.input
-class IDFilter:
-    """Filter for ID/UUID fields.
-
-    IDs are typically UUID values serialized as strings in GraphQL.
-    Operations are evaluated in precedence order: equals > not_equals > in > not_in.
-    """
-
+@strawberry.input(description="Added in 26.1.0. Filter for UUID fields.")
+class UUIDFilter:
     equals: Optional[str] = None
     not_equals: Optional[str] = strawberry.field(name="notEquals", default=None)
     in_: Optional[list[str]] = strawberry.field(name="in", default=None)
