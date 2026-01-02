@@ -11,7 +11,7 @@ from strawberry.dataloader import DataLoader
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
-from ai.backend.manager.api.gql.base import to_global_id
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
@@ -123,7 +123,7 @@ async def fetch_artifact_revisions(
     edges = []
     for revision_data in action_result.data:
         revision = ArtifactRevision.from_dataclass(revision_data)
-        cursor = to_global_id(ArtifactRevision, revision_data.id)
+        cursor = encode_cursor(revision_data.id)
         edges.append(ArtifactRevisionEdge(node=revision, cursor=cursor))
 
     page_info = strawberry.relay.PageInfo(
@@ -186,7 +186,7 @@ async def fetch_artifacts(
         artifact = Artifact.from_dataclass(
             artifact_data, registry_url=registry_meta.url, source_url=source_registry_meta.url
         )
-        cursor = to_global_id(Artifact, artifact_data.id)
+        cursor = encode_cursor(artifact_data.id)
         edges.append(ArtifactEdge(node=artifact, cursor=cursor))
 
     page_info = strawberry.relay.PageInfo(

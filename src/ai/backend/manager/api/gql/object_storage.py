@@ -8,7 +8,7 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.api.gql.base import to_global_id
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
 )
@@ -76,10 +76,7 @@ class ObjectStorage(Node):
         )
 
         nodes = [StorageNamespace.from_dataclass(bucket) for bucket in action_result.result]
-        edges = [
-            StorageNamespaceEdge(node=node, cursor=to_global_id(StorageNamespace, node.id))
-            for node in nodes
-        ]
+        edges = [StorageNamespaceEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
         return StorageNamespaceConnection(
             edges=edges,
@@ -129,9 +126,7 @@ async def object_storages(
     )
 
     nodes = [ObjectStorage.from_dataclass(data) for data in action_result.data]
-    edges = [
-        ObjectStorageEdge(node=node, cursor=to_global_id(ObjectStorage, node.id)) for node in nodes
-    ]
+    edges = [ObjectStorageEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
     return ObjectStorageConnection(
         edges=edges,

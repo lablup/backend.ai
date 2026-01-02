@@ -7,7 +7,7 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.api.gql.base import to_global_id
+from ai.backend.manager.api.gql.base import encode_cursor
 
 from ...data.vfs_storage.types import VFSStorageData
 from ...models.vfs_storage import VFSStorageRow
@@ -77,7 +77,7 @@ async def vfs_storages(
     )
 
     nodes = [VFSStorage.from_dataclass(data) for data in action_result.data]
-    edges = [VFSStorageEdge(node=node, cursor=to_global_id(VFSStorage, node.id)) for node in nodes]
+    edges = [VFSStorageEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
     return VFSStorageConnection(
         edges=edges,
