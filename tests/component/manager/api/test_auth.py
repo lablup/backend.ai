@@ -1,14 +1,28 @@
+from __future__ import annotations
+
 import json
 import uuid
 from datetime import datetime, timedelta
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 from aiohttp import web
 from dateutil.tz import gettz, tzutc
 
-from ai.backend.manager.api.auth import _extract_auth_params, check_date
-from ai.backend.manager.errors.auth import InvalidAuthParameters
+from ai.backend.common.types import ReadableCIDR
+from ai.backend.manager.api.auth import (
+    _extract_auth_params,
+    admin_required,
+    auth_required,
+    check_date,
+    superadmin_required,
+    validate_ip,
+)
+from ai.backend.manager.errors.auth import (
+    AuthorizationFailed,
+    InvalidAuthParameters,
+)
 from ai.backend.manager.server import (
     agent_registry_ctx,
     database_ctx,
@@ -192,3 +206,184 @@ async def test_authorize(
 #         assert resp.status == 401
 
 #     await do_authorize()
+
+
+def test_validate_ip_allowed() -> None:
+    """IP within CIDR range should be allowed, empty allowlist allows all."""
+    request = MagicMock(spec=web.Request)
+    request.headers = {"X-Forwarded-For": "10.0.0.50"}
+    request.remote = None
+
+    # Empty allowlist allows all IPs
+    user: dict[str, Any] = {"allowed_client_ip": None}
+    validate_ip(request, user)
+
+    # IP within CIDR range is allowed
+    user = {"allowed_client_ip": [ReadableCIDR("10.0.0.0/24", is_network=True)]}
+    validate_ip(request, user)
+
+
+def test_validate_ip_denied() -> None:
+    """IP not in allowlist should raise AuthorizationFailed."""
+    request = MagicMock(spec=web.Request)
+    request.headers = {"X-Forwarded-For": "192.168.1.100"}
+    request.remote = None
+
+    user: dict[str, Any] = {"allowed_client_ip": [ReadableCIDR("10.0.0.0/24", is_network=True)]}
+    with pytest.raises(AuthorizationFailed, match="not allowed IP address"):
+        validate_ip(request, user)
+
+
+class TestAuthDecorators:
+    """Tests for auth_required, admin_required, superadmin_required decorators."""
+
+    @pytest.mark.asyncio
+    async def test_auth_required_authorized(self) -> None:
+        """Authorized request should pass through."""
+
+        @auth_required
+        async def handler(request: web.Request) -> web.Response:
+            return web.Response(text="ok")
+
+        request = MagicMock(spec=web.Request)
+        request.get = MagicMock(side_effect=lambda k, d=None: {"is_authorized": True}.get(k, d))
+
+        response = await handler(request)
+        assert response.text == "ok"
+
+    @pytest.mark.asyncio
+    async def test_auth_required_unauthorized(self) -> None:
+        """Unauthorized request should raise AuthorizationFailed."""
+
+        @auth_required
+        async def handler(request: web.Request) -> web.Response:
+            return web.Response(text="ok")
+
+        request = MagicMock(spec=web.Request)
+        request.get = MagicMock(side_effect=lambda k, d=None: {"is_authorized": False}.get(k, d))
+
+        with pytest.raises(AuthorizationFailed, match="Unauthorized access"):
+            await handler(request)
+
+    @pytest.mark.asyncio
+    async def test_auth_required_sets_handler_attr(self) -> None:
+        """auth_required should set handler attributes."""
+
+        @auth_required
+        async def handler(request: web.Request) -> web.Response:
+            return web.Response(text="ok")
+
+        # get_handler_attr expects request.match_info.handler, so we check _backend_attrs directly
+        attrs = getattr(handler, "_backend_attrs", {})
+        assert attrs.get("auth_required", False) is True
+        assert attrs.get("auth_scope", None) == "user"
+
+    @pytest.mark.asyncio
+    async def test_admin_required_admin(self) -> None:
+        """Admin request should pass through."""
+
+        @admin_required
+        async def handler(request: web.Request) -> web.Response:
+            return web.Response(text="ok")
+
+        request = MagicMock(spec=web.Request)
+        request.get = MagicMock(
+            side_effect=lambda k, d=None: {"is_authorized": True, "is_admin": True}.get(k, d)
+        )
+
+        response = await handler(request)
+        assert response.text == "ok"
+
+    @pytest.mark.asyncio
+    async def test_admin_required_non_admin(self) -> None:
+        """Non-admin request should raise AuthorizationFailed."""
+
+        @admin_required
+        async def handler(request: web.Request) -> web.Response:
+            return web.Response(text="ok")
+
+        request = MagicMock(spec=web.Request)
+        request.get = MagicMock(
+            side_effect=lambda k, d=None: {"is_authorized": True, "is_admin": False}.get(k, d)
+        )
+
+        with pytest.raises(AuthorizationFailed, match="Unauthorized access"):
+            await handler(request)
+
+    @pytest.mark.asyncio
+    async def test_admin_required_unauthorized(self) -> None:
+        """Unauthorized request should raise AuthorizationFailed."""
+
+        @admin_required
+        async def handler(request: web.Request) -> web.Response:
+            return web.Response(text="ok")
+
+        request = MagicMock(spec=web.Request)
+        request.get = MagicMock(
+            side_effect=lambda k, d=None: {"is_authorized": False, "is_admin": False}.get(k, d)
+        )
+
+        with pytest.raises(AuthorizationFailed, match="Unauthorized access"):
+            await handler(request)
+
+    @pytest.mark.asyncio
+    async def test_admin_required_sets_handler_attr(self) -> None:
+        """admin_required should set handler attributes."""
+
+        @admin_required
+        async def handler(request: web.Request) -> web.Response:
+            return web.Response(text="ok")
+
+        # get_handler_attr expects request.match_info.handler, so we check _backend_attrs directly
+        attrs = getattr(handler, "_backend_attrs", {})
+        assert attrs.get("auth_required", False) is True
+        assert attrs.get("auth_scope", None) == "admin"
+
+    @pytest.mark.asyncio
+    async def test_superadmin_required_superadmin(self) -> None:
+        """Superadmin request should pass through."""
+
+        @superadmin_required
+        async def handler(request: web.Request) -> web.Response:
+            return web.Response(text="ok")
+
+        request = MagicMock(spec=web.Request)
+        request.get = MagicMock(
+            side_effect=lambda k, d=None: {"is_authorized": True, "is_superadmin": True}.get(k, d)
+        )
+
+        response = await handler(request)
+        assert response.text == "ok"
+
+    @pytest.mark.asyncio
+    async def test_superadmin_required_admin_only(self) -> None:
+        """Admin (not superadmin) request should raise AuthorizationFailed."""
+
+        @superadmin_required
+        async def handler(request: web.Request) -> web.Response:
+            return web.Response(text="ok")
+
+        request = MagicMock(spec=web.Request)
+        request.get = MagicMock(
+            side_effect=lambda k, d=None: {
+                "is_authorized": True,
+                "is_admin": True,
+                "is_superadmin": False,
+            }.get(k, d)
+        )
+
+        with pytest.raises(AuthorizationFailed, match="Unauthorized access"):
+            await handler(request)
+
+    @pytest.mark.asyncio
+    async def test_superadmin_required_sets_handler_attr(self) -> None:
+        """superadmin_required should set handler attributes."""
+
+        @superadmin_required
+        async def handler(request: web.Request) -> web.Response:
+            return web.Response(text="ok")
+
+        # get_handler_attr expects request.match_info.handler, so we check _backend_attrs directly
+        attrs = getattr(handler, "_backend_attrs", {})
+        assert attrs.get("auth_required", False) is True
+        assert attrs.get("auth_scope", None) == "superadmin"
