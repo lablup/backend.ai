@@ -80,13 +80,13 @@ class OutputFormatter(AbstractOutputFormatter):
             return "(null)"
         if isinstance(value, (dict, list, set)) and not value:
             return "(empty)"
-        elif isinstance(value, dict):
+        if isinstance(value, dict):
             return (
                 "{"
                 + ", ".join(f"{k}: {self.format_console(v, field)}" for k, v in value.items())
                 + "}"
             )
-        elif isinstance(value, (list, tuple, set)):
+        if isinstance(value, (list, tuple, set)):
             return "[" + ", ".join(self.format_console(v, field) for v in value) + "]"
         return str(value)
 
@@ -95,9 +95,9 @@ class OutputFormatter(AbstractOutputFormatter):
             return None
         if isinstance(value, decimal.Decimal):
             return str(value)
-        elif isinstance(value, dict):
+        if isinstance(value, dict):
             return {k: self.format_json(v, field) for k, v in value.items()}
-        elif isinstance(value, (list, tuple)):
+        if isinstance(value, (list, tuple)):
             return [self.format_json(v, field) for v in value]
         return value
 
@@ -310,8 +310,7 @@ class NestedObjectFormatter(OutputFormatter):
 def _fit_multiline_in_cell(text: str, indent: str) -> str:
     if "\n" in text:
         return "\n" + textwrap.indent(text, indent)
-    else:
-        return text
+    return text
 
 
 class ContainerListFormatter(NestedObjectFormatter):

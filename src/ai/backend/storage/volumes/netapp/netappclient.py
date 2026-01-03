@@ -413,8 +413,7 @@ class NetAppClient:
                 )
                 qtree_info.update(record)
                 return qtree_info
-            else:
-                raise NetAppQTreeNotFoundError(f"No qtree {name} found in the volume {volume_id}")
+            raise NetAppQTreeNotFoundError(f"No qtree {name} found in the volume {volume_id}")
 
     async def create_qtree(
         self,
@@ -614,7 +613,7 @@ class NetAppClient:
         ) as resp:
             data = await resp.json()
             fixed = data["fixed"]
-            qos_policy = {
+            return {
                 "uuid": data["uuid"],
                 "name": data["name"],
                 "fixed": {
@@ -626,7 +625,6 @@ class NetAppClient:
                 },
                 "svm": data["svm"],
             }
-            return qos_policy
 
     async def get_qos_by_volume_id(self, volume_uuid) -> Mapping[str, Any]:
         async with self.send_request(

@@ -185,6 +185,7 @@ class SessionPermissionValueField(graphene.Scalar):
     def parse_literal(node: Any, _variables=None):
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ComputeSessionPermission(node.value)
+        return None
 
     @staticmethod
     def parse_value(value: str) -> ComputeSessionPermission:
@@ -327,8 +328,7 @@ class ComputeSessionNode(graphene.ObjectType):
     async def _batch_load_queue_position(
         self, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
     ) -> list[Optional[int]]:
-        positions = await ctx.valkey_schedule.get_queue_positions(session_ids)
-        return positions
+        return await ctx.valkey_schedule.get_queue_positions(session_ids)
 
     @classmethod
     def from_row(
@@ -669,12 +669,11 @@ class ComputeSessionNode(graphene.ObjectType):
             query = cls._add_basic_options_to_query(query)
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 session_row = await db_session.scalar(query)
-        result = cls.from_row(
+        return cls.from_row(
             graph_ctx,
             session_row,
             permissions=await permission_ctx.calculate_final_permission(session_row),
         )
-        return result
 
     @classmethod
     async def get_accessible_connection(

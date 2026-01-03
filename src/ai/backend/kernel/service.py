@@ -146,7 +146,7 @@ class ServiceParser:
                     raise DisallowedEnvironment(
                         f"Environment variable {env_name} not allowed for service {service_name}"
                     )
-                elif env_name in frozen_envs:
+                if env_name in frozen_envs:
                     raise DisallowedEnvironment(
                         f"Environment variable {env_name} can't be overwritten"
                     )

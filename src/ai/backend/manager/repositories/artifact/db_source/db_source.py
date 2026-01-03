@@ -815,8 +815,7 @@ class ArtifactDBSource:
                     ArtifactRevisionRow.id == artifact_revision_id
                 )
             )
-            readme = result.scalar_one_or_none()
-            return readme
+            return result.scalar_one_or_none()
 
     async def list_artifacts_with_revisions_paginated(
         self,

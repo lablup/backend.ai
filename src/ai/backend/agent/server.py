@@ -178,12 +178,11 @@ class RPCFunctionRegistry:
             try:
                 if request.body is None:
                     return await meth(self_)
-                else:
-                    return await meth(
-                        self_,
-                        *request.body["args"],
-                        **request.body["kwargs"],
-                    )
+                return await meth(
+                    self_,
+                    *request.body["args"],
+                    **request.body["kwargs"],
+                )
             except (TimeoutError, asyncio.CancelledError):
                 raise
             except ResourceError:
@@ -216,13 +215,12 @@ class RPCFunctionRegistryV2:
             try:
                 if request.body is None:
                     return await meth(self_)
-                else:
-                    res = await meth(
-                        self_,
-                        *request.body["args"],
-                        **request.body["kwargs"],
-                    )
-                    return res.as_dict()
+                res = await meth(
+                    self_,
+                    *request.body["args"],
+                    **request.body["kwargs"],
+                )
+                return res.as_dict()
             except (TimeoutError, asyncio.CancelledError):
                 raise
             except ResourceError:
@@ -989,7 +987,7 @@ class AgentRPCServer(aobject):
                 code[:20] + "..." if len(code) > 20 else code,
             )
         agent = self.runtime.get_agent(agent_id)
-        result = await agent.execute(
+        return await agent.execute(
             SessionId(UUID(session_id)),
             KernelId(UUID(kernel_id)),
             run_id,
@@ -999,7 +997,6 @@ class AgentRPCServer(aobject):
             api_version=api_version,
             flush_timeout=flush_timeout,
         )
-        return result
 
     @rpc_function
     @collect_error

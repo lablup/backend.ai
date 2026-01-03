@@ -63,8 +63,7 @@ class RedisStorage(AbstractStorage):
             cookie = self.load_cookie(request)
             if cookie is None:
                 return Session(None, data=None, new=True, max_age=self.max_age, lifespan=lifespan)
-            else:
-                key = str(cookie)
+            key = str(cookie)
         data_bytes = await self._valkey_client.get_session_data(self.cookie_name + "_" + key)
         if data_bytes is None:
             return Session(None, data=None, new=True, max_age=self.max_age, lifespan=lifespan)

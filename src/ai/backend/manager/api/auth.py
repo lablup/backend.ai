@@ -313,8 +313,7 @@ def _extract_auth_params(request):
 
     try:
         access_key, signature = params["credential"].split(":", 1)
-        ret = params["signMethod"], access_key, signature
-        return ret
+        return params["signMethod"], access_key, signature
     except (KeyError, ValueError):
         raise InvalidAuthParameters("Missing or malformed authorization parameters")
 

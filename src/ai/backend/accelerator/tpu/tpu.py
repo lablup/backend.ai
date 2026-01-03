@@ -54,8 +54,7 @@ class libtpu:
             out, _ = await proc.communicate()
         except FileNotFoundError:
             raise ImportError("Gcloud SDK is not available!")
-        output = out.decode()
-        return output
+        return out.decode()
 
     @classmethod
     async def get_device_count(cls) -> int:
@@ -69,8 +68,7 @@ class libtpu:
         cmd = ["compute", "tpus", "list", "--format", "value(name)", "--filter", "state:READY"]
         ret = await cls._run_ctpu(cmd)
         devices_info = ret.strip().splitlines()
-        dev_name = devices_info[dev_idx].strip()
-        return dev_name
+        return devices_info[dev_idx].strip()
 
     @classmethod
     async def get_device_props(cls, dev_name: str):

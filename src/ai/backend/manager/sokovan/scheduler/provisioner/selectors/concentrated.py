@@ -95,6 +95,4 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
 
             return tuple(sort_key)
 
-        chosen_tracker = min(trackers, key=tracker_sort_key)
-
-        return chosen_tracker
+        return min(trackers, key=tracker_sort_key)

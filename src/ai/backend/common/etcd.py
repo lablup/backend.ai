@@ -338,8 +338,7 @@ class AsyncEtcd(AbstractKVStore):
         if isinstance(k, bytes):
             k = k.decode(self.encoding)
         prefix = f"/sorna/{self.ns}/"
-        k = k.removeprefix(prefix)
-        return k
+        return k.removeprefix(prefix)
 
     def _merge_scope_prefix_map(
         self,

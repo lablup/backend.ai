@@ -102,17 +102,16 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
                 if dotfile["path"] == params["path"]:
                     return web.json_response(dotfile)
             raise DotfileNotFound
-        else:
-            dotfiles, _ = await query_domain_dotfiles(conn, params["domain"])
-            if dotfiles is None:
-                raise DomainNotFound
-            for entry in dotfiles:
-                resp.append({
-                    "path": entry["path"],
-                    "permission": entry["perm"],
-                    "data": entry["data"],
-                })
-            return web.json_response(resp)
+        dotfiles, _ = await query_domain_dotfiles(conn, params["domain"])
+        if dotfiles is None:
+            raise DomainNotFound
+        for entry in dotfiles:
+            resp.append({
+                "path": entry["path"],
+                "permission": entry["perm"],
+                "data": entry["data"],
+            })
+        return web.json_response(resp)
 
 
 @server_status_required(READ_ALLOWED)

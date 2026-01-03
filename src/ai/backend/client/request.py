@@ -293,8 +293,7 @@ class Request:
             # multipart boundaries.
             self.headers.pop("Content-Type", None)
             return data
-        else:
-            return self._content
+        return self._content
 
     def _build_url(self) -> URL:
         base_url = self.config.endpoint.path.rstrip("/")
@@ -625,9 +624,8 @@ class FetchContextManager:
                         f"\u279c {e!r}"
                     )
                     raise BackendClientError(msg) from e
-                else:
-                    self.session.config.rotate_endpoints()
-                    continue
+                self.session.config.rotate_endpoints()
+                continue
             except aiohttp.ClientResponseError as e:
                 msg = f"API endpoint response error.\n\u279c {e!r}"
                 if raw_resp is not None:
@@ -767,9 +765,8 @@ class WebSocketContextManager:
                         f"Error detail: {e!r}"
                     )
                     raise BackendClientError(msg) from e
-                else:
-                    self.session.config.rotate_endpoints()
-                    continue
+                self.session.config.rotate_endpoints()
+                continue
             except aiohttp.ClientResponseError as e:
                 msg = f"API endpoint response error.\n\u279c {e!r}"
                 raise BackendClientError(msg) from e
@@ -929,9 +926,8 @@ class SSEContextManager:
                         f"\u279c {e!r}"
                     )
                     raise BackendClientError(msg) from e
-                else:
-                    self.session.config.rotate_endpoints()
-                    continue
+                self.session.config.rotate_endpoints()
+                continue
             except aiohttp.ClientResponseError as e:
                 msg = f"API endpoint response error.\n\u279c {e!r}"
                 raise BackendClientError(msg) from e

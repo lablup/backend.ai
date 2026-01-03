@@ -359,8 +359,7 @@ class HuggingFaceService:
                 endpoint=config.endpoint,
             )
         )
-        scanner = HuggingFaceScanner(client)
-        return scanner
+        return HuggingFaceScanner(client)
 
     async def scan_models(
         self,
@@ -609,9 +608,8 @@ class HuggingFaceService:
                 async with session.get(download_url) as resp:
                     if resp.status == 200:
                         return await resp.text()
-                    else:
-                        log.warning(f"Failed to download README.md: HTTP {resp.status}")
-                        return None
+                    log.warning(f"Failed to download README.md: HTTP {resp.status}")
+                    return None
         except Exception as e:
             log.error(f"Error downloading README.md: {e!s}")
             return None
@@ -705,8 +703,7 @@ class HuggingFaceService:
 
             return DispatchResult.success(None)
 
-        bgtask_id = await self._background_task_manager.start(_import_models_batch)
-        return bgtask_id
+        return await self._background_task_manager.start(_import_models_batch)
 
 
 # Import Pipeline Steps
@@ -755,8 +752,7 @@ class HuggingFaceDownloadStep(ImportStep[None]):
                 endpoint=config.endpoint,
             )
         )
-        scanner = HuggingFaceScanner(client)
-        return scanner
+        return HuggingFaceScanner(client)
 
     @override
     async def execute(self, context: ImportStepContext, input_data: None) -> DownloadStepResult:

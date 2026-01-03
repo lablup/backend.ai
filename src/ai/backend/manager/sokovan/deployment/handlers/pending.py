@@ -60,8 +60,7 @@ class CheckPendingDeploymentHandler(DeploymentHandler):
         log.debug("Checking for pending deployments")
 
         # Execute deployment check logic via executor
-        result = await self._deployment_executor.check_pending_deployments(deployments)
-        return result
+        return await self._deployment_executor.check_pending_deployments(deployments)
 
     async def post_process(self, result: DeploymentExecutionResult) -> None:
         """Handle post-processing after checking pending deployments."""

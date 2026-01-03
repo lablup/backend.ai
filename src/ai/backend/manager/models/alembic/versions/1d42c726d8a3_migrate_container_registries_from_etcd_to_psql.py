@@ -204,8 +204,7 @@ def migrate_data_etcd_to_psql() -> None:
             file=sys.stderr,
         )
         raise RuntimeError(err_msg) from maybe_registries
-    else:
-        registries = cast(Mapping[str, Any], maybe_registries)
+    registries = cast(Mapping[str, Any], maybe_registries)
 
     old_format_container_registries = {
         hostname: etcd_container_registry_iv.check(item)

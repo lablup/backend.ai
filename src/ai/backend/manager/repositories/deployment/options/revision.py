@@ -90,12 +90,10 @@ class RevisionOrders:
     def name(ascending: bool = True) -> QueryOrder:
         if ascending:
             return DeploymentRevisionRow.name.asc()
-        else:
-            return DeploymentRevisionRow.name.desc()
+        return DeploymentRevisionRow.name.desc()
 
     @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return DeploymentRevisionRow.created_at.asc()
-        else:
-            return DeploymentRevisionRow.created_at.desc()
+        return DeploymentRevisionRow.created_at.desc()

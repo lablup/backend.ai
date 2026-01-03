@@ -64,8 +64,7 @@ class TerminatingRouteHandler(RouteHandler):
         log.debug("Terminating {} routes", len(routes))
 
         # Execute route termination logic via executor
-        result = await self._route_executor.terminate_routes(routes)
-        return result
+        return await self._route_executor.terminate_routes(routes)
 
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Handle post-processing after terminating routes."""

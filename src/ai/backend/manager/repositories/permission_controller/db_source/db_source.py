@@ -669,8 +669,7 @@ class PermissionDBSource:
             )
         )
         async with self._db.begin_readonly_session() as db_session:
-            result = await db_session.scalar(role_query)
-            return result
+            return await db_session.scalar(role_query)
 
     def _make_query_statement_for_object_permission(
         self,
@@ -792,10 +791,9 @@ class PermissionDBSource:
                 for pg in role.permission_group_rows:
                     if pg.scope_type == ScopeType.GLOBAL:
                         return dict.fromkeys(object_ids, True)
-                    else:
-                        for object in pg.mapped_entities:
-                            object_id = object.object_id()
-                            result[object_id] = True
+                    for object in pg.mapped_entities:
+                        object_id = object.object_id()
+                        result[object_id] = True
         return result
 
     async def search_roles(

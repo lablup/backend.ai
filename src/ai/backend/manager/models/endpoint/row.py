@@ -500,12 +500,11 @@ class EndpointRow(Base):
                 RouteStatus.UNHEALTHY,
                 RouteStatus.FAILED_TO_START,
             }
-        else:
-            return {
-                RouteStatus.HEALTHY,
-                RouteStatus.UNHEALTHY,
-                RouteStatus.FAILED_TO_START,
-            }
+        return {
+            RouteStatus.HEALTHY,
+            RouteStatus.UNHEALTHY,
+            RouteStatus.FAILED_TO_START,
+        }
 
     @staticmethod
     async def delegate_endpoint_ownership(

@@ -21,8 +21,7 @@ def build_url(config, path: str) -> URL:
     base_url = config.endpoint.path.rstrip("/")
     query_path = path.lstrip("/") if len(path) > 0 else ""
     path = f"{base_url}/{query_path}"
-    canonical_url = config.endpoint.with_path(path)
-    return canonical_url
+    return config.endpoint.with_path(path)
 
 
 @pytest.fixture(scope="module", autouse=True)

@@ -20,12 +20,11 @@ from ...utils import ScenarioBase
 
 @pytest.fixture
 def mock_list_endpoints_by_owner_validated(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.repository,
         "list_endpoints_by_owner_validated",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 class TestListModelService:

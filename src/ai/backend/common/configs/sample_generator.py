@@ -86,8 +86,7 @@ def _dump_toml_scalar(
             if default is not None:
                 if isinstance(default, list):
                     return _dump_toml_scalar(default, None, ctx)
-                else:
-                    return "[ " + _dump_toml_scalar(default, None, ctx) + " ]"
+                return "[ " + _dump_toml_scalar(default, None, ctx) + " ]"
             return "[ " + _dump_toml_scalar(item_type, default, ctx) + " ]"
         case {"type": "integer"} | {"type": "number"}:
             if default is None:

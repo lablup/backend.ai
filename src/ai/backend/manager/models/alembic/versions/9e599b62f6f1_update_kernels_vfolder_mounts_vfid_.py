@@ -76,8 +76,7 @@ def upgrade() -> None:
 
         if quota_scope_id := known_quota_scopes.get(UUID(v2_id)):
             return f"{quota_scope_id}/{v2_id}"
-        else:
-            return v2_id
+        return v2_id
 
     prev_id = None
     while True:

@@ -257,8 +257,7 @@ class UserRepository:
                 await self._update_user_groups(
                     conn, updated_user.uuid, updated_user.domain_name, group_ids
                 )
-            res = UserData.from_row(updated_user)
-        return res
+            return UserData.from_row(updated_user)
 
     @user_repository_resilience.apply()
     async def soft_delete_user_validated(self, email: str, requester_uuid: Optional[UUID]) -> None:

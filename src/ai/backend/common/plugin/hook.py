@@ -155,8 +155,7 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
                         src_plugin=plugin_name,
                         result=result,
                     )
-                else:
-                    results.append(result)
+                results.append(result)
         if not success_if_no_hook and not executed_plugin_names:
             return HookResult(
                 status=REJECTED,

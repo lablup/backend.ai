@@ -36,8 +36,7 @@ class StringSetFlag(enum.StrEnum):
         if isinstance(other, str):
             if other == self.value:
                 return set()
-            else:
-                return other
+            return other
         raise TypeError
 
     def __rxor__(self, other):
@@ -46,8 +45,7 @@ class StringSetFlag(enum.StrEnum):
         if isinstance(other, str):
             if other == self.value:
                 return set()
-            else:
-                return other
+            return other
         raise TypeError
 
     def __str__(self):

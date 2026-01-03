@@ -459,8 +459,7 @@ class ImageRow(Base):
         result = await session.scalar(query)
         if result is not None:
             return result
-        else:
-            raise UnknownImageReference
+        raise UnknownImageReference
 
     @classmethod
     async def from_image_identifier(
@@ -1483,5 +1482,4 @@ async def get_permission_ctx(
 ) -> ImagePermissionContext:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         builder = ImagePermissionContextBuilder(db_session)
-        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
-    return permission_ctx
+        return await builder.build(ctx, target_scope, requested_permission)

@@ -163,8 +163,7 @@ class RoutingRow(Base):
         if user_uuid:
             query = query.filter(RoutingRow.session_owner == user_uuid)
         result = await db_sess.execute(query)
-        rows = result.scalars().all()
-        return rows
+        return result.scalars().all()
 
     @classmethod
     async def get(

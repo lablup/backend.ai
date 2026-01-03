@@ -129,13 +129,12 @@ async def is_user_allowed_to_access_resource(
 ) -> bool:
     if request["user"]["is_superadmin"]:
         return True
-    elif request["user"]["is_admin"]:
+    if request["user"]["is_admin"]:
         query = sa.select(UserRow).filter(UserRow.uuid == resource_owner)
         result = await db_sess.execute(query)
         user = result.scalar()
         return user.domain_name == request["user"]["domain_name"]
-    else:
-        return request["user"]["uyud"] == resource_owner
+    return request["user"]["uyud"] == resource_owner
 
 
 class ListServeRequestModel(LegacyBaseRequestModel):
@@ -775,17 +774,16 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
             )
         )
         return ServeInfoModel.from_deployment_info(deployment_result.data)
-    else:
-        # Fall back to model_serving
-        action = params.to_create_action(
-            validation_result=validation_result,
-            request_user_id=request["user"]["uuid"],
-            sudo_session_enabled=request["user"]["sudo_session_enabled"],
-        )
-        result: CreateModelServiceActionResult = (
-            await root_ctx.processors.model_serving.create_model_service.wait_for_complete(action)
-        )
-        return ServeInfoModel.from_dto(result.data)
+    # Fall back to model_serving
+    action = params.to_create_action(
+        validation_result=validation_result,
+        request_user_id=request["user"]["uuid"],
+        sudo_session_enabled=request["user"]["sudo_session_enabled"],
+    )
+    result: CreateModelServiceActionResult = (
+        await root_ctx.processors.model_serving.create_model_service.wait_for_complete(action)
+    )
+    return ServeInfoModel.from_dto(result.data)
 
 
 class TryStartResponseModel(LegacyBaseResponseModel):
@@ -841,21 +839,18 @@ async def delete(request: web.Request) -> SuccessResponseModel:
             )
         )
         return SuccessResponseModel(success=deployment_result.success)
-    else:
-        # Fall back to model_serving
-        action = DeleteModelServiceAction(
-            service_id=service_id,
-            requester_ctx=RequesterCtx(
-                is_authorized=request["is_authorized"],
-                user_id=request["user"]["uuid"],
-                user_role=request["user"]["role"],
-                domain_name=request["user"]["domain_name"],
-            ),
-        )
-        result = await root_ctx.processors.model_serving.delete_model_service.wait_for_complete(
-            action
-        )
-        return SuccessResponseModel(success=result.success)
+    # Fall back to model_serving
+    action = DeleteModelServiceAction(
+        service_id=service_id,
+        requester_ctx=RequesterCtx(
+            is_authorized=request["is_authorized"],
+            user_id=request["user"]["uuid"],
+            user_role=request["user"]["role"],
+            domain_name=request["user"]["domain_name"],
+        ),
+    )
+    result = await root_ctx.processors.model_serving.delete_model_service.wait_for_complete(action)
+    return SuccessResponseModel(success=result.success)
 
 
 @auth_required

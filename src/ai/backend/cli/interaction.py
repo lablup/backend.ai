@@ -59,9 +59,7 @@ def ask_string(prompt: str, default: str = "", use_default: bool = True) -> str:
             if user_reply == "":
                 return default
             return user_reply
-        else:
-            user_reply = input(f"{prompt} (if you don't want, just leave empty): ")
-            return user_reply
+        return input(f"{prompt} (if you don't want, just leave empty): ")
 
 
 def ask_string_in_array(prompt: str, choices: list, default: str) -> Optional[str]:

@@ -30,8 +30,7 @@ class TestEtcdDependency:
         )
 
         # Create a minimal BootstrapConfig with just etcd settings
-        config = BootstrapConfig(etcd=etcd_config)
-        return config
+        return BootstrapConfig(etcd=etcd_config)
 
     @pytest.mark.asyncio
     async def test_provide_etcd_client(

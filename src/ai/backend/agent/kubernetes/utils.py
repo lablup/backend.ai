@@ -60,8 +60,7 @@ class PersistentServiceContainer:
         except DockerError as e:
             if e.status == 404:
                 return 0, False
-            else:
-                raise
+            raise
         if c["Config"].get("Labels", {}).get("ai.backend.system", "0") != "1":
             raise RuntimeError(
                 f'An existing container named "{c["Name"].lstrip("/")}" is not a system container'
@@ -78,8 +77,7 @@ class PersistentServiceContainer:
         except DockerError as e:
             if e.status == 404:
                 return 0
-            else:
-                raise
+            raise
         return int(img["Config"].get("Labels", {}).get("ai.backend.version", "0"))
 
     async def ensure_running_latest(self) -> None:

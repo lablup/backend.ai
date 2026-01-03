@@ -143,9 +143,8 @@ class UndefChecker(t.Trafaret):
     def check_and_return(self, value: Any) -> object:
         if value == undefined:
             return value
-        else:
-            self._failure("Invalid Undef format", value=value)
-            return None
+        self._failure("Invalid Undef format", value=value)
+        return None
 
 
 resource_opts_iv = t.Dict({

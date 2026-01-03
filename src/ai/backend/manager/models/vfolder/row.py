@@ -723,8 +723,7 @@ async def get_allowed_vfolder_hosts_by_group(
         if values := await conn.scalar(query):
             allowed_hosts = allowed_hosts | values
     # Keypair Resource Policy's allowed_vfolder_hosts
-    allowed_hosts = allowed_hosts | resource_policy["allowed_vfolder_hosts"]
-    return allowed_hosts
+    return allowed_hosts | resource_policy["allowed_vfolder_hosts"]
 
 
 async def get_allowed_vfolder_hosts_by_user(
@@ -777,8 +776,7 @@ async def get_allowed_vfolder_hosts_by_user(
         for row in rows:
             allowed_hosts = allowed_hosts | row.allowed_vfolder_hosts
     # Keypair Resource Policy's allowed_vfolder_hosts
-    allowed_hosts = allowed_hosts | resource_policy["allowed_vfolder_hosts"]
-    return allowed_hosts
+    return allowed_hosts | resource_policy["allowed_vfolder_hosts"]
 
 
 @overload
@@ -906,8 +904,7 @@ async def prepare_vfolder_mounts(
     if not accessible_vfolders:
         if requested_vfolder_names:
             raise VFolderNotFound("There is no accessible vfolders at all.")
-        else:
-            return []
+        return []
 
     requested_names = set(requested_vfolder_names.values())
     for row in accessible_vfolders:
@@ -1084,8 +1081,8 @@ async def update_vfolder_status(
     vfolder_info_len = len(vfolder_ids)
     cond = vfolders.c.id.in_(vfolder_ids)
     if vfolder_info_len == 0:
-        return None
-    elif vfolder_info_len == 1:
+        return
+    if vfolder_info_len == 1:
         cond = vfolders.c.id == vfolder_ids[0]
 
     now = datetime.now(UTC)
@@ -1538,8 +1535,7 @@ class VFolderPermissionContextBuilder(
         target_scope: ScopeType,
     ) -> frozenset[VFolderRBACPermission]:
         roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
-        permissions = await self._calculate_permission_by_predefined_roles(roles)
-        return permissions
+        return await self._calculate_permission_by_predefined_roles(roles)
 
     @override
     async def build_ctx_in_system_scope(
@@ -1583,8 +1579,7 @@ class VFolderPermissionContextBuilder(
     async def build_ctx_in_user_scope(
         self, ctx: ClientContext, scope: UserRBACScope
     ) -> VFolderPermissionContext:
-        permission_ctx = await self._build_at_user_scope_non_recursively(ctx, scope.user_id)
-        return permission_ctx
+        return await self._build_at_user_scope_non_recursively(ctx, scope.user_id)
 
     async def _build_at_domain_scope_non_recursively(
         self,
@@ -1592,10 +1587,9 @@ class VFolderPermissionContextBuilder(
         domain_name: str,
     ) -> VFolderPermissionContext:
         domain_permissions = await self.calculate_permission(ctx, DomainScope(domain_name))
-        result = VFolderPermissionContext(
+        return VFolderPermissionContext(
             domain_name_to_permission_map={domain_name: domain_permissions}
         )
-        return result
 
     async def _build_at_project_scopes_in_domain(
         self,
@@ -1838,14 +1832,13 @@ async def get_permission_ctx(
 ) -> VFolderPermissionContext:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         builder = VFolderPermissionContextBuilder(db_session)
-        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
+        return await builder.build(ctx, target_scope, requested_permission)
         # TODO: Plan how to check storage host permission with recursive scopes
         # host_permission = _VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP[requested_permission]
         # host_permission_ctx = await StorageHostPermissionContextBuilder(db_session).build(
         #     ctx, target_scope, host_permission
         # )
         # permission_ctx.apply_host_permission_ctx(host_permission_ctx)
-    return permission_ctx
 
 
 def is_mount_duplicate(

@@ -411,9 +411,7 @@ class Circuit(SerializableCircuit):
 
     @property
     def prometheus_metric_label(self) -> dict[str, str]:
-        metric_labels = {"protocol": self.protocol.name}
-
-        return metric_labels
+        return {"protocol": self.protocol.name}
 
 
 class MetricTypes(enum.Enum):

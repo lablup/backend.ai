@@ -194,7 +194,7 @@ class Image(graphene.ObjectType):
 
     @classmethod
     def from_image_with_agent_install_status(cls, data: ImageWithAgentInstallStatus) -> Self:
-        result = cls(
+        return cls(
             id=data.image.id,
             name=data.image.name,
             namespace=data.image.namespace,
@@ -226,7 +226,6 @@ class Image(graphene.ObjectType):
             # legacy
             hash=data.image.digest,
         )
-        return result
 
     @classmethod
     async def batch_load_by_canonical(
@@ -314,8 +313,7 @@ class Image(graphene.ObjectType):
             GetAllImagesAction(status_filter=filter_by_statuses)
         )
         all_items = [cls.from_image_with_agent_install_status(img) for img in result.data.values()]
-        filtered_items = [item for item in all_items if item.matches_filter(ctx, types)]
-        return filtered_items
+        return [item for item in all_items if item.matches_filter(ctx, types)]
 
     @staticmethod
     async def filter_allowed(
@@ -398,6 +396,7 @@ class ImagePermissionValueField(graphene.Scalar):
     def parse_literal(node: Any, _variables=None):
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ImagePermission(node.value)
+        return None
 
     @staticmethod
     def parse_value(value: str) -> ImagePermission:
@@ -542,7 +541,7 @@ class ImageNode(graphene.ObjectType):
         version, ptag_set = image_ref.tag_set
         image_type = row.labels.get(LabelName.ROLE, ImageType.COMPUTE.value)
 
-        result = cls(
+        return cls(
             id=row.id,
             row_id=row.id,
             name=row.image,
@@ -570,15 +569,13 @@ class ImageNode(graphene.ObjectType):
             type=image_type,
         )
 
-        return result
-
     @classmethod
     def from_legacy_image(
         cls, image: Image, *, permissions: Optional[Iterable[ImagePermission]] = None
     ) -> ImageNode:
         labels: dict[str, str] = {kvpair.key: kvpair.value for kvpair in cast(list, image.labels)}
         image_type = labels.get(LabelName.ROLE, ImageType.COMPUTE.value)
-        result = cls(
+        return cls(
             id=image.id,
             row_id=image.id,
             name=image.name,
@@ -602,7 +599,6 @@ class ImageNode(graphene.ObjectType):
             status=image.status,
             type=image_type,
         )
-        return result
 
     @classmethod
     async def get_node(

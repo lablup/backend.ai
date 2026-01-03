@@ -111,10 +111,9 @@ class DeploymentController:
             SessionValidationSpec.from_revision(model_revision=model_revision)
         )
 
-        deployment_info = await self._deployment_repository.create_endpoint_legacy(
+        return await self._deployment_repository.create_endpoint_legacy(
             draft.to_creator(model_revision)
         )
-        return deployment_info
 
     async def update_deployment(
         self,

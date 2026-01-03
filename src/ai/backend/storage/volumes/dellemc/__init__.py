@@ -51,8 +51,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
             async with aiofiles.open(quota_id_path) as file:
                 quota_id = await file.read()
             return quota_id.rstrip()
-        else:
-            return None
+        return None
 
     async def _unset_quota_id(self, qspath: Path) -> None:
         quota_id_path = qspath / ".quota_id"
@@ -92,8 +91,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
                 used_bytes=used_bytes,
                 limit_bytes=limit_bytes,
             )
-        else:
-            return None
+        return None
 
     async def update_quota_scope(
         self,
@@ -228,15 +226,13 @@ class DellEMCOneFSVolume(BaseVolume):
 
     async def get_drive_stats(self) -> Mapping[str, Any]:
         try:
-            resp = await self.api_client.get_drive_stats()
-            return resp
+            return await self.api_client.get_drive_stats()
         except (IndexError, KeyError):
             raise DellNoMetricError
 
     async def get_protocol_stats(self) -> Mapping[str, Any]:
         try:
-            resp = await self.api_client.get_protocol_stats()
-            return resp
+            return await self.api_client.get_protocol_stats()
         except (IndexError, KeyError):
             return {
                 "disk": {
@@ -250,15 +246,13 @@ class DellEMCOneFSVolume(BaseVolume):
 
     async def get_system_stats(self) -> Mapping[str, Any]:
         try:
-            resp = await self.api_client.get_system_stats()
-            return resp
+            return await self.api_client.get_system_stats()
         except (IndexError, KeyError):
             raise DellNoMetricError
 
     async def get_workload_stats(self) -> Mapping[str, Any]:
         try:
-            resp = await self.api_client.get_workload_stats()
-            return resp
+            return await self.api_client.get_workload_stats()
         except (IndexError, KeyError):
             return {
                 "latency_write": 0,

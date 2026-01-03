@@ -132,10 +132,9 @@ class HuggingFaceClient:
         model_id = model.model_id
         revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
         try:
-            result = await asyncio.get_event_loop().run_in_executor(
+            return await asyncio.get_event_loop().run_in_executor(
                 None, lambda: model_info(model_id, revision=revision, token=self._token)
             )
-            return result
         except Exception as e:
             raise HuggingFaceAPIError(f"Failed to get model info for {model}: {e!s}") from e
 
@@ -170,10 +169,9 @@ class HuggingFaceClient:
         model_id = model.model_id
         revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
         try:
-            filepaths = await asyncio.get_event_loop().run_in_executor(
+            return await asyncio.get_event_loop().run_in_executor(
                 None, lambda: list_repo_files(model_id, revision=revision, token=self._token)
             )
-            return filepaths
         except Exception as e:
             raise HuggingFaceAPIError(f"Failed to list files for {model}: {e!s}") from e
 
@@ -193,13 +191,12 @@ class HuggingFaceClient:
         revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
 
         try:
-            info = await asyncio.get_event_loop().run_in_executor(
+            return await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: self._api.get_paths_info(
                     model_id, paths=paths, revision=revision, repo_type="model"
                 ),
             )
-            return info
         except Exception as e:
             raise HuggingFaceAPIError(f'Failed to get paths info for "{model}": {e!s}') from e
 
@@ -504,10 +501,8 @@ class HuggingFaceScanner:
             async with aiohttp.ClientSession() as session:
                 async with session.get(readme_url) as response:
                     if response.status == 200:
-                        content = await response.text()
-                        return content
-                    else:
-                        return None
+                        return await response.text()
+                    return None
 
         except Exception:
             return None

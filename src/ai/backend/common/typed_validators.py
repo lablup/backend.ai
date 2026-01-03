@@ -56,7 +56,7 @@ class _TimeDurationPydanticAnnotation:
                 t = float(value)
                 assert cls.allow_negative or t >= 0, "value must be positive"
                 return datetime.timedelta(seconds=t)
-            elif value[-2:].isalpha():
+            if value[-2:].isalpha():
                 t = int(value[:-2])
                 assert cls.allow_negative or t >= 0, "value must be positive"
                 match value[-2:]:
@@ -101,10 +101,9 @@ class _TimeDurationPydanticAnnotation:
                 )
                 if value.years:
                     return f"{value.years}yr"
-                elif value.months:
+                if value.months:
                     return f"{value.months}mo"
-                else:
-                    raise AssertionError("Should not reach here")
+                raise AssertionError("Should not reach here")
             case _:
                 raise AssertionError("Not a valid type")
 
@@ -270,10 +269,9 @@ class HostPortPair(BaseModel):
     def __getitem__(self, *args) -> int | str:
         if args[0] == 0:
             return self.host
-        elif args[0] == 1:
+        if args[0] == 1:
             return self.port
-        else:
-            raise KeyError(*args)
+        raise KeyError(*args)
 
     def to_legacy(self) -> LegacyHostPortPair:
         return LegacyHostPortPair(host=self.host, port=self.port)
@@ -350,17 +348,15 @@ class UserID(int):
         if value is None:
             if cls._default_uid is not None:
                 return cls._default_uid
-            else:
-                return os.getuid()
-        elif isinstance(value, int):
+            return os.getuid()
+        if isinstance(value, int):
             if value == -1:
                 return os.getuid()
         elif isinstance(value, str):
             if not value:
                 if cls._default_uid is not None:
                     return cls._default_uid
-                else:
-                    return os.getuid()
+                return os.getuid()
             try:
                 value = int(value)
             except ValueError:
@@ -403,17 +399,15 @@ class GroupID(int):
         if value is None:
             if cls._default_gid is not None:
                 return cls._default_gid
-            else:
-                return os.getgid()
-        elif isinstance(value, int):
+            return os.getgid()
+        if isinstance(value, int):
             if value == -1:
                 return os.getgid()
         elif isinstance(value, str):
             if not value:
                 if cls._default_gid is not None:
                     return cls._default_gid
-                else:
-                    return os.getgid()
+                return os.getgid()
             try:
                 value = int(value)
             except ValueError:

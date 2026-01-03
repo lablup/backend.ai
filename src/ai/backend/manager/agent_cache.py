@@ -39,20 +39,19 @@ class PeerInvoker(Peer):
         def __getattr__(self, name: str):
             if f := self._cached_funcs.get(name, None):
                 return f
-            else:
 
-                async def _wrapped(*args, **kwargs):
-                    request_body = {
-                        "args": args,
-                        "kwargs": kwargs,
-                    }
-                    self.peer.last_used = time.monotonic()
-                    ret = await self.peer.invoke(name, request_body, order_key=self.order_key.get())
-                    self.peer.last_used = time.monotonic()
-                    return ret
+            async def _wrapped(*args, **kwargs):
+                request_body = {
+                    "args": args,
+                    "kwargs": kwargs,
+                }
+                self.peer.last_used = time.monotonic()
+                ret = await self.peer.invoke(name, request_body, order_key=self.order_key.get())
+                self.peer.last_used = time.monotonic()
+                return ret
 
-                self._cached_funcs[name] = _wrapped
-                return _wrapped
+            self._cached_funcs[name] = _wrapped
+            return _wrapped
 
     call: _CallStub
     last_used: float

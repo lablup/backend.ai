@@ -615,12 +615,11 @@ class ScalingGroupPermissionContextBuilder(
         if domain_row is None:
             return ScalingGroupPermissionContext()
         scaling_groups = cast(list[ScalingGroupForDomainRow], domain_row.sgroup_for_domains_rows)
-        result = ScalingGroupPermissionContext(
+        return ScalingGroupPermissionContext(
             object_id_to_additional_permission_map={
                 row.scaling_group: permissions for row in scaling_groups
             }
         )
-        return result
 
     @override
     async def build_ctx_in_project_scope(
@@ -644,12 +643,11 @@ class ScalingGroupPermissionContextBuilder(
         if project_row is None:
             return ScalingGroupPermissionContext()
         scaling_groups = cast(list[ScalingGroupForProjectRow], project_row.sgroup_for_groups_rows)
-        result = ScalingGroupPermissionContext(
+        return ScalingGroupPermissionContext(
             object_id_to_additional_permission_map={
                 row.scaling_group: project_permissions for row in scaling_groups
             }
         )
-        return result
 
     @override
     async def build_ctx_in_user_scope(
@@ -686,10 +684,9 @@ class ScalingGroupPermissionContextBuilder(
             for sg in scaling_groups:
                 if sg.scaling_group not in object_id_to_additional_permission_map:
                     object_id_to_additional_permission_map[sg.scaling_group] = user_permissions
-        result = ScalingGroupPermissionContext(
+        return ScalingGroupPermissionContext(
             object_id_to_additional_permission_map=object_id_to_additional_permission_map
         )
-        return result
 
     @override
     @classmethod

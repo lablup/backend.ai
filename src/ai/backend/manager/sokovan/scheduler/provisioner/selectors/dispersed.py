@@ -81,6 +81,4 @@ class DispersedAgentSelector(AbstractAgentSelector):
                 ],
             ]
 
-        chosen_tracker = max(trackers, key=tracker_sort_key)
-
-        return chosen_tracker
+        return max(trackers, key=tracker_sort_key)

@@ -210,7 +210,7 @@ class TestUserRepository:
 
                 # Mock to_data method
                 def to_data():
-                    user_data = UserData(
+                    return UserData(
                         id=created_user_row.uuid,
                         uuid=created_user_row.uuid,
                         is_active=created_user_row.status == UserStatus.ACTIVE,
@@ -235,7 +235,6 @@ class TestUserRepository:
                         container_main_gid=created_user_row.container_main_gid,
                         container_gids=created_user_row.container_gids,
                     )
-                    return user_data
 
                 created_user_row.to_data = to_data
 

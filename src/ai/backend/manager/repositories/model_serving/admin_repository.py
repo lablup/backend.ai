@@ -77,8 +77,7 @@ class AdminModelServingRepository:
             )
             if not endpoint:
                 return None
-            data = endpoint.to_data()
-        return data
+            return endpoint.to_data()
 
     @model_serving_repository_resilience.apply()
     async def update_endpoint_lifecycle_force(
@@ -145,8 +144,7 @@ class AdminModelServingRepository:
             route = await self._get_route_by_id(session, route_id, load_endpoint=True)
             if not route or route.endpoint != service_id:
                 return None
-            data = route.to_data()
-        return data
+            return route.to_data()
 
     @model_serving_repository_resilience.apply()
     async def update_route_traffic_force(
@@ -218,8 +216,7 @@ class AdminModelServingRepository:
             session.add(token_row)
             await session.commit()
             await session.refresh(token_row)
-            data = token_row.to_dataclass()
-        return data
+            return token_row.to_dataclass()
 
     async def _get_endpoint_by_id(
         self,

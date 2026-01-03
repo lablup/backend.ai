@@ -97,8 +97,7 @@ class BaseHTTPFrontend(Generic[TCircuitKey], BaseFrontend[HTTPBackend, TCircuitK
 
         if self._is_websocket_request(request):
             return await backend.proxy_ws(request)
-        else:
-            return await backend.proxy_http(request)
+        return await backend.proxy_http(request)
 
     async def exception_safe_handler_wrapper(
         self, request: web.Request, handler: WebRequestHandler
@@ -116,13 +115,12 @@ class BaseHTTPFrontend(Generic[TCircuitKey], BaseFrontend[HTTPBackend, TCircuitK
                     status=ex.status_code,
                     headers={"Access-Control-Allow-Origin": "*"},
                 )
-            else:
-                return aiohttp_jinja2.render_template(
-                    "error.jinja2",
-                    request,
-                    ex.body_dict,
-                    status=ex.status_code,
-                )
+            return aiohttp_jinja2.render_template(
+                "error.jinja2",
+                request,
+                ex.body_dict,
+                status=ex.status_code,
+            )
         return resp
 
     @web.middleware
@@ -136,15 +134,12 @@ class BaseHTTPFrontend(Generic[TCircuitKey], BaseFrontend[HTTPBackend, TCircuitK
         self, request: web.Request, handler: WebRequestHandler
     ) -> web.StreamResponse:
         metrics = self.root_context.metrics
-        response: web.StreamResponse | None = None
-
         remote = request.remote or ""
         start = time.monotonic()
         try:
             if not self._is_websocket_request(request):
                 metrics.proxy.observe_downstream_http_request(remote=remote)
-            response = await handler(request)
-            return response
+            return await handler(request)
         finally:
             end = time.monotonic()
             if not self._is_websocket_request(request):

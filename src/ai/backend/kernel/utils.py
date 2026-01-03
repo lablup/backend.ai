@@ -110,7 +110,7 @@ def parse_proc_stat(pid):
     #  T  Stopped (on a signal) or (before Linux 2.6.33) trace stopped
     #  t  Tracing stop (Linux 2.6.33 onward)
     #  X  Dead (from Linux 2.6.0 onward)
-    stat = {
+    return {
         "name": name,
         "cmdline": Path(f"/proc/{pid}/cmdline").read_bytes(),
         "status": fields[0],
@@ -122,4 +122,3 @@ def parse_proc_stat(pid):
         "vsize": int(fields[20]),  # bytes
         "rss": int(fields[21]),  # num pages
     }
-    return stat

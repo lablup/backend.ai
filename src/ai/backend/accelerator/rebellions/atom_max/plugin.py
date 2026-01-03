@@ -146,8 +146,7 @@ class ATOMMaxPlugin(AbstractATOMPlugin[ATOMMaxDevice]):
         for d in live_devices:
             if d.device_id in unique_ids:
                 device_indexes.extend([dd.rbln_stat_info.npu for dd in d.children])
-        group_idx = await ATOMAPI.create_group(self._rbln_stat_path, device_indexes)
-        return group_idx
+        return await ATOMAPI.create_group(self._rbln_stat_path, device_indexes)
 
     async def list_device_files(self, device: ATOMMaxDevice) -> Iterable[str]:
         return [f"/dev/{c.rbln_stat_info.device}" for c in device.children]

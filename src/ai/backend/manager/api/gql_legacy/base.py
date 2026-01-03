@@ -128,6 +128,7 @@ class BigInt(Scalar):
                 # treat as float
                 return float(int(num))
             return num
+        return None
 
 
 class Bytes(Scalar):
@@ -735,8 +736,7 @@ async def simple_db_mutate(
                 await post_func(conn, result)
         if result.rowcount > 0:
             return result_cls(True, "success")
-        else:
-            return result_cls(False, f"no matching {result_cls.__name__.lower()}")
+        return result_cls(False, f"no matching {result_cls.__name__.lower()}")
 
     return await gql_mutation_wrapper(result_cls, _do_mutate)
 
@@ -787,8 +787,7 @@ async def simple_db_mutate_returning_item(
                 row = result.first()
             if result.rowcount > 0:
                 return result_cls(True, "success", item_cls.from_row(graph_ctx, row))
-            else:
-                return result_cls(False, f"no matching {result_cls.__name__.lower()}", None)
+            return result_cls(False, f"no matching {result_cls.__name__.lower()}", None)
 
     return await gql_mutation_wrapper(result_cls, _do_mutate)
 
@@ -844,8 +843,7 @@ def orm_set_if_set(
 def filter_gql_undefined[T](val: T, *, default_value: Optional[T] = None) -> Optional[T]:
     if val is Undefined:
         return default_value
-    else:
-        return val
+    return val
 
 
 class InferenceSessionError(graphene.ObjectType):

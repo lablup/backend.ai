@@ -119,6 +119,7 @@ class AliasGroupMixin(click.Group):
         command = super().get_command(ctx, cmd_name)
         if command:
             return command
+        return None
 
     def format_commands(self, ctx, formatter):
         commands = []

@@ -120,8 +120,7 @@ class AgentWatcher(BaseFunction):
             data = await resp.json()
             if "message" in data:
                 return data["message"]
-            else:
-                return data
+            return data
 
     @api_function
     @classmethod
@@ -135,8 +134,7 @@ class AgentWatcher(BaseFunction):
             data = await resp.json()
             if "message" in data:
                 return data["message"]
-            else:
-                return data
+            return data
 
     @api_function
     @classmethod
@@ -150,8 +148,7 @@ class AgentWatcher(BaseFunction):
             data = await resp.json()
             if "message" in data:
                 return data["message"]
-            else:
-                return data
+            return data
 
     @api_function
     @classmethod
@@ -165,5 +162,4 @@ class AgentWatcher(BaseFunction):
             data = await resp.json()
             if "message" in data:
                 return data["message"]
-            else:
-                return data
+            return data

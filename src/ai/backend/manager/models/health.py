@@ -84,13 +84,12 @@ class ConnectionInfoOfProcess(BaseModel):
 
 async def get_sqlalchemy_connection_info(root_ctx: RootContext) -> SQLAlchemyConnectionInfo:
     pool = cast(Pool, root_ctx.db.pool)
-    sqlalchemy_info = SQLAlchemyConnectionInfo(
+    return SQLAlchemyConnectionInfo(
         pool_type=type(pool).__name__,
         status_description=pool.status(),
         num_checkedout_cxn=pool.checkedout(),
         num_checkedin_cxn=pool.checkedin(),
     )
-    return sqlalchemy_info
 
 
 async def get_redis_object_info_list(root_ctx: RootContext) -> list[RedisObjectConnectionInfo]:

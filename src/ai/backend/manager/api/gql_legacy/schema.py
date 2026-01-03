@@ -1810,8 +1810,7 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
     ) -> Optional[Viewer]:
-        viewer = await Viewer.get_viewer(info)
-        return viewer
+        return await Viewer.get_viewer(info)
 
     @staticmethod
     @scoped_query(autofill_user=True, user_key="email")
@@ -2047,14 +2046,13 @@ class Query(graphene.ObjectType):
                 is_active=is_active,
                 limit=100,
             )
-        else:
-            loader = ctx.dataloader_manager.get_loader(
-                ctx,
-                "KeyPair.by_email",
-                domain_name=domain_name,
-                is_active=is_active,
-            )
-            return await loader.load(email)
+        loader = ctx.dataloader_manager.get_loader(
+            ctx,
+            "KeyPair.by_email",
+            domain_name=domain_name,
+            is_active=is_active,
+        )
+        return await loader.load(email)
 
     @staticmethod
     @scoped_query(autofill_user=False, user_key="email")
@@ -2103,12 +2101,11 @@ class Query(graphene.ObjectType):
                 "KeyPairResourcePolicy.by_ak",
             )
             return await loader.load(client_access_key)
-        else:
-            loader = ctx.dataloader_manager.get_loader(
-                ctx,
-                "KeyPairResourcePolicy.by_name",
-            )
-            return await loader.load(name)
+        loader = ctx.dataloader_manager.get_loader(
+            ctx,
+            "KeyPairResourcePolicy.by_name",
+        )
+        return await loader.load(name)
 
     @staticmethod
     async def resolve_keypair_resource_policies(
@@ -2120,16 +2117,15 @@ class Query(graphene.ObjectType):
         client_access_key = ctx.access_key
         if client_role == UserRole.SUPERADMIN:
             return await KeyPairResourcePolicy.load_all(info.context)
-        elif client_role == UserRole.ADMIN:
+        if client_role == UserRole.ADMIN:
             # TODO: filter resource policies by domains?
             return await KeyPairResourcePolicy.load_all(info.context)
-        elif client_role == UserRole.USER:
+        if client_role == UserRole.USER:
             return await KeyPairResourcePolicy.load_all_user(
                 info.context,
                 client_access_key,
             )
-        else:
-            raise InvalidAPIParameters("Unknown client role")
+        raise InvalidAPIParameters("Unknown client role")
 
     @staticmethod
     async def resolve_user_resource_policy(
@@ -2145,12 +2141,11 @@ class Query(graphene.ObjectType):
                 "UserResourcePolicy.by_user",
             )
             return await loader.load(user_uuid)
-        else:
-            loader = ctx.dataloader_manager.get_loader(
-                ctx,
-                "UserResourcePolicy.by_name",
-            )
-            return await loader.load(name)
+        loader = ctx.dataloader_manager.get_loader(
+            ctx,
+            "UserResourcePolicy.by_name",
+        )
+        return await loader.load(name)
 
     @staticmethod
     async def resolve_user_resource_policies(
@@ -2162,16 +2157,15 @@ class Query(graphene.ObjectType):
         user_uuid = ctx.user["uuid"]
         if client_role == UserRole.SUPERADMIN:
             return await UserResourcePolicy.load_all(info.context)
-        elif client_role == UserRole.ADMIN:
+        if client_role == UserRole.ADMIN:
             # TODO: filter resource policies by domains?
             return await UserResourcePolicy.load_all(info.context)
-        elif client_role == UserRole.USER:
+        if client_role == UserRole.USER:
             return await UserResourcePolicy.batch_load_by_user(
                 info.context,
                 [user_uuid],
             )
-        else:
-            raise InvalidAPIParameters("Unknown client role")
+        raise InvalidAPIParameters("Unknown client role")
 
     @staticmethod
     async def resolve_project_resource_policy(
@@ -2195,11 +2189,10 @@ class Query(graphene.ObjectType):
         client_role = ctx.user["role"]
         if client_role == UserRole.SUPERADMIN:
             return await ProjectResourcePolicy.load_all(info.context)
-        elif client_role == UserRole.ADMIN:
+        if client_role == UserRole.ADMIN:
             # TODO: filter resource policies by domains?
             return await ProjectResourcePolicy.load_all(info.context)
-        else:
-            raise InvalidAPIParameters("Unknown client role")
+        raise InvalidAPIParameters("Unknown client role")
 
     @staticmethod
     async def resolve_resource_preset(
@@ -2825,10 +2818,9 @@ class Query(graphene.ObjectType):
         matches = await loader.load(SessionId(uuid.UUID(sess_id)))
         if len(matches) == 0:
             return None
-        elif len(matches) == 1:
+        if len(matches) == 1:
             return matches[0]
-        else:
-            raise TooManyKernelsFound
+        raise TooManyKernelsFound
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)

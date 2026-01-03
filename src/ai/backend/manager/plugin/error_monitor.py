@@ -29,8 +29,7 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
             )
             self.enabled = False
             return
-        else:
-            self.enabled = True
+        self.enabled = True
         root_ctx: RootContext = context["_root.context"]  # type: ignore
         self.db = root_ctx.db
 
@@ -97,8 +96,7 @@ class ErrorEventDispatcher(AbstractEventDispatcherPlugin):
             )
             self.enabled = False
             return
-        else:
-            self.enabled = True
+        self.enabled = True
         root_ctx: RootContext = context
         self._db = root_ctx.db
 

@@ -59,8 +59,7 @@ def _traverse(scheme: t.Trafaret) -> dict:
         valid_trafarets = [x for x in trafarets if not isinstance(x, (t.Null, UndefChecker))]
         if len(valid_trafarets) >= 2:
             return {"anyOf": [_traverse(s) for s in valid_trafarets]}
-        else:
-            scheme = valid_trafarets[0]
+        scheme = valid_trafarets[0]
     if isinstance(scheme, t.Any):
         return {"type": "string"}
     if isinstance(scheme, t.Bool):

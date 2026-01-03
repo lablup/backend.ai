@@ -545,8 +545,7 @@ class KernelRegistry(MutableMapping[AgentKernelRegistryKey, AbstractKernel]):
     def __getitem__(self, key: KernelId | AgentKernelRegistryKey) -> AbstractKernel:
         if isinstance(key, AgentKernelRegistryKey):
             return self._registry[key]
-        else:
-            return self._global_registry[key]
+        return self._global_registry[key]
 
     def __setitem__(self, key: AgentKernelRegistryKey, value: AbstractKernel) -> None:
         self._registry[key] = value
@@ -647,8 +646,7 @@ class SocketPair:
             if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
                 log.exception(f"Socket invalid (addr: {self.output_sock.addr}, err: {e!r})")
                 raise InvalidSocket
-            else:
-                raise
+            raise
 
     def close(self) -> None:
         self.input_sock.close()
@@ -1071,16 +1069,16 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                     if rec.msg_type == "finished":
                         data = load_json(rec.data) if rec.data else {}
                         raise RunFinished(data)
-                    elif rec.msg_type == "clean-finished":
+                    if rec.msg_type == "clean-finished":
                         data = load_json(rec.data) if rec.data else {}
                         raise CleanFinished(data)
-                    elif rec.msg_type == "build-finished":
+                    if rec.msg_type == "build-finished":
                         data = load_json(rec.data) if rec.data else {}
                         raise BuildFinished(data)
-                    elif rec.msg_type == "waiting-input":
+                    if rec.msg_type == "waiting-input":
                         opts = load_json(rec.data) if rec.data else {}
                         raise InputRequestPending(opts)
-                    elif rec.msg_type == "exec-timeout":
+                    if rec.msg_type == "exec-timeout":
                         raise ExecTimeout
         except asyncio.CancelledError:
             self.resume_output_queue()

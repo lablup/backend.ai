@@ -193,18 +193,17 @@ async def setup(
                     f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}",
                     headers=cors_headers,
                 )
-            else:
-                return PydanticResponse(
-                    ProxySetupResponseModel(
-                        redirect=AnyUrl(
-                            f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}"
-                        ),
-                        redirectURI=AnyUrl(
-                            f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}"
-                        ),
+            return PydanticResponse(
+                ProxySetupResponseModel(
+                    redirect=AnyUrl(
+                        f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}"
                     ),
-                    headers=cors_headers,
-                )
+                    redirectURI=AnyUrl(
+                        f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}"
+                    ),
+                ),
+                headers=cors_headers,
+            )
         case _:
             raise InvalidAPIParameters("E20002: Protocol not available as interactive app")
 

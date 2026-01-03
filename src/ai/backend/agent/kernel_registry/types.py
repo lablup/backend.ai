@@ -57,7 +57,7 @@ class KernelRecoveryData(BaseModel):
 
     @classmethod
     def from_docker_kernel(cls, kernel: DockerKernel) -> Self:
-        result = cls(
+        return cls(
             id=kernel.kernel_id,
             agent_id=kernel.agent_id,
             image_ref=kernel.image,
@@ -74,7 +74,6 @@ class KernelRecoveryData(BaseModel):
             repl_in_port=kernel.data["repl_in_port"],
             repl_out_port=kernel.data["repl_out_port"],
         )
-        return result
 
     def to_docker_kernel(self) -> DockerKernel:
         from ai.backend.agent.docker.kernel import DockerKernel

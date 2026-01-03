@@ -91,8 +91,7 @@ async def _calculate_role_in_scope_for_suadmin(
             domain_row = cast(DomainRow | None, await db_session.scalar(stmt))
             if domain_row is not None:
                 return frozenset([PredefinedRole.ADMIN])
-            else:
-                return _EMPTY_FSET
+            return _EMPTY_FSET
         case ProjectScope(project_id):
             stmt = (
                 sa.select(GroupRow)
@@ -120,8 +119,7 @@ async def _calculate_role_in_scope_for_suadmin(
             user_row = cast(UserRow | None, await db_session.scalar(stmt))
             if user_row is not None:
                 return frozenset([PredefinedRole.ADMIN])
-            else:
-                return _EMPTY_FSET
+            return _EMPTY_FSET
 
 
 async def _calculate_role_in_scope_for_monitor(
@@ -143,8 +141,7 @@ async def _calculate_role_in_scope_for_monitor(
             domain_row = cast(DomainRow | None, await db_session.scalar(stmt))
             if domain_row is not None:
                 return frozenset([PredefinedRole.MONITOR])
-            else:
-                return _EMPTY_FSET
+            return _EMPTY_FSET
         case ProjectScope(project_id):
             stmt = (
                 sa.select(GroupRow)
@@ -176,8 +173,7 @@ async def _calculate_role_in_scope_for_monitor(
             user_row = cast(UserRow | None, await db_session.scalar(stmt))
             if user_row is not None:
                 return frozenset([PredefinedRole.MONITOR])
-            else:
-                return _EMPTY_FSET
+            return _EMPTY_FSET
 
 
 async def _calculate_role_in_scope_for_admin(
@@ -192,8 +188,7 @@ async def _calculate_role_in_scope_for_admin(
         case DomainScope(domain_name):
             if ctx.domain_name == domain_name:
                 return frozenset([PredefinedRole.ADMIN])
-            else:
-                return _EMPTY_FSET
+            return _EMPTY_FSET
         case ProjectScope(project_id):
             stmt = (
                 sa.select(GroupRow)
@@ -234,8 +229,7 @@ async def _calculate_role_in_scope_for_admin(
                 _domain_name = user_row.domain_name
             if _domain_name == ctx.domain_name:
                 return frozenset([PredefinedRole.ADMIN])
-            else:
-                return _EMPTY_FSET
+            return _EMPTY_FSET
 
 
 async def _calculate_role_in_scope_for_user(
@@ -249,8 +243,7 @@ async def _calculate_role_in_scope_for_user(
         case DomainScope(domain_name):
             if ctx.domain_name == domain_name:
                 return frozenset([PredefinedRole.MEMBER])
-            else:
-                return _EMPTY_FSET
+            return _EMPTY_FSET
         case ProjectScope(project_id):
             stmt = (
                 sa.select(AssocGroupUserRow)
@@ -263,13 +256,11 @@ async def _calculate_role_in_scope_for_user(
             assoc_row = cast(AssocGroupUserRow | None, await db_session.scalar(stmt))
             if assoc_row is not None:
                 return frozenset([PredefinedRole.PRIVILEGED_MEMBER])
-            else:
-                return _EMPTY_FSET
+            return _EMPTY_FSET
         case UserScope(user_id):
             if ctx.user_id == user_id:
                 return frozenset([PredefinedRole.OWNER])
-            else:
-                return _EMPTY_FSET
+            return _EMPTY_FSET
 
 
 class BaseScope(metaclass=ABCMeta):
@@ -332,8 +323,7 @@ class ProjectScope(BaseScope):
     def serialize(self) -> str:
         if self.domain_name is not None:
             return f"project:{self.project_id}:{self.domain_name}"
-        else:
-            return f"project:{self.project_id}"
+        return f"project:{self.project_id}"
 
     @classmethod
     def deserialize(cls, val: str) -> Self:
@@ -343,8 +333,7 @@ class ProjectScope(BaseScope):
         raw_project_id, _, domain_name = values.partition(":")
         if domain_name:
             return cls(uuid.UUID(raw_project_id), domain_name)
-        else:
-            return cls(uuid.UUID(raw_project_id))
+        return cls(uuid.UUID(raw_project_id))
 
 
 @dataclass(frozen=True)
@@ -358,8 +347,7 @@ class UserScope(BaseScope):
     def serialize(self) -> str:
         if self.domain_name is not None:
             return f"user:{self.user_id}:{self.domain_name}"
-        else:
-            return f"user:{self.user_id}"
+        return f"user:{self.user_id}"
 
     @classmethod
     def deserialize(cls, val: str) -> Self:
@@ -369,8 +357,7 @@ class UserScope(BaseScope):
         raw_user_id, _, domain_name = values.partition(":")
         if domain_name:
             return cls(uuid.UUID(raw_user_id), domain_name)
-        else:
-            return cls(uuid.UUID(raw_user_id))
+        return cls(uuid.UUID(raw_user_id))
 
 
 ScopeType: TypeAlias = SystemScope | DomainScope | ProjectScope | UserScope
@@ -707,8 +694,7 @@ def required_permission(permission: PermissionType):
         def wrapped(self: T_RBACModel) -> Optional[T_PropertyReturn]:
             if permission in self.permissions:
                 return property_func(self)
-            else:
-                return None
+            return None
 
         return wrapped
 

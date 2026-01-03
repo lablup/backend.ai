@@ -81,8 +81,7 @@ class DockerKernel(AbstractKernel):
         pass
 
     def __getstate__(self):
-        props = super().__getstate__()
-        return props
+        return super().__getstate__()
 
     def __setstate__(self, props):
         if "network_driver" not in props:
@@ -115,8 +114,7 @@ class DockerKernel(AbstractKernel):
     async def check_status(self):
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
-        result = await self.runner.feed_and_get_status()
-        return result
+        return await self.runner.feed_and_get_status()
 
     @override
     async def get_logs(self):
@@ -147,21 +145,19 @@ class DockerKernel(AbstractKernel):
                 break
         else:
             return {"status": "failed", "error": "invalid service name"}
-        result = await self.runner.feed_start_service({
+        return await self.runner.feed_start_service({
             "name": service,
             "port": sport["container_ports"][0],  # primary port
             "ports": sport["container_ports"],
             "protocol": sport["protocol"],
             "options": opts,
         })
-        return result
 
     @override
     async def start_model_service(self, model_service: Mapping[str, Any]):
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
-        result = await self.runner.feed_start_model_service(model_service)
-        return result
+        return await self.runner.feed_start_model_service(model_service)
 
     @override
     async def shutdown_service(self, service: str):
@@ -173,8 +169,7 @@ class DockerKernel(AbstractKernel):
     async def get_service_apps(self):
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
-        result = await self.runner.feed_service_apps()
-        return result
+        return await self.runner.feed_service_apps()
 
     def _get_commit_path(self, kernel_id: KernelId, subdir: str) -> Tuple[Path, Path]:
         base_commit_path: Path = self.agent_config["agent"]["image-commit-path"]

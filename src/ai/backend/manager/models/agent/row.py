@@ -102,10 +102,9 @@ class AgentRow(Base):
                 if kernel.status in KernelStatus.resource_occupied_statuses()
             ],
         )
-        actual_occupied_slots = sum(
+        return sum(
             (kernel.occupied_slots for kernel in resource_occupied_kernel_rows), ResourceSlot()
         )
-        return actual_occupied_slots
 
     def to_data(self) -> AgentData:
         return AgentData(
@@ -381,8 +380,7 @@ class AgentPermissionContextBuilder(
         target_scope: ScopeType,
     ) -> frozenset[AgentPermission]:
         roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
-        permissions = await self._calculate_permission_by_predefined_roles(roles)
-        return permissions
+        return await self._calculate_permission_by_predefined_roles(roles)
 
     @override
     async def build_ctx_in_system_scope(

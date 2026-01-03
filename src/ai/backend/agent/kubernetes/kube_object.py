@@ -181,7 +181,7 @@ class PersistentVolumeClaim(AbstractAPIObject):
         self.labels[k] = v
 
     def to_dict(self) -> dict:
-        base = {
+        return {
             "apiVersion": "v1",
             "kind": "PersistentVolumeClaim",
             "metadata": {
@@ -198,4 +198,3 @@ class PersistentVolumeClaim(AbstractAPIObject):
                 "storageClassName": "",
             },
         }
-        return base

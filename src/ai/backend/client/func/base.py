@@ -27,11 +27,9 @@ def _wrap_method(cls, orig_name, meth):
             )
         if isinstance(_api_session, AsyncSession):
             return coro
-        else:
-            if inspect.isasyncgen(coro):
-                return _api_session.worker_thread.execute_generator(coro)
-            else:
-                return _api_session.worker_thread.execute(coro)
+        if inspect.isasyncgen(coro):
+            return _api_session.worker_thread.execute_generator(coro)
+        return _api_session.worker_thread.execute(coro)
 
     return _method
 
@@ -68,8 +66,7 @@ def field_resolver(
                     for f in fields
                 )
                 kwargs["fields"] = resolved_fields
-            result = meth(*args, **kwargs)
-            return result
+            return meth(*args, **kwargs)
 
         return wrapper
 

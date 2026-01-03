@@ -72,7 +72,7 @@ class UserRole(enum.StrEnum):
 class Tables:
     @staticmethod
     def get_users_table() -> sa.Table:
-        users_table = sa.Table(
+        return sa.Table(
             "users",
             mapper_registry.metadata,
             IDColumn("uuid"),
@@ -81,11 +81,10 @@ class Tables:
             sa.Column("role", EnumValueType(UserRole), default=UserRole.USER),
             extend_existing=True,
         )
-        return users_table
 
     @staticmethod
     def get_groups_table() -> sa.Table:
-        groups_table = sa.Table(
+        return sa.Table(
             "groups",
             mapper_registry.metadata,
             IDColumn(),
@@ -99,11 +98,10 @@ class Tables:
             ),
             extend_existing=True,
         )
-        return groups_table
 
     @staticmethod
     def get_association_groups_users_table() -> sa.Table:
-        association_groups_users_table = sa.Table(
+        return sa.Table(
             "association_groups_users",
             mapper_registry.metadata,
             IDColumn(),
@@ -116,7 +114,6 @@ class Tables:
             ),
             extend_existing=True,
         )
-        return association_groups_users_table
 
 
 class RoleCreator:

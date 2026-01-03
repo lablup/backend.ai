@@ -48,8 +48,7 @@ class Tester:
         async with aiofiles.open(config_path) as fp:
             raw_content = await fp.read()
             content = tomli.loads(raw_content)
-            config = TesterConfig.model_validate(content, by_alias=True, by_name=True)
-            return config
+            return TesterConfig.model_validate(content, by_alias=True, by_name=True)
 
     async def _run_single_spec(self, spec: TestSpec, sub_name: Optional[str] = None) -> None:
         async with self._semaphore:

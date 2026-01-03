@@ -52,11 +52,10 @@ class OneFSClient:
     async def get_metadata(self) -> Mapping[str, Any]:
         cluster_metadata = await self.get_cluster_metadata()
         node_metadata = await self.get_node_metadata()
-        volume_cluster = {
+        return {
             "cluster": dump_json_str(cluster_metadata),
             "nodes": dump_json_str(node_metadata),
         }
-        return volume_cluster
 
     @asynccontextmanager
     async def _request(
@@ -205,8 +204,7 @@ class OneFSClient:
             "quota/quotas",
             json=data,
         ) as resp:
-            msg = await resp.json()
-        return msg
+            return await resp.json()
 
     async def delete_quota(self, quota_id) -> None:
         async with self._request(

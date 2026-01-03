@@ -481,8 +481,7 @@ class BaseVolume(AbstractVolume):
             stat = await loop.run_in_executor(None, metadata_path.stat)
             if stat.st_size > 10 * (2**20):
                 raise MetadataTooLargeError("Too large metadata (more than 10 MiB)")
-            data = await loop.run_in_executor(None, metadata_path.read_bytes)
-            return data
+            return await loop.run_in_executor(None, metadata_path.read_bytes)
         except FileNotFoundError:
             return b""
         # Other IO errors should be bubbled up.

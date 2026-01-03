@@ -658,6 +658,7 @@ class ComputeSession(BaseFunction):
         async with rqst.fetch() as resp:
             if resp.status == 200:
                 return await resp.json()
+        return None
 
     @api_function
     async def restart(self):

@@ -20,9 +20,7 @@ def load_dictionary(dictionary_file=None):
         dictionary_file = "/opt/kernel/words.json"
 
     with open(dictionary_file) as f:
-        dictionary = json.load(f)
-
-    return dictionary
+        return json.load(f)
 
 
 def default_hasher(data):

@@ -60,8 +60,7 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
     def load_dialect_impl(self, dialect):
         if dialect.name == "postgresql":
             return dialect.type_descriptor(UUID())
-        else:
-            return dialect.type_descriptor(CHAR(16))
+        return dialect.type_descriptor(CHAR(16))
 
     def process_bind_param(self, value: UUID_SubType | uuid.UUID | None, dialect):
         # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
@@ -70,7 +69,7 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
         #       Therefore, we just do isinstance on uuid.UUID only below.
         if value is None:
             return value
-        elif dialect.name == "postgresql":
+        if dialect.name == "postgresql":
             match value:
                 case uuid.UUID():
                     return str(value)
@@ -86,13 +85,12 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
     def process_result_value(self, value: Any, dialect) -> UUID_SubType | None:
         if value is None:
             return value
-        else:
-            cls = type(self)
-            match value:
-                case bytes():
-                    return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(bytes=value)))
-                case _:
-                    return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(value)))
+        cls = type(self)
+        match value:
+            case bytes():
+                return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(bytes=value)))
+            case _:
+                return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(value)))
 
 
 T_StrEnum = TypeVar("T_StrEnum", bound=enum.Enum, covariant=True)

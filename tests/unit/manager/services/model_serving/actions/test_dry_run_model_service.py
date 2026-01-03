@@ -31,12 +31,11 @@ def mock_get_vfolder_by_id_dry_run(mocker, mock_repositories):
 
 @pytest.fixture
 def mock_get_user_with_keypair(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.repository,
         "get_user_with_keypair",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
@@ -52,12 +51,11 @@ def mock_resolve_image_for_endpoint_creation_dry_run(mocker, mock_repositories):
 
 @pytest.fixture
 def mock_background_task_manager_start(mocker, mock_background_task_manager):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_background_task_manager,
         "start",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 class TestDryRunModelService:

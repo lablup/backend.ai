@@ -334,14 +334,13 @@ class IPUPlugin(AbstractComputePlugin):
 
     async def create_alloc_map(self) -> DiscretePropertyAllocMap:
         devices = await self.list_devices()
-        dpam = DiscretePropertyAllocMap(
+        return DiscretePropertyAllocMap(
             device_slots={
                 dev.device_id: DeviceSlotInfo(SlotTypes.COUNT, SlotName("ipu.device"), Decimal(1))
                 for dev in devices
             },
             exclusive_slot_types=self.exclusive_slot_types,
         )
-        return dpam
 
     async def generate_mounts(
         self,

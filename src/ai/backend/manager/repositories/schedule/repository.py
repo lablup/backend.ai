@@ -1486,13 +1486,12 @@ class ScheduleRepository:
     @schedule_repository_resilience.apply()
     async def get_endpoints_for_scaling(self) -> list:
         async with self._db.begin_readonly_session() as session:
-            endpoints = await EndpointRow.list(
+            return await EndpointRow.list(
                 session,
                 load_image=True,
                 load_routes=True,
                 status_filter=[EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING],
             )
-            return endpoints
 
     @schedule_repository_resilience.apply()
     async def get_sessions_to_destroy_for_scaling(

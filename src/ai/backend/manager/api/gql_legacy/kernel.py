@@ -635,20 +635,17 @@ class LegacyComputeSession(graphene.ObjectType):
             if value is None:
                 return convert_type(0)
             return convert_type(value)
-        else:
-            loader = graph_ctx.dataloader_manager.get_loader(
-                graph_ctx, "KernelStatistics.by_kernel"
-            )
-            kstat = await loader.load(self.id)
-            if kstat is None:
-                return convert_type(0)
-            metric = kstat.get(metric_key)
-            if metric is None:
-                return convert_type(0)
-            value = metric.get(metric_field)
-            if value is None:
-                return convert_type(0)
-            return convert_type(value)
+        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "KernelStatistics.by_kernel")
+        kstat = await loader.load(self.id)
+        if kstat is None:
+            return convert_type(0)
+        metric = kstat.get(metric_key)
+        if metric is None:
+            return convert_type(0)
+        value = metric.get(metric_field)
+        if value is None:
+            return convert_type(0)
+        return convert_type(value)
 
     async def resolve_cpu_used(self, info: graphene.ResolveInfo) -> Optional[float]:
         return await self._resolve_legacy_metric(info, "cpu_used", "current", float)

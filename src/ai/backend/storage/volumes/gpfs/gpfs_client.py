@@ -377,8 +377,7 @@ class GPFSAPIClient:
                 "GET",
                 f"/perfmon/data?{querystring}",
             )
-            data = await response.json()
-            return data
+            return await response.json()
 
     @error_handler
     async def list_nodes(self) -> List[str]:

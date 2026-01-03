@@ -334,8 +334,7 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
             return GenericBadRequest("Unsupported API version.")
     except (ValueError, KeyError):
         return GenericBadRequest("Unsupported API version.")
-    resp = await _handler(request)
-    return resp
+    return await _handler(request)
 
 
 def _debug_error_response(
@@ -392,10 +391,9 @@ async def exception_middleware(
     except InvalidArgument as ex:
         if len(ex.args) > 1:
             raise InvalidAPIParameters(f"{ex.args[0]}: {', '.join(map(str, ex.args[1:]))}")
-        elif len(ex.args) == 1:
+        if len(ex.args) == 1:
             raise InvalidAPIParameters(ex.args[0])
-        else:
-            raise InvalidAPIParameters()
+        raise InvalidAPIParameters()
     except BackendAIError as ex:
         if ex.status_code // 100 == 4:
             log.warning(
@@ -447,8 +445,7 @@ async def exception_middleware(
         )
         if root_ctx.config_provider.config.debug.enabled:
             return _debug_error_response(e)
-        else:
-            raise InternalServerError()
+        raise InternalServerError()
     else:
         await stats_monitor.report_metric(INCREMENT, f"ai.backend.manager.api.status.{resp.status}")
         return resp

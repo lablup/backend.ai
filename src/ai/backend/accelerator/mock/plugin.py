@@ -556,7 +556,7 @@ class MockPlugin(AbstractComputePlugin):
                 },
                 exclusive_slot_types=self.exclusive_slot_types,
             )
-        elif self._mode == AllocationModes.FRACTIONAL:
+        if self._mode == AllocationModes.FRACTIONAL:
             # for legacy agents
             kwargs: Dict[str, Any] = {
                 "quantum_size": self.quantum_size,
@@ -580,8 +580,7 @@ class MockPlugin(AbstractComputePlugin):
                 exclusive_slot_types=self.exclusive_slot_types,
                 **kwargs,
             )
-        else:
-            raise RuntimeError("Unsupported MockDevicePlugin allocation mode!")
+        raise RuntimeError("Unsupported MockDevicePlugin allocation mode!")
 
     async def get_hooks(self, distro: str, arch: str) -> Sequence[Path]:
         return []

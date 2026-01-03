@@ -50,15 +50,13 @@ class libnuma:
     def node_of_cpu(core) -> int:
         if _numa_supported:
             return int(_libnuma.numa_node_of_cpu(core))  # type: ignore
-        else:
-            return 0
+        return 0
 
     @staticmethod
     def num_nodes() -> int:
         if _numa_supported:
             return int(_libnuma.numa_num_configured_nodes())  # type: ignore
-        else:
-            return 1
+        return 1
 
     @staticmethod
     @aiotools.lru_cache(maxsize=1)

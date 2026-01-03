@@ -120,8 +120,7 @@ class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=
             devices = await self._list_devices()
             self._all_devices = devices
             return devices
-        else:
-            return self._all_devices
+        return self._all_devices
 
     @abstractmethod
     async def _list_devices(self) -> List[TATOMDevice]:
@@ -253,14 +252,13 @@ class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=
 
     async def create_alloc_map(self) -> DiscretePropertyAllocMap:
         devices = await self.list_devices()
-        dpam = DiscretePropertyAllocMap(
+        return DiscretePropertyAllocMap(
             device_slots={
                 dev.device_id: DeviceSlotInfo(SlotTypes.COUNT, self.slot_types[0][0], Decimal(1))
                 for dev in devices
             },
             exclusive_slot_types=self.exclusive_slot_types,
         )
-        return dpam
 
     async def generate_mounts(
         self,
@@ -272,8 +270,7 @@ class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=
             return [
                 MountInfo(MountTypes.BIND, binpath / "rbln-stat", binpath / "rbln-stat"),
             ]
-        else:
-            return []
+        return []
 
     @abstractmethod
     async def list_device_files(

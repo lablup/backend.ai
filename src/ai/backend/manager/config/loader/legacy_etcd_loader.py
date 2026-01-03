@@ -33,8 +33,7 @@ class LegacyEtcdLoader(AbstractConfigLoader):
 
     @override
     async def load(self) -> Mapping[str, Any]:
-        raw_cfg = await self._etcd.get_prefix(self._config_prefix)
-        return raw_cfg
+        return await self._etcd.get_prefix(self._config_prefix)
 
     async def close(self) -> None:
         await self._etcd.close()

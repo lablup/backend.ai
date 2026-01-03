@@ -46,13 +46,12 @@ async def rlim_middleware(
         response.headers["X-RateLimit-Remaining"] = str(remaining)
         response.headers["X-RateLimit-Window"] = str(_rlim_window)
         return response
-    else:
-        # No checks for rate limiting for non-authorized queries.
-        response = await handler(request)
-        response.headers["X-RateLimit-Limit"] = "1000"
-        response.headers["X-RateLimit-Remaining"] = "1000"
-        response.headers["X-RateLimit-Window"] = str(_rlim_window)
-        return response
+    # No checks for rate limiting for non-authorized queries.
+    response = await handler(request)
+    response.headers["X-RateLimit-Limit"] = "1000"
+    response.headers["X-RateLimit-Remaining"] = "1000"
+    response.headers["X-RateLimit-Window"] = str(_rlim_window)
+    return response
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)

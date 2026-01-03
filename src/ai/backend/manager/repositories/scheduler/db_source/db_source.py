@@ -2314,8 +2314,7 @@ class ScheduleDBSource:
                 .returning(KernelRow.session_id)
             )
             result = await db_sess.execute(stmt)
-            affected_session_ids = {row.session_id for row in result}
-            return affected_session_ids
+            return {row.session_id for row in result}
 
     async def check_and_cancel_session_if_needed(self, session_id: SessionId) -> bool:
         """
@@ -3325,26 +3324,25 @@ class ScheduleDBSource:
                 "Session {} exceeded max retries ({}), moved to PENDING", session_id, max_retries
             )
             return False  # Should not retry
-        else:
-            # Update with incremented retry count
-            status_data = {"retries": new_retries}
+        # Update with incremented retry count
+        status_data = {"retries": new_retries}
 
-            # Just update retry count, keep current status
-            update_stmt = (
-                sa.update(SessionRow)
-                .where(SessionRow.id == session_id)
-                .values(
-                    status_data=sql_json_merge(
-                        SessionRow.status_data,
-                        ("scheduler",),
-                        obj=status_data,
-                    ),
-                )
+        # Just update retry count, keep current status
+        update_stmt = (
+            sa.update(SessionRow)
+            .where(SessionRow.id == session_id)
+            .values(
+                status_data=sql_json_merge(
+                    SessionRow.status_data,
+                    ("scheduler",),
+                    obj=status_data,
+                ),
             )
-            await db_sess.execute(update_stmt)
+        )
+        await db_sess.execute(update_stmt)
 
-            log.debug("Session {} retry count incremented to {}", session_id, new_retries)
-            return True  # Should continue retrying
+        log.debug("Session {} retry count incremented to {}", session_id, new_retries)
+        return True  # Should continue retrying
 
     async def batch_update_stuck_session_retries(
         self, session_ids: list[SessionId], max_retries: int = 5

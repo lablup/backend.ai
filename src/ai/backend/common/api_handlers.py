@@ -237,19 +237,18 @@ async def _extract_param_value(request: web.Request, input_param_type: Any) -> _
                 )
             return param_instance.from_body(body)
 
-        elif origin_type is QueryParam:
+        if origin_type is QueryParam:
             return param_instance.from_query(request.query)
 
-        elif origin_type is HeaderParam:
+        if origin_type is HeaderParam:
             return param_instance.from_header(request.headers)
 
-        elif origin_type is PathParam:
+        if origin_type is PathParam:
             return param_instance.from_path(request.match_info)
 
-        else:
-            raise InvalidAPIParameters(
-                f"Parameter '{input_param_type}' must use one of QueryParam, PathParam, HeaderParam, MiddlewareParam, BodyParam"
-            )
+        raise InvalidAPIParameters(
+            f"Parameter '{input_param_type}' must use one of QueryParam, PathParam, HeaderParam, MiddlewareParam, BodyParam"
+        )
 
     except ValidationError as e:
         raise InvalidAPIParameters(str(e))

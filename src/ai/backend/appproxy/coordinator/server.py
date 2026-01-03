@@ -158,8 +158,7 @@ async def request_context_aware_middleware(
     request["request_id"] = request_id
     if _current_task := asyncio.current_task():
         _current_task.request_id = request_id
-    resp = await handler(request)
-    return resp
+    return await handler(request)
 
 
 @web.middleware
@@ -177,8 +176,7 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
     if ex is not None:
         # handled by exception_middleware
         raise ex
-    resp = await _handler(request)
-    return resp
+    return await _handler(request)
 
 
 @web.middleware
@@ -201,13 +199,12 @@ async def exception_middleware(
                 status=ex.status_code,
                 headers={"Access-Control-Allow-Origin": "*"},
             )
-        else:
-            return aiohttp_jinja2.render_template(
-                "error",
-                request,
-                ex.body_dict,
-                status=ex.status_code,
-            )
+        return aiohttp_jinja2.render_template(
+            "error",
+            request,
+            ex.body_dict,
+            status=ex.status_code,
+        )
     except web.HTTPException as ex:
         if ex.status_code == 404:
             raise URLNotFound(extra_data=request.path)
@@ -227,8 +224,7 @@ async def exception_middleware(
         log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
         if root_ctx.local_config.debug.enabled:
             raise InternalServerError(traceback.format_exc())
-        else:
-            raise InternalServerError()
+        raise InternalServerError()
     else:
         return resp
 
@@ -306,11 +302,10 @@ async def _make_message_queue(
             stream_redis_target,
             args,
         )
-    else:
-        return await RedisQueue.create(
-            stream_redis_target,
-            args,
-        )
+    return await RedisQueue.create(
+        stream_redis_target,
+        args,
+    )
 
 
 @asynccontextmanager
@@ -828,11 +823,10 @@ async def metrics(request: web.Request) -> web.Response:
     except ValueError:
         raise GenericForbidden
 
-    response = web.Response(
+    return web.Response(
         text=root_ctx.metrics.to_prometheus(),
         content_type="text/plain",
     )
-    return response
 
 
 async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:

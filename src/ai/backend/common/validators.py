@@ -211,8 +211,7 @@ class Enum(t.Trafaret, Generic[T_enum]):
         try:
             if self.use_name:
                 return self.enum_cls[value]
-            else:
-                return self.enum_cls(value)
+            return self.enum_cls(value)
         except (KeyError, ValueError):
             self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
 
@@ -394,17 +393,15 @@ class UserID(t.Trafaret):
         if value is None:
             if self._default_uid is not None:
                 return self._default_uid
-            else:
-                return os.getuid()
-        elif isinstance(value, int):
+            return os.getuid()
+        if isinstance(value, int):
             if value == -1:
                 return os.getuid()
         elif isinstance(value, str):
             if not value:
                 if self._default_uid is not None:
                     return self._default_uid
-                else:
-                    return os.getuid()
+                return os.getuid()
             try:
                 value = int(value)
             except ValueError:
@@ -428,17 +425,15 @@ class GroupID(t.Trafaret):
         if value is None:
             if self._default_gid is not None:
                 return self._default_gid
-            else:
-                return os.getgid()
-        elif isinstance(value, int):
+            return os.getgid()
+        if isinstance(value, int):
             if value == -1:
                 return os.getgid()
         elif isinstance(value, str):
             if not value:
                 if self._default_gid is not None:
                     return self._default_gid
-                else:
-                    return os.getgid()
+                return os.getgid()
             try:
                 value = int(value)
             except ValueError:
@@ -460,10 +455,9 @@ class UUID(t.Trafaret):
                 return value
             if isinstance(value, str):
                 return uuid.UUID(value)
-            elif isinstance(value, bytes):
+            if isinstance(value, bytes):
                 return uuid.UUID(bytes=value)
-            else:
-                self._failure("value must be string or bytes", value=value)
+            self._failure("value must be string or bytes", value=value)
         except ValueError:
             self._failure("cannot convert value to UUID", value=value)
 
@@ -553,32 +547,30 @@ class TimeDuration(t.Trafaret):
                 if not self._allow_negative and t < 0:
                     self._failure("value must be positive", value=value)
                 return datetime.timedelta(seconds=t)
-            elif value[-2:].isalpha():
+            if value[-2:].isalpha():
                 t = int(value[:-2])
                 if not self._allow_negative and t < 0:
                     self._failure("value must be positive", value=value)
                 if value[-2:] == "yr":
                     return relativedelta(years=t)
-                elif value[-2:] == "mo":
+                if value[-2:] == "mo":
                     return relativedelta(months=t)
-                else:
-                    self._failure("value is not a known time duration", value=value)
+                self._failure("value is not a known time duration", value=value)
             else:
                 t = float(value[:-1])
                 if not self._allow_negative and t < 0:
                     self._failure("value must be positive", value=value)
                 if value[-1] == "w":
                     return datetime.timedelta(weeks=t)
-                elif value[-1] == "d":
+                if value[-1] == "d":
                     return datetime.timedelta(days=t)
-                elif value[-1] == "h":
+                if value[-1] == "h":
                     return datetime.timedelta(hours=t)
-                elif value[-1] == "m":
+                if value[-1] == "m":
                     return datetime.timedelta(minutes=t)
-                elif value[-1] == "s":
+                if value[-1] == "s":
                     return datetime.timedelta(seconds=t)
-                else:
-                    self._failure("value is not a known time duration", value=value)
+                self._failure("value is not a known time duration", value=value)
         except ValueError:
             self._failure(f"invalid numeric literal: {value[:-1]}", value=value)
 
@@ -711,8 +703,8 @@ class ToSet(t.Trafaret):
     def check_and_return(self, value: Any) -> set:
         if isinstance(value, Iterable):
             return set(value)
-        else:
-            self._failure("value must be Iterable")
+        self._failure("value must be Iterable")
+        return None
 
 
 class ToNone(t.Trafaret):
@@ -720,12 +712,11 @@ class ToNone(t.Trafaret):
 
     def check_and_return(self, value: Any) -> None:
         if value is None:
-            return None
+            return
         _value = str(value).strip().lower()
         if _value in self.allowed_values:
-            return None
-        else:
-            self._failure(f"value must one of {self.allowed_values}")
+            return
+        self._failure(f"value must one of {self.allowed_values}")
 
 
 class Delay(t.Trafaret):
@@ -744,6 +735,7 @@ class Delay(t.Trafaret):
                 return 0
             case _:
                 self._failure(f"Value must be (float, tuple of float or None), not {type(value)}.")
+        return None
 
 
 class SessionName(t.Regexp):

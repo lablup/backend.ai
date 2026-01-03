@@ -360,8 +360,7 @@ class BackgroundTaskManager:
             return BgtaskPartialSuccessEvent(
                 task_id=task_id, message=message, errors=bgtask_result.errors
             )
-        else:
-            return BgtaskDoneEvent(task_id=task_id, message=message)
+        return BgtaskDoneEvent(task_id=task_id, message=message)
 
     async def _run_bgtask(
         self,

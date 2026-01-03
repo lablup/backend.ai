@@ -36,11 +36,10 @@ class ContainerBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
             raise KernelRegistryNotFound
         environ = await config.get_kernel_environ()
         resource_spec = await config.get_kernel_resource_spec()
-        recovery_data = json_data.to_kernel_recovery_data(
+        return json_data.to_kernel_recovery_data(
             resource_spec,
             environ,
         )
-        return recovery_data
 
     @override
     async def load_kernel_registry(self) -> MutableMapping[KernelId, AbstractKernel]:

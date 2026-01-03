@@ -44,11 +44,10 @@ class FlashBladeVolume(BaseVolume):
                 self.mount_path,
                 self.local_config["storage-proxy"]["scandir-limit"],
             )
-        else:
-            return RapidFileToolsFSOpModel(
-                self.mount_path,
-                self.local_config["storage-proxy"]["scandir-limit"],
-            )
+        return RapidFileToolsFSOpModel(
+            self.mount_path,
+            self.local_config["storage-proxy"]["scandir-limit"],
+        )
 
     async def get_toolkit_version(self) -> int:
         if self._toolkit_version is not None:

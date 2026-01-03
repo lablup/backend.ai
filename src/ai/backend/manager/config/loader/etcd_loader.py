@@ -13,8 +13,7 @@ class EtcdCommonConfigLoader(AbstractConfigLoader):
 
     @override
     async def load(self) -> Mapping[str, Any]:
-        raw_cfg = await self._etcd.get_prefix("ai/backend/config/common")
-        return raw_cfg
+        return await self._etcd.get_prefix("ai/backend/config/common")
 
 
 class EtcdManagerConfigLoader(AbstractConfigLoader):
@@ -25,5 +24,4 @@ class EtcdManagerConfigLoader(AbstractConfigLoader):
 
     @override
     async def load(self) -> Mapping[str, Any]:
-        raw_cfg = await self._etcd.get_prefix("ai/backend/config/manager")
-        return raw_cfg
+        return await self._etcd.get_prefix("ai/backend/config/manager")

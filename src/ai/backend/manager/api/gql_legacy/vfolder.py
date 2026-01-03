@@ -115,6 +115,7 @@ class VFolderPermissionValueField(graphene.Scalar):
     def parse_literal(node: Any, _variables=None):
         if isinstance(node, graphql.language.ast.StringValueNode):
             return VFolderRBACPermission(node.value)
+        return None
 
     @staticmethod
     def parse_value(value: str) -> VFolderRBACPermission:
@@ -616,8 +617,7 @@ class ModelCard(graphene.ObjectType):
                     author=vfolder_row.creator or "",
                     error_msg=str(e),
                 )
-            else:
-                return None
+            return None
 
     @classmethod
     async def parse_row(cls, graph_ctx: GraphQueryContext, vfolder_row: VFolderRow) -> Self:

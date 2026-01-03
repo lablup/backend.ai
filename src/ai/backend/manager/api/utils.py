@@ -367,8 +367,7 @@ def mask_sensitive_keys(data: Mapping[str, Any]) -> Mapping[str, Any]:
 def trim_text(value: str, maxlen: int) -> str:
     if len(value) <= maxlen:
         return value
-    value = value[: maxlen - 3] + "..."
-    return value
+    return value[: maxlen - 3] + "..."
 
 
 class _Infinity(numbers.Number):
@@ -523,8 +522,8 @@ async def call_non_bursty(
     if invoke:
         if inspect.iscoroutinefunction(coro):
             return await coro()
-        else:
-            return coro()
+        return coro()
+    return None
 
 
 class Singleton(type):

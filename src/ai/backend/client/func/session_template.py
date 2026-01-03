@@ -54,8 +54,7 @@ class SessionTemplate(BaseFunction):
             params["owner_access_key"] = self.owner_access_key
         rqst = Request("GET", f"/template/session/{self.template_id}", params=params)
         async with rqst.fetch() as resp:
-            data = await resp.text()
-        return data
+            return await resp.text()
 
     @api_function
     async def put(self, template: str) -> Any:

@@ -251,8 +251,7 @@ async def notification_rule_type_schema(
 
     # Convert GraphQL enum to internal enum and get schema
     internal_type = rule_type.to_internal()
-    schema = NotifiableMessage.get_message_schema(internal_type)
-    return schema
+    return NotifiableMessage.get_message_schema(internal_type)
 
 
 # Mutation fields

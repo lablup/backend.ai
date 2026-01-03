@@ -235,7 +235,7 @@ def sample_endpoint(
 @pytest.fixture
 def sample_route(sample_endpoint):
     """Create a sample routing for testing."""
-    route = RoutingRow(
+    return RoutingRow(
         id=uuid.uuid4(),
         endpoint=sample_endpoint.id,
         session=uuid.uuid4(),
@@ -245,13 +245,12 @@ def sample_route(sample_endpoint):
         domain=sample_endpoint.domain,
         project=sample_endpoint.project,
     )
-    return route
 
 
 @pytest.fixture
 def sample_auto_scaling_rule(sample_endpoint):
     """Create a sample auto scaling rule for testing."""
-    rule = EndpointAutoScalingRuleRow(
+    return EndpointAutoScalingRuleRow(
         id=uuid.uuid4(),
         endpoint=sample_endpoint.id,
         metric_source=AutoScalingMetricSource.KERNEL,
@@ -265,7 +264,6 @@ def sample_auto_scaling_rule(sample_endpoint):
         created_at=datetime.now(UTC),
         endpoint_row=sample_endpoint,
     )
-    return rule
 
 
 @pytest.fixture

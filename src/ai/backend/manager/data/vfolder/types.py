@@ -137,8 +137,7 @@ class VFolderOperationStatus(enum.StrEnum):
                 VFolderOperationStatus.DELETE_ONGOING,
                 VFolderOperationStatus.DELETE_ERROR,
             }
-        else:
-            return self == VFolderOperationStatus.DELETE_PENDING
+        return self == VFolderOperationStatus.DELETE_PENDING
 
     def to_field(self) -> VFolderOperationStatusField:
         return VFolderOperationStatusField(self)

@@ -386,14 +386,13 @@ class ProjectModel(RBACModel[ProjectPermission]):
 
 
 def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:
-    query = (
+    return (
         sa.select([groups.c.id])
         .select_from(groups)
         .where(
             cond & (groups.c.domain_name == domain_name),
         )
     )
-    return query
 
 
 async def resolve_group_name_or_id(
@@ -445,9 +444,7 @@ async def resolve_groups(
             raise TypeError("unexpected type for group_name_or_id")
 
     rows = (await db_conn.execute(query)).fetchall()
-    return_val = [row["id"] for row in rows]
-
-    return return_val
+    return [row["id"] for row in rows]
 
 
 class GroupDotfile(TypedDict):
@@ -473,8 +470,7 @@ async def query_group_domain(
     group_id: Union[GUID, uuid.UUID],
 ) -> str:
     query = sa.select([groups.c.domain_name]).select_from(groups).where(groups.c.id == group_id)
-    domain = await db_conn.scalar(query)
-    return domain
+    return await db_conn.scalar(query)
 
 
 def verify_dotfile_name(dotfile: str) -> bool:
@@ -574,8 +570,7 @@ class ProjectPermissionContextBuilder(
         target_scope: ScopeType,
     ) -> frozenset[ProjectPermission]:
         roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
-        permissions = await self._calculate_permission_by_predefined_roles(roles)
-        return permissions
+        return await self._calculate_permission_by_predefined_roles(roles)
 
     @override
     async def build_ctx_in_system_scope(
@@ -701,5 +696,4 @@ async def get_permission_ctx(
             return await builder.build_ctx_in_container_registry_scope(
                 ctx, container_registry_scope
             )
-        else:
-            return await builder.build(ctx, target_scope, requested_permission)
+        return await builder.build(ctx, target_scope, requested_permission)

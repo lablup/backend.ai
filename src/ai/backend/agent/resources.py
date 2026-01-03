@@ -728,10 +728,9 @@ class ResourceAllocator(aobject):
             slot, slot_extra = divmod(available_total_slot, self.num_agents)
             remainder_value = Decimal(1 if agent_idx < slot_extra else 0)
             return slot + remainder_value
-        elif alloc_map_type is FractionAllocMap:
+        if alloc_map_type is FractionAllocMap:
             return available_total_slot / self.num_agents
-        else:
-            raise NotImplementedError(f"Unrecognized AbstractAllocMap type {alloc_map_type}")
+        raise NotImplementedError(f"Unrecognized AbstractAllocMap type {alloc_map_type}")
 
     def _calculate_device_slot_manual(
         self,
@@ -744,14 +743,13 @@ class ResourceAllocator(aobject):
 
         if slot_name == SlotName("cpu"):
             return Decimal(resource_config.allocations.cpu)
-        elif slot_name == SlotName("mem"):
+        if slot_name == SlotName("mem"):
             return Decimal(resource_config.allocations.mem)
-        else:
-            if slot_name not in resource_config.allocations.devices:
-                raise ValueError(
-                    f"{slot_name=} not found in config {resource_config.allocations.devices!r}"
-                )
-            return resource_config.allocations.devices[slot_name]
+        if slot_name not in resource_config.allocations.devices:
+            raise ValueError(
+                f"{slot_name=} not found in config {resource_config.allocations.devices!r}"
+            )
+        return resource_config.allocations.devices[slot_name]
 
     def _calculate_reserved_slots(self, device_slots: SlotsMap, total_slots: SlotsMap) -> SlotsMap:
         reserved_slots: dict[SlotName, Decimal] = {}
@@ -777,11 +775,10 @@ class ResourceAllocator(aobject):
                     or SlotName("mem") not in self.available_total_slots
                 ):
                     raise ValueError("Memory not in allocated or total slots seen")
-                scaling_factor = {
+                return {
                     slot_name: slot / self.available_total_slots[slot_name]
                     for slot_name, slot in allocated_slots.items()
                 }
-                return scaling_factor
 
     def _ensure_slots_are_not_overallocated(self) -> None:
         if self.local_config.resource.allocation_mode != ResourceAllocationMode.MANUAL:

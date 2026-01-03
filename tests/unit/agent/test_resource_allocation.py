@@ -166,7 +166,7 @@ def create_mock_computers(
                     dev_id: (slot.slot_name, slot.amount)
                     for dev_id, slot in original_map.device_slots.items()
                 })
-            elif isinstance(original_map, DiscretePropertyAllocMap):
+            if isinstance(original_map, DiscretePropertyAllocMap):
                 return create_discrete_alloc_map({
                     dev_id: (slot.slot_name, slot.amount)
                     for dev_id, slot in original_map.device_slots.items()

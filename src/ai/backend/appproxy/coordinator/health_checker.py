@@ -549,14 +549,13 @@ class HealthCheckEngine:
                         interval,
                     )
                     return True
-                else:
-                    log.debug(
-                        "Health check interval not elapsed for endpoint {} ({:.1f}s < {:.1f}s)",
-                        endpoint_id,
-                        time_since_last_check,
-                        interval,
-                    )
-                    return False
+                log.debug(
+                    "Health check interval not elapsed for endpoint {} ({:.1f}s < {:.1f}s)",
+                    endpoint_id,
+                    time_since_last_check,
+                    interval,
+                )
+                return False
 
             except (ValueError, TypeError) as e:
                 log.warning(
@@ -699,15 +698,14 @@ class HealthCheckEngine:
                 if response.status == config.expected_status_code:
                     log.debug("Health check passed for {} (status: {})", url, response.status)
                     return True
-                else:
-                    log.warning(
-                        "Health check failed for {} (expected: {}, got: {}, attempts: {})",
-                        url,
-                        config.expected_status_code,
-                        response.status,
-                        current_state.current_retry_count + 1,
-                    )
-                    return False
+                log.warning(
+                    "Health check failed for {} (expected: {}, got: {}, attempts: {})",
+                    url,
+                    config.expected_status_code,
+                    response.status,
+                    current_state.current_retry_count + 1,
+                )
+                return False
 
         except TimeoutError:
             log.warning(
@@ -837,9 +835,8 @@ class HealthCheckEngine:
         if is_healthy:
             log.debug("Route {} health check passed", route.route_id)
             return ModelServiceStatus.HEALTHY, check_time, 0  # Reset failures on success
-        else:
-            log.debug("Route {} health check failed", route.route_id)
-            return ModelServiceStatus.UNHEALTHY, check_time, route.consecutive_failures + 1
+        log.debug("Route {} health check failed", route.route_id)
+        return ModelServiceStatus.UNHEALTHY, check_time, route.consecutive_failures + 1
 
     async def _perform_health_check_request_for_route(
         self,
@@ -871,15 +868,14 @@ class HealthCheckEngine:
                         "Route {} health check passed (status: {})", route.route_id, response.status
                     )
                     return True
-                else:
-                    log.warning(
-                        "Route {} health check failed (expected: {}, got: {}, failures: {})",
-                        route.route_id,
-                        config.expected_status_code,
-                        response.status,
-                        route.consecutive_failures + 1,
-                    )
-                    return False
+                log.warning(
+                    "Route {} health check failed (expected: {}, got: {}, failures: {})",
+                    route.route_id,
+                    config.expected_status_code,
+                    response.status,
+                    route.consecutive_failures + 1,
+                )
+                return False
 
         except TimeoutError:
             log.warning(

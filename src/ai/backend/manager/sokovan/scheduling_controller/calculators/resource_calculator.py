@@ -215,13 +215,12 @@ class ResourceCalculator:
                 image_min_slots,
                 known_slot_types,
             )
-        else:
-            # Legacy client support (prior to v19.03)
-            return await self._calculate_from_legacy(
-                creation_config,
-                image_min_slots,
-                known_slot_types,
-            )
+        # Legacy client support (prior to v19.03)
+        return await self._calculate_from_legacy(
+            creation_config,
+            image_min_slots,
+            known_slot_types,
+        )
 
     async def _calculate_from_resources(
         self,

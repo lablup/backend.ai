@@ -85,9 +85,9 @@ class QueryFilterTransformer(Transformer):
         a = token[0]
         if a.value == "null":
             return sa.null()
-        elif a.value == "true":
+        if a.value == "true":
             return sa.true()
-        elif a.value == "false":
+        if a.value == "false":
             return sa.false()
         raise ValueError("Unknown/unsupported atomic token", a.value)
 
@@ -98,8 +98,7 @@ class QueryFilterTransformer(Transformer):
             except KeyError:
                 raise ValueError("Unknown/unsupported field name", col_name)
             return func(value) if func is not None else value
-        else:
-            return value
+        return value
 
     def _transform_val(self, col_name: str, op: str, value: Any) -> Any:
         if isinstance(value, Tree):
@@ -204,7 +203,7 @@ class QueryFilterTransformer(Transformer):
         expr2 = children[2]
         if op == "&":
             return sa.and_(expr1, expr2)
-        elif op == "|":
+        if op == "|":
             return sa.or_(expr1, expr2)
         return args
 

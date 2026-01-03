@@ -100,11 +100,10 @@ class TPUPlugin(AbstractComputePlugin):
 
     async def available_slots(self) -> Mapping[SlotName, Decimal]:
         devices = await self.list_devices()
-        slots = {
+        return {
             # TODO: fractional alloc map
             SlotName("tpu.device"): Decimal(len(devices)),
         }
-        return slots
 
     def get_version(self) -> str:
         return __version__
@@ -115,10 +114,9 @@ class TPUPlugin(AbstractComputePlugin):
                 "tpu_support": "true",
                 "gcloud_sdk_version": "{}.{}.{}".format(*self.gcloud_sdk_version),
             }
-        else:
-            return {
-                "tpu_support": "false",
-            }
+        return {
+            "tpu_support": "false",
+        }
 
     async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
         # TODO: Implement

@@ -27,8 +27,7 @@ def format_exception(self, ei: Sequence[str] | _SysExcInfoType) -> str:
             s = "".join(traceback.format_exception(*ei))
         case _:
             s = "<exception-info-unavailable>"
-    s = s.rstrip("\n")
-    return s
+    return s.rstrip("\n")
 
 
 class SerializedExceptionFormatter(logging.Formatter):
@@ -45,9 +44,8 @@ class ConsoleFormatter(logging.Formatter):
         if datefmt:
             datefmt = datefmt.replace("%f", f"{int(record.msecs):03d}")
             return time.strftime(datefmt, ct)
-        else:
-            t = time.strftime("%Y-%m-%d %H:%M:%S", ct)
-            return f"{t}.{int(record.msecs):03d}"
+        t = time.strftime("%Y-%m-%d %H:%M:%S", ct)
+        return f"{t}.{int(record.msecs):03d}"
 
 
 class CustomJsonFormatter(JsonFormatter):

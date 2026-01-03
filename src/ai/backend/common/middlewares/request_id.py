@@ -21,5 +21,4 @@ async def request_id_middleware(request: web.Request, handler: Handler) -> web.S
         with_request_id(request_id),
         with_log_context_fields({"request_id": request_id}),
     ):
-        resp = await _handler(request)
-    return resp
+        return await _handler(request)

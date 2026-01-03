@@ -19,42 +19,38 @@ from ...utils import ScenarioBase
 
 @pytest.fixture
 def mock_get_endpoint_by_id_validated(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.repository,
         "get_endpoint_by_id_validated",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
 def mock_update_endpoint_lifecycle_validated(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.repository,
         "update_endpoint_lifecycle_validated",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
 def mock_get_endpoint_by_id_force(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.admin_repository,
         "get_endpoint_by_id_force",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
 def mock_update_endpoint_lifecycle_force(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.admin_repository,
         "update_endpoint_lifecycle_force",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture

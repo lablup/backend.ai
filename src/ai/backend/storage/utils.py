@@ -218,6 +218,4 @@ def normalize_filepath(filepath: str) -> str:
     normalized = str(path).replace("\\", "/")
 
     # Remove leading slash if present (we want relative paths)
-    normalized = normalized.removeprefix("/")
-
-    return normalized
+    return normalized.removeprefix("/")

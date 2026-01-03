@@ -26,8 +26,7 @@ class RoleConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return RoleRow.name.ilike(f"%{name}%")  # type: ignore[attr-defined]
-            else:
-                return RoleRow.name.like(f"%{name}%")  # type: ignore[attr-defined]
+            return RoleRow.name.like(f"%{name}%")  # type: ignore[attr-defined]
 
         return inner
 
@@ -36,8 +35,7 @@ class RoleConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return sa.func.lower(RoleRow.name) == name.lower()
-            else:
-                return RoleRow.name == name
+            return RoleRow.name == name
 
         return inner
 
@@ -131,22 +129,19 @@ class RoleOrders:
     def name(ascending: bool = True) -> QueryOrder:
         if ascending:
             return RoleRow.name.asc()  # type: ignore[attr-defined]
-        else:
-            return RoleRow.name.desc()  # type: ignore[attr-defined]
+        return RoleRow.name.desc()  # type: ignore[attr-defined]
 
     @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return RoleRow.created_at.asc()  # type: ignore[attr-defined]
-        else:
-            return RoleRow.created_at.desc()  # type: ignore[attr-defined]
+        return RoleRow.created_at.desc()  # type: ignore[attr-defined]
 
     @staticmethod
     def updated_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return RoleRow.updated_at.asc()  # type: ignore[union-attr]
-        else:
-            return RoleRow.updated_at.desc()  # type: ignore[union-attr]
+        return RoleRow.updated_at.desc()  # type: ignore[union-attr]
 
 
 class AssignedUserConditions:
@@ -164,8 +159,7 @@ class AssignedUserConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return UserRow.username.ilike(f"%{username}%")  # type: ignore[attr-defined]
-            else:
-                return UserRow.username.like(f"%{username}%")  # type: ignore[attr-defined]
+            return UserRow.username.like(f"%{username}%")  # type: ignore[attr-defined]
 
         return inner
 
@@ -174,8 +168,7 @@ class AssignedUserConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return sa.func.lower(UserRow.username) == username.lower()
-            else:
-                return UserRow.username == username
+            return UserRow.username == username
 
         return inner
 
@@ -184,8 +177,7 @@ class AssignedUserConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return UserRow.email.ilike(f"%{email}%")  # type: ignore[attr-defined]
-            else:
-                return UserRow.email.like(f"%{email}%")  # type: ignore[attr-defined]
+            return UserRow.email.like(f"%{email}%")  # type: ignore[attr-defined]
 
         return inner
 
@@ -194,8 +186,7 @@ class AssignedUserConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return sa.func.lower(UserRow.email) == email.lower()
-            else:
-                return UserRow.email == email
+            return UserRow.email == email
 
         return inner
 
@@ -214,19 +205,16 @@ class AssignedUserOrders:
     def username(ascending: bool = True) -> QueryOrder:
         if ascending:
             return UserRow.username.asc()  # type: ignore[attr-defined]
-        else:
-            return UserRow.username.desc()  # type: ignore[attr-defined]
+        return UserRow.username.desc()  # type: ignore[attr-defined]
 
     @staticmethod
     def email(ascending: bool = True) -> QueryOrder:
         if ascending:
             return UserRow.email.asc()  # type: ignore[attr-defined]
-        else:
-            return UserRow.email.desc()  # type: ignore[attr-defined]
+        return UserRow.email.desc()  # type: ignore[attr-defined]
 
     @staticmethod
     def granted_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return UserRoleRow.granted_at.asc()  # type: ignore[attr-defined]
-        else:
-            return UserRoleRow.granted_at.desc()  # type: ignore[attr-defined]
+        return UserRoleRow.granted_at.desc()  # type: ignore[attr-defined]

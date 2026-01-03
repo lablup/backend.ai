@@ -75,7 +75,7 @@ class QueryOrderTransformer(Transformer):
             col = self._get_col(children[0].value)
         if op == "+":
             return OrderingItem(col, OrderDirection.ASC)
-        elif op == "-":
+        if op == "-":
             return OrderingItem(col, OrderDirection.DESC)
         raise ValueError(f"Invalid operation `{op}`. Please use `+` or `-`")
 
@@ -90,8 +90,7 @@ class QueryOrderParser:
     def parse_order(self, table, order_expr: str) -> list[OrderingItem]:
         try:
             ast = self._parser.parse(order_expr)
-            orders = QueryOrderTransformer(table, self._column_map).transform(ast)
-            return orders
+            return QueryOrderTransformer(table, self._column_map).transform(ast)
         except LarkError as e:
             raise ValueError(f"Query ordering parsing error: {e}")
 

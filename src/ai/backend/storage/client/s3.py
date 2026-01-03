@@ -324,13 +324,11 @@ class S3Client:
             if response_content_type:
                 params["ResponseContentType"] = response_content_type
 
-            url = await s3_client.generate_presigned_url(
+            return await s3_client.generate_presigned_url(
                 "get_object",
                 Params=params,
                 ExpiresIn=expiration,
             )
-
-            return url
 
     async def get_object_meta(self, s3_key: str) -> ObjectMetaResponse:
         """

@@ -33,42 +33,38 @@ def mock_check_requester_access_scale(mocker, auto_scaling_service):
 
 @pytest.fixture
 def mock_get_endpoint_by_id_force_scale(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.admin_repository,
         "get_endpoint_by_id_force",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
 def mock_update_endpoint_replicas_force(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.admin_repository,
         "update_endpoint_replicas_force",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
 def mock_get_endpoint_by_id_validated_scale(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.repository,
         "get_endpoint_by_id_validated",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
 def mock_update_endpoint_replicas_validated(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.repository,
         "update_endpoint_replicas_validated",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 class TestScaleServiceReplicas:

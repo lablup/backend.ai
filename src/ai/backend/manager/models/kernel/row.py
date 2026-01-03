@@ -170,8 +170,7 @@ async def get_user_email(
     query = sa.select([users.c.email]).select_from(users).where(users.c.uuid == kernel["user_uuid"])
     result = await db_session.execute(query)
     user_email = str(result.scalar())
-    user_email = user_email.replace("@", "_")
-    return user_email
+    return user_email.replace("@", "_")
 
 
 def default_hostname(context) -> str:

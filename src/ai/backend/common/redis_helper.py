@@ -145,7 +145,7 @@ async def execute(
             if encoding:
                 if isinstance(result, bytes):
                     return result.decode(encoding)
-                elif isinstance(result, dict):
+                if isinstance(result, dict):
                     newdict = {}
                     for k, v in result.items():
                         newdict[k.decode(encoding)] = v.decode(encoding)
@@ -202,10 +202,9 @@ def _parse_redis_url(redis_target: RedisTarget, db: int) -> yarl.URL:
         raise ValueError("Redis URL is not provided in the configuration.")
 
     schema = _get_redis_url_schema(redis_target)
-    url = yarl.URL(f"{schema}://host").with_host(str(redis_url[0])).with_port(
+    return yarl.URL(f"{schema}://host").with_host(str(redis_url[0])).with_port(
         redis_url[1]
     ).with_password(redis_target.get("password")) / str(db)
-    return url
 
 
 def get_redis_object(
@@ -277,24 +276,23 @@ def get_redis_object(
             service_name=service_name,
             redis_helper_config=redis_helper_config,
         )
-    else:
-        redis_url = redis_target.addr
-        if redis_url is None:
-            raise ValueError("Redis URL is not provided in the configuration.")
+    redis_url = redis_target.addr
+    if redis_url is None:
+        raise ValueError("Redis URL is not provided in the configuration.")
 
-        url = _parse_redis_url(redis_target, db)
-        connection_pool: ConnectionPool = ConnectionPool.from_url(
-            str(url),
-            **conn_pool_opts,
-            **conn_opts,
-        )
-        return RedisConnectionInfo(
-            client=Redis.from_pool(connection_pool),  # type: ignore[attr-defined]
-            sentinel=None,
-            name=name,
-            service_name=None,
-            redis_helper_config=redis_helper_config,
-        )
+    url = _parse_redis_url(redis_target, db)
+    connection_pool: ConnectionPool = ConnectionPool.from_url(
+        str(url),
+        **conn_pool_opts,
+        **conn_opts,
+    )
+    return RedisConnectionInfo(
+        client=Redis.from_pool(connection_pool),  # type: ignore[attr-defined]
+        sentinel=None,
+        name=name,
+        service_name=None,
+        redis_helper_config=redis_helper_config,
+    )
 
 
 def get_redis_object_for_lock(
@@ -368,24 +366,23 @@ def get_redis_object_for_lock(
             service_name=service_name,
             redis_helper_config=redis_helper_config,
         )
-    else:
-        redis_url = redis_target.addr
-        if redis_url is None:
-            raise ValueError("Redis URL is not provided in the configuration.")
+    redis_url = redis_target.addr
+    if redis_url is None:
+        raise ValueError("Redis URL is not provided in the configuration.")
 
-        url = _parse_redis_url(redis_target, db)
-        connection_pool: BlockingConnectionPool = BlockingConnectionPool.from_url(
-            str(url),
-            **conn_pool_opts,
-            **conn_opts,
-        )
-        return RedisConnectionInfo(
-            client=Redis.from_pool(connection_pool),  # type: ignore[attr-defined]
-            sentinel=None,
-            name=name,
-            service_name=None,
-            redis_helper_config=redis_helper_config,
-        )
+    url = _parse_redis_url(redis_target, db)
+    connection_pool: BlockingConnectionPool = BlockingConnectionPool.from_url(
+        str(url),
+        **conn_pool_opts,
+        **conn_opts,
+    )
+    return RedisConnectionInfo(
+        client=Redis.from_pool(connection_pool),  # type: ignore[attr-defined]
+        sentinel=None,
+        name=name,
+        service_name=None,
+        redis_helper_config=redis_helper_config,
+    )
 
 
 async def create_valkey_client(

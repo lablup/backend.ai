@@ -40,9 +40,8 @@ class Runner(BaseRunner):
                 ".",
             ]
             return await self.run_subproc(cmd)
-        else:
-            log.warning('skipping the build phase due to missing "setup.py" file')
-            return 0
+        log.warning('skipping the build phase due to missing "setup.py" file')
+        return 0
 
     async def execute_heuristic(self) -> int:
         if Path("main.py").is_file():
@@ -52,9 +51,8 @@ class Runner(BaseRunner):
                 "main.py",
             ]
             return await self.run_subproc(cmd)
-        else:
-            log.error('cannot find the main script ("main.py").')
-            return 127
+        log.error('cannot find the main script ("main.py").')
+        return 127
 
     async def start_service(self, service_info):
         if service_info["name"] in ["jupyter", "jupyterlab"]:
@@ -78,9 +76,9 @@ class Runner(BaseRunner):
                 "--config",
                 config.name,
             ], {}
-        elif "h2o" in service_info["name"]:
+        if "h2o" in service_info["name"]:
             return ["echo", "h2o daemon already started"], {}
-        elif service_info["name"] == "sftp":
+        if service_info["name"] == "sftp":
             return [
                 self.runtime_path,
                 "-m",
@@ -88,3 +86,4 @@ class Runner(BaseRunner):
                 "--port",
                 str(service_info["port"]),
             ], {}
+        return None

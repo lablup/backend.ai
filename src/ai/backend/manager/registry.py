@@ -442,7 +442,7 @@ class AgentRegistry:
 
                     if row.status == SessionStatus.RUNNING:
                         return
-                    elif row.status in (SessionStatus.TERMINATED, SessionStatus.CANCELLED):
+                    if row.status in (SessionStatus.TERMINATED, SessionStatus.CANCELLED):
                         raise SessionNotFound("Session terminated during scheduling")
 
     async def create_session(
@@ -1553,8 +1553,7 @@ class AgentRegistry:
                 match = re.search(r"Key \(agent\)=\((?P<agent>[^)]+)\)", repr(e.orig))
                 if match:
                     raise InvalidAPIParameters(f"No such agent: {match.group('agent')}")
-                else:
-                    raise InvalidAPIParameters("No such agent")
+                raise InvalidAPIParameters("No such agent")
             raise
 
         await self.hook_plugin_ctx.notify(
@@ -2092,10 +2091,9 @@ class AgentRegistry:
                     [row.occupied_slots async for row in (await _sess.stream(query))], zero
                 )
                 # drop no-longer used slot types
-                user_occupied = ResourceSlot({
+                return ResourceSlot({
                     key: val for key, val in user_occupied.items() if key in known_slot_types
                 })
-                return user_occupied
 
         return await execute_with_retry(_query)
 
@@ -2555,14 +2553,13 @@ class AgentRegistry:
                         # TODO: refactor Session/Kernel status management and remove this.
                         await _force_destroy_for_superadmin(SessionStatus.TERMINATED)
                         return {}
-                    else:
-                        await SessionRow.set_session_status(
-                            self.db, session_id, SessionStatus.TERMINATING
-                        )
-                        await self.event_producer.anycast_and_broadcast_event(
-                            SessionTerminatingAnycastEvent(session_id, reason),
-                            SessionTerminatingBroadcastEvent(session_id, reason),
-                        )
+                    await SessionRow.set_session_status(
+                        self.db, session_id, SessionStatus.TERMINATING
+                    )
+                    await self.event_producer.anycast_and_broadcast_event(
+                        SessionTerminatingAnycastEvent(session_id, reason),
+                        SessionTerminatingBroadcastEvent(session_id, reason),
+                    )
                 case SessionStatus.TERMINATED:
                     raise GenericForbidden(
                         "Cannot destroy sessions that has already been already terminated"
@@ -3179,9 +3176,10 @@ class AgentRegistry:
         ):
             grouped_kernels = [*group_iterator]
             agent_client = self._get_agent_client(agent_id)
-            return await agent_client.sync_kernel_registry([
+            await agent_client.sync_kernel_registry([
                 (str(kernel.id), str(kernel.session_id)) for kernel in grouped_kernels
             ])
+            return
 
     async def mark_image_pull_started(
         self,
@@ -3424,8 +3422,7 @@ class AgentRegistry:
             query = sa.select(UserRow.email).where(UserRow.uuid == kernel.user_uuid)
             result = await db_conn.execute(query)
             user_email = str(result.scalar())
-            user_email = user_email.replace("@", "_")
-        return user_email
+            return user_email.replace("@", "_")
 
     async def get_commit_status(
         self,
@@ -3461,13 +3458,12 @@ class AgentRegistry:
         email = await self._get_user_email(kernel)
         async with handle_session_exception(self.db, "commit_session", session.id):
             agent_client = self._get_agent_client(kernel.agent, order_key=kernel.id)
-            resp = await agent_client.commit(
+            return await agent_client.commit(
                 str(kernel.id),
                 email,
                 canonical=new_image_ref.canonical,
                 extra_labels=extra_labels,
             )
-        return resp
 
     async def push_image(
         self,
@@ -3511,14 +3507,13 @@ class AgentRegistry:
         filename = filename.replace(":", "-")
         async with handle_session_exception(self.db, "commit_session_to_file", session.id):
             agent_client = self._get_agent_client(kernel.agent, order_key=kernel.id)
-            resp = await agent_client.commit(
+            return await agent_client.commit(
                 str(kernel.id),
                 email,
                 filename=filename,
                 extra_labels=extra_labels,
                 canonical=ImageRef.parse_image_str(kernel.image, registry).canonical,
             )
-        return resp
 
     async def get_agent_local_config(
         self,

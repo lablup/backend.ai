@@ -260,13 +260,11 @@ class SessionWorkload:
         }
 
         # Create selection criteria
-        criteria = AgentSelectionCriteria(
+        return AgentSelectionCriteria(
             session_metadata=session_metadata,
             kernel_requirements=kernel_requirements,
             kernel_counts_at_endpoint=self.kernel_counts_at_endpoint,
         )
-
-        return criteria
 
 
 @dataclass

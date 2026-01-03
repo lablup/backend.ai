@@ -255,4 +255,4 @@ class VolumeService:
             ongoing_task = self._deletion_tasks.get(vfolder_id)
             if ongoing_task is not None and ongoing_task.done():
                 asyncio.create_task(self._delete_vfolder(vfolder_key))
-        return None
+        return

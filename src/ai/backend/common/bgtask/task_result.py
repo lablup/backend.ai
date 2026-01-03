@@ -102,9 +102,8 @@ class TaskFailedResult(TaskResult):
     def error_code(self) -> Optional[ErrorCode]:
         if isinstance(self.exception, BackendAIError):
             return self.exception.error_code()
-        else:
-            return ErrorCode(
-                domain=ErrorDomain.BGTASK,
-                operation=ErrorOperation.EXECUTE,
-                error_detail=ErrorDetail.INTERNAL_ERROR,
-            )
+        return ErrorCode(
+            domain=ErrorDomain.BGTASK,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

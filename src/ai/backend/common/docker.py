@@ -309,11 +309,11 @@ async def login(
     if ping_status == 200:
         log.debug("docker-registry: {0} -> basic-auth", registry_url)
         return {"auth": basic_auth, "headers": {}}
-    elif ping_status == 404:
+    if ping_status == 404:
         raise RuntimeError(f"Unsupported docker registry: {registry_url}! (API v2 not implemented)")
     # Check also 400 response since the AWS ECR Public server returns a 400 response
     # when given invalid credential authorization.
-    elif ping_status in [400, 401]:
+    if ping_status in [400, 401]:
         params = {
             "scope": scope,
             "offline_token": "true",
@@ -546,10 +546,9 @@ class ImageRef:
                 or is_ip_address_format(maybe_registry)
             ):
                 return (maybe_registry, maybe_project_and_image_name)
-            elif registry is None:
+            if registry is None:
                 return (default_registry, image_str)
-            else:
-                return (registry, image_str)
+            return (registry, image_str)
 
         registry_part, project_and_image_name_part = divide_parts(image_str, registry)
 

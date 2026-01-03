@@ -33,10 +33,10 @@ class BaseFilterAdapter:
         """
         if string_filter.equals is not None:
             return equals_fn(string_filter.equals, False)
-        elif string_filter.i_equals is not None:
+        if string_filter.i_equals is not None:
             return equals_fn(string_filter.i_equals, True)
-        elif string_filter.contains is not None:
+        if string_filter.contains is not None:
             return contains_fn(string_filter.contains, False)
-        elif string_filter.i_contains is not None:
+        if string_filter.i_contains is not None:
             return contains_fn(string_filter.i_contains, True)
         return None

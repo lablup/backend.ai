@@ -113,8 +113,7 @@ select = [
     # Phase 7: Type annotations and modern syntax
     "UP",     # pyupgrade: modernizes Python syntax to latest version
     "A",      # flake8-builtins: prevents shadowing Python builtins
-    # "BLE",  # flake8-blind-except: prevents bare except clauses (deferred)
-    # "RET",  # flake8-return: enforces consistent return statement usage (deferred)
+    "RET",    # flake8-return: enforces consistent return statement usage
     # "ANN",  # flake8-annotations: enforces type annotations (deferred)
     # "TID252", # flake8-tidy-imports: enforces relative imports (deferred)
 ]
@@ -186,6 +185,10 @@ ignore = [
     # A (builtins) - defer common builtin shadowing for gradual adoption
     "A001",  # builtin-variable-shadowing - variable shadows builtin (75 violations, defer)
     "A002",  # builtin-argument-shadowing - argument shadows builtin (297 violations, defer)
+    # RET (return) - stylistic rules that may reduce readability
+    "RET502",  # implicit-return-value - mixed implicit/explicit return (stylistic preference)
+    "RET507",  # superfluous-else-continue - else after continue (can improve readability)
+    "RET508",  # superfluous-else-break - else after break (can improve readability)
 ]
 
 [tool.ruff.lint.isort]

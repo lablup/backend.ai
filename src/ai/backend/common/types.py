@@ -830,13 +830,11 @@ class BinarySize(int):
         if suffix_idx == 0:
             if self == 1:
                 return f"{int(self)} byte"
-            else:
-                return f"{int(self)} bytes"
-        else:
-            suffix = type(self).suffices[suffix_idx]
-            multiplier = type(self).suffix_map[suffix.lower()]
-            value = self._quantize(self, multiplier)
-            return f"{value:f} {suffix.upper()}iB"
+            return f"{int(self)} bytes"
+        suffix = type(self).suffices[suffix_idx]
+        multiplier = type(self).suffix_map[suffix.lower()]
+        value = self._quantize(self, multiplier)
+        return f"{value:f} {suffix.upper()}iB"
 
     def __format__(self, format_spec):
         if len(format_spec) != 1:
@@ -850,14 +848,13 @@ class BinarySize(int):
             multiplier = type(self).suffix_map[suffix.lower()]
             value = self._quantize(self, multiplier)
             return f"{value:f}{suffix.lower()}"
-        else:
-            # use the given scale
-            suffix = format_spec.lower()
-            multiplier = type(self).suffix_map.get(suffix)
-            if multiplier is None:
-                raise ValueError("Unsupported scale unit.", suffix)
-            value = self._quantize(self, multiplier)
-            return f"{value:f}{suffix.lower()}".strip()
+        # use the given scale
+        suffix = format_spec.lower()
+        multiplier = type(self).suffix_map.get(suffix)
+        if multiplier is None:
+            raise ValueError("Unsupported scale unit.", suffix)
+        value = self._quantize(self, multiplier)
+        return f"{value:f}{suffix.lower()}".strip()
 
 
 def _validate_binary_size(v: Any) -> BinarySize:
@@ -1208,8 +1205,7 @@ class VFolderID:
         first, _, second = val.partition("/")
         if second:
             return cls(QuotaScopeID.parse(first), UUID(hex=second))
-        else:
-            return cls(None, UUID(hex=first))
+        return cls(None, UUID(hex=first))
 
     def __init__(self, quota_scope_id: QuotaScopeID | str | None, folder_id: UUID) -> None:
         self.folder_id = folder_id
@@ -1983,8 +1979,7 @@ class DispatchResult(Generic[ResultType]):
             return str(self.result)
         if self.result is not None:
             return f"result: {self.result!s}\nerrors: " + "\n".join(self.errors)
-        else:
-            return "errors: " + "\n".join(self.errors)
+        return "errors: " + "\n".join(self.errors)
 
     @classmethod
     def success(cls, result_type: ResultType) -> DispatchResult[ResultType]:

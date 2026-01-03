@@ -47,16 +47,14 @@ class TOMLField(Extension):
         )
 
     def _transform(self, field_value: nodes.Expr, lineno: Optional[int] = None) -> nodes.Expr:
-        field_value = nodes.Filter(field_value, "toml_scalar", [], [], None, None, lineno=lineno)
-        return field_value
+        return nodes.Filter(field_value, "toml_scalar", [], [], None, None, lineno=lineno)
 
 
 class TOMLStringListField(TOMLField):
     tags = {"toml_strlist_field"}
 
     def _transform(self, field_value: nodes.Expr, lineno: Optional[int] = None) -> nodes.Expr:
-        field_value = nodes.Filter(field_value, "toml_scalar", [], [], None, None, lineno=lineno)
-        return field_value
+        return nodes.Filter(field_value, "toml_scalar", [], [], None, None, lineno=lineno)
 
 
 def toml_scalar(s: Any) -> str:

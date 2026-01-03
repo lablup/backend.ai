@@ -33,8 +33,7 @@ class ArtifactConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return ArtifactRow.name.ilike(f"%{name}%")
-            else:
-                return ArtifactRow.name.like(f"%{name}%")
+            return ArtifactRow.name.like(f"%{name}%")
 
         return inner
 
@@ -43,8 +42,7 @@ class ArtifactConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return sa.func.lower(ArtifactRow.name) == name.lower()
-            else:
-                return ArtifactRow.name == name
+            return ArtifactRow.name == name
 
         return inner
 
@@ -53,8 +51,7 @@ class ArtifactConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return ArtifactRow.registry_type.ilike(f"%{registry}%")
-            else:
-                return ArtifactRow.registry_type.like(f"%{registry}%")
+            return ArtifactRow.registry_type.like(f"%{registry}%")
 
         return inner
 
@@ -63,8 +60,7 @@ class ArtifactConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return sa.func.lower(ArtifactRow.registry_type) == registry.lower()
-            else:
-                return ArtifactRow.registry_type == registry
+            return ArtifactRow.registry_type == registry
 
         return inner
 
@@ -73,8 +69,7 @@ class ArtifactConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return ArtifactRow.source_registry_type.ilike(f"%{source}%")
-            else:
-                return ArtifactRow.source_registry_type.like(f"%{source}%")
+            return ArtifactRow.source_registry_type.like(f"%{source}%")
 
         return inner
 
@@ -83,8 +78,7 @@ class ArtifactConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return sa.func.lower(ArtifactRow.source_registry_type) == source.lower()
-            else:
-                return ArtifactRow.source_registry_type == source
+            return ArtifactRow.source_registry_type == source
 
         return inner
 
@@ -110,29 +104,25 @@ class ArtifactOrders:
     def name(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ArtifactRow.name.asc()
-        else:
-            return ArtifactRow.name.desc()
+        return ArtifactRow.name.desc()
 
     @staticmethod
     def type(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ArtifactRow.type.asc()
-        else:
-            return ArtifactRow.type.desc()
+        return ArtifactRow.type.desc()
 
     @staticmethod
     def scanned_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ArtifactRow.scanned_at.asc()
-        else:
-            return ArtifactRow.scanned_at.desc()
+        return ArtifactRow.scanned_at.desc()
 
     @staticmethod
     def updated_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ArtifactRow.updated_at.asc()
-        else:
-            return ArtifactRow.updated_at.desc()
+        return ArtifactRow.updated_at.desc()
 
 
 class ArtifactRevisionConditions:
@@ -150,8 +140,7 @@ class ArtifactRevisionConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return ArtifactRevisionRow.version.ilike(f"%{version}%")
-            else:
-                return ArtifactRevisionRow.version.like(f"%{version}%")
+            return ArtifactRevisionRow.version.like(f"%{version}%")
 
         return inner
 
@@ -160,8 +149,7 @@ class ArtifactRevisionConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return sa.func.lower(ArtifactRevisionRow.version) == version.lower()
-            else:
-                return ArtifactRevisionRow.version == version
+            return ArtifactRevisionRow.version == version
 
         return inner
 
@@ -229,33 +217,28 @@ class ArtifactRevisionOrders:
     def version(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ArtifactRevisionRow.version.asc()
-        else:
-            return ArtifactRevisionRow.version.desc()
+        return ArtifactRevisionRow.version.desc()
 
     @staticmethod
     def status(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ArtifactRevisionRow.status.asc()
-        else:
-            return ArtifactRevisionRow.status.desc()
+        return ArtifactRevisionRow.status.desc()
 
     @staticmethod
     def size(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ArtifactRevisionRow.size.asc()
-        else:
-            return ArtifactRevisionRow.size.desc()
+        return ArtifactRevisionRow.size.desc()
 
     @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ArtifactRevisionRow.created_at.asc()
-        else:
-            return ArtifactRevisionRow.created_at.desc()
+        return ArtifactRevisionRow.created_at.desc()
 
     @staticmethod
     def updated_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ArtifactRevisionRow.updated_at.asc()
-        else:
-            return ArtifactRevisionRow.updated_at.desc()
+        return ArtifactRevisionRow.updated_at.desc()

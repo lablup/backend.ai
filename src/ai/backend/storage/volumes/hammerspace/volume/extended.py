@@ -231,11 +231,10 @@ class HammerspaceVolume(BaseHammerspaceVolume):
             share_query_retry=self._share_query_retry,
             share_query_wait_sec=self._share_query_wait_sec,
         )
-        quota_model = HammerspaceQuotaModel(
+        return HammerspaceQuotaModel(
             base_args,
             self._client,
         )
-        return quota_model
 
     @override
     async def get_capabilities(self) -> frozenset[str]:

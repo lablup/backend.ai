@@ -60,8 +60,7 @@ async def curl(
             sess.get(url, params=params, headers=headers) as resp,
         ):
             body = await resp.text()
-            result = body.strip()
-            return result
+            return body.strip()
     except (TimeoutError, aiohttp.ClientError):
         if callable(default_value):
             return default_value()

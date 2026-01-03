@@ -202,7 +202,7 @@ def generate_ssh_keypair() -> Tuple[str, str]:
 def prepare_new_keypair(user_email: str, creator: KeyPairCreator) -> dict[str, Any]:
     ak, sk = generate_keypair()
     pubkey, privkey = generate_ssh_keypair()
-    data = {
+    return {
         "user_id": user_email,
         "access_key": ak,
         "secret_key": sk,
@@ -214,7 +214,6 @@ def prepare_new_keypair(user_email: str, creator: KeyPairCreator) -> dict[str, A
         "ssh_public_key": pubkey,
         "ssh_private_key": privkey,
     }
-    return data
 
 
 def generate_keypair_data() -> GeneratedKeyPairData:

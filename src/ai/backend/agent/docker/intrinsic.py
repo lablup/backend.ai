@@ -81,8 +81,7 @@ pruned_disk_types = frozenset([
 
 def netstat_ns_work(ns_path: Path):
     with nsenter(ns_path):
-        result = psutil.net_io_counters(pernic=True)
-    return result
+        return psutil.net_io_counters(pernic=True)
 
 
 async def netstat_ns(ns_path: Path):
@@ -103,8 +102,7 @@ async def netstat_ns(ns_path: Path):
         is_daemon = False
 
     if is_daemon:
-        result = await loop.run_in_executor(None, netstat_ns_work, ns_path)
-        return result
+        return await loop.run_in_executor(None, netstat_ns_work, ns_path)
     try:
         with ProcessPoolExecutor(max_workers=1) as executor:
             result = await loop.run_in_executor(executor, netstat_ns_work, ns_path)
@@ -279,8 +277,7 @@ class CPUPlugin(AbstractComputePlugin):
                     return None
                 if ret is None:
                     return None
-                cpu_used = nmget(ret, "cpu_stats.cpu_usage.total_usage", 0) / 1e6
-                return cpu_used
+                return nmget(ret, "cpu_stats.cpu_usage.total_usage", 0) / 1e6
 
         if ctx.mode == StatModes.CGROUP:
             impl = sysfs_impl
@@ -331,8 +328,7 @@ class CPUPlugin(AbstractComputePlugin):
             except psutil.NoSuchProcess:
                 log.debug("Process not found for CPU stats (pid:{0}, container id:{1})", pid, cid)
             else:
-                cpu_used = Decimal(cpu_times.user + cpu_times.system) * 1000
-                return cpu_used
+                return Decimal(cpu_times.user + cpu_times.system) * 1000
             return None
 
         async def api_impl(cid: str, pids: list[int]) -> list[Optional[Decimal]]:
@@ -1058,12 +1054,11 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
                     "NetworkMode": "host",
                 }
             }
-        else:
-            return {
-                "HostConfig": {
-                    "NetworkMode": "host",
-                },
-            }
+        return {
+            "HostConfig": {
+                "NetworkMode": "host",
+            },
+        }
 
     async def leave_network(self, kernel: DockerKernel) -> None:
         pass

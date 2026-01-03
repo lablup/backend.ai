@@ -114,8 +114,7 @@ class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
             id_column = self.model_class.id
             if pagination_order == ConnectionPaginationOrder.FORWARD:
                 return [id_column > cursor_uuid]
-            else:
-                return [id_column < cursor_uuid]
+            return [id_column < cursor_uuid]
 
         conditions = []
 

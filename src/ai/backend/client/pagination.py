@@ -124,11 +124,10 @@ async def fetch_paginated_result(
         # should remove to work with older managers
         variables.pop("filter")
         variables.pop("order")
-    result = await execute_paginated_query(
+    return await execute_paginated_query(
         root_field,
         variables,
         fields,
         limit=page_size,
         offset=page_offset,
     )
-    return result

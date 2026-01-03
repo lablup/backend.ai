@@ -162,8 +162,7 @@ def _load_library(name):
     try:
         if platform.system() == "Windows":
             return ctypes.windll.LoadLibrary(name)
-        else:
-            return ctypes.cdll.LoadLibrary(name)
+        return ctypes.cdll.LoadLibrary(name)
     except OSError:
         pass
     return None
@@ -219,8 +218,7 @@ class libhip(LibraryBase):
                 if _dll:
                     return _dll
             return None
-        else:
-            raise NotImplementedError
+        raise NotImplementedError
 
     @classmethod
     def get_version(cls) -> Tuple[int, int]:
@@ -281,8 +279,7 @@ class librocm_smi(LibraryBase):
                 if _dll:
                     return _dll
             return None
-        else:
-            raise NotImplementedError
+        raise NotImplementedError
 
     @classmethod
     def get_version(cls) -> Tuple[int, int, int]:
@@ -362,8 +359,7 @@ class librocm_smi(LibraryBase):
         vbios = cls.get_gpu_vbios_version(device_idx)
         if vbios.count("-") == 2 and len(str(vbios.split("-")[1])) > 1:
             return vbios.split("-")[1]
-        else:
-            return "unknown"
+        return "unknown"
 
     @classmethod
     def get_gpu_uuid(cls, device_idx: int) -> str:

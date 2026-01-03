@@ -64,7 +64,7 @@ def host_port_pair(s: str) -> Tuple[ipaddress._BaseAddress, int]:
     if len(pieces) == 1:
         msg = f"{s!r} should contain both IP address and port number."
         raise argparse.ArgumentTypeError(msg)
-    elif len(pieces) == 2:
+    if len(pieces) == 2:
         # strip potential brackets in IPv6 hostname-port strings (RFC 3986).
         host = pieces[0].strip("[]")
         try:

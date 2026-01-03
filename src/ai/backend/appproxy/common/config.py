@@ -69,10 +69,9 @@ class HostPortPair(BaseSchema):
     def __getitem__(self, *args) -> int | str:
         if args[0] == 0:
             return self.host
-        elif args[0] == 1:
+        if args[0] == 1:
             return self.port
-        else:
-            raise KeyError(*args)
+        raise KeyError(*args)
 
 
 class RedisHelperConfig(BaseSchema):
@@ -440,11 +439,11 @@ def generate_example_json(
         parent = []
     if isinstance(schema, types.UnionType):
         return generate_example_json(typing.get_args(schema)[0], parent=[*parent])
-    elif isinstance(schema, types.GenericAlias):
+    if isinstance(schema, types.GenericAlias):
         if typing.get_origin(schema) is not list:
             raise RuntimeError("GenericAlias other than list not supported!")
         return [generate_example_json(typing.get_args(schema)[0], parent=[*parent])]
-    elif issubclass(schema, BaseModel):
+    if issubclass(schema, BaseModel):
         res = {}
         for name, info in schema.model_fields.items():
             config_key = [*parent, name]
@@ -464,8 +463,7 @@ def generate_example_json(
                     else:
                         raise
         return res
-    else:
-        raise UnsupportedTypeError(str(schema))
+    raise UnsupportedTypeError(str(schema))
 
 
 def get_default_redis_key_ttl() -> int:

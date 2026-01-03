@@ -91,6 +91,7 @@ class ContainerRegistryTypeField(graphene.Scalar):
     def parse_literal(node, _variables=None):
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ContainerRegistryType(node.value)
+        return None
 
     @staticmethod
     def parse_value(value: str) -> ContainerRegistryType:

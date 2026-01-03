@@ -2307,11 +2307,10 @@ async def get_fstab_contents(request: web.Request, params: Any) -> web.Response:
                             "node_id": params["agent_id"],
                         }
                         return web.json_response(resp)
-                    else:
-                        message = await watcher_resp.text()
-                        raise BackendAgentError(
-                            "FAILURE", f"({watcher_resp.status}: {watcher_resp.reason}) {message}"
-                        )
+                    message = await watcher_resp.text()
+                    raise BackendAgentError(
+                        "FAILURE", f"({watcher_resp.status}: {watcher_resp.reason}) {message}"
+                    )
         except asyncio.CancelledError:
             raise
         except TimeoutError:

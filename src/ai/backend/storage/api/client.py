@@ -178,8 +178,7 @@ async def download(request: web.Request) -> web.StreamResponse:
             if params["archive"]:
                 # Download directory as an archive when archive param is set.
                 return await download_directory_as_archive(request, file_path)
-            else:
-                raise InvalidAPIParameters(extra_msg="The file is not a regular file.")
+            raise InvalidAPIParameters(extra_msg="The file is not a regular file.")
         if request.method == "HEAD":
             ifrange: datetime | None = request.if_range
             mtime = os.stat(file_path).st_mtime

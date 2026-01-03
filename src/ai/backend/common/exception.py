@@ -77,8 +77,7 @@ class InvalidImageTag(ValueError):
     def __str__(self) -> str:
         if self._full_name is not None:
             return f"Invalid or duplicate image name tag: {self._tag}, full image name: {self._full_name}"
-        else:
-            return f"Invalid or duplicate image name tag: {self._tag}"
+        return f"Invalid or duplicate image name tag: {self._tag}"
 
 
 class ProjectMismatchWithCanonical(ValueError):

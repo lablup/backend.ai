@@ -38,6 +38,7 @@ async def test_alias_dealias_image_by_admin():
             for item in items:
                 if "lua" in item["name"] and "5.1-alpine3.8" in item["tag"]:
                     return item
+            return None
 
         img_info = get_test_image_info()
         test_alias = "testalias-b9f1ce136f584ca892d5fef3e78dd11d"

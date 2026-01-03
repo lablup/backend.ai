@@ -292,8 +292,7 @@ async def get(request: web.Request, params: Any) -> web.Response:
     if params["format"] == "yaml":
         body = yaml.dump(template)
         return web.Response(text=body, content_type="text/yaml")
-    else:
-        return web.json_response(template)
+    return web.json_response(template)
 
 
 @auth_required

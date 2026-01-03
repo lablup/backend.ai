@@ -139,8 +139,8 @@ async def call_non_bursty(
     if invoke:
         if inspect.iscoroutinefunction(coro):
             return await coro()
-        else:
-            return coro()
+        return coro()
+    return None
 
 
 TAnyResponse = TypeVar("TAnyResponse", bound=web.StreamResponse)

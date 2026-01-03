@@ -181,8 +181,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
             def _kernel_resource_spec_read():
                 with open((self.config_dir / "resource.txt").resolve()) as f:
-                    resource_spec = KernelResourceSpec.read_from_file(f)
-                return resource_spec
+                    return KernelResourceSpec.read_from_file(f)
 
             resource_spec = await loop.run_in_executor(None, _kernel_resource_spec_read)
             resource_opts = None
@@ -675,7 +674,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         # TODO: Mark shmem feature as unsupported when advertising agent
 
-        kernel_obj = KubernetesKernel(
+        return KubernetesKernel(
             self.ownership_data,
             self.kernel_config["network_id"],
             self.image_ref,
@@ -686,7 +685,6 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             environ=environ,
             data={},
         )
-        return kernel_obj
 
     @override
     async def start_container(
@@ -1154,7 +1152,7 @@ class KubernetesAgent(
         except Exception:
             log.warning("_destroy_kernel({0}) kernel missing (already dead?)", kernel_id)
             await asyncio.shield(self.k8s_ptask_group.create_task(force_cleanup()))
-            return None
+            return
         deployment_name = kernel["deployment_name"]
         try:
             await core_api.delete_namespaced_service(f"{deployment_name}-service", "backend-ai")

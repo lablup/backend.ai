@@ -1876,10 +1876,9 @@ async def check_all_dependencies(
     )
     result = await db_session.execute(query)
     rows = result.scalars().all()
-    pending_dependencies = [
+    return [
         sess_row for sess_row in rows if SessionResult(sess_row.result) != SessionResult.SUCCESS
     ]
-    return pending_dependencies
 
 
 DEFAULT_SESSION_ORDERING = [
@@ -1984,8 +1983,7 @@ class ComputeSessionPermissionContextBuilder(
         target_scope: ScopeType,
     ) -> frozenset[ComputeSessionPermission]:
         roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
-        permissions = await self._calculate_permission_by_predefined_roles(roles)
-        return permissions
+        return await self._calculate_permission_by_predefined_roles(roles)
 
     @override
     async def build_ctx_in_system_scope(
@@ -2043,10 +2041,9 @@ class ComputeSessionPermissionContextBuilder(
         domain_name: str,
     ) -> ComputeSessionPermissionContext:
         permissions = await self.calculate_permission(ctx, DomainScope(domain_name))
-        result = ComputeSessionPermissionContext(
+        return ComputeSessionPermissionContext(
             domain_name_to_permission_map={domain_name: permissions}
         )
-        return result
 
     async def _build_at_user_scope_in_domain(
         self,
@@ -2065,10 +2062,9 @@ class ComputeSessionPermissionContextBuilder(
         own_folder_map = {
             row.id: permissions for row in await self.db_session.scalars(_vfolder_stmt)
         }
-        result = ComputeSessionPermissionContext(
+        return ComputeSessionPermissionContext(
             object_id_to_additional_permission_map=own_folder_map
         )
-        return result
 
     async def _build_at_user_scope_in_project(
         self,
@@ -2086,10 +2082,9 @@ class ComputeSessionPermissionContextBuilder(
         own_folder_map = {
             row.id: permissions for row in await self.db_session.scalars(_vfolder_stmt)
         }
-        result = ComputeSessionPermissionContext(
+        return ComputeSessionPermissionContext(
             object_id_to_additional_permission_map=own_folder_map
         )
-        return result
 
     async def _build_at_project_scopes_in_domain(
         self,
@@ -2115,10 +2110,9 @@ class ComputeSessionPermissionContextBuilder(
         project_id: UUID,
     ) -> ComputeSessionPermissionContext:
         permissions = await self.calculate_permission(ctx, ProjectScope(project_id))
-        result = ComputeSessionPermissionContext(
+        return ComputeSessionPermissionContext(
             project_id_to_permission_map={project_id: permissions}
         )
-        return result
 
     async def _build_at_user_scope_non_recursively(
         self,
@@ -2126,8 +2120,7 @@ class ComputeSessionPermissionContextBuilder(
         user_id: UUID,
     ) -> ComputeSessionPermissionContext:
         permissions = await self.calculate_permission(ctx, UserRBACScope(user_id))
-        result = ComputeSessionPermissionContext(user_id_to_permission_map={user_id: permissions})
-        return result
+        return ComputeSessionPermissionContext(user_id_to_permission_map={user_id: permissions})
 
     @override
     @classmethod
@@ -2173,5 +2166,4 @@ async def get_permission_ctx(
 ) -> ComputeSessionPermissionContext:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         builder = ComputeSessionPermissionContextBuilder(db_session)
-        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
-    return permission_ctx
+        return await builder.build(ctx, target_scope, requested_permission)

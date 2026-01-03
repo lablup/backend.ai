@@ -70,17 +70,16 @@ class DummyKernel(AbstractKernel):
                 exec_timeout=0,
                 client_features=client_features,
             )
-        else:
-            return await DummyCodeRunner.new(
-                self.kernel_id,
-                self.session_id,
-                event_producer,
-                kernel_host=self.data["kernel_host"],
-                repl_in_port=self.data["repl_in_port"],
-                repl_out_port=self.data["repl_out_port"],
-                exec_timeout=0,
-                client_features=client_features,
-            )
+        return await DummyCodeRunner.new(
+            self.kernel_id,
+            self.session_id,
+            event_producer,
+            kernel_host=self.data["kernel_host"],
+            repl_in_port=self.data["repl_in_port"],
+            repl_out_port=self.data["repl_out_port"],
+            exec_timeout=0,
+            client_features=client_features,
+        )
 
     @override
     async def check_status(self):

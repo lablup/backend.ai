@@ -638,6 +638,4 @@ async def fetch_resource_usage(
     )
     async with db_engine.begin_readonly_session() as db_sess:
         result = await db_sess.execute(query)
-        kernels = result.scalars().all()
-
-    return kernels
+        return result.scalars().all()

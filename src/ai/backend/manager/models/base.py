@@ -203,8 +203,7 @@ class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
             return None
         if self._use_name:
             return value.name
-        else:
-            return value.value
+        return value.value
 
     def process_result_value(
         self,
@@ -215,8 +214,7 @@ class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
             return None
         if self._use_name:
             return self._enum_cls[value]
-        else:
-            return self._enum_cls(value)
+        return self._enum_cls(value)
 
     def copy(self, **kw) -> type[Self]:
         return StrEnumType(self._enum_cls, self._use_name, **self._opts)
@@ -335,8 +333,7 @@ class StructuredJSONColumn(TypeDecorator):
     def load_dialect_impl(self, dialect: Dialect):
         if dialect.name == "sqlite":
             return dialect.type_descriptor(sa.JSON)
-        else:
-            return super().load_dialect_impl(dialect)
+        return super().load_dialect_impl(dialect)
 
     def process_bind_param(
         self,
@@ -431,8 +428,7 @@ class URLColumn(TypeDecorator):
     def process_result_value(self, value: Optional[str], dialect: Dialect) -> Optional[yarl.URL]:
         if value is None:
             return None
-        if value is not None:
-            return yarl.URL(value)
+        return yarl.URL(value)
 
 
 class IPColumn(TypeDecorator):
@@ -556,8 +552,7 @@ class GUID(TypeDecorator, Generic[TUUIDSubType]):
     def load_dialect_impl(self, dialect):
         if dialect.name == "postgresql":
             return dialect.type_descriptor(UUID())
-        else:
-            return dialect.type_descriptor(CHAR(16))
+        return dialect.type_descriptor(CHAR(16))
 
     def process_bind_param(self, value: TUUIDSubType | uuid.UUID, dialect):
         # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
@@ -566,26 +561,21 @@ class GUID(TypeDecorator, Generic[TUUIDSubType]):
         #       Therefore, we just do isinstance on uuid.UUID only below.
         if value is None:
             return value
-        elif dialect.name == "postgresql":
+        if dialect.name == "postgresql":
             if isinstance(value, uuid.UUID):
                 return str(value)
-            else:
-                return str(uuid.UUID(value))
-        else:
-            if isinstance(value, uuid.UUID):
-                return value.bytes
-            else:
-                return uuid.UUID(value).bytes
+            return str(uuid.UUID(value))
+        if isinstance(value, uuid.UUID):
+            return value.bytes
+        return uuid.UUID(value).bytes
 
     def process_result_value(self, value: Any, dialect) -> Optional[TUUIDSubType]:
         if value is None:
             return value
-        else:
-            cls = type(self)
-            if isinstance(value, bytes):
-                return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(bytes=value)))
-            else:
-                return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(value)))
+        cls = type(self)
+        if isinstance(value, bytes):
+            return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(bytes=value)))
+        return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(value)))
 
 
 class SlugType(TypeDecorator):

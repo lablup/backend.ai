@@ -408,7 +408,7 @@ class BaseRunner(metaclass=ABCMeta):
             if clean_cmd is None or clean_cmd == "":
                 # skipped
                 return
-            elif clean_cmd == "*":
+            if clean_cmd == "*":
                 ret = await self.clean_heuristic()
             else:
                 ret = await self.run_subproc(clean_cmd)
@@ -444,7 +444,7 @@ class BaseRunner(metaclass=ABCMeta):
             if build_cmd is None or build_cmd == "":
                 # skipped
                 return
-            elif build_cmd == "*":
+            if build_cmd == "*":
                 if Path("Makefile").is_file():
                     ret = await self.run_subproc("make")
                 else:
@@ -472,7 +472,7 @@ class BaseRunner(metaclass=ABCMeta):
             if exec_cmd is None or exec_cmd == "":
                 # skipped
                 return
-            elif exec_cmd == "*":
+            if exec_cmd == "*":
                 ret = await self.execute_heuristic()
             else:
                 ret = await self.run_subproc(exec_cmd, batch=True)

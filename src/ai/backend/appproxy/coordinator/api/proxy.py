@@ -221,8 +221,7 @@ async def proxy(
             ),
             headers={"Access-Control-Allow-Origin": "*", "Access-Control-Expose-Headers": "*"},
         )
-    else:
-        return web.HTTPPermanentRedirect(app_url)
+    return web.HTTPPermanentRedirect(app_url)
 
 
 async def init(app: web.Application) -> None:

@@ -244,8 +244,7 @@ class DeploymentDBSource:
             )
             result = await db_sess.execute(stmt)
             endpoint_result: EndpointRow = result.scalar_one()
-            deployment_info = endpoint_result.to_deployment_info()
-        return deployment_info
+            return endpoint_result.to_deployment_info()
 
     async def create_endpoint_legacy(
         self,
@@ -285,8 +284,7 @@ class DeploymentDBSource:
             )
             result = await db_sess.execute(stmt)
             endpoint_result: EndpointRow = result.scalar_one()
-            deployment_info = endpoint_result.to_deployment_info()
-        return deployment_info
+            return endpoint_result.to_deployment_info()
 
     async def _check_group_exists(
         self,
@@ -557,8 +555,7 @@ class DeploymentDBSource:
         """Delete an endpoint and all its routes in a single transaction."""
         async with self._begin_session_read_committed() as db_sess:
             # Delete routes first, then endpoint
-            deleted = await self._delete_routes_and_endpoint(db_sess, endpoint_id)
-            return deleted
+            return await self._delete_routes_and_endpoint(db_sess, endpoint_id)
 
     # AutoScalingRule operations
 
@@ -579,8 +576,7 @@ class DeploymentDBSource:
             row = EndpointAutoScalingRuleRow.from_creator(endpoint_id=endpoint_id, creator=creator)
             db_sess.add(row)
             await db_sess.flush()
-            rule = row.to_autoscaling_rule()
-        return rule
+            return row.to_autoscaling_rule()
 
     async def list_autoscaling_rules(
         self,
@@ -909,8 +905,7 @@ class DeploymentDBSource:
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = sa.select(RoutingRow.endpoint).where(RoutingRow.session == session_id)
             result = await db_sess.execute(query)
-            endpoint_id = result.scalar_one_or_none()
-            return endpoint_id
+            return result.scalar_one_or_none()
 
     async def fetch_route_service_discovery_info(
         self,

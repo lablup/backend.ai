@@ -176,16 +176,15 @@ class AgentSelectionCriteria:
                     kernel_ids=kernel_ids,
                 )
             ]
-        else:
-            # Return individual kernel resources for multi-node sessions
-            return [
-                ResourceRequirements(
-                    requested_slots=req.requested_slots,
-                    required_architecture=req.required_architecture,
-                    kernel_ids=[kernel_id],
-                )
-                for kernel_id, req in self.kernel_requirements.items()
-            ]
+        # Return individual kernel resources for multi-node sessions
+        return [
+            ResourceRequirements(
+                requested_slots=req.requested_slots,
+                required_architecture=req.required_architecture,
+                kernel_ids=[kernel_id],
+            )
+            for kernel_id, req in self.kernel_requirements.items()
+        ]
 
 
 class AbstractAgentSelector(ABC):

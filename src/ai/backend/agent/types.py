@@ -218,7 +218,7 @@ class KernelOwnershipData:
         def to_uuid(value: Optional[str | uuid.UUID]) -> Optional[uuid.UUID]:
             if value is None:
                 return None
-            elif isinstance(value, uuid.UUID):
+            if isinstance(value, uuid.UUID):
                 return value
             return uuid.UUID(value)
 

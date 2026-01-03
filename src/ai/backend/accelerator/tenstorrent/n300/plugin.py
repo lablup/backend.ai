@@ -244,7 +244,7 @@ class TTn300Plugin(AbstractComputePlugin):
 
     async def create_alloc_map(self) -> DiscretePropertyAllocMap:
         devices = await self.list_devices()
-        dpam = DiscretePropertyAllocMap(
+        return DiscretePropertyAllocMap(
             device_slots={
                 DeviceId(str(dev.device_id)): DeviceSlotInfo(
                     SlotTypes.COUNT, self.slot_types[0][0], Decimal(1)
@@ -253,7 +253,6 @@ class TTn300Plugin(AbstractComputePlugin):
             },
             exclusive_slot_types=self.exclusive_slot_types,
         )
-        return dpam
 
     async def generate_mounts(
         self,

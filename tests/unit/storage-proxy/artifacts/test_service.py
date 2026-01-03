@@ -547,10 +547,9 @@ class TestHuggingFaceDownloadStep:
         def mock_headers_get(key, default=None):
             if key == "Content-Length":
                 return "12"  # Total size matches our chunks
-            elif key == "ETag" or key == "Accept-Ranges":
+            if key == "ETag" or key == "Accept-Ranges":
                 return default
-            else:
-                return default
+            return default
 
         mock_response.headers.get.side_effect = mock_headers_get
 
@@ -620,8 +619,7 @@ class TestHuggingFaceDownloadStep:
         def mock_headers_get(key, default=None):
             if key == "Content-Length":
                 return "100"  # Valid content length for HEAD probe
-            else:
-                return default
+            return default
 
         mock_response.headers.get.side_effect = mock_headers_get
 
@@ -846,8 +844,7 @@ class TestReservoirDownloadStep:
         def mock_get_storage(name: str):
             if name == "test_storage":
                 return mock_storage_pool.get_storage("test_storage")
-            else:
-                raise KeyError(name)
+            raise KeyError(name)
 
         mock_storage_pool_with_error = Mock(spec=StoragePool)
         mock_storage_pool_with_error.get_storage = Mock(side_effect=mock_get_storage)

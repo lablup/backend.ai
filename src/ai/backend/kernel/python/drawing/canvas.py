@@ -100,8 +100,7 @@ class Canvas:
         self.update()
 
     def create_turtle(self):
-        t = Turtle(self)
-        return t
+        return Turtle(self)
 
     def stop_animation(self):
         self._cmd_history.append((self._id, "stop-anim"))

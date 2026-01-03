@@ -33,52 +33,47 @@ def mock_check_requester_access_token(mocker, model_serving_service):
 
 @pytest.fixture
 def mock_get_endpoint_by_id_force_token(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.admin_repository,
         "get_endpoint_by_id_force",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
 def mock_create_endpoint_token_force(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.admin_repository,
         "create_endpoint_token_force",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
 def mock_get_endpoint_by_id_validated_token(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.repository,
         "get_endpoint_by_id_validated",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
 def mock_create_endpoint_token_validated(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.repository,
         "create_endpoint_token_validated",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
 def mock_get_scaling_group_info_token(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.repository,
         "get_scaling_group_info",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 class TestGenerateToken:

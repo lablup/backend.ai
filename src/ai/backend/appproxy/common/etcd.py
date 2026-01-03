@@ -12,17 +12,15 @@ class TraefikEtcd(AsyncEtcd):
         if isinstance(k, bytes):
             k = k.decode(self.encoding)
         prefix = f"{self.ns}/"
-        k = k.removeprefix(prefix)
-        return k
+        return k.removeprefix(prefix)
 
 
 def convert_to_etcd_dict(item: Any) -> dict:
     def _convert(obj: Any) -> Any:
         if isinstance(obj, list):
             return {str(idx): item for idx, item in enumerate(obj)}
-        elif isinstance(obj, dict):
+        if isinstance(obj, dict):
             return {k: _convert(v) for k, v in obj.items()}
-        else:
-            return obj
+        return obj
 
     return _convert(item)

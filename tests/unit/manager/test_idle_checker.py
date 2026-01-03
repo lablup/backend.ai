@@ -1208,11 +1208,11 @@ class TestUtilizationIdleChecker:
         def mock_get_live_data_side_effect(key: str) -> Optional[bytes]:
             if ".util_first_collected" in key:
                 return f"{util_first_collected_time:.06f}".encode()
-            elif ".util_series" in key:
+            if ".util_series" in key:
                 return msgpack.packb({"cpu_util": [], "mem": [], "cuda_util": [], "cuda_mem": []})
-            elif ".utilization_extra" in key:
+            if ".utilization_extra" in key:
                 return msgpack.packb({"resources": {}})
-            elif ".utilization" in key:
+            if ".utilization" in key:
                 return msgpack.packb(insufficient_test_config.expected_remaining)
             return None
 

@@ -49,8 +49,7 @@ class LoginTemplate(WrapperTestTemplate):
 
 def _get_test_temp_dir(test_id: str) -> Path:
     temp_base = Path(tempfile.gettempdir()) / "backend_ai_tests"
-    temp_dir = temp_base / test_id
-    return temp_dir
+    return temp_base / test_id
 
 
 async def _login(

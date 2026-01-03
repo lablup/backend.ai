@@ -187,10 +187,9 @@ class WekaAPIClient:
         try:
             if method == "GET" or method == "DELETE":
                 return await func("/api/v2" + path, headers=self._req_header, ssl=self.ssl_context)
-            else:
-                return await func(
-                    "/api/v2" + path, headers=self._req_header, json=body, ssl=self.ssl_context
-                )
+            return await func(
+                "/api/v2" + path, headers=self._req_header, json=body, ssl=self.ssl_context
+            )
         except web.HTTPUnauthorized:
             await self._login(sess)
             try:
@@ -199,13 +198,12 @@ class WekaAPIClient:
                         "/api/v2" + path, headers=self._req_header, ssl=self.ssl_context
                     )
 
-                else:
-                    return await func(
-                        "/api/v2" + path,
-                        headers=self._req_header,
-                        json=body,
-                        ssl=self.ssl_context,
-                    )
+                return await func(
+                    "/api/v2" + path,
+                    headers=self._req_header,
+                    json=body,
+                    ssl=self.ssl_context,
+                )
 
             except web.HTTPUnauthorized:
                 raise WekaUnauthorizedError
@@ -248,11 +246,10 @@ class WekaAPIClient:
                 WekaQuota.from_json(quota_info["quota_id"], quota_info)
                 for quota_info in data["data"]
             ]
-        else:
-            return [
-                WekaQuota.from_json(quota_id, data["data"][quota_id])
-                for quota_id in data["data"].keys()
-            ]
+        return [
+            WekaQuota.from_json(quota_id, data["data"][quota_id])
+            for quota_id in data["data"].keys()
+        ]
 
     @error_handler
     async def get_quota(self, fs_uid: str, inode_id: int) -> WekaQuota:
@@ -269,9 +266,8 @@ class WekaAPIClient:
             raise WekaNotFoundError
         if "inode_id" in data["data"]:
             return WekaQuota.from_json("", data["data"])
-        else:
-            quota_id = list(data["data"].keys())[0]
-            return WekaQuota.from_json(quota_id, data["data"][quota_id])
+        quota_id = list(data["data"].keys())[0]
+        return WekaQuota.from_json(quota_id, data["data"][quota_id])
 
     @error_handler
     async def set_quota(
@@ -285,8 +281,7 @@ class WekaAPIClient:
             ss = str(s)
             if ss.endswith("bytes"):
                 return ss.replace("bytes", "B").replace(" ", "")
-            else:
-                return ss.replace(" ", "")
+            return ss.replace(" ", "")
 
         body = {
             "grace_seconds": None,

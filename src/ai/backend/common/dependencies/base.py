@@ -81,7 +81,7 @@ class NonMonitorableDependencyProvider(DependencyProvider[SetupInputT, ResourceT
         Returns:
             None indicating no health checks
         """
-        return None
+        return
 
 
 class DependencyComposer(ABC, Generic[SetupInputT, ResourcesT]):

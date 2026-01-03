@@ -597,8 +597,7 @@ class ReservoirService:
 
             return DispatchResult.success(None)
 
-        bgtask_id = await self._background_task_manager.start(_import_models_batch)
-        return bgtask_id
+        return await self._background_task_manager.start(_import_models_batch)
 
 
 # Import Pipeline Steps

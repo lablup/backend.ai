@@ -69,7 +69,7 @@ class HTTPBackend(BaseBackend):
     def selected_route(self) -> RouteInfo:
         if len(self.routes) == 0:
             raise WorkerNotAvailable
-        elif len(self.routes) == 1:
+        if len(self.routes) == 1:
             selected_route = self.routes[0]
             if selected_route.traffic_ratio == 0:
                 raise WorkerNotAvailable

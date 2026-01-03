@@ -288,8 +288,7 @@ class DomainPermissionContextBuilder(
         target_scope: ScopeType,
     ) -> frozenset[DomainPermission]:
         roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
-        permissions = await self._calculate_permission_by_predefined_roles(roles)
-        return permissions
+        return await self._calculate_permission_by_predefined_roles(roles)
 
     @override
     async def build_ctx_in_system_scope(
@@ -370,8 +369,7 @@ async def get_permission_ctx(
     db_session: SASession,
 ) -> DomainPermissionContext:
     builder = DomainPermissionContextBuilder(db_session)
-    permission_ctx = await builder.build(ctx, target_scope, requested_permission)
-    return permission_ctx
+    return await builder.build(ctx, target_scope, requested_permission)
 
 
 async def get_domains(

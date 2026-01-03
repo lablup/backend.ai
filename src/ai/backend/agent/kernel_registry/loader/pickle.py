@@ -45,8 +45,7 @@ class PickleBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
             )
         try:
             with open(final_file_path, "rb") as f:
-                result = pickle.load(f)
-                return result
+                return pickle.load(f)
         except EOFError as e:
             log.warning("Failed to load the last kernel registry: {}", str(final_file_path))
             raise KernelRegistryLoadError from e

@@ -32,8 +32,7 @@ class Color:
     def to_hex(self, include_alpha=True):
         if include_alpha:
             return f"#{self.red:02x}{self.green:02x}{self.blue:02x}{self.alpha:02x}"
-        else:
-            return f"#{self.red:02x}{self.green:02x}{self.blue:02x}"
+        return f"#{self.red:02x}{self.green:02x}{self.blue:02x}"
 
     def to_bytes(self):
         return rgba.pack(self.red, self.green, self.blue, self.alpha)

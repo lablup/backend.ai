@@ -68,8 +68,7 @@ class Admin(BaseFunction):
                             "data": errors,
                         },
                     )
-                else:
-                    return response["data"]
+                return response["data"]
         else:
             rqst = Request("POST", "/admin/graphql")
             rqst.set_json(gql_query)

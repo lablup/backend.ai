@@ -25,8 +25,7 @@ class DirectoryPathValidator(Validator):
     def validate(self, value: str) -> ValidationResult:
         if Path(value).is_dir():
             return self.success()
-        else:
-            return self.failure("The path is not a directory")
+        return self.failure("The path is not a directory")
 
 
 class ProgressItem(Static):

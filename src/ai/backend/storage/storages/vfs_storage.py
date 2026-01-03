@@ -271,8 +271,7 @@ class VFSStorage(AbstractStorage):
                 return VFSDirectoryDownloadServerStreamReader(
                     target_path, self._download_chunk_size
                 )
-            else:
-                return VFSFileDownloadServerStreamReader(target_path, self._download_chunk_size)
+            return VFSFileDownloadServerStreamReader(target_path, self._download_chunk_size)
 
         except Exception as e:
             raise FileStreamDownloadError(f"Download failed: {e!s}") from e

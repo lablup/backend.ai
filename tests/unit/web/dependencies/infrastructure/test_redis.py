@@ -35,8 +35,7 @@ class TestRedisProvider:
         from ai.backend.web.config.unified import SessionConfig
 
         session_config = SessionConfig(redis=redis_config)  # type: ignore[call-arg]
-        config = WebServerUnifiedConfig(session=session_config)  # type: ignore[call-arg]
-        return config
+        return WebServerUnifiedConfig(session=session_config)  # type: ignore[call-arg]
 
     @pytest.mark.asyncio
     async def test_provide_redis_client(

@@ -551,10 +551,10 @@ def run(
         if compute_session.status == "PENDING":
             print_info(f"Session ID {name} is enqueued for scheduling.")
             return
-        elif compute_session.status == "SCHEDULED":
+        if compute_session.status == "SCHEDULED":
             print_info(f"Session ID {name} is scheduled and about to be started.")
             return
-        elif compute_session.status == "RUNNING":
+        if compute_session.status == "RUNNING":
             if compute_session.created:
                 vprint_done(
                     f"[{idx}] Session {compute_session.name} is ready (domain={compute_session.domain}, group={compute_session.group})."
@@ -678,10 +678,10 @@ def run(
         if compute_session.status == "PENDING":
             print_info(f"Session ID {name} is enqueued for scheduling.")
             return
-        elif compute_session.status == "SCHEDULED":
+        if compute_session.status == "SCHEDULED":
             print_info(f"Session ID {name} is scheduled and about to be started.")
             return
-        elif compute_session.status == "RUNNING":
+        if compute_session.status == "RUNNING":
             if compute_session.created:
                 vprint_done(
                     f"[{idx}] Session {compute_session.name} is ready (domain={compute_session.domain}, group={compute_session.group})."

@@ -350,8 +350,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
     def _kernel_resource_spec_read(self, filename):
         with open(filename) as f:
-            resource_spec = KernelResourceSpec.read_from_file(f)
-        return resource_spec
+            return KernelResourceSpec.read_from_file(f)
 
     @override
     async def get_extra_envs(self) -> Mapping[str, str]:
@@ -952,7 +951,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         self.local_config.container.kernel_gid,
                     )
 
-        kernel_obj = DockerKernel(
+        return DockerKernel(
             self.ownership_data,
             self.kernel_config["network_id"],
             self.image_ref,
@@ -964,7 +963,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             environ=environ,
             data={},
         )
-        return kernel_obj
 
     @property
     @override
@@ -1845,7 +1843,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
             if not result:
                 raise RuntimeError("Failed to push image: unexpected return value from aiodocker")
-            elif error := result[-1].get("error"):
+            if error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to push image: {error}")
 
     @override
@@ -1872,7 +1870,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
             if not result:
                 raise RuntimeError("Failed to pull image: unexpected return value from aiodocker")
-            elif error := result[-1].get("error"):
+            if error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to pull image: {error}")
 
     async def _purge_image(self, docker: Docker, request: DockerPurgeImageReq) -> PurgeImageResp:
@@ -1920,7 +1918,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             if e.status == HTTPStatus.NOT_FOUND:
                 if auto_pull == AutoPullBehavior.DIGEST or auto_pull == AutoPullBehavior.TAG:
                     return True
-                elif auto_pull == AutoPullBehavior.NONE:
+                if auto_pull == AutoPullBehavior.NONE:
                     raise ImageNotAvailable(image_ref)
             else:
                 raise
@@ -2086,12 +2084,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         e.status == HTTPStatus.CONFLICT and "already in progress" in e.message
                     ) or e.status == HTTPStatus.NOT_FOUND:
                         return
-                    else:
-                        log.exception(
-                            "unexpected docker error while deleting container (k:{}, c:{})",
-                            kernel_id,
-                            container_id,
-                        )
+                    log.exception(
+                        "unexpected docker error while deleting container (k:{}, c:{})",
+                        kernel_id,
+                        container_id,
+                    )
                 except TimeoutError:
                     log.warning("container deletion timeout (k:{}, c:{})", kernel_id, container_id)
 

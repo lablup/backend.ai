@@ -28,9 +28,8 @@ def get_id_or_name(api_version: Tuple[int, str], obj: ComputeSession) -> str:
         return obj.name
     if obj.id:
         return str(obj.id)
-    else:
-        assert obj.name is not None
-        return obj.name
+    assert obj.name is not None
+    return obj.name
 
 
 def apply_version_aware_fields(

@@ -234,9 +234,7 @@ class CustomizedSchema(Schema):
             'import: ["@external", "@key"]', 'import: ["@external", "@key", "@shareable"]'
         )
         # Convert escaped newlines to actual newlines for better description formatting
-        sdl = sdl.replace("\\n", "\n")
-
-        return sdl
+        return sdl.replace("\\n", "\n")
 
 
 schema = CustomizedSchema(

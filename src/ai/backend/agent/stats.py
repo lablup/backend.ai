@@ -600,11 +600,10 @@ class StatContext:
                     slot_name = slot_names_with_same_prefix_as_metric_key[0]
                     log.info(f"Found slot name {slot_name} with same prefix as {metric_key}")
                     return resource_scaling_factors[slot_name]
-                else:
-                    raise ValueError(
-                        f"Plugin defines more than 1 device slots {slot_names}, "
-                        f"and matching with metric key {metric_key} yielded no results."
-                    )
+                raise ValueError(
+                    f"Plugin defines more than 1 device slots {slot_names}, "
+                    f"and matching with metric key {metric_key} yielded no results."
+                )
 
     def observe_container_metric(
         self,

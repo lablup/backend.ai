@@ -372,7 +372,7 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
         ) -> decimal.Decimal | UndefinedType:
             if isinstance(value, UndefinedType):
                 return value
-            elif value is None:
+            if value is None:
                 raise InvalidAPIParameters("Threshold cannot be None")
 
             try:
@@ -910,9 +910,9 @@ class Endpoint(graphene.ObjectType):
             case _:
                 if len(self.routings) == 0:
                     return EndpointStatus.READY
-                elif self.retries > SERVICE_MAX_RETRIES:
+                if self.retries > SERVICE_MAX_RETRIES:
                     return EndpointStatus.UNHEALTHY
-                elif (spawned_service_count := len([r for r in self.routings])) > 0:
+                if (spawned_service_count := len([r for r in self.routings])) > 0:
                     healthy_service_count = len([
                         r for r in self.routings if r.status == RouteStatus.HEALTHY.name
                     ])
@@ -1066,7 +1066,7 @@ class ModifyEndpointInput(graphene.InputObjectType):
         ) -> RuntimeVariant | UndefinedType:
             if isinstance(value, UndefinedType):
                 return value
-            elif value is None:
+            if value is None:
                 raise InvalidAPIParameters("Runtime variant cannot be None")
 
             try:
@@ -1084,7 +1084,7 @@ class ModifyEndpointInput(graphene.InputObjectType):
         ) -> list[ExtraMount] | UndefinedType:
             if isinstance(extra_mounts_gql, UndefinedType):
                 return extra_mounts_gql
-            elif extra_mounts_gql is None:
+            if extra_mounts_gql is None:
                 raise InvalidAPIParameters("Extra mounts cannot be None")
 
             return [extra_mount.to_action_field(info) for extra_mount in extra_mounts_gql]

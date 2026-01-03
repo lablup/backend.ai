@@ -47,8 +47,7 @@ class EtcdConfig(BaseFunction):
             "value": value,
         })
         async with rqst.fetch() as resp:
-            data = await resp.json()
-            return data
+            return await resp.json()
 
     @api_function
     @classmethod
@@ -65,5 +64,4 @@ class EtcdConfig(BaseFunction):
             "prefix": prefix,
         })
         async with rqst.fetch() as resp:
-            data = await resp.json()
-            return data
+            return await resp.json()
