@@ -157,7 +157,7 @@ async def request_context_aware_middleware(
     request_id = request.headers.get("X-BackendAI-RequestID", str(uuid.uuid4()))
     request["request_id"] = request_id
     if _current_task := asyncio.current_task():
-        setattr(_current_task, "request_id", request_id)
+        _current_task.request_id = request_id
     resp = await handler(request)
     return resp
 
@@ -1011,7 +1011,7 @@ def build_root_app(
         if pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.appproxy.coordinator.api")
-        init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+        init_subapp(pkg_name, app, subapp_mod.create_app)
     return app
 
 

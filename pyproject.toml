@@ -108,11 +108,12 @@ select = [
     "SIM",    # flake8-simplify: suggests code simplification
     "RUF",    # ruff-specific: Ruff's own linting rules
     "C4",     # flake8-comprehensions: optimizes list/set/dict comprehensions
-    # Phase 6: Type annotations and code quality (deferred - requires extensive review)
+    # Phase 6: Bug detection and code quality
+    "B",      # flake8-bugbear: detects likely bugs and design issues
+    # Phase 7: Type annotations and modern syntax (deferred - requires extensive review)
     # "A",    # flake8-builtins: prevents shadowing Python builtins
     # "BLE",  # flake8-blind-except: prevents bare except clauses
     # "RET",  # flake8-return: enforces consistent return statement usage
-    # "B",    # flake8-bugbear: detects likely bugs and design issues
     # "ANN",  # flake8-annotations: enforces type annotations
     # "UP",   # pyupgrade: suggests modern Python syntax
     # "TID252", # flake8-tidy-imports: enforces relative imports (banned-module-level-imports)
@@ -159,6 +160,18 @@ ignore = [
     "C408",  # unnecessary-collection-call - dict()/tuple()/list() can be clearer than literals in some cases
     "C416",  # unnecessary-comprehension - explicit comprehension can be clearer
     "C417",  # unnecessary-map - map() is valid Python and sometimes preferred
+    # B (bugbear)
+    "B007",  # unused-loop-control-variable - intentional in many cases (e.g., async for chunk in stream)
+    "B008",  # function-call-in-default-argument - defer for gradual review (18 violations)
+    "B012",  # return-in-finally - intentional pattern in some response handlers
+    "B017",  # assert-raises-exception - testing generic Exception is sometimes needed
+    "B023",  # function-uses-loop-variable - defer for gradual review (46 violations, some intentional)
+    "B024",  # abstract-base-class-without-abstract-method - intentional design pattern
+    "B027",  # empty-method-without-abstract-decorator - intentional empty methods for extensibility
+    "B028",  # no-explicit-stacklevel - stacklevel can be omitted in many logging calls
+    "B904",  # raise-without-from-inside-except - extensive legacy codebase, defer for gradual migration
+    "B905",  # zip-without-explicit-strict - Python 3.10+ feature, defer for gradual adoption
+    "B911",  # batched-without-explicit-strict - Python 3.13+ feature
 ]
 
 [tool.ruff.lint.isort]

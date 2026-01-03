@@ -439,10 +439,12 @@ class ImageRow(Base):
         session: AsyncSession,
         alias: str,
         load_aliases: bool = False,
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> Self:
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         query = (
             sa.select(ImageRow)
             .select_from(ImageRow)
@@ -466,10 +468,12 @@ class ImageRow(Base):
         session: AsyncSession,
         identifier: ImageIdentifier,
         load_aliases: bool = True,
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> Self:
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         query = sa.select(ImageRow).where(
             (ImageRow.name == identifier.canonical)
             & (ImageRow.architecture == identifier.architecture)
@@ -498,7 +502,7 @@ class ImageRow(Base):
         *,
         strict_arch: bool = False,
         load_aliases: bool = False,
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> Self:
         """
@@ -508,6 +512,8 @@ class ImageRow(Base):
         with respect to requested canonical, this function will
         return that row regardless of the image architecture.
         """
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         query = sa.select(ImageRow).where(ImageRow.name == ref.canonical)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
@@ -586,7 +592,7 @@ class ImageRow(Base):
         reference_candidates: list[ImageAlias | ImageRef | ImageIdentifier],
         *,
         strict_arch: bool = False,
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
         load_aliases: bool = True,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> Self:
@@ -623,6 +629,8 @@ class ImageRow(Base):
         When *load_aliases* is True, it tries to resolve the alias chain.
         Otherwise it finds only the direct image references.
         """
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         searched_refs = []
         for reference in reference_candidates:
             resolver_func: Any = None
@@ -679,9 +687,11 @@ class ImageRow(Base):
         cls,
         session: AsyncSession,
         image_id: UUID,
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
         load_aliases: bool = False,
     ) -> Optional[Self]:
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         query = sa.select(ImageRow).where(ImageRow.id == image_id)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
@@ -695,9 +705,11 @@ class ImageRow(Base):
     async def list(
         cls,
         session: AsyncSession,
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
         load_aliases: bool = False,
     ) -> list[Self]:
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         query = sa.select(ImageRow)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))

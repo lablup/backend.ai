@@ -134,10 +134,7 @@ async def test_tus_upload(tmp_path: Path) -> None:
         )
 
         res = await uploader.upload()
-        if res is None:
-            assert True
-        else:
-            assert False
+        assert res is None
 
 
 @pytest.mark.asyncio

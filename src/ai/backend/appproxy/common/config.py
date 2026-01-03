@@ -433,8 +433,11 @@ class UnsupportedTypeError(RuntimeError):
 
 
 def generate_example_json(
-    schema: type[BaseModel] | types.GenericAlias, parent: list[str] = []
+    schema: type[BaseModel] | types.GenericAlias,
+    parent: list[str] | None = None,
 ) -> dict | list:
+    if parent is None:
+        parent = []
     if isinstance(schema, types.UnionType):
         return generate_example_json(typing.get_args(schema)[0], parent=[*parent])
     elif isinstance(schema, types.GenericAlias):

@@ -135,8 +135,10 @@ class DummyKernel(AbstractKernel):
         *,
         canonical: str | None = None,
         filename: str | None = None,
-        extra_labels: dict[str, str] = {},
+        extra_labels: dict[str, str] | None = None,
     ) -> None:
+        if extra_labels is None:
+            extra_labels = {}
         self.is_commiting = True
         delay = self.dummy_kernel_cfg["delay"]["commit"]
         await asyncio.sleep(delay)

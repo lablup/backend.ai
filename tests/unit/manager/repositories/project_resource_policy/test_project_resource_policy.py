@@ -270,7 +270,7 @@ class TestProjectResourcePolicyRepository:
         assert result == sample_policy_data
 
         # Verify only specified field was updated
-        setattr(sample_policy_row, "max_vfolder_count", 25)
+        sample_policy_row.max_vfolder_count = 25
 
     @pytest.mark.asyncio
     async def test_delete_success(

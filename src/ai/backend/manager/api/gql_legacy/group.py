@@ -418,8 +418,10 @@ class Group(graphene.ObjectType):
         *,
         domain_name: Optional[str] = None,
         is_active: Optional[bool] = None,
-        type: list[ProjectType] = [ProjectType.GENERAL],
+        type: list[ProjectType] | None = None,
     ) -> Sequence[Group]:
+        if type is None:
+            type = [ProjectType.GENERAL]
         query = sa.select([groups]).select_from(groups).where(groups.c.type.in_(type))
         if domain_name is not None:
             query = query.where(groups.c.domain_name == domain_name)

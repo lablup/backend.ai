@@ -62,12 +62,17 @@ else:
     asyncio_run = _asyncio_run  # type: ignore
 
 
-def asyncio_run_forever(setup_coro, shutdown_coro, *, stop_signals={signal.SIGINT}, debug=False):
+def asyncio_run_forever(
+    setup_coro, shutdown_coro, *, stop_signals: set[signal.Signals] | None = None, debug=False
+):
     """
     A proposed-but-not-implemented asyncio.run_forever() API based on
     @vxgmichel's idea.
     See discussions on https://github.com/python/asyncio/pull/465
     """
+
+    if stop_signals is None:
+        stop_signals = {signal.SIGINT}
 
     async def wait_for_stop():
         loop = current_loop()

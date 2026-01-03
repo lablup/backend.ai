@@ -3448,12 +3448,14 @@ class AgentRegistry:
         session: SessionRow,
         new_image_ref: ImageRef,
         *,
-        extra_labels: dict[str | LabelName, str] = {},
+        extra_labels: dict[str | LabelName, str] | None = None,
     ) -> Mapping[str, Any]:
         """
         Commit a main kernel's container of the given session.
         """
 
+        if extra_labels is None:
+            extra_labels = {}
         kernel: KernelRow = session.main_kernel
         if kernel.status != KernelStatus.RUNNING:
             raise InvalidAPIParameters(
@@ -3490,12 +3492,14 @@ class AgentRegistry:
         self,
         session: SessionRow,
         filename: str | None,
-        extra_labels: dict[str, str] = {},
+        extra_labels: dict[str, str] | None = None,
     ) -> Mapping[str, Any]:
         """
         Commit a main kernel's container of the given session.
         """
 
+        if extra_labels is None:
+            extra_labels = {}
         kernel: KernelRow = session.main_kernel
         if kernel.status != KernelStatus.RUNNING:
             raise InvalidAPIParameters(

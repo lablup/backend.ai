@@ -197,8 +197,10 @@ class DockerKernel(AbstractKernel):
         *,
         canonical: str | None = None,
         filename: str | None = None,
-        extra_labels: dict[str, str] = {},
+        extra_labels: dict[str, str] | None = None,
     ) -> None:
+        if extra_labels is None:
+            extra_labels = {}
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
 

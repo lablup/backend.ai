@@ -202,7 +202,7 @@ def parse_trafaret_definition(root: t.Dict) -> list[dict]:
 
             schema["default"] = default_value
         if hasattr(key, "__openapi_desc__"):
-            schema["description"] = getattr(key, "__openapi_desc__")
+            schema["description"] = key.__openapi_desc__
         resp += [{"name": names[0], "schema": schema, "required": not optional}]
     return resp
 
@@ -273,7 +273,7 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
             parameters.extend(get_path_parameters(resource))
             if hasattr(route.handler, "_backend_attrs"):
                 preconds = []
-                handler_attrs = getattr(route.handler, "_backend_attrs")
+                handler_attrs = route.handler._backend_attrs
                 if handler_attrs.get("auth_required"):
                     route_def["security"] = [{"TokenAuth": []}]
                 if auth_scope := handler_attrs.get("auth_scope"):

@@ -944,7 +944,7 @@ async def scan_gpu_alloc_map(
             return {}
 
         except Exception as e:
-            setattr(e, "kernel_id", kernel_id)
+            e.kernel_id = kernel_id
             raise e
 
         return alloc_map

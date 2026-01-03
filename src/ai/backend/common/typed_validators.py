@@ -30,7 +30,6 @@ from ai.backend.common.types import HostPortPair as LegacyHostPortPair
 
 from .defs import (
     API_VFOLDER_LENGTH_LIMIT,
-    MODEL_VFOLDER_LENGTH_LIMIT,
     RESERVED_VFOLDER_PATTERNS,
     RESERVED_VFOLDERS,
 )
@@ -171,9 +170,11 @@ SESSION_NAME_MAX_LENGTH: Final[int] = 24
 
 
 def _vfolder_name_validator(name: str) -> str:
-    f"""
-    Although the length constraint of the `vfolders.name` column is {MODEL_VFOLDER_LENGTH_LIMIT},
-    we limit the length to {API_VFOLDER_LENGTH_LIMIT} in the create/rename API
+    """
+    Validate and return the VFolder name.
+
+    Although the length constraint of the ``vfolders.name`` column is 64 (MODEL_VFOLDER_LENGTH_LIMIT),
+    we limit the length to 48 (API_VFOLDER_LENGTH_LIMIT) in the create/rename API
     because we append a timestamp of deletion to the name when VFolders are deleted.
     """
     if (name_len := len(name)) > API_VFOLDER_LENGTH_LIMIT:

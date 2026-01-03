@@ -388,7 +388,7 @@ async def add_circuit(
     mode: AppMode,
     routes: list[RouteInfo],
     *,
-    envs: dict[str, Any] = {},
+    envs: dict[str, Any] | None = None,
     args: str | None = None,
     open_to_public=False,
     allowed_client_ips: str | None = None,
@@ -396,6 +396,8 @@ async def add_circuit(
     preferred_subdomain: str | None = None,
     worker_id: UUID | None = None,
 ) -> tuple[Circuit, Worker]:
+    if envs is None:
+        envs = {}
     if worker_id:
         worker = await Worker.get(session, worker_id, load_circuits=True)
         if worker.available_slots - worker.occupied_slots <= 0 and worker.available_slots >= 0:

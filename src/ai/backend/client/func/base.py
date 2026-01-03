@@ -40,7 +40,7 @@ def api_function(meth):
     """
     Mark the wrapped method as the API function method.
     """
-    setattr(meth, "_backend_api", True)
+    meth._backend_api = True
     return meth
 
 

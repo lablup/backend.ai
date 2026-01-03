@@ -1576,7 +1576,7 @@ def build_root_app(
         if pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.api")
-        init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+        init_subapp(pkg_name, app, subapp_mod.create_app)
 
     vendor_path = importlib.resources.files("ai.backend.manager.vendor")
     if not isinstance(vendor_path, Path):
@@ -1638,7 +1638,7 @@ def build_public_app(
         if root_ctx.pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.public_api")
-        init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+        init_subapp(pkg_name, app, subapp_mod.create_app)
     return app
 
 

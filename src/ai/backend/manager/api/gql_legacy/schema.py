@@ -295,7 +295,7 @@ def _is_legacy_mutation(mutation_cls: Any) -> bool:
     """
     Checks whether the GraphQL mutation is in the legacy format with the fields `ok` and `msg`.
     """
-    fields = getattr(mutation_cls, "_meta").fields
+    fields = mutation_cls._meta.fields
     return {"ok", "msg"}.issubset(fields)
 
 
@@ -1552,8 +1552,10 @@ class Query(graphene.ObjectType):
         id: uuid.UUID,
         *,
         domain_name: str | None = None,
-        type: list[str] = [ProjectType.GENERAL.name],
+        type: list[str] | None = None,
     ) -> Group:
+        if type is None:
+            type = [ProjectType.GENERAL.name]
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
@@ -1651,8 +1653,10 @@ class Query(graphene.ObjectType):
         *,
         domain_name: Optional[str] = None,
         is_active: Optional[bool] = None,
-        type: list[str] = [ProjectType.GENERAL.name],
+        type: list[str] | None = None,
     ) -> Sequence[Group]:
+        if type is None:
+            type = [ProjectType.GENERAL.name]
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
@@ -1750,10 +1754,12 @@ class Query(graphene.ObjectType):
         *,
         is_installed: bool | None = None,
         is_operation=False,
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
         load_filters: list[str] | None = None,
         image_filters: list[str] | None = None,
     ) -> Sequence[Image]:
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
@@ -1980,7 +1986,7 @@ class Query(graphene.ObjectType):
         info: graphene.ResolveInfo,
         *,
         scope_id: ScopeType,
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
         permission: ImagePermission = ImagePermission.READ_ATTRIBUTE,
         filter: Optional[str] = None,
         order: Optional[str] = None,
@@ -1990,6 +1996,8 @@ class Query(graphene.ObjectType):
         before: Optional[str] = None,
         last: Optional[int] = None,
     ) -> ConnectionResolverResult[ImageNode]:
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         return await ImageNode.get_connection(
             info,
             scope_id,
@@ -3343,7 +3351,6 @@ class GQLMetricMiddleware:
         )
         start = time.perf_counter()
         try:
-            info.field_name
             res = next(root, info, **args)
             graph_ctx.metric_observer.observe_request(
                 operation_type=operation_type,

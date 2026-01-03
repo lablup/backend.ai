@@ -1000,9 +1000,9 @@ class ComputeSession(graphene.ObjectType):
     def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
         if row is None:
             raise DataTransformationFailed("Session row cannot be None")
-        email = getattr(row, "email")
-        full_name = getattr(row, "full_name")
-        group_name = getattr(row, "group_name")
+        email = row.email
+        full_name = row.full_name
+        group_name = row.group_name
         row = row.SessionRow
         status_history = row.status_history or {}
         raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)

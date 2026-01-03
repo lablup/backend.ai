@@ -46,8 +46,10 @@ class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
         return await super().update_plugin_config(plugin_config)
 
     async def create_network(
-        self, *, identifier: str | None = None, options: dict[str, Any] = {}
+        self, *, identifier: str | None = None, options: dict[str, Any] | None = None
     ) -> NetworkInfo:
+        if options is None:
+            options = {}
         ident = identifier or f"{uuid.uuid4()}-nw"
         network_name = f"bai-multinode-{ident}"
         mtu: int | None = self.plugin_config["mtu"]

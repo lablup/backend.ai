@@ -314,7 +314,7 @@ async def test_async_file_writer_bytes() -> None:
     init_data = b"".join(randint(0, 255).to_bytes(1, sys.byteorder) for i in range(100))
 
     def dummy_encode(v: str) -> bytes:
-        assert False, "should not be called"
+        pytest.fail("should not be called")
 
     # 3. Write chuncked decoded string into file
     async with AsyncFileWriter(

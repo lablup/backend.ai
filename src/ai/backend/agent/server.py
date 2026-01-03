@@ -1065,9 +1065,11 @@ class AgentRPCServer(aobject):
         *,
         canonical: str | None = None,
         filename: str | None = None,
-        extra_labels: dict[str, str] = {},
+        extra_labels: dict[str, str] | None = None,
         agent_id: AgentId | None = None,
     ) -> dict[str, Any]:
+        if extra_labels is None:
+            extra_labels = {}
         log.info("rpc::commit(k:{})", kernel_id)
         agent = self.runtime.get_agent(agent_id)
         bgtask_mgr = agent.background_task_manager

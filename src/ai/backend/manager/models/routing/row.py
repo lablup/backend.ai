@@ -136,7 +136,7 @@ class RoutingRow(Base):
         endpoint_id: uuid.UUID,
         load_endpoint: bool = False,
         load_session: bool = False,
-        status_filter: list[RouteStatus] = list(RouteStatus.active_route_statuses()),
+        status_filter: list[RouteStatus] | None = None,
         project: Optional[uuid.UUID] = None,
         domain: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
@@ -144,6 +144,8 @@ class RoutingRow(Base):
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
         """
+        if status_filter is None:
+            status_filter = list(RouteStatus.active_route_statuses())
         query = (
             sa.select(RoutingRow)
             .filter(RoutingRow.endpoint == endpoint_id)

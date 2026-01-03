@@ -114,8 +114,10 @@ class HTTPBackend(BaseBackend):
 
     @asynccontextmanager
     async def connect_websocket(
-        self, route: RouteInfo, request: web.Request, protocols: list[str] = []
+        self, route: RouteInfo, request: web.Request, protocols: list[str] | None = None
     ) -> AsyncIterator[aiohttp.ClientWebSocketResponse]:
+        if protocols is None:
+            protocols = []
         client_key = ClientKey(
             endpoint=f"http://{route.current_kernel_host}:{route.kernel_port}",
             domain=str(route.route_id),

@@ -104,7 +104,7 @@ class UserID:
                     try:
                         return pwd.getpwnam(value).pw_uid
                     except KeyError:
-                        assert False, f"no such user {value} in system"
+                        raise ValueError(f"no such user {value} in system")
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -175,7 +175,7 @@ class GroupID:
                     try:
                         return pwd.getpwnam(value).pw_gid
                     except KeyError:
-                        assert False, f"no such user {value} in system"
+                        raise ValueError(f"no such user {value} in system")
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -435,8 +435,11 @@ class UnsupportedTypeError(RuntimeError):
 
 
 def generate_example_json(
-    schema: type[BaseSchema] | types.GenericAlias | types.UnionType, parent: list[str] = []
+    schema: type[BaseSchema] | types.GenericAlias | types.UnionType,
+    parent: list[str] | None = None,
 ) -> dict | list:
+    if parent is None:
+        parent = []
     if isinstance(schema, types.UnionType):
         return generate_example_json(typing.get_args(schema)[0], parent=[*parent])
     elif isinstance(schema, types.GenericAlias):

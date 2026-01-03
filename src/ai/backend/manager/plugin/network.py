@@ -17,7 +17,7 @@ class AbstractNetworkManagerPlugin(AbstractPlugin, metaclass=ABCMeta):
         self,
         *,
         identifier: str | None = None,
-        options: dict[str, Any] = {},
+        options: dict[str, Any] | None = None,
     ) -> NetworkInfo:
         """
         Creates a cross-container network and returns network config which later will be passed to agent.

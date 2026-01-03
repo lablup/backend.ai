@@ -438,7 +438,7 @@ def set_handler_attr(func, key, value):
     if attrs is None:
         attrs = {}
     attrs[key] = value
-    setattr(func, "_backend_attrs", attrs)
+    func._backend_attrs = attrs
 
 
 def get_handler_attr(request, key, default=None):

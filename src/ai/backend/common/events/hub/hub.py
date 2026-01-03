@@ -70,13 +70,15 @@ class EventHub:
     def register_event_propagator(
         self,
         event_propagator: EventPropagator,
-        aliases: list[tuple[EventDomain, str]] = [],
+        aliases: list[tuple[EventDomain, str]] | None = None,
     ) -> None:
         """
         Register a new event propagator.
         :param event_propagator: The event propagator instance implementing EventPropagator.
         :param aliases: List of aliases for the propagator.
         """
+        if aliases is None:
+            aliases = []
         propagator_id = event_propagator.id()
         self._propagators[propagator_id] = _PropagatorInfo(event_propagator, aliases)
         for alias in aliases:

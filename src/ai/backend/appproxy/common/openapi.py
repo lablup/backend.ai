@@ -92,7 +92,7 @@ def generate_openapi(
             parameters.extend(get_path_parameters(resource))
             if hasattr(route.handler, "_backend_attrs"):
                 preconds = []
-                handler_attrs = getattr(route.handler, "_backend_attrs")
+                handler_attrs = route.handler._backend_attrs
                 if handler_attrs.get("auth_required"):
                     route_def["security"] = [{"X-BackendAI-Token": []}]
                 if auth_scope := handler_attrs.get("auth_scope"):

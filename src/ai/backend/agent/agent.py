@@ -3742,8 +3742,10 @@ class AbstractAgent(
         *,
         canonical: str | None = None,
         filename: str | None = None,
-        extra_labels: dict[str, str] = {},
+        extra_labels: dict[str, str] | None = None,
     ):
+        if extra_labels is None:
+            extra_labels = {}
         return await self.kernel_registry[kernel_id].commit(
             kernel_id, subdir, canonical=canonical, filename=filename, extra_labels=extra_labels
         )

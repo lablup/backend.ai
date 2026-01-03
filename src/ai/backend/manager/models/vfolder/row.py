@@ -1232,11 +1232,8 @@ async def initiate_vfolder_deletion(
     """Purges VFolder content from storage host."""
     vfolder_info_len = len(requested_vfolders)
     vfolder_ids = tuple(vf_id.folder_id for vf_id, _, _ in requested_vfolders)
-    vfolders.c.id.in_(vfolder_ids)
     if vfolder_info_len == 0:
         return 0
-    elif vfolder_info_len == 1:
-        vfolders.c.id == vfolder_ids[0]
 
     async with db_engine.connect() as db_conn:
         await delete_vfolder_relation_rows(db_conn, db_engine.begin_session, vfolder_ids)

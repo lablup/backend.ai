@@ -163,8 +163,8 @@ async def test_plugin_context_config(etcd, mocker):
         await ctx.init()
         assert ctx.plugins
         assert isinstance(ctx.plugins["dummy"], DummyPlugin)
-        ctx.plugins["dummy"].local_config["local-key"] == "local-value"
-        ctx.plugins["dummy"].plugin_config["etcd-key"] == "etcd-value"
+        assert ctx.plugins["dummy"].local_config["local-key"] == "local-value"
+        assert ctx.plugins["dummy"].plugin_config["etcd-key"] == "etcd-value"
     finally:
         await ctx.cleanup()
 

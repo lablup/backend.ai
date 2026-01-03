@@ -233,8 +233,10 @@ class Image(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         image_names: Sequence[str],
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
     ) -> list[Self]:
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         result = await graph_ctx.processors.image.get_images_by_canonicals.wait_for_complete(
             GetImagesByCanonicalsAction(
                 image_canonicals=list(image_names),
@@ -252,8 +254,10 @@ class Image(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         image_refs: Sequence[ImageRef],
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
     ) -> Sequence[Optional[Image]]:
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         image_names = [x.canonical for x in image_refs]
         return await cls.batch_load_by_canonical(graph_ctx, image_names, filter_by_statuses)
 
@@ -262,8 +266,10 @@ class Image(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         id: UUID,
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
     ) -> Image:
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         result = await ctx.processors.image.get_image_by_id.wait_for_complete(
             GetImageByIdAction(
                 image_id=id,
@@ -279,8 +285,10 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         reference: str,
         architecture: str,
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
     ) -> Image:
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         result = await ctx.processors.image.get_image_by_identifier.wait_for_complete(
             GetImageByIdentifierAction(
                 image_identifier=ImageIdentifier(reference, architecture),
@@ -295,9 +303,13 @@ class Image(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        types: set[ImageLoadFilter] = set(),
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        types: set[ImageLoadFilter] | None = None,
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
     ) -> Sequence[Image]:
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
+        if types is None:
+            types = set()
         result = await ctx.processors.image.get_all_images.wait_for_complete(
             GetAllImagesAction(status_filter=filter_by_statuses)
         )
@@ -464,8 +476,10 @@ class ImageNode(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         name_and_arch: Sequence[tuple[str, str]],
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
     ) -> Sequence[Sequence[ImageNode]]:
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         query = (
             sa.select(ImageRow)
             .where(sa.tuple_(ImageRow.name, ImageRow.architecture).in_(name_and_arch))
@@ -489,8 +503,10 @@ class ImageNode(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         image_ids: Sequence[ImageIdentifier],
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
     ) -> Sequence[Sequence[ImageNode]]:
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         name_and_arch_tuples = [(img.canonical, img.architecture) for img in image_ids]
         return await cls.batch_load_by_name_and_arch(
             graph_ctx, name_and_arch_tuples, filter_by_statuses
@@ -632,7 +648,7 @@ class ImageNode(graphene.ObjectType):
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
         permission: ImagePermission,
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
         filter_expr: Optional[str] = None,
         order_expr: Optional[str] = None,
         offset: Optional[int] = None,
@@ -641,6 +657,8 @@ class ImageNode(graphene.ObjectType):
         before: Optional[str] = None,
         last: Optional[int] = None,
     ) -> ConnectionResolverResult[Self]:
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(_queryfilter_fieldspec))

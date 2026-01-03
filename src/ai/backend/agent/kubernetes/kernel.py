@@ -241,9 +241,11 @@ class KubernetesKernel(AbstractKernel):
         *,
         canonical: str | None = None,
         filename: str | None = None,
-        extra_labels: dict[str, str] = {},
+        extra_labels: dict[str, str] | None = None,
     ) -> None:
         # TODO: Implement container commit on Kubernetes kernel.
+        if extra_labels is None:
+            extra_labels = {}
         log.error("Committing in Kubernetes is not supported yet.")
         raise NotImplementedError
 

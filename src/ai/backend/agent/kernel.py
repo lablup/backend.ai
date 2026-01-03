@@ -360,7 +360,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         *,
         canonical: str | None = None,
         filename: str | None = None,
-        extra_labels: dict[str, str] = {},
+        extra_labels: dict[str, str] | None = None,
     ):
         raise NotImplementedError
 
