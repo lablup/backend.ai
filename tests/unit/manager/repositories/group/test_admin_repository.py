@@ -20,11 +20,13 @@ from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
@@ -63,10 +65,12 @@ class TestAdminGroupRepositoryDeleteEndpoints:
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
                 GroupRow,
                 ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 AgentRow,
                 SessionRow,
                 KernelRow,

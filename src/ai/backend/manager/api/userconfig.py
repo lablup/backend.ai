@@ -15,15 +15,9 @@ from ..errors.storage import (
     DotfileCreationFailed,
     DotfileNotFound,
 )
-from ..models import (
-    MAXIMUM_DOTFILE_SIZE,
-    keypairs,
-    query_accessible_vfolders,
-    query_bootstrap_script,
-    query_owned_dotfiles,
-    verify_dotfile_name,
-    vfolders,
-)
+from ..models.domain import MAXIMUM_DOTFILE_SIZE, verify_dotfile_name
+from ..models.keypair import keypairs, query_bootstrap_script, query_owned_dotfiles
+from ..models.vfolder import query_accessible_vfolders, vfolders
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware

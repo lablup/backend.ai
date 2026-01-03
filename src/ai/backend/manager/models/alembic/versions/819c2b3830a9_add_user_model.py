@@ -10,7 +10,6 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-from ai.backend.manager.models import UserRole
 from ai.backend.manager.models.base import (
     GUID,
     EnumValueType,
@@ -18,7 +17,7 @@ from ai.backend.manager.models.base import (
     IDColumn,
     convention,
 )
-from ai.backend.manager.models.user import PasswordColumn
+from ai.backend.manager.models.user import PasswordColumn, UserRole
 
 # from ai.backend.manager.models import keypairs, users, UserRole
 

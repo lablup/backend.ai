@@ -51,11 +51,13 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import (
@@ -114,10 +116,12 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             [
                 DomainRow,
                 ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 AgentRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
                 GroupRow,
@@ -828,6 +832,7 @@ class TestGetDefaultArchitectureFromScalingGroup:
             database_connection,
             [
                 ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 AgentRow,
             ],
         ):
@@ -1174,8 +1179,10 @@ class TestDeploymentRevisionOperations:
             [
                 DomainRow,
                 ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
                 VFolderRow,
@@ -1818,8 +1825,10 @@ class TestDeploymentAutoScalingPolicyOperations:
             [
                 DomainRow,
                 ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
                 VFolderRow,
@@ -2201,8 +2210,10 @@ class TestDeploymentPolicyOperations:
             [
                 DomainRow,
                 ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
                 VFolderRow,
@@ -2559,8 +2570,10 @@ class TestRouteOperations:
             [
                 DomainRow,
                 ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
                 VFolderRow,

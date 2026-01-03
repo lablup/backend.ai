@@ -34,12 +34,13 @@ from ..defs import DEFAULT_ROLE
 from ..errors.api import InvalidAPIParameters
 from ..errors.common import GenericBadRequest, ServerFrozen, ServiceUnavailable
 from ..errors.resource import InstanceNotFound
-from ..models import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, agents, kernels
+from ..models.agent import agents
 from ..models.health import (
     SQLAlchemyConnectionInfo,
     get_manager_db_cxn_status,
     report_manager_status,
 )
+from ..models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
 from . import ManagerStatus, SchedulerEvent
 from .auth import superadmin_required
 from .types import CORSOptions, WebMiddleware

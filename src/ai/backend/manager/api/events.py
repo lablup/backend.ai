@@ -58,8 +58,9 @@ from ..errors.kernel import SessionNotFound
 from ..errors.resource import NoCurrentTaskContext, ProjectNotFound
 from ..events.hub.propagators.session import SessionEventPropagator
 from ..exceptions import InvalidArgument
-from ..models import UserRole, groups
+from ..models.group import groups
 from ..models.session import SessionRow
+from ..models.user import UserRole
 from ..types import Sentinel
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required

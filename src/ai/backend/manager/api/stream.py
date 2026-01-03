@@ -54,7 +54,8 @@ from ..errors.api import InvalidAPIParameters
 from ..errors.kernel import InvalidStreamMode, SessionNotFound, TooManySessionsMatched
 from ..errors.resource import AppNotFound, NoCurrentTaskContext
 from ..errors.service import AppServiceStartFailed
-from ..models import KernelLoadingStrategy, KernelRow, SessionRow
+from ..models.kernel import KernelRow
+from ..models.session import KernelLoadingStrategy, SessionRow
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware

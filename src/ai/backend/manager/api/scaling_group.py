@@ -19,7 +19,7 @@ from ai.backend.manager.errors.common import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-from ..models import query_allowed_sgroups
+from ..models.scaling_group import query_allowed_sgroups
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware

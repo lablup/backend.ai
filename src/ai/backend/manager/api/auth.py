@@ -47,7 +47,9 @@ from ai.backend.manager.services.auth.actions.upload_ssh_keypair import UploadSS
 
 from ..errors.auth import AuthorizationFailed, InvalidAuthParameters, InvalidClientIPConfig
 from ..errors.common import RejectedByHook
-from ..models import keypair_resource_policies, keypairs, user_resource_policies, users
+from ..models.keypair import keypairs
+from ..models.resource_policy import keypair_resource_policies, user_resource_policies
+from ..models.user import users
 from ..models.utils import execute_with_retry
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params, get_handler_attr, set_handler_attr

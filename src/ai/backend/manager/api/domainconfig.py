@@ -17,7 +17,12 @@ from ..errors.storage import (
     DotfileCreationFailed,
     DotfileNotFound,
 )
-from ..models import MAXIMUM_DOTFILE_SIZE, domains, query_domain_dotfiles, verify_dotfile_name
+from ..models.domain import (
+    MAXIMUM_DOTFILE_SIZE,
+    domains,
+    query_domain_dotfiles,
+    verify_dotfile_name,
+)
 from .auth import admin_required, auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware

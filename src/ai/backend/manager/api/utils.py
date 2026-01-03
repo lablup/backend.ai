@@ -51,7 +51,7 @@ from ..errors.api import (
     NotImplementedAPI,
 )
 from ..errors.common import GenericForbidden
-from ..models import UserRole, users
+from ..models.user import UserRole, users
 from ..utils import (
     check_if_requester_is_eligible_to_act_as_target_access_key,
     check_if_requester_is_eligible_to_act_as_target_user_uuid,

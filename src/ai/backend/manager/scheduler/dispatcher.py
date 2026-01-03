@@ -85,14 +85,12 @@ from ..errors.common import (
 from ..errors.kernel import SessionNotFound
 from ..errors.resource import InstanceNotAvailable
 from ..exceptions import convert_to_status_data
-from ..models import (
-    AgentRow,
-    EndpointRow,
-    KernelRow,
-    RouteStatus,
-    ScalingGroupOpts,
-    SessionRow,
-)
+from ..models.agent import AgentRow
+from ..models.endpoint import EndpointRow
+from ..models.kernel import KernelRow
+from ..models.routing import RouteStatus
+from ..models.scaling_group import ScalingGroupOpts
+from ..models.session import SessionRow
 from ..models.utils import (
     execute_with_retry,
     retry_txn,

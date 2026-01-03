@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-from ai.backend.manager.models import VFolderInvitationState
+from ai.backend.manager.models.vfolder import VFolderInvitationState
 
 # revision identifiers, used by Alembic.
 revision = "6f5fe19894b7"

@@ -20,11 +20,13 @@ from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -61,9 +63,11 @@ class TestAdminDomainRepository:
                 KeyPairResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 UserRow,
+                UserRoleRow,  # UserRow relationship dependency
                 KeyPairRow,
                 GroupRow,
                 ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 AgentRow,
                 SessionRow,
                 KernelRow,

@@ -95,13 +95,9 @@ from ai.backend.manager.services.model_serving.actions.update_route import Updat
 from ..errors.api import InvalidAPIParameters
 from ..errors.auth import InvalidAuthParameters
 from ..errors.storage import VFolderNotFound
-from ..models import (
-    ModelServiceHelper,
-    UserRole,
-    UserRow,
-    query_accessible_vfolders,
-    vfolders,
-)
+from ..models.endpoint import ModelServiceHelper
+from ..models.user import UserRole, UserRow
+from ..models.vfolder import query_accessible_vfolders, vfolders
 from ..types import MountOptionModel, UserScope
 from .auth import auth_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required

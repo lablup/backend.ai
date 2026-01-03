@@ -43,6 +43,7 @@ from ai.backend.manager.models.group import GroupRow, association_groups_users
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -91,6 +92,7 @@ class TestCheckPresetsOccupiedSlots:
                 ScalingGroupRow,
                 ResourcePresetRow,
                 sgroups_for_domains,  # association table
+                UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
                 sgroups_for_keypairs,  # association table

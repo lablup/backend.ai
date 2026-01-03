@@ -15,18 +15,17 @@ from ai.backend.logging import BraceStyleAdapter
 
 from ..errors.api import InvalidAPIParameters
 from ..errors.resource import DBOperationFailed, TaskTemplateNotFound
-from ..models import (
+from ..models.domain import domains
+from ..models.group import association_groups_users as agus
+from ..models.group import groups
+from ..models.keypair import keypairs
+from ..models.session_template import (
     TemplateType,
-    UserRole,
-    domains,
-    groups,
-    keypairs,
+    check_cluster_template,
     query_accessible_session_templates,
     session_templates,
-    users,
 )
-from ..models import association_groups_users as agus
-from ..models.session_template import check_cluster_template
+from ..models.user import UserRole, users
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware
