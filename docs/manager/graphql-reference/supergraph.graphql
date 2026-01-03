@@ -7992,6 +7992,9 @@ type VirtualFolderNode implements Node
   permissions: [VFolderPermissionValueField] @join__field(graph: GRAPHENE)
 }
 
+"""
+Legacy VirtualFolderPermission GraphQL type (renamed to avoid conflict with VFolderPermission enum).
+"""
 type VirtualFolderPermission implements Item
   @join__implements(graph: GRAPHENE, interface: "Item")
   @join__type(graph: GRAPHENE)

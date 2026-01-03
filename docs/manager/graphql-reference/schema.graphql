@@ -1541,6 +1541,9 @@ type VirtualFolderPermissionList implements PaginatedList {
   total_count: Int!
 }
 
+"""
+Legacy VirtualFolderPermission GraphQL type (renamed to avoid conflict with VFolderPermission enum).
+"""
 type VirtualFolderPermission implements Item {
   id: ID
   permission: String
