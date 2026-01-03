@@ -37,22 +37,19 @@ from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.exceptions import ErrorStatusInfo
-from ai.backend.manager.models import (
-    AgentRow,
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.domain import DomainRow, domains
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_policy import (
     DefaultForUnspecified,
-    DomainRow,
-    GroupRow,
-    ImageRow,
-    KernelRow,
     KeyPairResourcePolicyRow,
-    KeyPairRow,
-    ScalingGroupRow,
-    SessionDependencyRow,
-    SessionRow,
-    UserRow,
-    query_allowed_sgroups,
 )
-from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.scaling_group import ScalingGroupRow, query_allowed_sgroups
+from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_merge,
@@ -1297,7 +1294,7 @@ class ScheduleDBSource:
         """
         Fetch vfolder mounts for the session using existing DB session.
         """
-        from ai.backend.manager.models import prepare_vfolder_mounts
+        from ai.backend.manager.models.vfolder import prepare_vfolder_mounts
 
         # Convert the async session to sync connection for legacy code
         conn = db_sess.bind
@@ -1324,7 +1321,7 @@ class ScheduleDBSource:
         """
         Fetch dotfile data for the session using existing DB session.
         """
-        from ai.backend.manager.models import prepare_dotfiles
+        from ai.backend.manager.models.dotfile import prepare_dotfiles
 
         # Convert the async session to sync connection for legacy code
         conn = db_sess.bind
@@ -1369,7 +1366,7 @@ class ScheduleDBSource:
         """
         Prepare vfolder mounts for the session.
         """
-        from ai.backend.manager.models import prepare_vfolder_mounts
+        from ai.backend.manager.models.vfolder import prepare_vfolder_mounts
 
         async with self._begin_readonly_read_committed() as conn:
             vfolder_mounts = await prepare_vfolder_mounts(
@@ -1394,7 +1391,7 @@ class ScheduleDBSource:
         Prepare dotfile data for the session.
         """
 
-        from ai.backend.manager.models import prepare_dotfiles
+        from ai.backend.manager.models.dotfile import prepare_dotfiles
 
         async with self._begin_readonly_read_committed() as conn:
             dotfile_data = await prepare_dotfiles(

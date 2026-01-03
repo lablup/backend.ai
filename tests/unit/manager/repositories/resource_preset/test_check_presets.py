@@ -37,26 +37,27 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserRole
-from ai.backend.manager.models import (
-    AgentRow,
-    DomainRow,
-    GroupRow,
-    KernelRow,
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.group import GroupRow, association_groups_users
+from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
-    KeyPairRow,
     ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.scaling_group import (
     ScalingGroupOpts,
     ScalingGroupRow,
-    SessionRow,
-    UserResourcePolicyRow,
-    UserRow,
-    association_groups_users,
     sgroups_for_domains,
     sgroups_for_groups,
     sgroups_for_keypairs,
 )
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.resource_preset.repository import (
     ResourcePresetRepository,

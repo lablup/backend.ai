@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from typing import override
 
 from ai.backend.manager.errors.resource import NoAvailableScalingGroup
-from ai.backend.manager.models import PRIVATE_SESSION_TYPES
+from ai.backend.manager.models.session import PRIVATE_SESSION_TYPES
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     AllowedScalingGroup,
     SessionCreationSpec,

@@ -20,13 +20,13 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.session import Session
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.data.deployment.types import (
     ModelReplicaData,
     ReplicaOrderField,
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.models.gql_models.session import ComputeSessionNode
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.deployment.options import RouteConditions, RouteOrders
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (

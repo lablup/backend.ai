@@ -34,10 +34,9 @@ from ai.backend.manager.errors.user import (
     UserModificationFailure,
     UserNotFound,
 )
-from ai.backend.manager.models import kernels
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
-from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
+from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES, kernels
 from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair_data, keypairs
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users

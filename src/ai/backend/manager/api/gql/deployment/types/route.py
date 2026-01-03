@@ -19,6 +19,7 @@ from ai.backend.manager.api.gql.base import (
     to_global_id,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.data.deployment.types import (
     RouteInfo,
 )
@@ -29,7 +30,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as RouteTrafficStatusEnum,
 )
 from ai.backend.manager.errors.deployment import EndpointNotFound
-from ai.backend.manager.models.gql_models.session import ComputeSessionNode
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.deployment.options import RouteConditions, RouteOrders
 

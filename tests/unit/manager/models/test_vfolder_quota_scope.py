@@ -81,7 +81,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
             policy = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_session_count_per_model_session=5,
                 max_customized_image_count=3,
             )
@@ -217,7 +217,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
             policy = ProjectResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_network_count=5,
             )
             db_sess.add(policy)

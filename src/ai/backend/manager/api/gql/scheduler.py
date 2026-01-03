@@ -14,8 +14,8 @@ from ai.backend.common.events.types import EventDomain
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.base import to_global_id
+from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.errors.kernel import InvalidSessionId
-from ai.backend.manager.models.gql_models.session import ComputeSessionNode
 
 from .session import Session
 

@@ -8,8 +8,8 @@ from aiohttp import web
 
 from ai.backend.logging import BraceStyleAdapter
 
-from ..models.acl import get_all_permissions
 from .auth import auth_required
+from .gql_legacy.acl import get_all_permissions
 from .manager import ALL_ALLOWED, server_status_required
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

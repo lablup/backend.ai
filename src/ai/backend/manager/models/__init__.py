@@ -1,4 +1,3 @@
-from . import acl as _acl
 from . import agent as _agent
 from . import app_config as _app_config
 from . import artifact as _artifact
@@ -42,13 +41,9 @@ from . import user as _user
 from . import vfolder as _vfolder
 from . import vfs_storage as _vfs_storage
 from .base import metadata
-from .gql_models import agent as _relay_agent
-from .gql_models import kernel as _relay_kernel
-from .gql_models import session as _relay_session
 
 __all__ = (
     "metadata",
-    *_acl.__all__,
     *_app_config.__all__,
     *_artifact_registries.__all__,
     *_auditlog.__all__,
@@ -90,13 +85,9 @@ __all__ = (
     *_vfs_storage.__all__,
     *_errorlogs.__all__,
     *_eventlog.__all__,
-    *_relay_agent.__all__,
-    *_relay_kernel.__all__,
     *_reservoir_registry.__all__,
-    *_relay_session.__all__,
 )
 
-from .acl import *  # noqa
 from .app_config import *  # noqa
 from .artifact_registries import *  # noqa
 from .audit_log import *  # noqa
@@ -137,7 +128,4 @@ from .user import *  # noqa
 from .vfolder import *  # noqa
 from .vfs_storage import *  # noqa
 from .rbac_models import *  # noqa
-from .gql_models.agent import *  # noqa
-from .gql_models.kernel import *  # noqa
-from .gql_models.session import *  # noqa
 from .reservoir_registry import *  # noqa

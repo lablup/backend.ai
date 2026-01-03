@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import pytest
 from graphql import Undefined
 
-from ai.backend.manager.models.resource_policy import ModifyKeyPairResourcePolicyInput
+from ai.backend.manager.api.gql_legacy.resource_policy import ModifyKeyPairResourcePolicyInput
 from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
     KeyPairResourcePolicyUpdaterSpec,
 )

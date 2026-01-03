@@ -531,7 +531,7 @@ For detailed GraphQL schema information, refer to the [GraphQL Reference](../../
 
 - [Manager API Overview](../README.md) - REST API adapters
 - [Repositories Layer](../../repositories/README.md) - Querier pattern
-- [Legacy GraphQL (Graphene)](../../models/gql_models/README.md) - DEPRECATED
+- [Legacy GraphQL (Graphene)](../gql_legacy/README.md) - DEPRECATED
 - [Services Layer](../../services/README.md)
 
 ## Migration from Graphene

@@ -26,19 +26,18 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
-from ai.backend.manager.models import (
-    AgentRow,
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_policy import (
     DefaultForUnspecified,
-    DomainRow,
-    GroupRow,
-    KernelRow,
     KeyPairResourcePolicyRow,
-    KeyPairRow,
-    ScalingGroupRow,
-    SessionDependencyRow,
-    SessionRow,
-    UserRow,
 )
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_merge,

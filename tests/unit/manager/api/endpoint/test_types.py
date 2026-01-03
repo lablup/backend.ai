@@ -3,8 +3,8 @@ from __future__ import annotations
 from unittest.mock import Mock
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, EndpointStatus
+from ai.backend.manager.api.gql_legacy.endpoint import Endpoint
 from ai.backend.manager.data.deployment.types import RouteStatus
-from ai.backend.manager.models.gql_models.endpoint import Endpoint
 
 
 class TestEndpointType:

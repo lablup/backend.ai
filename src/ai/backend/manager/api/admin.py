@@ -26,15 +26,15 @@ from ai.backend.manager.errors.auth import AuthorizationFailed
 
 from ..api.gql.schema import schema as strawberry_schema
 from ..errors.api import GraphQLError as BackendGQLError
-from ..models.base import DataLoaderManager
-from ..models.gql import (
+from .auth import auth_required
+from .gql_legacy.base import DataLoaderManager
+from .gql_legacy.schema import (
     GQLExceptionMiddleware,
     GQLMetricMiddleware,
     GQLMutationPrivilegeCheckMiddleware,
     GraphQueryContext,
     graphene_schema,
 )
-from .auth import auth_required
 from .manager import GQLMutationUnfrozenRequiredMiddleware
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params, set_handler_attr

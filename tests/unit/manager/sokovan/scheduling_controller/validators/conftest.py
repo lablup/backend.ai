@@ -15,7 +15,7 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.models import NetworkRow
+from ai.backend.manager.models.network import NetworkRow
 from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
 from ai.backend.manager.types import UserScope
 

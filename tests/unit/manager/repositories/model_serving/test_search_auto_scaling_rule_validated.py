@@ -20,27 +20,25 @@ from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleListResult,
     EndpointLifecycle,
 )
-from ai.backend.manager.models import (
-    DomainRow,
-    GroupRow,
-    ImageRow,
-    KeyPairResourcePolicyRow,
-    KeyPairRow,
-    ProjectResourcePolicyRow,
-    ScalingGroupRow,
-    UserResourcePolicyRow,
-    UserRow,
-)
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     EndpointAutoScalingRuleRow,
     EndpointRow,
 )
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts
-from ai.backend.manager.models.user import UserRole, UserStatus
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination

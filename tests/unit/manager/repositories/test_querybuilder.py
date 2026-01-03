@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ai.backend.manager.models.gql_relay import ConnectionPaginationOrder
+from ai.backend.manager.api.gql_legacy.gql_relay import ConnectionPaginationOrder
 from ai.backend.manager.repositories.types import (
     FilterApplier,
     GenericQueryBuilder,

@@ -16,19 +16,16 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.types import UserData
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.errors.auth import GroupMembershipNotFoundError
-from ai.backend.manager.models import (
-    DomainRow,
-    GroupRow,
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow, association_groups_users
+from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
-    KeyPairRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
-    UserRow,
-    association_groups_users,
 )
-from ai.backend.manager.models.group import AssocGroupUserRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.user import UserRole, UserStatus
+from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.testutils.db import with_tables
