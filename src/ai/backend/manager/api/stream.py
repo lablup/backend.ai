@@ -300,7 +300,7 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
                         session_name,
                         access_key,
                         kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                    ),  # noqa
+                    ),
                 ),
             )
     except SessionNotFound:
@@ -492,9 +492,7 @@ async def stream_proxy(
         proxy_cls = TCPProxy
     elif sport["protocol"] == "pty":
         raise NotImplementedError
-    elif sport["protocol"] == "http":
-        proxy_cls = TCPProxy
-    elif sport["protocol"] == "preopen":
+    elif sport["protocol"] == "http" or sport["protocol"] == "preopen":
         proxy_cls = TCPProxy
     else:
         raise InvalidAPIParameters(f"Unsupported service protocol: {sport['protocol']}")

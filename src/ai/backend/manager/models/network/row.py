@@ -16,8 +16,8 @@ from ..base import (
 )
 
 __all__: Final[tuple[str, ...]] = (
-    "NetworkType",
     "NetworkRow",
+    "NetworkType",
 )
 
 

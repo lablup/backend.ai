@@ -27,12 +27,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.deployment.types import RouteStatus
 
 __all__ = [
-    "EndpointLifecycle",
-    "EndpointData",
-    "RoutingData",
-    "EndpointTokenData",
     "EndpointAutoScalingRuleData",
     "EndpointAutoScalingRuleListResult",
+    "EndpointData",
+    "EndpointLifecycle",
+    "EndpointTokenData",
+    "RoutingData",
 ]
 
 

@@ -923,7 +923,7 @@ class HealthCheckEngine:
             endpoint_routes: dict[UUID, list[tuple[Circuit, UUID]]] = {}
 
             # Find circuits that contain these routes
-            for route_id in route_health_results.keys():
+            for route_id in route_health_results:
                 try:
                     # Find circuit containing this route
                     circuit_query = sa.select(Circuit).where(

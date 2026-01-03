@@ -121,7 +121,7 @@ def list(
         try:
             fields = [service_auto_scaling_rule_fields[f.strip()] for f in format.split(",")]
         except KeyError as e:
-            ctx.output.print_fail(f"Field {str(e)} not found")
+            ctx.output.print_fail(f"Field {e!s} not found")
             sys.exit(ExitCode.FAILURE)
     else:
         fields = None
@@ -163,7 +163,7 @@ def get(ctx: CLIContext, rule: UUID, format: str) -> None:
         try:
             fields = [service_auto_scaling_rule_fields[f.strip()] for f in format.split(",")]
         except KeyError as e:
-            ctx.output.print_fail(f"Field {str(e)} not found")
+            ctx.output.print_fail(f"Field {e!s} not found")
             sys.exit(ExitCode.FAILURE)
     else:
         fields = _default_get_fields

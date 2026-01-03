@@ -547,9 +547,7 @@ class TestHuggingFaceDownloadStep:
         def mock_headers_get(key, default=None):
             if key == "Content-Length":
                 return "12"  # Total size matches our chunks
-            elif key == "ETag":
-                return default
-            elif key == "Accept-Ranges":
+            elif key == "ETag" or key == "Accept-Ranges":
                 return default
             else:
                 return default

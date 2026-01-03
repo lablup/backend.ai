@@ -69,14 +69,13 @@ async def test_manipulate_resource_policy(self):
 @pytest.mark.asyncio
 async def test_user_cannot_create_resource_policy(self, userconfig):
     rpname = "testrp-" + uuid.uuid4().hex
-    with Session() as sess:
-        with pytest.raises(BackendAPIError):
-            sess.ResourcePolicy.create(
-                name=rpname,
-                default_for_unspecified="LIMITED",
-                total_resource_slots="{}",
-                max_concurrent_sessions=1,
-                max_containers_per_session=1,
-                idle_timeout=1,
-                allowed_vfolder_hosts=["local"],
-            )
+    with Session() as sess, pytest.raises(BackendAPIError):
+        sess.ResourcePolicy.create(
+            name=rpname,
+            default_for_unspecified="LIMITED",
+            total_resource_slots="{}",
+            max_concurrent_sessions=1,
+            max_containers_per_session=1,
+            idle_timeout=1,
+            allowed_vfolder_hosts=["local"],
+        )

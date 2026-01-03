@@ -47,15 +47,15 @@ from .session import Session as SyncSession
 log = logging.getLogger(__spec__.name)
 
 __all__ = [
-    "Request",
-    "BaseResponse",
-    "Response",
-    "WebSocketResponse",
-    "SSEResponse",
-    "FetchContextManager",
-    "WebSocketContextManager",
-    "SSEContextManager",
     "AttachedFile",
+    "BaseResponse",
+    "FetchContextManager",
+    "Request",
+    "Response",
+    "SSEContextManager",
+    "SSEResponse",
+    "WebSocketContextManager",
+    "WebSocketResponse",
 ]
 
 
@@ -116,19 +116,19 @@ class Request:
     """
 
     __slots__ = (
+        "_attached_files",
+        "_content",
+        "_session_mode",
+        "api_version",
         "config",
-        "session",
-        "method",
-        "path",
+        "content_type",
         "date",
         "headers",
+        "method",
         "params",
-        "content_type",
-        "api_version",
-        "_content",
-        "_attached_files",
+        "path",
         "reporthook",
-        "_session_mode",
+        "session",
     )
 
     _content: RequestContent
@@ -503,9 +503,9 @@ class BaseResponse:
     """
 
     __slots__ = (
-        "_session",
-        "_raw_response",
         "_async_mode",
+        "_raw_response",
+        "_session",
     )
 
     _session: BaseSession
@@ -571,13 +571,13 @@ class FetchContextManager:
     """
 
     __slots__ = (
-        "session",
-        "rqst_ctx_builder",
-        "_session_mode",
-        "response_cls",
-        "check_status",
         "_async_mode",
         "_rqst_ctx",
+        "_session_mode",
+        "check_status",
+        "response_cls",
+        "rqst_ctx_builder",
+        "session",
     )
 
     _rqst_ctx: Optional[_RequestContextManager]
@@ -729,11 +729,11 @@ class WebSocketContextManager:
     """
 
     __slots__ = (
+        "_ws_ctx",
+        "on_enter",
+        "response_cls",
         "session",
         "ws_ctx_builder",
-        "response_cls",
-        "on_enter",
-        "_ws_ctx",
     )
 
     _ws_ctx: Optional[_WSRequestContextManager]
@@ -803,8 +803,8 @@ class SSEMessage:
 class SSEResponse(BaseResponse):
     __slots__ = (
         "_auto_reconnect",
-        "_retry",
         "_connector",
+        "_retry",
     )
 
     def __init__(
@@ -884,10 +884,10 @@ class SSEResponse(BaseResponse):
 
 class SSEContextManager:
     __slots__ = (
-        "session",
-        "rqst_ctx_builder",
-        "response_cls",
         "_rqst_ctx",
+        "response_cls",
+        "rqst_ctx_builder",
+        "session",
     )
 
     _rqst_ctx: Optional[_RequestContextManager]

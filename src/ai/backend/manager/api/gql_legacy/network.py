@@ -35,11 +35,11 @@ if TYPE_CHECKING:
 
 
 __all__ = (
-    "NetworkNode",
-    "NetworkConnection",
     "CreateNetwork",
-    "ModifyNetwork",
     "DeleteNetwork",
+    "ModifyNetwork",
+    "NetworkConnection",
+    "NetworkNode",
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore

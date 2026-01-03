@@ -61,9 +61,9 @@ from ai.backend.logging import BraceStyleAdapter
 from .types import HostPortPair, QueueSentinel
 
 __all__ = (
+    "AsyncEtcd",
     "quote",
     "unquote",
-    "AsyncEtcd",
 )
 
 Event = namedtuple("Event", "key event value")

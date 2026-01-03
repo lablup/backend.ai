@@ -19,8 +19,8 @@ from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = (
     "User",
-    "UserStatus",
     "UserRole",
+    "UserStatus",
 )
 
 

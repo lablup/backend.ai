@@ -41,8 +41,8 @@ from .user import UserRow
 # Left this for compatibility with existing code
 __all__ = (
     "StorageProxyInfo",
-    "VolumeInfo",
     "StorageSessionManager",
+    "VolumeInfo",
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

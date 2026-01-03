@@ -15,17 +15,17 @@ from ai.backend.common import validators as tx
 from ai.backend.common.types import QuotaConfig, StreamReader, VFolderID
 
 __all__ = (
-    "Sentinel",
     "SENTINEL",
-    "FSPerfMetric",
     "CapacityUsage",
-    "VolumeInfo",
-    "VFolderID",
-    "TreeUsage",
-    "QuotaConfig",
-    "Stat",
     "DirEntry",
     "DirEntryType",
+    "FSPerfMetric",
+    "QuotaConfig",
+    "Sentinel",
+    "Stat",
+    "TreeUsage",
+    "VFolderID",
+    "VolumeInfo",
 )
 
 

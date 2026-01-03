@@ -778,10 +778,10 @@ class AgentRegistry:
         mount_map = {}
         environ = {}
 
-        if _mounts := template["spec"].get("mounts"):  # noqa
+        if _mounts := template["spec"].get("mounts"):
             mounts = list(_mounts.keys())
             mount_map = {key: value for (key, value) in _mounts.items() if len(value) > 0}
-        if _environ := template["spec"].get("environ"):  # noqa
+        if _environ := template["spec"].get("environ"):
             environ = _environ
 
         kernel_configs: List[KernelEnqueueingConfig] = []
@@ -3857,10 +3857,9 @@ async def handle_session_creation_lifecycle(
     if event.creation_id not in context.session_creation_tracker:
         return
     log.debug("handle_session_creation_lifecycle: ev:{} s:{}", event.event_name(), event.session_id)
-    if isinstance(event, SessionStartedAnycastEvent):
-        if tracker := context.session_creation_tracker.get(event.creation_id):
-            tracker.set()
-    elif isinstance(event, SessionCancelledAnycastEvent):
+    if isinstance(event, SessionStartedAnycastEvent) or isinstance(
+        event, SessionCancelledAnycastEvent
+    ):
         if tracker := context.session_creation_tracker.get(event.creation_id):
             tracker.set()
 
@@ -4159,7 +4158,7 @@ async def handle_route_creation(
                 environ["BACKEND_MODEL_NAME"] = endpoint.model_row.name
 
             await context.create_session(
-                f"{endpoint.name}-{str(event.route_id)}",
+                f"{endpoint.name}-{event.route_id!s}",
                 image_row.image_ref,
                 UserScope(
                     domain_name=endpoint.domain,

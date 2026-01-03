@@ -21,13 +21,13 @@ from ..base import (
 )
 
 __all__: Sequence[str] = (
-    "keypair_resource_policies",
-    "user_resource_policies",
-    "project_resource_policies",
-    "KeyPairResourcePolicyRow",
-    "UserResourcePolicyRow",
-    "ProjectResourcePolicyRow",
     "DefaultForUnspecified",
+    "KeyPairResourcePolicyRow",
+    "ProjectResourcePolicyRow",
+    "UserResourcePolicyRow",
+    "keypair_resource_policies",
+    "project_resource_policies",
+    "user_resource_policies",
 )
 
 

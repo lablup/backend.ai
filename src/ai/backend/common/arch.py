@@ -2,9 +2,9 @@ import platform
 from typing import Final, Mapping
 
 __all__ = (
-    "arch_name_aliases",
     "CURRENT_ARCH",
     "DEFAULT_IMAGE_ARCH",
+    "arch_name_aliases",
 )
 
 

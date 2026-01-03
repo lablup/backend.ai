@@ -205,7 +205,7 @@ class TestSessionUniqueNamePerUser:
         user_a = user_one
         status = test_config.first_session_status
         session = SessionRow(
-            name=f"test-{str(uuid.uuid4())}",
+            name=f"test-{uuid.uuid4()!s}",
             user_uuid=user_a.uuid,
             group_id=group.id,
             domain_name=domain.name,

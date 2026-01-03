@@ -53,10 +53,10 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 __all__: Sequence[str] = (
-    "domains",
-    "DomainRow",
-    "DomainDotfile",
     "MAXIMUM_DOTFILE_SIZE",
+    "DomainDotfile",
+    "DomainRow",
+    "domains",
     "query_domain_dotfiles",
     "verify_dotfile_name",
 )

@@ -48,8 +48,8 @@ async def test_check_rlim_for_anonymous_query(
     )
     ret = await client.get("/")
     assert ret.status == 200
-    assert "1000" == ret.headers["X-RateLimit-Limit"]
-    assert "1000" == ret.headers["X-RateLimit-Remaining"]
+    assert ret.headers["X-RateLimit-Limit"] == "1000"
+    assert ret.headers["X-RateLimit-Remaining"] == "1000"
     assert str(rlim._rlim_window) == ret.headers["X-RateLimit-Window"]
 
 
@@ -88,6 +88,6 @@ async def test_check_rlim_for_authorized_query(
 
     assert ret.status == 200
     # The default example keypair's ratelimit is 30000.
-    assert "30000" == ret.headers["X-RateLimit-Limit"]
-    assert "29999" == ret.headers["X-RateLimit-Remaining"]
+    assert ret.headers["X-RateLimit-Limit"] == "30000"
+    assert ret.headers["X-RateLimit-Remaining"] == "29999"
     assert str(rlim._rlim_window) == ret.headers["X-RateLimit-Window"]

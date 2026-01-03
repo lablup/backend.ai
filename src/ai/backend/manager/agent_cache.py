@@ -167,7 +167,7 @@ class AgentRPCCache:
             detail = (
                 "Fail to initate RPC connection. "
                 "This could be caused by a connection delay or an attempt to connect to an invalid address. "
-                f"(repr: {repr(orig_exc)})."
+                f"(repr: {orig_exc!r})."
             )
             raise RPCError(
                 agent_id,

@@ -43,10 +43,10 @@ from ..types import QueryCondition
 from ..utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 __all__: Sequence[str] = (
-    "agents",
     "AgentRow",
-    "recalc_agent_resource_occupancy",
+    "agents",
     "list_schedulable_agents_by_sgroup",
+    "recalc_agent_resource_occupancy",
 )
 
 

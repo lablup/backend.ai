@@ -70,10 +70,10 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
     "Agent",
-    "AgentNode",
     "AgentConnection",
-    "AgentSummary",
     "AgentList",
+    "AgentNode",
+    "AgentSummary",
     "AgentSummaryList",
     "ModifyAgent",
     "ModifyAgentInput",

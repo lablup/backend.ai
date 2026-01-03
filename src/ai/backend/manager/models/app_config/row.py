@@ -15,8 +15,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 __all__: Sequence[str] = (
-    "AppConfigScopeType",
     "AppConfigRow",
+    "AppConfigScopeType",
 )
 
 

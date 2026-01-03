@@ -151,18 +151,18 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
-    "determine_session_status_by_kernels",
-    "handle_session_exception",
+    "AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES",
     "ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE",
+    "DEAD_SESSION_STATUSES",
     "PRIVATE_SESSION_TYPES",
     "SESSION_STATUS_TRANSITION_MAP",
-    "DEAD_SESSION_STATUSES",
-    "AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES",
     "USER_RESOURCE_OCCUPYING_SESSION_STATUSES",
-    "SessionRow",
-    "SessionDependencyRow",
-    "check_all_dependencies",
     "KernelLoadingStrategy",
+    "SessionDependencyRow",
+    "SessionRow",
+    "check_all_dependencies",
+    "determine_session_status_by_kernels",
+    "handle_session_exception",
 )
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.session"))
@@ -1784,7 +1784,7 @@ class SessionLifecycleManager:
             redis.exceptions.RedisClusterException,
             redis.exceptions.ChildDeadlockedError,
         ) as e:
-            log.warning(f"Failed to update session status to redis, skip. (e:{repr(e)})")
+            log.warning(f"Failed to update session status to redis, skip. (e:{e!r})")
         await self.event_producer.anycast_event(DoUpdateSessionStatusEvent())
 
     async def get_status_updatable_sessions(self) -> set[SessionId]:
@@ -1797,7 +1797,7 @@ class SessionLifecycleManager:
             redis.exceptions.RedisClusterException,
             redis.exceptions.ChildDeadlockedError,
         ) as e:
-            log.warning(f"Failed to fetch session status data from redis, skip. (e:{repr(e)})")
+            log.warning(f"Failed to fetch session status data from redis, skip. (e:{e!r})")
             results = []
         result: list[SessionId] = []
         for raw_session_id in results:
@@ -1832,7 +1832,7 @@ class SessionLifecycleManager:
             redis.exceptions.RedisClusterException,
             redis.exceptions.ChildDeadlockedError,
         ) as e:
-            log.warning(f"Failed to remove session status data from redis, skip. (e:{repr(e)})")
+            log.warning(f"Failed to remove session status data from redis, skip. (e:{e!r})")
             return 0
         return ret
 

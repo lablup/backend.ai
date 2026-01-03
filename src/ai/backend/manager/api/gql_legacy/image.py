@@ -113,18 +113,18 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
-    "Image",
-    "ImageNode",
-    "PreloadImage",
-    "RescanImages",
+    "AliasImage",
+    "ClearImages",
+    "DealiasImage",
     "ForgetImage",
     "ForgetImageById",
-    "PurgeImageById",
-    "UntagImageFromRegistry",
+    "Image",
+    "ImageNode",
     "ModifyImage",
-    "AliasImage",
-    "DealiasImage",
-    "ClearImages",
+    "PreloadImage",
+    "PurgeImageById",
+    "RescanImages",
+    "UntagImageFromRegistry",
 )
 
 _queryfilter_fieldspec: FieldSpecType = {

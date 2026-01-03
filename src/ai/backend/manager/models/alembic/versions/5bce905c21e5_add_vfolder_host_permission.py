@@ -63,7 +63,7 @@ def upgrade() -> None:
         rows = connection.execute(query).fetchall()
         for row in rows:
             hosts: List[str] = row["allowed_vfolder_hosts"]
-            all_perms: Dict[str, List[str]] = {host: ALL_HOST_PERMISSIONS for host in hosts}
+            all_perms: Dict[str, List[str]] = dict.fromkeys(hosts, ALL_HOST_PERMISSIONS)
             map_list.append({bind_param_pk: row[pk_name], "allowed_vfolder_hosts": all_perms})
         return map_list
 

@@ -172,8 +172,8 @@ def test_string_set_flag() -> None:
     assert MyFlags.A != MyFlags.B
     assert MyFlags.A == "a"
     assert MyFlags.A != "b"
-    assert "a" == MyFlags.A
-    assert "b" != MyFlags.A
+    assert MyFlags.A == "a"
+    assert MyFlags.A != "b"
 
     assert {"a", "b"} == MyFlags.A | MyFlags.B
     assert {"a", "b"} == MyFlags.A | "b"

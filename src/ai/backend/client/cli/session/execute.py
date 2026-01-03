@@ -463,11 +463,11 @@ def run(
     mount, mount_map, mount_options = prepare_mount_arg(mount, escape=True)
 
     if env_range is None:
-        env_range = []  # noqa
+        env_range = []
     if build_range is None:
-        build_range = []  # noqa
+        build_range = []
     if exec_range is None:
-        exec_range = []  # noqa
+        exec_range = []
 
     env_ranges = {v: r for v, r in env_range}
     build_ranges = {v: r for v, r in build_range}
@@ -490,7 +490,7 @@ def run(
     env_templates = {k: string.Template(v) for k, v in envs.items()}
 
     if preopen is None:
-        preopen = []  # noqa
+        preopen = []
 
     preopen_ports = preopen
     assigned_agent_list = assign_agent  # should be None if not specified

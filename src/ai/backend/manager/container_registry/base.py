@@ -142,7 +142,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     try:
                         await fut
                     except Exception as e:
-                        errors.append(f"Failed to scan image! Detail: {str(e)}")
+                        errors.append(f"Failed to scan image! Detail: {e!s}")
 
             scanned_images = await self.commit_rescan_result()
             return RescanImagesResult(images=scanned_images, errors=errors)

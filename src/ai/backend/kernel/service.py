@@ -203,9 +203,9 @@ class ServiceArgumentInterpolator:
                 if last_index < start:
                     yield TokenType.TEXT, s[last_index:start]
                 # the matched expression
-                if (token := match.group("expr1")) is not None:
-                    yield TokenType.EXPR, token
-                elif (token := match.group("expr2")) is not None:
+                if (token := match.group("expr1")) is not None or (
+                    token := match.group("expr2")
+                ) is not None:
                     yield TokenType.EXPR, token
                 last_index = end
             # the rest of string

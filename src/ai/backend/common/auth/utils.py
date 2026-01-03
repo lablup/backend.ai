@@ -26,7 +26,7 @@ def generate_signature(
     hostname = endpoint.raw_authority
     body_hash = hashlib.new(hash_type, b"").hexdigest()
 
-    sign_str = "{}\n{}\n{}\nhost:{}\ncontent-type:{}\nx-backendai-version:{}\n{}".format(  # noqa
+    sign_str = "{}\n{}\n{}\nhost:{}\ncontent-type:{}\nx-backendai-version:{}\n{}".format(
         method.upper(),
         rel_url,
         date.isoformat(),

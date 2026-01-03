@@ -22,12 +22,12 @@ import psutil
 from .utils import curl
 
 __all__ = (
-    "detect_cloud",
     "current_provider",
+    "detect_cloud",
     "get_instance_id",
     "get_instance_ip",
-    "get_instance_type",
     "get_instance_region",
+    "get_instance_type",
     "get_root_fs_type",
     "get_wsl_version",
 )

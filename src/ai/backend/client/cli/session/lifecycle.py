@@ -838,7 +838,7 @@ def ls(session_id, path):
             kernel = session.ComputeSession(session_id)
             result = kernel.list_files(path)
 
-            if "errors" in result and result["errors"]:
+            if result.get("errors"):
                 print_fail(result["errors"])
                 sys.exit(ExitCode.FAILURE)
 

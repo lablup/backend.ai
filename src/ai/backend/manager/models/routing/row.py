@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from ..deployment_revision import DeploymentRevisionRow
 
 
-__all__ = ("RoutingRow", "RouteStatus")
+__all__ = ("RouteStatus", "RoutingRow")
 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore

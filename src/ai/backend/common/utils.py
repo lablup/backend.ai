@@ -421,7 +421,7 @@ async def check_nfs_remote_server(
         raise ShowmountNotFound("showmount command not found. Install nfs-common package.")
 
     except Exception as e:
-        raise NFSUnexpectedError(f"Unexpected error: {str(e)}") from e
+        raise NFSUnexpectedError(f"Unexpected error: {e!s}") from e
 
 
 async def mount(

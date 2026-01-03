@@ -16,14 +16,14 @@ from .exceptions import InvalidScope, ScopeTypeMismatch
 from .permission_defs import BasePermission
 
 __all__: Sequence[str] = (
-    "DomainScope",
-    "ProjectScope",
-    "UserScope",
-    "StorageHost",
-    "ImageRegistry",
-    "ScalingGroup",
     "AbstractPermissionContext",
     "AbstractPermissionContextBuilder",
+    "DomainScope",
+    "ImageRegistry",
+    "ProjectScope",
+    "ScalingGroup",
+    "StorageHost",
+    "UserScope",
 )
 
 
@@ -450,7 +450,7 @@ class ContainerRegistryScope(ExtraScope):
     registry_id: uuid.UUID
 
     def __str__(self) -> str:
-        return f"container_registry:{str(self.registry_id)}"
+        return f"container_registry:{self.registry_id!s}"
 
     def __repr__(self) -> str:
         return self.__str__()

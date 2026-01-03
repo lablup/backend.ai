@@ -79,7 +79,7 @@ class PathOwnerDeterminer:
 
 class ChownUtil:
     def __init__(self) -> None:
-        self._do_chown = 0 == os.geteuid()
+        self._do_chown = os.geteuid() == 0
 
     def chown_path(self, path: Path, uid: int, gid: int) -> None:
         """

@@ -164,7 +164,7 @@ class UUIDFloatMap(Scalar):
     @staticmethod
     def serialize(value: Any) -> dict[str, float]:
         if not isinstance(value, dict):
-            raise GraphQLError(f"UUIDFloatMap cannot represent non-dict value: {repr(value)}")
+            raise GraphQLError(f"UUIDFloatMap cannot represent non-dict value: {value!r}")
 
         validated: dict[str, float] = {}
         for k, v in value.items():
@@ -201,7 +201,7 @@ class UUIDFloatMap(Scalar):
     @staticmethod
     def parse_value(value: Any) -> dict[str, float]:
         if not isinstance(value, dict):
-            raise GraphQLError(f"UUIDFloatMap cannot represent non-dict value: {repr(value)}")
+            raise GraphQLError(f"UUIDFloatMap cannot represent non-dict value: {value!r}")
         validated: dict[str, float] = {}
         for k, v in value.items():
             try:
@@ -574,9 +574,9 @@ def scoped_query(
             else:
                 client_user_id = ctx.user["uuid"]
             client_domain = ctx.user["domain_name"]
-            domain_name = kwargs.get("domain_name", None)
-            group_id = kwargs.get("group_id", None) or kwargs.get("project_id", None)
-            user_id = kwargs.get(user_key, None)
+            domain_name = kwargs.get("domain_name")
+            group_id = kwargs.get("group_id") or kwargs.get("project_id")
+            user_id = kwargs.get(user_key)
             if client_role == UserRole.SUPERADMIN:
                 if autofill_user:
                     if user_id is None:
@@ -607,7 +607,7 @@ def scoped_query(
             kwargs["domain_name"] = domain_name
             if group_id is not None:
                 kwargs["group_id"] = group_id
-            if kwargs.get("project", None) is not None:
+            if kwargs.get("project") is not None:
                 kwargs["project"] = group_id
             kwargs[user_key] = user_id
             return await resolve_func(root, info, *args, **kwargs)

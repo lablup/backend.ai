@@ -39,18 +39,18 @@ if TYPE_CHECKING:
     from .types import ImageConfig
 
 __all__ = (
+    "MAX_KERNELSPEC",
+    "MIN_KERNELSPEC",
+    "ImageRef",
+    "ParsedImageStr",
     "arch_name_aliases",
+    "common_image_label_schema",
     "default_registry",
     "default_repository",
     "docker_api_arch_aliases",
-    "common_image_label_schema",
     "inference_image_label_schema",
-    "validate_image_labels",
     "login",
-    "MIN_KERNELSPEC",
-    "MAX_KERNELSPEC",
-    "ImageRef",
-    "ParsedImageStr",
+    "validate_image_labels",
 )
 
 # generalize architecture symbols to match docker API's norm
@@ -385,7 +385,7 @@ class PlatformTagSet(Mapping):
         return self.__str__()
 
     def __str__(self):
-        return f"PlatformTagSet({str(self._data)})"
+        return f"PlatformTagSet({self._data!s})"
 
     def has(self, key: str, version: Optional[str] = None):
         if version is None:

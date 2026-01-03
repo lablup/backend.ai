@@ -34,10 +34,10 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models"))
 
 __all__: Sequence[str] = (
-    "ResourcePreset",
     "CreateResourcePreset",
-    "ModifyResourcePreset",
     "DeleteResourcePreset",
+    "ModifyResourcePreset",
+    "ResourcePreset",
 )
 
 

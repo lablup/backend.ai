@@ -754,21 +754,23 @@ class ModelServingService:
 
         # Generate token via wsproxy
         body = {"user_uuid": str(endpoint_data.session_owner_id), "exp": action.expires_at}
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(
                 f"{scaling_group_data.wsproxy_addr}/v2/endpoints/{endpoint_data.id}/token",
                 json=body,
                 headers={
                     "accept": "application/json",
                     "X-BackendAI-Token": scaling_group_data.wsproxy_api_token,
                 },
-            ) as resp:
-                resp_json = await resp.json()
-                if resp.status != HTTPStatus.OK:
-                    raise EndpointNotFound(
-                        f"Failed to generate token: {resp.status} {resp.reason} {resp_json}"
-                    )
-                token = resp_json["token"]
+            ) as resp,
+        ):
+            resp_json = await resp.json()
+            if resp.status != HTTPStatus.OK:
+                raise EndpointNotFound(
+                    f"Failed to generate token: {resp.status} {resp.reason} {resp_json}"
+                )
+            token = resp_json["token"]
 
         # Create token in database
         token_id = uuid.uuid4()

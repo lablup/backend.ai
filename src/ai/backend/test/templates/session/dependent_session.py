@@ -93,7 +93,7 @@ class DependentSessionTemplate(WrapperTestTemplate):
         spec_meta = TestSpecMetaContext.current()
         test_id = spec_meta.test_id
         client_session = ClientSessionContext.current()
-        session_name = f"test_session_{str(test_id)}"
+        session_name = f"test_session_{test_id!s}"
         session_id = None
         batch_session_meta = CreatedSessionMetaContext.current()
         try:

@@ -30,12 +30,12 @@ from ..base import (
 )
 
 __all__: Sequence[str] = (
-    "keypairs",
-    "KeyPairRow",
-    "Dotfile",
     "MAXIMUM_DOTFILE_SIZE",
-    "query_owned_dotfiles",
+    "Dotfile",
+    "KeyPairRow",
+    "keypairs",
     "query_bootstrap_script",
+    "query_owned_dotfiles",
     "verify_dotfile_name",
 )
 

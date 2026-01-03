@@ -108,33 +108,33 @@ if TYPE_CHECKING:
     from ..storage import StorageSessionManager
 
 __all__: Sequence[str] = (
-    "vfolders",
-    "vfolder_invitations",
-    "vfolder_permissions",
-    "VFolderOwnershipType",
-    "VFolderInvitationState",
-    "VFolderPermission",
-    "VFolderPermissionValidator",
-    "VFolderOperationStatus",
-    "VFolderStatusSet",
     "DEAD_VFOLDER_STATUSES",
+    "DEAD_VFOLDER_STATUSES",
+    "HARD_DELETED_VFOLDER_STATUSES",
+    "SOFT_DELETED_VFOLDER_STATUSES",
     "VFolderCloneInfo",
     "VFolderDeletionInfo",
+    "VFolderInvitationState",
+    "VFolderOperationStatus",
+    "VFolderOwnershipType",
+    "VFolderPermission",
+    "VFolderPermissionSetAlias",
+    "VFolderPermissionValidator",
     "VFolderRow",
-    "query_accessible_vfolders",
-    "initiate_vfolder_deletion",
+    "VFolderStatusSet",
+    "ensure_host_permission_allowed",
+    "filter_host_allowed_permission",
     "get_allowed_vfolder_hosts_by_group",
     "get_allowed_vfolder_hosts_by_user",
-    "verify_vfolder_name",
+    "initiate_vfolder_deletion",
     "prepare_vfolder_mounts",
+    "query_accessible_vfolders",
     "update_vfolder_status",
-    "filter_host_allowed_permission",
-    "ensure_host_permission_allowed",
+    "verify_vfolder_name",
+    "vfolder_invitations",
+    "vfolder_permissions",
     "vfolder_status_map",
-    "DEAD_VFOLDER_STATUSES",
-    "SOFT_DELETED_VFOLDER_STATUSES",
-    "HARD_DELETED_VFOLDER_STATUSES",
-    "VFolderPermissionSetAlias",
+    "vfolders",
 )
 
 
@@ -1830,7 +1830,7 @@ async def validate_permission(
         vfolder_id=vfolder_id,
     )
     if not vfolders:
-        raise NotEnoughPermission(f"'{permission.name}' not allowed in {str(target_scope)}")
+        raise NotEnoughPermission(f"'{permission.name}' not allowed in {target_scope!s}")
 
 
 async def get_permission_ctx(

@@ -61,10 +61,10 @@ if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
 __all__ = (
-    "KernelNode",
-    "KernelConnection",
     "ComputeContainer",
     "ComputeContainerList",
+    "KernelConnection",
+    "KernelNode",
     "LegacyComputeSession",
     "LegacyComputeSessionList",
 )

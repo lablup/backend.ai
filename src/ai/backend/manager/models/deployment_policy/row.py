@@ -26,10 +26,10 @@ if TYPE_CHECKING:
     pass
 
 __all__ = (
-    "DeploymentPolicyRow",
-    "DeploymentPolicyData",
-    "RollingUpdateSpec",
     "BlueGreenSpec",
+    "DeploymentPolicyData",
+    "DeploymentPolicyRow",
+    "RollingUpdateSpec",
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]

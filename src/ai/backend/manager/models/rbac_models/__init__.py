@@ -8,8 +8,8 @@ from .user_role import UserRoleRow
 __all__ = (
     "AssociationScopesEntitiesRow",
     "ObjectPermissionRow",
-    "PermissionRow",
     "PermissionGroupRow",
+    "PermissionRow",
     "RoleRow",
     "UserRoleRow",
 )

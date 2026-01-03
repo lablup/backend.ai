@@ -73,16 +73,16 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 __all__: Sequence[str] = (
-    "groups",
-    "GroupRow",
-    "association_groups_users",
-    "AssocGroupUserRow",
-    "resolve_group_name_or_id",
-    "GroupDotfile",
-    "ProjectType",
     "MAXIMUM_DOTFILE_SIZE",
-    "query_group_dotfiles",
+    "AssocGroupUserRow",
+    "GroupDotfile",
+    "GroupRow",
+    "ProjectType",
+    "association_groups_users",
+    "groups",
     "query_group_domain",
+    "query_group_dotfiles",
+    "resolve_group_name_or_id",
     "verify_dotfile_name",
 )
 

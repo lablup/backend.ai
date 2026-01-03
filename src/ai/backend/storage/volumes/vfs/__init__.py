@@ -570,7 +570,7 @@ class BaseVolume(AbstractVolume):
         src_path = self.sanitize_vfpath(vfid, src)
         if not src_path.is_dir():
             raise InvalidAPIParameters(
-                extra_msg=f"source path {str(src_path)} is not a directory",
+                extra_msg=f"source path {src_path!s} is not a directory",
             )
         dst_path = self.sanitize_vfpath(vfid, dst)
         await self.fsop_model.move_tree(src_path, dst_path)
@@ -583,7 +583,7 @@ class BaseVolume(AbstractVolume):
     ) -> None:
         src_path = self.sanitize_vfpath(vfid, src)
         if not src_path.is_file():
-            raise InvalidAPIParameters(extra_msg=f"source path {str(src_path)} is not a file")
+            raise InvalidAPIParameters(extra_msg=f"source path {src_path!s} is not a file")
         dst_path = self.sanitize_vfpath(vfid, dst)
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(

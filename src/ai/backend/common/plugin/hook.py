@@ -14,18 +14,18 @@ from . import AbstractPlugin, BasePluginContext
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
+    "ALL_COMPLETED",
+    "ERROR",
+    "FIRST_COMPLETED",
+    "PASSED",
+    "REJECTED",
     "HookHandler",
     "HookPlugin",
     "HookPluginContext",
-    "Reject",
-    "HookResults",
     "HookResult",
+    "HookResults",
     "HookReturnTiming",
-    "PASSED",
-    "REJECTED",
-    "ERROR",
-    "ALL_COMPLETED",
-    "FIRST_COMPLETED",
+    "Reject",
 )
 
 

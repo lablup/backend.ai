@@ -41,7 +41,7 @@ async def execute_paginated_query(
     )
     query = query.replace(
         "$var_args",
-        ", ".join(f"{key}:${key}" for key in variables.keys()),
+        ", ".join(f"{key}:${key}" for key in variables),
     )
     query = textwrap.dedent(query).strip()
     var_values = {key: value[0] for key, value in variables.items()}
@@ -85,7 +85,7 @@ async def execute_paginated_relay_query(
     )
     query = query.replace(
         "$var_args",
-        ", ".join(f"{key}:${key}" for key in variables.keys()),
+        ", ".join(f"{key}:${key}" for key in variables),
     )
     query = textwrap.dedent(query).strip()
     var_values = {key: value[0] for key, value in variables.items()}

@@ -25,12 +25,12 @@ from .user import UserRow
 from .utils import ExtendedAsyncSAEngine
 
 __all__: Sequence[str] = (
+    "BaseResourceUsageGroup",
     "ResourceGroupUnit",
     "ResourceUsage",
-    "BaseResourceUsageGroup",
+    "fetch_resource_usage",
     "parse_resource_usage",
     "parse_resource_usage_groups",
-    "fetch_resource_usage",
 )
 
 

@@ -40,17 +40,19 @@ class WSProxyVersionQueryParams:
 async def query_wsproxy_status(
     wsproxy_addr: str,
 ) -> dict[str, Any]:
-    async with aiohttp.ClientSession() as session:
-        async with session.get(
+    async with (
+        aiohttp.ClientSession() as session,
+        session.get(
             wsproxy_addr + "/status",
             headers={"Accept": "application/json"},
-        ) as resp:
-            try:
-                result = await resp.json()
-            except (aiohttp.ContentTypeError, json.JSONDecodeError) as e:
-                log.error("Failed to parse wsproxy status response from {}: {}", wsproxy_addr, e)
-                raise InternalServerError("Got invalid response from wsproxy when querying status")
-            return result
+        ) as resp,
+    ):
+        try:
+            result = await resp.json()
+        except (aiohttp.ContentTypeError, json.JSONDecodeError) as e:
+            log.error("Failed to parse wsproxy status response from {}: {}", wsproxy_addr, e)
+            raise InternalServerError("Got invalid response from wsproxy when querying status")
+        return result
 
 
 @auth_required

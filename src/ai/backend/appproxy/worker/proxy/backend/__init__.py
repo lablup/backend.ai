@@ -1,6 +1,6 @@
 __all__ = (
-    "HTTPBackend",
     "H2Backend",
+    "HTTPBackend",
     "TCPBackend",
 )
 

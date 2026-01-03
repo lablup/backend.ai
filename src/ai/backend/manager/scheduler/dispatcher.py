@@ -124,9 +124,9 @@ from .types import (
 )
 
 __all__ = (
-    "load_scheduler",
-    "load_agent_selector",
     "SchedulerDispatcher",
+    "load_agent_selector",
+    "load_scheduler",
 )
 
 # Memoization cache for scheduler and agent selector classes
@@ -1138,15 +1138,13 @@ class SchedulerDispatcher(aobject):
                 # we do not expect sessions to be spawned when the endpoint is about to be destroyed
                 # so also delete routes in provisioning status
 
-                routes_to_destroy += list(
-                    sorted(
-                        [
-                            route
-                            for route in active_routings
-                            if route.status in endpoint.terminatable_route_statuses
-                        ],
-                        key=lambda r: r.status == RouteStatus.UNHEALTHY,
-                    )
+                routes_to_destroy += sorted(
+                    [
+                        route
+                        for route in active_routings
+                        if route.status in endpoint.terminatable_route_statuses
+                    ],
+                    key=lambda r: r.status == RouteStatus.UNHEALTHY,
                 )[:destroy_count]
                 log.debug(
                     "Shrinking {} from {} to {}",
@@ -1203,7 +1201,7 @@ class SchedulerDispatcher(aobject):
         await self._update_scheduler_mark(
             ScheduleType.SCALE_SERVICES,
             {
-                "up": dump_json_str([str(e.id) for e in endpoints_to_expand.keys()]),
+                "up": dump_json_str([str(e.id) for e in endpoints_to_expand]),
                 "finish_time": datetime.now(tzutc()).isoformat(),
             },
         )
@@ -1385,7 +1383,7 @@ class SchedulerDispatcher(aobject):
         Returns the Redis key for the given schedule type.
         """
         manager_id = self.config_provider.config.manager.id
-        return f"manager.{manager_id}.{str(schedule_type)}"
+        return f"manager.{manager_id}.{schedule_type!s}"
 
     async def _mark_scheduler_start(
         self,

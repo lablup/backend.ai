@@ -23,9 +23,8 @@ def cfg_params():
 def test_get_env():
     with pytest.raises(KeyError):
         get_env("TESTKEY")
-    with pytest.raises(KeyError):
-        with mock.patch.dict(os.environ, {"TESTKEY": "testkey"}):
-            get_env("TESTKEY")
+    with pytest.raises(KeyError), mock.patch.dict(os.environ, {"TESTKEY": "testkey"}):
+        get_env("TESTKEY")
     with mock.patch.dict(os.environ, {"BACKEND_TESTKEY": "testkey"}):
         r = get_env("TESTKEY")
         assert r == "testkey"

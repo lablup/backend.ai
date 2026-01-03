@@ -103,14 +103,14 @@ if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
 __all__ = (
-    "ComputeSessionNode",
-    "ComputeSessionConnection",
-    "ModifyComputeSession",
-    "ModifyComputeSession",
     "ComputeSession",
+    "ComputeSessionConnection",
     "ComputeSessionList",
+    "ComputeSessionNode",
     "InferenceSession",
     "InferenceSessionList",
+    "ModifyComputeSession",
+    "ModifyComputeSession",
 )
 
 

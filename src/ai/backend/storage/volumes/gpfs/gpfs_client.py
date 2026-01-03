@@ -149,7 +149,7 @@ class GPFSAPIClient:
                         case GPFSJobStatus.COMPLETED:
                             return
                         case GPFSJobStatus.FAILED:
-                            log.error(f"Failed to run GPFS job. (e:{str(jobs)})")
+                            log.error(f"Failed to run GPFS job. (e:{jobs!s})")
                             raise GPFSJobFailedError(
                                 job.result.to_json() if job.result is not None else ""
                             )

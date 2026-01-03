@@ -362,7 +362,7 @@ async def _serialize_parameter(
                 body = await request.json()
             except json.decoder.JSONDecodeError as e:
                 raise MalformedRequestBody(
-                    f"Malformed body - URL: {request.url}, Method: {request.method}, error: {repr(e)}"
+                    f"Malformed body - URL: {request.url}, Method: {request.method}, error: {e!r}"
                 )
             return param_instance_or_class.from_body(body)
         case QueryParam():
@@ -376,7 +376,7 @@ async def _serialize_parameter(
                 param_instance = await param_instance_or_class.from_request(request)
             except ValidationError as e:
                 raise MiddlewareParamParsingFailed(
-                    f"Failed while parsing {param_instance_or_class}. (error:{repr(e)})"
+                    f"Failed while parsing {param_instance_or_class}. (error:{e!r})"
                 )
     return param_instance
 
@@ -517,7 +517,7 @@ def stream_api_handler(handler: StreamBaseHandler) -> ParsedRequestHandler:
             await resp.write(first_chunk)
         except Exception as e:
             raise web.HTTPInternalServerError(
-                reason=f"Failed to send first chunk from stream: {repr(e)}"
+                reason=f"Failed to send first chunk from stream: {e!r}"
             ) from e
 
         async for chunk in body_iter:

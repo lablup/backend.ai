@@ -97,7 +97,7 @@ class VolumeService:
                 )
             )
         except Exception as e:
-            log.exception(f"VFolder deletion task failed. (vfolder_id:{vfolder_id}, e:{str(e)})")
+            log.exception(f"VFolder deletion task failed. (vfolder_id:{vfolder_id}, e:{e!s})")
             await self._event_producer.anycast_event(
                 VFolderDeletionFailureEvent(
                     vfid=vfolder_id,

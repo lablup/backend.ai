@@ -18,13 +18,13 @@ from ..exceptions import BackendAPIError
 
 __all__ = (
     "PrintStatus",
-    "print_pretty",
-    "print_info",
-    "print_wait",
     "print_done",
-    "print_warn",
-    "print_fail",
     "print_error",
+    "print_fail",
+    "print_info",
+    "print_pretty",
+    "print_wait",
+    "print_warn",
     "show_warning",
 )
 
@@ -118,7 +118,7 @@ def _format_gql_path(items: Sequence[str | int]) -> str:
             case int():
                 pieces.append(f"[{item}]")
             case _:
-                pieces.append(f".{str(item)}")
+                pieces.append(f".{item!s}")
     return "".join(pieces)[1:]  # strip first dot
 
 

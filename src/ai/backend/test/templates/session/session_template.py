@@ -147,7 +147,7 @@ class BatchSessionFromTemplateTemplate(WrapperTestTemplate):
         spec_meta = TestSpecMetaContext.current()
         test_id = spec_meta.test_id
         client_session = ClientSessionContext.current()
-        session_name = f"test_session_{str(test_id)}"
+        session_name = f"test_session_{test_id!s}"
 
         session_id = await self._verify_session_creation(client_session, session_name)
         with CreatedSessionMetaContext.with_current(
@@ -225,7 +225,7 @@ class InteractiveSessionFromTemplateTemplate(WrapperTestTemplate):
         spec_meta = TestSpecMetaContext.current()
         test_id = spec_meta.test_id
         client_session = ClientSessionContext.current()
-        session_name = f"test_session_{str(test_id)}"
+        session_name = f"test_session_{test_id!s}"
         session_id = None
         try:
             session_id = await self._verify_session_creation(client_session, session_name)

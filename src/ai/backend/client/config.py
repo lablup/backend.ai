@@ -11,13 +11,13 @@ from dotenv import find_dotenv, load_dotenv
 from yarl import URL
 
 __all__ = [
-    "parse_api_version",
-    "get_config",
-    "set_config",
-    "APIConfig",
     "API_VERSION",
     "DEFAULT_CHUNK_SIZE",
     "MAX_INFLIGHT_CHUNKS",
+    "APIConfig",
+    "get_config",
+    "parse_api_version",
+    "set_config",
 ]
 
 

@@ -20,8 +20,8 @@ from .pretty import print_error, print_fail, print_info
 
 class WebSocketProxy:
     __slots__ = (
-        "up_conn",
         "down_conn",
+        "up_conn",
         "upstream_buffer",
         "upstream_buffer_task",
     )
@@ -66,9 +66,7 @@ class WebSocketProxy:
                     await self.down_conn.send_str(msg.data)
                 elif msg.type == aiohttp.WSMsgType.BINARY:
                     await self.down_conn.send_bytes(msg.data)
-                elif msg.type == aiohttp.WSMsgType.CLOSED:
-                    break
-                elif msg.type == aiohttp.WSMsgType.ERROR:
+                elif msg.type == aiohttp.WSMsgType.CLOSED or msg.type == aiohttp.WSMsgType.ERROR:
                     break
             # here, server gracefully disconnected
         except asyncio.CancelledError:

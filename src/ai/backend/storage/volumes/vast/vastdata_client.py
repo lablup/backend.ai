@@ -209,7 +209,7 @@ class VASTAPIClient:
         try:
             self._auth_token = TokenPair(access_token=data["access"], refresh_token=data["refresh"])
         except KeyError:
-            raise VASTAPIError(f"Cannot parse token with given data (d:{str(data)})")
+            raise VASTAPIError(f"Cannot parse token with given data (d:{data!s})")
 
     async def _refresh(self) -> None:
         if self._auth_token is None:
@@ -218,7 +218,7 @@ class VASTAPIClient:
             base_url=self.api_endpoint,
         ) as sess:
             response = await sess.post(
-                f"/api/{str(self.api_version)}/token/refresh/",
+                f"/api/{self.api_version!s}/token/refresh/",
                 headers={
                     "Accept": "*/*",
                 },
@@ -233,7 +233,7 @@ class VASTAPIClient:
             base_url=self.api_endpoint,
         ) as sess:
             response = await sess.post(
-                f"/api/{str(self.api_version)}/token/",
+                f"/api/{self.api_version!s}/token/",
                 headers={
                     "Accept": "*/*",
                 },
@@ -284,9 +284,7 @@ class VASTAPIClient:
             VASTInvalidParameterError,
         ) as e:
             log.warning(
-                f"Error occurs during communicating with Vast data API. Login and retry (e:{
-                    repr(e)
-                })"
+                f"Error occurs during communicating with Vast data API. Login and retry (e:{e!r})"
             )
             await self._login()
             return await func(
@@ -321,7 +319,7 @@ class VASTAPIClient:
             response = await self._build_request(
                 sess,
                 GET,
-                f"quotas/{str(vast_quota_id)}/",
+                f"quotas/{vast_quota_id!s}/",
             )
             if response.status == 404:
                 return None
@@ -371,7 +369,7 @@ class VASTAPIClient:
                 case 201 | 200:
                     pass
                 case 400 | 401:
-                    raise VASTInvalidParameterError(f"Invalid parameter (data:{str(data)})")
+                    raise VASTInvalidParameterError(f"Invalid parameter (data:{data!s})")
                 case 403:
                     raise VASTUnauthorizedError
                 case 503:
@@ -417,7 +415,7 @@ class VASTAPIClient:
                 case 2:
                     pass
                 case 4:
-                    raise VASTInvalidParameterError(f"Invalid parameter (data:{str(data)})")
+                    raise VASTInvalidParameterError(f"Invalid parameter (data:{data!s})")
                 case 5:
                     err_msg = data.get("detail", "VAST server error")
                     raise VASTUnknownError(err_msg)

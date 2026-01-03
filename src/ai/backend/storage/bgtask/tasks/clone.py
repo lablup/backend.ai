@@ -62,7 +62,7 @@ class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneManifest, No
                 )
         except Exception as e:
             log.exception(
-                f"VFolder cloning task failed. (src_vfid:{manifest.src_vfolder}, dst_vfid:{manifest.dst_vfolder}, e:{str(e)})"
+                f"VFolder cloning task failed. (src_vfid:{manifest.src_vfolder}, dst_vfid:{manifest.dst_vfolder}, e:{e!s})"
             )
             await self._event_producer.anycast_event(
                 VFolderCloneFailureEvent(

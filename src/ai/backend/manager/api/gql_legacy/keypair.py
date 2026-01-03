@@ -27,14 +27,14 @@ if TYPE_CHECKING:
     from .vfolder import VirtualFolder
 
 __all__ = (
-    "UserInfo",
+    "CreateKeyPair",
+    "DeleteKeyPair",
     "KeyPair",
     "KeyPairInput",
     "KeyPairList",
-    "ModifyKeyPairInput",
-    "CreateKeyPair",
     "ModifyKeyPair",
-    "DeleteKeyPair",
+    "ModifyKeyPairInput",
+    "UserInfo",
 )
 
 from ...models.minilang.ordering import OrderSpecItem, QueryOrderParser
@@ -504,7 +504,7 @@ class CreateKeyPair(graphene.Mutation):
         user_id: str,
         props: KeyPairInput,
     ) -> CreateKeyPair:
-        from .user import users  # noqa
+        from .user import users
 
         graph_ctx: GraphQueryContext = info.context
         data = prepare_new_keypair(user_id, props.to_creator())

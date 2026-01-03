@@ -13,12 +13,12 @@ from ai.backend.common.data.notification import (
 )
 
 __all__ = (
-    "NotificationChannelType",
-    "NotificationRuleType",
-    "WebhookConfig",
-    "OrderDirection",
     "NotificationChannelOrderField",
+    "NotificationChannelType",
     "NotificationRuleOrderField",
+    "NotificationRuleType",
+    "OrderDirection",
+    "WebhookConfig",
 )
 
 

@@ -120,7 +120,7 @@ class VASTQuotaModel(BaseQuotaModel):
                 else:
                     log.error(
                         "Got invalid parameter error but no quota exists with given quota name"
-                        f" ({quota_name}). Raise error (orig:{str(e)})"
+                        f" ({quota_name}). Raise error (orig:{e!s})"
                     )
                     raise InvalidQuotaConfig(f"No existing quota found with name {quota_name}")
                 await self._set_vast_quota_id(quota_scope_id, existing_quota.id)

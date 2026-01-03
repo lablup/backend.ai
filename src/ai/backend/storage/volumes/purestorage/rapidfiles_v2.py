@@ -32,7 +32,7 @@ class RapidFileToolsv2FSOpModel(RapidFileToolsFSOpModel):
         if dst_path.is_dir():
             extra_opts.append(b"-T")
         try:
-            await run([  # noqa: F821
+            await run([
                 b"pcopy",
                 *extra_opts,
                 b"-p",

@@ -23,10 +23,10 @@ if TYPE_CHECKING:
 
 
 __all__ = (
-    "NotificationChannelType",
-    "WebhookConfig",
     "NotificationChannelRow",
+    "NotificationChannelType",
     "NotificationRuleRow",
+    "WebhookConfig",
 )
 
 

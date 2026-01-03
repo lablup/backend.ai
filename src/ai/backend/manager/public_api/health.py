@@ -37,7 +37,7 @@ async def report_status_bgtask(root_ctx: RootContext) -> None:
             except asyncio.CancelledError:
                 raise
             except Exception as e:
-                log.exception(f"Failed to report manager health status (e:{str(e)})")
+                log.exception(f"Failed to report manager health status (e:{e!s})")
     except asyncio.CancelledError:
         pass
 

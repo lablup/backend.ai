@@ -2,10 +2,10 @@ import json
 from typing import Any
 
 __all__ = (
-    "BackendError",
+    "APIVersionWarning",
     "BackendAPIError",
     "BackendClientError",
-    "APIVersionWarning",
+    "BackendError",
 )
 
 

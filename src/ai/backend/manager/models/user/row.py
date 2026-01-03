@@ -48,16 +48,16 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = (
-    "users",
-    "UserRow",
-    "UserRole",  # For compatibility with existing code
-    "UserStatus",  # For compatibility with existing code
     "ACTIVE_USER_STATUSES",
     "INACTIVE_USER_STATUSES",
     "PasswordHashAlgorithm",
-    "compare_to_hashed_password",
-    "check_credential_with_migration",
+    "UserRole",  # For compatibility with existing code
+    "UserRow",
+    "UserStatus",  # For compatibility with existing code
     "check_credential",
+    "check_credential_with_migration",
+    "compare_to_hashed_password",
+    "users",
 )
 
 

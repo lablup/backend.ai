@@ -30,12 +30,12 @@ class ServiceProxy(metaclass=ABCMeta):
     """
 
     __slots__ = (
-        "ws",
-        "host",
-        "port",
         "downstream_cb",
-        "upstream_cb",
+        "host",
         "ping_cb",
+        "port",
+        "upstream_cb",
+        "ws",
     )
 
     def __init__(
@@ -138,13 +138,13 @@ class TCPProxy(ServiceProxy):
 
 class WebSocketProxy:
     __slots__ = (
-        "up_conn",
         "down_conn",
+        "downstream_cb",
+        "ping_cb",
+        "up_conn",
         "upstream_buffer",
         "upstream_buffer_task",
-        "downstream_cb",
         "upstream_cb",
-        "ping_cb",
     )
 
     up_conn: aiohttp.ClientWebSocketResponse
@@ -212,9 +212,9 @@ class WebSocketProxy:
                         await self.down_conn.send_bytes(msg.data)
                         if self.downstream_cb is not None:
                             ts.create_task(self.downstream_cb(msg.data))
-                    elif msg.type == aiohttp.WSMsgType.CLOSED:
-                        break
-                    elif msg.type == aiohttp.WSMsgType.ERROR:
+                    elif (
+                        msg.type == aiohttp.WSMsgType.CLOSED or msg.type == aiohttp.WSMsgType.ERROR
+                    ):
                         break
             # here, server gracefully disconnected
         except asyncio.CancelledError:

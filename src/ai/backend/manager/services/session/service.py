@@ -863,9 +863,9 @@ class SessionService:
                 raise RuntimeError("should not reach here")
             # handle cases when some params are deliberately set to None
             if code is None:
-                code = ""  # noqa
+                code = ""
             if opts is None:
-                opts = {}  # noqa
+                opts = {}
             if mode == "complete":
                 # For legacy
                 completion_resp = await self._agent_registry.get_completions(session, code, opts)
@@ -1323,19 +1323,21 @@ class SessionService:
             },
         }
 
-        async with aiohttp.ClientSession() as req:
-            async with req.post(
+        async with (
+            aiohttp.ClientSession() as req,
+            req.post(
                 f"{wsproxy_addr}/v2/conf",
                 json=body,
-            ) as resp:
-                token_json = await resp.json()
+            ) as resp,
+        ):
+            token_json = await resp.json()
 
-                return StartServiceActionResult(
-                    result=None,
-                    session_data=session.to_dataclass(),
-                    token=token_json["token"],
-                    wsproxy_addr=wsproxy_advertise_addr,
-                )
+            return StartServiceActionResult(
+                result=None,
+                session_data=session.to_dataclass(),
+                token=token_json["token"],
+                wsproxy_addr=wsproxy_advertise_addr,
+            )
 
     async def upload_files(self, action: UploadFilesAction) -> UploadFilesActionResult:
         session_name = action.session_name

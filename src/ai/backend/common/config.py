@@ -22,18 +22,18 @@ from .types import RedisHelperConfig
 
 __all__ = (
     "ConfigurationError",
+    "check",
     "etcd_config_iv",
+    "merge",
+    "model_definition_iv",
+    "override_key",
+    "override_with_env",
+    "read_from_etcd",
+    "read_from_file",
     "redis_config_iv",
     "redis_helper_config_iv",
     "redis_helper_default_config",
     "vfolder_config_iv",
-    "model_definition_iv",
-    "read_from_file",
-    "read_from_etcd",
-    "override_key",
-    "override_with_env",
-    "check",
-    "merge",
 )
 
 

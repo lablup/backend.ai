@@ -3293,7 +3293,7 @@ class GQLMutationPrivilegeCheckMiddleware:
     def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
         graph_ctx: GraphQueryContext = info.context
         if info.operation.operation == OperationType.MUTATION:
-            mutation_field: GraphQLField | None = getattr(Mutation, info.field_name, None)  # noqa
+            mutation_field: GraphQLField | None = getattr(Mutation, info.field_name, None)
             if mutation_field is None:
                 return next(root, info, **args)
             mutation_cls = mutation_field.type

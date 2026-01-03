@@ -44,9 +44,9 @@ from .row import (
 __all__ = (
     "DEAD_VFOLDER_STATUSES",
     "HARD_DELETED_VFOLDER_STATUSES",
+    "SOFT_DELETED_VFOLDER_STATUSES",
     "MountPermission",
     "QuotaScopeID",
-    "SOFT_DELETED_VFOLDER_STATUSES",
     "VFolderCloneInfo",
     "VFolderDeletionInfo",
     "VFolderID",

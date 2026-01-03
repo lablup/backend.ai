@@ -11,14 +11,14 @@ from ai.backend.common.exception import (
 )
 
 __all__ = (
-    "NotificationChannelNotFound",
-    "NotificationRuleNotFound",
-    "NotificationChannelConflict",
-    "NotificationRuleConflict",
-    "NotificationProcessingFailure",
-    "NotificationTemplateRenderingFailure",
     "InvalidNotificationChannelType",
     "InvalidNotificationConfig",
+    "NotificationChannelConflict",
+    "NotificationChannelNotFound",
+    "NotificationProcessingFailure",
+    "NotificationRuleConflict",
+    "NotificationRuleNotFound",
+    "NotificationTemplateRenderingFailure",
 )
 
 

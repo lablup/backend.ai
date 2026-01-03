@@ -572,7 +572,7 @@ class ReservoirService:
                     except Exception as e:
                         failed_models += 1
                         log.error(
-                            f"Failed to import model in batch: {str(e)}, model_id={model_id}, progress={idx}/{model_count}"
+                            f"Failed to import model in batch: {e!s}, model_id={model_id}, progress={idx}/{model_count}"
                         )
                         errors.append(str(e))
                     finally:
@@ -592,8 +592,8 @@ class ReservoirService:
                     )
                     return DispatchResult.partial_success(None, errors=errors)
             except Exception as e:
-                log.error(f"Batch model import failed: {str(e)}")
-                return DispatchResult.error(f"Batch import failed: {str(e)}")
+                log.error(f"Batch model import failed: {e!s}")
+                return DispatchResult.error(f"Batch import failed: {e!s}")
 
             return DispatchResult.success(None)
 
@@ -786,7 +786,7 @@ class ReservoirDownloadStep(ImportStep[None]):
             return total_bytes
 
         except Exception as e:
-            log.error(f"VFS download failed for {model_prefix}: {str(e)}")
+            log.error(f"VFS download failed for {model_prefix}: {e!s}")
             raise
 
     async def _handle_object_storage_download(

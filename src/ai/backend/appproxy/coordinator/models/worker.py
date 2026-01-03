@@ -39,8 +39,8 @@ __all__ = [
     "Worker",
     "WorkerAppFilter",
     "WorkerStatus",
-    "pick_worker",
     "add_circuit",
+    "pick_worker",
 ]
 
 

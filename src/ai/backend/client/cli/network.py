@@ -79,7 +79,7 @@ def list(ctx: CLIContext, format, filter_, order, offset, limit):
         try:
             fields = [network_fields[f.strip()] for f in format.split(",")]
         except KeyError as e:
-            ctx.output.print_fail(f"Field {str(e)} not found")
+            ctx.output.print_fail(f"Field {e!s} not found")
             sys.exit(ExitCode.FAILURE)
     else:
         fields = None
@@ -117,7 +117,7 @@ def get(ctx: CLIContext, network, format):
         try:
             fields = [network_fields[f.strip()] for f in format.split(",")]
         except KeyError as e:
-            ctx.output.print_fail(f"Field {str(e)} not found")
+            ctx.output.print_fail(f"Field {e!s} not found")
             sys.exit(ExitCode.FAILURE)
     else:
         fields = _default_list_fields

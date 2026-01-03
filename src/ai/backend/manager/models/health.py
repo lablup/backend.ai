@@ -22,11 +22,11 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__: tuple[str, ...] = (
-    "SQLAlchemyConnectionInfo",
     "RedisObjectConnectionInfo",
-    "get_sqlalchemy_connection_info",
-    "get_redis_object_info_list",
+    "SQLAlchemyConnectionInfo",
     "_get_connnection_info",
+    "get_redis_object_info_list",
+    "get_sqlalchemy_connection_info",
     "report_manager_status",
 )
 

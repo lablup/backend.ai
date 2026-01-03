@@ -34,9 +34,8 @@ def test_auth_missing_signature(monkeypatch):
 
         noop_sign = lambda *args, **kwargs: ({}, None)
         monkeypatch.setattr(request, "generate_signature", noop_sign)
-        with pytest.raises(BackendAPIError) as e:
-            with rqst.fetch():
-                pass
+        with pytest.raises(BackendAPIError) as e, rqst.fetch():
+            pass
         assert e.value.status == 401
 
 
@@ -47,18 +46,16 @@ def test_auth_malformed():
             b"<this is not json>",
             content_type="application/json",
         )
-        with pytest.raises(BackendAPIError) as e:
-            with request.fetch():
-                pass
+        with pytest.raises(BackendAPIError) as e, request.fetch():
+            pass
         assert e.value.status == 400
 
 
 def test_auth_missing_body():
     with Session():
         request = Request("GET", "/auth")
-        with pytest.raises(BackendAPIError) as e:
-            with request.fetch():
-                pass
+        with pytest.raises(BackendAPIError) as e, request.fetch():
+            pass
         assert e.value.status == 400
 
 

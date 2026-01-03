@@ -11,8 +11,8 @@ if TYPE_CHECKING:
     import yarl
 
 __all__ = (
-    "find_free_port",
     "curl",
+    "find_free_port",
 )
 
 T = TypeVar("T")
@@ -53,14 +53,16 @@ async def curl(
     from a remote HTTP endpoint.
     """
     try:
-        async with aiohttp.ClientSession(
-            raise_for_status=True,
-            timeout=aiohttp.ClientTimeout(connect=timeout),
-        ) as sess:
-            async with sess.get(url, params=params, headers=headers) as resp:
-                body = await resp.text()
-                result = body.strip()
-                return result
+        async with (
+            aiohttp.ClientSession(
+                raise_for_status=True,
+                timeout=aiohttp.ClientTimeout(connect=timeout),
+            ) as sess,
+            sess.get(url, params=params, headers=headers) as resp,
+        ):
+            body = await resp.text()
+            result = body.strip()
+            return result
     except (asyncio.TimeoutError, aiohttp.ClientError):
         if callable(default_value):
             return default_value()

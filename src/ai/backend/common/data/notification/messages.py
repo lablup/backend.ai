@@ -11,10 +11,10 @@ from pydantic import BaseModel, Field
 from .types import NotificationRuleType
 
 __all__ = (
+    "ArtifactDownloadCompletedMessage",
     "NotifiableMessage",
     "SessionStartedMessage",
     "SessionTerminatedMessage",
-    "ArtifactDownloadCompletedMessage",
 )
 
 # Module-level registry for notification message types

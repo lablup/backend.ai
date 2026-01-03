@@ -7,12 +7,12 @@ from ai.backend.common.message_queue.types import MessagePayload
 from .user_event.user_event import UserEvent
 
 __all__ = (
-    "EventDomain",
-    "DeliveryPattern",
-    "AbstractEvent",
     "AbstractAnycastEvent",
     "AbstractBroadcastEvent",
+    "AbstractEvent",
     "BatchBroadcastEvent",
+    "DeliveryPattern",
+    "EventDomain",
 )
 
 

@@ -136,11 +136,13 @@ class TestUserRepository:
         mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
 
         # Mock the _get_user_by_email method to raise UserNotFound
-        with patch.object(
-            user_repository, "_get_user_by_email", side_effect=UserNotFound("User not found")
+        with (
+            patch.object(
+                user_repository, "_get_user_by_email", side_effect=UserNotFound("User not found")
+            ),
+            pytest.raises(UserNotFound),
         ):
-            with pytest.raises(UserNotFound):
-                await user_repository.get_by_email_validated("nonexistent@example.com")
+            await user_repository.get_by_email_validated("nonexistent@example.com")
 
     @pytest.mark.asyncio
     async def test_get_by_email_validated_access_denied(
@@ -339,32 +341,34 @@ class TestUserRepository:
         mock_db_engine.begin.return_value.__aenter__.return_value = mock_conn
 
         # Mock the methods
-        with patch.object(
-            user_repository, "_get_user_by_email_with_conn", return_value=sample_user_row
+        with (
+            patch.object(
+                user_repository, "_get_user_by_email_with_conn", return_value=sample_user_row
+            ),
+            patch.object(user_repository, "_validate_user_access", return_value=True),
         ):
-            with patch.object(user_repository, "_validate_user_access", return_value=True):
-                with patch.object(user_repository, "_update_user_groups", return_value=None):
-                    # Mock execute to return updated user
-                    mock_result = MagicMock()
-                    mock_result.first.return_value = sample_user_row
-                    mock_conn.execute.return_value = mock_result
+            with patch.object(user_repository, "_update_user_groups", return_value=None):
+                # Mock execute to return updated user
+                mock_result = MagicMock()
+                mock_result.first.return_value = sample_user_row
+                mock_conn.execute.return_value = mock_result
 
-                    from ai.backend.manager.types import OptionalState
+                from ai.backend.manager.types import OptionalState
 
-                    updater_spec = UserUpdaterSpec(
-                        full_name=OptionalState.update("Updated Name"),
-                        description=OptionalState.update("Updated Description"),
-                    )
-                    updater = Updater(spec=updater_spec, pk_value="test@example.com")
+                updater_spec = UserUpdaterSpec(
+                    full_name=OptionalState.update("Updated Name"),
+                    description=OptionalState.update("Updated Description"),
+                )
+                updater = Updater(spec=updater_spec, pk_value="test@example.com")
 
-                    result = await user_repository.update_user_validated(
-                        email="test@example.com",
-                        updater=updater,
-                        requester_uuid=None,
-                    )
+                result = await user_repository.update_user_validated(
+                    email="test@example.com",
+                    updater=updater,
+                    requester_uuid=None,
+                )
 
-                    assert result is not None
-                    assert isinstance(result, UserData)
+                assert result is not None
+                assert isinstance(result, UserData)
 
     @pytest.mark.asyncio
     async def test_update_user_validated_not_found(
@@ -376,23 +380,25 @@ class TestUserRepository:
         mock_db_engine.begin.return_value.__aenter__.return_value = mock_conn
 
         # Mock the _get_user_by_email_with_conn method to raise UserNotFound
-        with patch.object(
-            user_repository,
-            "_get_user_by_email_with_conn",
-            side_effect=UserNotFound("User not found"),
+        with (
+            patch.object(
+                user_repository,
+                "_get_user_by_email_with_conn",
+                side_effect=UserNotFound("User not found"),
+            ),
+            pytest.raises(UserNotFound),
         ):
-            with pytest.raises(UserNotFound):
-                from ai.backend.manager.types import OptionalState
+            from ai.backend.manager.types import OptionalState
 
-                updater_spec = UserUpdaterSpec(
-                    full_name=OptionalState.update("Updated Name"),
-                )
-                updater = Updater(spec=updater_spec, pk_value="nonexistent@example.com")
-                await user_repository.update_user_validated(
-                    email="nonexistent@example.com",
-                    updater=updater,
-                    requester_uuid=None,
-                )
+            updater_spec = UserUpdaterSpec(
+                full_name=OptionalState.update("Updated Name"),
+            )
+            updater = Updater(spec=updater_spec, pk_value="nonexistent@example.com")
+            await user_repository.update_user_validated(
+                email="nonexistent@example.com",
+                updater=updater,
+                requester_uuid=None,
+            )
 
     @pytest.mark.asyncio
     async def test_update_user_validated_access_denied(
@@ -413,16 +419,18 @@ class TestUserRepository:
         mock_db_engine.begin.return_value.__aenter__.return_value = mock_conn
 
         # Mock the methods
-        with patch.object(
-            user_repository, "_get_user_by_email_with_conn", return_value=sample_user_row
+        with (
+            patch.object(
+                user_repository, "_get_user_by_email_with_conn", return_value=sample_user_row
+            ),
+            patch.object(user_repository, "_validate_user_access", return_value=True),
         ):
-            with patch.object(user_repository, "_validate_user_access", return_value=True):
-                await user_repository.soft_delete_user_validated(
-                    email="test@example.com", requester_uuid=None
-                )
+            await user_repository.soft_delete_user_validated(
+                email="test@example.com", requester_uuid=None
+            )
 
-                # Verify the soft delete method was called
-                assert mock_conn.execute.called
+            # Verify the soft delete method was called
+            assert mock_conn.execute.called
 
     @pytest.mark.asyncio
     async def test_get_user_time_binned_monthly_stats(

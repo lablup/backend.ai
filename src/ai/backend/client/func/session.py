@@ -1280,10 +1280,10 @@ class ComputeSession(BaseFunction):
             opts = {}
         elif mode == "batch":
             opts = {
-                "clean": opts.get("clean", None),
-                "build": opts.get("build", None),
+                "clean": opts.get("clean"),
+                "build": opts.get("build"),
                 "buildLog": bool(opts.get("buildLog", False)),
-                "exec": opts.get("exec", None),
+                "exec": opts.get("exec"),
             }
         else:
             msg = "Invalid stream-execution mode: {0}".format(mode)

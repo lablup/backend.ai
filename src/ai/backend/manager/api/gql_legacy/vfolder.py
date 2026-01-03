@@ -69,20 +69,20 @@ from ...models.vfolder import (
 
 # Re-export for backward compatibility
 __all__ = (
-    "VFolderPermissionValueField",
-    "VirtualFolderNode",
-    "VirtualFolderConnection",
     "ModelCard",
     "ModelCardConnection",
-    "VirtualFolder",
-    "VirtualFolderList",
-    "VirtualFolderPermission",
-    "VirtualFolderPermissionList",
     "QuotaDetails",
     "QuotaScope",
     "QuotaScopeInput",
     "SetQuotaScope",
     "UnsetQuotaScope",
+    "VFolderPermissionValueField",
+    "VirtualFolder",
+    "VirtualFolderConnection",
+    "VirtualFolderList",
+    "VirtualFolderNode",
+    "VirtualFolderPermission",
+    "VirtualFolderPermissionList",
 )
 from .base import (
     BigInt,
@@ -661,13 +661,13 @@ class ModelCard(graphene.ObjectType):
                 model_definition_dict = yaml.load(model_definition_yaml)
             except YAMLError as e:
                 raise ModelCardParseError(
-                    extra_msg=f"Invalid YAML syntax (filename:{model_definition_filename}, detail:{str(e)})"
+                    extra_msg=f"Invalid YAML syntax (filename:{model_definition_filename}, detail:{e!s})"
                 ) from e
             try:
                 model_definition = model_definition_iv.check(model_definition_dict)
             except t.DataError as e:
                 raise ModelCardParseError(
-                    extra_msg=f"Failed to validate model definition file (data:{model_definition_dict}, detail:{str(e)})"
+                    extra_msg=f"Failed to validate model definition file (data:{model_definition_dict}, detail:{e!s})"
                 )
             if model_definition is None:
                 raise DataTransformationFailed(

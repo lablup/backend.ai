@@ -42,7 +42,7 @@ class ContextKWArgs(TypedDict):
 
 
 class BraceMessage:
-    __slots__ = ("fmt", "args", "kwargs")
+    __slots__ = ("args", "fmt", "kwargs")
 
     def __init__(self, fmt: str, args: tuple[Any, ...], kwargs: Mapping[str, Any]) -> None:
         self.fmt = fmt

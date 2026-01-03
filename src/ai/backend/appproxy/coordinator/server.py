@@ -656,7 +656,7 @@ async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[Non
                 if len(non_inference_http_circuits) == 0:
                     return []
                 last_access = await root_ctx.valkey_live.get_multiple_live_data([
-                    f"circuit.{str(c.id)}.last_access" for c in non_inference_http_circuits
+                    f"circuit.{c.id!s}.last_access" for c in non_inference_http_circuits
                 ])
                 unused_circuits: list[Circuit] = []
 

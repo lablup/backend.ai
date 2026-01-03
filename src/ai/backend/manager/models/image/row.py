@@ -90,12 +90,12 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 __all__ = (
-    "rescan_images",
     "ImageAliasRow",
+    "ImageIdentifier",
     "ImageLoadFilter",
     "ImageRow",
-    "ImageIdentifier",
     "PublicImageLoadFilter",
+    "rescan_images",
 )
 
 

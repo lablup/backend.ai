@@ -20,8 +20,8 @@ from .vfolder import verify_vfolder_name
 
 __all__: Sequence[str] = (
     "TemplateType",
-    "session_templates",
     "query_accessible_session_templates",
+    "session_templates",
 )
 
 

@@ -107,12 +107,12 @@ if TYPE_CHECKING:
     from ..gql import GraphQueryContext
 
 __all__ = (
-    "EndpointRow",
-    "ModelServiceHelper",
-    "EndpointStatistics",
-    "EndpointTokenRow",
     "EndpointAutoScalingRuleRow",
     "EndpointLifecycle",
+    "EndpointRow",
+    "EndpointStatistics",
+    "EndpointTokenRow",
+    "ModelServiceHelper",
 )
 
 

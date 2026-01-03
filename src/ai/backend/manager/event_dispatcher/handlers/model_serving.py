@@ -127,7 +127,7 @@ class ModelServingEventHandler:
                     environ["BACKEND_MODEL_NAME"] = endpoint.model_row.name
 
                 await self._registry.create_session(
-                    f"{endpoint.name}-{str(event.route_id)}",
+                    f"{endpoint.name}-{event.route_id!s}",
                     image_row.image_ref,
                     UserScope(
                         domain_name=endpoint.domain,

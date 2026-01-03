@@ -9,9 +9,9 @@ from .permission_adapter import PermissionAdapter
 from .role_adapter import RoleAdapter
 
 __all__ = (
-    "RoleAdapter",
     "AssignedUserAdapter",
-    "PermissionAdapter",
     "ObjectPermissionAdapter",
+    "PermissionAdapter",
+    "RoleAdapter",
     "create_app",
 )

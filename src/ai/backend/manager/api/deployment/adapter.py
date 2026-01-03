@@ -87,11 +87,11 @@ from ai.backend.manager.repositories.deployment.options import (
 )
 
 __all__ = (
+    "CreateDeploymentAdapter",
+    "CreateRevisionAdapter",
     "DeploymentAdapter",
     "RevisionAdapter",
     "RouteAdapter",
-    "CreateDeploymentAdapter",
-    "CreateRevisionAdapter",
 )
 
 

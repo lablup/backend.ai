@@ -92,17 +92,17 @@ if TYPE_CHECKING:
     from ..gql import GraphQueryContext
 
 __all__ = (
+    "AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES",
+    "DEAD_KERNEL_STATUSES",
+    "KERNEL_STATUS_TRANSITION_MAP",
+    "LIVE_STATUS",
+    "RESOURCE_USAGE_KERNEL_STATUSES",
+    "USER_RESOURCE_OCCUPYING_KERNEL_STATUSES",
+    "KernelRow",
+    "KernelStatistics",
     "get_user_email",
     "handle_kernel_exception",
     "kernels",
-    "KernelRow",
-    "KERNEL_STATUS_TRANSITION_MAP",
-    "KernelStatistics",
-    "AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES",
-    "USER_RESOURCE_OCCUPYING_KERNEL_STATUSES",
-    "RESOURCE_USAGE_KERNEL_STATUSES",
-    "DEAD_KERNEL_STATUSES",
-    "LIVE_STATUS",
     "recalc_concurrency_used",
 )
 

@@ -15,9 +15,9 @@ __all__ = (
 
 
 if hasattr(asyncio, "get_running_loop"):
-    current_loop = asyncio.get_running_loop  # type: ignore  # noqa
+    current_loop = asyncio.get_running_loop  # type: ignore
 else:
-    current_loop = asyncio.get_event_loop  # type: ignore  # noqa
+    current_loop = asyncio.get_event_loop  # type: ignore
 
 CLOCK_TICK: Final = os.sysconf("SC_CLK_TCK")
 

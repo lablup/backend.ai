@@ -7,12 +7,12 @@ from typing import Any, Mapping, Optional, Union
 from . import AbstractPlugin, BasePluginContext
 
 __all__ = (
-    "AbstractStatReporterPlugin",
-    "AbstractErrorReporterPlugin",
-    "StatsPluginContext",
-    "ErrorPluginContext",
-    "INCREMENT",
     "GAUGE",
+    "INCREMENT",
+    "AbstractErrorReporterPlugin",
+    "AbstractStatReporterPlugin",
+    "ErrorPluginContext",
+    "StatsPluginContext",
 )
 
 

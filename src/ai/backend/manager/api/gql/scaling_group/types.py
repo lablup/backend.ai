@@ -34,17 +34,17 @@ from ai.backend.manager.repositories.scaling_group.options import (
 )
 
 __all__ = (
-    "ScalingGroupStatusGQL",
+    "ScalingGroupDriverConfigGQL",
+    "ScalingGroupFilterGQL",
     "ScalingGroupMetadataGQL",
     "ScalingGroupNetworkConfigGQL",
-    "ScalingGroupDriverConfigGQL",
-    "ScalingGroupSchedulerOptionsGQL",
-    "ScalingGroupSchedulerTypeGQL",
-    "ScalingGroupSchedulerConfigGQL",
-    "ScalingGroupV2GQL",
-    "ScalingGroupFilterGQL",
     "ScalingGroupOrderByGQL",
     "ScalingGroupOrderFieldGQL",
+    "ScalingGroupSchedulerConfigGQL",
+    "ScalingGroupSchedulerOptionsGQL",
+    "ScalingGroupSchedulerTypeGQL",
+    "ScalingGroupStatusGQL",
+    "ScalingGroupV2GQL",
 )
 
 

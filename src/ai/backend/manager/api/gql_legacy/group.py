@@ -77,16 +77,16 @@ if TYPE_CHECKING:
 
 
 __all__ = (
-    "GroupNode",
-    "GroupConnection",
-    "Group",
-    "GroupInput",
-    "ModifyGroupInput",
     "CreateGroup",
-    "ModifyGroup",
     "DeleteGroup",
-    "PurgeGroup",
+    "Group",
+    "GroupConnection",
+    "GroupInput",
+    "GroupNode",
     "GroupPermissionField",
+    "ModifyGroup",
+    "ModifyGroupInput",
+    "PurgeGroup",
 )
 
 

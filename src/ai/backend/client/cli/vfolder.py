@@ -583,7 +583,7 @@ def ls(name, path):
         try:
             print_wait('Retrieving list of files in "{}"...'.format(path))
             result = session.VFolder(name).list_files(path)
-            if "error_msg" in result and result["error_msg"]:
+            if result.get("error_msg"):
                 print_fail(result["error_msg"])
                 return
             files = result["items"]

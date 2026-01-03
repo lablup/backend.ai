@@ -19,11 +19,11 @@ from ..pretty import print_error, print_fail, print_info, print_warn
 class WSProxy:
     __slots__ = (
         "api_session",
-        "session_name",
         "app_name",
         "args",
         "envs",
         "reader",
+        "session_name",
         "writer",
     )
 
@@ -115,16 +115,16 @@ class WSProxy:
 
 class ProxyRunnerContext:
     __slots__ = (
-        "session_name",
+        "api_session",
         "app_name",
-        "protocol",
-        "host",
-        "port",
         "args",
         "envs",
-        "api_session",
-        "local_server",
         "exit_code",
+        "host",
+        "local_server",
+        "port",
+        "protocol",
+        "session_name",
     )
 
     session_name: str

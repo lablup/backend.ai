@@ -482,11 +482,11 @@ def remove_exponent(num: Decimal) -> Decimal:
 
 class MovingStatistics:
     __slots__ = (
-        "_sum",
         "_count",
-        "_min",
-        "_max",
         "_last",
+        "_max",
+        "_min",
+        "_sum",
     )
     _sum: Decimal
     _count: int

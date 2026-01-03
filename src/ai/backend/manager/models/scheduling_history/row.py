@@ -23,10 +23,10 @@ from ai.backend.manager.data.session.types import (
 from ..base import GUID, Base, IDColumn
 
 __all__ = (
-    "SessionSchedulingHistoryRow",
-    "KernelSchedulingHistoryRow",
     "DeploymentHistoryRow",
+    "KernelSchedulingHistoryRow",
     "RouteHistoryRow",
+    "SessionSchedulingHistoryRow",
 )
 
 

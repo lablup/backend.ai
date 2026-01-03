@@ -33,8 +33,8 @@ class RPCError(RuntimeError):
     """
 
     __slots__ = (
-        "agent_id",
         "agent_addr",
+        "agent_id",
         "extra_msg",
     )
 

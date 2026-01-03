@@ -66,7 +66,7 @@ class StorageTransferManager:
         except Exception as e:
             raise StorageTransferError(
                 f"Failed to transfer file from {source_storage_name} to {dest_storage_name}: "
-                f"{source_path} -> {dest_path}: {str(e)}"
+                f"{source_path} -> {dest_path}: {e!s}"
             ) from e
 
     async def transfer_directory(
@@ -150,7 +150,7 @@ class StorageTransferManager:
         except Exception as e:
             raise StorageTransferError(
                 f"Failed to transfer directory from {source_storage_name} to {dest_storage_name}: "
-                f"{source_prefix} -> {dest_prefix}: {str(e)}"
+                f"{source_prefix} -> {dest_prefix}: {e!s}"
             ) from e
 
     async def _move_vfs_directory(
@@ -276,7 +276,7 @@ class StorageTransferManager:
         try:
             return await storage.list_objects_with_prefix(prefix)
         except Exception as e:
-            log.warning(f"Failed to list objects with prefix '{prefix}': {str(e)}")
+            log.warning(f"Failed to list objects with prefix '{prefix}': {e!s}")
             return []
 
     async def verify_transfer(
@@ -314,5 +314,5 @@ class StorageTransferManager:
             return True
 
         except Exception as e:
-            log.error(f"Failed to verify transfer: {source_path} -> {dest_path}: {str(e)}")
+            log.error(f"Failed to verify transfer: {source_path} -> {dest_path}: {e!s}")
             return False
