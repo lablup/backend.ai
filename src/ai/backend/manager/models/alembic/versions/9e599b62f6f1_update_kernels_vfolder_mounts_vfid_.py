@@ -66,7 +66,7 @@ def upgrade() -> None:
     updated_count = 0
 
     def render_vfolder_id(old_vfid: str) -> str:
-        if "/" in old_vfid and (old_vfid.startswith("user:") or old_vfid.startswith("project:")):
+        if "/" in old_vfid and old_vfid.startswith(("user:", "project:")):
             return old_vfid
 
         if "/" in old_vfid:

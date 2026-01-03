@@ -310,5 +310,5 @@ TBaseModel = TypeVar("TBaseModel", bound=Union[BaseModel, Sequence[BaseModel]])
 @dataclass
 class PydanticResponse(Generic[TBaseModel]):
     response: TBaseModel
-    headers: dict[str, Any] = dataclasses.field(default_factory=lambda: {})
+    headers: dict[str, Any] = dataclasses.field(default_factory=dict)
     status: int = 200

@@ -413,7 +413,7 @@ class Context(metaclass=ABCMeta):
         self.sed_in_place_multi(
             toml_path,
             [
-                (re.compile("^num-proc = .*", flags=re.M), "num-proc = 1"),
+                (re.compile("^num-proc = .*", flags=re.MULTILINE), "num-proc = 1"),
                 ("port = 8120", f"port = {halfstack.etcd_addr[0].face.port}"),
                 ("port = 8100", f"port = {halfstack.postgres_addr.face.port}"),
                 (
@@ -421,7 +421,7 @@ class Context(metaclass=ABCMeta):
                     f"port = {self.install_info.service_config.manager_addr.bind.port}",
                 ),
                 (
-                    re.compile("^(# )?ipc-base-path =.*", flags=re.M),
+                    re.compile("^(# )?ipc-base-path =.*", flags=re.MULTILINE),
                     f'ipc-base-path = "{self.install_info.service_config.manager_ipc_base_path}"',
                 ),
             ],
@@ -497,15 +497,15 @@ class Context(metaclass=ABCMeta):
                 ("port = 6001", f"port = {service.agent_rpc_addr.bind.port}"),
                 ("port = 6009", f"port = {service.agent_watcher_addr.bind.port}"),
                 (
-                    re.compile("^(# )?ipc-base-path = .*", flags=re.M),
+                    re.compile("^(# )?ipc-base-path = .*", flags=re.MULTILINE),
                     f'ipc-base-path = "{service.agent_ipc_base_path}"',
                 ),
                 (
-                    re.compile("^(# )?var-base-path = .*", flags=re.M),
+                    re.compile("^(# )?var-base-path = .*", flags=re.MULTILINE),
                     f'var-base-path = "{service.agent_var_base_path}"',
                 ),
                 (
-                    re.compile("(# )?mount_path = .*", flags=re.M),
+                    re.compile("(# )?mount_path = .*", flags=re.MULTILINE),
                     f'"{self.install_info.base_path / service.vfolder_relpath}"',
                 ),
             ],
@@ -531,7 +531,7 @@ class Context(metaclass=ABCMeta):
 
         self.sed_in_place(
             toml_path,
-            re.compile(r"^(# )?allow-compute-plugins = .*", flags=re.M),
+            re.compile(r"^(# )?allow-compute-plugins = .*", flags=re.MULTILINE),
             f"allow-compute-plugins = [{', '.join(plugin_list)}]",
         )
 
@@ -794,7 +794,7 @@ class Context(metaclass=ABCMeta):
                     f"{halfstack.postgres_addr.face.host}:{halfstack.postgres_addr.face.port}",
                 ),
                 (
-                    re.compile(r"^#?sqlalchemy.url\s*=.*", flags=re.M),
+                    re.compile(r"^#?sqlalchemy.url\s*=.*", flags=re.MULTILINE),
                     f"sqlalchemy.url = postgresql+asyncpg://appproxy:develove@{halfstack.postgres_addr.face.host}:{halfstack.postgres_addr.face.port}/appproxy",
                 ),
             ],

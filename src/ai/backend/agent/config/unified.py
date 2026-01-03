@@ -1187,7 +1187,7 @@ class AgentGlobalConfig(BaseConfigSchema):
         serialization_alias="kernel-lifecycles",
     )
     plugins: Any = Field(
-        default_factory=lambda: {},
+        default_factory=dict,
         description=textwrap.dedent("""
         Plugins configuration.
         This field is injected at runtime based on etcd configuration.

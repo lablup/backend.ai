@@ -257,7 +257,7 @@ class CircuitManager:
         log.debug("unload_traefik_circuit(): end")
 
     async def unload_legacy_circuits(self, circuits: Sequence[Circuit]) -> None:
-        circuits_by_worker: defaultdict[str, list[Circuit]] = defaultdict(lambda: [])
+        circuits_by_worker: defaultdict[str, list[Circuit]] = defaultdict(list)
         for circuit in circuits:
             circuits_by_worker[circuit.worker_row.authority].append(circuit)
 

@@ -93,11 +93,25 @@ select = [
     "FA",     # flake8-future-annotations: enforces `from __future__ import annotations`
     "ISC",    # flake8-implicit-str-concat: detects implicit string concatenation bugs
     "EXE",    # flake8-executable: validates shebang and file permissions consistency
+    # Phase 2-3: Minimal violations (<50)
+    "LOG",    # flake8-logging: enforces logging best practices (warn -> warning, etc.)
+    "FLY",    # flynt: converts old-style string formatting to f-strings
+    "PIE",    # flake8-pie: catches misc. code smells (duplicate class fields, unnecessary pass, etc.)
+    "FURB",   # refurb: suggests modern Python idioms (Path.read_text, etc.)
+    # "DTZ",  # flake8-datetimez: enforces timezone-aware datetime usage (208 violations - deferred)
 ]
 ignore = [
     "E203",   # whitespace before ':' - conflicts with Black formatter
     "E731",   # lambda assignment - sometimes useful for simple callbacks
     "E501",   # line too long - handled by formatter
+    # PIE
+    "PIE790", # unnecessary-pass - sometimes useful for readability in empty blocks
+    # FURB
+    "FURB157", # verbose-decimal-constructor - Decimal("0") is intentional for precision
+    # FLY
+    "FLY002", # static-join-to-f-string - unsafe fix, may change behavior
+    # PIE
+    "PIE796", # non-unique-enums - intentional aliases for backward compatibility
 ]
 
 [tool.ruff.lint.isort]

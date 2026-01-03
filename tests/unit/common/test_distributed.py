@@ -67,7 +67,7 @@ def dslice(start: Decimal, stop: Decimal, num: int):
     """
     delta = stop - start
     step = delta / (num - 1)
-    yield from (start + step * Decimal(tick) for tick in range(0, num))
+    yield from (start + step * Decimal(tick) for tick in range(num))
 
 
 @dataclass

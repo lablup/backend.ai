@@ -1344,7 +1344,7 @@ class ScheduleRepository:
 
         kernel_statistics_by_id: dict[KernelId, Mapping[str, object]] = {}
         endpoint_statistics_by_id: dict[uuid.UUID, Mapping[str, object]] = {}
-        kernels_by_session_id: dict[SessionId, list[KernelRow]] = defaultdict(lambda: [])
+        kernels_by_session_id: dict[SessionId, list[KernelRow]] = defaultdict(list)
 
         for rule in rules:
             match rule.metric_source:

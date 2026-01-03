@@ -236,7 +236,7 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
             },
             "schemas": {},
         },
-        "paths": defaultdict(lambda: {}),
+        "paths": defaultdict(dict),
     }
     operation_id_mapping: defaultdict[str, int] = defaultdict(lambda: 0)
     for app in subapps:

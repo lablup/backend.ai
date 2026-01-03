@@ -15,7 +15,7 @@ def ask_host(prompt: str, default: str = "127.0.0.1", allow_hostname=False) -> s
         try:
             if allow_hostname:
                 url = user_reply
-                if not (user_reply.startswith("http://") or user_reply.startswith("https://")):
+                if not user_reply.startswith(("http://", "https://")):
                     url = f"http://{user_reply}"
                 try:
                     urlopen(url)

@@ -21,8 +21,7 @@ async def write_file(
     filename = filename.format_map(variables)
     open_mode = "w" + ("+" if append else "")
     with open(filename, open_mode) as fw:
-        for line in body:
-            fw.write(line.format_map(variables) + "\n")
+        fw.writelines(line.format_map(variables) + "\n" for line in body)
     os.chmod(filename, int(mode, 8))
 
 

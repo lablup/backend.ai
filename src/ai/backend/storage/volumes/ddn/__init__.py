@@ -118,8 +118,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
                     # words[1] is soft_limit
                     if hard_limit == 0:
                         return None
-                    if raw_used_bytes.endswith("*"):
-                        raw_used_bytes = raw_used_bytes[:-1]
+                    raw_used_bytes = raw_used_bytes.removesuffix("*")
                     used_bytes = _kilobyte_to_byte(int(raw_used_bytes))
                     limit_bytes = _kilobyte_to_byte(hard_limit)
                     if used_bytes < 0 or limit_bytes < 0:

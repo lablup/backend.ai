@@ -181,7 +181,7 @@ def format_stats(stats):
         stats.pop("precpu_system_used", None)
         stats.pop("cpu_system_used", None)
         for key, val in stats.items():
-            if key.endswith("_size") or key.endswith("_bytes"):
+            if key.endswith(("_size", "_bytes")):
                 val = naturalsize(val, binary=True)
             elif key == "cpu_used":
                 key += "_msec"

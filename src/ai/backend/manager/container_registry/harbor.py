@@ -459,7 +459,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         if architecture:
             architecture = arch_name_aliases.get(architecture, architecture)
         else:
-            if tag.endswith("-arm64") or tag.endswith("-aarch64"):
+            if tag.endswith(("-arm64", "-aarch64")):
                 architecture = "aarch64"
             else:
                 architecture = "x86_64"
@@ -608,7 +608,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         async with concurrency_sema.get():
             # Harbor does not provide architecture information for a single-arch tag reference.
             # We heuristically detect the architecture using the tag name pattern.
-            if tag.endswith("-arm64") or tag.endswith("-aarch64"):
+            if tag.endswith(("-arm64", "-aarch64")):
                 architecture = "aarch64"
             else:
                 architecture = "x86_64"

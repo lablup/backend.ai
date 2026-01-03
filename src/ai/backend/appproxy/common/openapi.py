@@ -52,7 +52,7 @@ def generate_openapi(
             },
             "schemas": {},
         },
-        "paths": defaultdict(lambda: {}),
+        "paths": defaultdict(dict),
     }
     operation_id_mapping: defaultdict[str, int] = defaultdict(lambda: 0)
     for app in subapps:

@@ -5,16 +5,14 @@ from ai.backend.common.etcd import AsyncEtcd
 
 class TraefikEtcd(AsyncEtcd):
     def _mangle_key(self, k: str) -> str:
-        if k.startswith("/"):
-            k = k[1:]
+        k = k.removeprefix("/")
         return f"{self.ns}/{k}"
 
     def _demangle_key(self, k: bytes | str) -> str:
         if isinstance(k, bytes):
             k = k.decode(self.encoding)
         prefix = f"{self.ns}/"
-        if k.startswith(prefix):
-            k = k[len(prefix) :]
+        k = k.removeprefix(prefix)
         return k
 
 

@@ -955,7 +955,7 @@ class ReservoirDownloadStep(ImportStep[None]):
                 )
 
                 log.trace("[stream_bucket_to_bucket] done key={} bytes={}", key, size)
-                return size if size >= 0 else 0
+                return max(size, 0)
 
         # TODO: Replace this with global semaphore
         sizes = await asyncio.gather(*(_copy_single_object(k) for k in target_keys))

@@ -509,7 +509,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         if architecture:
             architecture = arch_name_aliases.get(architecture, architecture)
         else:
-            if tag.endswith("-arm64") or tag.endswith("-aarch64"):
+            if tag.endswith(("-arm64", "-aarch64")):
                 architecture = "aarch64"
             else:
                 architecture = "x86_64"
@@ -606,9 +606,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         if _accels_str := labels.get("ai.backend.accelerators"):
             accels |= set(_accels_str.split(","))
         for key in labels.keys():
-            if key.startswith("ai.backend.resource.min") or key.startswith(
-                "ai.backend.resource.max"
-            ):
+            if key.startswith(("ai.backend.resource.min", "ai.backend.resource.max")):
                 accel = key.split(
                     "."
                 )[
