@@ -1009,7 +1009,7 @@ class Context(metaclass=ABCMeta):
                             str(src.file),
                         ])
                 case ImageSource.LOCAL_REGISTRY:
-                    raise NotImplementedError()
+                    raise NotImplementedError
 
 
 class DevContext(Context):

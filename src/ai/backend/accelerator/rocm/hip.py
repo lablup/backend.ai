@@ -220,7 +220,7 @@ class libhip(LibraryBase):
                     return _dll
             return None
         else:
-            raise NotImplementedError()
+            raise NotImplementedError
 
     @classmethod
     def get_version(cls) -> Tuple[int, int]:
@@ -282,7 +282,7 @@ class librocm_smi(LibraryBase):
                     return _dll
             return None
         else:
-            raise NotImplementedError()
+            raise NotImplementedError
 
     @classmethod
     def get_version(cls) -> Tuple[int, int, int]:

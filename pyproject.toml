@@ -99,6 +99,9 @@ select = [
     "PIE",    # flake8-pie: catches misc. code smells (duplicate class fields, unnecessary pass, etc.)
     "FURB",   # refurb: suggests modern Python idioms (Path.read_text, etc.)
     # "DTZ",  # flake8-datetimez: enforces timezone-aware datetime usage (208 violations - deferred)
+    # Phase 4: Raise statement validation
+    "RSE",    # flake8-raise: enforces proper raise statement usage
+    # "T20",  # flake8-print: detects print statements (689 violations - deferred for careful review)
 ]
 ignore = [
     "E203",   # whitespace before ':' - conflicts with Black formatter
@@ -112,6 +115,8 @@ ignore = [
     "FLY002", # static-join-to-f-string - unsafe fix, may change behavior
     # PIE
     "PIE796", # non-unique-enums - intentional aliases for backward compatibility
+    # RSE
+    "RSE102", # unnecessary-paren-on-raise-exception - stylistic, explicit () is common practice
 ]
 
 [tool.ruff.lint.isort]

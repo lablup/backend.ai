@@ -44,7 +44,7 @@ class RevisionGenerator(ABC):
         Raises:
             InvalidAPIParameters: When validation fails
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @abstractmethod
     async def load_service_definition(
@@ -64,7 +64,7 @@ class RevisionGenerator(ABC):
         Returns:
             Service definition if found, None otherwise
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @abstractmethod
     def merge_revision(
@@ -87,7 +87,7 @@ class RevisionGenerator(ABC):
         Raises:
             InvalidAPIParameters: When required fields are missing
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @abstractmethod
     async def validate_revision(self, revision: ModelRevisionSpec) -> None:
@@ -103,4 +103,4 @@ class RevisionGenerator(ABC):
         Raises:
             InvalidAPIParameters: When validation fails
         """
-        raise NotImplementedError()
+        raise NotImplementedError

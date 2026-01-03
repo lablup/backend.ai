@@ -45,7 +45,7 @@ class AbstractAgentDiscovery(ABC):
         """
         Return the concrete implementation class of AbstactAgent for the backend.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @abstractmethod
     async def load_resources(
@@ -58,7 +58,7 @@ class AbstractAgentDiscovery(ABC):
 
         limit_cpus, limit_gpus are deprecated.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @abstractmethod
     async def scan_available_resources(
@@ -68,7 +68,7 @@ class AbstractAgentDiscovery(ABC):
         """
         Detect available computing resource of the system.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @abstractmethod
     async def prepare_krunner_env(self, local_config: Mapping[str, Any]) -> Mapping[str, str]:
@@ -77,7 +77,7 @@ class AbstractAgentDiscovery(ABC):
         If not, automatically create it and update its content from the packaged pre-built krunner
         tar archives.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 def get_agent_discovery(backend: AgentBackend) -> AbstractAgentDiscovery:

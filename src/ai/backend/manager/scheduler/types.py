@@ -251,7 +251,7 @@ class AbstractAgentSelector(Generic[T_ResourceGroupState], ABC):
     @classmethod
     @abstractmethod
     def get_state_cls(cls) -> type[T_ResourceGroupState]:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     async def assign_agent_for_session(
         self,
