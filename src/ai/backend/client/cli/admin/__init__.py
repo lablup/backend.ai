@@ -16,7 +16,7 @@ from . import (  # noqa
     group,
     image,
     keypair,
-    license,
+    license,  # noqa: A004
     manager,
     resource,
     resource_policy,

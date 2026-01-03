@@ -870,13 +870,13 @@ class ModifyAgent(graphene.Mutation):
     @classmethod
     @privileged_mutation(
         UserRole.SUPERADMIN,
-        lambda id, **kwargs: (None, id),
+        lambda agent_id, **kwargs: (None, agent_id),
     )
     async def mutate(
         cls,
         root,
         info: graphene.ResolveInfo,
-        id: str,
+        agent_id: str,
         props: ModifyAgentInput,
     ) -> ModifyAgent:
         graph_ctx: GraphQueryContext = info.context
@@ -885,9 +885,9 @@ class ModifyAgent(graphene.Mutation):
         set_if_set(props, data, "scaling_group")
         # TODO: Need to skip the following RPC call if the agent is not alive, or timeout.
         if (scaling_group := data.get("scaling_group")) is not None:
-            await graph_ctx.registry.update_scaling_group(id, scaling_group)
+            await graph_ctx.registry.update_scaling_group(agent_id, scaling_group)
 
-        update_query = sa.update(agents).values(data).where(agents.c.id == id)
+        update_query = sa.update(agents).values(data).where(agents.c.id == agent_id)
         return await simple_db_mutate(cls, graph_ctx, update_query)
 
 
@@ -908,7 +908,7 @@ class RescanGPUAllocMaps(graphene.Mutation):
     @classmethod
     @privileged_mutation(
         UserRole.SUPERADMIN,
-        lambda id, **kwargs: (None, id),
+        lambda agent_id, **kwargs: (None, agent_id),
     )
     async def mutate(
         cls,
