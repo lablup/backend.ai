@@ -83,14 +83,22 @@ src = ["src"]
 
 [tool.ruff.lint]
 select = [
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes
-    "I",  # isort
-    # "C",  # flake8-comprehensions
-    # "B",  # flake8-bugbear
+    # Default
+    "E",      # pycodestyle errors: PEP8 style violations
+    "W",      # pycodestyle warnings: PEP8 style warnings
+    "F",      # pyflakes: detects unused imports, undefined names, and other logical errors
+    "I",      # isort: enforces consistent import ordering
+    # Phase 1: Zero violations
+    "T10",    # flake8-debugger: prevents debugger statements (pdb, breakpoint) in production code
+    "FA",     # flake8-future-annotations: enforces `from __future__ import annotations`
+    "ISC",    # flake8-implicit-str-concat: detects implicit string concatenation bugs
+    "EXE",    # flake8-executable: validates shebang and file permissions consistency
 ]
-ignore = ["E203","E731","E501"]
+ignore = [
+    "E203",   # whitespace before ':' - conflicts with Black formatter
+    "E731",   # lambda assignment - sometimes useful for simple callbacks
+    "E501",   # line too long - handled by formatter
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["ai.backend"]
