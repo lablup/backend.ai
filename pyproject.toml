@@ -102,11 +102,11 @@ select = [
     # Phase 4: Raise statement validation
     "RSE",    # flake8-raise: enforces proper raise statement usage
     # "T20",  # flake8-print: detects print statements (689 violations - deferred for careful review)
-    # Phase 5: Performance, simplification, and comprehensions (deferred - requires extensive review)
-    # "PERF", # perflint: detects performance anti-patterns (~150 violations)
-    # "SIM",  # flake8-simplify: suggests code simplification (~150 violations)
-    # "RUF",  # ruff-specific: Ruff's own linting rules (~200 violations)
-    # "C4",   # flake8-comprehensions: optimizes list/set/dict comprehensions (~200 violations)
+    # Phase 5: Performance, simplification, and comprehensions
+    "PERF",   # perflint: detects performance anti-patterns
+    "SIM",    # flake8-simplify: suggests code simplification
+    "RUF",    # ruff-specific: Ruff's own linting rules
+    "C4",     # flake8-comprehensions: optimizes list/set/dict comprehensions
     # Phase 6: Type annotations and code quality (deferred - requires extensive review)
     # "A",    # flake8-builtins: prevents shadowing Python builtins
     # "BLE",  # flake8-blind-except: prevents bare except clauses
@@ -130,6 +130,31 @@ ignore = [
     "PIE796", # non-unique-enums - intentional aliases for backward compatibility
     # RSE
     "RSE102", # unnecessary-paren-on-raise-exception - stylistic, explicit () is common practice
+    # PERF
+    "PERF102", # incorrect-dict-iterator - dict.items() iteration is often intentional for clarity
+    "PERF401", # manual-list-comprehension - requires careful refactoring, may affect readability
+    "PERF402", # manual-list-copy - existing pattern is explicit
+    "PERF403", # manual-dict-comprehension - requires careful refactoring
+    # SIM
+    "SIM102", # collapsible-if - nested if statements often improve readability
+    "SIM105", # suppressible-exception - explicit try-except is clearer for error handling
+    "SIM108", # if-else-block-instead-of-if-exp - ternary can reduce readability for complex conditions
+    "SIM110", # reimplemented-builtin - explicit loops are sometimes clearer than any()/all()
+    "SIM115", # open-file-with-context-handler - some file operations need explicit close control
+    "SIM117", # multiple-with-statements - nested with statements often improve readability
+    "SIM118", # in-dict-keys - explicit .keys() is sometimes clearer
+    # RUF
+    "RUF005", # collection-literal-concatenation - explicit concatenation is sometimes clearer
+    "RUF006", # asyncio-dangling-task - fire-and-forget tasks are intentional in some cases
+    "RUF012", # mutable-class-default - existing codebase uses mutable defaults intentionally
+    "RUF015", # unnecessary-iterable-allocation-for-first-element - [0] is clearer than next(iter())
+    "RUF022", # unsorted-dunder-all - semantic ordering may be preferred over alphabetical
+    "RUF032", # decimal-from-float-literal - intentional float to Decimal conversion
+    "RUF059", # unused-unpacked-variable - _ convention not always followed
+    # C4
+    "C408",  # unnecessary-collection-call - dict()/tuple()/list() can be clearer than literals in some cases
+    "C416",  # unnecessary-comprehension - explicit comprehension can be clearer
+    "C417",  # unnecessary-map - map() is valid Python and sometimes preferred
 ]
 
 [tool.ruff.lint.isort]
