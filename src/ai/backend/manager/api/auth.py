@@ -33,32 +33,24 @@ from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.utils import with_log_context_fields
-from ai.backend.manager.errors.auth import (
-    AuthorizationFailed,
-    InvalidAuthParameters,
-    InvalidClientIPConfig,
-)
-from ai.backend.manager.errors.common import RejectedByHook
-from ai.backend.manager.models import (
-    keypair_resource_policies,
-    keypairs,
-    user_resource_policies,
-    users,
-)
-from ai.backend.manager.models.utils import execute_with_retry
-from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
-from ai.backend.manager.services.auth.actions.generate_ssh_keypair import GenerateSSHKeypairAction
-from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
-from ai.backend.manager.services.auth.actions.get_ssh_keypair import GetSSHKeypairAction
-from ai.backend.manager.services.auth.actions.signout import SignoutAction
-from ai.backend.manager.services.auth.actions.signup import SignupAction
-from ai.backend.manager.services.auth.actions.update_full_name import UpdateFullNameAction
-from ai.backend.manager.services.auth.actions.update_password import UpdatePasswordAction
-from ai.backend.manager.services.auth.actions.update_password_no_auth import (
+from ..errors.auth import AuthorizationFailed, InvalidAuthParameters, InvalidClientIPConfig
+from ..errors.common import RejectedByHook
+from ..models.keypair import keypairs
+from ..models.resource_policy import keypair_resource_policies, user_resource_policies
+from ..models.user import users
+from ..models.utils import execute_with_retry
+from ..services.auth.actions.authorize import AuthorizeAction
+from ..services.auth.actions.generate_ssh_keypair import GenerateSSHKeypairAction
+from ..services.auth.actions.get_role import GetRoleAction
+from ..services.auth.actions.get_ssh_keypair import GetSSHKeypairAction
+from ..services.auth.actions.signout import SignoutAction
+from ..services.auth.actions.signup import SignupAction
+from ..services.auth.actions.update_full_name import UpdateFullNameAction
+from ..services.auth.actions.update_password import UpdatePasswordAction
+from ..services.auth.actions.update_password_no_auth import (
     UpdatePasswordNoAuthAction,
 )
-from ai.backend.manager.services.auth.actions.upload_ssh_keypair import UploadSSHKeypairAction
-
+from ..services.auth.actions.upload_ssh_keypair import UploadSSHKeypairAction
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params, get_handler_attr, set_handler_attr
 

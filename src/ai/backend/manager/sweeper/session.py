@@ -16,13 +16,13 @@ from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.metrics.metric import SweeperMetricObserver
 from ai.backend.common.validators import TimeDelta
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.config_legacy import session_hang_tolerance_iv
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models import SessionRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.registry import AgentRegistry
 
+from ..api.context import RootContext
+from ..config_legacy import session_hang_tolerance_iv
+from ..models.session import SessionRow
+from ..models.utils import ExtendedAsyncSAEngine
+from ..registry import AgentRegistry
 from .base import DEFAULT_SWEEP_INTERVAL_SEC, AbstractSweeper
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

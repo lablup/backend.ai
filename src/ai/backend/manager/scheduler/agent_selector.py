@@ -14,8 +14,10 @@ from ai.backend.common.types import (
     ResourceSlot,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models import AgentRow, KernelRow, SessionRow
 
+from ..models.agent import AgentRow
+from ..models.kernel import KernelRow
+from ..models.session import SessionRow
 from .types import (
     AbstractAgentSelector,
     NullAgentSelectorState,

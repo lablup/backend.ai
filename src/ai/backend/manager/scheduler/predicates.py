@@ -9,18 +9,14 @@ from sqlalchemy.orm import load_only, noload
 from ai.backend.common.types import ResourceSlot, SessionResult, SessionTypes
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models import (
-    DefaultForUnspecified,
-    DomainRow,
-    GroupRow,
-    KeyPairResourcePolicyRow,
-    KeyPairRow,
-    SessionDependencyRow,
-    SessionRow,
-    UserRow,
-)
-from ai.backend.manager.models.utils import execute_with_retry
 
+from ..models.domain import DomainRow
+from ..models.group import GroupRow
+from ..models.keypair import KeyPairRow
+from ..models.resource_policy import DefaultForUnspecified, KeyPairResourcePolicyRow
+from ..models.session import SessionDependencyRow, SessionRow
+from ..models.user import UserRow
+from ..models.utils import execute_with_retry
 from .types import PredicateResult, SchedulingContext
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))

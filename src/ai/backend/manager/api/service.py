@@ -56,53 +56,48 @@ from ai.backend.manager.data.model_serving.types import (
     ServiceConfig,
     ServiceInfo,
 )
-from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.auth import InvalidAuthParameters
-from ai.backend.manager.errors.storage import VFolderNotFound
-from ai.backend.manager.models import (
-    ModelServiceHelper,
-    UserRole,
-    UserRow,
-    query_accessible_vfolders,
-    vfolders,
-)
-from ai.backend.manager.services.deployment.actions.create_legacy_deployment import (
+from ..errors.api import InvalidAPIParameters
+from ..errors.auth import InvalidAuthParameters
+from ..errors.storage import VFolderNotFound
+from ..models.endpoint import ModelServiceHelper
+from ..models.user import UserRole, UserRow
+from ..models.vfolder import query_accessible_vfolders, vfolders
+from ..services.deployment.actions.create_legacy_deployment import (
     CreateLegacyDeploymentAction,
     CreateLegacyDeploymentActionResult,
 )
-from ai.backend.manager.services.deployment.actions.destroy_deployment import (
+from ..services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
     DestroyDeploymentActionResult,
 )
-from ai.backend.manager.services.model_serving.actions.clear_error import ClearErrorAction
-from ai.backend.manager.services.model_serving.actions.create_model_service import (
+from ..services.model_serving.actions.clear_error import ClearErrorAction
+from ..services.model_serving.actions.create_model_service import (
     CreateModelServiceAction,
     CreateModelServiceActionResult,
 )
-from ai.backend.manager.services.model_serving.actions.delete_model_service import (
+from ..services.model_serving.actions.delete_model_service import (
     DeleteModelServiceAction,
 )
-from ai.backend.manager.services.model_serving.actions.delete_route import DeleteRouteAction
-from ai.backend.manager.services.model_serving.actions.dry_run_model_service import (
+from ..services.model_serving.actions.delete_route import DeleteRouteAction
+from ..services.model_serving.actions.dry_run_model_service import (
     DryRunModelServiceAction,
 )
-from ai.backend.manager.services.model_serving.actions.force_sync import ForceSyncAction
-from ai.backend.manager.services.model_serving.actions.generate_token import GenerateTokenAction
-from ai.backend.manager.services.model_serving.actions.get_model_service_info import (
+from ..services.model_serving.actions.force_sync import ForceSyncAction
+from ..services.model_serving.actions.generate_token import GenerateTokenAction
+from ..services.model_serving.actions.get_model_service_info import (
     GetModelServiceInfoAction,
     GetModelServiceInfoActionResult,
 )
-from ai.backend.manager.services.model_serving.actions.list_errors import ListErrorsAction
-from ai.backend.manager.services.model_serving.actions.list_model_service import (
+from ..services.model_serving.actions.list_errors import ListErrorsAction
+from ..services.model_serving.actions.list_model_service import (
     ListModelServiceAction,
     ListModelServiceActionResult,
 )
-from ai.backend.manager.services.model_serving.actions.scale_service_replicas import (
+from ..services.model_serving.actions.scale_service_replicas import (
     ScaleServiceReplicasAction,
 )
-from ai.backend.manager.services.model_serving.actions.update_route import UpdateRouteAction
-from ai.backend.manager.types import MountOptionModel, UserScope
-
+from ..services.model_serving.actions.update_route import UpdateRouteAction
+from ..types import MountOptionModel, UserScope
 from .auth import auth_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo

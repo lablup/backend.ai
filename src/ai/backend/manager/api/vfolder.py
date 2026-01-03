@@ -59,7 +59,7 @@ from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.common import InternalServerError, ObjectNotFound
 from ai.backend.manager.errors.kernel import BackendAgentError
 from ai.backend.manager.errors.service import ModelServiceDependencyNotCleared
-from ai.backend.manager.errors.storage import (
+from ..errors.storage import (
     TooManyVFoldersFound,
     VFolderAlreadyExists,
     VFolderBadRequest,
@@ -69,45 +69,39 @@ from ai.backend.manager.errors.storage import (
     VFolderNotFound,
     VFolderOperationFailed,
 )
-from ai.backend.manager.models import (
-    ACTIVE_USER_STATUSES,
-    EndpointRow,
-    UserRole,
-    UserStatus,
+from ..models.agent import agents
+from ..models.endpoint import EndpointRow
+from ..models.kernel import kernels
+from ..models.keypair import keypairs
+from ..models.resource_policy import keypair_resource_policies
+from ..models.storage import StorageSessionManager
+from ..models.user import ACTIVE_USER_STATUSES, UserRole, UserRow, UserStatus, users
+from ..models.utils import execute_with_retry, execute_with_txn_retry
+from ..models.vfolder import (
     VFolderInvitationState,
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
+    VFolderPermissionRow,
     VFolderPermissionSetAlias,
     VFolderPermissionValidator,
     VFolderStatusSet,
-    agents,
+    delete_vfolder_relation_rows,
     ensure_host_permission_allowed,
     get_allowed_vfolder_hosts_by_group,
     get_allowed_vfolder_hosts_by_user,
-    kernels,
-    keypair_resource_policies,
-    keypairs,
+    is_unmanaged,
     query_accessible_vfolders,
     update_vfolder_status,
-    users,
     vfolder_invitations,
     vfolder_permissions,
     vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.models.utils import execute_with_retry, execute_with_txn_retry
-from ai.backend.manager.models.vfolder import (
-    VFolderPermissionRow,
-    delete_vfolder_relation_rows,
-    is_unmanaged,
-)
-from ai.backend.manager.models.vfolder import VFolderRow as VFolderDBRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
-from ai.backend.manager.services.vfolder.actions.base import (
+from ..models.vfolder import VFolderRow as VFolderDBRow
+from ..repositories.base.updater import Updater
+from ..repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
+from ..services.vfolder.actions.base import (
     CloneVFolderAction,
     CreateVFolderAction,
     DeleteForeverVFolderAction,
@@ -118,7 +112,7 @@ from ai.backend.manager.services.vfolder.actions.base import (
     RestoreVFolderFromTrashAction,
     UpdateVFolderAttributeAction,
 )
-from ai.backend.manager.services.vfolder.actions.file import (
+from ..services.vfolder.actions.file import (
     CreateDownloadSessionAction,
     CreateUploadSessionAction,
     DeleteFilesAction,
@@ -127,7 +121,7 @@ from ai.backend.manager.services.vfolder.actions.file import (
     MkdirAction,
     RenameFileAction,
 )
-from ai.backend.manager.services.vfolder.actions.invite import (
+from ..services.vfolder.actions.invite import (
     AcceptInvitationAction,
     InviteVFolderAction,
     LeaveInvitedVFolderAction,
@@ -137,7 +131,7 @@ from ai.backend.manager.services.vfolder.actions.invite import (
     UpdateInvitationAction,
     UpdateInvitedVFolderMountPermissionAction,
 )
-from ai.backend.manager.types import OptionalState
+from ..types import OptionalState
 
 from .auth import admin_required, auth_required, superadmin_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
@@ -1556,7 +1550,7 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     if row["ownership_type"] != VFolderOwnershipType.GROUP:
         raise VFolderNotFound("Only project folders are directly sharable.")
     async with root_ctx.db.begin() as conn:
-        from ai.backend.manager.models import association_groups_users as agus
+        from ..models.group import association_groups_users as agus
 
         allowed_vfolder_types = (
             await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()

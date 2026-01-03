@@ -32,8 +32,11 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.errors.resource import InvalidSchedulerState
-from ai.backend.manager.models import AgentRow, KernelRow, SessionRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+
+from ..models.agent import AgentRow
+from ..models.kernel import KernelRow
+from ..models.scaling_group import ScalingGroupOpts
+from ..models.session import SessionRow
 
 if TYPE_CHECKING:
     from ai.backend.manager.registry import AgentRegistry

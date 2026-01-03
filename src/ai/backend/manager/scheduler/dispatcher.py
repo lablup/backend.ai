@@ -73,27 +73,24 @@ from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES, START_SESSION_TIMEOUT_SEC, LockID
-from ai.backend.manager.errors.common import (
+from ..errors.common import (
     GenericBadRequest,
     GenericForbidden,
 )
-from ai.backend.manager.errors.kernel import SessionNotFound
-from ai.backend.manager.errors.resource import InstanceNotAvailable
-from ai.backend.manager.exceptions import convert_to_status_data
-from ai.backend.manager.models import (
-    AgentRow,
-    EndpointRow,
-    KernelRow,
-    RouteStatus,
-    ScalingGroupOpts,
-    SessionRow,
-)
-from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
-from ai.backend.manager.models.utils import (
+from ..errors.kernel import SessionNotFound
+from ..errors.resource import InstanceNotAvailable
+from ..exceptions import convert_to_status_data
+from ..models.agent import AgentRow
+from ..models.endpoint import EndpointRow
+from ..models.kernel import KernelRow, USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
+from ..models.routing import RouteStatus
+from ..models.scaling_group import ScalingGroupOpts
+from ..models.session import SessionRow
+from ..models.utils import (
     execute_with_retry,
     retry_txn,
 )
-from ai.backend.manager.registry import AgentRegistry
+from ..registry import AgentRegistry
 from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
 from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.plugin.entrypoint import scan_entrypoints

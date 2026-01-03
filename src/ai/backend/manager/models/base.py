@@ -69,6 +69,28 @@ metadata = sa.MetaData(naming_convention=convention)
 mapper_registry = registry(metadata=metadata)
 Base: Any = mapper_registry.generate_base()  # TODO: remove Any after #422 is merged
 
+# Subpackages to skip when dynamically importing model modules
+_SKIP_SUBPACKAGES: Final[frozenset[str]] = frozenset({"alembic", "hasher", "minilang", "rbac"})
+
+
+def ensure_all_tables_registered() -> None:
+    """
+    Import all model modules to register their tables with the shared metadata.
+
+    Call this function before using `metadata` for operations that require
+    all tables to be registered (e.g., schema creation, fixture population).
+    """
+    import importlib
+    import pkgutil
+
+    import ai.backend.manager.models
+
+    for module_info in pkgutil.iter_modules(ai.backend.manager.models.__path__):
+        if module_info.name in _SKIP_SUBPACKAGES:
+            continue
+        importlib.import_module(f"ai.backend.manager.models.{module_info.name}")
+
+
 pgsql_connect_opts = {
     "server_settings": {
         "jit": "off",
@@ -657,6 +679,7 @@ async def populate_fixture(
     engine: SAEngine,
     fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],
 ) -> None:
+    ensure_all_tables_registered()
     op_mode = FixtureOpModes(cast(str, fixture_data.get("__mode", "insert")))
     for table_name, rows in fixture_data.items():
         if table_name.startswith("__"):

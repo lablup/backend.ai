@@ -38,14 +38,14 @@ from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.json import load_json
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.api import (
+from ..errors.api import (
     DeprecatedAPI,
     InvalidAPIParameters,
     NotImplementedAPI,
 )
-from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.models import UserRole, users
-from ai.backend.manager.utils import (
+from ..errors.common import GenericForbidden
+from ..models.user import UserRole, users
+from ..utils import (
     check_if_requester_is_eligible_to_act_as_target_access_key,
     check_if_requester_is_eligible_to_act_as_target_user_uuid,
 )

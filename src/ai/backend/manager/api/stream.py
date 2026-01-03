@@ -40,18 +40,15 @@ from ai.backend.common.exception import BackendAIError
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.kernel import (
-    InvalidStreamMode,
-    SessionNotFound,
-    TooManySessionsMatched,
-)
-from ai.backend.manager.errors.resource import AppNotFound, NoCurrentTaskContext
-from ai.backend.manager.errors.service import AppServiceStartFailed
-from ai.backend.manager.idle import AppStreamingStatus
-from ai.backend.manager.models import KernelLoadingStrategy, KernelRow, SessionRow
 
+from ..defs import DEFAULT_ROLE
+from ..errors.api import InvalidAPIParameters
+from ..errors.kernel import InvalidStreamMode, SessionNotFound, TooManySessionsMatched
+from ..errors.resource import AppNotFound, NoCurrentTaskContext
+from ..errors.service import AppServiceStartFailed
+from ..idle import AppStreamingStatus
+from ..models.kernel import KernelRow
+from ..models.session import KernelLoadingStrategy, SessionRow
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
