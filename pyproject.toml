@@ -107,6 +107,14 @@ select = [
     # "SIM",  # flake8-simplify: suggests code simplification (~150 violations)
     # "RUF",  # ruff-specific: Ruff's own linting rules (~200 violations)
     # "C4",   # flake8-comprehensions: optimizes list/set/dict comprehensions (~200 violations)
+    # Phase 6: Type annotations and code quality (deferred - requires extensive review)
+    # "A",    # flake8-builtins: prevents shadowing Python builtins
+    # "BLE",  # flake8-blind-except: prevents bare except clauses
+    # "RET",  # flake8-return: enforces consistent return statement usage
+    # "B",    # flake8-bugbear: detects likely bugs and design issues
+    # "ANN",  # flake8-annotations: enforces type annotations
+    # "UP",   # pyupgrade: suggests modern Python syntax
+    # "TID252", # flake8-tidy-imports: enforces relative imports (banned-module-level-imports)
 ]
 ignore = [
     "E203",   # whitespace before ':' - conflicts with Black formatter
