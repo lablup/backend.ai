@@ -33,7 +33,7 @@ from ..base import (
 )
 
 if TYPE_CHECKING:
-    from .routing import RoutingRow
+    from ..routing import RoutingRow
 
 __all__ = ("DeploymentRevisionRow",)
 

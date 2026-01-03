@@ -64,7 +64,8 @@ from ai.backend.common.types import QuotaScopeID, SessionId
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.models.session import SessionRow
 
-from ...models.container_registry.row import (
+from ...models.rbac import ContainerRegistryScope
+from .container_registry import (
     ContainerRegistry,
     CreateContainerRegistry,
     DeleteContainerRegistry,
@@ -77,7 +78,6 @@ from .gql_relay import (
     GlobalIDField,
     ResolvedGlobalID,
 )
-from .rbac import ContainerRegistryScope
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
@@ -89,6 +89,7 @@ if TYPE_CHECKING:
         SlotTypes,
     )
 
+    from ...models.storage import StorageSessionManager
     from ..api.manager import ManagerStatus
     from ..idle import IdleCheckerHost
     from ..models.utils import ExtendedAsyncSAEngine
@@ -96,33 +97,32 @@ if TYPE_CHECKING:
     from ..repositories.agent.repository import AgentRepository
     from ..repositories.scheduler.repository import SchedulerRepository
     from ..repositories.user.repository import UserRepository
-    from .storage import StorageSessionManager
 
+from ...data.image.types import ImageStatus
+from ...errors.api import InvalidAPIParameters
+from ...errors.auth import InsufficientPrivilege
+from ...errors.common import ObjectNotFound
+from ...errors.image import ImageNotFound
+from ...errors.kernel import TooManyKernelsFound
 from ...models.image.row import (
     ImageLoadFilter,
     PublicImageLoadFilter,
 )
+from ...models.rbac import ProjectScope, ScopeType, SystemScope
+from ...models.rbac.permission_defs import (
+    AgentPermission,
+    ComputeSessionPermission,
+    DomainPermission,
+    ImagePermission,
+    ProjectPermission,
+)
+from ...models.rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from ...models.scaling_group.row import (
     ScalingGroupRow,
     and_names,
     query_allowed_sgroups,
 )
-from ...models.vfolder.row import (
-    QuotaScope,
-    SetQuotaScope,
-    UnsetQuotaScope,
-    VirtualFolder,
-    VirtualFolderList,
-    VirtualFolderPermission,
-    VirtualFolderPermissionList,
-    ensure_quota_scope_accessible_by_user,
-)
-from ..data.image.types import ImageStatus
-from ..errors.api import InvalidAPIParameters
-from ..errors.auth import InsufficientPrivilege
-from ..errors.common import ObjectNotFound
-from ..errors.image import ImageNotFound
-from ..errors.kernel import TooManyKernelsFound
+from ...models.vfolder import ensure_quota_scope_accessible_by_user
 from .acl import PredefinedAtomicPermission
 from .agent import (
     Agent,
@@ -207,15 +207,6 @@ from .metric.base import ContainerUtilizationMetricMetadata
 from .metric.user import UserUtilizationMetric, UserUtilizationMetricQueryInput
 from .network import CreateNetwork, DeleteNetwork, ModifyNetwork, NetworkConnection, NetworkNode
 from .pending_queue import SessionPendingQueueConnection
-from .rbac import ProjectScope, ScopeType, SystemScope
-from .rbac.permission_defs import (
-    AgentPermission,
-    ComputeSessionPermission,
-    DomainPermission,
-    ImagePermission,
-    ProjectPermission,
-)
-from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from .resource_policy import (
     CreateKeyPairResourcePolicy,
     CreateProjectResourcePolicy,
@@ -284,9 +275,16 @@ from .user import (
 from .vfolder import (
     ModelCard,
     ModelCardConnection,
+    QuotaScope,
+    SetQuotaScope,
+    UnsetQuotaScope,
     VFolderPermissionValueField,
+    VirtualFolder,
     VirtualFolderConnection,
+    VirtualFolderList,
     VirtualFolderNode,
+    VirtualFolderPermission,
+    VirtualFolderPermissionList,
 )
 from .viewer import Viewer
 

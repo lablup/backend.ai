@@ -20,7 +20,7 @@ __all__ = ("StorageNamespaceRow",)
 
 
 def _get_storage_namespace_join_cond():
-    from .object_storage import ObjectStorageRow
+    from ..object_storage import ObjectStorageRow
 
     return foreign(StorageNamespaceRow.storage_id) == ObjectStorageRow.id
 

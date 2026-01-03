@@ -514,8 +514,8 @@ class EndpointRow(Base):
         target_user_uuid: UUID,
         target_access_key: AccessKey,
     ) -> None:
-        from .routing import RoutingRow
-        from .session import KernelLoadingStrategy, SessionRow
+        from ..routing import RoutingRow
+        from ..session import KernelLoadingStrategy, SessionRow
 
         endpoint_rows = await EndpointRow.list(
             db_session,
@@ -541,8 +541,8 @@ class EndpointRow(Base):
     async def generate_route_info(
         self, db_sess: AsyncSession
     ) -> ModelServiceSerializableConnectionInfo:
-        from .kernel import KernelRow
-        from .routing import RoutingRow
+        from ..kernel import KernelRow
+        from ..routing import RoutingRow
 
         active_routes = await RoutingRow.list(db_sess, self.id, load_session=True)
         running_main_kernels = await KernelRow.batch_load_main_kernels_by_session_id(

@@ -111,7 +111,7 @@ class KeyPair(graphene.ObjectType):
 
     ssh_public_key = graphene.String()
 
-    vfolders = graphene.List("ai.backend.manager.models.VirtualFolder")
+    vfolders = graphene.List("ai.backend.manager.api.gql_legacy.vfolder.VirtualFolder")
     compute_sessions = graphene.List(
         ComputeSession,
         status=graphene.String(),

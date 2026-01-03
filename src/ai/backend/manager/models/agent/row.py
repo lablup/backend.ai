@@ -389,7 +389,7 @@ class AgentPermissionContextBuilder(
         self,
         ctx: ClientContext,
     ) -> AgentPermissionContext:
-        from .domain import DomainRow
+        from ..domain import DomainRow
 
         perm_ctx = AgentPermissionContext()
         _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
@@ -404,7 +404,7 @@ class AgentPermissionContextBuilder(
         ctx: ClientContext,
         scope: DomainScope,
     ) -> AgentPermissionContext:
-        from .scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
+        from ..scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
 
         permissions = await self.calculate_permission(ctx, scope)
         aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
@@ -430,7 +430,7 @@ class AgentPermissionContextBuilder(
         ctx: ClientContext,
         scope: ProjectScope,
     ) -> AgentPermissionContext:
-        from .scaling_group import ScalingGroupForProjectRow, ScalingGroupRow
+        from ..scaling_group import ScalingGroupForProjectRow, ScalingGroupRow
 
         permissions = await self.calculate_permission(ctx, scope)
         aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
@@ -456,7 +456,7 @@ class AgentPermissionContextBuilder(
         ctx: ClientContext,
         scope: UserScope,
     ) -> AgentPermissionContext:
-        from .scaling_group import ScalingGroupForKeypairsRow, ScalingGroupRow
+        from ..scaling_group import ScalingGroupForKeypairsRow, ScalingGroupRow
 
         permissions = await self.calculate_permission(ctx, scope)
         aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
@@ -526,7 +526,7 @@ async def get_permission_ctx(
     target_scope: ScopeType,
     requested_permission: AgentPermission,
 ) -> AgentPermissionContext:
-    from .scaling_group import ScalingGroupPermissionContextBuilder
+    from ..scaling_group import ScalingGroupPermissionContextBuilder
 
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         sgroup_perm_ctx = await ScalingGroupPermissionContextBuilder(db_session).build(

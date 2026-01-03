@@ -24,7 +24,7 @@ def _get_object_storage_association_artifact_join_cond():
 
 
 def _get_object_storage_namespace_join_cond():
-    from .storage_namespace import StorageNamespaceRow
+    from ..storage_namespace import StorageNamespaceRow
 
     return foreign(StorageNamespaceRow.storage_id) == ObjectStorageRow.id
 

@@ -46,6 +46,7 @@ from .base import (
     OrderExprArg,
     PaginatedConnectionField,
     generate_sql_info_for_gql_connection,
+    set_if_set,
 )
 from .fields import ScopeField
 from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
@@ -66,6 +67,14 @@ __all__: Sequence[str] = (
     "CreateContainerRegistryNode",
     "ModifyContainerRegistryNode",
     "DeleteContainerRegistryNode",
+    # Legacy GraphQL classes (deprecated since 24.09.0)
+    "CreateContainerRegistryInput",
+    "ModifyContainerRegistryInput",
+    "ContainerRegistryConfig",
+    "ContainerRegistry",
+    "CreateContainerRegistry",
+    "ModifyContainerRegistry",
+    "DeleteContainerRegistry",
 )
 
 
@@ -605,3 +614,224 @@ class DeleteContainerRegistryQuota(graphene.Mutation):
             return cls(ok=True, msg="success")
         except Exception as e:
             return cls(ok=False, msg=str(e))
+
+
+# ================================================================================
+# Legacy GraphQL classes (deprecated since 24.09.0)
+# Moved from models/container_registry/row.py
+# ================================================================================
+
+
+class CreateContainerRegistryInput(graphene.InputObjectType):
+    """
+    Deprecated since 24.09.0.
+    """
+
+    url = graphene.String(required=True)
+    type = graphene.String(required=True)
+    project = graphene.List(graphene.String)
+    username = graphene.String()
+    password = graphene.String()
+    ssl_verify = graphene.Boolean()
+    is_global = graphene.Boolean(description="Added in 24.09.0.")
+
+
+class ModifyContainerRegistryInput(graphene.InputObjectType):
+    """
+    Deprecated since 24.09.0.
+    """
+
+    url = graphene.String()
+    type = graphene.String()
+    project = graphene.List(graphene.String)
+    username = graphene.String()
+    password = graphene.String()
+    ssl_verify = graphene.Boolean()
+    is_global = graphene.Boolean(description="Added in 24.09.0.")
+
+
+class ContainerRegistryConfig(graphene.ObjectType):
+    """
+    Deprecated since 24.09.0.
+    """
+
+    url = graphene.String(required=True)
+    type = graphene.String(required=True)
+    project = graphene.List(graphene.String)
+    username = graphene.String()
+    password = graphene.String()
+    ssl_verify = graphene.Boolean()
+    is_global = graphene.Boolean(description="Added in 24.09.0.")
+
+
+class ContainerRegistry(graphene.ObjectType):
+    """
+    Deprecated since 24.09.0. use `ContainerRegistryNode` instead
+    """
+
+    hostname = graphene.String()
+    config = graphene.Field(ContainerRegistryConfig)
+
+    class Meta:
+        interfaces = (AsyncNode,)
+
+    @classmethod
+    def from_row(cls, ctx: GraphQueryContext, row: ContainerRegistryRow) -> ContainerRegistry:
+        return cls(
+            id=row.id,  # auto-converted to Relay global ID
+            hostname=row.registry_name,
+            config=ContainerRegistryConfig(
+                url=row.url,
+                type=str(row.type),
+                project=[row.project],
+                username=row.username,
+                password=PASSWORD_PLACEHOLDER if row.password is not None else None,
+                ssl_verify=row.ssl_verify,
+                is_global=row.is_global,
+            ),
+        )
+
+    @classmethod
+    async def load_by_hostname(cls, ctx: GraphQueryContext, hostname: str) -> ContainerRegistry:
+        async with ctx.db.begin_readonly_session() as session:
+            return cls.from_row(
+                ctx,
+                (
+                    await ContainerRegistryRow.list_by_registry_name(
+                        session,
+                        hostname,
+                    )
+                )[0],
+            )
+
+    @classmethod
+    async def load_all(
+        cls,
+        ctx: GraphQueryContext,
+    ) -> Sequence[ContainerRegistry]:
+        async with ctx.db.begin_readonly_session() as session:
+            rows = await session.scalars(sa.select(ContainerRegistryRow))
+            return [cls.from_row(ctx, row) for row in rows]
+
+
+class CreateContainerRegistry(graphene.Mutation):
+    """
+    Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead
+    """
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+    container_registry = graphene.Field(ContainerRegistry)
+
+    class Arguments:
+        hostname = graphene.String(required=True)
+        props = CreateContainerRegistryInput(required=True)
+
+    @classmethod
+    async def mutate(
+        cls, root, info: graphene.ResolveInfo, hostname: str, props: CreateContainerRegistryInput
+    ) -> CreateContainerRegistry:
+        ctx: GraphQueryContext = info.context
+
+        input_config: dict[str, Any] = {
+            "registry_name": hostname,
+            "url": props.url,
+            "type": ContainerRegistryType(props.type),
+        }
+
+        if props.project:
+            input_config["project"] = props.project[0]
+
+        set_if_set(props, input_config, "username")
+        set_if_set(props, input_config, "password")
+        set_if_set(props, input_config, "ssl_verify")
+        set_if_set(props, input_config, "is_global")
+
+        async with ctx.db.begin_session() as db_session:
+            reg_row = ContainerRegistryRow(id=uuid.uuid4(), **input_config)
+            db_session.add(reg_row)
+            await db_session.flush()
+            await db_session.refresh(reg_row)
+
+            return cls(
+                container_registry=ContainerRegistry.from_row(ctx, reg_row),
+            )
+
+
+class ModifyContainerRegistry(graphene.Mutation):
+    """
+    Deprecated since 24.09.0. use `ModifyContainerRegistryNode` instead
+    """
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+    container_registry = graphene.Field(ContainerRegistry)
+
+    class Arguments:
+        hostname = graphene.String(required=True)
+        props = ModifyContainerRegistryInput(required=True)
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        hostname: str,
+        props: ModifyContainerRegistryInput,
+    ) -> ModifyContainerRegistry:
+        ctx: GraphQueryContext = info.context
+
+        input_config: dict[str, Any] = {
+            "registry_name": hostname,
+        }
+
+        if props.project:
+            input_config["project"] = props.project[0]
+
+        if props.type:
+            input_config["type"] = ContainerRegistryType(props.type)
+
+        set_if_set(props, input_config, "url")
+        set_if_set(props, input_config, "is_global")
+        set_if_set(props, input_config, "username")
+        set_if_set(props, input_config, "password")
+        set_if_set(props, input_config, "ssl_verify")
+
+        async with ctx.db.begin_session() as session:
+            stmt = sa.select(ContainerRegistryRow).where(
+                ContainerRegistryRow.registry_name == hostname
+            )
+            reg_row = await session.scalar(stmt)
+            if reg_row is None:
+                raise ValueError(f"ContainerRegistry not found (hostname: {hostname})")
+
+            for field, val in input_config.items():
+                setattr(reg_row, field, val)
+
+            return cls(container_registry=ContainerRegistry.from_row(ctx, reg_row))
+
+
+class DeleteContainerRegistry(graphene.Mutation):
+    """
+    Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead
+    """
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+    container_registry = graphene.Field(ContainerRegistry)
+
+    class Arguments:
+        hostname = graphene.String(required=True)
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        hostname: str,
+    ) -> DeleteContainerRegistry:
+        ctx: GraphQueryContext = info.context
+        container_registry = await ContainerRegistry.load_by_hostname(ctx, hostname)
+        async with ctx.db.begin_session() as session:
+            stmt = sa.delete(ContainerRegistryRow).where(
+                ContainerRegistryRow.registry_name == hostname
+            )
+            await session.execute(stmt)
+        return cls(container_registry=container_registry)

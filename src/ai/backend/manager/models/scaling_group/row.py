@@ -584,7 +584,7 @@ class ScalingGroupPermissionContextBuilder(
         self,
         ctx: ClientContext,
     ) -> ScalingGroupPermissionContext:
-        from .domain import DomainRow
+        from ..domain import DomainRow
 
         perm_ctx = ScalingGroupPermissionContext()
         _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
@@ -599,7 +599,7 @@ class ScalingGroupPermissionContextBuilder(
         ctx: ClientContext,
         scope: DomainScope,
     ) -> ScalingGroupPermissionContext:
-        from .domain import DomainRow
+        from ..domain import DomainRow
 
         permissions = await self.calculate_permission(ctx, scope)
         if not permissions:
@@ -628,7 +628,7 @@ class ScalingGroupPermissionContextBuilder(
         ctx: ClientContext,
         scope: ProjectScope,
     ) -> ScalingGroupPermissionContext:
-        from .group import GroupRow
+        from ..group import GroupRow
 
         project_permissions = await self.calculate_permission(ctx, scope)
         if not project_permissions:
@@ -657,8 +657,8 @@ class ScalingGroupPermissionContextBuilder(
         ctx: ClientContext,
         scope: UserScope,
     ) -> ScalingGroupPermissionContext:
-        from .keypair import KeyPairRow
-        from .user import UserRow
+        from ..keypair import KeyPairRow
+        from ..user import UserRow
 
         user_permissions = await self.calculate_permission(ctx, scope)
         if not user_permissions:

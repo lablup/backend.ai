@@ -1992,7 +1992,7 @@ class ComputeSessionPermissionContextBuilder(
         self,
         ctx: ClientContext,
     ) -> ComputeSessionPermissionContext:
-        from .domain import DomainRow
+        from ..domain import DomainRow
 
         perm_ctx = ComputeSessionPermissionContext()
         _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))

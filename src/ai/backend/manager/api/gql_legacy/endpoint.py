@@ -31,6 +31,7 @@ from ai.backend.common.types import (
     RuleId,
     RuntimeVariant,
 )
+from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.data.model_serving.creator import EndpointAutoScalingRuleCreator
 from ai.backend.manager.data.model_serving.modifier import (
     ExtraMount,
@@ -43,7 +44,6 @@ from ai.backend.manager.data.model_serving.types import (
 )
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES
 from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.routing import RouteStatus, Routing
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_serving.updaters import (
@@ -90,6 +90,7 @@ from .base import (
 )
 from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from .image import ImageNode
+from .routing import Routing
 from .vfolder import VirtualFolderNode
 
 if TYPE_CHECKING:

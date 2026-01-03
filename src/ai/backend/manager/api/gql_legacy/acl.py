@@ -1,23 +1,19 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, List, Sequence
+from typing import TYPE_CHECKING, Any
 
 import graphene
 
 from ai.backend.common.types import VFolderHostPermission
 
 if TYPE_CHECKING:
-    from .gql import GraphQueryContext
+    from .schema import GraphQueryContext
+
+__all__ = ("PredefinedAtomicPermission",)
 
 
-__all__: Sequence[str] = (
-    "PredefinedAtomicPermission",
-    "get_all_permissions",
-)
-
-
-def get_all_vfolder_host_permissions() -> List[str]:
+def get_all_vfolder_host_permissions() -> list[str]:
     return [perm.value for perm in VFolderHostPermission]
 
 
@@ -30,7 +26,7 @@ def get_all_permissions() -> Mapping[str, Any]:
 class PredefinedAtomicPermission(graphene.ObjectType):
     vfolder_host_permission_list = graphene.List(lambda: graphene.String)
 
-    async def resolve_vfolder_host_permission_list(self, info: graphene.ResolveInfo) -> List[str]:
+    async def resolve_vfolder_host_permission_list(self, info: graphene.ResolveInfo) -> list[str]:
         return get_all_vfolder_host_permissions()
 
     @classmethod

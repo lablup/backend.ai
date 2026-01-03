@@ -1262,8 +1262,8 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scope: DomainScope,
     ) -> ImagePermissionContext:
-        from .container_registry import ContainerRegistryRow
-        from .domain import DomainRow
+        from ..container_registry import ContainerRegistryRow
+        from ..domain import DomainRow
 
         permissions = await self.calculate_permission(ctx, scope)
         image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
@@ -1342,7 +1342,7 @@ class ImagePermissionContextBuilder(
         registry_condition_factory: Callable[[list[Any]], Any],
         filter_global_registry: bool = False,
     ) -> ImagePermissionContext:
-        from .container_registry import ContainerRegistryRow
+        from ..container_registry import ContainerRegistryRow
 
         project_ids = [scope.project_id for scope in scopes]
         project_id_to_permission_map: dict[str, frozenset[ImagePermission]] = {}
@@ -1401,7 +1401,7 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scopes: list[ProjectScope],
     ) -> ImagePermissionContext:
-        from .container_registry import ContainerRegistryRow
+        from ..container_registry import ContainerRegistryRow
 
         def global_registry_condition(project_ids: list[Any]):
             return ContainerRegistryRow.is_global == true()
@@ -1415,8 +1415,10 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scopes: list[ProjectScope],
     ) -> ImagePermissionContext:
-        from .association_container_registries_groups import AssociationContainerRegistriesGroupsRow
-        from .container_registry import ContainerRegistryRow
+        from ..association_container_registries_groups import (
+            AssociationContainerRegistriesGroupsRow,
+        )
+        from ..container_registry import ContainerRegistryRow
 
         def non_global_registry_condition(project_ids: list[Any]):
             return ContainerRegistryRow.association_container_registries_groups_rows.any(

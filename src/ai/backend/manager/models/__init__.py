@@ -1,4 +1,3 @@
-from . import acl as _acl
 from . import agent as _agent
 from . import app_config as _app_config
 from . import artifact as _artifact
@@ -45,7 +44,6 @@ from .base import metadata
 
 __all__ = (
     "metadata",
-    *_acl.__all__,
     *_app_config.__all__,
     *_artifact_registries.__all__,
     *_auditlog.__all__,
@@ -90,7 +88,6 @@ __all__ = (
     *_reservoir_registry.__all__,
 )
 
-from .acl import *  # noqa
 from .app_config import *  # noqa
 from .artifact_registries import *  # noqa
 from .audit_log import *  # noqa

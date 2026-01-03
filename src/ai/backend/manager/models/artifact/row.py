@@ -27,7 +27,7 @@ __all__ = ("ArtifactRow",)
 
 
 def _get_artifact_revision_join_cond():
-    from .artifact_revision import ArtifactRevisionRow
+    from ..artifact_revision import ArtifactRevisionRow
 
     return foreign(ArtifactRevisionRow.artifact_id) == ArtifactRow.id
 
