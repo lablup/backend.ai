@@ -517,12 +517,12 @@ jobs:
         python ./scripts/extract-release-changelog.py
         python ./scripts/determine-release-type.py
     - name: Download wheels
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
       with:
         name: wheels
         path: dist
     - name: Download scies
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
       with:
         pattern: scies-*
         path: dist
@@ -533,7 +533,7 @@ jobs:
         sort -u -k2 dist/checksum.txt -o dist/checksum.txt
     - name: Download SBOM report
       continue-on-error: true
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
       with:
         name: SBOM report
         path: dist
@@ -670,7 +670,7 @@ jobs:
       with:
         activate-conda: false
     - name: Download wheels
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
       with:
         name: wheels
         path: dist
