@@ -278,7 +278,7 @@ class Request:
             try:
                 cookie_jar = cast(aiohttp.CookieJar, self.session.aiohttp_session.cookie_jar)
                 cookie_jar.load(local_state_path / "cookie.dat")
-            except (IOError, PermissionError):
+            except (OSError, PermissionError):
                 pass
         else:
             raise ValueError("unsupported endpoint type")
@@ -301,8 +301,8 @@ class Request:
         query_path = self.path.lstrip("/") if self.path is not None and len(self.path) > 0 else ""
         if self.config.endpoint_type == "session":
             if not query_path.startswith("server"):
-                query_path = "func/{0}".format(query_path)
-        path = "{0}/{1}".format(base_url, query_path)
+                query_path = f"func/{query_path}"
+        path = f"{base_url}/{query_path}"
         url = self.config.endpoint.with_path(path)
         if self.params:
             url = url.with_query(self.params)
@@ -327,9 +327,7 @@ class Request:
             async with rqst.fetch() as resp:
               print(await resp.text())
         """
-        assert self.method in self._allowed_methods, "Disallowed HTTP method: {}".format(
-            self.method
-        )
+        assert self.method in self._allowed_methods, f"Disallowed HTTP method: {self.method}"
         self.date = datetime.now(tzutc())
         assert self.date is not None
         self.headers["Date"] = self.date.isoformat()
@@ -624,14 +622,14 @@ class FetchContextManager:
                     msg = (
                         "Request to the API endpoint has failed.\n"
                         "Check your network connection and/or the server status.\n"
-                        "\u279c {!r}".format(e)
+                        f"\u279c {e!r}"
                     )
                     raise BackendClientError(msg) from e
                 else:
                     self.session.config.rotate_endpoints()
                     continue
             except aiohttp.ClientResponseError as e:
-                msg = "API endpoint response error.\n\u279c {!r}".format(e)
+                msg = f"API endpoint response error.\n\u279c {e!r}"
                 if raw_resp is not None:
                     await raw_resp.__aexit__(*sys.exc_info())
                 raise BackendClientError(msg) from e
@@ -766,14 +764,14 @@ class WebSocketContextManager:
                     msg = (
                         "Request to the API endpoint has failed.\n"
                         "Check your network connection and/or the server status.\n"
-                        "Error detail: {!r}".format(e)
+                        f"Error detail: {e!r}"
                     )
                     raise BackendClientError(msg) from e
                 else:
                     self.session.config.rotate_endpoints()
                     continue
             except aiohttp.ClientResponseError as e:
-                msg = "API endpoint response error.\n\u279c {!r}".format(e)
+                msg = f"API endpoint response error.\n\u279c {e!r}"
                 raise BackendClientError(msg) from e
             else:
                 break
@@ -928,14 +926,14 @@ class SSEContextManager:
                     msg = (
                         "Request to the API endpoint has failed.\n"
                         "Check your network connection and/or the server status.\n"
-                        "\u279c {!r}".format(e)
+                        f"\u279c {e!r}"
                     )
                     raise BackendClientError(msg) from e
                 else:
                     self.session.config.rotate_endpoints()
                     continue
             except aiohttp.ClientResponseError as e:
-                msg = "API endpoint response error.\n\u279c {!r}".format(e)
+                msg = f"API endpoint response error.\n\u279c {e!r}"
                 raise BackendClientError(msg) from e
             finally:
                 self.session.config.load_balance_endpoints()

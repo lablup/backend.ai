@@ -2314,7 +2314,7 @@ async def get_fstab_contents(request: web.Request, params: Any) -> web.Response:
                         )
         except asyncio.CancelledError:
             raise
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log.error(
                 "VFOLDER.GET_FSTAB_CONTENTS(u:{}): timeout from watcher (agent:{})",
                 access_key,
@@ -2409,7 +2409,7 @@ async def list_mounts(request: web.Request) -> web.Response:
                     return (agent_id, data)
             except asyncio.CancelledError:
                 raise
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 log.error(
                     "VFOLDER.LIST_MOUNTS(u:{}): timeout from watcher (agent:{})",
                     access_key,
@@ -2525,7 +2525,7 @@ async def mount_host(request: web.Request, params: Any) -> web.Response:
                     return (agent_id, data)
             except asyncio.CancelledError:
                 raise
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 log.error(
                     log_fmt + ": timeout from watcher (ag:{})",
                     *log_args,
@@ -2653,7 +2653,7 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
                     return (agent_id, data)
             except asyncio.CancelledError:
                 raise
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 log.error(
                     log_fmt + ": timeout from watcher (agent:{})",
                     *log_args,

@@ -162,7 +162,7 @@ def read_sysfs(path: Union[str, Path], type_: Type[Any], default: Optional[Any] 
             return t.ToBool().check(raw_str)
         else:
             return type_(raw_str)
-    except IOError:
+    except OSError:
         return default
 
 
@@ -377,7 +377,7 @@ async def container_pid_to_host_pid(container_id: str, container_pid: ContainerP
             if nspids[1] == str(container_pid):
                 return HostPID(PID(pid))
         return NotHostPID
-    except (ValueError, KeyError, IOError):
+    except (OSError, ValueError, KeyError):
         return NotHostPID
 
 

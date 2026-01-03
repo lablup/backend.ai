@@ -184,7 +184,7 @@ class Context(metaclass=ABCMeta):
             p.terminate()
             try:
                 exit_code = await p.wait()
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 p.kill()
                 exit_code = await p.wait()
         return exit_code
@@ -1281,7 +1281,7 @@ class PackageContext(Context):
         self.log.write(f"Verifying {dst_path} ...")
         csum_path = self.dist_info.target_path / "checksum.txt"
 
-        with open(csum_path, "r") as f:
+        with open(csum_path) as f:
             lines = f.readlines()
             for line in lines:
                 if pkg_name in line:

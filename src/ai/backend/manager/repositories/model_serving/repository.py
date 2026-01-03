@@ -397,7 +397,7 @@ class ModelServingRepository:
             query = (
                 sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
                 .select_from(scaling_groups)
-                .where((scaling_groups.c.name == scaling_group_name))
+                .where(scaling_groups.c.name == scaling_group_name)
             )
             result = await session.execute(query)
             row = result.first()
@@ -968,7 +968,7 @@ class ModelServingRepository:
         except StatementError as e:
             orig_exc = e.orig
             return MutationResult(success=False, message=str(orig_exc), data=None)
-        except (asyncio.CancelledError, asyncio.TimeoutError):
+        except (TimeoutError, asyncio.CancelledError):
             raise
         except Exception:
             raise

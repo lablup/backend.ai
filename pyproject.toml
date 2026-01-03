@@ -110,13 +110,13 @@ select = [
     "C4",     # flake8-comprehensions: optimizes list/set/dict comprehensions
     # Phase 6: Bug detection and code quality
     "B",      # flake8-bugbear: detects likely bugs and design issues
-    # Phase 7: Type annotations and modern syntax (deferred - requires extensive review)
-    # "A",    # flake8-builtins: prevents shadowing Python builtins
-    # "BLE",  # flake8-blind-except: prevents bare except clauses
-    # "RET",  # flake8-return: enforces consistent return statement usage
-    # "ANN",  # flake8-annotations: enforces type annotations
-    # "UP",   # pyupgrade: suggests modern Python syntax
-    # "TID252", # flake8-tidy-imports: enforces relative imports (banned-module-level-imports)
+    # Phase 7: Type annotations and modern syntax
+    "UP",     # pyupgrade: modernizes Python syntax to latest version
+    # "A",    # flake8-builtins: prevents shadowing Python builtins (deferred)
+    # "BLE",  # flake8-blind-except: prevents bare except clauses (deferred)
+    # "RET",  # flake8-return: enforces consistent return statement usage (deferred)
+    # "ANN",  # flake8-annotations: enforces type annotations (deferred)
+    # "TID252", # flake8-tidy-imports: enforces relative imports (deferred)
 ]
 ignore = [
     "E203",   # whitespace before ':' - conflicts with Black formatter
@@ -172,6 +172,17 @@ ignore = [
     "B904",  # raise-without-from-inside-except - extensive legacy codebase, defer for gradual migration
     "B905",  # zip-without-explicit-strict - Python 3.10+ feature, defer for gradual adoption
     "B911",  # batched-without-explicit-strict - Python 3.13+ feature
+    # UP (pyupgrade) - defer large-scale changes for gradual adoption
+    "UP006",  # non-pep585-annotation - typing.List -> list (633 violations, defer)
+    "UP007",  # non-pep604-annotation-union - Union[X, Y] -> X | Y (107 violations, defer)
+    "UP030",  # format-literals - implicit positional references in format (42 violations, defer)
+    "UP031",  # printf-string-formatting - percent format to f-string (11 violations, defer)
+    "UP035",  # deprecated-import - defer for gradual migration (759 violations)
+    "UP040",  # non-pep695-type-alias - TypeAlias -> type statement (77 violations, Python 3.12+ syntax)
+    "UP043",  # unnecessary-default-type-args - defer for review (256 violations)
+    "UP045",  # non-pep604-annotation-optional - Optional[X] -> X | None (5392 violations, defer)
+    "UP046",  # non-pep695-generic-class - Python 3.12+ generic syntax (93 violations, defer)
+    "UP047",  # non-pep695-generic-function - Python 3.12+ type parameter syntax (24 violations, defer)
 ]
 
 [tool.ruff.lint.isort]
@@ -184,6 +195,7 @@ split-on-trailing-comma = true
 "src/ai/backend/manager/config.py" = ["E402"]
 "src/ai/backend/manager/models/alembic/env.py" = ["E402"]
 "src/ai/backend/logging/otel.py" = ["LOG015"]  # root logger usage is intentional for OTEL initialization
+"src/ai/backend/kernel/python/sitecustomize.py" = ["UP036"]  # Python 2 compatibility is intentional for kernel environments
 
 [tool.ruff.format]
 preview = true  # enable the black's preview style

@@ -250,7 +250,7 @@ class VFolderByName(BaseFunction):
     @api_function
     async def info(self):
         await self.update_id_by_name()
-        rqst = Request("GET", "/folders/{0}".format(self.request_key))
+        rqst = Request("GET", f"/folders/{self.request_key}")
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -304,14 +304,14 @@ class VFolderByName(BaseFunction):
     @api_function
     async def force_delete(self) -> dict[str, Any]:
         await self.update_id_by_name()
-        rqst = Request("DELETE", "/folders/{0}/force".format(self.request_key))
+        rqst = Request("DELETE", f"/folders/{self.request_key}/force")
         async with rqst.fetch():
             return {}
 
     @api_function
     async def rename(self, new_name):
         await self.update_id_by_name()
-        rqst = Request("POST", "/folders/{0}/rename".format(self.request_key))
+        rqst = Request("POST", f"/folders/{self.request_key}/rename")
         rqst.set_json({
             "new_name": new_name,
         })
@@ -405,7 +405,7 @@ class VFolderByName(BaseFunction):
                                                             chunk = await raw_resp.content.read(
                                                                 chunk_size
                                                             )
-                                                        except asyncio.TimeoutError:
+                                                        except TimeoutError:
                                                             raise TryAgain
                                             except RetryError:
                                                 raise ResponseFailed
@@ -447,7 +447,7 @@ class VFolderByName(BaseFunction):
             if file_path.exists():
                 raise RuntimeError("The target file already exists", file_path.name)
 
-            rqst = Request("POST", "/folders/{}/request-download".format(self.request_key))
+            rqst = Request("POST", f"/folders/{self.request_key}/request-download")
             rqst.set_json({
                 "path": str(relpath),
             })
@@ -487,9 +487,9 @@ class VFolderByName(BaseFunction):
                     f"Failed to upload {file_path}. Use recursive option to upload directories."
                 )
             file_size = Path(file_path).stat().st_size
-            rqst = Request("POST", "/folders/{}/request-upload".format(self.request_key))
+            rqst = Request("POST", f"/folders/{self.request_key}/request-upload")
             rqst.set_json({
-                "path": "{}".format(str(Path(file_path).relative_to(base_path))),
+                "path": f"{Path(file_path).relative_to(base_path)!s}",
                 "size": int(file_size),
             })
             async with rqst.fetch() as resp:
@@ -574,7 +574,7 @@ class VFolderByName(BaseFunction):
         exist_ok: Optional[bool] = False,
     ) -> ResultSet:
         await self.update_id_by_name()
-        rqst = Request("POST", "/folders/{}/mkdir".format(self.request_key))
+        rqst = Request("POST", f"/folders/{self.request_key}/mkdir")
         rqst.set_json({
             "path": path,
             "parents": parents,
@@ -596,7 +596,7 @@ class VFolderByName(BaseFunction):
     @api_function
     async def rename_file(self, target_path: str, new_name: str):
         await self.update_id_by_name()
-        rqst = Request("POST", "/folders/{}/rename-file".format(self.request_key))
+        rqst = Request("POST", f"/folders/{self.request_key}/rename-file")
         rqst.set_json({
             "target_path": target_path,
             "new_name": new_name,
@@ -607,7 +607,7 @@ class VFolderByName(BaseFunction):
     @api_function
     async def move_file(self, src_path: str, dst_path: str):
         await self.update_id_by_name()
-        rqst = Request("POST", "/folders/{}/move-file".format(self.request_key))
+        rqst = Request("POST", f"/folders/{self.request_key}/move-file")
         rqst.set_json({
             "src": src_path,
             "dst": dst_path,
@@ -618,7 +618,7 @@ class VFolderByName(BaseFunction):
     @api_function
     async def delete_files(self, files: Sequence[Union[str, Path]], recursive: bool = False):
         await self.update_id_by_name()
-        rqst = Request("DELETE", "/folders/{}/delete-files".format(self.request_key))
+        rqst = Request("DELETE", f"/folders/{self.request_key}/delete-files")
         rqst.set_json({
             "files": files,
             "recursive": recursive,
@@ -629,16 +629,14 @@ class VFolderByName(BaseFunction):
     @api_function
     async def list_files(self, path: Union[str, Path] = "."):
         await self.update_id_by_name()
-        rqst = Request(
-            "GET", "/folders/{}/files".format(self.request_key), params={"path": str(path)}
-        )
+        rqst = Request("GET", f"/folders/{self.request_key}/files", params={"path": str(path)})
         async with rqst.fetch() as resp:
             return await resp.json()
 
     @api_function
     async def invite(self, perm: str, emails: Sequence[str]):
         await self.update_id_by_name()
-        rqst = Request("POST", "/folders/{}/invite".format(self.request_key))
+        rqst = Request("POST", f"/folders/{self.request_key}/invite")
         rqst.set_json({
             "perm": perm,
             "user_ids": emails,
@@ -723,7 +721,7 @@ class VFolderByName(BaseFunction):
     @api_function
     async def share(self, perm: str, emails: Sequence[str]):
         await self.update_id_by_name()
-        rqst = Request("POST", "/folders/{}/share".format(self.request_key))
+        rqst = Request("POST", f"/folders/{self.request_key}/share")
         rqst.set_json({
             "permission": perm,
             "emails": emails,
@@ -734,7 +732,7 @@ class VFolderByName(BaseFunction):
     @api_function
     async def unshare(self, emails: Sequence[str]):
         await self.update_id_by_name()
-        rqst = Request("DELETE", "/folders/{}/unshare".format(self.request_key))
+        rqst = Request("DELETE", f"/folders/{self.request_key}/unshare")
         rqst.set_json({
             "emails": emails,
         })
@@ -744,7 +742,7 @@ class VFolderByName(BaseFunction):
     @api_function
     async def leave(self, shared_user_uuid=None):
         await self.update_id_by_name()
-        rqst = Request("POST", "/folders/{}/leave".format(self.request_key))
+        rqst = Request("POST", f"/folders/{self.request_key}/leave")
         rqst.set_json({"shared_user_uuid": shared_user_uuid})
         async with rqst.fetch() as resp:
             return await resp.json()
@@ -758,7 +756,7 @@ class VFolderByName(BaseFunction):
         permission: str = "rw",
     ):
         await self.update_id_by_name()
-        rqst = Request("POST", "/folders/{}/clone".format(self.request_key))
+        rqst = Request("POST", f"/folders/{self.request_key}/clone")
         rqst.set_json({
             "target_name": target_name,
             "target_host": target_host,
@@ -773,7 +771,7 @@ class VFolderByName(BaseFunction):
         self, name: str, permission: Optional[str] = None, cloneable: Optional[bool] = None
     ):
         await self.update_id_by_name()
-        rqst = Request("POST", "/folders/{}/update-options".format(self.request_key))
+        rqst = Request("POST", f"/folders/{self.request_key}/update-options")
         rqst.set_json({
             "cloneable": cloneable,
             "permission": permission,

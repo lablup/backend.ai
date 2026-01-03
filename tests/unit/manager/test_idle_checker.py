@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Optional
 from unittest.mock import AsyncMock
@@ -94,7 +94,7 @@ class TestNewUserGracePeriodChecker:
     @pytest.fixture
     def base_time(self) -> datetime:
         """Reference time for all tests. All other times are calculated as offsets from this."""
-        return datetime.now(timezone.utc).replace(microsecond=0)
+        return datetime.now(UTC).replace(microsecond=0)
 
     @pytest.fixture
     async def valkey_live(self) -> AsyncMock:
@@ -172,7 +172,7 @@ class TestNetworkTimeoutIdleChecker:
     @pytest.fixture
     def base_time(self) -> datetime:
         """Reference time for all tests. All other times are calculated as offsets from this."""
-        return datetime.now(timezone.utc).replace(microsecond=0)
+        return datetime.now(UTC).replace(microsecond=0)
 
     @pytest.fixture
     async def test_valkey_live(self) -> AsyncMock:
@@ -404,7 +404,7 @@ class TestSessionLifetimeChecker:
     @pytest.fixture
     def base_time(self) -> datetime:
         """Reference time: All sessions and users created at this time"""
-        return datetime.now(timezone.utc).replace(microsecond=0)
+        return datetime.now(UTC).replace(microsecond=0)
 
     @pytest.fixture
     async def valkey_live(self) -> AsyncMock:
@@ -678,7 +678,7 @@ class TestUtilizationIdleChecker:
     @pytest.fixture
     def base_time(self) -> datetime:
         """Reference time for all tests. All other times are calculated as offsets from this."""
-        return datetime.now(timezone.utc).replace(microsecond=0)
+        return datetime.now(UTC).replace(microsecond=0)
 
     @pytest.fixture
     async def valkey_live(self) -> AsyncMock:

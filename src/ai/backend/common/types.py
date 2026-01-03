@@ -169,7 +169,7 @@ current_resource_slots: ContextVar[Mapping[SlotName, SlotTypes]] = ContextVar(
 )
 
 
-class aobject(object):
+class aobject:
     """
     An "asynchronous" object which guarantees to invoke both ``def __init__(self, ...)`` and
     ``async def __ainit(self)__`` to ensure asynchronous initialization of the object.
@@ -1047,7 +1047,7 @@ class ResourceSlot(UserDict[str, Decimal]):
     def _humanize_value(cls, value: Decimal, unit: str) -> str:
         if unit == "bytes":
             try:
-                result = "{:s}".format(BinarySize(value))
+                result = f"{BinarySize(value):s}"
             except (OverflowError, ValueError):
                 result = _stringify_number(value)
         else:
@@ -1061,7 +1061,7 @@ class ResourceSlot(UserDict[str, Decimal]):
         return SlotTypes.COUNT
 
     @classmethod
-    def from_policy(cls, policy: Mapping[str, Any], slot_types: Mapping) -> "ResourceSlot":
+    def from_policy(cls, policy: Mapping[str, Any], slot_types: Mapping) -> ResourceSlot:
         try:
             data = {
                 k: cls._normalize_value(k, v, slot_types[k])
@@ -1084,7 +1084,7 @@ class ResourceSlot(UserDict[str, Decimal]):
         cls,
         obj: Mapping[str, Any],
         slot_types: Optional[Mapping[SlotName, SlotTypes]],
-    ) -> "ResourceSlot":
+    ) -> ResourceSlot:
         pruned_obj = {k: v for k, v in obj.items() if v != 0}
 
         try:
@@ -1122,7 +1122,7 @@ class ResourceSlot(UserDict[str, Decimal]):
             raise ValueError(f"Unknown slot type: {e.args[0]!r}")
 
     @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> "ResourceSlot":
+    def from_json(cls, obj: Mapping[str, Any]) -> ResourceSlot:
         data = {k: Decimal(v) for k, v in obj.items() if v is not None}
         return cls(data)
 
@@ -1587,11 +1587,11 @@ def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
         elif math.isinf(v) and v < 0:
             result = "-Infinity"
         else:
-            result = "{:f}".format(v)
+            result = f"{v:f}"
     elif isinstance(v, BinarySize):
-        result = "{:d}".format(int(v))
+        result = f"{int(v):d}"
     elif isinstance(v, int):
-        result = "{:d}".format(v)
+        result = f"{v:d}"
     else:
         result = str(v)
     return result

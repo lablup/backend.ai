@@ -71,7 +71,7 @@ async def exec_loop(
                 elif rec[0] == "stderr":
                     print(rec[1], end="", file=stderr)
                 else:
-                    print("----- output record (type: {0}) -----".format(rec[0]), file=stdout)
+                    print(f"----- output record (type: {rec[0]}) -----", file=stdout)
                     print(rec[1], file=stdout)
                     print("----- end of record -----", file=stdout)
             stdout.flush()
@@ -83,19 +83,19 @@ async def exec_loop(
                 print("--- end of generated files ---", file=stdout)
             if result["status"] == "clean-finished":
                 exitCode = result.get("exitCode")
-                msg = "Clean finished. (exit code = {0})".format(exitCode)
+                msg = f"Clean finished. (exit code = {exitCode})"
                 if is_multi:
                     print(msg, file=stderr)
                 vprint_done(msg)
             elif result["status"] == "build-finished":
                 exitCode = result.get("exitCode")
-                msg = "Build finished. (exit code = {0})".format(exitCode)
+                msg = f"Build finished. (exit code = {exitCode})"
                 if is_multi:
                     print(msg, file=stderr)
                 vprint_done(msg)
             elif result["status"] == "finished":
                 exitCode = result.get("exitCode")
-                msg = "Execution finished. (exit code = {0})".format(exitCode)
+                msg = f"Execution finished. (exit code = {exitCode})"
                 if is_multi:
                     print(msg, file=stderr)
                 vprint_done(msg)
@@ -128,7 +128,7 @@ def exec_loop_sync(
             elif rec[0] == "stderr":
                 print(rec[1], end="", file=stderr)
             else:
-                print("----- output record (type: {0}) -----".format(rec[0]), file=stdout)
+                print(f"----- output record (type: {rec[0]}) -----", file=stdout)
                 print(rec[1], file=stdout)
                 print("----- end of record -----", file=stdout)
         stdout.flush()
@@ -140,17 +140,17 @@ def exec_loop_sync(
             print("--- end of generated files ---", file=stdout)
         if result["status"] == "clean-finished":
             exitCode = result.get("exitCode")
-            vprint_done("Clean finished. (exit code = {0}".format(exitCode), file=stdout)
+            vprint_done(f"Clean finished. (exit code = {exitCode}", file=stdout)
             mode = "continue"
             code = ""
         elif result["status"] == "build-finished":
             exitCode = result.get("exitCode")
-            vprint_done("Build finished. (exit code = {0})".format(exitCode), file=stdout)
+            vprint_done(f"Build finished. (exit code = {exitCode})", file=stdout)
             mode = "continue"
             code = ""
         elif result["status"] == "finished":
             exitCode = result.get("exitCode")
-            vprint_done("Execution finished. (exit code = {0})".format(exitCode), file=stdout)
+            vprint_done(f"Execution finished. (exit code = {exitCode})", file=stdout)
             break
         elif result["status"] == "waiting-input":
             mode = "input"
@@ -185,9 +185,9 @@ def format_stats(stats):
                 val = naturalsize(val, binary=True)
             elif key == "cpu_used":
                 key += "_msec"
-                val = "{0:,}".format(int(val))
+                val = f"{int(val):,}"
             else:
-                val = "{0:,}".format(int(val))
+                val = f"{int(val):,}"
             formatted.append((key, val))
     elif version == 2:
         max_integer_len = 0
@@ -199,7 +199,7 @@ def format_stats(stats):
                     val = metric.get("stats.max", metric["current"])
                     val = naturalsize(val, binary=True)
                     val, unit = val.rsplit(" ", maxsplit=1)
-                    val = "{:,}".format(Decimal(val))
+                    val = f"{Decimal(val):,}"
                 case "msec" | "usec" | "sec":
                     val = "{:,}".format(Decimal(metric["current"]))
                 case "percent" | "pct" | "%":
@@ -520,8 +520,8 @@ def run(
         if not quiet:
             vprint_info("Running multiple sessions for the following combinations:")
             for case in case_set.keys():
-                pretty_env = " ".join("{}={}".format(item[0], item[1]) for item in case[0])
-                print("env = {!r}, build = {!r}, exec = {!r}".format(pretty_env, case[1], case[2]))
+                pretty_env = " ".join(f"{item[0]}={item[1]}" for item in case[0])
+                print(f"env = {pretty_env!r}, build = {case[1]!r}, exec = {case[2]!r}")
 
     def _run_legacy(session, idx, name, envs, clean_cmd, build_cmd, exec_cmd):
         try:
@@ -549,44 +549,40 @@ def run(
             print_error(e)
             sys.exit(ExitCode.FAILURE)
         if compute_session.status == "PENDING":
-            print_info("Session ID {0} is enqueued for scheduling.".format(name))
+            print_info(f"Session ID {name} is enqueued for scheduling.")
             return
         elif compute_session.status == "SCHEDULED":
-            print_info("Session ID {0} is scheduled and about to be started.".format(name))
+            print_info(f"Session ID {name} is scheduled and about to be started.")
             return
         elif compute_session.status == "RUNNING":
             if compute_session.created:
                 vprint_done(
-                    "[{0}] Session {1} is ready (domain={2}, group={3}).".format(
-                        idx, compute_session.name, compute_session.domain, compute_session.group
-                    )
+                    f"[{idx}] Session {compute_session.name} is ready (domain={compute_session.domain}, group={compute_session.group})."
                 )
             else:
-                vprint_done("[{0}] Reusing session {1}...".format(idx, compute_session.name))
+                vprint_done(f"[{idx}] Reusing session {compute_session.name}...")
         elif compute_session.status == "TERMINATED":
             print_warn(
-                "Session ID {0} is already terminated.\n"
-                "This may be an error in the compute_session image.".format(name)
+                f"Session ID {name} is already terminated.\n"
+                "This may be an error in the compute_session image."
             )
             return
         elif compute_session.status == "TIMEOUT":
-            print_info("Session ID {0} is still on the job queue.".format(name))
+            print_info(f"Session ID {name} is still on the job queue.")
             return
         elif compute_session.status in ("ERROR", "CANCELLED"):
-            print_fail(
-                "Session ID {0} has an error during scheduling/startup or cancelled.".format(name)
-            )
+            print_fail(f"Session ID {name} has an error during scheduling/startup or cancelled.")
             return
 
         try:
             if files:
-                vprint_wait("[{0}] Uploading source files...".format(idx))
+                vprint_wait(f"[{idx}] Uploading source files...")
                 ret = compute_session.upload(files, basedir=basedir, show_progress=True)
                 if ret.status // 100 != 2:
-                    print_fail("[{0}] Uploading source files failed!".format(idx))
-                    print("{0}: {1}\n{2}".format(ret.status, ret.reason, ret.text()))
+                    print_fail(f"[{idx}] Uploading source files failed!")
+                    print(f"{ret.status}: {ret.reason}\n{ret.text()}")
                     return
-                vprint_done("[{0}] Uploading done.".format(idx))
+                vprint_done(f"[{idx}] Uploading done.")
                 opts = {
                     "clean": clean_cmd,
                     "build": build_cmd,
@@ -610,21 +606,21 @@ def run(
                 exec_loop_sync(
                     sys.stdout, sys.stderr, compute_session, "query", code, vprint_done=vprint_done
                 )
-            vprint_done("[{0}] Execution finished.".format(idx))
+            vprint_done(f"[{idx}] Execution finished.")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
         finally:
             if rm:
-                vprint_wait("[{0}] Cleaning up the session...".format(idx))
+                vprint_wait(f"[{idx}] Cleaning up the session...")
                 ret = compute_session.destroy()
-                vprint_done("[{0}] Cleaned up the session.".format(idx))
+                vprint_done(f"[{idx}] Cleaned up the session.")
                 if stats:
                     _stats = ret.get("stats", None) if ret else None
                     if _stats:
-                        print("[{0}] Statistics:\n{1}".format(idx, format_stats(_stats)))
+                        print(f"[{idx}] Statistics:\n{format_stats(_stats)}")
                     else:
-                        print("[{0}] Statistics is not available.".format(idx))
+                        print(f"[{idx}] Statistics is not available.")
 
     async def _run(session, idx, name, envs, clean_cmd, build_cmd, exec_cmd, is_multi=False):
         try:
@@ -677,36 +673,32 @@ def run(
                 attach_network=network_id,
             )
         except Exception as e:
-            print_fail("[{0}] {1}".format(idx, e))
+            print_fail(f"[{idx}] {e}")
             return
         if compute_session.status == "PENDING":
-            print_info("Session ID {0} is enqueued for scheduling.".format(name))
+            print_info(f"Session ID {name} is enqueued for scheduling.")
             return
         elif compute_session.status == "SCHEDULED":
-            print_info("Session ID {0} is scheduled and about to be started.".format(name))
+            print_info(f"Session ID {name} is scheduled and about to be started.")
             return
         elif compute_session.status == "RUNNING":
             if compute_session.created:
                 vprint_done(
-                    "[{0}] Session {1} is ready (domain={2}, group={3}).".format(
-                        idx, compute_session.name, compute_session.domain, compute_session.group
-                    )
+                    f"[{idx}] Session {compute_session.name} is ready (domain={compute_session.domain}, group={compute_session.group})."
                 )
             else:
-                vprint_done("[{0}] Reusing session {1}...".format(idx, compute_session.name))
+                vprint_done(f"[{idx}] Reusing session {compute_session.name}...")
         elif compute_session.status == "TERMINATED":
             print_warn(
-                "Session ID {0} is already terminated.\n"
-                "This may be an error in the compute_session image.".format(name)
+                f"Session ID {name} is already terminated.\n"
+                "This may be an error in the compute_session image."
             )
             return
         elif compute_session.status == "TIMEOUT":
-            print_info("Session ID {0} is still on the job queue.".format(name))
+            print_info(f"Session ID {name} is still on the job queue.")
             return
         elif compute_session.status in ("ERROR", "CANCELLED"):
-            print_fail(
-                "Session ID {0} has an error during scheduling/startup or cancelled.".format(name)
-            )
+            print_fail(f"Session ID {name} has an error during scheduling/startup or cancelled.")
             return
 
         if not is_multi:
@@ -715,26 +707,26 @@ def run(
         else:
             log_dir = local_cache_path / "client-logs"
             log_dir.mkdir(parents=True, exist_ok=True)
-            stdout = open(log_dir / "{0}.stdout.log".format(name), "w", encoding="utf-8")
-            stderr = open(log_dir / "{0}.stderr.log".format(name), "w", encoding="utf-8")
+            stdout = open(log_dir / f"{name}.stdout.log", "w", encoding="utf-8")
+            stderr = open(log_dir / f"{name}.stderr.log", "w", encoding="utf-8")
 
         try:
 
             def indexed_vprint_done(msg):
-                vprint_done("[{0}] ".format(idx) + msg)
+                vprint_done(f"[{idx}] " + msg)
 
             if files:
                 if not is_multi:
-                    vprint_wait("[{0}] Uploading source files...".format(idx))
+                    vprint_wait(f"[{idx}] Uploading source files...")
                 ret = await compute_session.upload(
                     files, basedir=basedir, show_progress=not is_multi
                 )
                 if ret.status // 100 != 2:
-                    print_fail("[{0}] Uploading source files failed!".format(idx))
-                    print("{0}: {1}\n{2}".format(ret.status, ret.reason, ret.text()), file=stderr)
+                    print_fail(f"[{idx}] Uploading source files failed!")
+                    print(f"{ret.status}: {ret.reason}\n{ret.text()}", file=stderr)
                     raise RuntimeError("Uploading source files has failed!")
                 if not is_multi:
-                    vprint_done("[{0}] Uploading done.".format(idx))
+                    vprint_done(f"[{idx}] Uploading done.")
                 opts = {
                     "clean": clean_cmd,
                     "build": build_cmd,
@@ -765,35 +757,32 @@ def run(
                     is_multi=is_multi,
                 )
         except BackendError as e:
-            print_fail("[{0}] {1}".format(idx, e))
+            print_fail(f"[{idx}] {e}")
             raise RuntimeError(e)
         except Exception as e:
-            print_fail("[{0}] Execution failed!".format(idx))
+            print_fail(f"[{idx}] Execution failed!")
             traceback.print_exc()
             raise RuntimeError(e)
         finally:
             try:
                 if rm:
                     if not is_multi:
-                        vprint_wait("[{0}] Cleaning up the session...".format(idx))
+                        vprint_wait(f"[{idx}] Cleaning up the session...")
                     ret = await compute_session.destroy()
-                    vprint_done("[{0}] Cleaned up the session.".format(idx))
+                    vprint_done(f"[{idx}] Cleaned up the session.")
                     if stats:
                         _stats = ret.get("stats", None) if ret else None
                         if _stats:
                             stats_str = format_stats(_stats)
-                            print(
-                                format_info("[{0}] Statistics:".format(idx))
-                                + "\n{0}".format(stats_str)
-                            )
+                            print(format_info(f"[{idx}] Statistics:") + f"\n{stats_str}")
                             if is_multi:
-                                print("Statistics:\n{0}".format(stats_str), file=stderr)
+                                print(f"Statistics:\n{stats_str}", file=stderr)
                         else:
-                            print_warn("[{0}] Statistics: unavailable.".format(idx))
+                            print_warn(f"[{idx}] Statistics: unavailable.")
                             if is_multi:
                                 print("Statistics: unavailable.", file=stderr)
             except Exception as e:
-                print_fail("[{0}] Error while printing stats".format(idx))
+                print_fail(f"[{idx}] Error while printing stats")
                 traceback.print_exc()
                 raise RuntimeError(e)
             finally:
@@ -807,7 +796,7 @@ def run(
             name_prefix = f"pysdk-{secrets.token_hex(5)}"
         else:
             name_prefix = name
-        vprint_info("Session name prefix: {0}".format(name_prefix))
+        vprint_info(f"Session name prefix: {name_prefix}")
         if is_multi:
             print_info(
                 "Check out the stdout/stderr logs stored in "
@@ -818,7 +807,7 @@ def run(
             # TODO: limit max-parallelism using aiojobs
             for idx, case in enumerate(case_set.keys()):
                 if is_multi:
-                    _name = "{0}-{1}".format(name_prefix, idx)
+                    _name = f"{name_prefix}-{idx}"
                 else:
                     _name = name_prefix
                 envs = dict(case[0])
@@ -840,4 +829,4 @@ def run(
     try:
         asyncio_run(_run_cases())
     except Exception as e:
-        print_fail("{0}".format(e))
+        print_fail(f"{e}")

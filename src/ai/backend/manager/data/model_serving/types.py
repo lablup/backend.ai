@@ -69,7 +69,7 @@ class EndpointData:
     lifecycle_stage: EndpointLifecycle
     runtime_variant: RuntimeVariant
     extra_mounts: Sequence[VFolderMount]
-    routings: Optional[Sequence["RoutingData"]] = None
+    routings: Optional[Sequence[RoutingData]] = None
 
 
 @dataclass

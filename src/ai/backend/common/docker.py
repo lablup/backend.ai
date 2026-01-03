@@ -163,12 +163,12 @@ class DockerConnector:
     source: DockerConnectorSource
 
 
-@functools.lru_cache()
+@functools.lru_cache
 def get_docker_context_host() -> str | None:
     try:
         docker_config_path = Path.home() / ".docker" / "config.json"
         docker_config = json.loads(docker_config_path.read_bytes())
-    except IOError:
+    except OSError:
         return None
     current_context_name = docker_config.get("currentContext", "default")
     for meta_path in (Path.home() / ".docker" / "contexts" / "meta").glob("*/meta.json"):
@@ -207,7 +207,7 @@ def parse_docker_host_url(
 
 
 # We may cache the connector type but not connector instances!
-@functools.lru_cache()
+@functools.lru_cache
 def _search_docker_socket_files_impl() -> tuple[
     Path, yarl.URL, type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
 ]:
@@ -595,7 +595,7 @@ class ImageRef:
         tags = self.tag.split("-")
         self._tag_set = (tags[0], PlatformTagSet(tags[1:], self.name))
 
-    def generate_aliases(self) -> Mapping[str, "ImageRef"]:
+    def generate_aliases(self) -> Mapping[str, ImageRef]:
         basename = self.name.split("/")[-1]
         possible_names = basename.rsplit("-")
         if len(possible_names) > 1:
@@ -626,7 +626,7 @@ class ImageRef:
         return ret
 
     @staticmethod
-    def merge_aliases(genned_aliases_1, genned_aliases_2) -> Mapping[str, "ImageRef"]:
+    def merge_aliases(genned_aliases_1, genned_aliases_2) -> Mapping[str, ImageRef]:
         ret = {}
         aliases_set_1, aliases_set_2 = set(genned_aliases_1.keys()), set(genned_aliases_2.keys())
         aliases_dup = aliases_set_1 & aliases_set_2

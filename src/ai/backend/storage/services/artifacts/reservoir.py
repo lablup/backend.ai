@@ -197,7 +197,7 @@ class ReservoirVFSFileDownloader:
                         f"Network error during download: {e}, Downloaded {self._bytes_downloaded} bytes before failure"
                     )
                     raise
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     log.error(f"Timeout after downloading {self._bytes_downloaded} bytes")
                     raise
         except Exception as e:

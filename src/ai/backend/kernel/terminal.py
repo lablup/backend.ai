@@ -155,7 +155,7 @@ class Terminal:
                     try:
                         term_writer.write(data[0])
                         await term_writer.drain()
-                    except IOError:
+                    except OSError:
                         break
         except asyncio.CancelledError:
             pass
@@ -167,7 +167,7 @@ class Terminal:
             while not term_reader.at_eof():
                 try:
                     data = await term_reader.read(4096)
-                except IOError:
+                except OSError:
                     # In docker containers, this path is taken.
                     break
                 if not data:

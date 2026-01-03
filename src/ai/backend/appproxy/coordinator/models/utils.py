@@ -309,9 +309,7 @@ async def execute_with_txn_retry(
                         raise TryAgain
                     raise
     except RetryError:
-        raise asyncio.TimeoutError(
-            f"DB serialization failed after {max_attempts} retry transactions"
-        )
+        raise TimeoutError(f"DB serialization failed after {max_attempts} retry transactions")
     if result is Sentinel.TOKEN:
         raise TransactionResultError("Transaction did not produce a result")
     return result

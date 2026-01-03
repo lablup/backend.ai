@@ -261,48 +261,32 @@ def _create_cmd(docs: Optional[str] = None):
                 sys.exit(ExitCode.FAILURE)
             else:
                 if compute_session.status == "PENDING":
-                    print_info(
-                        "Session ID {0} is enqueued for scheduling.".format(compute_session.id)
-                    )
+                    print_info(f"Session ID {compute_session.id} is enqueued for scheduling.")
                 elif compute_session.status == "SCHEDULED":
                     print_info(
-                        "Session ID {0} is scheduled and about to be started.".format(
-                            compute_session.id
-                        )
+                        f"Session ID {compute_session.id} is scheduled and about to be started."
                     )
                     return
                 elif compute_session.status == "PREPARED":
                     print_info(
-                        "Session ID {0} is prepared and about to be started.".format(
-                            compute_session.id
-                        )
+                        f"Session ID {compute_session.id} is prepared and about to be started."
                     )
                     return
                 elif compute_session.status == "PREPARING":
                     print_info(
-                        "Session ID {0} preparation in progress and about to be started.".format(
-                            compute_session.id
-                        )
+                        f"Session ID {compute_session.id} preparation in progress and about to be started."
                     )
                     return
                 elif compute_session.status == "CREATING":
                     print_info(
-                        "Session ID {0} creation in progress and about to be started.".format(
-                            compute_session.id
-                        )
+                        f"Session ID {compute_session.id} creation in progress and about to be started."
                     )
                     return
                 elif compute_session.status == "RUNNING":
                     if compute_session.created:
-                        print_info(
-                            "Session ID {0} is created and ready.".format(compute_session.id)
-                        )
+                        print_info(f"Session ID {compute_session.id} is created and ready.")
                     else:
-                        print_info(
-                            "Session ID {0} is already running and ready.".format(
-                                compute_session.id
-                            )
-                        )
+                        print_info(f"Session ID {compute_session.id} is already running and ready.")
                     if compute_session.service_ports:
                         print_info(
                             "This session provides the following app services: "
@@ -310,20 +294,14 @@ def _create_cmd(docs: Optional[str] = None):
                         )
                 elif compute_session.status == "TERMINATED":
                     print_warn(
-                        "Session ID {0} is already terminated.\n"
-                        "This may be an error in the compute_session image.".format(
-                            compute_session.id
-                        )
+                        f"Session ID {compute_session.id} is already terminated.\n"
+                        "This may be an error in the compute_session image."
                     )
                 elif compute_session.status == "TIMEOUT":
-                    print_info(
-                        "Session ID {0} is still on the job queue.".format(compute_session.id)
-                    )
+                    print_info(f"Session ID {compute_session.id} is still on the job queue.")
                 elif compute_session.status in ("ERROR", "CANCELLED"):
                     print_fail(
-                        "Session ID {0} has an error during scheduling/startup or cancelled.".format(
-                            compute_session.id
-                        )
+                        f"Session ID {compute_session.id} has an error during scheduling/startup or cancelled."
                     )
 
     if docs is not None:
@@ -574,30 +552,26 @@ def _create_from_template_cmd(docs: Optional[str] = None):
                 sys.exit(ExitCode.FAILURE)
             else:
                 if compute_session.status == "PENDING":
-                    print_info("Session ID {0} is enqueued for scheduling.".format(name))
+                    print_info(f"Session ID {name} is enqueued for scheduling.")
                 elif compute_session.status == "SCHEDULED":
-                    print_info("Session ID {0} is scheduled and about to be started.".format(name))
+                    print_info(f"Session ID {name} is scheduled and about to be started.")
                     return
                 elif compute_session.status == "PREPARED":
-                    print_info("Session ID {0} is prepared and about to be started.".format(name))
+                    print_info(f"Session ID {name} is prepared and about to be started.")
                     return
                 elif compute_session.status == "PREPARING":
                     print_info(
-                        "Session ID {0} preparation in progress and about to be started.".format(
-                            name
-                        )
+                        f"Session ID {name} preparation in progress and about to be started."
                     )
                     return
                 elif compute_session.status == "CREATING":
-                    print_info(
-                        "Session ID {0} creation in progress and about to be started.".format(name)
-                    )
+                    print_info(f"Session ID {name} creation in progress and about to be started.")
                     return
                 elif compute_session.status == "RUNNING":
                     if compute_session.created:
-                        print_info("Session ID {0} is created and ready.".format(name))
+                        print_info(f"Session ID {name} is created and ready.")
                     else:
-                        print_info("Session ID {0} is already running and ready.".format(name))
+                        print_info(f"Session ID {name} is already running and ready.")
                     if compute_session.service_ports:
                         print_info(
                             "This session provides the following app services: "
@@ -605,16 +579,14 @@ def _create_from_template_cmd(docs: Optional[str] = None):
                         )
                 elif compute_session.status == "TERMINATED":
                     print_warn(
-                        "Session ID {0} is already terminated.\n"
-                        "This may be an error in the compute_session image.".format(name)
+                        f"Session ID {name} is already terminated.\n"
+                        "This may be an error in the compute_session image."
                     )
                 elif compute_session.status == "TIMEOUT":
-                    print_info("Session ID {0} is still on the job queue.".format(name))
+                    print_info(f"Session ID {name} is still on the job queue.")
                 elif compute_session.status in ("ERROR", "CANCELLED"):
                     print_fail(
-                        "Session ID {0} has an error during scheduling/startup or cancelled.".format(
-                            name
-                        )
+                        f"Session ID {name} has an error during scheduling/startup or cancelled."
                     )
 
     if docs is not None:
@@ -810,10 +782,10 @@ def download(session_id, files, dest):
         return
     with Session() as session:
         try:
-            print_wait("Downloading file(s) from {}...".format(session_id))
+            print_wait(f"Downloading file(s) from {session_id}...")
             kernel = session.ComputeSession(session_id)
             kernel.download(files, dest, show_progress=True)
-            print_done("Downloaded to {}.".format(dest.resolve()))
+            print_done(f"Downloaded to {dest.resolve()}.")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -834,7 +806,7 @@ def ls(session_id, path):
     """
     with Session() as session:
         try:
-            print_wait('Retrieving list of files in "{}"...'.format(path))
+            print_wait(f'Retrieving list of files in "{path}"...')
             kernel = session.ComputeSession(session_id)
             result = kernel.list_files(path)
 
@@ -1495,7 +1467,7 @@ def _watch_cmd(docs: Optional[str] = None):
             try:
                 async with timeout(max_wait):
                     await _run_events()
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 sys.exit(ExitCode.OPERATION_TIMEOUT)
 
         try:

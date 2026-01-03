@@ -338,7 +338,7 @@ async def put(request: web.Request, params: Any) -> web.Response:
         query = (
             sa.update(session_templates)
             .values(template=template_data, name=template_data["metadata"]["name"])
-            .where((session_templates.c.id == template_id))
+            .where(session_templates.c.id == template_id)
         )
         result = await conn.execute(query)
         if result.rowcount != 1:
@@ -382,7 +382,7 @@ async def delete(request: web.Request, params: Any) -> web.Response:
         query = (
             sa.update(session_templates)
             .values(is_active=False)
-            .where((session_templates.c.id == template_id))
+            .where(session_templates.c.id == template_id)
         )
         result = await conn.execute(query)
         if result.rowcount != 1:

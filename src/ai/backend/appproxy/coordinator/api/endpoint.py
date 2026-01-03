@@ -144,11 +144,9 @@ async def create_or_update_endpoint(
             domain = "." + ".".join(_url.host.split(".")[1:])
 
             query = sa.select(Worker).where(
-                (
-                    Worker.accepted_traffics.contains([AppMode.INFERENCE])
-                    & (Worker.frontend_mode == FrontendMode.WILDCARD_DOMAIN)
-                    & (Worker.wildcard_domain == domain)
-                )
+                Worker.accepted_traffics.contains([AppMode.INFERENCE])
+                & (Worker.frontend_mode == FrontendMode.WILDCARD_DOMAIN)
+                & (Worker.wildcard_domain == domain)
             )
             result = await sess.execute(query)
             matched_worker = result.scalar()
@@ -158,11 +156,9 @@ async def create_or_update_endpoint(
                 if not _url.port:
                     raise InvalidURLError("URL is missing port component for port-based worker.")
                 query = sa.select(Worker).where(
-                    (
-                        Worker.accepted_traffics.contains([AppMode.INFERENCE])
-                        & (Worker.frontend_mode == FrontendMode.PORT)
-                        & (Worker.hostname == _url.host)
-                    )
+                    Worker.accepted_traffics.contains([AppMode.INFERENCE])
+                    & (Worker.frontend_mode == FrontendMode.PORT)
+                    & (Worker.hostname == _url.host)
                 )
                 result = await sess.execute(query)
                 worker_candidates = result.scalars().all()

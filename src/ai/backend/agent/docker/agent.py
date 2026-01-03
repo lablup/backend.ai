@@ -349,7 +349,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self.network_plugin_ctx = network_plugin_ctx
 
     def _kernel_resource_spec_read(self, filename):
-        with open(filename, "r") as f:
+        with open(filename) as f:
             resource_spec = KernelResourceSpec.read_from_file(f)
         return resource_spec
 
@@ -990,7 +990,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             )
             return
 
-        async with aiofiles.open(default_seccomp_path, mode="r") as fp:
+        async with aiofiles.open(default_seccomp_path) as fp:
             seccomp_profile = load_json(await fp.read())
 
             additional_allowed_syscalls = self.additional_allowed_syscalls
@@ -1181,7 +1181,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 try:
                     extra_container_opts = load_json(extra_container_opts_file.read_bytes())
                     update_nested_dict(container_config, extra_container_opts)
-                except IOError:
+                except OSError:
                     pass
 
         # The final container config is settled down here.
@@ -1802,7 +1802,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         raise
                     except Exception as e:
                         log.exception("handle_agent_socket(): internal error")
-                        reply = [struct.pack("i", -1), f"Error: {e}".encode("utf-8")]
+                        reply = [struct.pack("i", -1), f"Error: {e}".encode()]
                     await agent_sock.send_multipart(reply)
             except asyncio.CancelledError:
                 terminating = True
@@ -1832,9 +1832,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         reg_passwd = registry_conf.get("password")
         log.info("pushing image {} to registry", image_ref.canonical)
         if reg_user and reg_passwd:
-            encoded_creds = base64.b64encode(f"{reg_user}:{reg_passwd}".encode("utf-8")).decode(
-                "ascii"
-            )
+            encoded_creds = base64.b64encode(f"{reg_user}:{reg_passwd}".encode()).decode("ascii")
             auth_config = {
                 "auth": encoded_creds,
             }
@@ -1862,9 +1860,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         reg_user = registry_conf.get("username")
         reg_passwd = registry_conf.get("password")
         if reg_user and reg_passwd:
-            encoded_creds = base64.b64encode(f"{reg_user}:{reg_passwd}".encode("utf-8")).decode(
-                "ascii"
-            )
+            encoded_creds = base64.b64encode(f"{reg_user}:{reg_passwd}".encode()).decode("ascii")
             auth_config = {
                 "auth": encoded_creds,
             }
@@ -2055,7 +2051,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         )
                     else:
                         raise
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     log.warning(
                         "timeout for collecting container logs (k:{}, cid:{})",
                         kernel_id,
@@ -2077,7 +2073,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         await domain_socket_proxy.proxy_server.wait_closed()
                         try:
                             domain_socket_proxy.host_proxy_path.unlink()
-                        except IOError:
+                        except OSError:
                             pass
 
             if not self.local_config.debug.skip_container_deletion and container_id is not None:
@@ -2096,7 +2092,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             kernel_id,
                             container_id,
                         )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     log.warning("container deletion timeout (k:{}, c:{})", kernel_id, container_id)
 
             if not restarting:

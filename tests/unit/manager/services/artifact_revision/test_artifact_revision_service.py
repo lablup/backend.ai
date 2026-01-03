@@ -7,7 +7,7 @@ Includes tests for ArtifactService methods that deal with revisions.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -149,7 +149,7 @@ class TestArtifactRevisionService:
     @pytest.fixture
     def sample_artifact_revision_data(self) -> ArtifactRevisionData:
         """Create sample artifact revision data"""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return ArtifactRevisionData(
             id=uuid.uuid4(),
             artifact_id=uuid.uuid4(),
@@ -305,7 +305,7 @@ class TestArtifactRevisionService:
             status=ArtifactStatus.AVAILABLE,
             remote_status=None,
             created_at=sample_artifact_revision_data.created_at,
-            updated_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(UTC),
             digest=sample_artifact_revision_data.digest,
             verification_result=sample_artifact_revision_data.verification_result,
         )
@@ -337,7 +337,7 @@ class TestArtifactRevisionService:
             status=ArtifactStatus.REJECTED,
             remote_status=None,
             created_at=sample_artifact_revision_data.created_at,
-            updated_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(UTC),
             digest=sample_artifact_revision_data.digest,
             verification_result=sample_artifact_revision_data.verification_result,
         )
@@ -422,7 +422,7 @@ class TestArtifactServiceRevisionOperations:
     @pytest.fixture
     def sample_artifact_data(self) -> ArtifactData:
         """Create sample artifact data"""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         registry_id = uuid.uuid4()
         return ArtifactData(
             id=uuid.uuid4(),
@@ -443,7 +443,7 @@ class TestArtifactServiceRevisionOperations:
     @pytest.fixture
     def sample_artifact_revision(self, sample_artifact_data: ArtifactData) -> ArtifactRevisionData:
         """Create sample artifact revision data"""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return ArtifactRevisionData(
             id=uuid.uuid4(),
             artifact_id=sample_artifact_data.id,

@@ -108,7 +108,7 @@ class Circuit(Base, BaseMixin):
         load_worker=True,
         load_endpoint=True,
     ) -> "Circuit":
-        query = sa.select(Circuit).where((Circuit.id == circuit_id))
+        query = sa.select(Circuit).where(Circuit.id == circuit_id)
         if load_worker:
             query = query.options(selectinload(Circuit.worker_row))
         if load_endpoint:
@@ -126,7 +126,7 @@ class Circuit(Base, BaseMixin):
         load_worker=True,
         load_endpoint=True,
     ) -> "Circuit":
-        query = sa.select(Circuit).where((Circuit.endpoint_id == endpoint_id))
+        query = sa.select(Circuit).where(Circuit.endpoint_id == endpoint_id)
         if load_worker:
             query = query.options(selectinload(Circuit.worker_row))
         if load_endpoint:
@@ -183,7 +183,7 @@ class Circuit(Base, BaseMixin):
         load_worker=True,
         load_endpoint=True,
     ) -> "Circuit":
-        query = sa.select(Circuit).where((Circuit.endpoint_id == endpoint_id))
+        query = sa.select(Circuit).where(Circuit.endpoint_id == endpoint_id)
         if load_worker:
             query = query.options(selectinload(Circuit.worker_row))
         if load_endpoint:

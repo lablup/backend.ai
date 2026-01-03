@@ -56,7 +56,7 @@ def create(path, permission, dotfile_path, owner_access_key, domain, group):
     """
 
     if dotfile_path:
-        with open(dotfile_path, "r") as fr:
+        with open(dotfile_path) as fr:
             body = fr.read()
     else:
         body = ""
@@ -209,7 +209,7 @@ def update(path, permission, dotfile_path, owner_access_key, domain, group):
     """
 
     if dotfile_path:
-        with open(dotfile_path, "r") as fr:
+        with open(dotfile_path) as fr:
             body = fr.read()
     else:
         body = ""

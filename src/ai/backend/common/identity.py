@@ -48,7 +48,7 @@ def is_containerized() -> bool:
     try:
         cginfo = Path("/proc/self/cgroup").read_text()
         return "/docker/" in cginfo or "/lxc/" in cginfo
-    except IOError:
+    except OSError:
         return False
 
 

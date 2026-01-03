@@ -7,7 +7,7 @@ import random
 import re
 import statistics
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import ROUND_DOWN, Decimal
 from pathlib import Path
 from pprint import pformat
@@ -781,7 +781,7 @@ class MockPlugin(AbstractComputePlugin):
                 "platform": "Backend.AI",
                 "serial_number": "N/A",
                 "version": __version__,
-                "last_updated": datetime.now(timezone.utc).isoformat(),
+                "last_updated": datetime.now(UTC).isoformat(),
             },
         }
 

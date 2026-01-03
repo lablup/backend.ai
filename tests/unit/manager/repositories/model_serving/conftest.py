@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -74,8 +74,8 @@ def sample_user():
         domain_name="default",
         role=UserRole.USER,
         resource_policy="default",
-        created_at=datetime.now(timezone.utc),
-        modified_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        modified_at=datetime.now(UTC),
         main_access_key="test-access-key",
         sudo_session_enabled=False,
     )
@@ -97,8 +97,8 @@ def sample_admin_user():
         domain_name="default",
         role=UserRole.ADMIN,
         resource_policy="default",
-        created_at=datetime.now(timezone.utc),
-        modified_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        modified_at=datetime.now(UTC),
         main_access_key="admin-access-key",
         sudo_session_enabled=True,
     )
@@ -120,8 +120,8 @@ def sample_superadmin_user():
         domain_name="default",
         role=UserRole.SUPERADMIN,
         resource_policy="default",
-        created_at=datetime.now(timezone.utc),
-        modified_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        modified_at=datetime.now(UTC),
         main_access_key="superadmin-access-key",
         sudo_session_enabled=True,
     )
@@ -143,7 +143,7 @@ def sample_image():
     image.accelerators = ""
     image.labels = {}
     image._resources = {}
-    image.created_at = datetime.now(timezone.utc)
+    image.created_at = datetime.now(UTC)
     image.config_digest = "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
     image.status = "active"
     return image
@@ -164,12 +164,12 @@ def sample_vfolder():
     vfolder.max_size = 10737418240  # 10GB
     vfolder.num_files = 100
     vfolder.cur_size = 1073741824  # 1GB
-    vfolder.created_at = datetime.now(timezone.utc)
-    vfolder.last_used = datetime.now(timezone.utc)
+    vfolder.created_at = datetime.now(UTC)
+    vfolder.last_used = datetime.now(UTC)
     vfolder.unmanaged_path = ""
     vfolder.usage_mode = "model"
     vfolder.permission = "rw"
-    vfolder.last_size_update = datetime.now(timezone.utc)
+    vfolder.last_size_update = datetime.now(UTC)
     vfolder.status = "ready"
     return vfolder
 
@@ -218,7 +218,7 @@ def sample_endpoint(
     endpoint = sample_endpoint_creator_spec.build_row()
     # Set attributes that are normally set by the database
     endpoint.id = uuid.uuid4()
-    endpoint.created_at = datetime.now(timezone.utc)
+    endpoint.created_at = datetime.now(UTC)
     endpoint.destroyed_at = None
     endpoint.lifecycle_stage = EndpointLifecycle.CREATED
     endpoint.retries = 0
@@ -262,7 +262,7 @@ def sample_auto_scaling_rule(sample_endpoint):
         cooldown_seconds=300,
         min_replicas=1,
         max_replicas=10,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         endpoint_row=sample_endpoint,
     )
     return rule

@@ -71,7 +71,7 @@ class ServiceParser:
                     if "prestart" in raw_service_def:
                         raw_service_def["prestart_actions"] = raw_service_def["prestart"]
                         del raw_service_def["prestart"]
-            except IOError:
+            except OSError:
                 raise InvalidServiceDefinition(
                     f"could not read the service-def file: {service_def_file.name}"
                 )

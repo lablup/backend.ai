@@ -411,7 +411,7 @@ class XCPFSOpModel(BaseFSOpModel):
                             error_msg = line.removeprefix(error_msg_prefix).rstrip().decode()
                             break
                     raise ProcessExecutionError(f"Running XCP has failed: {error_msg}")
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # -1 indicates "too many"
             total_size = -1
             total_count = -1

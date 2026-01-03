@@ -184,7 +184,7 @@ class RPCFunctionRegistry:
                         *request.body["args"],
                         **request.body["kwargs"],
                     )
-            except (asyncio.CancelledError, asyncio.TimeoutError):
+            except (TimeoutError, asyncio.CancelledError):
                 raise
             except ResourceError:
                 # This is an expected scenario.
@@ -223,7 +223,7 @@ class RPCFunctionRegistryV2:
                         **request.body["kwargs"],
                     )
                     return res.as_dict()
-            except (asyncio.CancelledError, asyncio.TimeoutError):
+            except (TimeoutError, asyncio.CancelledError):
                 raise
             except ResourceError:
                 # This is an expected scenario.
@@ -572,7 +572,7 @@ class AgentRPCServer(aobject):
 
                 self.local_config.update(container_update=container_updates)
         except Exception as e:
-            log.warning("etcd: container-config error: {}".format(e))
+            log.warning(f"etcd: container-config error: {e}")
 
     async def __aenter__(self) -> None:
         await self.rpc_server.__aenter__()
@@ -600,7 +600,7 @@ class AgentRPCServer(aobject):
     @collect_error
     async def update_scaling_group(self, scaling_group: str, agent_id: AgentId | None = None):
         cfg_src_path = config.find_config_file("agent")
-        with open(cfg_src_path, "r") as f:
+        with open(cfg_src_path) as f:
             data = tomlkit.load(f)
         agent = self.runtime.get_agent(agent_id)
         if "agents" in data:

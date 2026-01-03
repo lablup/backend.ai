@@ -58,7 +58,7 @@ class DummyKernel(AbstractKernel):
         *,
         client_features: FrozenSet[str],
         api_version: int,
-    ) -> "AbstractCodeRunner":
+    ) -> AbstractCodeRunner:
         if self.dummy_kernel_cfg["use-fake-code-runner"]:
             return await DummyFakeCodeRunner.new(
                 self.kernel_id,

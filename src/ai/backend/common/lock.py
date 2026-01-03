@@ -107,7 +107,7 @@ class FileLock(AbstractDistributedLock):
                     if self._debug:
                         log.debug("file lock acquired: {}", self._path)
         except RetryError:
-            raise asyncio.TimeoutError(f"failed to lock file: {self._path}")
+            raise TimeoutError(f"failed to lock file: {self._path}")
 
     def release(self) -> None:
         assert self._file is not None
@@ -251,7 +251,7 @@ class RedisLock(AbstractDistributedLock):
         try:
             await self._lock.__aenter__()
         except LockError as e:
-            raise asyncio.TimeoutError(str(e))
+            raise TimeoutError(str(e))
         if self._debug:
             log.debug("RedisLock.__aenter__(): lock acquired")
 

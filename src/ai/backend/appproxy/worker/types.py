@@ -365,9 +365,9 @@ class Circuit(SerializableCircuit):
     runtime_variant: str | None
     "for initialization usage only; use `app_info` variable"
 
-    _app_inference_metrics: dict[MetricKey, "Metric | HistogramMetric"]
+    _app_inference_metrics: dict[MetricKey, Metric | HistogramMetric]
     _replica_inference_metrics: dict[
-        MetricKey, dict[UUID, "Metric | HistogramMetric"]
+        MetricKey, dict[UUID, Metric | HistogramMetric]
     ]  # [Metric Key:[Route id: Metric]] pair
 
     def __init__(self, *args, **kwargs) -> None:
@@ -376,7 +376,7 @@ class Circuit(SerializableCircuit):
         self._replica_inference_metrics = {}
 
     @classmethod
-    def from_serialized_circuit(cls, circuit: SerializableCircuit) -> "Circuit":
+    def from_serialized_circuit(cls, circuit: SerializableCircuit) -> Circuit:
         frontend: PortFrontendInfo | SubdomainFrontendInfo
         app_info: InteractiveAppInfo | InferenceAppInfo
 
@@ -572,7 +572,7 @@ class Metric:
     stats_filter: FrozenSet[str]
     current: Decimal
     capacity: Optional[Decimal] = None
-    current_hook: Optional[Callable[["Metric"], Decimal]] = None
+    current_hook: Optional[Callable[[Metric], Decimal]] = None
 
     def update(self, value: Measurement):
         if value.capacity is not None:

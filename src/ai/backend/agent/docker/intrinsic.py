@@ -260,7 +260,7 @@ class CPUPlugin(AbstractComputePlugin):
                             )
                         }
                         cpu_used = int(cpu_stats["usage_usec"]) / 1e3
-            except IOError as e:
+            except OSError as e:
                 log.warning(
                     "CPUPlugin: cannot read stats: sysfs unreadable for container {0}\n{1!r}",
                     container_id[:7],
@@ -275,7 +275,7 @@ class CPUPlugin(AbstractComputePlugin):
                 try:
                     async with async_timeout.timeout(2.0):
                         ret = await fetch_api_stats(container)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     return None
                 if ret is None:
                     return None
@@ -687,7 +687,7 @@ class MemoryPlugin(AbstractComputePlugin):
                                     io_read_bytes += int(value)
                                 if stat == "wbytes":
                                     io_write_bytes += int(value)
-            except IOError as e:
+            except OSError as e:
                 log.warning(
                     "MemoryPlugin: cannot read stats: sysfs unreadable for container {0}\n{1!r}",
                     container_id[:7],
@@ -724,7 +724,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 try:
                     async with async_timeout.timeout(2.0):
                         ret = await fetch_api_stats(container)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     return None
                 if ret is None:
                     return None

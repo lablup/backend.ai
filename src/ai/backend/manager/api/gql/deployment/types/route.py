@@ -78,7 +78,7 @@ class Route(Node):
     @strawberry.field(description="The deployment this route belongs to.")
     async def deployment(
         self, info: Info[StrawberryGQLContext]
-    ) -> Annotated["ModelDeployment", strawberry.lazy(".deployment")]:
+    ) -> Annotated[ModelDeployment, strawberry.lazy(".deployment")]:
         """Resolve deployment using dataloader."""
         from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
 
@@ -104,7 +104,7 @@ class Route(Node):
     @strawberry.field(description="The revision associated with the route.")
     async def revision(
         self, info: Info[StrawberryGQLContext]
-    ) -> Annotated["ModelRevision", strawberry.lazy(".revision")] | None:
+    ) -> Annotated[ModelRevision, strawberry.lazy(".revision")] | None:
         """Resolve revision using dataloader."""
         from ai.backend.manager.api.gql.deployment.types.revision import ModelRevision
 

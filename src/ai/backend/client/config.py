@@ -103,7 +103,7 @@ def _clean_urls(v: URL | str) -> list[URL]:
         for entry in v.split(","):
             url = URL(entry)
             if not url.is_absolute():
-                raise ValueError("URL {} is not absolute.".format(url))
+                raise ValueError(f"URL {url} is not absolute.")
             urls.append(url)
     return urls
 

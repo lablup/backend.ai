@@ -434,9 +434,7 @@ class VirtualFolderNode(graphene.ObjectType):
         ]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
-    async def __resolve_reference(
-        self, info: graphene.ResolveInfo, **kwargs
-    ) -> "VirtualFolderNode":
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> VirtualFolderNode:
         vfolder_node = await VirtualFolderNode.get_node(info, self.id)
         if vfolder_node is None:
             raise VFolderNotFound(f"Virtual folder not found: {self.id}")

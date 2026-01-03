@@ -267,12 +267,7 @@ class KubernetesKernel(AbstractKernel):
             await loop.run_in_executor(None, _write_to_disk)
         except OSError as e:
             raise RuntimeError(
-                "{0}: writing uploaded file failed: {1} -> {2} ({3})".format(
-                    self.kernel_id,
-                    container_path,
-                    host_abspath,
-                    repr(e),
-                )
+                f"{self.kernel_id}: writing uploaded file failed: {container_path} -> {host_abspath} ({e!r})"
             )
 
     @override

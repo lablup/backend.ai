@@ -34,7 +34,7 @@ try:
     _file_perm = (Path(__file__).parent.parent / "server.py").stat()
     _default_uid = _file_perm.st_uid
     _default_gid = _file_perm.st_gid
-except IOError:
+except OSError:
     _default_uid = os.getuid()
     _default_gid = os.getgid()
 

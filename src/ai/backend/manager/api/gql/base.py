@@ -275,7 +275,7 @@ class PageInfo:
     start_cursor: Optional[str] = None
     end_cursor: Optional[str] = None
 
-    def to_strawberry_page_info(self) -> "strawberry.relay.PageInfo":
+    def to_strawberry_page_info(self) -> strawberry.relay.PageInfo:
         return strawberry.relay.PageInfo(
             has_next_page=self.has_next_page,
             has_previous_page=self.has_previous_page,

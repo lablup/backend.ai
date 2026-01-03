@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Protocol, runtime_checkable
 
 from ..abc import StaticServiceHealthChecker
@@ -78,7 +78,7 @@ class ValkeyHealthChecker(StaticServiceHealthChecker):
                 last_checked_at=check_time,
                 error_message=None,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             status = ComponentHealthStatus(
                 is_healthy=False,
                 last_checked_at=check_time,
@@ -100,7 +100,7 @@ class ValkeyHealthChecker(StaticServiceHealthChecker):
         Returns:
             ServiceHealth containing status for each component
         """
-        check_time = datetime.now(timezone.utc)
+        check_time = datetime.now(UTC)
 
         # Run all health checks concurrently
         tasks = [

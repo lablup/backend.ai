@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import socket
 from contextlib import closing
 from typing import TYPE_CHECKING, Callable, Mapping, Optional, TypeVar, overload
@@ -63,7 +62,7 @@ async def curl(
             body = await resp.text()
             result = body.strip()
             return result
-    except (asyncio.TimeoutError, aiohttp.ClientError):
+    except (TimeoutError, aiohttp.ClientError):
         if callable(default_value):
             return default_value()
         return default_value

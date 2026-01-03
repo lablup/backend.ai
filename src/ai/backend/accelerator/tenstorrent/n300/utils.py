@@ -25,7 +25,7 @@ async def host_pid_to_container_pid(container_id: str, host_pid: int) -> int:
                 return nspids[1]  # in the given container
             return -2  # in other container
         return -1  # in host
-    except (ValueError, KeyError, IOError):
+    except (OSError, ValueError, KeyError):
         return -1  # in host
 
 

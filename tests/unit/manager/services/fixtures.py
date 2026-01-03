@@ -1,6 +1,6 @@
 import dataclasses
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -47,7 +47,7 @@ IMAGE_ROW_FIXTURE = ImageRow(
     status=ImageStatus.ALIVE,
 )
 IMAGE_ROW_FIXTURE.id = uuid.uuid4()
-IMAGE_ROW_FIXTURE.created_at = datetime(2023, 9, 30, 15, 0, 0, tzinfo=timezone.utc)
+IMAGE_ROW_FIXTURE.created_at = datetime(2023, 9, 30, 15, 0, 0, tzinfo=UTC)
 
 IMAGE_FIXTURE_DATA = IMAGE_ROW_FIXTURE.to_dataclass()
 

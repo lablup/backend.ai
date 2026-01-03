@@ -1094,7 +1094,7 @@ class ScheduleDBSource:
         scaling_group_name: str,
         storage_manager,
         allowed_vfolder_types: list[str],
-    ) -> "SessionCreationContext":
+    ) -> SessionCreationContext:
         """
         Fetch all data needed for session creation in a single DB session.
 
@@ -1241,7 +1241,7 @@ class ScheduleDBSource:
 
     async def _resolve_image_info(
         self, db_sess: SASession, image_refs: list[ImageRef]
-    ) -> dict[str, "ImageInfo"]:
+    ) -> dict[str, ImageInfo]:
         """
         Resolve image references to image information.
 

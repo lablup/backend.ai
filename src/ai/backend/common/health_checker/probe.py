@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Optional
 
 from aiotools import cancel_and_wait
@@ -128,7 +128,7 @@ class HealthProbe:
             AllServicesHealth containing results from all registered checkers
         """
         registered = await self._get_all_registered()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Run all checks in parallel
         check_tasks = [
@@ -277,7 +277,7 @@ class HealthProbe:
             log.debug(f"Health check succeeded for {service_group}")
             return result
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # Health check timed out - return empty result
             log.warning(f"Health check timed out for {service_group} after {checker.timeout}s")
             return ServiceHealth(results={})
@@ -321,5 +321,5 @@ class HealthProbe:
         return ConnectivityCheckResponse(
             overall_healthy=overall_healthy,
             connectivity_checks=components,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )

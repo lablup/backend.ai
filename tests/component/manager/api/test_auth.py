@@ -78,15 +78,15 @@ def test_check_date():
     assert not check_date(request)
 
     # RFC822-style date formatting used in plain HTTP
-    request.headers = {"Date": "{:%a, %d %b %Y %H:%M:%S GMT}".format(now)}
+    request.headers = {"Date": f"{now:%a, %d %b %Y %H:%M:%S GMT}"}
     assert check_date(request)
 
     # RFC822-style date formatting used in plain HTTP with a non-UTC timezone
     now_kst = now.astimezone(gettz("Asia/Seoul"))
-    request.headers = {"Date": "{:%a, %d %b %Y %H:%M:%S %Z}".format(now_kst)}
+    request.headers = {"Date": f"{now_kst:%a, %d %b %Y %H:%M:%S %Z}"}
     assert check_date(request)
     now_est = now.astimezone(gettz("America/Panama"))
-    request.headers = {"Date": "{:%a, %d %b %Y %H:%M:%S %Z}".format(now_est)}
+    request.headers = {"Date": f"{now_est:%a, %d %b %Y %H:%M:%S %Z}"}
     assert check_date(request)
 
     request.headers = {"Date": "some-unrecognizable-malformed-date-time"}

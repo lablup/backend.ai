@@ -188,7 +188,7 @@ class XFSProjectQuotaModel(BaseQuotaModel):
                 await self.project_registry.read_project_info()
                 await self.project_registry.add_project_entry(quota_scope_id, qspath)
                 await self.project_registry.read_project_info()
-        except (asyncio.CancelledError, asyncio.TimeoutError):
+        except (TimeoutError, asyncio.CancelledError):
             log.exception("quota-scope creation timeout")
             raise
         except Exception:

@@ -285,9 +285,7 @@ class FstabEntry:
         return str(self) == str(o)
 
     def __str__(self):
-        return "{} {} {} {} {} {}".format(
-            self.device, self.mountpoint, self.fstype, self.options, self.d, self.p
-        )
+        return f"{self.device} {self.mountpoint} {self.fstype} {self.options} {self.d} {self.p}"
 
 
 class Fstab:
@@ -414,7 +412,7 @@ async def check_nfs_remote_server(
     except BaseNFSMountCheckFailed:
         raise
 
-    except asyncio.TimeoutError:
+    except TimeoutError:
         raise NFSTimeoutError(f"Timeout: No response from {server} within 10 seconds")
 
     except FileNotFoundError:
@@ -508,7 +506,7 @@ async def umount(
             raw_out.decode("utf8")
             err = raw_err.decode("utf8")
             await proc.wait()
-    except asyncio.TimeoutError:
+    except TimeoutError:
         raise VolumeUnmountFailed(
             f"Failed to umount {mountpoint}. Raise timeout ({timeout_sec}sec). "
             "The process may be hanging in state D, which needs to be checked."

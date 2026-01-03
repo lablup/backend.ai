@@ -19,7 +19,7 @@ def load_dictionary(dictionary_file=None):
     if dictionary_file is None:
         dictionary_file = "/opt/kernel/words.json"
 
-    with open(dictionary_file, "r") as f:
+    with open(dictionary_file) as f:
         dictionary = json.load(f)
 
     return dictionary
@@ -53,7 +53,7 @@ def hash_phrase(
     # Check entropy
     if num_words * entropy_per_word > available_entropy:
         raise Exception(
-            "The output entropy of the specified hashfunc (%d) is too small." % available_entropy
+            f"The output entropy of the specified hashfunc ({available_entropy}) is too small."
         )
 
     # Generate phrase

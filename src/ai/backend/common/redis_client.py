@@ -30,7 +30,7 @@ if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
     _keepalive_options[_TCP_KEEPCNT] = 3
 
 
-class Ellipsis(object):
+class Ellipsis:
     pass
 
 
@@ -128,7 +128,7 @@ class RedisClient(aobject):
         while True:
             try:
                 hiredis_reader = hiredis.Reader(notEnoughData=ellipsis)
-                _blobs = bytes()
+                _blobs = b""
                 for command in commands:
                     request_blob = hiredis.pack_command(tuple(command))  # type: ignore[arg-type]
                     self.writer.write(request_blob)
@@ -143,7 +143,7 @@ class RedisClient(aobject):
                 results = []
                 first_result = ellipsis
 
-                _buf = bytes()
+                _buf = b""
 
                 met_unexpected_eof = False
 

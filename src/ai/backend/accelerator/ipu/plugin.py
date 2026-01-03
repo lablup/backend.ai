@@ -103,7 +103,7 @@ class IPUPlugin(AbstractComputePlugin):
         log.info("Read IPU device configs from {}", cfg_src_path)
 
         def _read_json():
-            with open(self.ipu_config["ipuof-config-path"], "r") as fr:
+            with open(self.ipu_config["ipuof-config-path"]) as fr:
                 return json.loads(fr.read())
 
         try:

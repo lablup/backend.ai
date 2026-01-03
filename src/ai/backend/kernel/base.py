@@ -95,7 +95,7 @@ async def terminate_and_wait(proc: asyncio.subprocess.Process, timeout: float = 
         proc.terminate()
         try:
             await asyncio.wait_for(proc.wait(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             proc.kill()
             await proc.wait()
     except ProcessLookupError:
@@ -789,7 +789,7 @@ class BaseRunner(metaclass=ABCMeta):
                             new_health_status = HealthStatus.HEALTHY
                     except urllib.error.URLError:
                         pass
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 elapsed_time = health_check_info["max_wait_time"]
                 pass
             finally:
@@ -924,7 +924,7 @@ class BaseRunner(metaclass=ABCMeta):
                             "status": "failed",
                             "error": error_reason,
                         }
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         # Takes too much time to open a local port.
                         if service_info["name"] in self.services_running:
                             await terminate_and_wait(proc, timeout=10.0)

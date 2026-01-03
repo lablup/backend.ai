@@ -460,7 +460,7 @@ class UserNode(graphene.ObjectType):
                 result.append(GroupNode.from_row(graph_ctx, prj_row))
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
-    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> "UserNode":
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> UserNode:
         return await UserNode.get_node(info, self.id)
 
 

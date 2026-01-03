@@ -433,9 +433,9 @@ class DeploymentFilter(GQLFilter):
     endpoint_url: Optional[StringFilter] = None
     ids_in: strawberry.Private[Optional[Sequence[UUID]]] = None
 
-    AND: Optional[list["DeploymentFilter"]] = None
-    OR: Optional[list["DeploymentFilter"]] = None
-    NOT: Optional[list["DeploymentFilter"]] = None
+    AND: Optional[list[DeploymentFilter]] = None
+    OR: Optional[list[DeploymentFilter]] = None
+    NOT: Optional[list[DeploymentFilter]] = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:

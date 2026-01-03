@@ -78,7 +78,7 @@ async def _negotiate_api_version(
                     category=APIVersionWarning,
                 )
             return min(server_version, client_version)
-    except (asyncio.TimeoutError, aiohttp.ClientError):
+    except (TimeoutError, aiohttp.ClientError):
         # fallback to the configured API version
         return client_version
 

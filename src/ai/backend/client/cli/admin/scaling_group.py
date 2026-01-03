@@ -356,9 +356,7 @@ def associate_scaling_group(ctx: CLIContext, scaling_group, domain):
         ctx.output.print_mutation_result(
             data,
             extra_info={
-                "detail_msg": "Scaling group {} is associated with domain {}.".format(
-                    scaling_group, domain
-                ),
+                "detail_msg": f"Scaling group {scaling_group} is associated with domain {domain}.",
             },
         )
 
@@ -392,4 +390,4 @@ def dissociate_scaling_group(ctx: CLIContext, scaling_group, domain):
                 action_name="scaling_group_dissociation",
             )
             sys.exit(ExitCode.FAILURE)
-        print_done("Scaling group {} is dissociated from domain {}.".format(scaling_group, domain))
+        print_done(f"Scaling group {scaling_group} is dissociated from domain {domain}.")

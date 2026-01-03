@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock
 
@@ -32,7 +32,7 @@ def mock_healthy_checker() -> ServiceHealthChecker:
     checker = AsyncMock(spec=ServiceHealthChecker)
 
     # Create healthy result
-    check_time = datetime.now(timezone.utc)
+    check_time = datetime.now(UTC)
     healthy_result = ServiceHealth(
         results={
             ComponentId("test-component"): ComponentHealthStatus(
@@ -55,7 +55,7 @@ def mock_unhealthy_checker() -> ServiceHealthChecker:
     checker = AsyncMock(spec=ServiceHealthChecker)
 
     # Create unhealthy result
-    check_time = datetime.now(timezone.utc)
+    check_time = datetime.now(UTC)
     unhealthy_result = ServiceHealth(
         results={
             ComponentId("test-component"): ComponentHealthStatus(

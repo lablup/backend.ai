@@ -10,27 +10,23 @@ from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-NewMetadataPluginResponse = NamedTuple(
-    "NewMetadataPluginResponse",
-    [("app", web.Application), ("global_middlewares", Sequence[WebMiddleware])],
-)
-InitMetadataPluginResponse = NamedTuple(
-    "InitMetadataPluginResponse",
-    [
-        ("app", web.Application),
-        ("global_middlewares", Sequence[WebMiddleware]),
-        ("structure", Mapping[str, Any]),
-    ],
-)
-MetadataPluginRoute = NamedTuple(
-    "MetadataPluginRoute",
-    [
-        ("method", str),
-        ("route", str),
-        ("route_handler", Callable[[web.Request], Coroutine[Any, Any, web.Response]]),
-        ("route_name", Optional[str]),
-    ],
-)
+
+class NewMetadataPluginResponse(NamedTuple):
+    app: web.Application
+    global_middlewares: Sequence[WebMiddleware]
+
+
+class InitMetadataPluginResponse(NamedTuple):
+    app: web.Application
+    global_middlewares: Sequence[WebMiddleware]
+    structure: Mapping[str, Any]
+
+
+class MetadataPluginRoute(NamedTuple):
+    method: str
+    route: str
+    route_handler: Callable[[web.Request], Coroutine[Any, Any, web.Response]]
+    route_name: Optional[str]
 
 
 class MetadataPlugin(AbstractPlugin, metaclass=ABCMeta):

@@ -106,12 +106,12 @@ class libnuma:
                     return None
             docker_cpuset_path = mount_point / cgroup_parent / cpuset_source_name
             log.debug(f"docker_cpuset_path: {docker_cpuset_path}")
-            cpuset_source = "the docker cgroup (v{})".format(version)
+            cpuset_source = f"the docker cgroup (v{version})"
             try:
                 docker_cpuset = docker_cpuset_path.read_text()
                 cpuset = {*parse_cpuset(docker_cpuset)}
                 return cpuset, cpuset_source
-            except (IOError, ValueError):
+            except (OSError, ValueError):
                 log.warning(
                     "failed to parse cgroup cpuset from {}, falling back to the next cpuset source",
                     docker_cpuset_path,

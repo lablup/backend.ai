@@ -27,6 +27,7 @@ from collections.abc import (
 )
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import UTC
 from decimal import Decimal
 from io import SEEK_END, BytesIO
 from itertools import chain
@@ -1026,7 +1027,7 @@ class AbstractAgent(
             await self.valkey_stat_client.store_computer_metadata(field_value_map)
 
         all_devices = list(
-            chain.from_iterable((computer.devices for computer in self.computers.values()))
+            chain.from_iterable(computer.devices for computer in self.computers.values())
         )
         self.affinity_map = AffinityMap.build(all_devices)
 
@@ -1291,7 +1292,7 @@ class AbstractAgent(
             await self.valkey_image_client.add_agent_installed_images(
                 agent_id=self.id, installed_image_info=list(self.images.values())
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log.warning("event dispatch timeout: instance_heartbeat")
         except Exception:
             log.exception("instance_heartbeat failure")
@@ -1684,7 +1685,7 @@ class AbstractAgent(
         tasks = [self._clean_kernel_object(kernel_id) for kernel_id in kernel_ids]
         try:
             await asyncio.gather(*tasks, return_exceptions=True)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log.warning(
                 "clean_kernel_objects() timed out, some kernel objects may not be cleaned up"
             )
@@ -1993,7 +1994,7 @@ class AbstractAgent(
             self._sync_container_lifecycle_observer.observe_container_lifecycle_failure(
                 agent_id=self.id, exception=e
             )
-        except asyncio.TimeoutError as e:
+        except TimeoutError as e:
             log.warning("sync_container_lifecycles() timeout, continuing")
             self._sync_container_lifecycle_observer.observe_container_lifecycle_failure(
                 agent_id=self.id, exception=e
@@ -2073,7 +2074,7 @@ class AbstractAgent(
         auto_terminate = self.local_config.agent.force_terminate_abusing_containers
 
         def _read(path: Path) -> str:
-            with open(path, "r") as fr:
+            with open(path) as fr:
                 return fr.read()
 
         def _rm(path: Path) -> None:
@@ -2181,7 +2182,7 @@ class AbstractAgent(
         Spawn bgtasks that pull the specified images and return bgtask IDs.
         Tracks pull operations for health monitoring.
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from ai.backend.common.bgtask.bgtask import ProgressReporter
         from ai.backend.common.events.event_types.image.anycast import (
@@ -2226,7 +2227,7 @@ class AbstractAgent(
                             image=str(img_ref),
                             image_ref=img_ref,
                             agent_id=self.id,
-                            timestamp=datetime.now(timezone.utc).timestamp(),
+                            timestamp=datetime.now(UTC).timestamp(),
                         )
                     )
 
@@ -2236,7 +2237,7 @@ class AbstractAgent(
                             img_ref, img_conf["registry"], timeout=image_pull_timeout
                         )
 
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         log.exception(
                             f"Image pull timeout (img:{img_ref!s}, sec:{image_pull_timeout})"
                         )
@@ -2271,7 +2272,7 @@ class AbstractAgent(
                                 image=str(img_ref),
                                 image_ref=img_ref,
                                 agent_id=self.id,
-                                timestamp=datetime.now(timezone.utc).timestamp(),
+                                timestamp=datetime.now(UTC).timestamp(),
                             )
                         )
                 else:
@@ -2282,7 +2283,7 @@ class AbstractAgent(
                             image=str(img_ref),
                             image_ref=img_ref,
                             agent_id=self.id,
-                            timestamp=datetime.now(timezone.utc).timestamp(),
+                            timestamp=datetime.now(UTC).timestamp(),
                             msg="Image already exists",
                         )
                     )
@@ -2540,7 +2541,7 @@ class AbstractAgent(
                         "exec": "",
                     }
                     mode = "continue"
-        except asyncio.TimeoutError:
+        except TimeoutError:
             await self.anycast_and_broadcast_event(
                 SessionFailureAnycastEvent(session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2),
                 SessionFailureBroadcastEvent(
@@ -2674,7 +2675,7 @@ class AbstractAgent(
                             timeout=image_pull_timeout,
                         )
 
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         log.exception(
                             f"Image pull timeout after {image_pull_timeout} seconds. Destroying kernel (k:{kernel_id}, img:{ctx.image_ref.canonical})"
                         )
@@ -3161,7 +3162,7 @@ class AbstractAgent(
                             pretty_container_id,
                             service_ports,
                         )
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         await self.inject_container_lifecycle_event(
                             kernel_id,
                             session_id,
@@ -3620,7 +3621,7 @@ class AbstractAgent(
             try:
                 with timeout(60):
                     await tracker.destroy_event.wait()
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 log.warning("timeout detected while restarting kernel {0}!", kernel_id)
                 self.restarting_kernels.pop(kernel_id, None)
                 await self.inject_container_lifecycle_event(

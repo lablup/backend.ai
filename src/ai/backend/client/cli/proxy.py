@@ -44,9 +44,7 @@ class WebSocketProxy:
                 if msg.type in (aiohttp.WSMsgType.TEXT, aiohttp.WSMsgType.BINARY):
                     await self.send(msg.data, msg.type)
                 elif msg.type == aiohttp.WSMsgType.ERROR:
-                    print_fail(
-                        "ws connection closed with exception {}".format(self.up_conn.exception())
-                    )
+                    print_fail(f"ws connection closed with exception {self.up_conn.exception()}")
                     break
                 elif msg.type == aiohttp.WSMsgType.CLOSE:
                     break
@@ -72,7 +70,7 @@ class WebSocketProxy:
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            print_fail("unexpected error: {}".format(e))
+            print_fail(f"unexpected error: {e}")
         finally:
             await self.close_upstream()
             print_info("websocket proxy terminated")

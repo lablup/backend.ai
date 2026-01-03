@@ -94,7 +94,7 @@ class RoutingRow(Base):
 
     endpoint_row = relationship("EndpointRow", back_populates="routings")
     session_row = relationship("SessionRow", back_populates="routing")
-    revision_row: "DeploymentRevisionRow" = relationship(
+    revision_row: DeploymentRevisionRow = relationship(
         "DeploymentRevisionRow",
         primaryjoin="RoutingRow.revision == DeploymentRevisionRow.id",
         foreign_keys="RoutingRow.revision",

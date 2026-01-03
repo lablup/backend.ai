@@ -700,7 +700,7 @@ async def gql_mutation_wrapper(
         )
         orig_exc = e.orig
         return result_cls(False, str(orig_exc), None)
-    except (asyncio.CancelledError, asyncio.TimeoutError):
+    except (TimeoutError, asyncio.CancelledError):
         raise
     except Exception as e:
         log.exception("gql_mutation_wrapper(): other error")

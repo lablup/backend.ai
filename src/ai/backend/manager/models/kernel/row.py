@@ -286,7 +286,7 @@ async def handle_kernel_exception(
     # NOTE: Error logging is done outside of this actxmanager.
     try:
         yield
-    except asyncio.TimeoutError:
+    except TimeoutError:
         if set_error:
             await KernelRow.set_kernel_status(
                 db,

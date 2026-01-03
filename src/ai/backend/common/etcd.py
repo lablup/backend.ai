@@ -671,7 +671,7 @@ class AsyncEtcd(AbstractKVStore):
                     if wait_timeout is not None:
                         try:
                             ev = await asyncio.wait_for(iterator.__anext__(), wait_timeout)
-                        except asyncio.TimeoutError:
+                        except TimeoutError:
                             pass
                     yield Event(
                         bytes(ev.key).decode(self.encoding)[scope_prefix_len:],

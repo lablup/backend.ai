@@ -57,7 +57,7 @@ class Endpoint(Base, BaseMixin):
         *,
         load_circuit: bool = False,
     ) -> "Endpoint":
-        query = sa.select(Endpoint).where((Endpoint.id == endpoint_id))
+        query = sa.select(Endpoint).where(Endpoint.id == endpoint_id)
         if load_circuit:
             query = query.options(selectinload(Endpoint.circuit_row))
         endpoint = await session.scalar(query)

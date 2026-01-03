@@ -45,7 +45,7 @@ class KernelStatus(CIStrEnum):
     CANCELLED = "CANCELLED"
 
     @classmethod
-    def having_containers(cls) -> set["KernelStatus"]:
+    def having_containers(cls) -> set[KernelStatus]:
         return {
             cls.PULLING,
             cls.CREATING,
@@ -60,7 +60,7 @@ class KernelStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def resource_occupied_statuses(cls) -> frozenset["KernelStatus"]:
+    def resource_occupied_statuses(cls) -> frozenset[KernelStatus]:
         """
         Returns a set of kernel statuses that are considered as resource-occupying.
         """
@@ -71,7 +71,7 @@ class KernelStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def resource_requested_statuses(cls) -> frozenset["KernelStatus"]:
+    def resource_requested_statuses(cls) -> frozenset[KernelStatus]:
         """
         Returns a set of kernel statuses that are considered as resource-occupying.
         """
@@ -85,7 +85,7 @@ class KernelStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def terminatable_statuses(cls) -> frozenset["KernelStatus"]:
+    def terminatable_statuses(cls) -> frozenset[KernelStatus]:
         """Return statuses that can transition to TERMINATING."""
         return frozenset(
             status
@@ -102,7 +102,7 @@ class KernelStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def terminal_statuses(cls) -> frozenset["KernelStatus"]:
+    def terminal_statuses(cls) -> frozenset[KernelStatus]:
         """
         Returns a set of kernel statuses that are considered terminal.
         """
@@ -114,21 +114,19 @@ class KernelStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def retriable_statuses(cls) -> frozenset["KernelStatus"]:
+    def retriable_statuses(cls) -> frozenset[KernelStatus]:
         """
         Returns a set of kernel statuses that are considered retriable.
         """
         return frozenset(
-            (
-                status
-                for status in cls
-                if status
-                not in (
-                    cls.RUNNING,
-                    cls.TERMINATING,
-                    cls.TERMINATED,
-                    cls.CANCELLED,
-                )
+            status
+            for status in cls
+            if status
+            not in (
+                cls.RUNNING,
+                cls.TERMINATING,
+                cls.TERMINATED,
+                cls.CANCELLED,
             )
         )
 

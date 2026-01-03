@@ -48,7 +48,7 @@ class VASTQuotaModel(BaseQuotaModel):
 
         def _read():
             try:
-                with open(qs_path / VAST_QUOTA_ID_FILE_NAME, "r") as f:
+                with open(qs_path / VAST_QUOTA_ID_FILE_NAME) as f:
                     return VASTQuotaID(f.read())
             except FileNotFoundError:
                 return None

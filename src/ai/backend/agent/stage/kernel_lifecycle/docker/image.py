@@ -107,9 +107,7 @@ class ImagePullProvisioner(Provisioner[ImagePullSpec, ImagePullResult]):
         reg_user = spec.registry_conf.get("username")
         reg_passwd = spec.registry_conf.get("password")
         if reg_user is not None and reg_passwd is not None:
-            encoded_creds = base64.b64encode(f"{reg_user}:{reg_passwd}".encode("utf-8")).decode(
-                "ascii"
-            )
+            encoded_creds = base64.b64encode(f"{reg_user}:{reg_passwd}".encode()).decode("ascii")
             auth_config = {
                 "auth": encoded_creds,
             }

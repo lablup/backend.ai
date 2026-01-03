@@ -4,7 +4,7 @@ import logging
 import ssl
 import time
 from dataclasses import dataclass, field, fields
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any, Mapping, NewType, Optional, TypedDict
@@ -181,7 +181,7 @@ class VASTAPIClient:
         if self.force_login:
             return await self._login()
 
-        current_dt = datetime.now(timezone.utc)
+        current_dt = datetime.now(UTC)
 
         def get_exp_dt(token: str) -> datetime:
             decoded: Mapping[str, Any] = jwt.decode(

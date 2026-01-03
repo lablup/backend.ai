@@ -49,7 +49,7 @@ class Runner:
             try:
                 async with asyncio.timeout(observer.timeout()):
                     await observer.observe()
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 log.warning(
                     "Observer {} timed out after {} seconds.",
                     observer.name,

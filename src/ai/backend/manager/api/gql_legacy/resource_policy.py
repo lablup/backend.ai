@@ -275,7 +275,7 @@ class KeyPairResourcePolicy(graphene.ObjectType):
         query = (
             sa.select([keypair_resource_policies])
             .select_from(j)
-            .where((keypairs.c.access_key.in_(access_keys)))
+            .where(keypairs.c.access_key.in_(access_keys))
             .order_by(keypair_resource_policies.c.name)
         )
         async with ctx.db.begin_readonly() as conn:
@@ -574,7 +574,7 @@ class UserResourcePolicy(graphene.ObjectType):
 
         query = (
             sa.select(UserRow)
-            .where((UserRow.uuid.in_(user_uuids)))
+            .where(UserRow.uuid.in_(user_uuids))
             .options(selectinload(UserRow.resource_policy_row))
             .order_by(UserRow.resource_policy)
         )
@@ -833,7 +833,7 @@ class ProjectResourcePolicy(graphene.ObjectType):
 
         query = (
             sa.select(GroupRow)
-            .where((GroupRow.id.in_(project_uuids)))
+            .where(GroupRow.id.in_(project_uuids))
             .order_by(GroupRow.resource_policy)
             .options(selectinload(GroupRow.resource_policy_row))
         )

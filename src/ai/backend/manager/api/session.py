@@ -1533,7 +1533,7 @@ async def list_files(request: web.Request) -> web.Response:
                 owner_access_key=owner_access_key,
             )
         )
-    except (asyncio.TimeoutError, AssertionError, json.decoder.JSONDecodeError) as e:
+    except (TimeoutError, AssertionError, json.decoder.JSONDecodeError) as e:
         log.warning("LIST_FILES: invalid/missing parameters, {0!r}", e)
         raise InvalidAPIParameters(extra_msg=str(e.args[0]))
 

@@ -67,7 +67,7 @@ class WithCachePropagator(EventPropagator):
                 if event is None:
                     break
                 yield event
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # On timeout, check for cached event again
                 cached_event = await self._fetch_cached_event_safe(cache_id)
                 if cached_event is not None:

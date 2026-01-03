@@ -162,7 +162,7 @@ def apply_missing_revisions(
         importlib.resources.files("ai.backend.manager.models.alembic.revision_history")
     ) as f:
         try:
-            with open(f / f"{previous_version}.json", "r") as fr:
+            with open(f / f"{previous_version}.json") as fr:
                 revision_history: RevisionHistory = load_json(fr.read())
         except FileNotFoundError:
             log.error(

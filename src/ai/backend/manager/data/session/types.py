@@ -48,7 +48,7 @@ class SessionStatus(CIStrEnum):
     CANCELLED = "CANCELLED"
 
     @classmethod
-    def kernel_awaiting_statuses(cls) -> set["SessionStatus"]:
+    def kernel_awaiting_statuses(cls) -> set[SessionStatus]:
         return {
             cls.PREPARING,
             cls.PULLING,
@@ -58,7 +58,7 @@ class SessionStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def resource_occupied_statuses(cls) -> frozenset["SessionStatus"]:
+    def resource_occupied_statuses(cls) -> frozenset[SessionStatus]:
         return frozenset(
             status
             for status in cls
@@ -72,7 +72,7 @@ class SessionStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def terminatable_statuses(cls) -> frozenset["SessionStatus"]:
+    def terminatable_statuses(cls) -> frozenset[SessionStatus]:
         """Return statuses that can transition to TERMINATING."""
         return frozenset(
             status
@@ -89,7 +89,7 @@ class SessionStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def terminal_statuses(cls) -> frozenset["SessionStatus"]:
+    def terminal_statuses(cls) -> frozenset[SessionStatus]:
         return frozenset((
             cls.ERROR,
             cls.TERMINATED,
@@ -98,18 +98,16 @@ class SessionStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def retriable_statuses(cls) -> frozenset["SessionStatus"]:
+    def retriable_statuses(cls) -> frozenset[SessionStatus]:
         return frozenset(
-            (
-                status
-                for status in cls
-                if status
-                not in (
-                    cls.RUNNING,
-                    cls.TERMINATING,
-                    cls.TERMINATED,
-                    cls.CANCELLED,
-                )
+            status
+            for status in cls
+            if status
+            not in (
+                cls.RUNNING,
+                cls.TERMINATING,
+                cls.TERMINATED,
+                cls.CANCELLED,
             )
         )
 
@@ -132,7 +130,7 @@ class SessionData:
     requested_slots: Any
     use_host_network: bool
     created_at: datetime = field(compare=False)
-    status: "SessionStatus"
+    status: SessionStatus
     result: SessionResult
     num_queries: int
     creation_id: Optional[str]

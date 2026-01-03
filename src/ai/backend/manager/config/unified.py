@@ -178,7 +178,7 @@ import os
 import secrets
 import socket
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from ipaddress import IPv4Network
 from pathlib import Path
 from pprint import pformat
@@ -1198,7 +1198,7 @@ class DebugConfig(BaseConfigSchema):
 
 class SystemConfig(BaseConfigSchema):
     timezone: TimeZone = Field(
-        default_factory=lambda: timezone.utc,
+        default_factory=lambda: UTC,
         description="""
         Timezone setting for the manager.
         Uses pytz-compatible timezone names.

@@ -18,7 +18,7 @@ from collections.abc import (
     MutableMapping,
     Sequence,
 )
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import (
     Any,
@@ -429,7 +429,7 @@ class AgentRegistry:
                                 str(SessionStatus.CANCELLED),
                             ):
                                 raise SessionNotFound("Session terminated during scheduling")
-            except asyncio.TimeoutError as e:
+            except TimeoutError as e:
                 if max_wait > 0:
                     raise e
                 async with self.db.begin_readonly_session() as db_session:
@@ -698,7 +698,7 @@ class AgentRegistry:
                 )
                 try:
                     await self._wait_for_session_running(session_id, propagator, max_wait)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     resp["status"] = "TIMEOUT"
                 else:
                     await asyncio.sleep(0.5)
@@ -931,7 +931,7 @@ class AgentRegistry:
                 )
                 try:
                     await self._wait_for_session_running(session_id, propagator, max_wait)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     resp["status"] = "TIMEOUT"
                 else:
                     await asyncio.sleep(0.5)
@@ -2052,7 +2052,7 @@ class AgentRegistry:
                 [binding.kernel.id for binding in items],
                 agent_alloc_ctx.agent_id,
             )
-        except (asyncio.TimeoutError, asyncio.CancelledError):
+        except (TimeoutError, asyncio.CancelledError):
             log.warning("_create_kernels_in_one_agent(s:{}) cancelled", scheduled_session.id)
             raise
 
@@ -2252,12 +2252,10 @@ class AgentRegistry:
                 session_query = (
                     sa.select(SessionRow)
                     .where(
-                        (
-                            SessionRow.status.in_({
-                                *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
-                                *USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
-                            })
-                        )
+                        SessionRow.status.in_({
+                            *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
+                            *USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
+                        })
                     )
                     .options(
                         load_only(
@@ -2308,12 +2306,10 @@ class AgentRegistry:
                         ],
                     )
                     await db_sess.execute(
-                        (
-                            sa.update(AgentRow)
-                            .values(occupied_slots=ResourceSlot({}))
-                            .where(AgentRow.status == AgentStatus.ALIVE)
-                            .where(sa.not_(AgentRow.id.in_(occupied_slots_per_agent.keys())))
-                        )
+                        sa.update(AgentRow)
+                        .values(occupied_slots=ResourceSlot({}))
+                        .where(AgentRow.status == AgentStatus.ALIVE)
+                        .where(sa.not_(AgentRow.id.in_(occupied_slots_per_agent.keys())))
                     )
                 else:
                     query = (
@@ -2768,7 +2764,7 @@ class AgentRegistry:
                             )
                             if last_stat is not None:
                                 last_stat["version"] = 2
-                        except asyncio.TimeoutError:
+                        except TimeoutError:
                             pass
                         if kernel.cluster_role == DEFAULT_ROLE:
                             main_stat = {
@@ -3415,7 +3411,7 @@ class AgentRegistry:
         await self.session_lifecycle_mgr.register_status_updatable_session([session_id])
 
     async def mark_kernel_heartbeat(self, kernel_id: KernelId) -> None:
-        last_seen = datetime.now(timezone.utc)
+        last_seen = datetime.now(UTC)
         async with self.db.begin_session() as db_session:
             kernel_row = await KernelRow.get_kernel_to_update_status(db_session, kernel_id)
             kernel_row.last_seen = last_seen
@@ -3653,7 +3649,7 @@ class AgentRegistry:
         query = (
             sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
             .select_from(scaling_groups)
-            .where((scaling_groups.c.name == endpoint.resource_group))
+            .where(scaling_groups.c.name == endpoint.resource_group)
         )
 
         result = await db_sess.execute(query)
@@ -3692,7 +3688,7 @@ class AgentRegistry:
         query = (
             sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
             .select_from(scaling_groups)
-            .where((scaling_groups.c.name == endpoint.resource_group))
+            .where(scaling_groups.c.name == endpoint.resource_group)
         )
 
         result = await db_sess.execute(query)
@@ -4338,7 +4334,7 @@ async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:
     except asyncio.CancelledError:
         log_func = log.warning
         log_msg, log_fmt, log_arg = "cancelled", "elapsed_time = {3:.6f}", time.monotonic() - begin
-    except asyncio.TimeoutError:
+    except TimeoutError:
         log_func = log.warning
         log_msg, log_fmt, log_arg = "timeout", "elapsed_time = {3:.6f}", time.monotonic() - begin
     finally:

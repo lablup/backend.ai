@@ -1035,7 +1035,7 @@ class SchedulerDispatcher(aobject):
                 )
                 raise asyncio.CancelledError()
             raise
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log.warning("check_precond(): timeout while executing start_session()")
 
     async def start(
@@ -1100,7 +1100,7 @@ class SchedulerDispatcher(aobject):
                 )
                 raise asyncio.CancelledError()
             raise
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log.warning("start(): timeout while executing start_session()")
 
     async def scale_services(

@@ -180,7 +180,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             await kube_config.load_kube_config()
 
             def _kernel_resource_spec_read():
-                with open((self.config_dir / "resource.txt").resolve(), "r") as f:
+                with open((self.config_dir / "resource.txt").resolve()) as f:
                     resource_spec = KernelResourceSpec.read_from_file(f)
                 return resource_spec
 

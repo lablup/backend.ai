@@ -3,7 +3,7 @@ import json
 import logging
 import time
 from collections.abc import MutableMapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import (
     Any,
     Awaitable,
@@ -109,14 +109,7 @@ class Session(MutableMapping[str, Any]):
             self._mapping.update(session_data)
 
     def __repr__(self) -> str:
-        return "<{} [new:{}, changed:{}, created:{} expiration:{}] {!r}>".format(
-            self.__class__.__name__,
-            self.new,
-            self._changed,
-            self.created,
-            self.expiration_dt,
-            self._mapping,
-        )
+        return f"<{self.__class__.__name__} [new:{self.new}, changed:{self._changed}, created:{self.created} expiration:{self.expiration_dt}] {self._mapping!r}>"
 
     @property
     def new(self) -> bool:
@@ -205,8 +198,8 @@ async def get_session(request: web.Request) -> Session:
         session = await storage.load_session(request)
         if not isinstance(session, Session):
             raise RuntimeError(
-                "Installed {!r} storage should return session instance "
-                "on .load_session() call, got {!r}.".format(storage, session)
+                f"Installed {storage!r} storage should return session instance "
+                f"on .load_session() call, got {session!r}."
             )
         request[SESSION_KEY] = session
     return session
@@ -220,8 +213,8 @@ async def new_session(request: web.Request) -> Session:
     session = await storage.new_session()
     if not isinstance(session, Session):
         raise RuntimeError(
-            "Installed {!r} storage should return session instance "
-            "on .load_session() call, got {!r}.".format(storage, session)
+            f"Installed {storage!r} storage should return session instance "
+            f"on .load_session() call, got {session!r}."
         )
     request[SESSION_KEY] = session
     return session
@@ -354,7 +347,7 @@ class AbstractStorage(metaclass=abc.ABCMeta):
         if max_age is not None:
             params["max_age"] = max_age
         if expiration_dt is not None:
-            params["expires"] = datetime.fromtimestamp(expiration_dt, tz=timezone.utc).isoformat()
+            params["expires"] = datetime.fromtimestamp(expiration_dt, tz=UTC).isoformat()
         if not cookie_data:
             # Ignoring type for params until aiohttp#4238 is released
             response.del_cookie(

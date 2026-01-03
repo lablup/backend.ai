@@ -7,7 +7,7 @@ import uuid
 from collections.abc import Container, Iterable, Mapping
 from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from typing import (
     TYPE_CHECKING,
@@ -1088,7 +1088,7 @@ async def update_vfolder_status(
     elif vfolder_info_len == 1:
         cond = vfolders.c.id == vfolder_ids[0]
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if update_status.is_deletable(force):
         select_stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))

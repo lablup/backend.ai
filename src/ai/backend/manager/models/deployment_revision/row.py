@@ -137,7 +137,7 @@ class DeploymentRevisionRow(Base):
         "ImageRow",
         primaryjoin="foreign(DeploymentRevisionRow.image) == ImageRow.id",
     )
-    routings: list["RoutingRow"] = relationship(
+    routings: list[RoutingRow] = relationship(
         "RoutingRow",
         primaryjoin="DeploymentRevisionRow.id == foreign(RoutingRow.revision)",
         viewonly=True,

@@ -101,7 +101,7 @@ class SchedulingContext:
     Context for each scheduling decision.
     """
 
-    registry: "AgentRegistry"
+    registry: AgentRegistry
     known_slot_types: Mapping[SlotName, SlotTypes]
 
 

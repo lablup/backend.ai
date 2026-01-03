@@ -90,7 +90,7 @@ async def detect_system_docker(ctx: Context) -> str:
     try:
         async with asyncio.timeout(0.5):
             await proc.communicate()
-    except asyncio.TimeoutError:
+    except TimeoutError:
         proc.kill()
         await proc.wait()
         raise PrerequisiteError(

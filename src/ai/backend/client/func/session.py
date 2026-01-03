@@ -985,7 +985,7 @@ class ComputeSession(BaseFunction):
                 },
             })
         else:
-            raise BackendClientError("Invalid execution mode: {0}".format(mode))
+            raise BackendClientError(f"Invalid execution mode: {mode}")
         async with rqst.fetch() as resp:
             return (await resp.json())["result"]
 
@@ -1042,9 +1042,7 @@ class ComputeSession(BaseFunction):
                         )
                     )
                 except ValueError:
-                    msg = 'File "{0}" is outside of the base directory "{1}".'.format(
-                        file_path, base_path
-                    )
+                    msg = f'File "{file_path}" is outside of the base directory "{base_path}".'
                     raise ValueError(msg) from None
             rqst = Request(
                 "POST",
@@ -1286,7 +1284,7 @@ class ComputeSession(BaseFunction):
                 "exec": opts.get("exec"),
             }
         else:
-            msg = "Invalid stream-execution mode: {0}".format(mode)
+            msg = f"Invalid stream-execution mode: {mode}"
             raise BackendClientError(msg)
         request = Request(
             "GET",

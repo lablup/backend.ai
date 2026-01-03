@@ -97,7 +97,7 @@ def test_kernel_execution_query_mode_user_input(py3_kernel):
     code = 'name = input("your name? "); print(f"hello, {name}!")'
     console, n = exec_loop(py3_kernel, "query", code, None, user_inputs=[name])
     assert "your name?" in console["stdout"]
-    assert "hello, {}!".format(name) in console["stdout"]
+    assert f"hello, {name}!" in console["stdout"]
 
 
 def test_kernel_get_or_create_reuse():
@@ -124,7 +124,7 @@ def test_kernel_execution_batch_mode(py3_kernel):
         "",
         {
             "build": "",
-            "exec": "python {}".format(Path(f.name).name),
+            "exec": f"python {Path(f.name).name}",
         },
     )
     assert "hello world" in console["stdout"]
@@ -145,12 +145,12 @@ def test_kernel_execution_batch_mode_user_input(py3_kernel):
         "",
         {
             "build": "",
-            "exec": "python {}".format(Path(f.name).name),
+            "exec": f"python {Path(f.name).name}",
         },
         user_inputs=[name],
     )
     assert "your name?" in console["stdout"]
-    assert "hello, {}!".format(name) in console["stdout"]
+    assert f"hello, {name}!" in console["stdout"]
 
 
 def test_kernel_execution_with_vfolder_mounts():
@@ -172,7 +172,7 @@ def test_kernel_execution_with_vfolder_mounts():
                     "",
                     {
                         "build": "",
-                        "exec": "python {}/{}".format(vfname, Path(f.name).name),
+                        "exec": f"python {vfname}/{Path(f.name).name}",
                     },
                 )
                 assert "hello world" in console["stdout"]

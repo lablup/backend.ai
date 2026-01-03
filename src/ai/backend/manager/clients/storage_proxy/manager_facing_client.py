@@ -663,7 +663,7 @@ class StorageProxyManagerFacingClient:
             vfid=vfid,
             relpath=relpath,
         ) as response_stream:
-            chunks = bytes()
+            chunks = b""
             while True:
                 chunk = await response_stream.content.read(DEFAULT_CHUNK_SIZE)
                 if not chunk:

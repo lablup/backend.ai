@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -37,7 +37,7 @@ def test_jwt_user_context_immutable() -> None:
 def test_jwt_claims_creation() -> None:
     """Test JWTClaims dataclass creation."""
     access_key = AccessKey("AKIAIOSFODNN7EXAMPLE")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     claims = JWTClaims(
         exp=now,
@@ -53,7 +53,7 @@ def test_jwt_claims_creation() -> None:
 def test_jwt_claims_to_dict() -> None:
     """Test JWTClaims serialization to dictionary."""
     access_key = AccessKey("AKIAIOSFODNN7EXAMPLE")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     claims = JWTClaims(
         exp=now,
@@ -73,7 +73,7 @@ def test_jwt_claims_to_dict() -> None:
 def test_jwt_claims_from_dict() -> None:
     """Test JWTClaims deserialization from dictionary."""
     access_key = AccessKey("AKIAIOSFODNN7EXAMPLE")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     payload = {
         "exp": int(now.timestamp()),
@@ -91,7 +91,7 @@ def test_jwt_claims_from_dict() -> None:
 def test_jwt_claims_roundtrip() -> None:
     """Test that JWTClaims can be serialized and deserialized correctly."""
     access_key = AccessKey("AKIAIOSFODNN7EXAMPLE")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     original_claims = JWTClaims(
         exp=now,
@@ -112,8 +112,8 @@ def test_jwt_claims_roundtrip() -> None:
 def test_jwt_claims_from_dict_missing_field() -> None:
     """Test that JWTClaims.from_dict raises error when required field is missing."""
     payload = {
-        "exp": int(datetime.now(timezone.utc).timestamp()),
-        "iat": int(datetime.now(timezone.utc).timestamp()),
+        "exp": int(datetime.now(UTC).timestamp()),
+        "iat": int(datetime.now(UTC).timestamp()),
         # Missing access_key, role
     }
 

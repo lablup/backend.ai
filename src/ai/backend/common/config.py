@@ -391,7 +391,7 @@ def read_from_file(
         discovered_path = Path(toml_path)
     try:
         config = cast(Dict[str, Any], tomli.loads(discovered_path.read_text()))
-    except IOError:
+    except OSError:
         raise ConfigurationError({
             "read_from_file()": f"Could not read config from: {discovered_path}",
         })

@@ -4,7 +4,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from functools import partial
 from typing import TYPE_CHECKING, Optional, cast
@@ -1229,7 +1229,7 @@ class ScheduleRepository:
             return await self._transit_scheduled_to_preparing(session)
 
     async def _transit_scheduled_to_preparing(self, session: SASession) -> list[SessionRow]:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         scheduled_sessions = await SessionRow.get_sessions_by_status(
             session, SessionStatus.SCHEDULED, load_kernel_image=True
         )
@@ -1243,7 +1243,7 @@ class ScheduleRepository:
     @schedule_repository_resilience.apply()
     async def mark_sessions_and_kernels_creating(self) -> list[SessionRow]:
         async with self._db.begin_session() as session:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             session_rows = await SessionRow.get_sessions_by_status(session, SessionStatus.PREPARED)
             for row in session_rows:
                 for kernel_row in row.kernels:
@@ -1327,7 +1327,7 @@ class ScheduleRepository:
             await self._autoscale_endpoints(session)
 
     async def _autoscale_endpoints(self, session: SASession) -> None:
-        current_datetime = datetime.now(timezone.utc)
+        current_datetime = datetime.now(UTC)
         rules = await EndpointAutoScalingRuleRow.list(session)
 
         # Currently auto scaling supports two types of stat as source: kernel and endpoint
@@ -2608,7 +2608,7 @@ class ScheduleRepository:
 
         from ai.backend.manager.data.session.types import SessionStatus
 
-        timed_out_sessions: list["SweptSessionInfo"] = []
+        timed_out_sessions: list[SweptSessionInfo] = []
         now = datetime.now(tzutc())
 
         async with self._db.begin_readonly_session() as db_sess:

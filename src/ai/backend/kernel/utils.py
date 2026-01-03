@@ -72,7 +72,7 @@ async def wait_local_port_open(port):
         except ConnectionRefusedError:
             await asyncio.sleep(0.1)
             continue
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise
         except Exception:
             raise
@@ -91,7 +91,7 @@ def scan_proc_stats() -> dict[int, dict]:
             try:
                 stat = parse_proc_stat(pid)
                 pid_set[pid] = stat
-            except IOError:
+            except OSError:
                 pass
     return pid_set
 

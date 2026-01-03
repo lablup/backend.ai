@@ -3,8 +3,7 @@ from __future__ import annotations
 import enum
 import logging
 from contextlib import asynccontextmanager as actxmgr
-from datetime import datetime
-from datetime import timezone as tz
+from datetime import UTC, datetime
 from pathlib import PurePath
 from typing import Any, AsyncIterator, Optional, Union
 
@@ -28,7 +27,7 @@ class CheckParamSource(enum.Enum):
 
 
 def fstime2datetime(t: Union[float, int]) -> datetime:
-    return datetime.utcfromtimestamp(t).replace(tzinfo=tz.utc)
+    return datetime.utcfromtimestamp(t).replace(tzinfo=UTC)
 
 
 @actxmgr

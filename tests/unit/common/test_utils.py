@@ -296,7 +296,7 @@ async def test_async_file_writer_str() -> None:
             await file_writer.write(init_str[i : i + 20])
 
     # 4. Read string from the file and close it
-    with open(file_name, "r") as f:
+    with open(file_name) as f:
         final_str = f.read()
     Path(file_name).unlink()
 

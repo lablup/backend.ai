@@ -118,25 +118,25 @@ def test_binary_size_str_conversion():
     assert BinarySize.from_str("1m") == 1048576
     assert BinarySize.from_str("0.5m") == 524288
     assert BinarySize.from_str("512k") == 524288
-    assert "{: }".format(BinarySize(930)) == "930"
-    assert "{:k}".format(BinarySize(1024)) == "1k"  # type: ignore
-    assert "{:k}".format(BinarySize(524288)) == "512k"  # type: ignore
-    assert "{:k}".format(BinarySize(1048576)) == "1024k"  # type: ignore
-    assert "{:m}".format(BinarySize(524288)) == "0.5m"  # type: ignore
-    assert "{:m}".format(BinarySize(1048576)) == "1m"  # type: ignore
-    assert "{:m}".format(BinarySize(1048576123)) == "1000m"  # type: ignore
-    assert "{:g}".format(BinarySize(2**30)) == "1g"
+    assert f"{BinarySize(930): }" == "930"
+    assert f"{BinarySize(1024):k}" == "1k"  # type: ignore
+    assert f"{BinarySize(524288):k}" == "512k"  # type: ignore
+    assert f"{BinarySize(1048576):k}" == "1024k"  # type: ignore
+    assert f"{BinarySize(524288):m}" == "0.5m"  # type: ignore
+    assert f"{BinarySize(1048576):m}" == "1m"  # type: ignore
+    assert f"{BinarySize(1048576123):m}" == "1000m"  # type: ignore
+    assert f"{BinarySize(2**30):g}" == "1g"
     with pytest.raises(ValueError):
-        "{:x}".format(BinarySize(1))
+        f"{BinarySize(1):x}"
     with pytest.raises(ValueError):
-        "{:qqqq}".format(BinarySize(1))
+        f"{BinarySize(1):qqqq}"
     with pytest.raises(ValueError):
-        "{:}".format(BinarySize(1))
-    assert "{:s}".format(BinarySize(930)) == "930"
-    assert "{:s}".format(BinarySize(1024)) == "1k"
-    assert "{:s}".format(BinarySize(524288)) == "512k"
-    assert "{:s}".format(BinarySize(1048576)) == "1m"
-    assert "{:s}".format(BinarySize(2**30)) == "1g"
+        f"{BinarySize(1)}"
+    assert f"{BinarySize(930):s}" == "930"
+    assert f"{BinarySize(1024):s}" == "1k"
+    assert f"{BinarySize(524288):s}" == "512k"
+    assert f"{BinarySize(1048576):s}" == "1m"
+    assert f"{BinarySize(2**30):s}" == "1g"
 
 
 def test_binary_size_decimal_conversion():

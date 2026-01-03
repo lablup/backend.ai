@@ -421,10 +421,8 @@ def insert_registry_id_to_images_with_missing_registry_id() -> None:
             sa.update(images_table)
             .values(registry_id=registry_id)
             .where(
-                (
-                    images_table.c.name.startswith(f"{registry_name}/{project}")
-                    & (images_table.c.registry_id.is_(None))
-                )
+                images_table.c.name.startswith(f"{registry_name}/{project}")
+                & (images_table.c.registry_id.is_(None))
             )
         )
 
@@ -485,7 +483,7 @@ def mark_local_images_with_missing_registry_id() -> None:
             registry_id=local_registry_id,
             is_local=True,
         )
-        .where((images_table.c.registry_id.is_(None)))
+        .where(images_table.c.registry_id.is_(None))
     )
 
 

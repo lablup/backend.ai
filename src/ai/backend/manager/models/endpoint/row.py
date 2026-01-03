@@ -1006,7 +1006,7 @@ class EndpointAutoScalingRuleRow(Base):
     @classmethod
     async def get(
         cls, session: AsyncSession, id: UUID, load_endpoint: bool = False
-    ) -> "EndpointAutoScalingRuleRow":
+    ) -> EndpointAutoScalingRuleRow:
         query = sa.select(EndpointAutoScalingRuleRow).filter(EndpointAutoScalingRuleRow.id == id)
         if load_endpoint:
             query = query.options(selectinload(EndpointAutoScalingRuleRow.endpoint_row))
@@ -1190,7 +1190,7 @@ class ModelServiceHelper:
         query = (
             sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
             .select_from(scaling_groups)
-            .where((scaling_groups.c.name == checked_scaling_group))
+            .where(scaling_groups.c.name == checked_scaling_group)
         )
 
         result = await conn.execute(query)
@@ -1389,7 +1389,7 @@ class EndpointStatistics:
     @classmethod
     async def batch_load_by_endpoint(
         cls,
-        ctx: "GraphQueryContext",
+        ctx: GraphQueryContext,
         endpoint_ids: Sequence[UUID],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
         return await cls.batch_load_by_endpoint_impl(ctx.valkey_stat, endpoint_ids)

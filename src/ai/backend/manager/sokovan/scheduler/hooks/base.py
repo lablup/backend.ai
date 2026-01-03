@@ -3,6 +3,7 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import UTC
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import ClusterMode
@@ -70,7 +71,7 @@ class SessionHook(AbstractSessionHook):
 
     async def _produce_session_started_notification(self, session: SessionTransitionData) -> None:
         """Produce notification event for session start."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from ai.backend.common.data.notification import NotificationRuleType
         from ai.backend.common.data.notification.messages import SessionStartedMessage
@@ -86,7 +87,7 @@ class SessionHook(AbstractSessionHook):
             )
             event = NotificationTriggeredEvent(
                 rule_type=NotificationRuleType.SESSION_STARTED.value,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 notification_data=message.model_dump(),
             )
             await self._event_producer.anycast_event(event)
@@ -102,7 +103,7 @@ class SessionHook(AbstractSessionHook):
         self, session: SessionTransitionData
     ) -> None:
         """Produce notification event for session termination."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from ai.backend.common.data.notification import NotificationRuleType
         from ai.backend.common.data.notification.messages import SessionTerminatedMessage
@@ -119,7 +120,7 @@ class SessionHook(AbstractSessionHook):
             )
             event = NotificationTriggeredEvent(
                 rule_type=NotificationRuleType.SESSION_TERMINATED.value,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 notification_data=message.model_dump(),
             )
             await self._event_producer.anycast_event(event)

@@ -156,11 +156,7 @@ async def upgrade_2_to_3(
                     quota_scope_id = quota_scope_map[folder_id]
                 except KeyError:
                     continue
-                progbar.set_description(
-                    "inspecting contents of vfolder {}".format(
-                        folder_id,
-                    )
-                )
+                progbar.set_description(f"inspecting contents of vfolder {folder_id}")
                 orig_vfid = VFolderID(None, folder_id)
                 dst_vfid = VFolderID(quota_scope_id, folder_id)
                 try:

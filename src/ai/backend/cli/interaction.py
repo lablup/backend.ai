@@ -124,7 +124,7 @@ def ask_yn(prompt: str = "Are you sure?", default: str = "y") -> bool:
     else:
         raise ValueError("default must be given either 'y' or 'n'.")
     while True:
-        user_reply = input("{0} [{1}] ".format(prompt, choices)).lower()
+        user_reply = input(f"{prompt} [{choices}] ").lower()
         if user_reply == "":
             user_reply = default
         if user_reply in ("y", "yes", "n", "no"):

@@ -310,7 +310,7 @@ def list_shared_vfolders():
                 if shared_to:
                     print("- Shared to:")
                     for k, v in shared_to.items():
-                        print("\t- {0}: {1}\n".format(k, v))
+                        print(f"\t- {k}: {v}\n")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -345,7 +345,7 @@ def shared_vfolder_info(vfolder_id):
                 if shared_to:
                     print("- Shared to:")
                     for k, v in shared_to.items():
-                        print("\t- {0}: {1}\n".format(k, v))
+                        print(f"\t- {k}: {v}\n")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)

@@ -228,7 +228,7 @@ class SessionWorkload:
     # Only populated for inference sessions with enforce_spreading_endpoint_replica
     kernel_counts_at_endpoint: Optional[dict[AgentId, int]] = None
 
-    def to_agent_selection_criteria(self) -> "AgentSelectionCriteria":
+    def to_agent_selection_criteria(self) -> AgentSelectionCriteria:
         """
         Convert to new agent selection criteria for scheduling.
 
@@ -322,9 +322,9 @@ class SessionAllocation:
     def from_agent_selections(
         cls,
         session_workload: SessionWorkload,
-        selections: list["AgentSelection"],
+        selections: list[AgentSelection],
         scaling_group: str,
-    ) -> "SessionAllocation":
+    ) -> SessionAllocation:
         """
         Build a SessionAllocation from agent selection results.
 
@@ -680,7 +680,7 @@ class KernelCreationInfo:
     kernel_host: Optional[str] = None
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "KernelCreationInfo":
+    def from_dict(cls, data: dict[str, Any]) -> KernelCreationInfo:
         """Create from dictionary, handling missing or invalid fields."""
         return cls(
             container_id=data.get("container_id"),

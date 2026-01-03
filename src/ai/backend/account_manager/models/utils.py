@@ -1,4 +1,3 @@
-import asyncio
 import functools
 import json
 import logging
@@ -198,9 +197,7 @@ class ExtendedAsyncSAEngine(SAEngine):
                             raise TryAgain
                         raise
         except RetryError:
-            raise asyncio.TimeoutError(
-                f"DB serialization failed after {max_attempts} retry transactions"
-            )
+            raise TimeoutError(f"DB serialization failed after {max_attempts} retry transactions")
         return result
 
 

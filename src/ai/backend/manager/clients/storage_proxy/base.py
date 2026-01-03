@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from collections.abc import Mapping
 from contextlib import asynccontextmanager as actxmgr
@@ -162,7 +161,7 @@ class StorageProxyHTTPClient:
                     yield client_resp
                     return
                 await self._handle_exceptional_response(client_resp)
-        except asyncio.TimeoutError as e:
+        except TimeoutError as e:
             raise StorageProxyTimeoutError(
                 extra_msg="Request to storage proxy timed out",
             ) from e

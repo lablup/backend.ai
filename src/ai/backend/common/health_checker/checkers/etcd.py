@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ai.backend.common.etcd import AsyncEtcd
 
@@ -41,7 +41,7 @@ class EtcdHealthChecker(StaticServiceHealthChecker):
         Returns:
             ServiceHealth containing status for etcd component
         """
-        check_time = datetime.now(timezone.utc)
+        check_time = datetime.now(UTC)
 
         try:
             await self._etcd.ping()

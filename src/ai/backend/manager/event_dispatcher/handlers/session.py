@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import aiohttp
@@ -301,7 +301,7 @@ class SessionEventHandler:
             "type": "session_lifecycle",
             "event": event.event_name().removeprefix("session_"),
             "session_id": str(event.session_id),
-            "when": datetime.now(timezone.utc).isoformat(),
+            "when": datetime.now(UTC).isoformat(),
         }
 
         self._registry.webhook_ptask_group.create_task(
@@ -379,7 +379,7 @@ async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:
     except asyncio.CancelledError:
         log_func = log.warning
         log_msg, log_fmt, log_arg = "cancelled", "elapsed_time = {3:.6f}", time.monotonic() - begin
-    except asyncio.TimeoutError:
+    except TimeoutError:
         log_func = log.warning
         log_msg, log_fmt, log_arg = "timeout", "elapsed_time = {3:.6f}", time.monotonic() - begin
     finally:

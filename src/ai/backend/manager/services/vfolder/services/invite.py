@@ -184,7 +184,7 @@ class VFolderInviteService:
             # Update invitation state
             await self._vfolder_repository.update_invitation_state(action.invitation_id, state)
 
-        except (asyncio.CancelledError, asyncio.TimeoutError):
+        except (TimeoutError, asyncio.CancelledError):
             raise
         except Exception as e:
             if not isinstance(e, (VFolderInvitationNotFound, VFolderNotFound, Forbidden)):

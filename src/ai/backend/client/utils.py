@@ -113,4 +113,4 @@ def to_global_id(node_name: str, id: uuid.UUID) -> str:
     Used to generate a global ID for a node in the GraphQL Relay specification.
     Encode the node name and id into a global ID using Base64 encoding.
     """
-    return base64.b64encode(f"{node_name}:{id!s}".encode("utf-8")).decode("ascii")
+    return base64.b64encode(f"{node_name}:{id!s}".encode()).decode("ascii")

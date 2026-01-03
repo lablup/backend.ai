@@ -451,7 +451,7 @@ class ComputeSessionNode(graphene.ObjectType):
 
     async def __resolve_reference(
         self, info: graphene.ResolveInfo, **kwargs
-    ) -> Optional["ComputeSessionNode"]:
+    ) -> Optional[ComputeSessionNode]:
         # TODO: Confirm if scope and permsission are correct
         # Parse the global ID from Federation (converts base64 encoded string to tuple)
         resolved_id = resolve_global_id(self.id)

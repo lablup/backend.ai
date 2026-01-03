@@ -131,7 +131,7 @@ class AliasGroupMixin(click.Group):
                 continue
             if subcommand in self._commands:
                 aliases = ",".join(sorted(self._commands[subcommand]))
-                subcommand = "{0} ({1})".format(subcommand, aliases)
+                subcommand = f"{subcommand} ({aliases})"
             commands.append((subcommand, cmd))
 
         # allow for 3 times the default spacing

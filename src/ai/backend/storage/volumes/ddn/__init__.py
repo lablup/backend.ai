@@ -48,7 +48,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
     async def _read_project_id(self, pid_file_path: str | Path) -> int | None:
         def _read():
             try:
-                with open(pid_file_path, "r") as f:
+                with open(pid_file_path) as f:
                     return int(f.read())
             except FileNotFoundError:
                 return None

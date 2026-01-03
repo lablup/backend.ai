@@ -317,7 +317,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         *,
         client_features: FrozenSet[str],
         api_version: int,
-    ) -> "AbstractCodeRunner":
+    ) -> AbstractCodeRunner:
         raise NotImplementedError
 
     @abstractmethod
@@ -939,7 +939,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             return load_json(result)
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return {"status": "failed", "error": "timeout"}
 
     async def feed_start_service(self, service_info):
@@ -955,7 +955,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             return load_json(result)
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return {"status": "failed", "error": "timeout"}
 
     async def feed_shutdown_service(self, service_name: str):
@@ -969,7 +969,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"get-apps",
-            "".encode("utf8"),
+            b"",
         ])
         try:
             with timeout(10):
@@ -978,7 +978,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             return load_json(result)
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return {"status": "failed", "error": "timeout"}
 
     async def watchdog(self) -> None:
@@ -1085,7 +1085,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except asyncio.CancelledError:
             self.resume_output_queue()
             raise
-        except asyncio.TimeoutError:
+        except TimeoutError:
             result = {
                 "runId": self.current_run_id,
                 "status": "continued",

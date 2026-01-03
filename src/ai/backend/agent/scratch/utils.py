@@ -84,7 +84,7 @@ class ScratchConfig:
         filepath = self._json_recovery_file_path()
         if not filepath.is_file():
             return None
-        async with aiofiles.open(filepath, "r") as file:
+        async with aiofiles.open(filepath) as file:
             text = await file.read()
         raw_data = load_json(text)
         return KernelRecoveryScratchData.model_validate(raw_data)

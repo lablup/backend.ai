@@ -1200,7 +1200,7 @@ class DeploymentDBSource:
                     scaling_groups.c.wsproxy_api_token,
                 ])
                 .select_from(scaling_groups)
-                .where((scaling_groups.c.name.in_(scaling_group)))
+                .where(scaling_groups.c.name.in_(scaling_group))
             )
             result = await db_sess.execute(query)
             rows = result.all()

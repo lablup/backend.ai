@@ -48,7 +48,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
         """
         quota_id_path = qspath / ".quota_id"
         if quota_id_path.exists():
-            async with aiofiles.open(quota_id_path, "r") as file:
+            async with aiofiles.open(quota_id_path) as file:
                 quota_id = await file.read()
             return quota_id.rstrip()
         else:

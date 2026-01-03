@@ -456,7 +456,7 @@ async def handle_session_exception(
     exc_class = OP_EXC[op]
     try:
         yield
-    except asyncio.TimeoutError:
+    except TimeoutError:
         if set_error:
             await SessionRow.set_session_status(
                 db,

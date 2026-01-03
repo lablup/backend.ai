@@ -18,7 +18,7 @@ __all__ = (
 )
 
 # Module-level registry for notification message types
-_MESSAGE_TYPE_REGISTRY: dict[NotificationRuleType, type["NotifiableMessage"]] = {}
+_MESSAGE_TYPE_REGISTRY: dict[NotificationRuleType, type[NotifiableMessage]] = {}
 
 
 class NotifiableMessage(BaseModel):
@@ -52,7 +52,7 @@ class NotifiableMessage(BaseModel):
         cls,
         rule_type: NotificationRuleType,
         data: Mapping[str, Any],
-    ) -> "NotifiableMessage":
+    ) -> NotifiableMessage:
         """Validate notification data against the appropriate message type.
 
         Args:

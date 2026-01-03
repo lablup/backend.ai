@@ -225,7 +225,7 @@ class GroupRow(Base):
         session: AsyncSession,
         project_id: uuid.UUID,
         load_resource_policy=False,
-    ) -> "GroupRow":
+    ) -> GroupRow:
         query = sa.select(GroupRow).filter(GroupRow.id == project_id)
         if load_resource_policy:
             query = query.options(selectinload(GroupRow.resource_policy_row))

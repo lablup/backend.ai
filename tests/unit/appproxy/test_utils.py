@@ -1,5 +1,5 @@
 import enum
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from uuid import UUID
 
@@ -53,7 +53,7 @@ class SampleEnum(enum.Enum):
         (Path("/some/path"), "/some/path"),
         (SampleModel(id=1, name="Test"), {"id": 1, "name": "Test"}),
         (SampleEnum.VALUE_1, "value1"),
-        (datetime(2024, 7, 16, 5, 45, 45, tzinfo=timezone.utc), 1721108745.0),
+        (datetime(2024, 7, 16, 5, 45, 45, tzinfo=UTC), 1721108745.0),
         (datetime(2024, 7, 16, 5, 45, 45, tzinfo=timezone(timedelta(hours=9))), 1721076345.0),
     ],
 )

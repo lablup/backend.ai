@@ -168,10 +168,7 @@ async def execute(
             show_retry_warning(e, warn_on_first_attempt)
             await asyncio.sleep(reconnect_poll_interval)
             continue
-        except (
-            redis.exceptions.TimeoutError,
-            asyncio.TimeoutError,
-        ) as e:
+        except (TimeoutError, redis.exceptions.TimeoutError) as e:
             if command_timeout is not None:
                 now = time.perf_counter()
                 if now - first_trial >= command_timeout + 1.0:

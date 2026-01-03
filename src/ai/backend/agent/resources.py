@@ -132,7 +132,7 @@ class KernelResourceSpec:
     scratch_disk_size: int
     """The size of scratch disk. (not implemented yet)"""
 
-    mounts: list["Mount"] = attrs.Factory(list)
+    mounts: list[Mount] = attrs.Factory(list)
     """The mounted vfolder list."""
 
     unified_devices: Iterable[tuple[DeviceName, SlotName]] = attrs.Factory(list)
@@ -204,7 +204,7 @@ class KernelResourceSpec:
         file.write(self.write_to_string())
 
     @classmethod
-    def read_from_string(cls, text: str) -> "KernelResourceSpec":
+    def read_from_string(cls, text: str) -> KernelResourceSpec:
         kvpairs = {}
         for line in text.split("\n"):
             if "=" not in line:
@@ -252,12 +252,12 @@ class KernelResourceSpec:
         )
 
     @classmethod
-    def read_from_file(cls, file: TextIOWrapper) -> "KernelResourceSpec":
+    def read_from_file(cls, file: TextIOWrapper) -> KernelResourceSpec:
         text = "\n".join(file.readlines())
         return cls.read_from_string(text)
 
     @classmethod
-    async def aread_from_file(cls, file: AsyncTextIOWrapper) -> "KernelResourceSpec":
+    async def aread_from_file(cls, file: AsyncTextIOWrapper) -> KernelResourceSpec:
         text = "\n".join(await file.readlines())  # type: ignore
         return cls.read_from_string(text)
 
@@ -416,7 +416,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def create_alloc_map(self) -> "AbstractAllocMap":
+    async def create_alloc_map(self) -> AbstractAllocMap:
         """
         Create and return an allocation map for this plugin.
         """

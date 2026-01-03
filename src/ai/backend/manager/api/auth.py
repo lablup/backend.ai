@@ -457,7 +457,7 @@ async def _query_cred_by_access_key(
         query = (
             sa.select([users, user_resource_policies], use_labels=True)
             .select_from(j)
-            .where((keypairs.c.access_key == access_key))
+            .where(keypairs.c.access_key == access_key)
         )
         result = await conn.execute(query)
         user_row = result.first()

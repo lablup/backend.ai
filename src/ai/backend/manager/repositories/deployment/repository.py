@@ -5,7 +5,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal, DecimalException
 from typing import Any, Optional, cast
 
@@ -737,7 +737,7 @@ class DeploymentRepository:
         if not auto_scaling_rules:
             return None
 
-        current_datetime = datetime.now(timezone.utc)
+        current_datetime = datetime.now(UTC)
         current_replica_count = deployment.replica_spec.target_replica_count
         routes = metrics_data.routes_by_endpoint.get(deployment.id, [])
 

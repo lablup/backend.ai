@@ -20,7 +20,7 @@ from ai.backend.testutils.mock import AsyncMock
 def build_url(config, path: str) -> URL:
     base_url = config.endpoint.path.rstrip("/")
     query_path = path.lstrip("/") if len(path) > 0 else ""
-    path = "{0}/{1}".format(base_url, query_path)
+    path = f"{base_url}/{query_path}"
     canonical_url = config.endpoint.with_path(path)
     return canonical_url
 
@@ -52,14 +52,14 @@ async def test_upload_jwt_generation(tmp_path) -> None:
             }
 
             m.post(
-                build_url(session.config, "/folders/{}/request-upload".format(vfolder_name)),
+                build_url(session.config, f"/folders/{vfolder_name}/request-upload"),
                 payload=payload,
                 status=HTTPStatus.OK,
             )
 
-            rqst = Request("POST", "/folders/{}/request-upload".format(vfolder_name))
+            rqst = Request("POST", f"/folders/{vfolder_name}/request-upload")
             rqst.set_json({
-                "path": "{}".format(str(Path(mock_file))),
+                "path": f"{Path(mock_file)!s}",
                 "size": str(file_size),
             })
 
@@ -108,13 +108,13 @@ async def test_tus_upload(tmp_path: Path) -> None:
             "Server": "Python/3.8 aiohttp/3.6.2",
         }
 
-        upload_url = "http://127.0.0.1:6021/upload?token={}".format(token)
+        upload_url = f"http://127.0.0.1:6021/upload?token={token}"
         m.head(
-            "http://127.0.0.1:6021/folders/{}/upload?token={}".format(vfolder_name, token),
+            f"http://127.0.0.1:6021/folders/{vfolder_name}/upload?token={token}",
             status=HTTPStatus.OK,
         )
         m.patch(
-            "http://127.0.0.1:6021/upload?token={}".format(token),
+            f"http://127.0.0.1:6021/upload?token={token}",
             payload=storage_proxy_payload,
             status=HTTPStatus.NO_CONTENT,
             headers={
@@ -168,9 +168,7 @@ async def test_vfolder_download(mocker) -> None:
             )
             # 1. Client to Manager throught Request
             m.post(
-                build_url(
-                    session.config, "/folders/{}/request-download".format(source_vfolder_uuid.hex)
-                ),
+                build_url(session.config, f"/folders/{source_vfolder_uuid.hex}/request-download"),
                 payload=payload,
                 status=HTTPStatus.OK,
                 headers={

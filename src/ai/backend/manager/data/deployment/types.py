@@ -101,7 +101,7 @@ class RouteStatus(enum.Enum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def active_route_statuses(cls) -> set["RouteStatus"]:
+    def active_route_statuses(cls) -> set[RouteStatus]:
         return {
             RouteStatus.PROVISIONING,
             RouteStatus.HEALTHY,
@@ -111,7 +111,7 @@ class RouteStatus(enum.Enum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def inactive_route_statuses(cls) -> set["RouteStatus"]:
+    def inactive_route_statuses(cls) -> set[RouteStatus]:
         return {RouteStatus.TERMINATING, RouteStatus.TERMINATED, RouteStatus.FAILED_TO_START}
 
     def is_active(self) -> bool:

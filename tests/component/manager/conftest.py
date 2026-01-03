@@ -166,7 +166,7 @@ def vfolder_mount(test_id):
     yield ret
     try:
         shutil.rmtree(ret.parent)
-    except IOError:
+    except OSError:
         pass
 
 
@@ -289,7 +289,7 @@ def bootstrap_config(
     yield bootstrap_config
     try:
         shutil.rmtree(ipc_base_path)
-    except IOError:
+    except OSError:
         pass
 
 
@@ -628,18 +628,18 @@ async def database_fixture(
         )
         try:
             async with engine.begin() as conn:
-                await conn.execute((vfolders.delete()))
-                await conn.execute((kernels.delete()))
-                await conn.execute((SessionRow.__table__.delete()))
-                await conn.execute((agents.delete()))
-                await conn.execute((session_templates.delete()))
-                await conn.execute((keypairs.delete()))
-                await conn.execute((users.delete()))
-                await conn.execute((scaling_groups.delete()))
-                await conn.execute((domains.delete()))
-                await conn.execute((ImageAliasRow.__table__.delete()))
-                await conn.execute((ImageRow.__table__.delete()))
-                await conn.execute((ContainerRegistryRow.__table__.delete()))
+                await conn.execute(vfolders.delete())
+                await conn.execute(kernels.delete())
+                await conn.execute(SessionRow.__table__.delete())
+                await conn.execute(agents.delete())
+                await conn.execute(session_templates.delete())
+                await conn.execute(keypairs.delete())
+                await conn.execute(users.delete())
+                await conn.execute(scaling_groups.delete())
+                await conn.execute(domains.delete())
+                await conn.execute(ImageAliasRow.__table__.delete())
+                await conn.execute(ImageRow.__table__.delete())
+                await conn.execute(ContainerRegistryRow.__table__.delete())
         finally:
             await engine.dispose()
 

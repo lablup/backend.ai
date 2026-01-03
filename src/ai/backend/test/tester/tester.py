@@ -45,7 +45,7 @@ class Tester:
 
     @aiotools.lru_cache(maxsize=1)
     async def _load_tester_config(self, config_path: Path) -> TesterConfig:
-        async with aiofiles.open(config_path, mode="r") as fp:
+        async with aiofiles.open(config_path) as fp:
             raw_content = await fp.read()
             content = tomli.loads(raw_content)
             config = TesterConfig.model_validate(content, by_alias=True, by_name=True)

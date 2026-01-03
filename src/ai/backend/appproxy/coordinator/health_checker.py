@@ -44,7 +44,7 @@ class HealthCheckEngine:
     db: ExtendedAsyncSAEngine
     event_producer: EventProducer
     valkey_live: ValkeyLiveClient
-    circuit_manager: "CircuitManager"
+    circuit_manager: CircuitManager
     valkey_schedule: ValkeyScheduleClient
 
     health_check_timer_interval: float
@@ -54,7 +54,7 @@ class HealthCheckEngine:
         db: ExtendedAsyncSAEngine,
         event_producer: EventProducer,
         valkey_live: ValkeyLiveClient,
-        circuit_manager: "CircuitManager",
+        circuit_manager: CircuitManager,
         health_check_timer_interval: float,
         valkey_schedule: ValkeyScheduleClient,
     ) -> None:
@@ -290,7 +290,7 @@ class HealthCheckEngine:
                     route.consecutive_failures + 1,
                 )
                 return False
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log.warning(
                 "Container health check timeout for route {} at {} (timeout: {}s, failures: {})",
                 route.route_id,
@@ -709,7 +709,7 @@ class HealthCheckEngine:
                     )
                     return False
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log.warning(
                 "Health check timeout for {} (timeout: {}s, attempts: {})",
                 url,
@@ -881,7 +881,7 @@ class HealthCheckEngine:
                     )
                     return False
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log.warning(
                 "Route {} health check timeout (timeout: {}s, failures: {})",
                 route.route_id,
@@ -1003,14 +1003,14 @@ class HealthCheckEngine:
                 self._check_with_concurrency_limit(list(endpoints), safe_concurrency),
                 timeout=target_duration,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log.error(
                 "Health check cycle exceeded {:.1f}s timeout",
                 target_duration,
             )
 
     async def _check_with_concurrency_limit(
-        self, endpoints: list["Endpoint"], concurrency_limit: int
+        self, endpoints: list[Endpoint], concurrency_limit: int
     ) -> None:
         """
         Perform health checks with semaphore-based concurrency limiting
@@ -1021,7 +1021,7 @@ class HealthCheckEngine:
         """
         semaphore = asyncio.Semaphore(concurrency_limit)
 
-        async def _check_with_semaphore(endpoint: "Endpoint") -> tuple[UUID, bool]:
+        async def _check_with_semaphore(endpoint: Endpoint) -> tuple[UUID, bool]:
             """Wrapper to apply semaphore limiting to individual health checks"""
             async with semaphore:
                 try:

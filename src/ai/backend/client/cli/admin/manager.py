@@ -68,9 +68,7 @@ def freeze(wait, force_kill):
                     if active_sessions_num == 0:
                         break
                     print_wait(
-                        "Waiting for all sessions terminated... ({0} left)".format(
-                            active_sessions_num
-                        )
+                        f"Waiting for all sessions terminated... ({active_sessions_num} left)"
                     )
                     time.sleep(3)
                 print_done("All sessions are terminated.")
@@ -183,7 +181,7 @@ def dismiss():
         with open(local_state_path / "announcement.json", "w") as f:
             json.dump(state, f)
         print_done("Dismissed the last shown announcement.")
-    except (IOError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError):
         print_fail("No announcements seen yet.")
         sys.exit(ExitCode.FAILURE)
     except Exception as e:

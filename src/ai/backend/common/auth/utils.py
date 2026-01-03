@@ -26,15 +26,7 @@ def generate_signature(
     hostname = endpoint.raw_authority
     body_hash = hashlib.new(hash_type, b"").hexdigest()
 
-    sign_str = "{}\n{}\n{}\nhost:{}\ncontent-type:{}\nx-backendai-version:{}\n{}".format(
-        method.upper(),
-        rel_url,
-        date.isoformat(),
-        hostname,
-        content_type.lower(),
-        version,
-        body_hash,
-    )
+    sign_str = f"{method.upper()}\n{rel_url}\n{date.isoformat()}\nhost:{hostname}\ncontent-type:{content_type.lower()}\nx-backendai-version:{version}\n{body_hash}"
     sign_bytes = sign_str.encode()
 
     sign_key = hmac.new(secret_key.encode(), date.strftime("%Y%m%d").encode(), hash_type).digest()
@@ -42,10 +34,6 @@ def generate_signature(
 
     signature = hmac.new(sign_key, sign_bytes, hash_type).hexdigest()
     headers = {
-        "Authorization": "BackendAI signMethod=HMAC-{}, credential={}:{}".format(
-            hash_type.upper(),
-            access_key,
-            signature,
-        ),
+        "Authorization": f"BackendAI signMethod=HMAC-{hash_type.upper()}, credential={access_key}:{signature}",
     }
     return headers, signature
