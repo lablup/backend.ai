@@ -97,7 +97,7 @@ jobs:
         output-file: bom-${{ matrix.name }}.json
 
     - name: Attest SBOM
-      uses: actions/attest-sbom@v2
+      uses: actions/attest-sbom@v3
       with:
         subject-name: backendai-${{ matrix.name }}
         subject-digest: ${{ steps.build.outputs.digest }}
