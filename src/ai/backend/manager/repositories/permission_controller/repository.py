@@ -191,7 +191,7 @@ class PermissionControllerRepository:
         target_object_id = data.target_object_id
         roles = await self._db_source.get_user_roles(data.user_id)
         associated_scopes = await self._db_source.get_entity_mapped_scopes(target_object_id)
-        associated_scopes_set = set([row.parsed_scope_id() for row in associated_scopes])
+        associated_scopes_set = {row.parsed_scope_id() for row in associated_scopes}
         for role in roles:
             for object_perm in role.object_permission_rows:
                 if object_perm.operation != data.operation:

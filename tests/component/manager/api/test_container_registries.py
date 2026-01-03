@@ -85,7 +85,7 @@ class TestContainerRegistryValidator:
         args = ContainerRegistryValidatorArgs(url=registry_url, type=registry_type, project=None)
         validator = ContainerRegistryValidator(args)
         with pytest.raises(
-            InvalidContainerRegistryProject, match="Project name is required for Harbor."
+            InvalidContainerRegistryProject, match=r"Project name is required for Harbor\."
         ):
             validator.validate()
 
@@ -106,7 +106,7 @@ class TestContainerRegistryValidator:
             project=project_name,
         )
         validator = ContainerRegistryValidator(args)
-        with pytest.raises(InvalidContainerRegistryProject, match="Invalid project name length."):
+        with pytest.raises(InvalidContainerRegistryProject, match=r"Invalid project name length\."):
             validator.validate()
 
     @pytest.mark.asyncio
@@ -147,7 +147,7 @@ class TestContainerRegistryValidator:
             project=invalid_project_name,
         )
         validator = ContainerRegistryValidator(args)
-        with pytest.raises(InvalidContainerRegistryProject, match="Invalid project name format."):
+        with pytest.raises(InvalidContainerRegistryProject, match=r"Invalid project name format\."):
             validator.validate()
 
     @pytest.mark.asyncio

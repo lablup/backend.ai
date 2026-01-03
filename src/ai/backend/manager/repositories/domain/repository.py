@@ -352,7 +352,7 @@ class DomainRepository:
             db_session=db_session,
             ctx=client_ctx,
         )
-        not_allowed_sgroups = set(sgroup_names) - set([sg.name for sg in sgroup_models])
+        not_allowed_sgroups = set(sgroup_names) - {sg.name for sg in sgroup_models}
         if not_allowed_sgroups:
             raise InvalidDomainConfiguration(
                 f"Not allowed to associate the domain with given scaling groups(s:{not_allowed_sgroups})"

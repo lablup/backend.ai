@@ -172,8 +172,6 @@ class ModifyServiceConfigNode(graphene.Mutation):
     class Meta:
         description = "Updates configuration for a given service. Added in 25.8.0."
 
-    Output = ModifyServiceConfigNodePayload
-
     class Arguments:
         input = ModifyServiceConfigNodeInput(required=True, description="Added in 25.8.0.")
 

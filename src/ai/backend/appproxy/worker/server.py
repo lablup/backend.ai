@@ -433,7 +433,7 @@ async def proxy_frontend_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         try:
             await root_ctx.proxy_frontend.stop()
         except CleanupError as ee:
-            if all([isinstance(e, asyncio.CancelledError) for e in ee.exceptions]):
+            if all(isinstance(e, asyncio.CancelledError) for e in ee.exceptions):
                 raise asyncio.CancelledError()
             else:
                 raise ee

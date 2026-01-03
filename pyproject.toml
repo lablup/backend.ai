@@ -95,6 +95,7 @@ select = [
     "EXE",    # flake8-executable: validates shebang and file permissions consistency
     # Phase 2-3: Minimal violations (<50)
     "LOG",    # flake8-logging: enforces logging best practices (warn -> warning, etc.)
+    # Note: LOG015 (root-logger-call) is intentionally not ignored - root logger usage should be reviewed
     "FLY",    # flynt: converts old-style string formatting to f-strings
     "PIE",    # flake8-pie: catches misc. code smells (duplicate class fields, unnecessary pass, etc.)
     "FURB",   # refurb: suggests modern Python idioms (Path.read_text, etc.)
@@ -124,6 +125,7 @@ ignore = [
     "PIE790", # unnecessary-pass - sometimes useful for readability in empty blocks
     # FURB
     "FURB157", # verbose-decimal-constructor - Decimal("0") is intentional for precision
+    "FURB187", # use-list-reverse - Sequence type cannot be reversed in place
     # FLY
     "FLY002", # static-join-to-f-string - unsafe fix, may change behavior
     # PIE
@@ -144,8 +146,10 @@ ignore = [
     "SIM117", # multiple-with-statements - nested with statements often improve readability
     "SIM118", # in-dict-keys - explicit .keys() is sometimes clearer
     # RUF
+    "RUF003", # ambiguous-unicode-character-comment - intentional use of special characters (e.g., × for multiplication)
     "RUF005", # collection-literal-concatenation - explicit concatenation is sometimes clearer
     "RUF006", # asyncio-dangling-task - fire-and-forget tasks are intentional in some cases
+    "RUF009", # function-call-in-dataclass-default - cast() in dataclass defaults is intentional
     "RUF012", # mutable-class-default - existing codebase uses mutable defaults intentionally
     "RUF015", # unnecessary-iterable-allocation-for-first-element - [0] is clearer than next(iter())
     "RUF022", # unsorted-dunder-all - semantic ordering may be preferred over alphabetical
@@ -166,6 +170,7 @@ split-on-trailing-comma = true
 [tool.ruff.lint.per-file-ignores]
 "src/ai/backend/manager/config.py" = ["E402"]
 "src/ai/backend/manager/models/alembic/env.py" = ["E402"]
+"src/ai/backend/logging/otel.py" = ["LOG015"]  # root logger usage is intentional for OTEL initialization
 
 [tool.ruff.format]
 preview = true  # enable the black's preview style

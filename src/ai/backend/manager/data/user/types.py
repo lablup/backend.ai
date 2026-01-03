@@ -124,7 +124,7 @@ class UserData:
             need_password_change=row.need_password_change,
             full_name=row.full_name,
             description=row.description,
-            is_active=True if row.status == UserStatus.ACTIVE else False,
+            is_active=row.status == UserStatus.ACTIVE,
             status=row.status,
             status_info=row.status_info,
             created_at=row.created_at,

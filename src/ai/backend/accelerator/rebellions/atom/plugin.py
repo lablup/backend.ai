@@ -46,9 +46,7 @@ class ATOMPlugin(AbstractATOMPlugin[ATOMDevice]):
         return devices
 
     async def group_npus(self, devices: List[ATOMDevice]) -> int:
-        non_zero_groups: Set[int] = set([int(d.rbln_stat_info.group_id) for d in devices]) - set([
-            0
-        ])
+        non_zero_groups: Set[int] = {int(d.rbln_stat_info.group_id) for d in devices} - {0}
         if len(non_zero_groups) > 0:
             await ATOMAPI.destroy_groups(self._rbln_stat_path, list(non_zero_groups))
 

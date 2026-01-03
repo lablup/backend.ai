@@ -121,7 +121,7 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
         result = await conn.execute(query)
         entries = []
         for row in result.fetchall():
-            is_owner = True if row.session_templates_user_uuid == user_uuid else False
+            is_owner = row.session_templates_user_uuid == user_uuid
             entries.append({
                 "name": row.session_templates_name,
                 "id": row.session_templates_id,

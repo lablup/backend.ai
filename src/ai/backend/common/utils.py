@@ -541,9 +541,7 @@ async def chown(path: Path | str, uid_gid: str, mount_prefix: Optional[str | Pat
 def is_ip_address_format(str: str) -> bool:
     try:
         url = yarl.URL("//" + str)
-        if url.host and ipaddress.ip_address(url.host):
-            return True
-        return False
+        return bool(url.host and ipaddress.ip_address(url.host))
     except ValueError:
         return False
 

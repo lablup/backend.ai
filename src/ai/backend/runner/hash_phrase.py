@@ -43,7 +43,7 @@ def hash_phrase(
 
     dict_len = len(dictionary)
     entropy_per_word = math.log2(dict_len)
-    num_words = int(math.ceil(minimum_entropy / entropy_per_word))
+    num_words = math.ceil(minimum_entropy / entropy_per_word)
 
     # Hash the data and convert to a big integer (converts as Big Endian)
     hash = hashfunc(data)

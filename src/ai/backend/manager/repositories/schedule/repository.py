@@ -1180,7 +1180,7 @@ class ScheduleRepository:
         status_data: ErrorStatusInfo,
     ) -> None:
         async with self._db.begin_session() as db_session:
-            affected_agents = set(k.agent for k in session.kernels)
+            affected_agents = {k.agent for k in session.kernels}
             await self._rollback_predicate_mutations(db_session, sched_ctx, session)
             now = datetime.now(tzutc())
             update_query = (

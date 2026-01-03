@@ -892,9 +892,9 @@ async def signup(request: web.Request, params: Any) -> web.Response:
         domain_name=params["domain"],
         email=params["email"],
         password=params["password"],
-        username=params["username"] if "username" in params else None,
-        full_name=params["full_name"] if "full_name" in params else None,
-        description=params["description"] if "description" in params else None,
+        username=params.get("username"),
+        full_name=params.get("full_name"),
+        description=params.get("description"),
     )
     result = await root_ctx.processors.auth.signup.wait_for_complete(action)
 

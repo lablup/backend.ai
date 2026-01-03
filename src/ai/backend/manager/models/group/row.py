@@ -478,9 +478,7 @@ async def query_group_domain(
 
 
 def verify_dotfile_name(dotfile: str) -> bool:
-    if dotfile in RESERVED_DOTFILES:
-        return False
-    return True
+    return dotfile not in RESERVED_DOTFILES
 
 
 ALL_PROJECT_PERMISSIONS = frozenset([perm for perm in ProjectPermission])

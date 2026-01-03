@@ -578,7 +578,7 @@ async def database_fixture(
             return str(obj)
         if isinstance(obj, datetime):
             return str(obj)
-        if isinstance(obj, enum.Enum) or isinstance(obj, enum.StrEnum):
+        if isinstance(obj, (enum.Enum, enum.StrEnum)):
             return obj.value
         if isinstance(obj, yarl.URL):
             return str(obj)

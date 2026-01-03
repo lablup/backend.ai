@@ -1043,7 +1043,7 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
         return await super().update_plugin_config(plugin_config)
 
     async def get_capabilities(self) -> set[ContainerNetworkCapability]:
-        return set([ContainerNetworkCapability.GLOBAL])
+        return {ContainerNetworkCapability.GLOBAL}
 
     async def join_network(
         self, kernel_config: KernelCreationConfig, cluster_info: ClusterInfo, **kwargs

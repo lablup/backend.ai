@@ -448,9 +448,9 @@ class AgentRPCServer(aobject):
                 case list():
                     return [_ensure_serializable(e) for e in o]
                 case set():
-                    return set([_ensure_serializable(e) for e in o])
+                    return {_ensure_serializable(e) for e in o}
                 case tuple():
-                    return tuple([_ensure_serializable(e) for e in o])
+                    return tuple(_ensure_serializable(e) for e in o)
                 case _:
                     return str(o)
 

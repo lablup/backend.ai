@@ -361,9 +361,7 @@ class SlotName(UserString):
         return self._minor_type
 
     def is_accelerator(self) -> bool:
-        if self.major_type in ("device", "devices", "share", "shares"):
-            return True
-        return False
+        return self.major_type in ("device", "devices", "share", "shares")
 
 
 def _validate_slot_name(v: Any) -> SlotName:

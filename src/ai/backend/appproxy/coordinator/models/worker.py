@@ -418,7 +418,7 @@ async def add_circuit(
             subdomain = f"{_requested_subdomain}-{sub_id}"
         circuit_params["subdomain"] = subdomain
     else:
-        acquired_ports = set([c.port for c in worker.circuits])
+        acquired_ports = {c.port for c in worker.circuits}
         port_range = worker.port_range
         if not port_range:
             raise MissingFrontendConfigError("Port range is required for PORT frontend mode")

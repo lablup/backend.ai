@@ -89,7 +89,7 @@ class DeploymentExecutor:
     async def check_pending_deployments(
         self, deployments: Sequence[DeploymentInfo]
     ) -> DeploymentExecutionResult:
-        scaling_groups = set(deployment.metadata.resource_group for deployment in deployments)
+        scaling_groups = {deployment.metadata.resource_group for deployment in deployments}
         scaling_group_targets = await self._deployment_repo.fetch_scaling_group_proxy_targets(
             scaling_groups
         )

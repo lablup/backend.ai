@@ -3857,9 +3857,7 @@ async def handle_session_creation_lifecycle(
     if event.creation_id not in context.session_creation_tracker:
         return
     log.debug("handle_session_creation_lifecycle: ev:{} s:{}", event.event_name(), event.session_id)
-    if isinstance(event, SessionStartedAnycastEvent) or isinstance(
-        event, SessionCancelledAnycastEvent
-    ):
+    if isinstance(event, (SessionStartedAnycastEvent, SessionCancelledAnycastEvent)):
         if tracker := context.session_creation_tracker.get(event.creation_id):
             tracker.set()
 

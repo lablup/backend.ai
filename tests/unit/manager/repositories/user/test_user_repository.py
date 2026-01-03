@@ -291,7 +291,7 @@ class TestUserRepository:
         with patch.object(user_repository, "_check_domain_exists", return_value=False):
             from ai.backend.manager.errors.user import UserCreationBadRequest
 
-            with pytest.raises(UserCreationBadRequest, match="Domain.*does not exist"):
+            with pytest.raises(UserCreationBadRequest, match=r"Domain.*does not exist"):
                 await user_repository.create_user_validated(sample_user_creator, group_ids=[])
 
         # Test 2: User with same email or username already exists
@@ -302,7 +302,7 @@ class TestUserRepository:
                 from ai.backend.manager.errors.user import UserConflict
 
                 with pytest.raises(
-                    UserConflict, match="User with email.*or username.*already exists"
+                    UserConflict, match=r"User with email.*or username.*already exists"
                 ):
                     await user_repository.create_user_validated(sample_user_creator, group_ids=[])
 

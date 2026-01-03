@@ -500,7 +500,7 @@ class PermissionListColumn(TypeDecorator):
     ) -> set[AbstractPermission]:
         if value is None:
             return set()
-        return set(self._perm_type(perm) for perm in value)
+        return {self._perm_type(perm) for perm in value}
 
 
 class VFolderHostPermissionColumn(TypeDecorator):

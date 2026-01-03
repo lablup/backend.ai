@@ -94,7 +94,7 @@ _default_session_node_detail_fields = (
 def drop(d: Mapping[str, Any], value_to_drop: Any) -> Mapping[str, Any]:
     modified: dict[str, Any] = {}
     for k, v in d.items():
-        if isinstance(v, Mapping) or isinstance(v, dict):
+        if isinstance(v, (Mapping, dict)):
             modified[k] = drop(v, value_to_drop)
         elif v != value_to_drop:
             modified[k] = v

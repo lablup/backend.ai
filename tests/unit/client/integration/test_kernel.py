@@ -18,7 +18,7 @@ def aggregate_console(c):
         "stdout": "".join(item[1] for item in c if item[0] == "stdout"),
         "stderr": "".join(item[1] for item in c if item[0] == "stderr"),
         "html": "".join(item[1] for item in c if item[0] == "html"),
-        "media": list(item[1] for item in c if item[0] == "media"),
+        "media": [item[1] for item in c if item[0] == "media"],
     }
 
 

@@ -650,7 +650,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         except Exception as e:
             # just catching ValueError | VFolderNotFound will raise
             # TypeError: catching classes that do not inherit from BaseException is not allowed
-            if isinstance(e, ValueError) or isinstance(e, VFolderNotFound):
+            if isinstance(e, (ValueError, VFolderNotFound)):
                 try:
                     extra_vf_conds = (vfolders.c.name == params.config.model) & (
                         vfolders.c.usage_mode == VFolderUsageMode.MODEL

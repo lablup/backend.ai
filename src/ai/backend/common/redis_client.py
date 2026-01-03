@@ -180,7 +180,7 @@ class RedisClient(aobject):
                     results.append(next_result)
 
                 try:
-                    if not len(results) == len(commands):
+                    if len(results) != len(commands):
                         log.warning("requests: {}", commands)
                         log.warning("responses: {}", results)
                         log.warning("raw request: {}", _blobs)

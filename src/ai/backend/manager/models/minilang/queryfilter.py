@@ -241,7 +241,7 @@ class QueryFilterParser:
         """
         if isinstance(sa_query, sa.sql.Select):
             table = sa_query.froms[0]
-        elif isinstance(sa_query, sa.sql.Delete) or isinstance(sa_query, sa.sql.Update):
+        elif isinstance(sa_query, (sa.sql.Delete, sa.sql.Update)):
             table = sa_query.table
         else:
             raise ValueError("Unsupported SQLAlchemy query object type")

@@ -18,7 +18,7 @@ class Vec2D(tuple):
         return Vec2D(self[0] * other, self[1] * other)
 
     def __rmul__(self, other):
-        if isinstance(other, int) or isinstance(other, float):
+        if isinstance(other, (int, float)):
             return Vec2D(self[0] * other, self[1] * other)
 
     def __sub__(self, other):

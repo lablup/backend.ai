@@ -103,7 +103,7 @@ class AdminGroupRepository:
             )
         )
         active_kernel_count = await session.scalar(query)
-        return True if active_kernel_count > 0 else False
+        return active_kernel_count > 0
 
     async def _delete_group_vfolders(self, group_id: uuid.UUID) -> int:
         """Delete all vfolders belonging to the group."""

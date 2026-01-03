@@ -56,11 +56,9 @@ def flatten_or(scheme: t.Trafaret) -> list[t.Trafaret]:
 def _traverse(scheme: t.Trafaret) -> dict:
     if isinstance(scheme, t.Or):
         trafarets = flatten_or(scheme)
-        valid_trafarets = [
-            x for x in trafarets if not (isinstance(x, t.Null) or isinstance(x, UndefChecker))
-        ]
+        valid_trafarets = [x for x in trafarets if not isinstance(x, (t.Null, UndefChecker))]
         if len(valid_trafarets) >= 2:
-            return {"anyOf": list(_traverse(s) for s in valid_trafarets)}
+            return {"anyOf": [_traverse(s) for s in valid_trafarets]}
         else:
             scheme = valid_trafarets[0]
     if isinstance(scheme, t.Any):
@@ -174,7 +172,7 @@ def parse_trafaret_value(scheme: t.Trafaret) -> tuple[dict, bool]:
         and len([
             x
             for x in scheme.trafarets  # type: ignore[attr-defined]
-            if (isinstance(x, t.Null) or isinstance(x, UndefChecker))
+            if isinstance(x, (t.Null, UndefChecker))
         ])
         > 0
     )

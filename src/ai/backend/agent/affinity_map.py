@@ -129,7 +129,7 @@ class AffinityMap(nx.Graph):
             raise RuntimeError(
                 "This is a logic error trying to allocate the same resource slots twice in a single allocation run."
             )
-        src_numa_nodes = set(src_device.numa_node for src_device in src_devices)
+        src_numa_nodes = {src_device.numa_node for src_device in src_devices}
         primary_sets = []
         secondary_set = set()
         for numa_node in src_numa_nodes:

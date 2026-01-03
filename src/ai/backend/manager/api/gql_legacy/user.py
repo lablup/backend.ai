@@ -595,7 +595,7 @@ class User(graphene.ObjectType):
             need_password_change=row["need_password_change"],
             full_name=row["full_name"],
             description=row["description"],
-            is_active=True if row["status"] == UserStatus.ACTIVE else False,  # legacy
+            is_active=row["status"] == UserStatus.ACTIVE,  # legacy
             status=row["status"],
             status_info=row["status_info"],
             created_at=row["created_at"],

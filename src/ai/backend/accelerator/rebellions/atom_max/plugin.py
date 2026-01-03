@@ -135,8 +135,8 @@ class ATOMMaxPlugin(AbstractATOMPlugin[ATOMMaxDevice]):
         groups: Set[int] = set()
         device_indexes = []
         for d in devices:
-            groups |= set([int(dd.rbln_stat_info.group_id) for dd in d.children])
-        non_zero_groups: Set[int] = groups - set([0])
+            groups |= {int(dd.rbln_stat_info.group_id) for dd in d.children}
+        non_zero_groups: Set[int] = groups - {0}
         if len(non_zero_groups) > 0:
             await ATOMAPI.destroy_groups(self._rbln_stat_path, list(non_zero_groups))
 

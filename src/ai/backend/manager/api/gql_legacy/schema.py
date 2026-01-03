@@ -1638,7 +1638,7 @@ class Query(graphene.ObjectType):
                 "Group.by_user",
             )
             client_groups = await loader.load(client_user_id)
-            client_group_ids = set(g.id for g in client_groups)
+            client_group_ids = {g.id for g in client_groups}
             groups = filter(lambda g: g.id in client_group_ids, groups)
         else:
             raise InvalidAPIParameters("Unknown client role")
@@ -1723,7 +1723,7 @@ class Query(graphene.ObjectType):
         client_domain = ctx.user["domain_name"]
         items = await Image.load_all(
             ctx,
-            types=set((ImageLoadFilter.CUSTOMIZED,)),
+            types={ImageLoadFilter.CUSTOMIZED},
         )
         if client_role == UserRole.SUPERADMIN:
             pass

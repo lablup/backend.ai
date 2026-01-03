@@ -90,7 +90,7 @@ class VASTClusterInfo:
     max_performance: Performance = field(default_factory=default_perf)
 
     def __init__(self, **kwargs):
-        names = set([f.name for f in fields(self)])
+        names = {f.name for f in fields(self)}
         for k, v in kwargs.items():
             if k in names:
                 setattr(self, k, v)
@@ -117,7 +117,7 @@ class VASTQuota:
     percent_capacity: int
 
     def __init__(self, **kwargs):
-        names = set([f.name for f in fields(self)])
+        names = {f.name for f in fields(self)}
         for k, v in kwargs.items():
             if k in names:
                 setattr(self, k, v)

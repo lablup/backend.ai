@@ -16,8 +16,8 @@ class StringSetFlag(enum.StrEnum):
         if isinstance(other, type(self)):
             other = other.value
         if not isinstance(other, (set, frozenset)):
-            other = set((other,))
-        return set((self.value,)) | other
+            other = {other}
+        return {self.value} | other
 
     __ror__ = __or__
 
@@ -32,7 +32,7 @@ class StringSetFlag(enum.StrEnum):
 
     def __xor__(self, other):
         if isinstance(other, (set, frozenset)):
-            return set((self.value,)) ^ other
+            return {self.value} ^ other
         if isinstance(other, str):
             if other == self.value:
                 return set()
@@ -42,7 +42,7 @@ class StringSetFlag(enum.StrEnum):
 
     def __rxor__(self, other):
         if isinstance(other, (set, frozenset)):
-            return other ^ set((self.value,))
+            return other ^ {self.value}
         if isinstance(other, str):
             if other == self.value:
                 return set()

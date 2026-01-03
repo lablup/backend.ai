@@ -356,11 +356,9 @@ class DummyAgent(
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
     ) -> bool:
-        if (
+        return (
             existing_imgs := self.dummy_agent_cfg["image"]["already-have"]
-        ) is not None and image_ref in existing_imgs:
-            return True
-        return False
+        ) is not None and image_ref in existing_imgs
 
     @override
     async def init_kernel_context(

@@ -331,6 +331,4 @@ async def query_bootstrap_script(
 
 
 def verify_dotfile_name(dotfile: str) -> bool:
-    if dotfile in RESERVED_DOTFILES:
-        return False
-    return True
+    return dotfile not in RESERVED_DOTFILES

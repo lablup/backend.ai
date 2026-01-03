@@ -193,7 +193,7 @@ async def get_extra_volumes(docker, lang):
     avail_volumes = (await docker.volumes.list())["Volumes"]
     if not avail_volumes:
         return []
-    avail_volume_names = set(v["Name"] for v in avail_volumes)
+    avail_volume_names = {v["Name"] for v in avail_volumes}
 
     # deeplearning specialization
     # TODO: extract as config

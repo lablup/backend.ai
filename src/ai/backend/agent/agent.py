@@ -743,7 +743,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             additional_allowed_syscalls = computer_ctx.instance.get_additional_allowed_syscalls()
             additional_allowed_syscalls_set.update(additional_allowed_syscalls)
 
-        self.additional_allowed_syscalls = sorted(list(additional_allowed_syscalls_set))
+        self.additional_allowed_syscalls = sorted(additional_allowed_syscalls_set)
         update_additional_gids(environ, list(additional_gid_set))
 
     def get_overriding_uid(self) -> Optional[int]:
@@ -1190,9 +1190,7 @@ class AbstractAgent(
                             await t
                         except asyncio.CancelledError:
                             continue
-        if isinstance(event, KernelStartedAnycastEvent) or isinstance(
-            event, KernelTerminatedAnycastEvent
-        ):
+        if isinstance(event, (KernelStartedAnycastEvent, KernelTerminatedAnycastEvent)):
             await self.save_last_registry()
 
     async def anycast_event(self, event: AbstractAnycastEvent) -> None:

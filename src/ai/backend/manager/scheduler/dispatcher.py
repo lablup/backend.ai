@@ -713,7 +713,7 @@ class SchedulerDispatcher(aobject):
         log_args = _log_args.get(tuple())
 
         try:
-            requested_architectures = set(k.architecture for k in sess_ctx.kernels)
+            requested_architectures = {k.architecture for k in sess_ctx.kernels}
             if len(requested_architectures) > 1:
                 raise GenericBadRequest(
                     "Cannot assign multiple kernels with different architectures' single node session",

@@ -88,7 +88,7 @@ class ATOMAPI:
             raise LibraryError("Group member not specified")
 
         stats = await cls.get_stats(exec_path)
-        groups = set([int(d.group_id) for d in stats.devices])
+        groups = {int(d.group_id) for d in stats.devices}
         new_group_id = -1
         for i in range(1, 256):
             if i not in groups:

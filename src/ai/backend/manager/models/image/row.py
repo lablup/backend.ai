@@ -1091,9 +1091,7 @@ class ImageAccessCriteria:
         """
         if image.registry not in self.allowed_registries:
             return False
-        if image.customized and not image.is_owned_by(self.user_id):
-            return False
-        return True
+        return not (image.customized and not image.is_owned_by(self.user_id))
 
 
 class ImagePermissionContextBuilder(

@@ -243,7 +243,7 @@ class AuthService:
             "user_id": action.email,
             "access_key": ak,
             "secret_key": sk,
-            "is_active": True if data.get("status") == UserStatus.ACTIVE else False,
+            "is_active": data.get("status") == UserStatus.ACTIVE,
             "is_admin": False,
             "resource_policy": resource_policy,
             "rate_limit": 1000,
