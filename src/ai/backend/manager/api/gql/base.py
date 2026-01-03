@@ -115,6 +115,47 @@ class IntFilter:
         )
 
 
+@strawberry.input(description="Added in 26.1.0. Filter for UUID fields.")
+class UUIDFilter:
+    equals: Optional[uuid.UUID] = None
+    not_equals: Optional[uuid.UUID] = strawberry.field(name="notEquals", default=None)
+    in_: Optional[list[uuid.UUID]] = strawberry.field(name="in", default=None)
+    not_in: Optional[list[uuid.UUID]] = strawberry.field(name="notIn", default=None)
+
+    @staticmethod
+    def _negate_condition(condition: QueryCondition) -> QueryCondition:
+        """Negate a QueryCondition by wrapping it with NOT operator."""
+
+        def inner():
+            return ~condition()
+
+        return inner
+
+    def build_query_condition(
+        self,
+        equals_factory: Callable[[uuid.UUID], QueryCondition],
+        in_factory: Callable[[list[uuid.UUID]], QueryCondition],
+    ) -> Optional[QueryCondition]:
+        """Build a query condition from this filter using the provided factory callables.
+
+        Args:
+            equals_factory: Factory function that takes a single UUID and returns QueryCondition for equality check
+            in_factory: Factory function that takes a list of UUIDs and returns QueryCondition for membership check
+
+        Returns:
+            QueryCondition if any filter field is set, None otherwise
+        """
+        if self.equals:
+            return equals_factory(self.equals)
+        elif self.not_equals:
+            return self._negate_condition(equals_factory(self.not_equals))
+        elif self.in_:
+            return in_factory(self.in_)
+        elif self.not_in:
+            return self._negate_condition(in_factory(self.not_in))
+        return None
+
+
 @strawberry.input
 class DateTimeFilter:
     """Filter for datetime fields."""
