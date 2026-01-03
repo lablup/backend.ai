@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import functools
 import logging
-import sys
 import uuid
 from collections.abc import (
     Awaitable,
@@ -237,6 +236,30 @@ TLoaderKey = TypeVar("TLoaderKey")
 TLoaderResult = TypeVar("TLoaderResult")
 
 
+def _build_gql_type_cache() -> dict[str, Any]:
+    """Build a cache mapping type names to their classes from gql_legacy submodules."""
+    import importlib
+    from pathlib import Path
+
+    cache: dict[str, Any] = {}
+    gql_legacy_path = Path(__file__).parent
+
+    for py_file in gql_legacy_path.glob("*.py"):
+        if py_file.name.startswith("_"):
+            continue
+        module_name = py_file.stem
+        try:
+            submod = importlib.import_module(f".{module_name}", "ai.backend.manager.api.gql_legacy")
+            for attr_name in getattr(submod, "__all__", dir(submod)):
+                if not attr_name.startswith("_"):
+                    attr = getattr(submod, attr_name, None)
+                    if isinstance(attr, type):
+                        cache[attr_name] = attr
+        except ImportError:
+            continue
+    return cache
+
+
 class DataLoaderManager(Generic[TContext, TLoaderKey, TLoaderResult]):
     """
     For every different combination of filtering conditions, we need to make a
@@ -249,11 +272,16 @@ class DataLoaderManager(Generic[TContext, TLoaderKey, TLoaderResult]):
     """
 
     cache: dict[int, DataLoader[TLoaderKey, TLoaderResult]]
+    _type_cache: dict[str, Any] | None = None
 
     def __init__(self) -> None:
         self.cache = {}
-        self.mod = sys.modules["ai.backend.manager.models"]
-        self._gql_mod = sys.modules["ai.backend.manager.api.gql_legacy"]
+
+    @classmethod
+    def _get_type_cache(cls) -> dict[str, Any]:
+        if cls._type_cache is None:
+            cls._type_cache = _build_gql_type_cache()
+        return cls._type_cache
 
     @staticmethod
     def _get_key(otname: str, args, kwargs) -> int:
@@ -265,12 +293,12 @@ class DataLoaderManager(Generic[TContext, TLoaderKey, TLoaderResult]):
             key += item
         return hash(key)
 
-    # TODO: Remove this method and logic to parse `batch_load_` method name
     def load_attr(self, objtype_name: str) -> Any:
-        try:
-            return getattr(self.mod, objtype_name)
-        except Exception:
-            return getattr(self._gql_mod, objtype_name)
+        """Load a GraphQL type class by name from gql_legacy submodules."""
+        type_cache = self._get_type_cache()
+        if objtype_name not in type_cache:
+            raise AttributeError(f"Type '{objtype_name}' not found in gql_legacy submodules")
+        return type_cache[objtype_name]
 
     def get_loader(
         self, context: GraphQueryContext, objtype_name: str, *args, **kwargs
