@@ -15,10 +15,13 @@ from ai.backend.manager.models.app_config import AppConfigRow, AppConfigScopeTyp
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config import AppConfigRepository
@@ -54,8 +57,11 @@ class TestAppConfigRepository:
                 DomainRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
+                ScalingGroupRow,
+                ResourcePresetRow,
                 AppConfigRow,
             ],
         ):

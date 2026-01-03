@@ -13,8 +13,8 @@ from alembic import op
 from sqlalchemy.sql import text
 
 from ai.backend.common.types import BinarySize, ResourceSlot
-from ai.backend.manager.models import keypair_resource_policies
 from ai.backend.manager.models.base import ResourceSlotColumn
+from ai.backend.manager.models.resource_policy import keypair_resource_policies
 
 # revision identifiers, used by Alembic.
 revision = "8e660aa31fe3"

@@ -19,14 +19,15 @@ from ..errors.storage import (
     DotfileCreationFailed,
     DotfileNotFound,
 )
-from ..models import (
-    MAXIMUM_DOTFILE_SIZE,
+from ..models.domain import MAXIMUM_DOTFILE_SIZE, verify_dotfile_name
+from ..models.group import (
+    association_groups_users as agus,
+)
+from ..models.group import (
     groups,
     query_group_domain,
     query_group_dotfiles,
-    verify_dotfile_name,
 )
-from ..models import association_groups_users as agus
 from .auth import admin_required, auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware

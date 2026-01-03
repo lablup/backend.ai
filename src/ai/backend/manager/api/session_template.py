@@ -16,8 +16,9 @@ from ai.backend.logging import BraceStyleAdapter
 
 from ..errors.api import InvalidAPIParameters
 from ..errors.resource import DBOperationFailed, TaskTemplateNotFound
-from ..models import TemplateType, groups, session_templates, users
-from ..models.session_template import check_task_template
+from ..models.group import groups
+from ..models.session_template import TemplateType, check_task_template, session_templates
+from ..models.user import users
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .session import query_userinfo

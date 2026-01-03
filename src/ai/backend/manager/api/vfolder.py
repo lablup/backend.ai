@@ -77,39 +77,33 @@ from ..errors.storage import (
     VFolderNotFound,
     VFolderOperationFailed,
 )
-from ..models import (
-    ACTIVE_USER_STATUSES,
-    EndpointRow,
-    UserRole,
-    UserStatus,
+from ..models.agent import agents
+from ..models.endpoint import EndpointRow
+from ..models.kernel import kernels
+from ..models.keypair import keypairs
+from ..models.resource_policy import keypair_resource_policies
+from ..models.user import ACTIVE_USER_STATUSES, UserRole, UserRow, UserStatus, users
+from ..models.utils import execute_with_retry, execute_with_txn_retry
+from ..models.vfolder import (
     VFolderInvitationState,
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
+    VFolderPermissionRow,
     VFolderPermissionSetAlias,
     VFolderPermissionValidator,
     VFolderStatusSet,
-    agents,
+    delete_vfolder_relation_rows,
     ensure_host_permission_allowed,
     get_allowed_vfolder_hosts_by_group,
     get_allowed_vfolder_hosts_by_user,
-    kernels,
-    keypair_resource_policies,
-    keypairs,
+    is_unmanaged,
     query_accessible_vfolders,
     update_vfolder_status,
-    users,
     vfolder_invitations,
     vfolder_permissions,
     vfolder_status_map,
     vfolders,
-)
-from ..models.user import UserRow
-from ..models.utils import execute_with_retry, execute_with_txn_retry
-from ..models.vfolder import (
-    VFolderPermissionRow,
-    delete_vfolder_relation_rows,
-    is_unmanaged,
 )
 from ..models.vfolder import VFolderRow as VFolderDBRow
 from ..repositories.base.updater import Updater
@@ -1559,7 +1553,7 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     if row["ownership_type"] != VFolderOwnershipType.GROUP:
         raise VFolderNotFound("Only project folders are directly sharable.")
     async with root_ctx.db.begin() as conn:
-        from ..models import association_groups_users as agus
+        from ..models.group import association_groups_users as agus
 
         allowed_vfolder_types = (
             await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()

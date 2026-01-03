@@ -13,7 +13,8 @@ from ai.backend.common.types import (
     SessionId,
 )
 
-from ..models import KernelRow, SessionRow
+from ..models.kernel import KernelRow
+from ..models.session import SessionRow
 from .types import AbstractScheduler
 
 

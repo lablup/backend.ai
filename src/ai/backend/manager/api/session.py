@@ -107,14 +107,10 @@ from ..errors.api import InvalidAPIParameters
 from ..errors.auth import InsufficientPrivilege
 from ..errors.kernel import InvalidSessionData, SessionNotFound
 from ..errors.resource import NoCurrentTaskContext
-from ..models import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    SessionDependencyRow,
-    SessionRow,
-    UserRole,
-    kernels,
-    keypairs,
-)
+from ..models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
+from ..models.keypair import keypairs
+from ..models.session import SessionDependencyRow, SessionRow
+from ..models.user import UserRole
 from ..utils import query_userinfo as _query_userinfo
 from .auth import auth_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required

@@ -27,10 +27,13 @@ from ai.backend.manager.models.notification import (
     NotificationRuleRow,
     WebhookConfig,
 )
+from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.user import (
     PasswordHashAlgorithm,
     PasswordInfo,
@@ -73,8 +76,11 @@ class TestNotificationRepository:
                 DomainRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
+                ScalingGroupRow,
+                ResourcePresetRow,
                 NotificationChannelRow,
                 NotificationRuleRow,
             ],

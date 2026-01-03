@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from ai.backend.common.lock import AbstractDistributedLock
 
     from .defs import LockID
-    from .models import SessionRow
+    from .models.session import SessionRow
 
 
 class SessionGetter(Protocol):

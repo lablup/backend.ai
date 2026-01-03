@@ -10,16 +10,12 @@ from ai.backend.common.types import ResourceSlot, SessionResult, SessionTypes
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.session.types import SessionStatus
 
-from ..models import (
-    DefaultForUnspecified,
-    DomainRow,
-    GroupRow,
-    KeyPairResourcePolicyRow,
-    KeyPairRow,
-    SessionDependencyRow,
-    SessionRow,
-    UserRow,
-)
+from ..models.domain import DomainRow
+from ..models.group import GroupRow
+from ..models.keypair import KeyPairRow
+from ..models.resource_policy import DefaultForUnspecified, KeyPairResourcePolicyRow
+from ..models.session import SessionDependencyRow, SessionRow
+from ..models.user import UserRow
 from ..models.utils import execute_with_retry
 from .types import PredicateResult, SchedulingContext
 
