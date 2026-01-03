@@ -408,6 +408,10 @@ class ModeMenu(Static):
         self.install_variable = InstallVariable(
             public_facing_address=args.public_facing_address,
             accelerator=Accelerator(args.accelerator) if args.accelerator is not None else None,
+            public_mode=args.public_mode,
+            fqdn_prefix=args.fqdn_prefix,
+            tls_advertised=args.tls_advertised,
+            advertised_port=args.advertised_port,
         )
 
     def compose(self) -> ComposeResult:
