@@ -134,7 +134,7 @@ async def token_auth_middleware(
 def skip_token_auth(
     handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
 ) -> Callable[[web.Request], Awaitable[web.StreamResponse]]:
-    handler.skip_token_auth = True
+    setattr(handler, "skip_token_auth", True)
     return handler
 
 

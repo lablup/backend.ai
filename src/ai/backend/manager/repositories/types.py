@@ -34,7 +34,7 @@ class RepositoryArgs:
 
 
 # Generic types for pagination
-TModel = TypeVar("TModel")
+TModel = TypeVar("TModel", bound="PaginatableModel")
 TData = TypeVar("TData")
 TFilters = TypeVar("TFilters")
 TOrdering = TypeVar("TOrdering")

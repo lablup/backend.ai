@@ -157,7 +157,7 @@ async def request_context_aware_middleware(
     request_id = request.headers.get("X-BackendAI-RequestID", str(uuid.uuid4()))
     request["request_id"] = request_id
     if _current_task := asyncio.current_task():
-        _current_task.request_id = request_id
+        setattr(_current_task, "request_id", request_id)
     return await handler(request)
 
 
