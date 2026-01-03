@@ -309,7 +309,7 @@ class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=
             log.debug("Created NPU Group {} with members {}", group_idx, assigned_devices)
             additional_device_files.append(Path(f"/dev/rsd{group_idx}"))
         except LibraryError as e:
-            log.warning(f"Failed to create NPU Group: {str(e)}, starting kernel without NPU group")
+            log.warning(f"Failed to create NPU Group: {e!s}, starting kernel without NPU group")
             additional_device_files.append(Path("/dev/rsd0"))
 
         for filename in additional_device_files:

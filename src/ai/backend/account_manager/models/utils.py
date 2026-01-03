@@ -135,9 +135,8 @@ class ExtendedAsyncSAEngine(SAEngine):
                     await session.commit()
 
         if bind is None:
-            async with self.connect() as _bind:
-                async with _begin_session(_bind) as sess:
-                    yield sess
+            async with self.connect() as _bind, _begin_session(_bind) as sess:
+                yield sess
         else:
             async with _begin_session(bind) as sess:
                 yield sess
@@ -156,9 +155,8 @@ class ExtendedAsyncSAEngine(SAEngine):
                 yield session
 
         if bind is None:
-            async with self.connect() as _conn:
-                async with _begin_session(_conn) as sess:
-                    yield sess
+            async with self.connect() as _conn, _begin_session(_conn) as sess:
+                yield sess
         else:
             async with _begin_session(bind) as sess:
                 yield sess

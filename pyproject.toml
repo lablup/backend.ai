@@ -102,6 +102,11 @@ select = [
     # Phase 4: Raise statement validation
     "RSE",    # flake8-raise: enforces proper raise statement usage
     # "T20",  # flake8-print: detects print statements (689 violations - deferred for careful review)
+    # Phase 5: Performance, simplification, and comprehensions (deferred - requires extensive review)
+    # "PERF", # perflint: detects performance anti-patterns (~150 violations)
+    # "SIM",  # flake8-simplify: suggests code simplification (~150 violations)
+    # "RUF",  # ruff-specific: Ruff's own linting rules (~200 violations)
+    # "C4",   # flake8-comprehensions: optimizes list/set/dict comprehensions (~200 violations)
 ]
 ignore = [
     "E203",   # whitespace before ':' - conflicts with Black formatter

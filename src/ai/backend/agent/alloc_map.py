@@ -312,8 +312,8 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
         requested_slots = {k: v for k, v in slots.items() if v > 0}
 
         # check exclusive
-        for slot_name_a in requested_slots.keys():
-            for slot_name_b in requested_slots.keys():
+        for slot_name_a in requested_slots:
+            for slot_name_b in requested_slots:
                 if self.check_exclusive(slot_name_a, slot_name_b):
                     raise InvalidResourceCombination(
                         f"Slots {slot_name_a} and {slot_name_b} cannot be allocated at the same"
@@ -354,7 +354,7 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                 )
                 log.debug("DiscretePropertyAllocMap(FILL): current-alloc: {!r}", sorted_dev_allocs)
 
-            total_allocatable = int(0)
+            total_allocatable = 0
             remaining_alloc = Decimal(requested_alloc).normalize()
 
             # fill up starting from the most free devices considering affinity hint
@@ -531,8 +531,8 @@ class FractionAllocMap(AbstractAllocMap):
         requested_slots = {k: v for k, v in slots.items() if v > 0}
 
         # check exclusive
-        for slot_name_a in requested_slots.keys():
-            for slot_name_b in requested_slots.keys():
+        for slot_name_a in requested_slots:
+            for slot_name_b in requested_slots:
                 if self.check_exclusive(slot_name_a, slot_name_b):
                     raise InvalidResourceCombination(
                         f"Slots {slot_name_a} and {slot_name_b} cannot be allocated at the same"

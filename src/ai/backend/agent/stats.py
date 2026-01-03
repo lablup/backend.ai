@@ -62,12 +62,12 @@ if TYPE_CHECKING:
 
 
 __all__ = (
-    "StatContext",
-    "StatModes",
-    "MetricTypes",
-    "NodeMeasurement",
     "ContainerMeasurement",
     "Measurement",
+    "MetricTypes",
+    "NodeMeasurement",
+    "StatContext",
+    "StatModes",
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -203,11 +203,11 @@ def _to_serializable_value(value: Decimal, *, exponent: Decimal = Decimal("0.000
 
 class MovingStatistics:
     __slots__ = (
-        "_sum",
         "_count",
-        "_min",
-        "_max",
         "_last",
+        "_max",
+        "_min",
+        "_sum",
     )
     _sum: Decimal
     _count: int

@@ -632,7 +632,7 @@ class SocketPair:
         except zmq.ZMQError as e:
             if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
                 log.warning(
-                    f"Socket invalid, recreating socket (addr: {self.input_sock.addr}, err: {repr(e)})"
+                    f"Socket invalid, recreating socket (addr: {self.input_sock.addr}, err: {e!r})"
                 )
                 self.input_sock.recreate_socket()
                 self.output_sock.recreate_socket()
@@ -645,7 +645,7 @@ class SocketPair:
             return await self.output_sock.socket.recv_multipart()
         except zmq.ZMQError as e:
             if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
-                log.exception(f"Socket invalid (addr: {self.output_sock.addr}, err: {repr(e)})")
+                log.exception(f"Socket invalid (addr: {self.output_sock.addr}, err: {e!r})")
                 raise InvalidSocket
             else:
                 raise

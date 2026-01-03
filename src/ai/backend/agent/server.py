@@ -152,7 +152,7 @@ def collect_error(meth: Callable) -> Callable:
         try:
             return await meth(self, *args, **kwargs)
         except Exception:
-            agent_id = kwargs.get("agent_id", None)
+            agent_id = kwargs.get("agent_id")
             agent = self.runtime.get_agent(agent_id)
             await agent.produce_error_event()
             raise

@@ -2,7 +2,7 @@ import logging
 
 
 class BraceMessage:
-    __slots__ = ("fmt", "args")
+    __slots__ = ("args", "fmt")
 
     def __init__(self, fmt, args):
         self.fmt = fmt

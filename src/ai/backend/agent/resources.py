@@ -64,11 +64,11 @@ from ai.backend.logging import BraceStyleAdapter
 
 # Expose legacy import names for plugins
 from .affinity_map import AffinityHint, AffinityMap, AffinityPolicy
-from .alloc_map import AbstractAllocMap as AbstractAllocMap  # noqa: F401
-from .alloc_map import AllocationStrategy as AllocationStrategy  # noqa: F401
-from .alloc_map import DeviceSlotInfo as DeviceSlotInfo  # noqa: F401
-from .alloc_map import DiscretePropertyAllocMap as DiscretePropertyAllocMap  # noqa: F401
-from .alloc_map import FractionAllocMap as FractionAllocMap  # noqa: F401
+from .alloc_map import AbstractAllocMap as AbstractAllocMap
+from .alloc_map import AllocationStrategy as AllocationStrategy
+from .alloc_map import DeviceSlotInfo as DeviceSlotInfo
+from .alloc_map import DiscretePropertyAllocMap as DiscretePropertyAllocMap
+from .alloc_map import FractionAllocMap as FractionAllocMap
 from .exception import ResourceError
 from .stats import ContainerMeasurement, NodeMeasurement, ProcessMeasurement, StatContext
 from .types import AbstractAgentDiscovery, MountInfo, get_agent_discovery

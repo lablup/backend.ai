@@ -1051,9 +1051,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             if sport["name"] in self.protected_services:
                 protected_service_ports.update(sport["container_ports"])
         for eport in exposed_ports:
-            if eport in self.repl_ports:  # always protected
-                host_ips.append("127.0.0.1")
-            elif eport in protected_service_ports:  # check if protected by resource group type
+            if eport in self.repl_ports or eport in protected_service_ports:  # always protected
                 host_ips.append("127.0.0.1")
             else:
                 host_ips.append(str(container_bind_host))
@@ -1234,7 +1232,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 if container is not None:
                     raise ContainerCreationError(
                         container_id=ContainerId(container.id),
-                        message=f"Unexpected error during container creation: {repr(e)}",
+                        message=f"Unexpected error during container creation: {e!r}",
                     )
                 raise
 
@@ -1250,7 +1248,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 await _rollback_container_creation()
                 raise ContainerCreationError(
                     container_id=cid,
-                    message=f"Unexpected error during container start: {repr(e)}",
+                    message=f"Unexpected error during container start: {e!r}",
                 )
 
             if self.internal_data.get("sudo_session_enabled", False):
@@ -1891,19 +1889,18 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     @override
     async def purge_images(self, request: PurgeImagesReq) -> PurgeImagesResp:
-        async with closing_async(Docker()) as docker:
-            async with TaskGroup() as tg:
-                tasks = [
-                    tg.create_task(
-                        self._purge_image(
-                            docker,
-                            DockerPurgeImageReq(
-                                image=image, force=request.force, noprune=request.noprune
-                            ),
-                        )
+        async with closing_async(Docker()) as docker, TaskGroup() as tg:
+            tasks = [
+                tg.create_task(
+                    self._purge_image(
+                        docker,
+                        DockerPurgeImageReq(
+                            image=image, force=request.force, noprune=request.noprune
+                        ),
                     )
-                    for image in request.images
-                ]
+                )
+                for image in request.images
+            ]
 
         results = []
         for task in tasks:
@@ -1925,9 +1922,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             log.info("found the local up-to-date image for {}", image_ref.canonical)
         except DockerError as e:
             if e.status == HTTPStatus.NOT_FOUND:
-                if auto_pull == AutoPullBehavior.DIGEST:
-                    return True
-                elif auto_pull == AutoPullBehavior.TAG:
+                if auto_pull == AutoPullBehavior.DIGEST or auto_pull == AutoPullBehavior.TAG:
                     return True
                 elif auto_pull == AutoPullBehavior.NONE:
                     raise ImageNotAvailable(image_ref)
@@ -2091,9 +2086,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     with timeout(90):
                         await container.delete(force=True, v=True)
                 except DockerError as e:
-                    if e.status == HTTPStatus.CONFLICT and "already in progress" in e.message:
-                        return
-                    elif e.status == HTTPStatus.NOT_FOUND:
+                    if (
+                        e.status == HTTPStatus.CONFLICT and "already in progress" in e.message
+                    ) or e.status == HTTPStatus.NOT_FOUND:
                         return
                     else:
                         log.exception(

@@ -777,7 +777,7 @@ class PermissionDBSource:
         object_ids: Iterable[ObjectId],
         operation: OperationType,
     ) -> dict[ObjectId, bool]:
-        result: dict[ObjectId, bool] = {object_id: False for object_id in object_ids}
+        result: dict[ObjectId, bool] = dict.fromkeys(object_ids, False)
         role_query = self._make_query_statement_for_object_permissions(
             user_id, object_ids, operation
         )
@@ -791,7 +791,7 @@ class PermissionDBSource:
                     result[object_id] = True
                 for pg in role.permission_group_rows:
                     if pg.scope_type == ScopeType.GLOBAL:
-                        return {obj_id: True for obj_id in object_ids}
+                        return dict.fromkeys(object_ids, True)
                     else:
                         for object in pg.mapped_entities:
                             object_id = object.object_id()

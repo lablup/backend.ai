@@ -264,7 +264,7 @@ async def get_container_process_table(
 
 async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> ContainerPID:
     kernel_ver = Path("/proc/version").read_text()
-    if m := re.match(r"Linux version (\d+)\.(\d+)\..*", kernel_ver):  # noqa
+    if m := re.match(r"Linux version (\d+)\.(\d+)\..*", kernel_ver):
         kernel_ver_tuple: Tuple[str, str] = m.groups()  # type: ignore
         if kernel_ver_tuple < ("4", "1"):
             # TODO: this should be deprecated when the minimun supported Linux kernel will be 4.1.
@@ -341,7 +341,7 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
 
 async def container_pid_to_host_pid(container_id: str, container_pid: ContainerPID) -> HostPID:
     kernel_ver = Path("/proc/version").read_text()
-    if m := re.match(r"Linux version (\d+)\.(\d+)\..*", kernel_ver):  # noqa
+    if m := re.match(r"Linux version (\d+)\.(\d+)\..*", kernel_ver):
         kernel_ver_tuple: Tuple[str, str] = m.groups()  # type: ignore
         if kernel_ver_tuple < ("4", "1"):
             # reverse implementation of host_pid_to_container_pid().

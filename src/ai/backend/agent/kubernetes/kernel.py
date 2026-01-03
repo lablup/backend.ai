@@ -152,7 +152,7 @@ class KubernetesKernel(AbstractKernel):
                 return False
             for container in containers:
                 started = container.get("started")
-                if not container["ready"] or started is not None and not started:
+                if not container["ready"] or (started is not None and not started):
                     return False
         return True
 

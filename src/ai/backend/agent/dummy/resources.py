@@ -51,7 +51,7 @@ async def load_resources(
         ):
             raise InitializationError(
                 "Slot types defined by an accelerator plugin must be prefixed by the plugin's key.",
-                invalid_name,  # noqa: F821
+                invalid_name,
                 plugin_instance.key,
             )
         if plugin_instance.key in compute_device_types:

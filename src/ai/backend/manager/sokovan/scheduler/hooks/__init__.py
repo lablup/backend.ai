@@ -8,11 +8,11 @@ from .registry import HookRegistry
 from .system import SystemSessionHook
 
 __all__ = [
-    "SessionHook",
-    "NoOpSessionHook",
-    "HookRegistry",
-    "InteractiveSessionHook",
     "BatchSessionHook",
+    "HookRegistry",
     "InferenceSessionHook",
+    "InteractiveSessionHook",
+    "NoOpSessionHook",
+    "SessionHook",
     "SystemSessionHook",
 ]

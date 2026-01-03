@@ -10,10 +10,10 @@ from .replica import CheckReplicaDeploymentHandler
 from .scaling import ScalingDeploymentHandler
 
 __all__ = [
-    "DeploymentHandler",
     "CheckPendingDeploymentHandler",
     "CheckReplicaDeploymentHandler",
-    "ScalingDeploymentHandler",
+    "DeploymentHandler",
     "DestroyingDeploymentHandler",
     "ReconcileDeploymentHandler",
+    "ScalingDeploymentHandler",
 ]

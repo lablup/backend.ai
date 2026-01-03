@@ -5,8 +5,8 @@ from ..common.atom_api import ATOMDeviceStat
 from ..common.types import AbstractATOMDevice
 
 __all__ = (
-    "ATOMMaxDevice",
     "ATOMMaxChildDevice",
+    "ATOMMaxDevice",
 )
 
 

@@ -1983,9 +1983,7 @@ class AbstractAgent(
                         )
                 finally:
                     # Enqueue the events.
-                    terminated_kernel_ids = ",".join([
-                        str(kid) for kid in terminated_kernels.keys()
-                    ])
+                    terminated_kernel_ids = ",".join([str(kid) for kid in terminated_kernels])
                     if terminated_kernel_ids:
                         log.debug(f"Terminate kernels(ids:[{terminated_kernel_ids}])")
                     for kernel_id, ev in terminated_kernels.items():
@@ -2003,7 +2001,7 @@ class AbstractAgent(
                 agent_id=self.id, exception=e
             )
         except Exception as e:
-            log.exception(f"sync_container_lifecycles() failure, continuing (detail: {repr(e)})")
+            log.exception(f"sync_container_lifecycles() failure, continuing (detail: {e!r})")
             self._sync_container_lifecycle_observer.observe_container_lifecycle_failure(
                 agent_id=self.id, exception=e
             )
@@ -2223,7 +2221,7 @@ class AbstractAgent(
                 )
 
                 if need_to_pull:
-                    log.info(f"check_and_pull() start pulling {str(img_ref)}")
+                    log.info(f"check_and_pull() start pulling {img_ref!s}")
 
                     await self.anycast_event(
                         ImagePullStartedEvent(
@@ -2242,7 +2240,7 @@ class AbstractAgent(
 
                     except asyncio.TimeoutError:
                         log.exception(
-                            f"Image pull timeout (img:{str(img_ref)}, sec:{image_pull_timeout})"
+                            f"Image pull timeout (img:{img_ref!s}, sec:{image_pull_timeout})"
                         )
 
                         await self.anycast_event(
@@ -2256,7 +2254,7 @@ class AbstractAgent(
                         raise
 
                     except Exception as e:
-                        log.exception(f"Image pull failed (img:{img_ref}, err:{repr(e)})")
+                        log.exception(f"Image pull failed (img:{img_ref}, err:{e!r})")
 
                         await self.anycast_event(
                             ImagePullFailedEvent(
@@ -3071,7 +3069,7 @@ class AbstractAgent(
                             container_id=ContainerId(cid),
                         )
                         raise ContainerCreationFailedError(
-                            f"Kernel failed to create container (k:{str(ctx.kernel_id)}, detail:{msg})"
+                            f"Kernel failed to create container (k:{ctx.kernel_id!s}, detail:{msg})"
                         )
                     except Exception as e:
                         log.warning(
@@ -3085,7 +3083,7 @@ class AbstractAgent(
                             KernelLifecycleEventReason.FAILED_TO_CREATE,
                         )
                         raise ContainerCreationFailedError(
-                            f"Kernel failed to create container (k:{str(kernel_id)}, detail: {str(e)})"
+                            f"Kernel failed to create container (k:{kernel_id!s}, detail: {e!s})"
                         )
                     try:
                         pretty_container_id: str = container_data["container_id"][:12]
@@ -3174,7 +3172,7 @@ class AbstractAgent(
                             container_id=ContainerId(container_data["container_id"]),
                         )
                         raise ContainerStartupTimeoutError(
-                            f"Timeout during container startup (k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
+                            f"Timeout during container startup (k:{ctx.kernel_id!s}, container:{container_data['container_id']})"
                         )
                     except asyncio.CancelledError:
                         await self.inject_container_lifecycle_event(
@@ -3185,7 +3183,7 @@ class AbstractAgent(
                             container_id=ContainerId(container_data["container_id"]),
                         )
                         raise ContainerStartupCancelledError(
-                            f"Cancelled waiting of container startup (k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
+                            f"Cancelled waiting of container startup (k:{ctx.kernel_id!s}, container:{container_data['container_id']})"
                         )
                     except RetryError:
                         await self.inject_container_lifecycle_event(
@@ -3197,7 +3195,7 @@ class AbstractAgent(
                         )
                         err_msg = (
                             "Container startup failed, the container might be missing or failed to initialize "
-                            f"(k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
+                            f"(k:{ctx.kernel_id!s}, container:{container_data['container_id']})"
                         )
                         log.exception(err_msg)
                         raise ContainerStartupFailedError(err_msg)

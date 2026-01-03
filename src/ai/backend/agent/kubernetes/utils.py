@@ -135,9 +135,7 @@ class PersistentServiceContainer:
             await c.stop()
             await c.delete(force=True)
         except DockerError as e:
-            if e.status == 409 and "is not running" in e.message:
-                pass
-            elif e.status == 404:
+            if (e.status == 409 and "is not running" in e.message) or e.status == 404:
                 pass
             else:
                 raise

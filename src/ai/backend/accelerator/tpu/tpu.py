@@ -28,14 +28,16 @@ class libtpu:
                 cls.zone = zone
             else:
                 try:
-                    async with aiohttp.ClientSession() as sess:
-                        async with sess.get(
+                    async with (
+                        aiohttp.ClientSession() as sess,
+                        sess.get(
                             "http://metadata.google.internal/computeMetadata/v1/instance/zone",
                             headers={"Metadata-Flavor": "Google"},
-                        ) as resp:
-                            resp_body = await resp.text()
-                            zone = resp_body.split("/")[-1]
-                            cls.zone = zone
+                        ) as resp,
+                    ):
+                        resp_body = await resp.text()
+                        zone = resp_body.split("/")[-1]
+                        cls.zone = zone
                 except aiohttp.ClientError as e:
                     raise ImportError(
                         "Could not detect Gcloud zone automatically. Please set default gcloud zone."
