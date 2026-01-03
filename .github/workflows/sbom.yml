@@ -17,7 +17,7 @@ jobs:
       # see for usage: https://pypi.org/project/cyclonedx-bom/
       run: cyclonedx-py requirements -o bom-python.json
     - name: Upload Python SBOM
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: SBOM-Python
         path: ./bom-python.json
@@ -105,7 +105,7 @@ jobs:
         push-to-registry: false
 
     - name: Upload Container SBOM
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: SBOM-${{ matrix.name }}
         path: ./bom-${{ matrix.name }}.json
