@@ -602,19 +602,19 @@ class CreateUserResourcePolicyInput(graphene.InputObjectType):
     )
 
     def to_creator(self, name: str) -> Creator[UserResourcePolicyRow]:
-        def value_or_none(value: Any) -> Any:
-            return value if value is not Undefined else None
+        def value_or_default(value: Any, default: int) -> int:
+            return value if value is not Undefined and value is not None else default
 
         CreatorSpec = _get_user_resource_policy_creator_spec()
         return Creator(
             spec=CreatorSpec(
                 name=name,
-                max_vfolder_count=value_or_none(self.max_vfolder_count),
-                max_quota_scope_size=value_or_none(self.max_quota_scope_size),
-                max_session_count_per_model_session=value_or_none(
-                    self.max_session_count_per_model_session
+                max_vfolder_count=value_or_default(self.max_vfolder_count, 0),
+                max_quota_scope_size=value_or_default(self.max_quota_scope_size, 0),
+                max_session_count_per_model_session=value_or_default(
+                    self.max_session_count_per_model_session, 0
                 ),
-                max_customized_image_count=value_or_none(self.max_customized_image_count),
+                max_customized_image_count=value_or_default(self.max_customized_image_count, 3),
             )
         )
 
@@ -858,16 +858,16 @@ class CreateProjectResourcePolicyInput(graphene.InputObjectType):
     )
 
     def to_creator(self, name: str) -> Creator[ProjectResourcePolicyRow]:
-        def value_or_none(value: Any) -> Any:
-            return value if value is not Undefined else None
+        def value_or_default(value: Any, default: int) -> int:
+            return value if value is not Undefined and value is not None else default
 
         CreatorSpec = _get_project_resource_policy_creator_spec()
         return Creator(
             spec=CreatorSpec(
                 name=name,
-                max_vfolder_count=value_or_none(self.max_vfolder_count),
-                max_quota_scope_size=value_or_none(self.max_quota_scope_size),
-                max_network_count=value_or_none(self.max_network_count),
+                max_vfolder_count=value_or_default(self.max_vfolder_count, 0),
+                max_quota_scope_size=value_or_default(self.max_quota_scope_size, 0),
+                max_network_count=value_or_default(self.max_network_count, 0),
             )
         )
 

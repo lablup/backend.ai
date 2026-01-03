@@ -85,24 +85,24 @@ def test_user_resource_policy_creator_build_row() -> None:
     assert row.max_customized_image_count == 3
 
 
-def test_user_resource_policy_creator_build_row_with_none_values() -> None:
-    """Test that UserResourcePolicyCreatorSpec handles None values correctly"""
+def test_user_resource_policy_creator_build_row_with_zero_values() -> None:
+    """Test that UserResourcePolicyCreatorSpec handles zero/default values correctly"""
     spec = UserResourcePolicyCreatorSpec(
         name="minimal-policy",
-        max_vfolder_count=None,
-        max_quota_scope_size=None,
-        max_session_count_per_model_session=None,
-        max_customized_image_count=None,
+        max_vfolder_count=0,
+        max_quota_scope_size=0,
+        max_session_count_per_model_session=0,
+        max_customized_image_count=0,
     )
 
     row = spec.build_row()
 
-    # Check that all expected fields are present, even if None
+    # Check that all expected fields are present with zero values
     assert row.name == "minimal-policy"
-    assert row.max_vfolder_count is None
-    assert row.max_quota_scope_size is None
-    assert row.max_session_count_per_model_session is None
-    assert row.max_customized_image_count is None
+    assert row.max_vfolder_count == 0
+    assert row.max_quota_scope_size == 0
+    assert row.max_session_count_per_model_session == 0
+    assert row.max_customized_image_count == 0
 
 
 def test_user_resource_policy_updater_spec_build_values() -> None:
