@@ -8,7 +8,8 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.engine import Row
 
-from ai.backend.manager.models import KernelRow, SessionRow, kernels
+from ai.backend.manager.models.kernel import KernelRow, kernels
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import agg_to_array, agg_to_str, sql_json_merge
 
 

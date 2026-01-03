@@ -512,8 +512,9 @@ async def query_accessible_vfolders(
     extra_vf_group_conds=None,
     allowed_status_set: VFolderStatusSet | None = None,
 ) -> Sequence[Mapping[str, Any]]:
-    from ai.backend.manager.models import association_groups_users as agus
-    from ai.backend.manager.models import groups, users
+    from ai.backend.manager.models.group import association_groups_users as agus
+    from ai.backend.manager.models.group import groups
+    from ai.backend.manager.models.user import users
 
     if allowed_vfolder_types is None:
         allowed_vfolder_types = ["user"]  # legacy default
@@ -1280,7 +1281,7 @@ async def ensure_quota_scope_accessible_by_user(
     quota_scope: QuotaScopeID,
     user: Mapping[str, Any],
 ) -> None:
-    from ai.backend.manager.models import association_groups_users as agus
+    from ai.backend.manager.models.group import association_groups_users as agus
 
     # Lookup user table to match if quota is scoped to the user
     query = sa.select(UserRow).where(UserRow.uuid == quota_scope.scope_id)

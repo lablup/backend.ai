@@ -66,34 +66,32 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.models import (
-    DomainRow,
-    GroupRow,
-    ImageRow,
-    KernelRow,
-    ProjectResourcePolicyRow,
-    ScalingGroupRow,
-    SessionRow,
-    UserResourcePolicyRow,
-    UserRow,
-    agents,
-    domains,
-    kernels,
-    keypairs,
-    scaling_groups,
-    users,
-    vfolders,
-)
+from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.base import (
     pgsql_connect_opts,
     populate_fixture,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.domain import DomainRow, domains
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageAliasRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.models.image import ImageAliasRow, ImageRow
+from ai.backend.manager.models.kernel import KernelRow, kernels
+from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.resource_policy import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupOpts,
+    ScalingGroupRow,
+    scaling_groups,
+)
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import session_templates
+from ai.backend.manager.models.user import UserRow, users
 from ai.backend.manager.models.utils import connect_database
+from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.server import build_root_app, config_provider_ctx, etcd_ctx

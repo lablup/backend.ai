@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.types import SessionId
 from ai.backend.manager.errors.kernel import SessionNotFound
-from ai.backend.manager.models import SessionRow
+from ai.backend.manager.models.session import SessionRow
 
 
 @dataclass

@@ -13,13 +13,13 @@ from ai.backend.common.types import (
     ResourceSlot,
     VFolderHostPermission,
 )
-from ai.backend.manager.models import (
-    DomainRow,
-    UserResourcePolicyRow,
-    UserRow,
-)
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater

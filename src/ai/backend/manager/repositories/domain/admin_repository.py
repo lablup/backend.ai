@@ -21,9 +21,8 @@ from ai.backend.manager.errors.resource import (
     DomainHasGroups,
     DomainHasUsers,
 )
-from ai.backend.manager.models import groups
 from ai.backend.manager.models.domain import DomainRow, domains, row_to_data
-from ai.backend.manager.models.group import ProjectType
+from ai.backend.manager.models.group import ProjectType, groups
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     kernels,

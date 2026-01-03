@@ -1225,8 +1225,7 @@ class VirtualFolder(graphene.ObjectType):
         user_id: Optional[uuid.UUID] = None,
         filter: Optional[str] = None,
     ) -> int:
-        from ai.backend.manager.models import association_groups_users as agus
-
+        from ...models.group import association_groups_users as agus
         from ...models.group import groups
 
         query = sa.select([agus.c.group_id]).select_from(agus).where(agus.c.user_id == user_id)
@@ -1261,8 +1260,7 @@ class VirtualFolder(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> list[VirtualFolder]:
-        from ai.backend.manager.models import association_groups_users as agus
-
+        from ...models.group import association_groups_users as agus
         from ...models.group import groups
 
         query = sa.select([agus.c.group_id]).select_from(agus).where(agus.c.user_id == user_id)

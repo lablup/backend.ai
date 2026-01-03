@@ -18,7 +18,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.kernel import QuotaExceeded
-from ai.backend.manager.models import NetworkRow
+from ai.backend.manager.models.network import NetworkRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     AllowedScalingGroup,

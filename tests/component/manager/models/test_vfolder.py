@@ -5,7 +5,7 @@ import pytest
 
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.common.types import VFolderMount
-from ai.backend.manager.api.gql_legacy.base import GraphQueryContext
+from ai.backend.manager.api.gql_legacy.schema import GraphQueryContext
 from ai.backend.manager.api.gql_legacy.vfolder import VirtualFolder
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (

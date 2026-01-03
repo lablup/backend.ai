@@ -42,39 +42,36 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import KernelNotFound, SessionNotFound
 from ai.backend.manager.errors.resource import AgentNotFound, AllocationFailed, ScalingGroupNotFound
 from ai.backend.manager.exceptions import ErrorStatusInfo
-from ai.backend.manager.models import (
-    PRIVATE_SESSION_TYPES,
-    AgentRow,
-    DefaultForUnspecified,
-    DomainRow,
-    EndpointRow,
-    GroupRow,
-    KernelRow,
-    KernelStatistics,
-    KeyPairResourcePolicyRow,
-    KeyPairRow,
-    RoutingRow,
-    ScalingGroupOpts,
-    ScalingGroupRow,
-    SessionDependencyRow,
-    SessionRow,
-    UserRow,
-    recalc_agent_resource_occupancy,
-)
+from ai.backend.manager.models.agent import AgentRow, recalc_agent_resource_occupancy
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointLifecycle,
+    EndpointRow,
     EndpointStatistics,
 )
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import (
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    KernelRow,
+    KernelStatistics,
     recalc_concurrency_used,
 )
-from ai.backend.manager.models.routing import RouteStatus
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_policy import (
+    DefaultForUnspecified,
+    KeyPairResourcePolicyRow,
+)
+from ai.backend.manager.models.routing import RouteStatus, RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import (
+    PRIVATE_SESSION_TYPES,
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
+    SessionDependencyRow,
+    SessionRow,
     _build_session_fetch_query,
 )
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_increment,
@@ -812,7 +809,7 @@ class ScheduleRepository:
     @schedule_repository_resilience.apply()
     async def get_schedulable_agents_by_sgroup(self, sgroup_name: str) -> list[AgentRow]:
         async with self._db.begin_readonly_session() as session:
-            from ai.backend.manager.models import list_schedulable_agents_by_sgroup
+            from ai.backend.manager.models.agent import list_schedulable_agents_by_sgroup
 
             result = await list_schedulable_agents_by_sgroup(session, sgroup_name)
             return list(result)

@@ -23,8 +23,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.errors.deployment import DeploymentHasNoTargetRevision
-from ai.backend.manager.models import NetworkRow
-from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.network import NetworkRow, NetworkType
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.types import UserScope
 

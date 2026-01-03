@@ -150,8 +150,9 @@ async def query_accessible_session_templates(
     allowed_types: Iterable[str] = ["user"],
     extra_conds=None,
 ) -> List[Mapping[str, Any]]:
-    from ai.backend.manager.models import association_groups_users as agus
-    from ai.backend.manager.models import groups, users
+    from .group import association_groups_users as agus
+    from .group import groups
+    from .user import users
 
     entries: List[Mapping[str, Any]] = []
     if "user" in allowed_types:
