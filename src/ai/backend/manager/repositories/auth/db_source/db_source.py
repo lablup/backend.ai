@@ -14,11 +14,15 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
+from ai.backend.manager.data.auth.types import CredentialsByAccessKey, GroupMembershipData, UserData
 from ai.backend.manager.errors.auth import GroupMembershipNotFoundError, UserCreationError
 from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.resource_policy import (
+    keypair_resource_policies,
+    user_resource_policies,
+)
 from ai.backend.manager.models.user import (
     UserRow,
     UserStatus,
@@ -285,3 +289,51 @@ class AuthDBSource:
         """Fetch current time from database."""
         async with self._db.begin_readonly() as db_conn:
             return await db_conn.scalar(sa.select(sa.func.now()))
+
+    @auth_db_source_resilience.apply()
+    async def fetch_credentials_by_access_key(
+        self,
+        access_key: str,
+    ) -> CredentialsByAccessKey:
+        """
+        Fetch keypair and user credentials by access_key.
+
+        Returns:
+            CredentialsByAccessKey with user_row and keypair_row
+        """
+        async with self._db.begin_readonly() as conn:
+            # Query keypair with resource policy
+            j = keypairs.join(
+                keypair_resource_policies,
+                keypairs.c.resource_policy == keypair_resource_policies.c.name,
+            )
+            query = (
+                sa.select([keypairs, keypair_resource_policies], use_labels=True)
+                .select_from(j)
+                .where(
+                    (keypairs.c.access_key == access_key) & (keypairs.c.is_active.is_(True)),
+                )
+            )
+            result = await conn.execute(query)
+            keypair_row = result.first()
+
+            if keypair_row is None:
+                return CredentialsByAccessKey(user_row=None, keypair_row=None)
+
+            # Query user with resource policy by joining keypairs table
+            j = users.join(
+                user_resource_policies,
+                users.c.resource_policy == user_resource_policies.c.name,
+            ).join(
+                keypairs,
+                users.c.uuid == keypairs.c.user,
+            )
+            query = (
+                sa.select([users, user_resource_policies], use_labels=True)
+                .select_from(j)
+                .where((keypairs.c.access_key == access_key))
+            )
+            result = await conn.execute(query)
+            user_row = result.first()
+
+            return CredentialsByAccessKey(user_row=user_row, keypair_row=keypair_row)
