@@ -15,11 +15,12 @@ from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
-from ai.backend.manager.models.gql_models.session import ComputeSession
 from ai.backend.manager.models.keypair import (
     keypairs,
     prepare_new_keypair,
 )
+
+from .session import ComputeSession
 
 if TYPE_CHECKING:
     from .schema import GraphQueryContext

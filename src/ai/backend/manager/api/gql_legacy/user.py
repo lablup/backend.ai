@@ -132,7 +132,7 @@ class UserNode(graphene.ObjectType):
     )
 
     project_nodes = PaginatedConnectionField(
-        "ai.backend.manager.models.gql_models.group.GroupConnection",
+        "ai.backend.manager.api.gql_legacy.group.GroupConnection",
         description="Added in 25.5.0.",
     )
 
@@ -1062,7 +1062,7 @@ class CreateUser(graphene.Mutation):
     msg = graphene.String()
     user = graphene.Field(lambda: User, required=False)
     keypair = graphene.Field(
-        "ai.backend.manager.models.gql_models.keypair.KeyPair", description="Added in 25.15.0."
+        "ai.backend.manager.api.gql_legacy.keypair.KeyPair", description="Added in 25.15.0."
     )
 
     @classmethod

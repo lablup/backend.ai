@@ -38,7 +38,6 @@ from ai.backend.manager.api.gql.base import resolve_global_id
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.idle import ReportInfo
-from ai.backend.manager.models.gql_models.user import UserNode
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.utils import agg_to_array
 from ai.backend.manager.repositories.base.updater import Updater
@@ -97,6 +96,7 @@ from .gql_relay import (
 )
 from .group import GroupRow
 from .kernel import ComputeContainer, KernelConnection, KernelNode
+from .user import UserNode
 from .vfolder import VirtualFolderConnection, VirtualFolderNode
 
 if TYPE_CHECKING:
@@ -267,15 +267,15 @@ class ComputeSessionNode(graphene.ObjectType):
         KernelConnection,
     )
     dependents = PaginatedConnectionField(
-        "ai.backend.manager.models.gql_models.session.ComputeSessionConnection",
+        "ai.backend.manager.api.gql_legacy.session.ComputeSessionConnection",
         description="Added in 24.09.0.",
     )
     dependees = PaginatedConnectionField(
-        "ai.backend.manager.models.gql_models.session.ComputeSessionConnection",
+        "ai.backend.manager.api.gql_legacy.session.ComputeSessionConnection",
         description="Added in 24.09.0.",
     )
     graph = PaginatedConnectionField(
-        "ai.backend.manager.models.gql_models.session.ComputeSessionConnection",
+        "ai.backend.manager.api.gql_legacy.session.ComputeSessionConnection",
         description="Added in 24.09.0.",
     )
 

@@ -42,9 +42,6 @@ from ai.backend.manager.data.model_serving.types import (
     RequesterCtx,
 )
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES
-from ai.backend.manager.models.gql_models.base import ImageRefType
-from ai.backend.manager.models.gql_models.image import ImageNode
-from ai.backend.manager.models.gql_models.vfolder import VirtualFolderNode
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.routing import RouteStatus, Routing
 from ai.backend.manager.models.vfolder import VFolderRow
@@ -84,6 +81,7 @@ from ...models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from ...models.user import UserRole, UserRow
 from .base import (
     FilterExprArg,
+    ImageRefType,
     InferenceSessionError,
     Item,
     OrderExprArg,
@@ -91,6 +89,8 @@ from .base import (
     generate_sql_info_for_gql_connection,
 )
 from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
+from .image import ImageNode
+from .vfolder import VirtualFolderNode
 
 if TYPE_CHECKING:
     from .schema import GraphQueryContext

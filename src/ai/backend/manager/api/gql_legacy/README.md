@@ -16,7 +16,7 @@ This directory provides only some Graphene-based endpoints for backward compatib
 
 **❌ Don't:**
 - Add new types or queries with Graphene
-- Create new files in `models/gql_models/`
+- Create new files in `api/gql_legacy/`
 
 **✅ Do:**
 - Define new types with Strawberry

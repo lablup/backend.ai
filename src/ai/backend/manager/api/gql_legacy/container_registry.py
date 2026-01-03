@@ -18,7 +18,6 @@ from ai.backend.manager.models.container_registry import (
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
-from ai.backend.manager.models.gql_models.fields import ScopeField
 from ai.backend.manager.models.rbac import (
     ContainerRegistryScope,
     ProjectScope,
@@ -48,6 +47,7 @@ from .base import (
     PaginatedConnectionField,
     generate_sql_info_for_gql_connection,
 )
+from .fields import ScopeField
 from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from .group import GroupConnection, GroupNode
 
