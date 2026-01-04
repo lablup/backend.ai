@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import List
 
 from ai.backend.common.types import DeviceId
 
@@ -7,8 +6,8 @@ from .types import LPUDevice
 from .utils import blocking_job
 
 
-async def list_devices() -> List[LPUDevice]:
-    devices: List[LPUDevice] = []
+async def list_devices() -> list[LPUDevice]:
+    devices: list[LPUDevice] = []
     xclmgmt_path = Path("/sys/bus/pci/drivers/xclmgmt")
     folders = await blocking_job(
         lambda: sorted(

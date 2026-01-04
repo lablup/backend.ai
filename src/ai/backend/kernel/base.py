@@ -20,11 +20,8 @@ from pathlib import Path
 from typing import (
     Any,
     ClassVar,
-    Dict,
-    List,
     Optional,
     TypeVar,
-    Union,
 )
 
 import janus
@@ -148,7 +145,7 @@ class BaseRunner(metaclass=ABCMeta):
     service_parser: Optional[ServiceParser]
     runtime_path: Path
 
-    services_running: Dict[str, asyncio.subprocess.Process]
+    services_running: dict[str, asyncio.subprocess.Process]
 
     intrinsic_host_ports_mapping: Mapping[str, int]
 
@@ -857,7 +854,7 @@ class BaseRunner(metaclass=ABCMeta):
                             "error": error_reason,
                         }
 
-                    cmdargs: Optional[Sequence[Union[str, os.PathLike]]]
+                    cmdargs: Optional[Sequence[str | os.PathLike]]
                     env: Mapping[str, str]
                     cmdargs, env = None, {}
                     if service_info["name"] == "ttyd":
@@ -969,7 +966,7 @@ class BaseRunner(metaclass=ABCMeta):
         )
         self.services_running.pop(service_name, None)
 
-    async def run_subproc(self, cmd: Union[str, List[str]], batch: bool = False):
+    async def run_subproc(self, cmd: str | list[str], batch: bool = False):
         """A thin wrapper for an external command."""
         loop = current_loop()
         if Path("/home/work/.logs").is_dir():

@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import List, Optional
+from typing import Optional
 
 from ai.backend.client.request import Request
 
@@ -51,7 +51,7 @@ class Dotfile(BaseFunction):
         owner_access_key: Optional[str] = None,
         domain: Optional[str] = None,
         group: Optional[str] = None,
-    ) -> "List[Mapping[str, str]]":
+    ) -> "list[Mapping[str, str]]":
         params = {}
         if group:
             params["group"] = group

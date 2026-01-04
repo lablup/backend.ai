@@ -4,7 +4,7 @@ import logging
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
-from typing import Self, Type
+from typing import Self
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
@@ -31,7 +31,7 @@ from .xfs import XfsVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
+_DEFAULT_BACKENDS: Mapping[str, type[AbstractVolume]] = {
     FlashBladeVolume.name: FlashBladeVolume,
     BaseVolume.name: BaseVolume,
     XfsVolume.name: XfsVolume,
@@ -111,7 +111,7 @@ class VolumePool:
     async def _init_volume(
         cls,
         volume_config: VolumeInfoConfig,
-        volume_type: Type[AbstractVolume],
+        volume_type: type[AbstractVolume],
         local_config: StorageProxyUnifiedConfig,
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
@@ -131,7 +131,7 @@ class VolumePool:
     @classmethod
     async def _init_storage_backend_plugin(
         cls,
-        backends: dict[str, Type[AbstractVolume]],
+        backends: dict[str, type[AbstractVolume]],
         local_config: StorageProxyUnifiedConfig,
         etcd: AsyncEtcd,
     ) -> StoragePluginContext:

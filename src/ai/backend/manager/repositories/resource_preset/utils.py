@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Optional, Type
+from typing import Optional
 
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -14,7 +14,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 @contextmanager
 def suppress_with_log(
-    exceptions: list[Type[BaseException]],
+    exceptions: list[type[BaseException]],
     message: Optional[str] = None,
     log_level: int = logging.WARNING,
 ) -> Generator[None, None, None]:

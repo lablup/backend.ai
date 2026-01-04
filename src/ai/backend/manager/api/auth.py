@@ -9,7 +9,7 @@ from collections.abc import Iterable, Mapping
 from contextlib import ExitStack
 from datetime import datetime, timedelta
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Final, Tuple
+from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import urlparse
 
 import aiohttp_cors
@@ -1097,7 +1097,7 @@ async def upload_ssh_keypair(request: web.Request, params: Any) -> web.Response:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["prefix"] = "auth"  # slashed to distinguish with "/vN/authorize"
     app["api_versions"] = (1, 2, 3, 4)

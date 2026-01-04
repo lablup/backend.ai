@@ -15,11 +15,7 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    FrozenSet,
-    List,
     Optional,
-    Tuple,
-    Union,
     override,
 )
 
@@ -108,13 +104,13 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     scratch_dir: Path
     work_dir: Path
     config_dir: Path
-    internal_mounts: List[Mount] = []
+    internal_mounts: list[Mount] = []
     static_pvc_name: str
     workers: Mapping[str, Mapping[str, str]]
-    config_maps: List[ConfigMap]
+    config_maps: list[ConfigMap]
     agent_sockpath: Path
-    volume_mounts: List[KubernetesVolumeMount]
-    volumes: List[KubernetesAbstractVolume]
+    volume_mounts: list[KubernetesVolumeMount]
+    volumes: list[KubernetesAbstractVolume]
 
     def __init__(
         self,
@@ -172,7 +168,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         return {}
 
     @override
-    async def prepare_resource_spec(self) -> Tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
+    async def prepare_resource_spec(self) -> tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
         loop = current_loop()
         if self.restarting:
             await kube_config.load_kube_config()
@@ -286,7 +282,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
     @override
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
-        mounts: List[Mount] = [
+        mounts: list[Mount] = [
             # Mount scratch directory
             Mount(
                 MountTypes.K8S_GENERIC,
@@ -434,8 +430,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     def get_runner_mount(
         self,
         type: MountTypes,
-        src: Union[str, Path],
-        target: Union[str, Path],
+        src: str | Path,
+        target: str | Path,
         perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
     ) -> Mount:
@@ -452,7 +448,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
     async def process_volumes(
         self,
-        volumes: List[KubernetesAbstractVolume],
+        volumes: list[KubernetesAbstractVolume],
     ) -> None:
         self.volumes += volumes
 
@@ -503,15 +499,15 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         self,
         computer: AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         return []
 
     async def generate_deployment_object(
         self,
         image: str,
         environ: Mapping[str, Any],
-        ports: List[int],
-        command: List[str],
+        ports: list[int],
+        command: list[str],
         labels: Mapping[str, Any] = {},
     ) -> dict:
         return {
@@ -688,7 +684,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     async def start_container(
         self,
         kernel_obj: AbstractKernel,
-        cmdargs: List[str],
+        cmdargs: list[str],
         resource_opts,
         preopen_ports,
         cluster_info: ClusterInfo,
@@ -735,9 +731,9 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         )
 
         async def rollup(
-            functions: List[Tuple[Optional[functools.partial], Optional[functools.partial]]],
+            functions: list[tuple[Optional[functools.partial], Optional[functools.partial]]],
         ):
-            rollback_functions: List[Optional[functools.partial]] = []
+            rollback_functions: list[Optional[functools.partial]] = []
 
             for rollup_function, future_rollback_function in functions:
                 try:
@@ -751,7 +747,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     log.exception("Error while rollup: {}", e)
                     raise
 
-        arguments: List[Tuple[Optional[functools.partial], Optional[functools.partial]]] = []
+        arguments: list[tuple[Optional[functools.partial], Optional[functools.partial]]] = []
 
         try:
             expose_service_api_response: V1Service = await core_api.create_namespaced_service(
@@ -763,7 +759,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         if expose_service_api_response.spec is None:
             raise K8sError("expose_service_api_response.spec is None")
-        node_ports: List[V1ServicePort] = expose_service_api_response.spec.ports
+        node_ports: list[V1ServicePort] = expose_service_api_response.spec.ports
         arguments.append((
             None,
             functools.partial(
@@ -1020,8 +1016,8 @@ class KubernetesAgent(
     @override
     async def enumerate_containers(
         self,
-        status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> Sequence[Tuple[KernelId, Container]]:
+        status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
+    ) -> Sequence[tuple[KernelId, Container]]:
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
 
@@ -1031,7 +1027,7 @@ class KubernetesAgent(
             # Additional check to filter out real worker pods only?
 
             async def _fetch_container_info(pod: Any):
-                kernel_id: Union[KernelId, str, None] = "(unknown)"
+                kernel_id: KernelId | str | None = "(unknown)"
                 try:
                     kernel_id = await get_kernel_id_from_deployment(pod)
                     if kernel_id is None or kernel_id not in self.kernel_registry:

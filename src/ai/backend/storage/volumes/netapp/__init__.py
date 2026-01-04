@@ -10,11 +10,7 @@ import time
 from collections.abc import AsyncIterator
 from contextlib import aclosing
 from pathlib import Path
-from typing import (
-    Any,
-    FrozenSet,
-    Optional,
-)
+from typing import Any
 
 import aiofiles
 import aiofiles.os
@@ -90,8 +86,8 @@ class QTreeQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         result = await self.netapp_client.create_qtree(self.svm_id, self.volume_id, qspath.name)
@@ -134,7 +130,7 @@ class QTreeQuotaModel(BaseQuotaModel):
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-    ) -> Optional[QuotaUsage]:
+    ) -> QuotaUsage | None:
         qspath = self.mangle_qspath(quota_scope_id)
         if not qspath.exists():
             return None
@@ -512,7 +508,7 @@ class NetAppVolume(BaseVolume):
     async def shutdown(self) -> None:
         await self.netapp_client.aclose()
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_FAST_FS_SIZE, CAP_FAST_SIZE, CAP_QUOTA, CAP_METRIC])
 
     async def get_hwinfo(self) -> HardwareMetadata:

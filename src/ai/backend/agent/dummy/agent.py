@@ -4,10 +4,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import (
     Any,
-    FrozenSet,
     Literal,
     Optional,
-    Tuple,
     override,
 )
 
@@ -95,7 +93,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
     @override
     async def prepare_resource_spec(
         self,
-    ) -> Tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
+    ) -> tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
         slots = ResourceSlot.from_json(self.kernel_config["resource_slots"])
         # Ensure that we have intrinsic slots.
         if SlotName("cpu") not in slots:
@@ -292,8 +290,8 @@ class DummyAgent(
     @override
     async def enumerate_containers(
         self,
-        status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> Sequence[Tuple[KernelId, Container]]:
+        status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
+    ) -> Sequence[tuple[KernelId, Container]]:
         return []
 
     @override

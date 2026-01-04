@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import builtins
 import sys
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import click
 
@@ -18,7 +19,7 @@ from ai.backend.client.session import Session
 
 from . import admin
 
-SessionItem = Dict[str, Any]
+SessionItem = dict[str, Any]
 
 
 @admin.group()
@@ -109,7 +110,7 @@ def _list_cmd(name: str = "list", docs: Optional[str] = None):
         """
         List and manage compute sessions.
         """
-        fields: List[FieldSpec] = []
+        fields: builtins.list[FieldSpec] = []
         with Session() as api_sess:
             is_admin = api_sess.KeyPair(api_sess.config.access_key).info()["is_admin"]
             api_version = api_sess.api_version

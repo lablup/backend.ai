@@ -64,7 +64,6 @@ from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import (
     Any,
-    List,
     NotRequired,
     Optional,
     TypeAlias,
@@ -589,7 +588,7 @@ class NetAppClient:
                 limit_bytes=limit_bytes,
             )
 
-    async def get_qos_policies(self) -> List[Mapping[str, Any]]:
+    async def get_qos_policies(self) -> list[Mapping[str, Any]]:
         async with self.send_request(
             "get",
             "/api/storage/qos/policies",

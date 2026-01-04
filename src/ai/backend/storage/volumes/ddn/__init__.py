@@ -3,7 +3,7 @@ import logging
 from collections.abc import Mapping
 from pathlib import Path
 from subprocess import CalledProcessError
-from typing import Any, Final, FrozenSet
+from typing import Any, Final
 
 import aiofiles
 import aiofiles.os
@@ -234,5 +234,5 @@ class EXAScalerFSVolume(BaseVolume):
     async def create_quota_model(self) -> AbstractQuotaModel:
         return EXAScalerQuotaModel(self.mount_path, self.local_config, self.etcd)
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA])

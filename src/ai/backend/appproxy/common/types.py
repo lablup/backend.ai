@@ -12,7 +12,6 @@ from typing import (
     Optional,
     TypeAlias,
     TypeVar,
-    Union,
 )
 from uuid import UUID
 
@@ -300,7 +299,7 @@ class HealthCheckState(BaseModel):
     status: ModelServiceStatus | None = None
 
 
-TBaseModel = TypeVar("TBaseModel", bound=Union[BaseModel, Sequence[BaseModel]])
+TBaseModel = TypeVar("TBaseModel", bound=BaseModel | Sequence[BaseModel])
 
 
 @dataclass

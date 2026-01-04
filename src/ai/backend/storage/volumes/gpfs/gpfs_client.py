@@ -5,7 +5,7 @@ import urllib.parse
 from collections.abc import AsyncIterator, Callable, Coroutine, Mapping
 from pathlib import Path
 from ssl import SSLContext
-from typing import Any, Dict, List, Optional, TypeAlias
+from typing import Any, Optional, TypeAlias
 
 import aiohttp
 from aiohttp import BasicAuth, web
@@ -174,7 +174,7 @@ class GPFSAPIClient:
             return GPFSJob.from_dict(data["jobs"][0])
 
     @error_handler
-    async def list_fs(self) -> List[GPFSFilesystem]:
+    async def list_fs(self) -> list[GPFSFilesystem]:
         async with self._build_session() as sess:
             response = await self._build_request(sess, "GET", "/filesystems")
             data = await response.json()
@@ -190,7 +190,7 @@ class GPFSAPIClient:
         return GPFSFilesystem.from_dict(data["filesystems"][0])
 
     @error_handler
-    async def list_fs_pools(self, fs_name: str) -> List[GPFSStoragePoolUsage]:
+    async def list_fs_pools(self, fs_name: str) -> list[GPFSStoragePoolUsage]:
         async with self._build_session() as sess:
             response = await self._build_request(sess, "GET", f"/filesystems/{fs_name}/pools")
             data = await response.json()
@@ -210,7 +210,7 @@ class GPFSAPIClient:
         return GPFSStoragePoolUsage.from_dict(data["storagePool"][0])
 
     @error_handler
-    async def list_fs_disks(self, fs_name: str) -> List[GPFSDisk]:
+    async def list_fs_disks(self, fs_name: str) -> list[GPFSDisk]:
         async with self._build_session() as sess:
             response = await self._build_request(sess, "GET", f"/filesystems/{fs_name}/disks")
             data = await response.json()
@@ -221,7 +221,7 @@ class GPFSAPIClient:
     @error_handler
     async def list_quotas(
         self, fs_name: str, quota_type: GPFSQuotaType = GPFSQuotaType.FILESET
-    ) -> List[GPFSQuota]:
+    ) -> list[GPFSQuota]:
         async with self._build_session() as sess:
             response = await self._build_request(
                 sess,
@@ -237,7 +237,7 @@ class GPFSAPIClient:
         fs_name: str,
         fileset_name: str,
         quota_type: GPFSQuotaType = GPFSQuotaType.FILESET,
-    ) -> List[GPFSQuota]:
+    ) -> list[GPFSQuota]:
         async with self._build_session() as sess:
             response = await self._build_request(
                 sess,
@@ -287,7 +287,7 @@ class GPFSAPIClient:
         permissions: Optional[int] = None,
         create_directory=True,
     ) -> None:
-        body: Dict[str, Any] = {
+        body: dict[str, Any] = {
             "filesetName": fileset_name,
         }
         if owner is not None:
@@ -381,14 +381,14 @@ class GPFSAPIClient:
             return await response.json()
 
     @error_handler
-    async def list_nodes(self) -> List[str]:
+    async def list_nodes(self) -> list[str]:
         async with self._build_session() as sess:
             response = await self._build_request(sess, "GET", "/nodes")
             data = await response.json()
             return [x["adminNodeName"] for x in data["nodes"]]
 
     @error_handler
-    async def get_node_health(self, node_name: str) -> List[GPFSSystemHealthState]:
+    async def get_node_health(self, node_name: str) -> list[GPFSSystemHealthState]:
         async with self._build_session() as sess:
             response = await self._build_request(sess, "GET", f"/nodes/{node_name}/health/states")
             data = await response.json()

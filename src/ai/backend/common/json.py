@@ -1,7 +1,7 @@
 import datetime
 import json
 import uuid
-from typing import Any, Optional, Protocol, Union
+from typing import Any, Optional, Protocol
 
 import orjson
 
@@ -15,7 +15,7 @@ class ExtendedJSONEncoder(json.JSONEncoder):
         return super().default(o)
 
 
-def load_json(s: Union[bytes, bytearray, memoryview, str]) -> Any:
+def load_json(s: bytes | bytearray | memoryview | str) -> Any:
     """
     Loads a JSON string into a Python object.
     """

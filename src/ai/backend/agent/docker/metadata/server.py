@@ -1,7 +1,7 @@
 import logging
 from collections.abc import Mapping, MutableMapping, Sequence
 from http import HTTPStatus
-from typing import Any, List, cast
+from typing import Any, cast
 from uuid import UUID
 
 import attr
@@ -91,7 +91,7 @@ class MetadataServer(aobject):
     app: web.Application
     runner: web.AppRunner
     route_structure: MutableMapping[str, Any]
-    loaded_apps: List[str]
+    loaded_apps: list[str]
 
     def __init__(
         self,

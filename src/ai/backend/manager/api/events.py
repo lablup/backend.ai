@@ -9,7 +9,6 @@ from typing import (
     Any,
     Final,
     Optional,
-    Tuple,
 )
 from weakref import WeakSet
 
@@ -71,7 +70,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 sentinel: Final = Sentinel.TOKEN
 
-SessionEventInfo = Tuple[str, dict, str, Optional[int]]
+SessionEventInfo = tuple[str, dict, str, Optional[int]]
 
 
 @server_status_required(READ_ALLOWED)
@@ -304,7 +303,7 @@ async def events_shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["prefix"] = "events"
     app["events.context"] = PrivateContext()

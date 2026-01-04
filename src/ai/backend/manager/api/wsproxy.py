@@ -8,7 +8,7 @@ import asyncio
 import logging
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Coroutine
-from typing import Any, Optional, TypeVar, Union
+from typing import Any, Optional, TypeVar
 
 import aiohttp
 import aiotools
@@ -238,7 +238,7 @@ class WebSocketProxy:
             finally:
                 self.upstream_buffer.task_done()
 
-    async def write(self, msg: Union[bytes, str], tp: web.WSMsgType) -> None:
+    async def write(self, msg: bytes | str, tp: web.WSMsgType) -> None:
         await self.upstream_buffer.put((msg, tp))
 
     async def close_downstream(self) -> None:

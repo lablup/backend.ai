@@ -10,10 +10,8 @@ from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
-    List,
     Optional,
     Self,
-    Tuple,
     TypeAlias,
     cast,
     override,
@@ -484,7 +482,7 @@ class ImageRow(Base):
         query = _apply_loading_option(query, loading_options)
 
         result = await session.execute(query)
-        candidates: List[ImageRow] = result.scalars().all()
+        candidates: list[ImageRow] = result.scalars().all()
 
         if len(candidates) <= 0:
             raise UnknownImageReference(identifier.canonical)
@@ -520,7 +518,7 @@ class ImageRow(Base):
         query = _apply_loading_option(query, loading_options)
 
         result = await session.execute(query)
-        candidates: List[ImageRow] = result.scalars().all()
+        candidates: list[ImageRow] = result.scalars().all()
 
         if len(candidates) == 0:
             raise UnknownImageReference(ref)
@@ -843,7 +841,7 @@ class ImageRow(Base):
     def set_resource_limit(
         self,
         slot_type: str,
-        value_range: Tuple[Optional[Decimal], Optional[Decimal]],
+        value_range: tuple[Optional[Decimal], Optional[Decimal]],
     ):
         resources = self._resources
         if resources.get(slot_type) is None:

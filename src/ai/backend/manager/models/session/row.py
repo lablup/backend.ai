@@ -12,11 +12,9 @@ from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    List,
     Optional,
     Self,
     TypeAlias,
-    Union,
     cast,
     override,
 )
@@ -554,7 +552,7 @@ async def _match_sessions_by_id(
     for_update: bool = False,
     max_matches: Optional[int] = None,
     eager_loading_op: Optional[Sequence] = None,
-) -> List[SessionRow]:
+) -> list[SessionRow]:
     if isinstance(session_id_or_list, list):
         cond = SessionRow.id.in_(session_id_or_list)
     else:
@@ -585,7 +583,7 @@ async def _match_sessions_by_name(
     for_update: bool = False,
     max_matches: Optional[int] = None,
     eager_loading_op: Optional[Sequence] = None,
-) -> List[SessionRow]:
+) -> list[SessionRow]:
     if allow_prefix:
         cond = sa.sql.expression.cast(SessionRow.name, sa.String).like(f"{session_name}%")
     else:
@@ -1318,7 +1316,7 @@ class SessionRow(Base):
         for_update: bool = False,
         max_matches: Optional[int] = 10,
         eager_loading_op: Optional[Sequence] = None,
-    ) -> List[SessionRow]:
+    ) -> list[SessionRow]:
         """
         Match the prefix of session ID or session name among the sessions
         that belongs to the given access key, and return the list of SessionRow.
@@ -1381,7 +1379,7 @@ class SessionRow(Base):
     async def get_session(
         cls,
         db_session: SASession,
-        session_name_or_id: Union[str, UUID],
+        session_name_or_id: str | UUID,
         access_key: Optional[AccessKey] = None,
         *,
         allow_stale: bool = False,
@@ -1528,7 +1526,7 @@ class SessionRow(Base):
         cls,
         db_sess: SASession,
         sgroup_name: str,
-    ) -> List[SessionRow]:
+    ) -> list[SessionRow]:
         candidate_statues = (SessionStatus.PENDING, *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES)
         query = (
             sa.select(SessionRow)
@@ -1861,7 +1859,7 @@ class SessionDependencyRow(Base):
 async def check_all_dependencies(
     db_session: SASession,
     sess_ctx: SessionRow,
-) -> List[SessionRow]:
+) -> list[SessionRow]:
     j = sa.join(
         SessionDependencyRow,
         SessionRow,

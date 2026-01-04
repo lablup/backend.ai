@@ -5,7 +5,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Optional, Protocol, Type, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Optional, Protocol, TypeVar, cast
 
 import graphene
 import strawberry
@@ -188,7 +188,7 @@ class JSONString:
 
 
 def to_global_id(
-    type_: Type[Any], local_id: uuid.UUID | str, is_target_graphene_object: bool = False
+    type_: type[Any], local_id: uuid.UUID | str, is_target_graphene_object: bool = False
 ) -> str:
     if is_target_graphene_object:
         # For compatibility with existing Graphene-based global IDs

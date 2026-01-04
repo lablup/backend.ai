@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
-from typing import Final, Tuple
+from typing import Final
 
 import attrs
 from aiohttp import web
@@ -83,7 +83,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     # default_cors_options is kept for API consistency but not used in rate limiting
     app = web.Application()
     app["api_versions"] = (1, 2, 3, 4)

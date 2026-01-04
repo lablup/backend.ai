@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Optional, TypeAlias, TypeVar, Union
+from typing import Any, Optional, TypeAlias, TypeVar
 from uuid import UUID
 
 import aiohttp
@@ -432,10 +432,10 @@ class VFolderByName(BaseFunction):
     @api_function
     async def download(
         self,
-        relative_paths: Sequence[Union[str, Path]],
+        relative_paths: Sequence[str | Path],
         *,
-        basedir: Optional[Union[str, Path]] = None,
-        dst_dir: Optional[Union[str, Path]] = None,
+        basedir: Optional[str | Path] = None,
+        dst_dir: Optional[str | Path] = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         show_progress: bool = False,
         address_map: Optional[Mapping[str, str]] = None,
@@ -475,8 +475,8 @@ class VFolderByName(BaseFunction):
     async def _upload_files(
         self,
         file_paths: Sequence[Path],
-        basedir: Optional[Union[str, Path]] = None,
-        dst_dir: Optional[Union[str, Path]] = None,
+        basedir: Optional[str | Path] = None,
+        dst_dir: Optional[str | Path] = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         address_map: Optional[Mapping[str, str]] = None,
     ) -> None:
@@ -527,8 +527,8 @@ class VFolderByName(BaseFunction):
     async def _upload_recursively(
         self,
         source: Sequence[Path],
-        basedir: Optional[Union[str, Path]] = None,
-        dst_dir: Optional[Union[str, Path]] = None,
+        basedir: Optional[str | Path] = None,
+        dst_dir: Optional[str | Path] = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         address_map: Optional[Mapping[str, str]] = None,
     ) -> None:
@@ -550,11 +550,11 @@ class VFolderByName(BaseFunction):
     @api_function
     async def upload(
         self,
-        sources: Sequence[Union[str, Path]],
+        sources: Sequence[str | Path],
         *,
-        basedir: Optional[Union[str, Path]] = None,
+        basedir: Optional[str | Path] = None,
         recursive: bool = False,
-        dst_dir: Optional[Union[str, Path]] = None,
+        dst_dir: Optional[str | Path] = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         address_map: Optional[Mapping[str, str]] = None,
         show_progress: bool = False,
@@ -617,7 +617,7 @@ class VFolderByName(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def delete_files(self, files: Sequence[Union[str, Path]], recursive: bool = False):
+    async def delete_files(self, files: Sequence[str | Path], recursive: bool = False):
         await self.update_id_by_name()
         rqst = Request("DELETE", f"/folders/{self.request_key}/delete-files")
         rqst.set_json({
@@ -628,7 +628,7 @@ class VFolderByName(BaseFunction):
             return await resp.text()
 
     @api_function
-    async def list_files(self, path: Union[str, Path] = "."):
+    async def list_files(self, path: str | Path = "."):
         await self.update_id_by_name()
         rqst = Request("GET", f"/folders/{self.request_key}/files", params={"path": str(path)})
         async with rqst.fetch() as resp:

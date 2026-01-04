@@ -4,7 +4,7 @@ import inspect
 import textwrap
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, List, cast, get_args, get_type_hints
+from typing import Any, cast, get_args, get_type_hints
 
 import aiohttp_cors
 import click
@@ -361,7 +361,7 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
                     arg: type[BaseModel]
                     (arg,) = get_args(ret_type)
                     schema_name = f"{arg.__name__}_List"
-                    response_schema = TypeAdapter(List[arg]).json_schema(  # type: ignore[valid-type]
+                    response_schema = TypeAdapter(list[arg]).json_schema(  # type: ignore[valid-type]
                         ref_template="#/components/schemas/{model}"
                     )
                 elif issubclass(response_cls, BaseModel):

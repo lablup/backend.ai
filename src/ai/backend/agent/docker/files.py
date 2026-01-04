@@ -1,7 +1,6 @@
 import logging
 import os
 from pathlib import Path
-from typing import Dict
 
 from ai.backend.logging import BraceStyleAdapter
 
@@ -27,7 +26,7 @@ def scandir(root: Path, allowed_max_size: int):
     Scans a directory recursively and returns a dictionary of all files and
     their last modified time.
     """
-    file_stats: Dict[Path, float] = dict()
+    file_stats: dict[Path, float] = dict()
     if not isinstance(root, Path):
         root = Path(root)
     if not root.exists():

@@ -5,7 +5,7 @@ import subprocess
 from collections.abc import Collection, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, List, Set, Tuple
+from typing import Any
 
 import aiodocker
 
@@ -43,11 +43,11 @@ class TPUDevice(AbstractComputeDevice):
 
 class TPUPlugin(AbstractComputePlugin):
     key = DeviceName("tpu")
-    slot_types: Sequence[Tuple[SlotName, SlotTypes]] = (
+    slot_types: Sequence[tuple[SlotName, SlotTypes]] = (
         (SlotName("tpu.device"), SlotTypes("count")),
     )
 
-    gcloud_sdk_version: Tuple[int, ...] = (0, 0, 0)
+    gcloud_sdk_version: tuple[int, ...] = (0, 0, 0)
     enabled: bool = True
 
     async def init(self, context: Any = None) -> None:
@@ -149,7 +149,7 @@ class TPUPlugin(AbstractComputePlugin):
         docker: aiodocker.Docker,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ):
-        assigned_device_ids: List[DeviceId] = []
+        assigned_device_ids: list[DeviceId] = []
 
         for slot_type, per_device_alloc in device_alloc.items():
             for device_id, alloc in per_device_alloc.items():
@@ -175,11 +175,11 @@ class TPUPlugin(AbstractComputePlugin):
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Sequence[DeviceModelInfo]:
-        device_ids: List[DeviceId] = []
+        device_ids: list[DeviceId] = []
         if SlotName("tpu.device") in device_alloc:
             device_ids.extend(device_alloc[SlotName("tpu.device")].keys())
         available_devices = await self.list_devices()
-        attached_devices: List[DeviceModelInfo] = []
+        attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
                 proc = device.processing_units
@@ -206,7 +206,7 @@ class TPUPlugin(AbstractComputePlugin):
         if not self.enabled:
             return data
 
-        active_device_id_set: Set[DeviceId] = set()
+        active_device_id_set: set[DeviceId] = set()
         for slot_type, per_device_alloc in device_alloc.items():
             for dev_id, alloc in per_device_alloc.items():
                 if alloc > 0:

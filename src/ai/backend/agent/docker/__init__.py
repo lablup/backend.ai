@@ -1,6 +1,6 @@
 from collections.abc import Mapping
 from decimal import Decimal
-from typing import Any, Type, override
+from typing import Any, override
 
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.resources import AbstractComputePlugin
@@ -15,7 +15,7 @@ from .resources import load_resources, scan_available_resources
 
 class DockerAgentDiscovery(AbstractAgentDiscovery):
     @override
-    def get_agent_cls(self) -> Type[AbstractAgent]:
+    def get_agent_cls(self) -> type[AbstractAgent]:
         return DockerAgent
 
     @override

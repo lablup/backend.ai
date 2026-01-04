@@ -8,6 +8,7 @@ import asyncio
 import logging
 import os
 from collections.abc import Awaitable, Callable, Iterator
+from contextlib import AbstractAsyncContextManager
 from contextlib import contextmanager as ctxmgr
 from datetime import datetime
 from http import HTTPStatus
@@ -15,7 +16,6 @@ from pathlib import Path, PurePosixPath
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncContextManager,
     NotRequired,
     Optional,
     TypedDict,
@@ -243,7 +243,7 @@ async def get_hwinfo(request: web.Request) -> web.Response:
         volume: str
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -268,7 +268,7 @@ async def create_quota_scope(request: web.Request) -> web.Response:
         extra_args: NotRequired[dict[str, Any]]
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -303,7 +303,7 @@ async def get_quota_scope(request: web.Request) -> web.Response:
         qsid: QuotaScopeID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -334,7 +334,7 @@ async def update_quota_scope(request: web.Request) -> web.Response:
         options: QuotaConfig
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -372,7 +372,7 @@ async def unset_quota(request: web.Request) -> web.Response:
         qsid: QuotaScopeID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -402,7 +402,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
         options: dict[str, Any] | None  # deprecated
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -457,7 +457,7 @@ async def delete_vfolder(request: web.Request) -> web.Response:
         vfid: VFolderID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -491,7 +491,7 @@ async def clone_vfolder(request: web.Request) -> web.Response:
         dst_vfid: VFolderID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -530,7 +530,7 @@ async def get_vfolder_mount(request: web.Request) -> web.Response:
         subpath: str
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -583,7 +583,7 @@ async def get_performance_metric(request: web.Request) -> web.Response:
         volume: str
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -616,7 +616,7 @@ async def fetch_file(request: web.Request) -> web.StreamResponse:
         relpath: PurePosixPath
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -660,7 +660,7 @@ async def get_metadata(request: web.Request) -> web.Response:
         vfid: VFolderID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -686,7 +686,7 @@ async def set_metadata(request: web.Request) -> web.Response:
         payload: bytes
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -711,7 +711,7 @@ async def get_vfolder_fs_usage(request: web.Request) -> web.Response:
         volume: str
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -739,7 +739,7 @@ async def get_vfolder_usage(request: web.Request) -> web.Response:
         vfid: VFolderID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -774,7 +774,7 @@ async def get_vfolder_used_bytes(request: web.Request) -> web.Response:
         vfid: VFolderID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -808,7 +808,7 @@ async def get_quota(request: web.Request) -> web.Response:
         vfid: VFolderID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -833,7 +833,7 @@ async def set_quota(request: web.Request) -> web.Response:
         size_bytes: BinarySize
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -861,7 +861,7 @@ async def mkdir(request: web.Request) -> web.Response:
         exist_ok: bool
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -934,7 +934,7 @@ async def list_files(request: web.Request) -> web.Response:
         relpath: PurePosixPath
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -984,7 +984,7 @@ async def rename_file(request: web.Request) -> web.Response:
         is_dir: bool
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -1019,7 +1019,7 @@ async def move_file(request: web.Request) -> web.Response:
         dst_relpath: PurePosixPath
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -1053,7 +1053,7 @@ async def create_download_session(request: web.Request) -> web.Response:
         unmanaged_path: str | None
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -1096,7 +1096,7 @@ async def create_upload_session(request: web.Request) -> web.Response:
         size: int
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -1142,7 +1142,7 @@ async def delete_files(request: web.Request) -> web.Response:
         recursive: bool
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(

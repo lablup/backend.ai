@@ -5,7 +5,7 @@ import os
 import secrets
 import uuid
 from collections.abc import Sequence
-from typing import Any, List, Optional, Self, Tuple, TypedDict
+from typing import Any, Optional, Self, TypedDict
 
 import sqlalchemy as sa
 from cryptography.exceptions import InvalidSignature
@@ -163,7 +163,7 @@ class Dotfile(TypedDict):
     perm: str
 
 
-def generate_keypair() -> Tuple[AccessKey, SecretKey]:
+def generate_keypair() -> tuple[AccessKey, SecretKey]:
     """
     AWS-like access key and secret key generation.
     """
@@ -172,7 +172,7 @@ def generate_keypair() -> Tuple[AccessKey, SecretKey]:
     return AccessKey(ak), SecretKey(sk)
 
 
-def generate_ssh_keypair() -> Tuple[str, str]:
+def generate_ssh_keypair() -> tuple[str, str]:
     """
     Generate RSA keypair for SSH/SFTP connection.
     """
@@ -305,7 +305,7 @@ def validate_ssh_keypair(
 async def query_owned_dotfiles(
     conn: SAConnection,
     access_key: AccessKey,
-) -> Tuple[List[Dotfile], int]:
+) -> tuple[list[Dotfile], int]:
     query = (
         sa.select([keypairs.c.dotfiles])
         .select_from(keypairs)
@@ -319,7 +319,7 @@ async def query_owned_dotfiles(
 async def query_bootstrap_script(
     conn: SAConnection,
     access_key: AccessKey,
-) -> Tuple[str, int]:
+) -> tuple[str, int]:
     query = (
         sa.select([keypairs.c.bootstrap_script])
         .select_from(keypairs)

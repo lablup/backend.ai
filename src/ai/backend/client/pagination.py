@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import textwrap
 from collections.abc import Sequence
-from typing import Any, Dict, Final, Tuple, TypeVar
+from typing import Any, Final, TypeVar
 
 from .exceptions import BackendAPIVersionError
 from .output.types import FieldSpec, PaginatedResult, RelayPaginatedResult
@@ -16,7 +16,7 @@ T = TypeVar("T")
 
 async def execute_paginated_query(
     root_field: str,
-    variables: Dict[str, Tuple[Any, str]],
+    variables: dict[str, tuple[Any, str]],
     fields: Sequence[FieldSpec],
     *,
     limit: int,
@@ -58,7 +58,7 @@ async def execute_paginated_query(
 
 async def execute_paginated_relay_query(
     root_field: str,
-    variables: Dict[str, Tuple[Any, str]],
+    variables: dict[str, tuple[Any, str]],
     fields: Sequence[FieldSpec],
     *,
     limit: int | None = None,
@@ -107,7 +107,7 @@ async def execute_paginated_relay_query(
 
 async def fetch_paginated_result(
     root_field: str,
-    variables: Dict[str, Tuple[Any, str]],
+    variables: dict[str, tuple[Any, str]],
     fields: Sequence[FieldSpec],
     *,
     page_offset: int,

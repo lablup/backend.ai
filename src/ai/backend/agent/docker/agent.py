@@ -22,14 +22,8 @@ from subprocess import CalledProcessError
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
     Final,
-    FrozenSet,
-    List,
     Optional,
-    Set,
-    Tuple,
-    Union,
     cast,
     override,
 )
@@ -299,10 +293,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     tmp_dir: Path
     config_dir: Path
     work_dir: Path
-    container_configs: List[Mapping[str, Any]]
-    domain_socket_proxies: List[DomainSocketProxy]
-    computer_docker_args: Dict[str, Any]
-    port_pool: Set[int]
+    container_configs: list[Mapping[str, Any]]
+    domain_socket_proxies: list[DomainSocketProxy]
+    computer_docker_args: dict[str, Any]
+    port_pool: set[int]
     agent_sockpath: Path
     resource_lock: asyncio.Lock
     cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
@@ -319,7 +313,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         distro: str,
         local_config: AgentUnifiedConfig,
         computers: Mapping[DeviceName, ComputerContext],
-        port_pool: Set[int],
+        port_pool: set[int],
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
         network_plugin_ctx: NetworkPluginContext,
@@ -368,7 +362,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         return {}
 
     @override
-    async def prepare_resource_spec(self) -> Tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
+    async def prepare_resource_spec(self) -> tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
         loop = current_loop()
         if self.restarting:
             resource_spec = await loop.run_in_executor(
@@ -523,7 +517,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         loop = current_loop()
 
         # scratch/config/tmp mounts
-        mounts: List[Mount] = [
+        mounts: list[Mount] = [
             Mount(
                 MountTypes.BIND, self.config_dir, Path("/home/config"), MountPermission.READ_ONLY
             ),
@@ -662,8 +656,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     def get_runner_mount(
         self,
         type: MountTypes,
-        src: Union[str, Path],
-        target: Union[str, Path],
+        src: str | Path,
+        target: str | Path,
         perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
     ) -> Mount:
@@ -812,7 +806,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self,
         computer: AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         src_path = self.config_dir / str(computer.key)
         src_path.mkdir(exist_ok=True)
         return await computer.generate_mounts(src_path, device_alloc)
@@ -822,7 +816,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
-        service_ports: List[ServicePort],
+        service_ports: list[ServicePort],
         cluster_info: ClusterInfo,
     ) -> DockerKernel:
         loop = current_loop()
@@ -1019,7 +1013,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     async def start_container(
         self,
         kernel_obj: AbstractKernel,
-        cmdargs: List[str],
+        cmdargs: list[str],
         resource_opts,
         preopen_ports,
         cluster_info: ClusterInfo,
@@ -1278,7 +1272,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         message=f"sudoers provision failed: {shell_response.decode()}",
                     )
 
-            additional_network_names: Set[str] = set()
+            additional_network_names: set[str] = set()
             for dev_name, device_alloc in resource_spec.allocations.items():
                 n = await self.computers[dev_name].instance.get_docker_networks(device_alloc)
                 additional_network_names |= set(n)
@@ -1306,7 +1300,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         ],
                     )
 
-            created_host_ports: Tuple[int, ...]
+            created_host_ports: tuple[int, ...]
             repl_in_port = 0
             repl_out_port = 0
             if container_network_info:
@@ -1384,7 +1378,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     agent_sock_task: asyncio.Task
     docker_ptask_group: aiotools.PersistentTaskGroup
     gwbridge_subnet: Optional[str]
-    checked_invalid_images: Set[str]
+    checked_invalid_images: set[str]
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -1590,8 +1584,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     @override
     async def enumerate_containers(
         self,
-        status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> Sequence[Tuple[KernelId, Container]]:
+        status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
+    ) -> Sequence[tuple[KernelId, Container]]:
         result = []
         fetch_tasks = []
         async with closing_async(Docker()) as docker:

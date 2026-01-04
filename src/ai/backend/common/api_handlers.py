@@ -11,7 +11,6 @@ from typing import (
     Generic,
     Optional,
     Self,
-    Type,
     TypeAlias,
     TypeVar,
     get_args,
@@ -77,10 +76,10 @@ def convert_validation_error[T](func: Callable[..., T]) -> Callable[..., T]:
 
 
 class BodyParam(Generic[TRequestModel]):
-    _model: Type[TRequestModel]
+    _model: type[TRequestModel]
     _parsed: Optional[TRequestModel]
 
-    def __init__(self, model: Type[TRequestModel]) -> None:
+    def __init__(self, model: type[TRequestModel]) -> None:
         self._model = model
         self._parsed: Optional[TRequestModel] = None
 
@@ -99,10 +98,10 @@ class BodyParam(Generic[TRequestModel]):
 
 
 class QueryParam(Generic[TRequestModel]):
-    _model: Type[TRequestModel]
+    _model: type[TRequestModel]
     _parsed: Optional[TRequestModel]
 
-    def __init__(self, model: Type[TRequestModel]) -> None:
+    def __init__(self, model: type[TRequestModel]) -> None:
         self._model = model
         self._parsed: Optional[TRequestModel] = None
 
@@ -121,10 +120,10 @@ class QueryParam(Generic[TRequestModel]):
 
 
 class HeaderParam(Generic[TRequestModel]):
-    _model: Type[TRequestModel]
+    _model: type[TRequestModel]
     _parsed: Optional[TRequestModel]
 
-    def __init__(self, model: Type[TRequestModel]) -> None:
+    def __init__(self, model: type[TRequestModel]) -> None:
         self._model = model
         self._parsed: Optional[TRequestModel] = None
 
@@ -143,10 +142,10 @@ class HeaderParam(Generic[TRequestModel]):
 
 
 class PathParam(Generic[TRequestModel]):
-    _model: Type[TRequestModel]
+    _model: type[TRequestModel]
     _parsed: Optional[TRequestModel]
 
-    def __init__(self, model: Type[TRequestModel]) -> None:
+    def __init__(self, model: type[TRequestModel]) -> None:
         self._model = model
         self._parsed: Optional[TRequestModel] = None
 

@@ -5,7 +5,6 @@ from collections.abc import Container, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import (
-    List,
     Optional,
     Self,
     TypeAlias,
@@ -199,7 +198,7 @@ class DomainDotfile(TypedDict):
 async def query_domain_dotfiles(
     conn: SAConnection,
     name: str,
-) -> tuple[List[DomainDotfile], int]:
+) -> tuple[list[DomainDotfile], int]:
     query = sa.select([domains.c.dotfiles]).select_from(domains).where(domains.c.name == name)
     packed_dotfile = await conn.scalar(query)
     if packed_dotfile is None:

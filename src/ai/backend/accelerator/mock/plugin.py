@@ -14,12 +14,7 @@ from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Dict,
-    List,
     Optional,
-    Set,
-    Tuple,
-    Type,
     cast,
 )
 
@@ -130,8 +125,8 @@ class MockPlugin(AbstractComputePlugin):
     config_watch_enabled = False
 
     key: DeviceName
-    slot_types: List[Tuple[SlotName, SlotTypes]] = []
-    exclusive_slot_types: Set[str] = set()
+    slot_types: list[tuple[SlotName, SlotTypes]] = []
+    exclusive_slot_types: set[str] = set()
 
     device_formats: Mapping[str, Mapping[str, Any]]
 
@@ -145,8 +140,8 @@ class MockPlugin(AbstractComputePlugin):
     _unit_mem: int = 2 * (2**30)  # 2 GiB
     _unit_proc: int = 8  # number of SMPs
 
-    nvdocker_version: Tuple[int, ...] = (0, 0, 0)
-    docker_version: Tuple[int, ...] = (0, 0, 0)
+    nvdocker_version: tuple[int, ...] = (0, 0, 0)
+    docker_version: tuple[int, ...] = (0, 0, 0)
 
     async def init(self, context: Optional[Any] = None) -> None:
         # Read the mockup device config.
@@ -276,7 +271,7 @@ class MockPlugin(AbstractComputePlugin):
         if self._all_devices is not None:
             return self._all_devices
 
-        device_cls: Type[MockDevice]
+        device_cls: type[MockDevice]
         all_devices = []
 
         for idx, dev_info in enumerate(self.mock_config["devices"]):
@@ -305,7 +300,7 @@ class MockPlugin(AbstractComputePlugin):
         self._all_devices = all_devices
         return all_devices
 
-    def _cuda_available_slots(self, devices: List[CUDADevice]) -> MutableMapping[SlotName, Decimal]:
+    def _cuda_available_slots(self, devices: list[CUDADevice]) -> MutableMapping[SlotName, Decimal]:
         slots: MutableMapping[SlotName, Decimal] = defaultdict(Decimal)
         if self._mode == AllocationModes.DISCRETE:
             slots[SlotName("cuda.device")] = Decimal(
@@ -331,7 +326,7 @@ class MockPlugin(AbstractComputePlugin):
         slots: MutableMapping[SlotName, Decimal] = defaultdict(Decimal)
         match self.key:
             case "cuda":
-                slots = self._cuda_available_slots(cast(List[CUDADevice], devices))
+                slots = self._cuda_available_slots(cast(list[CUDADevice], devices))
             case _:
                 if self._mode == AllocationModes.DISCRETE:
                     slots[SlotName(f"{self.key}.device")] = Decimal(len(devices))
@@ -458,11 +453,11 @@ class MockPlugin(AbstractComputePlugin):
         ctx: StatContext,
         container_ids: Sequence[str],
     ) -> Sequence[ContainerMeasurement]:
-        mem_stats: Dict[str, int] = {}
-        mem_sizes: Dict[str, int] = {}
-        util_stats: Dict[str, float] = {}
-        device_occurrences_per_container: Dict[str, int] = defaultdict(int)
-        assignment_per_container: Dict[str, Mapping[DeviceId, Decimal]] = {}
+        mem_stats: dict[str, int] = {}
+        mem_sizes: dict[str, int] = {}
+        util_stats: dict[str, float] = {}
+        device_occurrences_per_container: dict[str, int] = defaultdict(int)
+        assignment_per_container: dict[str, Mapping[DeviceId, Decimal]] = {}
         if self.enabled:
             for cid in container_ids:
                 mem_stats[cid] = 0
@@ -555,7 +550,7 @@ class MockPlugin(AbstractComputePlugin):
             )
         if self._mode == AllocationModes.FRACTIONAL:
             # for legacy agents
-            kwargs: Dict[str, Any] = {
+            kwargs: dict[str, Any] = {
                 "quantum_size": self.quantum_size,
             }
             for kw in [*kwargs.keys()]:
@@ -587,7 +582,7 @@ class MockPlugin(AbstractComputePlugin):
         docker: aiodocker.Docker,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Mapping[str, Any]:
-        docker_config: Dict[str, Any] = {}
+        docker_config: dict[str, Any] = {}
         if not self.enabled:
             return docker_config
         assigned_device_ids = []
@@ -628,7 +623,7 @@ class MockPlugin(AbstractComputePlugin):
         quantum = Decimal(".01")
         return Decimal(common_shares).quantize(quantum, ROUND_DOWN)
 
-    def _share_to_spec(self, share: Decimal) -> Tuple[BinarySize, int]:
+    def _share_to_spec(self, share: Decimal) -> tuple[BinarySize, int]:
         return (
             BinarySize(self._unit_mem * share),
             max(int(self._unit_proc * share), MIN_SMP_COUNT),
@@ -643,7 +638,7 @@ class MockPlugin(AbstractComputePlugin):
             return data
 
         is_unique = False
-        active_device_id_list: List[DeviceId] = []
+        active_device_id_list: list[DeviceId] = []
         for slot_type, per_device_alloc in device_alloc.items():
             if slot_type == SlotTypes.UNIQUE:
                 assert len(device_alloc) == 1
@@ -737,7 +732,7 @@ class MockPlugin(AbstractComputePlugin):
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Sequence[DeviceModelInfo]:
-        device_ids: List[DeviceId] = []
+        device_ids: list[DeviceId] = []
         for slot_name, per_device_alloc in device_alloc.items():
             # cuda.device:* slot name dedicated for mocked MIG devices
             if slot_name.startswith("cuda.device:") or slot_name in (
@@ -746,7 +741,7 @@ class MockPlugin(AbstractComputePlugin):
             ):
                 device_ids.extend(per_device_alloc.keys())
         available_devices = await self.list_devices()
-        attached_devices: List[DeviceModelInfo] = []
+        attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
                 if self._mode == AllocationModes.FRACTIONAL:
@@ -783,12 +778,12 @@ class MockPlugin(AbstractComputePlugin):
 
     async def get_docker_networks(
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[str]:
+    ) -> list[str]:
         return []
 
     async def generate_mounts(
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         return []
 
     def get_metadata(self) -> AcceleratorMetadata:

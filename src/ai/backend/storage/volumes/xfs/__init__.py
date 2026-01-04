@@ -4,13 +4,7 @@ import os
 from collections.abc import Mapping
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import (
-    Any,
-    Dict,
-    FrozenSet,
-    List,
-    Optional,
-)
+from typing import Any
 
 import aiofiles
 import aiofiles.os
@@ -45,8 +39,8 @@ class XfsProjectRegistry:
     file_projects: Path = Path("/etc/projects")
     file_projid: Path = Path("/etc/projid")
     backend: BaseVolume
-    name_id_map: Dict[str, int] = dict()
-    project_id_pool: List[int] = list()
+    name_id_map: dict[str, int] = dict()
+    project_id_pool: list[int] = list()
 
     async def init(self, backend: BaseVolume) -> None:
         self.backend = backend
@@ -77,7 +71,7 @@ class XfsProjectRegistry:
         quota_scope_id: QuotaScopeID,
         qspath: Path,
         *,
-        project_id: Optional[int] = None,
+        project_id: int | None = None,
     ) -> None:
         if project_id is None:
             project_id = self.get_free_project_id()
@@ -167,8 +161,8 @@ class XFSProjectQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         try:
@@ -198,7 +192,7 @@ class XFSProjectQuotaModel(BaseQuotaModel):
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-    ) -> Optional[QuotaUsage]:
+    ) -> QuotaUsage | None:
         if not self.mangle_qspath(quota_scope_id).exists():
             return None
         full_report = await run(
@@ -305,8 +299,8 @@ class XfsVolume(BaseVolume):
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
-        watcher: Optional[WatcherClient] = None,
-        options: Optional[Mapping[str, Any]] = None,
+        watcher: WatcherClient | None = None,
+        options: Mapping[str, Any] | None = None,
     ) -> None:
         super().__init__(
             local_config,
@@ -342,5 +336,5 @@ class XfsVolume(BaseVolume):
             self._lock_path,
         )
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA])

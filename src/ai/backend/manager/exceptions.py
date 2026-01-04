@@ -4,11 +4,9 @@ import traceback
 from typing import (
     TYPE_CHECKING,
     Any,
-    List,
     Literal,
     NotRequired,
     Optional,
-    Tuple,
     TypedDict,
 )
 
@@ -71,7 +69,7 @@ class AgentError(RuntimeError):
         agent_id: AgentId,
         exc_name: str,
         exc_repr: str,
-        exc_args: Tuple[Any, ...],
+        exc_args: tuple[Any, ...],
         exc_tb: Optional[str] = None,
     ) -> None:
         super().__init__(agent_id, exc_name, exc_repr, exc_args, exc_tb)
@@ -93,7 +91,7 @@ class ErrorDetail(TypedDict):
     name: str
     repr: str
     agent_id: NotRequired[str]
-    collection: NotRequired[List[ErrorDetail]]
+    collection: NotRequired[list[ErrorDetail]]
     traceback: NotRequired[str]
 
 

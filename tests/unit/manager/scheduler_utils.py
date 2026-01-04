@@ -146,11 +146,14 @@ def create_mock_kernel(
     )
 
 
+_DEFAULT_ACCESS_KEY = AccessKey("user01")
+
+
 def create_mock_session(
     session_id: SessionId,
     requested_slots: ResourceSlot,
     *,
-    access_key: AccessKey = AccessKey("user01"),
+    access_key: AccessKey = _DEFAULT_ACCESS_KEY,
     status: SessionStatus = SessionStatus.PENDING,
     status_data: dict[str, Any] | None = None,
     kernel_opts: Sequence[KernelOpt] | None = None,
@@ -199,12 +202,15 @@ def create_mock_session(
     )
 
 
+_EMPTY_RESOURCE_SLOT = ResourceSlot()
+
+
 def create_mock_agent(
     id: AgentId,
     *,
     scaling_group: str = example_sgroup_name1,
     available_slots: ResourceSlot,
-    occupied_slots: ResourceSlot = ResourceSlot(),
+    occupied_slots: ResourceSlot = _EMPTY_RESOURCE_SLOT,
 ) -> AgentRow:
     return AgentRow(
         id=id,

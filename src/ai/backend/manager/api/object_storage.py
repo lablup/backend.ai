@@ -5,7 +5,6 @@ import logging
 import uuid
 from collections.abc import Iterable
 from http import HTTPStatus
-from typing import Tuple
 
 import aiohttp_cors
 from aiohttp import web
@@ -178,7 +177,7 @@ class APIHandler:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["api_versions"] = (1, 2, 3, 4, 5)
     app["prefix"] = "object-storages"

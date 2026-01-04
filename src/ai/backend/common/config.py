@@ -4,7 +4,7 @@ import os
 import sys
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Union, cast
+from typing import Any, Optional, cast
 
 import humps
 import tomli
@@ -200,7 +200,7 @@ class PreStartAction(BaseConfigModel):
         description="The name of the pre-start action to execute.",
         examples=["action_name"],
     )
-    args: Dict[str, Any] = Field(
+    args: dict[str, Any] = Field(
         default_factory=dict,
         description="Arguments for the pre-start action.",
         examples=[{"arg1": "value1", "arg2": "value2"}],
@@ -308,7 +308,7 @@ class ModelMetadata(BaseConfigModel):
     license: Optional[str] = Field(
         default=None,
     )
-    min_resource: Optional[Dict[str, Any]] = Field(
+    min_resource: Optional[dict[str, Any]] = Field(
         default=None,
         description="Minimum resource requirements for the model.",
     )
@@ -382,16 +382,16 @@ def find_config_file(daemon_name: str) -> Path:
 
 
 def read_from_file(
-    toml_path: Optional[Union[Path, str]], daemon_name: str
-) -> Tuple[Dict[str, Any], Path]:
-    config: Dict[str, Any]
+    toml_path: Optional[Path | str], daemon_name: str
+) -> tuple[dict[str, Any], Path]:
+    config: dict[str, Any]
     discovered_path: Path
     if toml_path is None:
         discovered_path = find_config_file(daemon_name)
     else:
         discovered_path = Path(toml_path)
     try:
-        config = cast(Dict[str, Any], tomli.loads(discovered_path.read_text()))
+        config = cast(dict[str, Any], tomli.loads(discovered_path.read_text()))
     except OSError:
         raise ConfigurationError({
             "read_from_file()": f"Could not read config from: {discovered_path}",
@@ -402,17 +402,17 @@ def read_from_file(
 
 async def read_from_etcd(
     etcd_config: Mapping[str, Any], scope_prefix_map: Mapping[ConfigScopes, str]
-) -> Optional[Dict[str, Any]]:
+) -> Optional[dict[str, Any]]:
     etcd = AsyncEtcd(etcd_config["addr"], etcd_config["namespace"], scope_prefix_map)
     raw_value = await etcd.get("daemon/config")
     if raw_value is None:
         return None
-    config: Dict[str, Any]
-    config = cast(Dict[str, Any], tomli.loads(raw_value))
+    config: dict[str, Any]
+    config = cast(dict[str, Any], tomli.loads(raw_value))
     return config
 
 
-def override_key(table: MutableMapping[str, Any], key_path: Tuple[str, ...], value: Any):
+def override_key(table: MutableMapping[str, Any], key_path: tuple[str, ...], value: Any):
     for k in key_path[:-1]:
         if k not in table:
             table[k] = {}
@@ -420,7 +420,7 @@ def override_key(table: MutableMapping[str, Any], key_path: Tuple[str, ...], val
     table[key_path[-1]] = value
 
 
-def override_with_env(table: MutableMapping[str, Any], key_path: Tuple[str, ...], env_key: str):
+def override_with_env(table: MutableMapping[str, Any], key_path: tuple[str, ...], env_key: str):
     val = os.environ.get(env_key, None)
     if val is None:
         return
@@ -448,7 +448,7 @@ def merge(table: Mapping[str, Any], updates: Mapping[str, Any]) -> Mapping[str, 
     return result
 
 
-def set_if_not_set(table: MutableMapping[str, Any], key_path: Tuple[str, ...], value: Any) -> None:
+def set_if_not_set(table: MutableMapping[str, Any], key_path: tuple[str, ...], value: Any) -> None:
     for k in key_path[:-1]:
         if k not in table:
             return

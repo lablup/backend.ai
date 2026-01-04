@@ -2,13 +2,12 @@ import asyncio
 import logging
 import tempfile
 from pathlib import Path
-from typing import List
 
 from ai.backend.kernel import BaseRunner
 
 log = logging.getLogger()
 
-DEFAULT_PYFLAGS: List[str] = []
+DEFAULT_PYFLAGS: list[str] = []
 
 
 class Runner(BaseRunner):

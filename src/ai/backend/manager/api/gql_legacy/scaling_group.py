@@ -6,7 +6,6 @@ from collections.abc import Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
     Optional,
     Self,
     cast,
@@ -686,7 +685,7 @@ class ModifyScalingGroup(graphene.Mutation):
         name: str,
         props: ModifyScalingGroupInput,
     ) -> ModifyScalingGroup:
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
         set_if_set(props, data, "description")
         set_if_set(props, data, "is_active")
         set_if_set(props, data, "is_public")

@@ -2,7 +2,7 @@ import json
 import logging
 import uuid
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, List, Tuple
+from typing import TYPE_CHECKING, Any
 
 import aiohttp_cors
 import sqlalchemy as sa
@@ -191,7 +191,7 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
 
     log.info("CLUSTER_TEMPLATE.LIST (ak:{})", access_key)
     async with root_ctx.db.begin() as conn:
-        entries: List[Mapping[str, Any]]
+        entries: list[Mapping[str, Any]]
         if request["is_superadmin"] and params["all"]:
             j = session_templates.join(
                 users, session_templates.c.user_uuid == users.c.uuid, isouter=True
@@ -401,7 +401,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)

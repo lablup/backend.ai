@@ -10,7 +10,6 @@ from typing import (
     ClassVar,
     Generic,
     Optional,
-    Type,
     TypeVar,
     cast,
 )
@@ -201,7 +200,7 @@ class StructuredJSONObjectColumn(TypeDecorator):
     impl = JSONB
     cache_ok = True
 
-    def __init__(self, schema: Type[BaseModel]) -> None:
+    def __init__(self, schema: type[BaseModel]) -> None:
         super().__init__()
         self._schema = schema
 
@@ -231,7 +230,7 @@ class StructuredJSONObjectListColumn(TypeDecorator, Generic[TBaseModel]):
     impl = JSONB
     cache_ok = True
 
-    def __init__(self, schema: Type[TBaseModel]) -> None:
+    def __init__(self, schema: type[TBaseModel]) -> None:
         super().__init__()
         self._schema = schema
 

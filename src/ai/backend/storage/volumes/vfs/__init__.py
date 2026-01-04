@@ -11,7 +11,7 @@ import time
 from collections import deque
 from collections.abc import AsyncIterator, Sequence
 from pathlib import Path, PurePosixPath
-from typing import Any, FrozenSet, Optional, Union, final, override
+from typing import Any, Optional, final, override
 
 import aiofiles.os
 import janus
@@ -400,7 +400,7 @@ class BaseVolume(AbstractVolume):
             self.watcher,
         )
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER])
 
     async def get_hwinfo(self) -> HardwareMetadata:
@@ -651,11 +651,11 @@ class BaseVolume(AbstractVolume):
         chunk_size: int = 0,
     ) -> AsyncIterator[bytes]:
         target_path = self.sanitize_vfpath(vfid, relpath)
-        q: janus.Queue[Union[bytes, Exception]] = janus.Queue()
+        q: janus.Queue[bytes | Exception] = janus.Queue()
         loop = asyncio.get_running_loop()
 
         def _read(
-            q: janus._SyncQueueProxy[Union[bytes, Exception]],
+            q: janus._SyncQueueProxy[bytes | Exception],
             chunk_size: int,
         ) -> None:
             try:

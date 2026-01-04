@@ -6,7 +6,6 @@ from typing import (
     Final,
     Optional,
     Self,
-    Union,
     cast,
 )
 from uuid import UUID
@@ -871,7 +870,7 @@ class ValkeyStatClient:
         return seconds + (microseconds / 10**6)
 
     @valkey_stat_resilience.apply()
-    async def setex(self, name: str, value: Union[str, bytes], time: int) -> None:
+    async def setex(self, name: str, value: str | bytes, time: int) -> None:
         """
         Set a key with an expiration time.
 

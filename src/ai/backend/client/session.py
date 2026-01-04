@@ -12,9 +12,7 @@ from typing import (
     Any,
     Literal,
     Optional,
-    Tuple,
     TypeVar,
-    Union,
 )
 
 import aiohttp
@@ -41,7 +39,7 @@ api_session: ContextVar[BaseSession] = ContextVar("api_session")
 async def _negotiate_api_version(
     http_session: aiohttp.ClientSession,
     config: APIConfig,
-) -> Tuple[int, str]:
+) -> tuple[int, str]:
     client_version = parse_api_version(config.version)
     try:
         timeout_config = aiohttp.ClientTimeout(
@@ -127,14 +125,9 @@ _Item = TypeVar("_Item")
 
 
 class _SyncWorkerThread(threading.Thread):
-    work_queue: queue.Queue[
-        Union[
-            Tuple[Union[AsyncIterator, Coroutine], Context],
-            Sentinel,
-        ]
-    ]
-    done_queue: queue.Queue[Union[Any, Exception]]
-    stream_queue: queue.Queue[Union[Any, Exception, Sentinel]]
+    work_queue: queue.Queue[tuple[AsyncIterator | Coroutine, Context] | Sentinel]
+    done_queue: queue.Queue[Any | Exception]
+    stream_queue: queue.Queue[Any | Exception | Sentinel]
     stream_block: threading.Event
     agen_shutdown: bool
 
@@ -280,7 +273,7 @@ class BaseSession(metaclass=abc.ABCMeta):
     )
 
     aiohttp_session: aiohttp.ClientSession
-    api_version: Tuple[int, str]
+    api_version: tuple[int, str]
 
     _closed: bool
     _config: APIConfig
@@ -370,14 +363,14 @@ class BaseSession(metaclass=abc.ABCMeta):
         return self._proxy_mode
 
     @abc.abstractmethod
-    def open(self) -> Union[None, Awaitable[None]]:
+    def open(self) -> None | Awaitable[None]:
         """
         Initializes the session and perform version negotiation.
         """
         raise NotImplementedError
 
     @abc.abstractmethod
-    def close(self) -> Union[None, Awaitable[None]]:
+    def close(self) -> None | Awaitable[None]:
         """
         Terminates the session and releases underlying resources.
         """

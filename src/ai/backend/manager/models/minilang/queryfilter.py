@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any, Optional, Type, TypeAlias, Union
+from typing import Any, Optional, TypeAlias
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
@@ -56,7 +56,7 @@ _parser = Lark(
     maybe_placeholders=False,
 )
 
-FilterableSQLQuery = Union[sa.sql.Select, sa.sql.Update, sa.sql.Delete]
+FilterableSQLQuery: TypeAlias = sa.sql.Select | sa.sql.Update | sa.sql.Delete
 FieldSpecType: TypeAlias = Mapping[str, FieldSpecItem] | None
 WhereClauseType: TypeAlias = (
     sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
@@ -82,7 +82,7 @@ class QueryFilterTransformer(Transformer):
 
     array = list
 
-    def atom(self, token: list[Token]) -> Type[sa.sql.elements.SingletonConstant]:
+    def atom(self, token: list[Token]) -> type[sa.sql.elements.SingletonConstant]:
         a = token[0]
         if a.value == "null":
             return sa.null()

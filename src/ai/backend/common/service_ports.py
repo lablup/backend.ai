@@ -1,6 +1,5 @@
 import re
 from collections.abc import Iterator, Sequence
-from typing import List, Set, Type
 
 from .types import ServicePort, ServicePortProtocols
 
@@ -14,10 +13,10 @@ _rx_service_ports = re.compile(
 def parse_service_ports(
     service_ports_label: str | Sequence[str],
     endpoint_ports_label: str | Sequence[str],
-    exception_cls: Type[Exception] = ValueError,
+    exception_cls: type[Exception] = ValueError,
 ) -> Sequence[ServicePort]:
-    items: List[ServicePort] = []
-    used_ports: Set[int] = set()
+    items: list[ServicePort] = []
+    used_ports: set[int] = set()
     inference_apps: Sequence[str]
     if isinstance(endpoint_ports_label, str):
         inference_apps = endpoint_ports_label.split(",")

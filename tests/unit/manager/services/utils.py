@@ -1,4 +1,5 @@
-from typing import Awaitable, Callable, Generic, Optional, Self, TypeVar
+from collections.abc import Awaitable, Callable
+from typing import Generic, Optional, Self, TypeVar
 
 import pytest
 

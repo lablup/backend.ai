@@ -10,7 +10,7 @@ import traceback
 import uuid
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
-from typing import Optional, Tuple
+from typing import Optional
 
 import aiohttp
 import click
@@ -251,7 +251,7 @@ def prepare_mount_arg(
     mount_args: Optional[Sequence[str]] = None,
     *,
     escape: bool = True,
-) -> Tuple[Sequence[str], Mapping[str, str], Mapping[str, Mapping[str, str]]]:
+) -> tuple[Sequence[str], Mapping[str, str], Mapping[str, Mapping[str, str]]]:
     """
     Parse the list of mount arguments into a list of
     vfolder name and in-container mount path pairs,

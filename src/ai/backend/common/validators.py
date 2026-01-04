@@ -18,13 +18,9 @@ from pathlib import PurePath as _PurePath
 from typing import (
     Any,
     Generic,
-    List,
     Literal,
     Optional,
-    Tuple,
-    Type,
     TypeVar,
-    Union,
 )
 
 import dateutil.tz
@@ -129,7 +125,7 @@ class MultiKey(t.Key):
             return data.getall(self.name, default)
         # fallback for plain dicts
         raw_value = data.get(self.name, default)
-        if isinstance(raw_value, (List, Tuple)):
+        if isinstance(raw_value, (list, tuple)):
             # if plain dict already contains list of values, just return it.
             return raw_value
         # otherwise, wrap the value in a list.
@@ -137,7 +133,7 @@ class MultiKey(t.Key):
 
 
 class BinarySize(t.Trafaret):
-    def check_and_return(self, value: Any) -> Union[_BinarySize, Decimal]:
+    def check_and_return(self, value: Any) -> _BinarySize | Decimal:
         try:
             if not isinstance(value, str):
                 value = str(value)
@@ -152,7 +148,7 @@ TItem = TypeVar("TItem")
 class DelimiterSeperatedList(t.Trafaret, Generic[TItem]):
     def __init__(
         self,
-        trafaret: Type[t.Trafaret] | t.Trafaret,
+        trafaret: type[t.Trafaret] | t.Trafaret,
         *,
         delimiter: str = ",",
         min_length: Optional[int] = None,
@@ -201,7 +197,7 @@ T_enum = TypeVar("T_enum", bound=enum.Enum)
 
 
 class Enum(t.Trafaret, Generic[T_enum]):
-    def __init__(self, enum_cls: Type[T_enum], *, use_name: bool = False) -> None:
+    def __init__(self, enum_cls: type[T_enum], *, use_name: bool = False) -> None:
         self.enum_cls = enum_cls
         self.use_name = use_name
 
@@ -321,7 +317,7 @@ class HostPortPair(t.Trafaret):
         super().__init__()
         self._allow_blank_host = allow_blank_host
 
-    def check_and_return(self, value: Any) -> Tuple[ipaddress._BaseAddress, int]:
+    def check_and_return(self, value: Any) -> tuple[ipaddress._BaseAddress, int]:
         host: str | ipaddress._BaseAddress
         if isinstance(value, str):
             pair = value.rsplit(":", maxsplit=1)
@@ -359,7 +355,7 @@ class HostPortPair(t.Trafaret):
 
 
 class PortRange(t.Trafaret):
-    def check_and_return(self, value: Any) -> Tuple[int, int]:
+    def check_and_return(self, value: Any) -> tuple[int, int]:
         if isinstance(value, str):
             try:
                 value = tuple(map(int, value.split("-")))

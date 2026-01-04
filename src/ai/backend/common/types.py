@@ -23,20 +23,15 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    Dict,
     Generic,
-    List,
     Literal,
     NewType,
     NotRequired,
     Optional,
     Self,
-    Tuple,
-    Type,
     TypeAlias,
     TypedDict,
     TypeVar,
-    Union,
     cast,
     overload,
     override,
@@ -180,7 +175,7 @@ class aobject:
     """
 
     @classmethod
-    async def new(cls: Type[Self], *args, **kwargs) -> Self:
+    async def new(cls: type[Self], *args, **kwargs) -> Self:
         """
         We can do ``await SomeAObject(...)``, but this makes mypy
         to complain about its return type with ``await`` statement.
@@ -265,33 +260,33 @@ T4 = TypeVar("T4")
 
 @overload
 def check_typed_tuple(
-    value: Tuple[Any],
-    types: Tuple[Type[T1]],
-) -> Tuple[T1]: ...
+    value: tuple[Any],
+    types: tuple[type[T1]],
+) -> tuple[T1]: ...
 
 
 @overload
 def check_typed_tuple(
-    value: Tuple[Any, Any],
-    types: Tuple[Type[T1], Type[T2]],
-) -> Tuple[T1, T2]: ...
+    value: tuple[Any, Any],
+    types: tuple[type[T1], type[T2]],
+) -> tuple[T1, T2]: ...
 
 
 @overload
 def check_typed_tuple(
-    value: Tuple[Any, Any, Any],
-    types: Tuple[Type[T1], Type[T2], Type[T3]],
-) -> Tuple[T1, T2, T3]: ...
+    value: tuple[Any, Any, Any],
+    types: tuple[type[T1], type[T2], type[T3]],
+) -> tuple[T1, T2, T3]: ...
 
 
 @overload
 def check_typed_tuple(
-    value: Tuple[Any, Any, Any, Any],
-    types: Tuple[Type[T1], Type[T2], Type[T3], Type[T4]],
-) -> Tuple[T1, T2, T3, T4]: ...
+    value: tuple[Any, Any, Any, Any],
+    types: tuple[type[T1], type[T2], type[T3], type[T4]],
+) -> tuple[T1, T2, T3, T4]: ...
 
 
-def check_typed_tuple(value: Tuple[Any, ...], types: Tuple[Type, ...]) -> Tuple:
+def check_typed_tuple(value: tuple[Any, ...], types: tuple[type, ...]) -> tuple:
     for val, typ in itertools.zip_longest(value, types):
         if typ is not None:
             typeguard.check_type(val, typ)
@@ -463,7 +458,7 @@ class SlotTypes(enum.StrEnum):
 class HardwareMetadata(TypedDict):
     status: Literal["healthy", "degraded", "offline", "unavailable"]
     status_info: Optional[str]
-    metadata: Dict[str, str]
+    metadata: dict[str, str]
 
 
 class AutoPullBehavior(enum.StrEnum):
@@ -659,7 +654,7 @@ class MountExpression:
 
 
 class HostPortPair(namedtuple("HostPortPair", "host port")):
-    def as_sockaddr(self) -> Tuple[str, int]:
+    def as_sockaddr(self) -> tuple[str, int]:
         return str(self.host), self.port
 
     def __str__(self) -> str:
@@ -668,7 +663,7 @@ class HostPortPair(namedtuple("HostPortPair", "host port")):
         return f"{self.host}:{self.port}"
 
 
-_Address = TypeVar("_Address", bound=Union[ipaddress.IPv4Network, ipaddress.IPv6Network])
+_Address = TypeVar("_Address", bound=ipaddress.IPv4Network | ipaddress.IPv6Network)
 
 
 class ReadableCIDR(Generic[_Address]):
@@ -745,7 +740,7 @@ class BinarySize(int):
     endings = ("ibytes", "ibyte", "ib", "bytes", "byte", "b")
 
     @classmethod
-    def _parse_str(cls, expr: str) -> Union[BinarySize, Decimal]:
+    def _parse_str(cls, expr: str) -> BinarySize | Decimal:
         if expr.lower() in ("inf", "infinite", "infinity"):
             return Decimal("Infinity")
         orig_expr = expr
@@ -782,7 +777,7 @@ class BinarySize(int):
     @classmethod
     def finite_from_str(
         cls,
-        expr: Union[str, Decimal, numbers.Integral],
+        expr: str | Decimal | numbers.Integral,
     ) -> BinarySize:
         if isinstance(expr, Decimal):
             if expr.is_infinite():
@@ -798,8 +793,8 @@ class BinarySize(int):
     @classmethod
     def from_str(
         cls,
-        expr: Union[str, Decimal, numbers.Integral],
-    ) -> Union[BinarySize, Decimal]:
+        expr: str | Decimal | numbers.Integral,
+    ) -> BinarySize | Decimal:
         if isinstance(expr, Decimal):
             return cls(expr)
         if isinstance(expr, numbers.Integral):
@@ -1316,7 +1311,7 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
             return self
         if not isinstance(other, dict):
             raise ValueError(f"Invalid type. expected `dict` type, got {type(other)} type")
-        union_map: Dict[str, set] = defaultdict(set)
+        union_map: dict[str, set] = defaultdict(set)
         for host, perms in [*self.items(), *other.items()]:
             try:
                 perm_list = [VFolderHostPermission(perm) for perm in perms]
@@ -1390,7 +1385,7 @@ class ServicePort(TypedDict):
     is_inference: bool
 
 
-ClusterSSHPortMapping = NewType("ClusterSSHPortMapping", Mapping[str, Tuple[str, int]])
+ClusterSSHPortMapping = NewType("ClusterSSHPortMapping", Mapping[str, tuple[str, int]])
 
 
 class ClusterInfo(TypedDict):
@@ -1545,8 +1540,8 @@ class KernelCreationConfig(TypedDict):
     bootstrap_script: Optional[str]
     startup_command: Optional[str]
     internal_data: Optional[Mapping[str, Any]]
-    preopen_ports: List[int]
-    allocated_host_ports: List[int]
+    preopen_ports: list[int]
+    allocated_host_ports: list[int]
     scaling_group: str
     agent_addr: str
     endpoint_id: Optional[str]
@@ -1554,7 +1549,7 @@ class KernelCreationConfig(TypedDict):
 
 class SessionEnqueueingConfig(TypedDict):
     creation_config: dict
-    kernel_configs: List[KernelEnqueueingConfig]
+    kernel_configs: list[KernelEnqueueingConfig]
 
 
 class KernelEnqueueingConfig(TypedDict):
@@ -1571,7 +1566,7 @@ class KernelEnqueueingConfig(TypedDict):
     supplementary_gids: list[int]
 
 
-def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
+def _stringify_number(v: BinarySize | int | float | Decimal) -> str:
     """
     Stringify a number, preventing unwanted scientific notations.
     """
@@ -1617,7 +1612,7 @@ class ValkeyTarget:
 @dataclass
 class RedisTarget:
     addr: Optional[HostPortPair] = None
-    sentinel: Optional[Union[str, List[HostPortPair]]] = None
+    sentinel: Optional[str | list[HostPortPair]] = None
     service_name: Optional[str] = None
     password: Optional[str] = None
     redis_helper_config: Optional[RedisHelperConfig] = None
@@ -1711,7 +1706,7 @@ class RedisProfileTarget:
         self,
         *,
         addr: Optional[HostPortPair] = None,
-        sentinel: Optional[Union[str, List[HostPortPair]]] = None,
+        sentinel: Optional[str | list[HostPortPair]] = None,
         service_name: Optional[str] = None,
         password: Optional[str] = None,
         redis_helper_config: Optional[RedisHelperConfig] = None,

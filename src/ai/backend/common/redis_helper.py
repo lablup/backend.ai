@@ -11,7 +11,6 @@ from collections.abc import Awaitable, Callable, Mapping, MutableMapping
 from typing import (
     Any,
     Optional,
-    Union,
     cast,
 )
 
@@ -80,7 +79,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 # TODO: Remove this after migrating redis_lock client to valkey glide
 async def execute(
     redis_obj: RedisConnectionInfo,
-    func: Callable[[Union[Redis, Any]], Awaitable[Any]],
+    func: Callable[[Redis | Any], Awaitable[Any]],
     *,
     service_name: Optional[str] = None,
     encoding: Optional[str] = None,

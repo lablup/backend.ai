@@ -4,7 +4,6 @@ import asyncio
 import contextlib
 import logging
 import re
-from typing import FrozenSet
 
 from ai.backend.common.types import HardwareMetadata
 from ai.backend.logging import BraceStyleAdapter
@@ -104,7 +103,7 @@ class FlashBladeVolume(BaseVolume):
     async def shutdown(self) -> None:
         await self.purity_client.aclose()
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset(
             [
                 CAP_FAST_FS_SIZE,

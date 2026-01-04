@@ -20,10 +20,6 @@ from datetime import timedelta
 from typing import (
     TYPE_CHECKING,
     Any,
-    DefaultDict,
-    List,
-    Tuple,
-    Union,
 )
 from urllib.parse import urlparse
 
@@ -112,7 +108,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
 
     async def connect_streams(
         compute_session: KernelRow,
-    ) -> Tuple[zmq.asyncio.Socket, zmq.asyncio.Socket]:
+    ) -> tuple[zmq.asyncio.Socket, zmq.asyncio.Socket]:
         # TODO: refactor as custom row/table method
         if compute_session.kernel_host is None:
             kernel_host = urlparse(compute_session.agent_addr).hostname
@@ -555,7 +551,7 @@ async def stream_proxy(
             )
         )
 
-        opts: MutableMapping[str, Union[None, str, List[str]]] = {}
+        opts: MutableMapping[str, None | str | list[str]] = {}
         if params["arguments"] is not None:
             opts["arguments"] = load_json(params["arguments"])
         if params["envs"] is not None:
@@ -705,14 +701,14 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
-    stream_pty_handlers: DefaultDict[KernelId, weakref.WeakSet[asyncio.Task]]
-    stream_execute_handlers: DefaultDict[KernelId, weakref.WeakSet[asyncio.Task]]
-    stream_proxy_handlers: DefaultDict[KernelId, weakref.WeakSet[asyncio.Task]]
-    stream_stdin_socks: DefaultDict[KernelId, weakref.WeakSet[zmq.asyncio.Socket]]
+    stream_pty_handlers: defaultdict[KernelId, weakref.WeakSet[asyncio.Task]]
+    stream_execute_handlers: defaultdict[KernelId, weakref.WeakSet[asyncio.Task]]
+    stream_proxy_handlers: defaultdict[KernelId, weakref.WeakSet[asyncio.Task]]
+    stream_stdin_socks: defaultdict[KernelId, weakref.WeakSet[zmq.asyncio.Socket]]
     zctx: zmq.asyncio.Context
     conn_tracker_lock: asyncio.Lock
     conn_tracker_gc_task: asyncio.Task
-    active_session_ids: DefaultDict[SessionId, int]
+    active_session_ids: defaultdict[SessionId, int]
 
 
 async def stream_app_ctx(app: web.Application) -> AsyncIterator[None]:
@@ -743,7 +739,7 @@ async def stream_shutdown(app: web.Application) -> None:
     rpc_ptask_group: aiotools.PersistentTaskGroup = app["rpc_ptask_group"]
     await database_ptask_group.shutdown()
     await rpc_ptask_group.shutdown()
-    cancelled_tasks: List[asyncio.Task] = []
+    cancelled_tasks: list[asyncio.Task] = []
     app_ctx: PrivateContext = app["stream.context"]
     app_ctx.conn_tracker_gc_task.cancel()
     cancelled_tasks.append(app_ctx.conn_tracker_gc_task)
@@ -767,7 +763,7 @@ async def stream_shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app.cleanup_ctx.append(stream_app_ctx)
     app.on_shutdown.append(stream_shutdown)

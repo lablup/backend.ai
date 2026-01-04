@@ -6,7 +6,7 @@ import shutil
 import textwrap
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, FrozenSet, Optional, Tuple, override
+from typing import Any, Optional, override
 
 import pkg_resources
 import zmq
@@ -44,7 +44,7 @@ class KubernetesKernel(AbstractKernel):
         agent_config: Mapping[str, Any],
         resource_spec: KernelResourceSpec,
         service_ports: Any,  # TODO: type-annotation
-        data: Dict[str, Any],
+        data: dict[str, Any],
         environ: Mapping[str, Any],
     ) -> None:
         super().__init__(
@@ -67,7 +67,7 @@ class KubernetesKernel(AbstractKernel):
 
     @override
     async def create_code_runner(
-        self, event_producer: EventProducer, *, client_features: FrozenSet[str], api_version: int
+        self, event_producer: EventProducer, *, client_features: frozenset[str], api_version: int
     ) -> AbstractCodeRunner:
         scale = await self.scale(1)
         if scale.to_dict()["spec"]["replicas"] == 0:
@@ -400,7 +400,7 @@ class KubernetesCodeRunner(AbstractCodeRunner):
 
 async def prepare_krunner_env_impl(
     distro: str, entrypoint_name: str, root_path: str
-) -> Tuple[str, Optional[str]]:
+) -> tuple[str, Optional[str]]:
     docker = Docker()
     arch = get_arch_name()
     current_version = int(

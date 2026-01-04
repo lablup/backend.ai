@@ -6,8 +6,8 @@ Tests the repository layer with real database operations for artifact revisions.
 from __future__ import annotations
 
 import uuid
+from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
-from typing import AsyncGenerator
 
 import pytest
 

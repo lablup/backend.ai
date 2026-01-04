@@ -4,7 +4,7 @@ import platform
 from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import aiohttp
 from aiodocker.docker import Docker, DockerContainer
@@ -46,7 +46,7 @@ from .resources import get_resource_spec_from_container
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]]:
+async def fetch_api_stats(container: DockerContainer) -> Optional[dict[str, Any]]:
     short_cid = ContainerId(container.id[:7])
     try:
         ret = await container.stats(stream=False)  # TODO: cache
@@ -218,7 +218,7 @@ class CPUPlugin(AbstractComputePlugin):
     ) -> Sequence[DeviceModelInfo]:
         device_ids = [*device_alloc[SlotName("cpu")].keys()]
         available_devices = await self.list_devices()
-        attached_devices: List[DeviceModelInfo] = []
+        attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
                 attached_devices.append({
@@ -230,12 +230,12 @@ class CPUPlugin(AbstractComputePlugin):
 
     async def generate_mounts(
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         return []
 
     async def get_docker_networks(
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[str]:
+    ) -> list[str]:
         return []
 
     def get_metadata(self) -> AcceleratorMetadata:
@@ -373,7 +373,7 @@ class MemoryPlugin(AbstractComputePlugin):
     ) -> Sequence[DeviceModelInfo]:
         device_ids = [*device_alloc[SlotName("mem")].keys()]
         available_devices = await self.list_devices()
-        attached_devices: List[DeviceModelInfo] = []
+        attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
                 attached_devices.append({
@@ -385,12 +385,12 @@ class MemoryPlugin(AbstractComputePlugin):
 
     async def generate_mounts(
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         return []
 
     async def get_docker_networks(
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[str]:
+    ) -> list[str]:
         return []
 
     def get_metadata(self) -> AcceleratorMetadata:

@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Iterable, Sequence
-from typing import List, Optional, Set, Tuple
+from typing import Optional
 
 from ai.backend.accelerator.rebellions.common.atom_api import ATOMAPI
 from ai.backend.accelerator.rebellions.common.plugin import AbstractATOMPlugin
@@ -22,16 +22,16 @@ VALID_DEVICE_NAME = ("RBLN-CA12", "RBLN-CA22")
 
 class ATOMPlusPlugin(AbstractATOMPlugin[ATOMPlusDevice]):
     key = DeviceName("atom-plus")
-    slot_types: Sequence[Tuple[SlotName, SlotTypes]] = (
+    slot_types: Sequence[tuple[SlotName, SlotTypes]] = (
         (SlotName("atom-plus.device"), SlotTypes("count")),
     )
-    exclusive_slot_types: Set[str] = {"atom-plus.device"}
+    exclusive_slot_types: set[str] = {"atom-plus.device"}
 
-    _all_devices: Optional[List[ATOMPlusDevice]]
+    _all_devices: Optional[list[ATOMPlusDevice]]
 
-    async def _list_devices(self) -> List[ATOMPlusDevice]:
+    async def _list_devices(self) -> list[ATOMPlusDevice]:
         stats = await ATOMAPI.get_stats(self._rbln_stat_path)
-        devices: List[ATOMPlusDevice] = []
+        devices: list[ATOMPlusDevice] = []
         for device_info in stats.devices:
             if device_info.name not in VALID_DEVICE_NAME:
                 continue
@@ -56,7 +56,7 @@ class ATOMPlusPlugin(AbstractATOMPlugin[ATOMPlusDevice]):
         self,
         devices: Iterable[ATOMPlusDevice],
     ) -> int:
-        non_zero_groups: Set[int] = {int(d.rbln_stat_info.group_id) for d in devices} - {0}
+        non_zero_groups: set[int] = {int(d.rbln_stat_info.group_id) for d in devices} - {0}
         if len(non_zero_groups) > 0:
             await ATOMAPI.destroy_groups(self._rbln_stat_path, list(non_zero_groups))
 

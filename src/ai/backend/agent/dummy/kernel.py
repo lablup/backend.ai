@@ -4,7 +4,7 @@ import asyncio
 import os
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
-from typing import Any, Dict, FrozenSet, override
+from typing import Any, override
 
 from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel, NextResult, ResultRecord
 from ai.backend.agent.resources import KernelResourceSpec
@@ -29,7 +29,7 @@ class DummyKernel(AbstractKernel):
         resource_spec: KernelResourceSpec,
         service_ports: Any,  # TODO: type-annotation
         environ: Mapping[str, Any],
-        data: Dict[str, Any],
+        data: dict[str, Any],
         dummy_config: Mapping[str, Any],
     ) -> None:
         super().__init__(
@@ -56,7 +56,7 @@ class DummyKernel(AbstractKernel):
         self,
         event_producer: EventProducer,
         *,
-        client_features: FrozenSet[str],
+        client_features: frozenset[str],
         api_version: int,
     ) -> AbstractCodeRunner:
         if self.dummy_kernel_cfg["use-fake-code-runner"]:

@@ -5,20 +5,18 @@ import dataclasses
 import enum
 import time
 from collections.abc import Callable, Mapping
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncContextManager,
     Final,
-    FrozenSet,
     Generic,
     Optional,
     Self,
     TypeAlias,
     TypeVar,
-    Union,
 )
 from uuid import UUID
 
@@ -322,7 +320,7 @@ class RootContext:
     health_probe: HealthProbe
 
 
-CleanupContext: TypeAlias = Callable[["RootContext"], AsyncContextManager[None]]
+CleanupContext: TypeAlias = Callable[["RootContext"], AbstractAsyncContextManager[None]]
 TCircuitKey = TypeVar("TCircuitKey", int, str)
 
 
@@ -456,7 +454,7 @@ class HistogramMeasurement:
     sum: Optional[Decimal] = dataclasses.field(default=None)
 
 
-TMeasurement = TypeVar("TMeasurement", bound=Union[Measurement, HistogramMeasurement])
+TMeasurement = TypeVar("TMeasurement", bound=Measurement | HistogramMeasurement)
 
 
 @dataclass
@@ -469,7 +467,7 @@ class InferenceMeasurement(Generic[TMeasurement]):
     type: MetricTypes
     per_app: TMeasurement
     per_replica: Mapping[UUID, TMeasurement]  # [Route Id: Measurement] pair
-    stats_filter: FrozenSet[str] = dataclasses.field(default_factory=frozenset)
+    stats_filter: frozenset[str] = dataclasses.field(default_factory=frozenset)
     unit_hint: str = dataclasses.field(default="count")
 
 
@@ -566,7 +564,7 @@ class Metric:
     type: MetricTypes
     unit_hint: str
     stats: MovingStatistics
-    stats_filter: FrozenSet[str]
+    stats_filter: frozenset[str]
     current: Decimal
     capacity: Optional[Decimal] = None
     current_hook: Optional[Callable[[Metric], Decimal]] = None

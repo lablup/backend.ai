@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
 from datetime import UTC, datetime
 from pathlib import PurePath
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 import trafaret as t
 from aiohttp import web
@@ -27,7 +27,7 @@ class CheckParamSource(enum.Enum):
     QUERY = 1
 
 
-def fstime2datetime(t: Union[float, int]) -> datetime:
+def fstime2datetime(t: float | int) -> datetime:
     return datetime.utcfromtimestamp(t).replace(tzinfo=UTC)
 
 
@@ -87,7 +87,7 @@ async def check_params(
 
 
 async def log_manager_api_entry(
-    log: Union[logging.Logger, BraceStyleAdapter],
+    log: logging.Logger | BraceStyleAdapter,
     name: str,
     params: Any,
 ) -> None:
@@ -138,7 +138,7 @@ async def log_manager_api_entry(
 
 
 async def log_manager_api_entry_new(
-    log: Union[logging.Logger, BraceStyleAdapter],
+    log: logging.Logger | BraceStyleAdapter,
     name: str,
     params: Any,
 ) -> None:
@@ -164,7 +164,7 @@ async def log_manager_api_entry_new(
 
 
 async def log_client_api_entry(
-    log: Union[logging.Logger, BraceStyleAdapter],
+    log: logging.Logger | BraceStyleAdapter,
     name: str,
     params: Any,
 ) -> None:

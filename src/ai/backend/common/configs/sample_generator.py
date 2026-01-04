@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from ipaddress import IPv4Address, IPv4Network, IPv6Address, IPv6Network
 from pathlib import PosixPath, PurePath
-from typing import Any, Optional, Type
+from typing import Any, Optional
 
 import toml
 from pydantic import BaseModel
@@ -144,7 +144,7 @@ def _dump_toml_scalar(
     return toml.dumps({"x": value}).strip().split(" = ", 1)[1]
 
 
-def _generate_sample_config(model_class: Type[BaseModel]) -> str:
+def _generate_sample_config(model_class: type[BaseModel]) -> str:
     """
     Generate a sample TOML configuration file from a Pydantic model.
 
@@ -157,7 +157,7 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
     warnings: list[str] = []
     schema = model_class.model_json_schema()
 
-    def _get_field_info(model_cls: Type[BaseModel], field_name: str, indent: int) -> dict[str, Any]:
+    def _get_field_info(model_cls: type[BaseModel], field_name: str, indent: int) -> dict[str, Any]:
         """Extract field information from Pydantic model including Field metadata."""
         field_info: dict[str, Any] = {}
         if hasattr(model_cls, "model_fields"):
@@ -216,7 +216,7 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
         prop_name: str,
         prop_schema: dict[str, Any],
         indent: int = 0,
-        model_cls: Optional[Type[BaseModel]] = None,
+        model_cls: Optional[type[BaseModel]] = None,
     ) -> list[str]:
         """Process a single property and return TOML lines with comments."""
         lines = []
@@ -323,7 +323,7 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
         schema_dict: dict[str, Any],
         path: Optional[list[str]] = None,
         parent_required: Optional[list[str]] = None,
-        model_cls: Optional[Type[BaseModel]] = None,
+        model_cls: Optional[type[BaseModel]] = None,
     ) -> list[str]:
         """Recursively process schema and generate TOML lines."""
         if path is None:
@@ -542,7 +542,7 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
 
 
 def generate_sample_config_file(
-    model_class: Type[BaseModel], output_path: str, header_comment: Optional[str] = None
+    model_class: type[BaseModel], output_path: str, header_comment: Optional[str] = None
 ) -> None:
     """
     Generate a sample TOML configuration file and write it to disk.

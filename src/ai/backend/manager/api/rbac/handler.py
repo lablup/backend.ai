@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from http import HTTPStatus
-from typing import Tuple
 
 import aiohttp_cors
 from aiohttp import web
@@ -341,7 +340,7 @@ class RBACAPIHandler:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     """Create aiohttp application for RBAC API endpoints."""
     app = web.Application()
     app["api_versions"] = (4, 5)

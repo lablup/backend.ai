@@ -3,7 +3,7 @@ import logging
 from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Final, FrozenSet, Literal, Optional, cast
+from typing import Any, Final, Literal, Optional, cast
 
 import aiofiles
 import aiofiles.os
@@ -251,7 +251,7 @@ class VASTVolume(BaseVolume):
     async def create_quota_model(self) -> VASTQuotaModel:
         return VASTQuotaModel(self.mount_path, self.api_client)
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_METRIC, CAP_QUOTA, CAP_FAST_FS_SIZE, CAP_FAST_SIZE])
 
     async def get_hwinfo(self) -> HardwareMetadata:

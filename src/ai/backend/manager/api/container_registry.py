@@ -4,7 +4,7 @@ import logging
 import uuid
 from collections.abc import Iterable
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Optional
 
 import aiohttp_cors
 import sqlalchemy as sa
@@ -208,7 +208,7 @@ async def harbor_webhook_handler(
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["api_versions"] = (1, 2, 3, 4, 5)
     app["prefix"] = "container-registries"

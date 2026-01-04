@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import attrs
 
@@ -53,7 +53,7 @@ class KubernetesHostPathVolume(KubernetesAbstractVolume):
 
 
 class ConfigMap(AbstractAPIObject):
-    items: Dict[str, str] = {}
+    items: dict[str, str] = {}
 
     def __init__(self, kernel_id, name: str):
         self.name = name
@@ -83,7 +83,7 @@ class Service(AbstractAPIObject):
         self.labels = {"run": self.name, "backend.ai/kernel-id": kernel_id}
 
     def to_dict(self) -> dict:
-        base: Dict[str, Any] = {
+        base: dict[str, Any] = {
             "apiVersion": "v1",
             "kind": "Service",
             "metadata": {

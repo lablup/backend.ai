@@ -18,7 +18,6 @@ from functools import partial
 from typing import (
     Any,
     Optional,
-    Union,
     cast,
 )
 
@@ -704,7 +703,7 @@ class SchedulerDispatcher(aobject):
         sgroup_name: str,
         candidate_agents: Sequence[AgentRow],
         sess_ctx: SessionRow,
-        check_results: list[tuple[str, Union[Exception, PredicateResult]]],
+        check_results: list[tuple[str, Exception | PredicateResult]],
     ) -> None:
         """
         Finds and assigns an agent having resources enough to host the entire session.
@@ -839,7 +838,7 @@ class SchedulerDispatcher(aobject):
         sgroup_name: str,
         candidate_agents: Sequence[AgentRow],
         sess_ctx: SessionRow,
-        check_results: list[tuple[str, Union[Exception, PredicateResult]]],
+        check_results: list[tuple[str, Exception | PredicateResult]],
     ) -> None:
         """
         Finds and assigns agents having resources enough to host each kernel in the session.
@@ -1314,8 +1313,8 @@ class SchedulerDispatcher(aobject):
         pending_sess: SessionRow,
         *,
         exc_handler: Callable[[Exception], None] | None = None,
-    ) -> list[tuple[str, Union[Exception, PredicateResult]]]:
-        check_results: list[tuple[str, Union[Exception, PredicateResult]]] = []
+    ) -> list[tuple[str, Exception | PredicateResult]]:
+        check_results: list[tuple[str, Exception | PredicateResult]] = []
         async with self.registry.db.begin_session() as db_sess:
             predicates: list[tuple[str, Awaitable[PredicateResult]]] = [
                 (

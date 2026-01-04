@@ -1,13 +1,12 @@
 import json
 from collections.abc import Callable
 from contextlib import closing
-from typing import Tuple
 
 from ai.backend.test.cli_integration.conftest import User
 from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
-def test_add_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
+def test_add_user(run_admin: ClientRunnerFunc, users: tuple[User, ...]):
     """
     Testcase for user addition.
     """
@@ -62,7 +61,7 @@ def test_add_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
 
 def test_update_user(
     run_admin: ClientRunnerFunc,
-    users: Tuple[User, ...],
+    users: tuple[User, ...],
     gen_username: Callable[[], str],
     gen_fullname: Callable[[], str],
 ):
@@ -138,7 +137,7 @@ def test_update_user(
         )
 
 
-def test_delete_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
+def test_delete_user(run_admin: ClientRunnerFunc, users: tuple[User, ...]):
     """
     !!Run this testcase after running test_add_user
     Testcase for user deletion.

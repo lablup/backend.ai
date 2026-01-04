@@ -9,13 +9,13 @@ import logging
 import os
 import urllib.parse
 from collections.abc import Mapping, MutableMapping
+from contextlib import AbstractAsyncContextManager
 from datetime import datetime
 from http import HTTPStatus
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncContextManager,
     Final,
     Literal,
     TypedDict,
@@ -101,7 +101,7 @@ async def check_status(request: web.Request) -> web.StreamResponse:
         pass
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict({}),
@@ -130,7 +130,7 @@ async def download(request: web.Request) -> web.StreamResponse:
 
     async with (
         cast(
-            AsyncContextManager[Params],
+            AbstractAsyncContextManager[Params],
             check_params(
                 request,
                 t.Dict(
@@ -292,7 +292,7 @@ async def tus_check_session(request: web.Request) -> web.Response:
         dst_dir: str
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -325,7 +325,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
         dst_dir: str
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(

@@ -1,9 +1,5 @@
 import logging
 from collections.abc import Iterable
-from typing import (
-    List,
-    Set,
-)
 
 from ai.backend.accelerator.rebellions.common.atom_api import ATOMAPI
 from ai.backend.accelerator.rebellions.common.plugin import AbstractATOMPlugin
@@ -22,9 +18,9 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
 class ATOMPlugin(AbstractATOMPlugin[ATOMDevice]):
-    async def _list_devices(self) -> List[ATOMDevice]:
+    async def _list_devices(self) -> list[ATOMDevice]:
         stats = await ATOMAPI.get_stats(self._rbln_stat_path)
-        devices: List[ATOMDevice] = []
+        devices: list[ATOMDevice] = []
         for device_info in stats.devices:
             if device_info.name not in VALID_DEVICE_NAME:
                 continue
@@ -45,8 +41,8 @@ class ATOMPlugin(AbstractATOMPlugin[ATOMDevice]):
 
         return devices
 
-    async def group_npus(self, devices: List[ATOMDevice]) -> int:
-        non_zero_groups: Set[int] = {int(d.rbln_stat_info.group_id) for d in devices} - {0}
+    async def group_npus(self, devices: list[ATOMDevice]) -> int:
+        non_zero_groups: set[int] = {int(d.rbln_stat_info.group_id) for d in devices} - {0}
         if len(non_zero_groups) > 0:
             await ATOMAPI.destroy_groups(self._rbln_stat_path, list(non_zero_groups))
 

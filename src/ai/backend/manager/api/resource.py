@@ -14,7 +14,6 @@ from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
-    Tuple,
 )
 
 import aiohttp_cors
@@ -378,7 +377,7 @@ async def get_container_registries(request: web.Request) -> web.Response:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["api_versions"] = (4,)
     app["prefix"] = "resource"

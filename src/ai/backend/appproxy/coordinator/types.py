@@ -3,11 +3,11 @@ import itertools
 import logging
 from collections import defaultdict
 from collections.abc import Callable, Sequence
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from typing import (
     Annotated,
     Any,
-    AsyncContextManager,
     Optional,
     Protocol,
     Self,
@@ -294,7 +294,7 @@ class RootContext:
     leader_election: ValkeyLeaderElection
 
 
-CleanupContext: TypeAlias = Callable[["RootContext"], AsyncContextManager[None]]
+CleanupContext: TypeAlias = Callable[["RootContext"], AbstractAsyncContextManager[None]]
 
 
 class InferenceAppConfig(BaseModel):

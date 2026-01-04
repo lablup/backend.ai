@@ -14,11 +14,7 @@ from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from decimal import Decimal, DecimalException
 from typing import (
     TYPE_CHECKING,
-    FrozenSet,
-    List,
     Optional,
-    Set,
-    Tuple,
     cast,
 )
 
@@ -151,7 +147,7 @@ class NodeMeasurement:
     type: MetricTypes
     per_node: Measurement
     per_device: Mapping[DeviceId, Measurement] = attrs.Factory(dict)
-    stats_filter: FrozenSet[str] = attrs.Factory(frozenset)
+    stats_filter: frozenset[str] = attrs.Factory(frozenset)
     current_hook: Optional[Callable[["Metric"], Decimal]] = None
     unit_hint: str = "count"
 
@@ -165,7 +161,7 @@ class ContainerMeasurement:
     key: MetricKey
     type: MetricTypes
     per_container: Mapping[str, Measurement] = attrs.Factory(dict)
-    stats_filter: FrozenSet[str] = attrs.Factory(frozenset)
+    stats_filter: frozenset[str] = attrs.Factory(frozenset)
     current_hook: Optional[Callable[["Metric"], Decimal]] = None
     unit_hint: str = "count"
 
@@ -179,7 +175,7 @@ class ProcessMeasurement:
     key: MetricKey
     type: MetricTypes
     per_process: Mapping[int, Measurement] = attrs.Factory(dict)
-    stats_filter: FrozenSet[str] = attrs.Factory(frozenset)
+    stats_filter: frozenset[str] = attrs.Factory(frozenset)
     current_hook: Optional[Callable[["Metric"], Decimal]] = None
     unit_hint: str = "count"
 
@@ -210,7 +206,7 @@ class MovingStatistics:
     _count: int
     _min: Decimal
     _max: Decimal
-    _last: List[Tuple[Decimal, float]]
+    _last: list[tuple[Decimal, float]]
 
     def __init__(self, initial_value: Optional[Decimal] = None):
         self._last = []
@@ -296,7 +292,7 @@ class Metric:
     type: MetricTypes
     unit_hint: str
     stats: MovingStatistics
-    stats_filter: FrozenSet[str]
+    stats_filter: frozenset[str]
     current: Decimal
     capacity: Optional[Decimal] = None
     current_hook: Optional[Callable[["Metric"], Decimal]] = None
@@ -359,7 +355,7 @@ class StatContext:
         self._utilization_metric_observer = UtilizationMetricObserver.instance()
         self._stage_observer = StageObserver.instance()
 
-    def update_timestamp(self, timestamp_key: str) -> Tuple[float, float]:
+    def update_timestamp(self, timestamp_key: str) -> tuple[float, float]:
         """
         Update the timestamp for the given key and return a pair of the current timestamp and
         the interval from the last update of the same key.
@@ -672,7 +668,7 @@ class StatContext:
                 upper_layer="collect_container_stat",
             )
             results = await asyncio.gather(*_tasks, return_exceptions=True)
-            updated_kernel_ids: Set[KernelId] = set()
+            updated_kernel_ids: set[KernelId] = set()
             self._stage_observer.observe_stage(
                 stage="before_observe",
                 upper_layer="collect_container_stat",
@@ -851,7 +847,7 @@ class StatContext:
                 stage="before_observe",
                 upper_layer="collect_per_container_process_stat",
             )
-            updated_cids: Set[ContainerId] = set()
+            updated_cids: set[ContainerId] = set()
             for result in results:
                 if isinstance(result, BaseException):
                     log.error(

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping, Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, Optional, Self
+from typing import TYPE_CHECKING, Any, Optional, Self
 
 import graphene
 import sqlalchemy as sa
@@ -536,7 +536,7 @@ class ModifyKeyPair(graphene.Mutation):
         props: ModifyKeyPairInput,
     ) -> ModifyKeyPair:
         ctx: GraphQueryContext = info.context
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
         set_if_set(props, data, "is_active")
         set_if_set(props, data, "is_admin")
         set_if_set(props, data, "resource_policy")

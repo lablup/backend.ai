@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import List
 
 from ai.backend.accelerator.rebellions.common.atom_api import ATOMDeviceStat
 from ai.backend.accelerator.rebellions.common.types import AbstractATOMDevice
@@ -20,12 +19,12 @@ class ATOMMaxChildDevice:
 
 class ATOMMaxDevice(AbstractATOMDevice):
     model_name: str
-    children: List[ATOMMaxChildDevice]
+    children: list[ATOMMaxChildDevice]
 
     def __init__(
         self,
         model_name: str,
-        children: List[ATOMMaxChildDevice],
+        children: list[ATOMMaxChildDevice],
         *args,
         **kwargs,
     ) -> None:

@@ -3,7 +3,7 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Dict, FrozenSet, List
+from typing import Any
 
 import aiofiles.os
 
@@ -133,8 +133,8 @@ class CephFSOpModel(BaseFSOpModel):
 class CephFSVolume(BaseVolume):
     name = "cephfs"
     loop: asyncio.AbstractEventLoop
-    registry: Dict[str, int]
-    project_id_pool: List[int]
+    registry: dict[str, int]
+    project_id_pool: list[int]
 
     async def init(self) -> None:
         try:
@@ -152,7 +152,7 @@ class CephFSVolume(BaseVolume):
             self.local_config["storage-proxy"]["scandir-limit"],
         )
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_FAST_SIZE])
 
     async def get_fs_usage(self) -> CapacityUsage:

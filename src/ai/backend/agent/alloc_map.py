@@ -11,7 +11,6 @@ from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from decimal import ROUND_DOWN, Decimal
 from typing import (
     TYPE_CHECKING,
-    FrozenSet,
     Optional,
     TypeVar,
     final,
@@ -75,7 +74,7 @@ def round_down(from_dec: Decimal, with_dec: Decimal):
 
 class AbstractAllocMap(metaclass=ABCMeta):
     device_slots: Mapping[DeviceId, DeviceSlotInfo]
-    device_mask: FrozenSet[DeviceId]
+    device_mask: frozenset[DeviceId]
     exclusive_slot_types: Iterable[SlotName]
     allocations: MutableMapping[SlotName, MutableMapping[DeviceId, Decimal]]
 

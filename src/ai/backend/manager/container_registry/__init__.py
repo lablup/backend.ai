@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Type
+from typing import TYPE_CHECKING
 
 import yarl
 
@@ -12,10 +12,10 @@ if TYPE_CHECKING:
     from .base import BaseContainerRegistry
 
 
-def get_container_registry_cls(registry_info: ContainerRegistryRow) -> Type[BaseContainerRegistry]:
+def get_container_registry_cls(registry_info: ContainerRegistryRow) -> type[BaseContainerRegistry]:
     registry_url = yarl.URL(registry_info.url)
     registry_type = registry_info.type
-    cr_cls: Type[BaseContainerRegistry]
+    cr_cls: type[BaseContainerRegistry]
     if registry_url.host is not None and registry_url.host.endswith(".docker.io"):
         from .docker import DockerHubRegistry
 

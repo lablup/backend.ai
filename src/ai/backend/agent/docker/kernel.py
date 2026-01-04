@@ -13,7 +13,7 @@ import subprocess
 import textwrap
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, Final, FrozenSet, Optional, Tuple, cast, override
+from typing import Any, Final, Optional, cast, override
 
 import aiohttp
 import janus
@@ -59,7 +59,7 @@ class DockerKernel(AbstractKernel):
         resource_spec: KernelResourceSpec,
         service_ports: Any,  # TODO: type-annotation
         environ: Mapping[str, Any],
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> None:
         super().__init__(
             ownership_data,
@@ -89,7 +89,7 @@ class DockerKernel(AbstractKernel):
 
     @override
     async def create_code_runner(
-        self, event_producer: EventProducer, *, client_features: FrozenSet[str], api_version: int
+        self, event_producer: EventProducer, *, client_features: frozenset[str], api_version: int
     ) -> AbstractCodeRunner:
         return await DockerCodeRunner.new(
             self.kernel_id,
@@ -170,7 +170,7 @@ class DockerKernel(AbstractKernel):
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         return await self.runner.feed_service_apps()
 
-    def _get_commit_path(self, kernel_id: KernelId, subdir: str) -> Tuple[Path, Path]:
+    def _get_commit_path(self, kernel_id: KernelId, subdir: str) -> tuple[Path, Path]:
         base_commit_path: Path = self.agent_config["agent"]["image-commit-path"]
         commit_path = base_commit_path / subdir
         lock_path = commit_path / "lock" / str(kernel_id)
@@ -480,7 +480,7 @@ class DockerCodeRunner(AbstractCodeRunner):
         return f"tcp://{self.kernel_host}:{self.repl_out_port}"
 
 
-async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> Tuple[str, Optional[str]]:
+async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[str, Optional[str]]:
     docker = Docker()
     arch = get_arch_name()
     current_version = int(

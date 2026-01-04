@@ -4,7 +4,6 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import List
 
 import janus
 
@@ -13,7 +12,7 @@ from ai.backend.kernel.base import promote_path
 
 log = logging.getLogger()
 
-DEFAULT_PYFLAGS: List[str] = []
+DEFAULT_PYFLAGS: list[str] = []
 
 
 class Runner(BaseRunner):

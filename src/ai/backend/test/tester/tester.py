@@ -2,7 +2,7 @@ import asyncio
 from collections.abc import Mapping
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Any, Optional, Type, cast
+from typing import Any, Optional, cast
 
 import aiofiles
 import aiotools
@@ -18,7 +18,7 @@ from .runner import TestRunner
 
 class Tester:
     _spec_manager: TestSpecManager
-    _exporter_type: Type[TestExporter]
+    _exporter_type: type[TestExporter]
     _config_file_path: Path
     _config: Optional[TesterConfig]
     _semaphore_instance: Optional[asyncio.Semaphore]
@@ -26,7 +26,7 @@ class Tester:
     def __init__(
         self,
         spec_manager: TestSpecManager,
-        exporter_type: Type[TestExporter],
+        exporter_type: type[TestExporter],
         config_file_path: Path,
     ) -> None:
         self._spec_manager = spec_manager

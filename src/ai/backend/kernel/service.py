@@ -22,7 +22,6 @@ from typing import (
     Any,
     Optional,
     TypedDict,
-    Union,
 )
 
 import attrs
@@ -50,7 +49,7 @@ class ServiceDefinition:
     env: Mapping[str, str] = attrs.Factory(dict)
     allowed_envs: list[str] = attrs.Factory(list)
     allowed_arguments: list[str] = attrs.Factory(list)
-    default_arguments: Mapping[str, Union[None, str, list[str]]] = attrs.Factory(dict)
+    default_arguments: Mapping[str, None | str | list[str]] = attrs.Factory(dict)
 
 
 class ServiceParser:

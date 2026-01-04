@@ -5,7 +5,7 @@ Kernel and session-related exceptions.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 from aiohttp import web
 
@@ -170,7 +170,7 @@ class BackendAgentError(BackendAIError):
     def __init__(
         self,
         agent_error_type: str,
-        exc_info: Union[str, AgentError, Exception, Mapping[str, Optional[str]], None] = None,
+        exc_info: str | AgentError | Exception | Mapping[str, Optional[str]] | None = None,
     ):
         super().__init__()
         agent_details: Mapping[str, Optional[str]]

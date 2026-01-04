@@ -8,7 +8,6 @@ from typing import (
     Any,
     Optional,
     Self,
-    Set,
     TypeAlias,
     cast,
     overload,
@@ -444,7 +443,7 @@ async def query_allowed_sgroups(
                 group_ids = []
         case list() | tuple() | set():
             group_ids = await resolve_groups(db_conn, domain_name, cast(Iterable, group))
-    from_group: Set[str]
+    from_group: set[str]
     if not group_ids:
         from_group = set()  # empty
     else:

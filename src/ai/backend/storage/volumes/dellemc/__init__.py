@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, FrozenSet, Optional, cast
+from typing import Any, Optional, cast
 
 import aiofiles.os
 
@@ -197,7 +197,7 @@ class DellEMCOneFSVolume(BaseVolume):
             self.mount_path, api_client=self.api_client, ifs_path=ifs_path
         )
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_FAST_FS_SIZE, CAP_VFOLDER, CAP_QUOTA, CAP_METRIC])
 
     async def get_hwinfo(self) -> HardwareMetadata:

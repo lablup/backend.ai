@@ -9,7 +9,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Type, TypeAlias
+from typing import TYPE_CHECKING, Any, Optional, TypeAlias
 
 import attrs
 from aiohttp.typedefs import Middleware
@@ -42,7 +42,7 @@ class AgentBackend(enum.StrEnum):
 
 class AbstractAgentDiscovery(ABC):
     @abstractmethod
-    def get_agent_cls(self) -> Type[AbstractAgent]:
+    def get_agent_cls(self) -> type[AbstractAgent]:
         """
         Return the concrete implementation class of AbstactAgent for the backend.
         """

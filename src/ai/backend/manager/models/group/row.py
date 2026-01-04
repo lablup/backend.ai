@@ -11,7 +11,6 @@ from typing import (
     Self,
     TypeAlias,
     TypedDict,
-    Union,
     cast,
     overload,
     override,
@@ -395,7 +394,7 @@ def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sq
 async def resolve_group_name_or_id(
     db_conn: SAConnection,
     domain_name: str,
-    value: Union[str, uuid.UUID],
+    value: str | uuid.UUID,
 ) -> Optional[uuid.UUID]:
     match value:
         case uuid.UUID():
@@ -452,7 +451,7 @@ class GroupDotfile(TypedDict):
 
 async def query_group_dotfiles(
     db_conn: SAConnection,
-    group_id: Union[GUID, uuid.UUID],
+    group_id: GUID | uuid.UUID,
 ) -> tuple[list[GroupDotfile], int]:
     query = sa.select([groups.c.dotfiles]).select_from(groups).where(groups.c.id == group_id)
     packed_dotfile = await db_conn.scalar(query)
@@ -464,7 +463,7 @@ async def query_group_dotfiles(
 
 async def query_group_domain(
     db_conn: SAConnection,
-    group_id: Union[GUID, uuid.UUID],
+    group_id: GUID | uuid.UUID,
 ) -> str:
     query = sa.select([groups.c.domain_name]).select_from(groups).where(groups.c.id == group_id)
     return await db_conn.scalar(query)

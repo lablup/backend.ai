@@ -1,10 +1,7 @@
 from collections.abc import Collection, Sequence
 from pathlib import Path
 from typing import (
-    List,
     Optional,
-    Set,
-    Tuple,
 )
 
 import pyhlml
@@ -30,10 +27,10 @@ PREFIX = "gaudi2"
 
 class Gaudi2Plugin(AbstractGaudiPlugin):
     key = DeviceName("gaudi2")
-    slot_types: Sequence[Tuple[SlotName, SlotTypes]] = (
+    slot_types: Sequence[tuple[SlotName, SlotTypes]] = (
         (SlotName("gaudi2.device"), SlotTypes("count")),
     )
-    exclusive_slot_types: Set[str] = {"gaudi2.device"}
+    exclusive_slot_types: set[str] = {"gaudi2.device"}
 
     async def list_devices(self) -> Collection[Gaudi2Device]:
         if not self.enabled:
@@ -44,7 +41,7 @@ class Gaudi2Plugin(AbstractGaudiPlugin):
 
         num_devices = pyhlml.hlmlDeviceGetCount()
 
-        devices: List[Gaudi2Device] = []
+        devices: list[Gaudi2Device] = []
         for dev_idx in range(num_devices):
             if dev_idx in self.device_mask:
                 continue

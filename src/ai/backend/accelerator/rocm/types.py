@@ -1,5 +1,3 @@
-from typing import List
-
 from ai.backend.agent.resources import AbstractComputeDevice
 
 __all__ = ("ROCmDevice",)
@@ -13,14 +11,14 @@ class ROCmDevice(AbstractComputeDevice):
     model_name: str
     unique_id: str
     sku: str
-    xcds: List[ROCmXCD]
+    xcds: list[ROCmXCD]
 
     def __init__(
         self,
         model_name: str,
         unique_id: str,
         sku: str,
-        xcds: List[ROCmXCD],
+        xcds: list[ROCmXCD],
         *args,
         **kwargs,
     ) -> None:

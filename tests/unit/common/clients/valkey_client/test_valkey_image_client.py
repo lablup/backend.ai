@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import random
-from typing import AsyncGenerator, cast
+from collections.abc import AsyncGenerator
+from typing import cast
 
 import pytest
 

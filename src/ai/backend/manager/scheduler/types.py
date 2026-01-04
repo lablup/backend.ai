@@ -11,7 +11,6 @@ from typing import (
     Generic,
     Optional,
     Self,
-    Set,
     TypeVar,
     override,
 )
@@ -106,7 +105,7 @@ class SchedulingContext:
 class KernelAgentBinding:
     kernel: KernelRow
     agent_alloc_ctx: AgentAllocationContext
-    allocated_host_ports: Set[int]
+    allocated_host_ports: set[int]
 
 
 @attrs.define(auto_attribs=True, slots=True)

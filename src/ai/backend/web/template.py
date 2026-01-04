@@ -1,5 +1,5 @@
 import json
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from jinja2 import nodes
 from jinja2.ext import Extension
@@ -11,7 +11,7 @@ from .errors import InvalidTemplateValueError
 class TOMLField(Extension):
     tags = {"toml_field"}
 
-    def parse(self, parser: Parser) -> nodes.Node | List[nodes.Node]:
+    def parse(self, parser: Parser) -> nodes.Node | list[nodes.Node]:
         tag_name = list(self.tags)[0]
         lineno = parser.stream.expect(f"name:{tag_name}").lineno
         field_name: nodes.Expr = parser.parse_expression()

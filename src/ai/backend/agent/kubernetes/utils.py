@@ -5,7 +5,7 @@ import subprocess
 from collections.abc import Mapping
 from contextlib import closing
 from pathlib import Path
-from typing import Any, Final, Optional, Tuple
+from typing import Any, Final, Optional
 
 import pkg_resources
 from aiodocker.docker import Docker
@@ -53,7 +53,7 @@ class PersistentServiceContainer:
             )
         )
 
-    async def get_container_version_and_status(self) -> Tuple[int, bool]:
+    async def get_container_version_and_status(self) -> tuple[int, bool]:
         try:
             c = self.docker.containers.container(self.container_name)
             await c.show()

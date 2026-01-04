@@ -13,7 +13,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Final,
-    List,
     NamedTuple,
     Optional,
     TypeAlias,
@@ -581,7 +580,7 @@ async def query_accessible_vfolders(
                 "cur_size": row.vfolders_cur_size,
             })
 
-    entries: List[dict] = []
+    entries: list[dict] = []
     # User vfolders.
     if "user" in allowed_vfolder_types:
         # Scan vfolders on requester's behalf.

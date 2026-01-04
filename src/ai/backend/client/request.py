@@ -15,11 +15,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import (
     Any,
-    List,
     Optional,
-    Type,
     TypeVar,
-    Union,
     cast,
 )
 
@@ -54,14 +51,7 @@ __all__ = [
 ]
 
 
-RequestContent = Union[
-    bytes,
-    bytearray,
-    str,
-    aiohttp.StreamReader,
-    io.IOBase,
-    None,
-]
+RequestContent = bytes | bytearray | str | aiohttp.StreamReader | io.IOBase | None
 """
 The type alias for the set of allowed types for request content.
 """
@@ -141,7 +131,7 @@ class Request:
         content: Optional[RequestContent] = None,
         *,
         content_type: Optional[str] = None,
-        params: Optional[Mapping[str, Union[str, int]]] = None,
+        params: Optional[Mapping[str, str | int]] = None,
         reporthook: Optional[Callable] = None,
         override_api_version: Optional[str] = None,
         session_mode: SessionMode = SessionMode.CLIENT,
@@ -278,7 +268,7 @@ class Request:
         else:
             raise ValueError("unsupported endpoint type")
 
-    def _pack_content(self) -> Union[RequestContent, aiohttp.FormData]:
+    def _pack_content(self) -> RequestContent | aiohttp.FormData:
         if self._attached_files is not None:
             data = aiohttp.FormData()
             for f in self._attached_files:
@@ -580,7 +570,7 @@ class FetchContextManager:
         rqst_ctx_builder: Callable[[], _RequestContextManager],
         session_mode: SessionMode = SessionMode.CLIENT,
         *,
-        response_cls: Type[Response] = Response,
+        response_cls: type[Response] = Response,
         check_status: bool = True,
     ) -> None:
         self.session = session
@@ -735,7 +725,7 @@ class WebSocketContextManager:
         ws_ctx_builder: Callable[[], _WSRequestContextManager],
         *,
         on_enter: Optional[Callable] = None,
-        response_cls: Type[WebSocketResponse] = WebSocketResponse,
+        response_cls: type[WebSocketResponse] = WebSocketResponse,
     ) -> None:
         self.session = session
         self.ws_ctx_builder = ws_ctx_builder
@@ -813,7 +803,7 @@ class SSEResponse(BaseResponse):
         self._connector = connector
 
     async def fetch_events(self) -> AsyncIterator[SSEMessage]:
-        msg_lines: List[str] = []
+        msg_lines: list[str] = []
         server_closed = False
         while True:
             received_line = await self._raw_response.content.readline()
@@ -887,7 +877,7 @@ class SSEContextManager:
         session: BaseSession,
         rqst_ctx_builder: Callable[[], _RequestContextManager],
         *,
-        response_cls: Type[SSEResponse] = SSEResponse,
+        response_cls: type[SSEResponse] = SSEResponse,
     ) -> None:
         self.session = session
         self.rqst_ctx_builder = rqst_ctx_builder

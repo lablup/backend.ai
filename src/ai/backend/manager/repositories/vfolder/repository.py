@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -640,7 +640,7 @@ class VfolderRepository:
 
     @vfolder_repository_resilience.apply()
     async def get_group_resource_info(
-        self, group_id_or_name: Union[str, uuid.UUID], domain_name: str
+        self, group_id_or_name: str | uuid.UUID, domain_name: str
     ) -> Optional[tuple[uuid.UUID, int, int, ProjectType]]:
         """
         Get group resource information by group ID or name.

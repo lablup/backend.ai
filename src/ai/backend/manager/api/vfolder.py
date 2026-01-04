@@ -15,9 +15,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Concatenate,
-    Dict,
     ParamSpec,
-    Tuple,
     TypeAlias,
     cast,
 )
@@ -549,7 +547,7 @@ async def fetch_exposed_volume_fields(
     valkey_stat_client: ValkeyStatClient,
     proxy_name: str,
     volume_name: str,
-) -> Dict[str, int | float]:
+) -> dict[str, int | float]:
     volume_usage = {}
 
     show_percentage = ExposedVolumeInfoField.percentage in storage_manager._exposed_volume_info
@@ -2041,7 +2039,7 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     }),
 )
 async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    resp: Dict[str, Any] = {}
+    resp: dict[str, Any] = {}
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     user_uuid = request["user"]["uuid"]
@@ -2385,7 +2383,7 @@ async def list_mounts(request: web.Request) -> web.Response:
         sema: asyncio.Semaphore,
         sess: aiohttp.ClientSession,
         agent_id: str,
-    ) -> Tuple[str, Mapping]:
+    ) -> tuple[str, Mapping]:
         async with sema:
             watcher_info = await get_watcher_info(request, agent_id)
             headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
@@ -2503,7 +2501,7 @@ async def mount_host(request: web.Request, params: Any) -> web.Response:
         sema: asyncio.Semaphore,
         sess: aiohttp.ClientSession,
         agent_id: str,
-    ) -> Tuple[str, Mapping]:
+    ) -> tuple[str, Mapping]:
         async with sema:
             watcher_info = await get_watcher_info(request, agent_id)
             try:
@@ -2631,7 +2629,7 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
         sema: asyncio.Semaphore,
         sess: aiohttp.ClientSession,
         agent_id: str,
-    ) -> Tuple[str, Mapping]:
+    ) -> tuple[str, Mapping]:
         async with sema:
             watcher_info = await get_watcher_info(request, agent_id)
             try:

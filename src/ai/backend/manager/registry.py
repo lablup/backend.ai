@@ -22,13 +22,9 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import (
     Any,
-    Dict,
-    List,
     Literal,
     Optional,
-    Tuple,
     TypeAlias,
-    Union,
     cast,
 )
 
@@ -243,7 +239,7 @@ from .models.utils import (
 from .scheduler.types import AgentAllocationContext, KernelAgentBinding, SchedulingContext
 from .types import UserScope
 
-MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
+MSetType: TypeAlias = Mapping[str | bytes, bytes | float | int | str]
 __all__ = ["AgentRegistry", "InstanceNotFound"]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -462,7 +458,7 @@ class AgentRegistry:
         max_wait_seconds=0,
         priority: int = SESSION_PRIORITY_DEFAULT,
         bootstrap_script: Optional[str] = None,
-        dependencies: Optional[List[uuid.UUID]] = None,
+        dependencies: Optional[list[uuid.UUID]] = None,
         startup_command: Optional[str] = None,
         starts_at_timestamp: Optional[str] = None,
         batch_timeout: Optional[timedelta] = None,
@@ -593,7 +589,7 @@ class AgentRegistry:
                     "Parameter batch_timeout should be used only for batch sessions"
                 )
 
-        starts_at: Union[datetime, None] = None
+        starts_at: datetime | None = None
         if starts_at_timestamp:
             try:
                 starts_at = isoparse(starts_at_timestamp)
@@ -784,7 +780,7 @@ class AgentRegistry:
         if _environ := template["spec"].get("environ"):
             environ = _environ
 
-        kernel_configs: List[KernelEnqueueingConfig] = []
+        kernel_configs: list[KernelEnqueueingConfig] = []
         for node in template["spec"]["nodes"]:
             # Resolve session template.
             kernel_config = {
@@ -1002,7 +998,7 @@ class AgentRegistry:
         network: NetworkRow | None,
     ) -> SessionId:
         """Enqueue session using Sokovan scheduling controller."""
-        kernel_enqueue_configs: List[KernelEnqueueingConfig] = session_enqueue_configs[
+        kernel_enqueue_configs: list[KernelEnqueueingConfig] = session_enqueue_configs[
             "kernel_configs"
         ]
 
@@ -1724,7 +1720,7 @@ class AgentRegistry:
 
         network_name: Optional[str] = None
         network_config: Mapping[str, Any] = {}
-        cluster_ssh_port_mapping: Optional[Dict[str, Tuple[str, int]]] = None
+        cluster_ssh_port_mapping: Optional[dict[str, tuple[str, int]]] = None
         match scheduled_session.network_type:
             case NetworkType.PERSISTENT:
                 async with self.db.begin_readonly_session() as db_sess:
@@ -1912,7 +1908,7 @@ class AgentRegistry:
         slots = ResourceSlot()
         for alloc_map in allocations.values():
             for slot_name, allocation_by_device in alloc_map.items():
-                total_allocs: List[Decimal] = []
+                total_allocs: list[Decimal] = []
                 for allocation in allocation_by_device.values():
                     if (
                         isinstance(allocation, (BinarySize, str))
@@ -2377,7 +2373,7 @@ class AgentRegistry:
             key=keyfunc,
         ):
             rpc_coros = []
-            destroyed_kernels: List[Mapping[str, Any]] = []
+            destroyed_kernels: list[Mapping[str, Any]] = []
             grouped_kernels = [*group_iterator]
             kernel: Mapping[str, Any]
             for kernel in grouped_kernels:
@@ -2723,7 +2719,7 @@ class AgentRegistry:
                         destroyed_kernels.append(kernel)
 
                 async def _destroy_kernels_in_agent(
-                    session: SessionRow, destroyed_kernels: List[KernelRow]
+                    session: SessionRow, destroyed_kernels: list[KernelRow]
                 ) -> None:
                     nonlocal main_stat
                     rpc_coros = []
@@ -2874,7 +2870,7 @@ class AgentRegistry:
 
         async def _restart_kernel(kernel: KernelRow) -> None:
             try:
-                updated_config: Dict[str, Any] = {
+                updated_config: dict[str, Any] = {
                     # TODO: support rescaling of sub-containers
                 }
                 async with self.db.begin_session() as db_sess:
@@ -2938,7 +2934,7 @@ class AgentRegistry:
     async def execute(
         self,
         session: SessionRow,
-        api_version: Tuple[int, str],
+        api_version: tuple[int, str],
         run_id: str,
         mode: str,
         code: str,
@@ -4246,7 +4242,7 @@ async def check_scaling_group(
     session_type: SessionTypes,
     access_key: AccessKey,
     domain_name: str,
-    group_id: Union[uuid.UUID, str],
+    group_id: uuid.UUID | str,
     public_sgroup_only: bool = False,
 ) -> str:
     # Check scaling group availability if scaling_group parameter is given.

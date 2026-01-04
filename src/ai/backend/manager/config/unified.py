@@ -182,7 +182,7 @@ from datetime import UTC, datetime
 from ipaddress import IPv4Network
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal, Optional
 
 from pydantic import (
     AliasChoices,
@@ -2056,7 +2056,7 @@ class ReservoirVFSStorageConfig(BaseConfigSchema):
     )
 
 
-StorageSpecificConfig = Union[ReservoirObjectStorageConfig, ReservoirVFSStorageConfig]
+StorageSpecificConfig = ReservoirObjectStorageConfig | ReservoirVFSStorageConfig
 
 
 class ReservoirConfig(BaseConfigSchema):

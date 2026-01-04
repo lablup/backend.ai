@@ -9,7 +9,7 @@ import socket
 import textwrap
 from collections.abc import Iterable
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Final, FrozenSet, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Final, Optional, cast
 
 import aiohttp_cors
 import attrs
@@ -61,7 +61,7 @@ class SchedulerOps(enum.Enum):
     EXCLUDE_AGENTS = "exclude-agents"
 
 
-def server_status_required(allowed_status: FrozenSet[ManagerStatus]):
+def server_status_required(allowed_status: frozenset[ManagerStatus]):
     def decorator(handler):
         @functools.wraps(handler)
         async def wrapped(request, *args, **kwargs) -> web.StreamResponse:
@@ -449,7 +449,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["api_versions"] = (2, 3, 4)
     app["manager.context"] = PrivateContext()

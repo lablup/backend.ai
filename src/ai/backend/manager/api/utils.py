@@ -23,10 +23,8 @@ from typing import (
     Optional,
     ParamSpec,
     Protocol,
-    Tuple,
     TypeAlias,
     TypeVar,
-    Union,
 )
 
 import sqlalchemy as sa
@@ -69,7 +67,7 @@ def method_placeholder(orig_method):
 
 async def get_access_key_scopes(
     request: web.Request, params: Optional[Any] = None
-) -> Tuple[AccessKey, AccessKey]:
+) -> tuple[AccessKey, AccessKey]:
     if not request["is_authorized"]:
         raise GenericForbidden("Only authorized requests may have access key scopes.")
     root_ctx: RootContext = request.app["_root.context"]
@@ -93,7 +91,7 @@ async def get_access_key_scopes(
 
 async def get_user_uuid_scopes(
     request: web.Request, params: Optional[Any] = None
-) -> Tuple[uuid.UUID, uuid.UUID]:
+) -> tuple[uuid.UUID, uuid.UUID]:
     if not request["is_authorized"]:
         raise GenericForbidden("Only authorized requests may have access key scopes.")
     root_ctx: RootContext = request.app["_root.context"]
@@ -476,7 +474,7 @@ async def call_non_bursty(
     coro: Callable[[], Any],
     *,
     max_bursts: int = 64,
-    max_idle: Union[int, float] = 100.0,
+    max_idle: int | float = 100.0,
 ):
     """
     Execute a coroutine once upon max_bursts bursty invocations or max_idle

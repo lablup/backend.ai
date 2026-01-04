@@ -1,7 +1,7 @@
 import logging
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, FrozenSet, Literal, Optional
+from typing import Any, Literal, Optional
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
@@ -190,7 +190,7 @@ class GPFSVolume(BaseVolume):
             self.fs,
         )
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_FAST_FS_SIZE, CAP_VFOLDER, CAP_QUOTA, CAP_METRIC])
 
     async def get_hwinfo(self) -> HardwareMetadata:

@@ -5,11 +5,7 @@ from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Dict,
-    List,
     Optional,
-    Set,
-    Tuple,
 )
 
 import aiodocker
@@ -71,15 +67,15 @@ class ROCmPlugin(AbstractComputePlugin):
     config_watch_enabled = False
 
     key = DeviceName("rocm")
-    slot_types: Sequence[Tuple[SlotName, SlotTypes]] = (
+    slot_types: Sequence[tuple[SlotName, SlotTypes]] = (
         (SlotName("rocm.device"), SlotTypes("count")),
     )
-    exclusive_slot_types: Set[str] = {"rocm.device"}
+    exclusive_slot_types: set[str] = {"rocm.device"}
 
     device_mask: Sequence[DeviceId] = []
     enabled: bool = True
 
-    _all_devices: Optional[List[ROCmDevice]]
+    _all_devices: Optional[list[ROCmDevice]]
 
     async def init(self, context: Any = None) -> None:
         self._all_devices = None
@@ -117,7 +113,7 @@ class ROCmPlugin(AbstractComputePlugin):
 
         num_devices = libhip.get_device_count()
 
-        devices_by_serial: Dict[str, ROCmDevice] = {}
+        devices_by_serial: dict[str, ROCmDevice] = {}
 
         for dev_id in range(num_devices):
             if dev_id in self.device_mask:
@@ -255,11 +251,11 @@ class ROCmPlugin(AbstractComputePlugin):
         ctx: StatContext,
         container_ids: Sequence[str],
     ) -> Sequence[ContainerMeasurement]:
-        mem_stats: Dict[str, int] = {}
-        mem_sizes: Dict[str, int] = {}
-        util_stats: Dict[str, Decimal] = {}
-        number_of_devices_per_container: Dict[str, int] = {}
-        device_stats_by_device_filename: Dict[str, Dict[str, Any]] = {}
+        mem_stats: dict[str, int] = {}
+        mem_sizes: dict[str, int] = {}
+        util_stats: dict[str, Decimal] = {}
+        number_of_devices_per_container: dict[str, int] = {}
+        device_stats_by_device_filename: dict[str, dict[str, Any]] = {}
         if self.enabled:
             try:
                 for device in await self.list_devices():
@@ -343,7 +339,7 @@ class ROCmPlugin(AbstractComputePlugin):
         self,
         source_path: Path,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         return []
 
     async def get_hooks(self, distro: str, arch: str) -> Sequence[Path]:
@@ -354,7 +350,7 @@ class ROCmPlugin(AbstractComputePlugin):
         docker: aiodocker.Docker,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Mapping[str, Any]:
-        assigned_xcds: List[ROCmXCD] = []
+        assigned_xcds: list[ROCmXCD] = []
         for dev in await self.list_devices():
             if dev.device_id in device_alloc.get(self.slot_types[0][0], {}).keys():
                 assigned_xcds.extend(dev.xcds)
@@ -389,11 +385,11 @@ class ROCmPlugin(AbstractComputePlugin):
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Sequence[DeviceModelInfo]:
-        device_ids: List[DeviceId] = []
+        device_ids: list[DeviceId] = []
         if SlotName("rocm.device") in device_alloc:
             device_ids.extend(device_alloc[SlotName("rocm.device")].keys())
         available_devices = await self.list_devices()
-        attached_devices: List[DeviceModelInfo] = []
+        attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
                 proc = device.processing_units
@@ -452,7 +448,7 @@ class ROCmPlugin(AbstractComputePlugin):
         if not self.enabled:
             return data
 
-        active_device_id_set: Set[DeviceId] = set()
+        active_device_id_set: set[DeviceId] = set()
         for slot_type, per_device_alloc in device_alloc.items():
             for dev_id, alloc in per_device_alloc.items():
                 if alloc > 0:
@@ -466,7 +462,7 @@ class ROCmPlugin(AbstractComputePlugin):
     async def cleanup(self) -> None:
         librocm_smi.shutdown()
 
-    async def list_additional_gids(self) -> List[int]:
+    async def list_additional_gids(self) -> list[int]:
         return [44, 109]
 
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
@@ -475,7 +471,7 @@ class ROCmPlugin(AbstractComputePlugin):
     async def get_docker_networks(
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
-    ) -> List[str]:
+    ) -> list[str]:
         return []
 
     async def gather_process_measures(

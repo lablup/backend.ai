@@ -4,7 +4,7 @@ import logging
 import os
 from collections.abc import AsyncIterator, Iterable
 from http import HTTPStatus
-from typing import Optional, Tuple, cast, override
+from typing import Optional, cast, override
 
 import aiohttp_cors
 from aiohttp import ClientResponse, web
@@ -257,7 +257,7 @@ class APIHandler:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     """Initialize VFS storage API handlers."""
     app = web.Application()
     app["api_versions"] = (1, 2, 3, 4, 5)

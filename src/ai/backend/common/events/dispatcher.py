@@ -13,10 +13,8 @@ from typing import (
     Generic,
     Optional,
     Protocol,
-    Type,
     TypedDict,
     TypeVar,
-    Union,
     cast,
     override,
 )
@@ -66,10 +64,10 @@ TConsumedEvent = TypeVar("TConsumedEvent", bound=AbstractAnycastEvent)
 TEventCov = TypeVar("TEventCov", bound="AbstractEvent")
 TContext = TypeVar("TContext")
 
-EventCallback = Union[
-    Callable[[TContext, AgentId, TEvent], Coroutine[Any, Any, None]],
-    Callable[[TContext, AgentId, TEvent], None],
-]
+EventCallback = (
+    Callable[[TContext, AgentId, TEvent], Coroutine[Any, Any, None]]
+    | Callable[[TContext, AgentId, TEvent], None]
+)
 
 
 class EventHandlerType(enum.Enum):
@@ -79,7 +77,7 @@ class EventHandlerType(enum.Enum):
 
 @attrs.define(auto_attribs=True, slots=True, frozen=True, eq=False, order=False)
 class EventHandler(Generic[TContext, TEvent]):
-    event_cls: Type[TEvent]
+    event_cls: type[TEvent]
     name: str
     context: TContext
     callback: EventCallback[TContext, TEvent]
@@ -211,7 +209,7 @@ class EventDispatcherGroup(ABC):
     @abstractmethod
     def consume(
         self,
-        event_cls: Type[TConsumedEvent],
+        event_cls: type[TConsumedEvent],
         context: TContext,
         callback: EventCallback[TContext, TConsumedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
@@ -224,7 +222,7 @@ class EventDispatcherGroup(ABC):
     @abstractmethod
     def subscribe(
         self,
-        event_cls: Type[TSubscirbedEvent],
+        event_cls: type[TSubscirbedEvent],
         context: TContext,
         callback: EventCallback[TContext, TSubscirbedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
@@ -267,7 +265,7 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
     @override
     def consume(
         self,
-        event_cls: Type[TConsumedEvent],
+        event_cls: type[TConsumedEvent],
         context: TContext,
         callback: EventCallback[TContext, TConsumedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
@@ -289,7 +287,7 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
     @override
     def subscribe(
         self,
-        event_cls: Type[TSubscirbedEvent],
+        event_cls: type[TSubscirbedEvent],
         context: TContext,
         callback: EventCallback[TContext, TSubscirbedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
@@ -405,7 +403,7 @@ class EventDispatcher(EventDispatcherGroup):
     @override
     def consume(
         self,
-        event_cls: Type[TConsumedEvent],
+        event_cls: type[TConsumedEvent],
         context: TContext,
         callback: EventCallback[TContext, TConsumedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
@@ -452,7 +450,7 @@ class EventDispatcher(EventDispatcherGroup):
     @override
     def subscribe(
         self,
-        event_cls: Type[TSubscirbedEvent],
+        event_cls: type[TSubscirbedEvent],
         context: TContext,
         callback: EventCallback[TContext, TSubscirbedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,

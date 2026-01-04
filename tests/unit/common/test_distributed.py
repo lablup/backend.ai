@@ -5,11 +5,12 @@ import random
 import tempfile
 import threading
 import time
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable, Iterable, List, Literal, Optional, Tuple
+from typing import Any, Literal, Optional
 
 import aiotools
 import pytest
@@ -102,7 +103,7 @@ EVENT_DISPATCHER_CONSUMER_GROUP = "test"
 async def run_timer(
     lock_factory: Callable[[], AbstractDistributedLock],
     stop_event: asyncio.Event,
-    event_records: List[float],
+    event_records: list[float],
     redis_addr: HostPortPair,
     test_case_ns: str,
     interval: int | float,
@@ -329,13 +330,13 @@ async def test_global_timer_filelock(
     request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
     lock_factory = lambda: FileLock(lock_path, timeout=0, debug=True)
 
-    event_records: List[float] = []
+    event_records: list[float] = []
     num_threads = 7
     num_records = 0
     delay = 3.0
     interval = 0.5
     target_count = delay / interval
-    threads: List[TimerNode] = []
+    threads: list[TimerNode] = []
     stream_key = f"{test_case_ns}-stream-{random.randint(0, 1000)}"
     group_name = f"test-group-{random.randint(0, 1000)}"
     for thread_idx in range(num_threads):
@@ -386,13 +387,13 @@ async def test_global_timer_redlock(
     )
     lock_factory = lambda: RedisLock(f"{test_case_ns}lock", r, debug=True)
 
-    event_records: List[float] = []
+    event_records: list[float] = []
     num_threads = 7
     num_records = 0
     delay = 3.0
     interval = 0.5
     target_count = delay / interval
-    tasks: List[Tuple[asyncio.Task, asyncio.Event]] = []
+    tasks: list[tuple[asyncio.Task, asyncio.Event]] = []
     for thread_idx in range(num_threads):
         stop_event = asyncio.Event()
         task = asyncio.create_task(

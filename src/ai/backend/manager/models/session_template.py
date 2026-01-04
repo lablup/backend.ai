@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 import sqlalchemy as sa
 import trafaret as t
@@ -124,7 +124,7 @@ cluster_template_v1 = t.Dict({
 
 def check_cluster_template(raw_data: Mapping[str, Any]) -> Mapping[str, Any]:
     data = cluster_template_v1.check(raw_data)
-    defined_roles: List[str] = []
+    defined_roles: list[str] = []
     for node in data["spec"]["nodes"]:
         node["session_template"] = str(node["session_template"])
         if node["role"] in defined_roles:
@@ -150,12 +150,12 @@ async def query_accessible_session_templates(
     domain_name: Optional[str] = None,
     allowed_types: Iterable[str] = ["user"],
     extra_conds=None,
-) -> List[Mapping[str, Any]]:
+) -> list[Mapping[str, Any]]:
     from .group import association_groups_users as agus
     from .group import groups
     from .user import users
 
-    entries: List[Mapping[str, Any]] = []
+    entries: list[Mapping[str, Any]] = []
     if "user" in allowed_types:
         # Query user templates
         j = session_templates.join(users, session_templates.c.user_uuid == users.c.uuid)

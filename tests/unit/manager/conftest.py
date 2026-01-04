@@ -12,23 +12,13 @@ import shutil
 import tempfile
 import textwrap
 import uuid
+from collections.abc import AsyncIterator, Callable, Iterator, Mapping, Sequence
+from contextlib import AbstractAsyncContextManager
 from datetime import datetime
 from decimal import Decimal
 from functools import partial, update_wrapper
 from pathlib import Path
-from typing import (
-    Any,
-    AsyncContextManager,
-    AsyncIterator,
-    Callable,
-    Iterator,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-)
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import aiofiles.os
@@ -730,23 +720,23 @@ async def create_app_and_client(bootstrap_config) -> AsyncIterator:
     client: Client | None = None
     client_session: aiohttp.ClientSession | None = None
     runner: web.BaseRunner | None = None
-    _outer_ctxs: List[AsyncContextManager] = []
+    _outer_ctxs: list[AbstractAsyncContextManager] = []
 
     async def app_builder(
-        cleanup_contexts: Optional[Sequence[CleanupContext]] = None,
-        subapp_pkgs: Optional[Sequence[str]] = None,
-        scheduler_opts: Optional[Mapping[str, Any]] = None,
-    ) -> Tuple[web.Application, Client]:
+        cleanup_contexts: Sequence[CleanupContext] | None = None,
+        subapp_pkgs: Sequence[str] | None = None,
+        scheduler_opts: Mapping[str, Any] | None = None,
+    ) -> tuple[web.Application, Client]:
         nonlocal client, client_session, runner
         nonlocal _outer_ctxs
 
         if scheduler_opts is None:
             scheduler_opts = {}
         _cleanup_ctxs = []
-        _outer_ctx_classes: List[Type[AsyncContextManager]] = []
+        _outer_ctx_classes: list[type[AbstractAsyncContextManager]] = []
         if cleanup_contexts is not None:
             for ctx in cleanup_contexts:
-                # if isinstance(ctx, AsyncContextManager):
+                # if isinstance(ctx, AbstractAsyncContextManager):
                 if ctx.__name__ in ["webapp_plugins_ctx"]:
                     _outer_ctx_classes.append(ctx)  # type: ignore
                 else:

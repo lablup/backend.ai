@@ -1,10 +1,9 @@
 import ipaddress
 from pathlib import Path
-from typing import Optional, Union
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
-Numeric = Union[int, float]
+Numeric = int | float
 
 
 def ask_host(prompt: str, default: str = "127.0.0.1", allow_hostname=False) -> str:
@@ -62,7 +61,7 @@ def ask_string(prompt: str, default: str = "", use_default: bool = True) -> str:
         return input(f"{prompt} (if you don't want, just leave empty): ")
 
 
-def ask_string_in_array(prompt: str, choices: list, default: str) -> Optional[str]:
+def ask_string_in_array(prompt: str, choices: list, default: str) -> str | None:
     if default and default not in choices:
         print("Default value should be in choices args.")
         return None

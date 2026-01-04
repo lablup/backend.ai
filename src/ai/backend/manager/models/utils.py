@@ -13,7 +13,6 @@ from typing import (
     Concatenate,
     Optional,
     ParamSpec,
-    Tuple,
     TypeAlias,
     TypeVar,
     cast,
@@ -535,7 +534,7 @@ JSONCoalesceExpr: TypeAlias = sa.sql.elements.BinaryExpression
 
 def sql_json_merge(
     col,
-    key: Tuple[str, ...],
+    key: tuple[str, ...],
     obj: Mapping[str, Any],
     *,
     _depth: int = 0,
@@ -570,7 +569,7 @@ def sql_json_merge(
 
 def sql_json_increment(
     col,
-    key: Tuple[str, ...],
+    key: tuple[str, ...],
     *,
     parent_updates: Optional[Mapping[str, Any]] = None,
     _depth: int = 0,

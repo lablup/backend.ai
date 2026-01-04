@@ -10,7 +10,6 @@ from contextvars import ContextVar
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
     Final,
     Optional,
     cast,
@@ -54,7 +53,7 @@ concurrency_sema: ContextVar[asyncio.Semaphore] = ContextVar("concurrency_sema")
 progress_reporter: ContextVar[Optional[ProgressReporter]] = ContextVar(
     "progress_reporter", default=None
 )
-all_updates: ContextVar[Dict[ImageIdentifier, Dict[str, Any]]] = ContextVar("all_updates")
+all_updates: ContextVar[dict[ImageIdentifier, dict[str, Any]]] = ContextVar("all_updates")
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -66,8 +65,8 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     registry_info: ContainerRegistryRow
     registry_url: yarl.URL
     max_concurrency_per_registry: int
-    base_hdrs: Dict[str, str]
-    credentials: Dict[str, str]
+    base_hdrs: dict[str, str]
+    credentials: dict[str, str]
     ssl_verify: bool
 
     MEDIA_TYPE_OCI_INDEX: Final[str] = "application/vnd.oci.image.index.v1+json"

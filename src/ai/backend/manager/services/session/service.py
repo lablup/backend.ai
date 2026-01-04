@@ -7,7 +7,7 @@ import uuid
 from collections.abc import Mapping, MutableMapping
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 from urllib.parse import urlparse
 
 import aiohttp
@@ -1295,7 +1295,7 @@ class SessionService:
             )
         )
 
-        opts: MutableMapping[str, Union[None, str, list[str]]] = {}
+        opts: MutableMapping[str, None | str | list[str]] = {}
         if arguments is not None:
             opts["arguments"] = load_json(arguments)
         if envs is not None:

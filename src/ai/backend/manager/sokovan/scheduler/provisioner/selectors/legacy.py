@@ -8,7 +8,6 @@ with fewer unutilized capabilities.
 import sys
 from collections.abc import Sequence
 from decimal import Decimal
-from typing import Union
 
 from .selector import (
     AbstractAgentSelector,
@@ -62,7 +61,7 @@ class LegacyAgentSelector(AbstractAgentSelector):
         )
 
         # Choose the best tracker
-        def tracker_sort_key(tracker: AgentStateTracker) -> list[Union[int, Decimal]]:
+        def tracker_sort_key(tracker: AgentStateTracker) -> list[int | Decimal]:
             occupied_slots = tracker.get_current_occupied_slots()
             return [
                 -count_unutilized_capabilities(

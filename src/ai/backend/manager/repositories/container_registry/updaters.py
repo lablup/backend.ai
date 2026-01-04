@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, override
@@ -20,7 +21,7 @@ from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
 if TYPE_CHECKING:
-    import typing
+    pass
 
 
 async def handle_allowed_groups_update(
@@ -96,7 +97,7 @@ class ContainerRegistryUpdaterSpec(UpdaterSpec[ContainerRegistryRow]):
 
     @property
     @override
-    def row_class(self) -> typing.Type[ContainerRegistryRow]:  # type: ignore[name-defined]
+    def row_class(self) -> builtins.type[ContainerRegistryRow]:  # type: ignore[name-defined]
         return ContainerRegistryRow
 
     @override

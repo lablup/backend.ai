@@ -3,7 +3,7 @@ import json
 import logging
 import uuid
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Dict, List, Tuple
+from typing import TYPE_CHECKING, Any
 
 import aiohttp_cors
 import sqlalchemy as sa
@@ -108,7 +108,7 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
     log.info("SESSION_TEMPLATE.LIST (ak:{})", access_key)
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin() as conn:
-        entries: List[Mapping[str, Any]]
+        entries: list[Mapping[str, Any]]
         j = session_templates.join(
             users, session_templates.c.user_uuid == users.c.uuid, isouter=True
         ).join(groups, session_templates.c.group_id == groups.c.id, isouter=True)
@@ -170,7 +170,7 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
 async def get(request: web.Request, params: Any) -> web.Response:
     if params["format"] not in ["yaml", "json"]:
         raise InvalidAPIParameters('format should be "yaml" or "json"')
-    resp: Dict[str, Any] = {}
+    resp: dict[str, Any] = {}
     domain_name = request["user"]["domain_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
     log.info(
@@ -327,7 +327,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)

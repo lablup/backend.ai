@@ -3,7 +3,7 @@ import json
 import shlex
 import sys
 from collections.abc import MutableMapping, Sequence
-from typing import Dict, List, Optional, Union
+from typing import Optional
 
 import aiohttp
 import click
@@ -35,7 +35,7 @@ class WSProxy:
         api_session: AsyncSession,
         session_name: str,
         app_name: str,
-        args: MutableMapping[str, Union[None, str, List[str]]],
+        args: MutableMapping[str, None | str | list[str]],
         envs: MutableMapping[str, str],
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
@@ -135,8 +135,8 @@ class ProxyRunnerContext:
     protocol: str
     host: str
     port: int
-    args: Dict[str, Union[None, str, List[str]]]
-    envs: Dict[str, str]
+    args: dict[str, None | str | list[str]]
+    envs: dict[str, str]
     api_session: Optional[AsyncSession]
     local_server: Optional[asyncio.AbstractServer]
     exit_code: int

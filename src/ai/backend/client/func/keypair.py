@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Any, Dict
+from typing import Any
 
 from ai.backend.cli.types import Undefined, undefined
 from ai.backend.client.output.fields import keypair_fields
@@ -169,7 +169,7 @@ class KeyPair(BaseFunction):
                 % uid_type
             )
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
-        variables: Dict[str, Any] = {
+        variables: dict[str, Any] = {
             "is_active": is_active,
         }
         if user_id is not None:

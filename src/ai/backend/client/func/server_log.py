@@ -1,5 +1,4 @@
 from collections.abc import Mapping, Sequence
-from typing import Union
 
 from ai.backend.client.request import Request
 
@@ -29,7 +28,7 @@ class ServerLog(BaseFunction):
         :param page_size: Number of logs to fetch (from latest log).
         :param page_no: Page number to fetch.
         """
-        params: Mapping[str, Union[str, int]] = {
+        params: Mapping[str, str | int] = {
             "mark_read": str(mark_read),
             "page_size": page_size,
             "page_no": page_no,

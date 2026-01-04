@@ -1,6 +1,6 @@
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from http import HTTPStatus
-from typing import Mapping, Optional, Union
+from typing import Optional
 from unittest import mock
 from uuid import UUID
 
@@ -14,7 +14,7 @@ from ai.backend.testutils.mock import AsyncMock
 
 
 def build_url(
-    config: APIConfig, path: str, params: Optional[Mapping[str, Union[str, int]]] = None
+    config: APIConfig, path: str, params: Optional[Mapping[str, str | int]] = None
 ) -> URL:
     base_url = config.endpoint.path.rstrip("/")
     query_path = path.lstrip("/") if len(path) > 0 else ""

@@ -1,7 +1,8 @@
 import asyncio
 import functools
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
-from typing import Any, Callable, Iterator, Mapping, Optional, Type, overload
+from typing import Any, Optional, overload
 from unittest.mock import AsyncMock
 
 import pytest
@@ -37,7 +38,7 @@ class DummyPlugin(AbstractPlugin):
 @dataclass
 class DummyEntrypoint:
     name: str
-    load_result: Type[AbstractPlugin] | Callable[..., AbstractPlugin]
+    load_result: type[AbstractPlugin] | Callable[..., AbstractPlugin]
     value: str = "dummy.mod.DummyPlugin"
     group: str = "dummy_group_v00"
 
@@ -67,7 +68,7 @@ def mock_entrypoints_with_class(
     allowlist: Optional[set[str]] = None,
     blocklist: Optional[set[str]] = None,
     *,
-    plugin_cls: list[Type[AbstractPlugin]],
+    plugin_cls: list[type[AbstractPlugin]],
 ) -> Iterator[DummyEntrypoint]: ...
 
 
@@ -77,7 +78,7 @@ def mock_entrypoints_with_class(
     allowlist: Optional[set[str]] = None,
     blocklist: Optional[set[str]] = None,
     *,
-    plugin_cls: Type[AbstractPlugin],
+    plugin_cls: type[AbstractPlugin],
 ) -> DummyEntrypoint: ...
 
 

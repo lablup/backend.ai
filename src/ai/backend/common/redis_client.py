@@ -2,7 +2,8 @@ import asyncio
 import logging
 import socket
 from collections.abc import AsyncIterator, Sequence
-from typing import Any, AsyncContextManager, Final, Optional
+from contextlib import AbstractAsyncContextManager
+from typing import Any, Final, Optional
 
 import hiredis
 
@@ -207,7 +208,7 @@ class RedisClient(aobject):
                 await asyncio.sleep(0)
 
 
-class RedisConnection(AsyncContextManager[RedisClient]):
+class RedisConnection(AbstractAsyncContextManager[RedisClient]):
     _redis_target: RedisTarget
     _db: int
 

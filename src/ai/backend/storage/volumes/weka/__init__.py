@@ -6,7 +6,7 @@ import os
 from collections.abc import Mapping
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, FrozenSet, Optional
+from typing import Any, Optional
 
 import aiofiles.os
 
@@ -162,7 +162,7 @@ class WekaVolume(BaseVolume):
     async def create_quota_model(self) -> AbstractQuotaModel:
         return WekaQuotaModel(self.mount_path, self._fs_uid, self.api_client)
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_METRIC, CAP_FAST_FS_SIZE])
 
     async def get_hwinfo(self) -> HardwareMetadata:

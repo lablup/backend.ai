@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from ai.backend.client.request import Request
 from ai.backend.client.session import api_session
@@ -39,7 +39,7 @@ class SessionTemplate(BaseFunction):
 
     @api_function
     @classmethod
-    async def list_templates(cls, list_all: bool = False) -> List[Mapping[str, str]]:
+    async def list_templates(cls, list_all: bool = False) -> list[Mapping[str, str]]:
         rqst = Request("GET", "/template/session")
         rqst.set_json({"all": list_all})
         async with rqst.fetch() as resp:

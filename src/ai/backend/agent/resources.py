@@ -24,7 +24,6 @@ from typing import (
     Any,
     Optional,
     TextIO,
-    Type,
     TypeAlias,
     cast,
 )
@@ -704,7 +703,7 @@ class ResourceAllocator(aobject):
         slot_name: SlotName,
         agent_idx: int,
         agent_config: AgentUnifiedConfig,
-        alloc_map_type: Type[AbstractAllocMap],
+        alloc_map_type: type[AbstractAllocMap],
     ) -> Decimal:
         match agent_config.resource.allocation_mode:
             case ResourceAllocationMode.SHARED:
@@ -720,7 +719,7 @@ class ResourceAllocator(aobject):
     def _calculate_device_slot_auto_split(
         self,
         slot_name: SlotName,
-        alloc_map_type: Type[AbstractAllocMap],
+        alloc_map_type: type[AbstractAllocMap],
         agent_idx: int,
     ) -> Decimal:
         available_total_slot = self.available_total_slots[slot_name]
@@ -825,7 +824,7 @@ class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
         plugin_group: str,
         allowlist: Optional[set[str]] = None,
         blocklist: Optional[set[str]] = None,
-    ) -> Iterator[tuple[str, Type[AbstractComputePlugin]]]:
+    ) -> Iterator[tuple[str, type[AbstractComputePlugin]]]:
         scanned_plugins = [*super().discover_plugins(plugin_group, allowlist, blocklist)]
 
         def accel_lt_intrinsic(item):

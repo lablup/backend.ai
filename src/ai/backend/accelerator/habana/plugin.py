@@ -6,12 +6,8 @@ from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Dict,
     Generic,
-    List,
     Optional,
-    Set,
-    Tuple,
     TypeVar,
 )
 
@@ -77,17 +73,17 @@ class AbstractGaudiPlugin(AbstractComputePlugin, Generic[TDevice], metaclass=ABC
     config_watch_enabled = False
 
     key = DeviceName("gaudi")
-    slot_types: Sequence[Tuple[SlotName, SlotTypes]] = (
+    slot_types: Sequence[tuple[SlotName, SlotTypes]] = (
         (SlotName("gaudi.device"), SlotTypes("count")),
     )
-    exclusive_slot_types: Set[str] = {"gaudi.device"}
+    exclusive_slot_types: set[str] = {"gaudi.device"}
 
     device_mask: Sequence[DeviceId] = []
     enabled: bool = True
 
     gaudi_config: Mapping[str, Any]
 
-    _all_devices: Optional[List[TDevice]]
+    _all_devices: Optional[list[TDevice]]
 
     _driver_version: str
 
@@ -126,7 +122,7 @@ class AbstractGaudiPlugin(AbstractComputePlugin, Generic[TDevice], metaclass=ABC
     async def prepare_networks(self) -> None:
         self.subnet_network_map = {}
         docker_network_identifiers = self.gaudi_config["docker-networks"]
-        network_map: Dict[str, Any] = {}
+        network_map: dict[str, Any] = {}
         async with aiodocker.Docker() as docker:
             networks = await docker.networks.list()
             for network in networks:
@@ -212,11 +208,11 @@ class AbstractGaudiPlugin(AbstractComputePlugin, Generic[TDevice], metaclass=ABC
         ctx: StatContext,
         container_ids: Sequence[str],
     ) -> Sequence[ContainerMeasurement]:
-        mem_stats: Dict[str, int] = {}
-        mem_sizes: Dict[str, int] = {}
-        util_stats: Dict[str, Decimal] = {}
-        number_of_devices_per_container: Dict[str, int] = {}
-        device_stats_by_device_filename: Dict[str, Dict[str, Any]] = {}
+        mem_stats: dict[str, int] = {}
+        mem_sizes: dict[str, int] = {}
+        util_stats: dict[str, Decimal] = {}
+        number_of_devices_per_container: dict[str, int] = {}
+        device_stats_by_device_filename: dict[str, dict[str, Any]] = {}
         if self.enabled:
             try:
                 for device in await self.list_devices():
@@ -298,7 +294,7 @@ class AbstractGaudiPlugin(AbstractComputePlugin, Generic[TDevice], metaclass=ABC
         self,
         source_path: Path,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         return []
 
     async def get_hooks(self, distro: str, arch: str) -> Sequence[Path]:
@@ -309,7 +305,7 @@ class AbstractGaudiPlugin(AbstractComputePlugin, Generic[TDevice], metaclass=ABC
         docker: aiodocker.Docker,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Mapping[str, Any]:
-        assigned_devices: List[str] = []
+        assigned_devices: list[str] = []
         for idx, dev in enumerate(await self.list_devices()):
             if dev.device_id in device_alloc.get(self.slot_types[0][0], {}).keys():
                 assigned_devices.append(f"/dev/accel/accel{idx}")
@@ -336,11 +332,11 @@ class AbstractGaudiPlugin(AbstractComputePlugin, Generic[TDevice], metaclass=ABC
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Sequence[DeviceModelInfo]:
-        device_ids: List[DeviceId] = []
+        device_ids: list[DeviceId] = []
         if self.slot_types[0][0] in device_alloc:
             device_ids.extend(device_alloc[self.slot_types[0][0]].keys())
         available_devices = await self.list_devices()
-        attached_devices: List[DeviceModelInfo] = []
+        attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
                 proc = device.processing_units
@@ -399,7 +395,7 @@ class AbstractGaudiPlugin(AbstractComputePlugin, Generic[TDevice], metaclass=ABC
         if not self.enabled:
             return data
 
-        active_device_id_set: Set[DeviceId] = set()
+        active_device_id_set: set[DeviceId] = set()
         for slot_type, per_device_alloc in device_alloc.items():
             for dev_id, alloc in per_device_alloc.items():
                 if alloc > 0:
@@ -413,7 +409,7 @@ class AbstractGaudiPlugin(AbstractComputePlugin, Generic[TDevice], metaclass=ABC
     async def cleanup(self) -> None:
         pyhlml.hlmlShutdown()
 
-    async def list_additional_gids(self) -> List[int]:
+    async def list_additional_gids(self) -> list[int]:
         return [44, 109]
 
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
@@ -422,7 +418,7 @@ class AbstractGaudiPlugin(AbstractComputePlugin, Generic[TDevice], metaclass=ABC
     async def get_docker_networks(
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
-    ) -> List[str]:
+    ) -> list[str]:
         return self.gaudi_config["docker-networks"]
 
     async def gather_process_measures(

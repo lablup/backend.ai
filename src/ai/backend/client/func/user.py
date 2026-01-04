@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any, Union
+from typing import Any
 
 from ai.backend.cli.types import Undefined, undefined
 from ai.backend.client.auth import AuthTokenTypes
@@ -218,7 +218,7 @@ class User(BaseFunction):
     @classmethod
     async def detail_by_uuid(
         cls,
-        user_uuid: Union[str, uuid.UUID] | None = None,
+        user_uuid: str | uuid.UUID | None = None,
         fields: Sequence[FieldSpec] = _default_detail_fields,
     ) -> Sequence[dict]:
         """

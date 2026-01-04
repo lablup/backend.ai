@@ -18,11 +18,9 @@ from typing import (
     Any,
     ClassVar,
     Final,
-    List,
     NamedTuple,
     Optional,
     Self,
-    Type,
     TypedDict,
     cast,
     override,
@@ -728,7 +726,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
     ).allow_extra("*")
 
     idle_timeout: timedelta
-    _evhandlers: List[EventHandler[None, AbstractEvent]]
+    _evhandlers: list[EventHandler[None, AbstractEvent]]
 
     @override
     def terminate_reason(self) -> KernelLifecycleEventReason:
@@ -959,7 +957,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
     thresholds_check_operator: ThresholdOperator
     time_window: timedelta
     initial_grace_period: timedelta
-    _evhandlers: List[EventHandler[None, AbstractEvent]]
+    _evhandlers: list[EventHandler[None, AbstractEvent]]
 
     @override
     def terminate_reason(self) -> KernelLifecycleEventReason:
@@ -1270,7 +1268,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         return msgpack.unpackb(data) if data is not None else None
 
 
-checker_registry: Mapping[str, Type[BaseIdleChecker]] = {
+checker_registry: Mapping[str, type[BaseIdleChecker]] = {
     NetworkTimeoutIdleChecker.name: NetworkTimeoutIdleChecker,
     UtilizationIdleChecker.name: UtilizationIdleChecker,
 }

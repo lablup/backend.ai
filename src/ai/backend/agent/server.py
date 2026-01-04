@@ -29,7 +29,6 @@ from typing import (
     ClassVar,
     Literal,
     Optional,
-    Set,
     cast,
 )
 from uuid import UUID
@@ -163,7 +162,7 @@ def collect_error(meth: Callable) -> Callable:
 
 
 class RPCFunctionRegistry:
-    functions: Set[str]
+    functions: set[str]
     _metric_observer: RPCMetricObserver
 
     def __init__(self) -> None:
@@ -200,7 +199,7 @@ class RPCFunctionRegistry:
 
 
 class RPCFunctionRegistryV2:
-    functions: Set[str]
+    functions: set[str]
     _metric_observer: RPCMetricObserver
 
     def __init__(self) -> None:

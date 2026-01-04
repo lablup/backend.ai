@@ -1,13 +1,12 @@
 import json
 from contextlib import closing
-from typing import Tuple
 
 from ai.backend.test.cli_integration.conftest import KeypairOption, User
 from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
 def test_add_keypair(
-    run_admin: ClientRunnerFunc, users: Tuple[User], keypair_options: Tuple[KeypairOption]
+    run_admin: ClientRunnerFunc, users: tuple[User], keypair_options: tuple[KeypairOption]
 ):
     """
     Test add keypair.
@@ -113,7 +112,7 @@ def test_add_keypair(
 
 
 def test_update_keypair(
-    run_admin: ClientRunnerFunc, users: Tuple[User], new_keypair_options: Tuple[KeypairOption]
+    run_admin: ClientRunnerFunc, users: tuple[User], new_keypair_options: tuple[KeypairOption]
 ):
     """
     Test update keypair.
@@ -177,7 +176,7 @@ def test_update_keypair(
         )
 
 
-def test_delete_keypair(run_admin: ClientRunnerFunc, users: Tuple[User]):
+def test_delete_keypair(run_admin: ClientRunnerFunc, users: tuple[User]):
     """
     Test delete keypair.
     This test must be executed after test_add_keypair.

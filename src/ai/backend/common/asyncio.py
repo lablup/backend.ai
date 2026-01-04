@@ -3,12 +3,10 @@ from __future__ import annotations
 import asyncio
 import inspect
 from collections.abc import Awaitable, Callable, Collection, Sequence
+from contextlib import AbstractAsyncContextManager
 from typing import (
     Any,
-    AsyncContextManager,
     Protocol,
-    Tuple,
-    Type,
     TypeVar,
     cast,
 )
@@ -62,7 +60,7 @@ else:
 
 async def run_through(
     *awaitable_or_callables: Callable[[], None] | Awaitable[None],
-    ignored_exceptions: Tuple[Type[Exception], ...],
+    ignored_exceptions: tuple[type[Exception], ...],
 ) -> None:
     """
     A syntactic sugar to simplify the code patterns like:
@@ -102,7 +100,7 @@ async def run_through(
             else:
                 f()  # type: ignore
         except Exception as e:
-            if isinstance(e, cast(Tuple[Any, ...], ignored_exceptions)):
+            if isinstance(e, cast(tuple[Any, ...], ignored_exceptions)):
                 continue
             raise
 
@@ -142,7 +140,7 @@ class SupportsAsyncClose(Protocol):
 _SupportsAsyncCloseT = TypeVar("_SupportsAsyncCloseT", bound=SupportsAsyncClose)
 
 
-class closing_async(AsyncContextManager[_SupportsAsyncCloseT]):
+class closing_async(AbstractAsyncContextManager[_SupportsAsyncCloseT]):
     """
     contextlib.closing calls close(), and aiotools.aclosing() calls aclose().
     This context manager calls close() as a coroutine.

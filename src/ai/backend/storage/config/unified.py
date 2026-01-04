@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import os
 from pathlib import Path, PurePath
-from typing import Any, Literal, Optional, Self, Union
+from typing import Any, Literal, Optional, Self
 
 from pydantic import (
     AliasChoices,
@@ -1003,7 +1003,7 @@ class ArtifactRegistryStorageConfig(BaseConfigSchema):
         return self
 
 
-LegacyRegistrySpecificConfig = Union[LegacyHuggingfaceConfig, LegacyReservoirConfig]
+LegacyRegistrySpecificConfig = LegacyHuggingfaceConfig | LegacyReservoirConfig
 
 
 class LegacyArtifactRegistryConfig(BaseConfigSchema):

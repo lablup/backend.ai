@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    List,
     Optional,
     Self,
     TypeAlias,
@@ -521,7 +520,7 @@ class EndpointRow(Base):
             load_routes=True,
             load_tokens=True,
         )
-        session_ids: List[UUID] = []
+        session_ids: list[UUID] = []
         for row in endpoint_rows:
             row.session_owner = target_user_uuid
             for token_row in cast(list[EndpointTokenRow], row.tokens):

@@ -21,16 +21,10 @@ from collections.abc import (
 from dataclasses import dataclass
 from typing import (
     Any,
-    Dict,
-    FrozenSet,
-    List,
     Literal,
     NotRequired,
     Optional,
-    Set,
-    Tuple,
     TypedDict,
-    Union,
     cast,
     overload,
 )
@@ -92,7 +86,7 @@ ConsoleItemType = Literal[
     "log",
     "completion",
 ]
-outgoing_msg_types: FrozenSet[ConsoleItemType] = frozenset([
+outgoing_msg_types: frozenset[ConsoleItemType] = frozenset([
     "stdout",
     "stderr",
     "media",
@@ -100,17 +94,17 @@ outgoing_msg_types: FrozenSet[ConsoleItemType] = frozenset([
     "log",
     "completion",
 ])
-ResultType = Union[
-    ConsoleItemType,
-    Literal[
+ResultType = (
+    ConsoleItemType
+    | Literal[
         "continued",
         "clean-finished",
         "build-finished",
         "finished",
         "exec-timeout",
         "waiting-input",
-    ],
-]
+    ]
+)
 
 
 class ClientFeatures(StringSetFlag):
@@ -190,8 +184,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     container_id: Optional[str]
     image: ImageRef
     resource_spec: KernelResourceSpec
-    service_ports: List[ServicePort]
-    data: Dict[Any, Any]
+    service_ports: list[ServicePort]
+    data: dict[Any, Any]
     last_used: float
     termination_reason: Optional[KernelLifecycleEventReason]
     clean_event: Optional[asyncio.Future]
@@ -200,7 +194,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     state: KernelLifecycleStatus
     session_type: SessionTypes
 
-    _tasks: Set[asyncio.Task]
+    _tasks: set[asyncio.Task]
 
     runner: Optional[AbstractCodeRunner]
 
@@ -214,7 +208,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         agent_config: Mapping[str, Any],
         resource_spec: KernelResourceSpec,
         service_ports: Any,  # TODO: type-annotation
-        data: Dict[Any, Any],
+        data: dict[Any, Any],
         environ: Mapping[str, Any],
         session_type: SessionTypes = SessionTypes.INTERACTIVE,
     ) -> None:
@@ -315,7 +309,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self,
         event_producer: EventProducer,
         *,
-        client_features: FrozenSet[str],
+        client_features: frozenset[str],
         api_version: int,
     ) -> AbstractCodeRunner:
         raise NotImplementedError
@@ -660,7 +654,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     finished_at: Optional[float]
     exec_timeout: float
     max_record_size: int
-    client_features: FrozenSet[str]
+    client_features: frozenset[str]
 
     event_producer: EventProducer
 
@@ -674,7 +668,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     _is_socket_invalid: bool
     output_queue: Optional[asyncio.Queue[ResultRecord]]
     current_run_id: Optional[str]
-    pending_queues: OrderedDict[str, Tuple[asyncio.Event, asyncio.Queue[ResultRecord]]]
+    pending_queues: OrderedDict[str, tuple[asyncio.Event, asyncio.Queue[ResultRecord]]]
 
     read_task: Optional[asyncio.Task]
     status_task: Optional[asyncio.Task]
@@ -689,7 +683,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         event_producer: EventProducer,
         *,
         exec_timeout: float = 0,
-        client_features: Optional[FrozenSet[str]] = None,
+        client_features: Optional[frozenset[str]] = None,
     ) -> None:
         global _zctx
         self.kernel_id = kernel_id
@@ -1015,7 +1009,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             result["html"] = html_items
 
         elif api_ver >= 2:
-            console_items: List[Tuple[ConsoleItemType, Union[str, Tuple[str, str]]]] = []
+            console_items: list[tuple[ConsoleItemType, str | tuple[str, str]]] = []
             last_stdout = io.StringIO()
             last_stderr = io.StringIO()
 
@@ -1296,7 +1290,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 break
 
 
-def match_distro_data(data: Mapping[str, Any], distro: str) -> Tuple[str, Any]:
+def match_distro_data(data: Mapping[str, Any], distro: str) -> tuple[str, Any]:
     """
     Find the latest or exactly matching entry from krunner_volumes mapping using the given distro
     string expression.
@@ -1307,7 +1301,7 @@ def match_distro_data(data: Mapping[str, Any], distro: str) -> Tuple[str, Any]:
     """
     rx_ver_suffix = re.compile(r"(\d+(\.\d+)*)$")
 
-    def _extract_version(key: str) -> Tuple[int, ...]:
+    def _extract_version(key: str) -> tuple[int, ...]:
         m = rx_ver_suffix.search(key)
         if m is not None:
             return tuple(map(int, m.group(1).split(".")))

@@ -2,7 +2,6 @@
 
 import uuid
 from datetime import datetime
-from typing import Tuple
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
@@ -55,7 +54,7 @@ from ai.backend.storage.types import BucketCopyOptions
 _DEFAULT_CHUNK_SIZE = 8192
 
 
-def create_mock_aiohttp_session() -> Tuple[Mock, Mock]:
+def create_mock_aiohttp_session() -> tuple[Mock, Mock]:
     """Create a properly configured mock session that supports async context manager protocol."""
     mock_session = Mock()
 

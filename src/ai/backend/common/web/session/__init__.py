@@ -6,11 +6,8 @@ from collections.abc import Awaitable, Callable, Iterator, MutableMapping
 from datetime import UTC, datetime
 from typing import (
     Any,
-    Dict,
     Final,
-    Optional,
     TypedDict,
-    Union,
     cast,
     override,
 )
@@ -33,19 +30,19 @@ Handler = Callable[[web.Request], Awaitable[web.StreamResponse]]
 
 
 class _CookieParams(TypedDict, total=False):
-    domain: Optional[str]
-    max_age: Optional[int]
+    domain: str | None
+    max_age: int | None
     path: str
-    secure: Optional[bool]
+    secure: bool | None
     httponly: bool
-    samesite: Optional[str]
-    expires: Optional[str]
+    samesite: str | None
+    expires: str | None
 
 
 class SessionData(TypedDict, total=False):
     created: int
     expiration_dt: int
-    session: Dict[str, Any]
+    session: dict[str, Any]
 
 
 DEFAULT_SESSION_AGE: Final[int] = 3600  # 1hour
@@ -60,12 +57,12 @@ class Session(MutableMapping[str, Any]):
 
     def __init__(
         self,
-        identity: Optional[Any],
+        identity: Any | None,
         *,
-        data: Optional[SessionData],
+        data: SessionData | None,
         new: bool,
-        max_age: Optional[int] = None,
-        lifespan: Optional[int] = None,
+        max_age: int | None = None,
+        lifespan: int | None = None,
     ) -> None:
         self._changed: bool = False
         self._mapping: dict[str, Any] = {}
@@ -113,7 +110,7 @@ class Session(MutableMapping[str, Any]):
         return self._new
 
     @property
-    def identity(self) -> Optional[Any]:  # type: ignore[misc]
+    def identity(self) -> Any | None:  # type: ignore[misc]
         return self._identity
 
     @property
@@ -138,11 +135,11 @@ class Session(MutableMapping[str, Any]):
         self._changed = True
 
     @property
-    def max_age(self) -> Optional[int]:
+    def max_age(self) -> int | None:
         return self._max_age
 
     @max_age.setter
-    def max_age(self, value: Optional[int]) -> None:
+    def max_age(self, value: int | None) -> None:
         self._max_age = value
 
     def changed(self) -> None:
@@ -152,7 +149,7 @@ class Session(MutableMapping[str, Any]):
         self._changed = True
         self._mapping = {}
 
-    def set_new_identity(self, identity: Optional[Any]) -> None:
+    def set_new_identity(self, identity: Any | None) -> None:
         if not self._new:
             raise RuntimeError("Can't change identity for a session which is not new")
 
@@ -227,7 +224,7 @@ def session_middleware(storage: "AbstractStorage") -> Middleware:
         raise_response = False
         # TODO aiohttp 4:
         # Remove Union from response, and drop the raise_response variable
-        response: Union[web.StreamResponse, web.HTTPException]
+        response: web.StreamResponse | web.HTTPException
         try:
             response = await handler(request)
         except web.HTTPException as exc:
@@ -262,12 +259,12 @@ class AbstractStorage(metaclass=abc.ABCMeta):
         self,
         *,
         cookie_name: str = "AIOHTTP_SESSION",
-        domain: Optional[str] = None,
-        max_age: Optional[int] = None,
+        domain: str | None = None,
+        max_age: int | None = None,
         path: str = "/",
-        secure: Optional[bool] = None,
+        secure: bool | None = None,
         httponly: bool = True,
-        samesite: Optional[str] = None,
+        samesite: str | None = None,
         encoder: Callable[[object], str] = json.dumps,
         decoder: Callable[[str], Any] = json.loads,
     ) -> None:
@@ -289,7 +286,7 @@ class AbstractStorage(metaclass=abc.ABCMeta):
         return self._cookie_name
 
     @property
-    def max_age(self) -> Optional[int]:
+    def max_age(self) -> int | None:
         return self._max_age
 
     @property
@@ -327,9 +324,9 @@ class AbstractStorage(metaclass=abc.ABCMeta):
     ) -> None:
         pass
 
-    def load_cookie(self, request: web.Request) -> Optional[str]:
+    def load_cookie(self, request: web.Request) -> str | None:
         # TODO: Remove explicit type annotation when aiohttp 3.8 is out
-        cookie: Optional[str] = request.cookies.get(self._cookie_name)
+        cookie: str | None = request.cookies.get(self._cookie_name)
         return cookie
 
     def save_cookie(
@@ -363,12 +360,12 @@ class SimpleCookieStorage(AbstractStorage):
         self,
         *,
         cookie_name: str = "AIOHTTP_SESSION",
-        domain: Optional[str] = None,
-        max_age: Optional[int] = None,
+        domain: str | None = None,
+        max_age: int | None = None,
         path: str = "/",
-        secure: Optional[bool] = None,
+        secure: bool | None = None,
         httponly: bool = True,
-        samesite: Optional[str] = None,
+        samesite: str | None = None,
         encoder: Callable[[object], str] = json.dumps,
         decoder: Callable[[str], Any] = json.loads,
     ) -> None:

@@ -8,7 +8,6 @@ from typing import (
     Any,
     ClassVar,
     Final,
-    FrozenSet,
     Optional,
     final,
 )
@@ -265,7 +264,7 @@ class AbstractVolume(metaclass=ABCMeta):
     # ------ volume operations -------
 
     @abstractmethod
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         raise NotImplementedError
 
     @abstractmethod

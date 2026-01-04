@@ -1,7 +1,7 @@
 import shutil
 import sys
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from typing import Any, List, Literal, Optional
+from typing import Any, Literal, Optional
 
 import click
 from tabulate import tabulate
@@ -27,7 +27,7 @@ def tabulate_items(
 ) -> Iterator[str]:
     is_first = True
     output_count = 0
-    buffered_items: List[_Item] = []
+    buffered_items: list[_Item] = []
 
     # check table header/footer sizes
     header_height = 0

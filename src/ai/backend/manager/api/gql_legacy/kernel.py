@@ -7,7 +7,6 @@ from typing import (
     Any,
     Optional,
     Self,
-    Type,
     TypeVar,
     cast,
 )
@@ -619,7 +618,7 @@ class LegacyComputeSession(graphene.ObjectType):
         info: graphene.ResolveInfo,
         metric_key: str,
         metric_field: str,
-        convert_type: Type[MetricValueType],
+        convert_type: type[MetricValueType],
     ) -> Optional[MetricValueType]:
         if not hasattr(self, "status"):
             return None

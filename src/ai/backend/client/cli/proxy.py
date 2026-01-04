@@ -5,7 +5,6 @@ import json
 import re
 from collections.abc import AsyncIterator
 from http import HTTPStatus
-from typing import Tuple, Union
 
 import aiohttp
 import click
@@ -27,7 +26,7 @@ class WebSocketProxy:
         "upstream_buffer_task",
     )
 
-    upstream_buffer: asyncio.Queue[Tuple[Union[str, bytes], aiohttp.WSMsgType]]
+    upstream_buffer: asyncio.Queue[tuple[str | bytes, aiohttp.WSMsgType]]
 
     def __init__(self, up_conn: aiohttp.ClientWebSocketResponse, down_conn: web.WebSocketResponse):
         self.up_conn = up_conn

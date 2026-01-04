@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from . import AbstractPlugin, BasePluginContext
 
@@ -38,7 +38,7 @@ class AbstractStatReporterPlugin(AbstractPlugin, metaclass=ABCMeta):
         self,
         metric_type: StatMetricTypes,
         metric_name: str,
-        value: Optional[Union[float, int]] = None,
+        value: Optional[float | int] = None,
     ) -> None:
         pass
 
@@ -70,7 +70,7 @@ class StatsPluginContext(BasePluginContext[AbstractStatReporterPlugin]):
         self,
         metric_type: StatMetricTypes,
         metric_name: str,
-        value: Optional[Union[float, int]] = None,
+        value: Optional[float | int] = None,
     ) -> None:
         for plugin_instance in self.plugins.values():
             await plugin_instance.report_metric(metric_type, metric_name, value)

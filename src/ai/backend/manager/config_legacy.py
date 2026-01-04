@@ -13,7 +13,6 @@ from pprint import pformat
 from typing import (
     Any,
     Final,
-    List,
     Optional,
     TypeAlias,
 )
@@ -384,7 +383,7 @@ class AbstractConfig(UserDict):
     Deprecated: Use ai.backend.manager.config.unified instead.
     """
 
-    _watch_callbacks: List[ConfigWatchCallback]
+    _watch_callbacks: list[ConfigWatchCallback]
 
     def __init__(self, initial_data: Optional[Mapping[str, Any]] = None) -> None:
         super().__init__(initial_data)
