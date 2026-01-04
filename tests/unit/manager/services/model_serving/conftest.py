@@ -15,9 +15,8 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.model_serving.admin_repository import (
     AdminModelServingRepository,
 )
@@ -63,8 +62,12 @@ def mock_event_dispatcher() -> MagicMock:
 
 @pytest.fixture
 def mock_agent_registry() -> MagicMock:
-    """Mock AgentRegistry for testing."""
-    return MagicMock(spec=AgentRegistry)
+    """Mock AgentRegistry for testing.
+
+    Note: We don't use spec=AgentRegistry to avoid importing the real class
+    which triggers SQLAlchemy mapper initialization.
+    """
+    return MagicMock()
 
 
 @pytest.fixture

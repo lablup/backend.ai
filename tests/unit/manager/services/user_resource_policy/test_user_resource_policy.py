@@ -30,25 +30,31 @@ from ai.backend.manager.services.user_resource_policy.actions.delete_user_resour
 from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
     ModifyUserResourcePolicyAction,
 )
-from ai.backend.manager.services.user_resource_policy.processors import UserResourcePolicyProcessors
-from ai.backend.manager.services.user_resource_policy.service import UserResourcePolicyService
+from ai.backend.manager.services.user_resource_policy.processors import (
+    UserResourcePolicyProcessors,
+)
+from ai.backend.manager.services.user_resource_policy.service import (
+    UserResourcePolicyService,
+)
 from ai.backend.manager.types import OptionalState
 
+# ==================== Shared Fixtures ====================
+
 
 @pytest.fixture
-def mock_repository():
+def mock_repository() -> MagicMock:
     """Mock repository for testing"""
-    return AsyncMock(spec=UserResourcePolicyRepository)
+    return MagicMock(spec=UserResourcePolicyRepository)
 
 
 @pytest.fixture
-def mock_action_monitor():
+def mock_action_monitor() -> MagicMock:
     """Mock action monitor for testing"""
     return MagicMock(spec=ActionMonitor)
 
 
 @pytest.fixture
-def service(mock_repository):
+def service(mock_repository: MagicMock) -> UserResourcePolicyService:
     """Service instance with mocked repository"""
     return UserResourcePolicyService(
         user_resource_policy_repository=mock_repository,
@@ -56,7 +62,10 @@ def service(mock_repository):
 
 
 @pytest.fixture
-def processors(service, mock_action_monitor):
+def processors(
+    service: UserResourcePolicyService,
+    mock_action_monitor: MagicMock,
+) -> UserResourcePolicyProcessors:
     """Processors instance with mocked dependencies"""
     return UserResourcePolicyProcessors(
         service=service,
@@ -64,9 +73,10 @@ def processors(service, mock_action_monitor):
     )
 
 
-def test_user_resource_policy_creator_build_row() -> None:
-    """Test that UserResourcePolicyCreatorSpec properly builds a row"""
-    spec = UserResourcePolicyCreatorSpec(
+@pytest.fixture
+def sample_policy_data() -> UserResourcePolicyData:
+    """Create sample user resource policy data."""
+    return UserResourcePolicyData(
         name="test-policy",
         max_vfolder_count=10,
         max_quota_scope_size=1000000,
@@ -74,285 +84,266 @@ def test_user_resource_policy_creator_build_row() -> None:
         max_customized_image_count=3,
     )
 
-    row = spec.build_row()
 
-    # Check that all expected fields are present
-    assert row.name == "test-policy"
-    assert row.max_vfolder_count == 10
-    assert row.max_quota_scope_size == 1000000
-    assert row.max_session_count_per_model_session == 5
-    assert row.max_customized_image_count == 3
+# ==================== Action Structure Tests ====================
 
 
-def test_user_resource_policy_creator_build_row_with_zero_values() -> None:
-    """Test that UserResourcePolicyCreatorSpec handles zero/default values correctly"""
-    spec = UserResourcePolicyCreatorSpec(
-        name="minimal-policy",
-        max_vfolder_count=0,
-        max_quota_scope_size=0,
-        max_session_count_per_model_session=0,
-        max_customized_image_count=0,
-    )
+class TestActionStructure:
+    """Test action dataclass structure without triggering mapper initialization."""
 
-    row = spec.build_row()
+    def test_create_action_structure(self) -> None:
+        """Test CreateUserResourcePolicyAction structure"""
+        spec = UserResourcePolicyCreatorSpec(
+            name="test-policy",
+            max_vfolder_count=10,
+            max_quota_scope_size=1000000,
+            max_session_count_per_model_session=5,
+            max_customized_image_count=3,
+        )
 
-    # Check that all expected fields are present with zero values
-    assert row.name == "minimal-policy"
-    assert row.max_vfolder_count == 0
-    assert row.max_quota_scope_size == 0
-    assert row.max_session_count_per_model_session == 0
-    assert row.max_customized_image_count == 0
+        creator = Creator(spec=spec)
+        action = CreateUserResourcePolicyAction(creator=creator)
 
+        assert action.creator == creator
+        assert action.entity_id() is None
+        assert action.operation_type() == "create"
 
-def test_user_resource_policy_updater_spec_build_values() -> None:
-    """Test that UserResourcePolicyUpdaterSpec properly serializes fields to update"""
-    spec = UserResourcePolicyUpdaterSpec(
-        max_vfolder_count=OptionalState.update(20),
-        max_quota_scope_size=OptionalState.update(2000000),
-        max_session_count_per_model_session=OptionalState.nop(),
-        max_customized_image_count=OptionalState.nop(),
-    )
+    def test_modify_action_structure(self) -> None:
+        """Test ModifyUserResourcePolicyAction structure"""
+        spec = UserResourcePolicyUpdaterSpec(
+            max_vfolder_count=OptionalState.update(20),
+        )
+        updater = Updater(spec=spec, pk_value="test-policy")
 
-    fields = spec.build_values()
+        action = ModifyUserResourcePolicyAction(
+            name="test-policy",
+            updater=updater,
+        )
 
-    # Check that updated fields are present
-    assert fields["max_vfolder_count"] == 20
-    assert fields["max_quota_scope_size"] == 2000000
+        assert action.name == "test-policy"
+        assert action.updater == updater
+        assert action.entity_id() is None
+        assert action.operation_type() == "modify"
 
-    # Check that nop fields are not present
-    assert "max_session_count_per_model_session" not in fields
-    assert "max_customized_image_count" not in fields
+    def test_delete_action_structure(self) -> None:
+        """Test DeleteUserResourcePolicyAction structure"""
+        action = DeleteUserResourcePolicyAction(name="test-policy")
 
-
-def test_create_user_resource_policy_action() -> None:
-    """Test CreateUserResourcePolicyAction structure"""
-    spec = UserResourcePolicyCreatorSpec(
-        name="test-policy",
-        max_vfolder_count=10,
-        max_quota_scope_size=1000000,
-        max_session_count_per_model_session=5,
-        max_customized_image_count=3,
-    )
-
-    creator = Creator(spec=spec)
-    action = CreateUserResourcePolicyAction(creator=creator)
-
-    assert action.creator == creator
-    assert action.entity_id() is None
-    assert action.operation_type() == "create"
+        assert action.name == "test-policy"
+        assert action.entity_id() is None
+        assert action.operation_type() == "delete"
 
 
-def test_modify_user_resource_policy_action() -> None:
-    """Test ModifyUserResourcePolicyAction structure"""
-    spec = UserResourcePolicyUpdaterSpec(
-        max_vfolder_count=OptionalState.update(20),
-    )
-    updater = Updater(spec=spec, pk_value="test-policy")
-
-    action = ModifyUserResourcePolicyAction(
-        name="test-policy",
-        updater=updater,
-    )
-
-    assert action.name == "test-policy"
-    assert action.updater == updater
-    assert action.entity_id() is None
-    assert action.operation_type() == "modify"
+# ==================== UpdaterSpec Tests ====================
 
 
-def test_delete_user_resource_policy_action() -> None:
-    """Test DeleteUserResourcePolicyAction structure"""
-    action = DeleteUserResourcePolicyAction(name="test-policy")
+class TestUpdaterSpec:
+    """Test UpdaterSpec build_values without triggering mapper initialization."""
 
-    assert action.name == "test-policy"
-    assert action.entity_id() is None
-    assert action.operation_type() == "delete"
+    def test_build_values_with_updates(self) -> None:
+        """Test that UserResourcePolicyUpdaterSpec properly serializes fields to update"""
+        spec = UserResourcePolicyUpdaterSpec(
+            max_vfolder_count=OptionalState.update(20),
+            max_quota_scope_size=OptionalState.update(2000000),
+            max_session_count_per_model_session=OptionalState.nop(),
+            max_customized_image_count=OptionalState.nop(),
+        )
 
+        fields = spec.build_values()
 
-@pytest.mark.asyncio
-async def test_create_user_resource_policy_service(service, mock_repository) -> None:
-    """Test create user resource policy service method"""
-    # Setup mock return value
-    expected_data = UserResourcePolicyData(
-        name="test-policy",
-        max_vfolder_count=10,
-        max_quota_scope_size=1000000,
-        max_session_count_per_model_session=5,
-        max_customized_image_count=3,
-    )
-    mock_repository.create.return_value = expected_data
+        # Check that updated fields are present
+        assert fields["max_vfolder_count"] == 20
+        assert fields["max_quota_scope_size"] == 2000000
 
-    # Create action
-    spec = UserResourcePolicyCreatorSpec(
-        name="test-policy",
-        max_vfolder_count=10,
-        max_quota_scope_size=1000000,
-        max_session_count_per_model_session=5,
-        max_customized_image_count=3,
-    )
-    creator = Creator(spec=spec)
-    action = CreateUserResourcePolicyAction(creator=creator)
-
-    # Execute service method
-    result = await service.create_user_resource_policy(action)
-
-    # Verify result
-    assert result.user_resource_policy == expected_data
-
-    # Verify repository was called with correct creator object
-    mock_repository.create.assert_called_once()
-    call_args = mock_repository.create.call_args[0][0]
-    assert isinstance(call_args.spec, UserResourcePolicyCreatorSpec)
-    assert call_args.spec.name == "test-policy"
-    assert call_args.spec.max_vfolder_count == 10
-    assert call_args.spec.max_quota_scope_size == 1000000
-    assert call_args.spec.max_session_count_per_model_session == 5
-    assert call_args.spec.max_customized_image_count == 3
+        # Check that nop fields are not present
+        assert "max_session_count_per_model_session" not in fields
+        assert "max_customized_image_count" not in fields
 
 
-@pytest.mark.asyncio
-async def test_modify_user_resource_policy_service(service, mock_repository) -> None:
-    """Test modify user resource policy service method"""
-    # Setup mock return value
-    expected_data = UserResourcePolicyData(
-        name="test-policy",
-        max_vfolder_count=20,
-        max_quota_scope_size=2000000,
-        max_session_count_per_model_session=5,  # Unchanged
-        max_customized_image_count=5,
-    )
-    mock_repository.update.return_value = expected_data
-
-    # Create action
-    spec = UserResourcePolicyUpdaterSpec(
-        max_vfolder_count=OptionalState.update(20),
-        max_quota_scope_size=OptionalState.update(2000000),
-        max_session_count_per_model_session=OptionalState.nop(),
-        max_customized_image_count=OptionalState.update(5),
-    )
-    updater = Updater(spec=spec, pk_value="test-policy")
-    action = ModifyUserResourcePolicyAction(
-        name="test-policy",
-        updater=updater,
-    )
-
-    # Execute service method
-    result = await service.modify_user_resource_policy(action)
-
-    # Verify result
-    assert result.user_resource_policy == expected_data
-
-    # Verify repository was called with correct updater object
-    mock_repository.update.assert_called_once()
-    call_args = mock_repository.update.call_args[0]
-    assert isinstance(call_args[0], Updater)
-    assert isinstance(call_args[0].spec, UserResourcePolicyUpdaterSpec)
-
-    # Verify spec contains correct fields
-    spec_arg = call_args[0].spec
-    assert spec_arg.max_vfolder_count.value() == 20
-    assert spec_arg.max_quota_scope_size.value() == 2000000
-    assert spec_arg.max_customized_image_count.value() == 5
-
-    # Verify build_values only contains updated fields
-    build_values = spec_arg.build_values()
-    assert build_values == {
-        "max_vfolder_count": 20,
-        "max_quota_scope_size": 2000000,
-        "max_customized_image_count": 5,
-    }
+# ==================== Create Service Tests ====================
 
 
-@pytest.mark.asyncio
-async def test_delete_user_resource_policy_service(service, mock_repository) -> None:
-    """Test delete user resource policy service method"""
-    # Setup mock return value
-    expected_data = UserResourcePolicyData(
-        name="test-policy",
-        max_vfolder_count=10,
-        max_quota_scope_size=1000000,
-        max_session_count_per_model_session=5,
-        max_customized_image_count=3,
-    )
-    mock_repository.delete.return_value = expected_data
+class TestCreateUserResourcePolicy:
+    """Test cases for UserResourcePolicyService.create_user_resource_policy"""
 
-    # Create action
-    action = DeleteUserResourcePolicyAction(name="test-policy")
+    async def test_success(
+        self,
+        service: UserResourcePolicyService,
+        mock_repository: MagicMock,
+        sample_policy_data: UserResourcePolicyData,
+    ) -> None:
+        """Test create user resource policy service method"""
+        mock_repository.create = AsyncMock(return_value=sample_policy_data)
 
-    # Execute service method
-    result = await service.delete_user_resource_policy(action)
+        spec = UserResourcePolicyCreatorSpec(
+            name="test-policy",
+            max_vfolder_count=10,
+            max_quota_scope_size=1000000,
+            max_session_count_per_model_session=5,
+            max_customized_image_count=3,
+        )
+        creator = Creator(spec=spec)
+        action = CreateUserResourcePolicyAction(creator=creator)
 
-    # Verify result
-    assert result.user_resource_policy == expected_data
+        result = await service.create_user_resource_policy(action)
 
-    # Verify repository was called correctly
-    mock_repository.delete.assert_called_once_with("test-policy")
-
-
-@pytest.mark.asyncio
-async def test_modify_non_existing_policy_raises_exception(service, mock_repository) -> None:
-    """Test that modifying non-existing policy raises UserResourcePolicyNotFound"""
-    # Setup mock to raise exception
-    mock_repository.update.side_effect = UserResourcePolicyNotFound("Policy not found")
-
-    # Create action
-    spec = UserResourcePolicyUpdaterSpec(
-        max_vfolder_count=OptionalState.update(20),
-    )
-    updater = Updater(spec=spec, pk_value="non-existing-policy")
-    action = ModifyUserResourcePolicyAction(
-        name="non-existing-policy",
-        updater=updater,
-    )
-
-    # Execute and verify exception is raised
-    with pytest.raises(UserResourcePolicyNotFound):
-        await service.modify_user_resource_policy(action)
+        assert result.user_resource_policy == sample_policy_data
+        mock_repository.create.assert_called_once()
+        call_args = mock_repository.create.call_args[0][0]
+        assert isinstance(call_args.spec, UserResourcePolicyCreatorSpec)
+        assert call_args.spec.name == "test-policy"
+        assert call_args.spec.max_vfolder_count == 10
+        assert call_args.spec.max_quota_scope_size == 1000000
+        assert call_args.spec.max_session_count_per_model_session == 5
+        assert call_args.spec.max_customized_image_count == 3
 
 
-@pytest.mark.asyncio
-async def test_delete_non_existing_policy_raises_exception(service, mock_repository) -> None:
-    """Test that deleting non-existing policy raises UserResourcePolicyNotFound"""
-    # Setup mock to raise exception
-    mock_repository.delete.side_effect = UserResourcePolicyNotFound("Policy not found")
-
-    # Create action
-    action = DeleteUserResourcePolicyAction(name="non-existing-policy")
-
-    # Execute and verify exception is raised
-    with pytest.raises(UserResourcePolicyNotFound):
-        await service.delete_user_resource_policy(action)
+# ==================== Modify Service Tests ====================
 
 
-@pytest.mark.asyncio
-async def test_processors_integration(processors, mock_repository) -> None:
+class TestModifyUserResourcePolicy:
+    """Test cases for UserResourcePolicyService.modify_user_resource_policy"""
+
+    async def test_success(
+        self,
+        service: UserResourcePolicyService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test modify user resource policy service method"""
+        expected_data = UserResourcePolicyData(
+            name="test-policy",
+            max_vfolder_count=20,
+            max_quota_scope_size=2000000,
+            max_session_count_per_model_session=5,
+            max_customized_image_count=5,
+        )
+        mock_repository.update = AsyncMock(return_value=expected_data)
+
+        spec = UserResourcePolicyUpdaterSpec(
+            max_vfolder_count=OptionalState.update(20),
+            max_quota_scope_size=OptionalState.update(2000000),
+            max_session_count_per_model_session=OptionalState.nop(),
+            max_customized_image_count=OptionalState.update(5),
+        )
+        updater = Updater(spec=spec, pk_value="test-policy")
+        action = ModifyUserResourcePolicyAction(
+            name="test-policy",
+            updater=updater,
+        )
+
+        result = await service.modify_user_resource_policy(action)
+
+        assert result.user_resource_policy == expected_data
+        mock_repository.update.assert_called_once()
+        call_args = mock_repository.update.call_args[0]
+        assert isinstance(call_args[0], Updater)
+        assert isinstance(call_args[0].spec, UserResourcePolicyUpdaterSpec)
+
+        spec_arg = call_args[0].spec
+        assert spec_arg.max_vfolder_count.value() == 20
+        assert spec_arg.max_quota_scope_size.value() == 2000000
+        assert spec_arg.max_customized_image_count.value() == 5
+
+        build_values = spec_arg.build_values()
+        assert build_values == {
+            "max_vfolder_count": 20,
+            "max_quota_scope_size": 2000000,
+            "max_customized_image_count": 5,
+        }
+
+    async def test_not_found(
+        self,
+        service: UserResourcePolicyService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test that modifying non-existing policy raises UserResourcePolicyNotFound"""
+        mock_repository.update = AsyncMock(
+            side_effect=UserResourcePolicyNotFound("Policy not found")
+        )
+
+        spec = UserResourcePolicyUpdaterSpec(
+            max_vfolder_count=OptionalState.update(20),
+        )
+        updater = Updater(spec=spec, pk_value="non-existing-policy")
+        action = ModifyUserResourcePolicyAction(
+            name="non-existing-policy",
+            updater=updater,
+        )
+
+        with pytest.raises(UserResourcePolicyNotFound):
+            await service.modify_user_resource_policy(action)
+
+
+# ==================== Delete Service Tests ====================
+
+
+class TestDeleteUserResourcePolicy:
+    """Test cases for UserResourcePolicyService.delete_user_resource_policy"""
+
+    async def test_success(
+        self,
+        service: UserResourcePolicyService,
+        mock_repository: MagicMock,
+        sample_policy_data: UserResourcePolicyData,
+    ) -> None:
+        """Test delete user resource policy service method"""
+        mock_repository.delete = AsyncMock(return_value=sample_policy_data)
+
+        action = DeleteUserResourcePolicyAction(name="test-policy")
+
+        result = await service.delete_user_resource_policy(action)
+
+        assert result.user_resource_policy == sample_policy_data
+        mock_repository.delete.assert_called_once_with("test-policy")
+
+    async def test_not_found(
+        self,
+        service: UserResourcePolicyService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test that deleting non-existing policy raises UserResourcePolicyNotFound"""
+        mock_repository.delete = AsyncMock(
+            side_effect=UserResourcePolicyNotFound("Policy not found")
+        )
+
+        action = DeleteUserResourcePolicyAction(name="non-existing-policy")
+
+        with pytest.raises(UserResourcePolicyNotFound):
+            await service.delete_user_resource_policy(action)
+
+
+# ==================== Processors Integration Tests ====================
+
+
+class TestProcessorsIntegration:
     """Test that processors work correctly with the service"""
-    # Setup mock return value
-    expected_data = UserResourcePolicyData(
-        name="processor-test",
-        max_vfolder_count=15,
-        max_quota_scope_size=1500000,
-        max_session_count_per_model_session=7,
-        max_customized_image_count=4,
-    )
-    mock_repository.create.return_value = expected_data
 
-    # Create action
-    spec = UserResourcePolicyCreatorSpec(
-        name="processor-test",
-        max_vfolder_count=15,
-        max_quota_scope_size=1500000,
-        max_session_count_per_model_session=7,
-        max_customized_image_count=4,
-    )
-    creator = Creator(spec=spec)
-    action = CreateUserResourcePolicyAction(creator=creator)
+    async def test_create_via_processors(
+        self,
+        processors: UserResourcePolicyProcessors,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test that processors work correctly with the service"""
+        expected_data = UserResourcePolicyData(
+            name="processor-test",
+            max_vfolder_count=15,
+            max_quota_scope_size=1500000,
+            max_session_count_per_model_session=7,
+            max_customized_image_count=4,
+        )
+        mock_repository.create = AsyncMock(return_value=expected_data)
 
-    # Execute through processors
-    result = await processors.create_user_resource_policy.wait_for_complete(action)
+        spec = UserResourcePolicyCreatorSpec(
+            name="processor-test",
+            max_vfolder_count=15,
+            max_quota_scope_size=1500000,
+            max_session_count_per_model_session=7,
+            max_customized_image_count=4,
+        )
+        creator = Creator(spec=spec)
+        action = CreateUserResourcePolicyAction(creator=creator)
 
-    # Verify result
-    assert result.user_resource_policy == expected_data
+        result = await processors.create_user_resource_policy.wait_for_complete(action)
 
-    # Verify repository was called
-    mock_repository.create.assert_called_once()
+        assert result.user_resource_policy == expected_data
+        mock_repository.create.assert_called_once()

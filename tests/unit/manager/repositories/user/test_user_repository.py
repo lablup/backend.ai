@@ -14,9 +14,16 @@ import sqlalchemy as sa
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.user import UserConflict, UserCreationBadRequest, UserNotFound
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow, ProjectType
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import (
     AssociationScopesEntitiesRow,
@@ -31,9 +38,12 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
@@ -65,20 +75,30 @@ class TestUserRepository:
             [
                 # FK dependency order: parents before children
                 DomainRow,
+                ScalingGroupRow,
                 UserResourcePolicyRow,
-                KeyPairResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
                 UserRow,
                 RoleRow,  # RBAC role table
                 PermissionGroupRow,  # Depends on RoleRow
                 PermissionRow,  # Depends on PermissionGroupRow
-                UserRoleRow,  # UserRow + RoleRow relationship dependency
                 AssociationScopesEntitiesRow,  # RBAC scopes-entities association
                 KeyPairRow,
                 GroupRow,
                 AssocGroupUserRow,  # Association table for users-groups
-                ScalingGroupRow,
-                ResourcePresetRow,  # ScalingGroupRow relationship dependency
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
             ],
         ):
             yield database_connection

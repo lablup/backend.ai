@@ -29,7 +29,12 @@ from ai.backend.manager.models.endpoint import (
 )
 from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+    execute_batch_querier,
+    execute_creator,
+)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 model_serving_repository_resilience = Resilience(
@@ -170,7 +175,14 @@ class AdminModelServingRepository:
             )
             await session.execute(query)
 
-            endpoint = await self._get_endpoint_by_id(session, service_id, load_routes=True)
+            endpoint = await self._get_endpoint_by_id(
+                session,
+                service_id,
+                load_routes=True,
+                load_session_owner=True,
+                load_model=True,
+                load_image=True,
+            )
             if endpoint is None:
                 raise NoResultFound
             data = endpoint.to_data()
@@ -202,21 +214,21 @@ class AdminModelServingRepository:
 
     @model_serving_repository_resilience.apply()
     async def create_endpoint_token_force(
-        self, token_row: EndpointTokenRow
+        self, creator: Creator[EndpointTokenRow]
     ) -> Optional[EndpointTokenData]:
         """
         Create endpoint token without access validation.
         Returns token data if created, None if endpoint not found.
         """
         async with self._db.begin_session() as session:
-            endpoint = await self._get_endpoint_by_id(session, token_row.endpoint)
+            endpoint_id = creator.spec.endpoint  # type: ignore[attr-defined]
+            endpoint = await self._get_endpoint_by_id(session, endpoint_id)
             if not endpoint:
                 return None
 
-            session.add(token_row)
-            await session.commit()
-            await session.refresh(token_row)
-            return token_row.to_dataclass()
+            result = await execute_creator(session, creator)
+            data = result.row.to_dataclass()
+        return data
 
     async def _get_endpoint_by_id(
         self,

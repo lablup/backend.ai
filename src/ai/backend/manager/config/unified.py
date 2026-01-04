@@ -234,7 +234,11 @@ This email is sent from Backend.AI SMTP Reporter.
 """
 
 _max_num_proc = os.cpu_count() or 8
-_file_perm = (Path(__file__).parent.parent / "server.py").stat()
+try:
+    _file_perm = (Path(__file__).parent.parent / "server.py").stat()
+except FileNotFoundError:
+    # Fallback for test environments where server.py is not present
+    _file_perm = type("_FallbackPerm", (), {"st_uid": os.getuid(), "st_gid": os.getgid()})()
 
 
 class DatabaseType(enum.StrEnum):

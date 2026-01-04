@@ -362,14 +362,19 @@ class ModelServingRepository:
 
     @model_serving_repository_resilience.apply()
     async def create_endpoint_token_validated(
-        self, token_row: EndpointTokenRow, user_id: uuid.UUID, user_role: UserRole, domain_name: str
+        self,
+        creator: Creator[EndpointTokenRow],
+        user_id: uuid.UUID,
+        user_role: UserRole,
+        domain_name: str,
     ) -> Optional[EndpointTokenData]:
         """
         Create endpoint token with access validation.
         Returns token data if created, None if no access to endpoint.
         """
         async with self._db.begin_session() as session:
-            endpoint = await self._get_endpoint_by_id(session, token_row.endpoint)
+            endpoint_id = creator.spec.endpoint  # type: ignore[attr-defined]
+            endpoint = await self._get_endpoint_by_id(session, endpoint_id)
             if not endpoint:
                 return None
 
@@ -378,11 +383,8 @@ class ModelServingRepository:
             ):
                 return None
 
-            session.add(token_row)
-            await session.commit()
-            await session.refresh(token_row)
-
-            return token_row.to_dataclass()
+            result = await execute_creator(session, creator)
+            return result.row.to_dataclass()
 
     @model_serving_repository_resilience.apply()
     async def get_scaling_group_info(self, scaling_group_name: str) -> Optional[ScalingGroupData]:

@@ -53,10 +53,7 @@ from ai.backend.manager.errors.service import (
     RouteNotFound,
 )
 from ai.backend.manager.errors.storage import UnexpectedStorageProxyResponseError
-from ai.backend.manager.models.endpoint import (
-    EndpointLifecycle,
-    EndpointTokenRow,
-)
+from ai.backend.manager.models.endpoint import EndpointLifecycle
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole
@@ -67,6 +64,7 @@ from ai.backend.manager.repositories.model_serving import EndpointCreatorSpec
 from ai.backend.manager.repositories.model_serving.admin_repository import (
     AdminModelServingRepository,
 )
+from ai.backend.manager.repositories.model_serving.creators import EndpointTokenCreatorSpec
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
@@ -774,21 +772,23 @@ class ModelServingService:
 
         # Create token in database
         token_id = uuid.uuid4()
-        token_row = EndpointTokenRow(
-            token_id,
-            token,
-            endpoint_data.id,
-            endpoint_data.domain,
-            endpoint_data.project,
-            endpoint_data.session_owner_id,
+        token_creator = Creator(
+            spec=EndpointTokenCreatorSpec(
+                id=token_id,
+                token=token,
+                endpoint=endpoint_data.id,
+                domain=endpoint_data.domain,
+                project=endpoint_data.project,
+                session_owner=endpoint_data.session_owner_id,
+            )
         )
 
         await self.check_requester_access(action.requester_ctx)
         if action.requester_ctx.user_role == UserRole.SUPERADMIN:
-            token_data = await self._admin_repository.create_endpoint_token_force(token_row)
+            token_data = await self._admin_repository.create_endpoint_token_force(token_creator)
         else:
             token_data = await self._repository.create_endpoint_token_validated(
-                token_row,
+                token_creator,
                 action.requester_ctx.user_id,
                 action.requester_ctx.user_role,
                 action.requester_ctx.domain_name,

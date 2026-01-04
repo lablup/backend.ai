@@ -11,10 +11,16 @@ from ai.backend.common.types import SessionTypes
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
@@ -49,21 +55,27 @@ class TestScalingGroupRepositoryDB:
         async with with_tables(
             database_connection,
             [
-                # FK dependency order: parents first
+                # FK dependency order: parents before children
                 DomainRow,
-                ProjectResourcePolicyRow,
-                UserResourcePolicyRow,
-                KeyPairResourcePolicyRow,
                 ScalingGroupRow,
-                ResourcePresetRow,  # ScalingGroupRow relationship dependency
-                UserRoleRow,  # UserRow relationship dependency
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
                 UserRow,
                 KeyPairRow,
                 GroupRow,
-                SessionRow,
+                ImageRow,
                 VFolderRow,
                 EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
                 RoutingRow,
+                ResourcePresetRow,
             ],
         ):
             yield database_connection
