@@ -46,8 +46,9 @@ Example: Adding a new service → Read `services/README.md` → Follow patterns 
 * Minimize state and side effects
 * Use the simplest solution that could possibly work
 * Make dependencies explicit
-  - Use relative imports when referring to modules in a subtree under `src` sharing a single BUILD file
-  - Use absolute imports when referring to modules in other subtrees under `src`, 3rd-party packages, and Python intrinsic packages
+  - Use child relative imports (`from .submodule`) only for modules within the same package directory
+  - Use absolute imports (`from ai.backend.package.module`) for parent modules and cross-package references
+  - Never use parent relative imports (`from ..module`) - always convert to absolute imports
 * Express intent clearly through naming and structure
 * Name things with meaningful, predictable, and explicit but concise tones
   - When reading codes, variable names should align with what intermediate-level developers could expect from them.
