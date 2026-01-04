@@ -114,8 +114,9 @@ select = [
     "UP",     # pyupgrade: modernizes Python syntax to latest version
     "A",      # flake8-builtins: prevents shadowing Python builtins
     "RET",    # flake8-return: enforces consistent return statement usage
+    "T20",    # flake8-print: detects print statements (should use logging)
+    # "TID252", # flake8-tidy-imports: conflicts with project policy (relative imports allowed)
     # "ANN",  # flake8-annotations: enforces type annotations (deferred)
-    # "TID252", # flake8-tidy-imports: enforces relative imports (deferred)
 ]
 ignore = [
     "E203",   # whitespace before ':' - conflicts with Black formatter
@@ -203,6 +204,51 @@ split-on-trailing-comma = true
 "src/ai/backend/manager/models/alembic/env.py" = ["E402"]
 "src/ai/backend/logging/otel.py" = ["LOG015"]  # root logger usage is intentional for OTEL initialization
 "src/ai/backend/kernel/python/sitecustomize.py" = ["UP036"]  # Python 2 compatibility is intentional for kernel environments
+# T20 (print statements) exceptions:
+# - CLI modules are allowed to use print for user-facing output
+"src/ai/backend/cli/**/*.py" = ["T20"]
+"src/ai/backend/*/cli/**/*.py" = ["T20"]
+"src/ai/backend/*/*/cli/**/*.py" = ["T20"]
+"src/ai/backend/client/cli/**/*.py" = ["T20"]
+"src/ai/backend/plugin/cli.py" = ["T20"]
+# - Client output module is designed for console printing
+"src/ai/backend/client/output/*.py" = ["T20"]
+# - Client func vfolder has progress printing
+"src/ai/backend/client/func/vfolder.py" = ["T20"]
+# - Alembic migrations may print progress
+"src/ai/backend/*/models/alembic/**/*.py" = ["T20"]
+"src/ai/backend/*/*/models/alembic/**/*.py" = ["T20"]
+# - Config files print debug info to stderr
+"src/ai/backend/*/config.py" = ["T20"]
+"src/ai/backend/*/*/config.py" = ["T20"]
+"src/ai/backend/*/config_legacy.py" = ["T20"]
+"src/ai/backend/storage/config/**/*.py" = ["T20"]
+# - Server files print debug config info
+"src/ai/backend/*/server.py" = ["T20"]
+"src/ai/backend/*/*/server.py" = ["T20"]
+# - Installer prints progress info
+"src/ai/backend/install/**/*.py" = ["T20"]
+# - Runner scripts for containers
+"src/ai/backend/runner/**/*.py" = ["T20"]
+# - Kernel vendor scripts
+"src/ai/backend/kernel/vendor/**/*.py" = ["T20"]
+# - Helpers package
+"src/ai/backend/helpers/**/*.py" = ["T20"]
+# - Watcher modules
+"src/ai/backend/*/watcher/**/*.py" = ["T20"]
+"src/ai/backend/storage/watcher.py" = ["T20"]
+# - Common utilities with debug functions
+"src/ai/backend/common/utils.py" = ["T20"]
+"src/ai/backend/common/configs/sample_generator.py" = ["T20"]
+# - OpenAPI generator
+"src/ai/backend/manager/openapi.py" = ["T20"]
+# - Storage migration scripts
+"src/ai/backend/storage/migration.py" = ["T20"]
+# - Logging handler (prints to stderr by design)
+"src/ai/backend/logging/handler/**/*.py" = ["T20"]
+# - Test files may use print for debugging
+"tests/**/*.py" = ["T20"]
+"src/ai/backend/test/**/*.py" = ["T20"]
 
 [tool.ruff.format]
 preview = true  # enable the black's preview style
