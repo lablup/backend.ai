@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from ai.backend.common.events.event_types.image.anycast import (
     ImagePullFailedEvent,
@@ -38,7 +38,7 @@ class ImageEventHandler:
         agent_id: AgentId,
         ev: ImagePullStartedEvent,
     ) -> None:
-        dt = datetime.fromtimestamp(ev.timestamp)
+        dt = datetime.fromtimestamp(ev.timestamp, tz=UTC)
         log.debug("handle_image_pull_started: ag:{} img:{}, start_dt:{}", ev.agent_id, ev.image, dt)
 
         if self._use_sokovan:
@@ -56,7 +56,7 @@ class ImageEventHandler:
     async def handle_image_pull_finished(
         self, context: None, agent_id: AgentId, ev: ImagePullFinishedEvent
     ) -> None:
-        dt = datetime.fromtimestamp(ev.timestamp)
+        dt = datetime.fromtimestamp(ev.timestamp, tz=UTC)
         log.debug("handle_image_pull_finished: ag:{} img:{}, end_dt:{}", ev.agent_id, ev.image, dt)
 
         if self._use_sokovan:

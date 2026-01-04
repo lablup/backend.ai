@@ -1,5 +1,5 @@
 from collections.abc import AsyncIterator, Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Optional, override
 
@@ -29,7 +29,7 @@ from ai.backend.storage.volumes.abc import (
 
 async def _return_empty_dir_entry() -> AsyncIterator[DirEntry]:
     yield DirEntry(
-        "", Path(), DirEntryType.FILE, Stat(0, "", 0, datetime.now(), datetime.now()), ""
+        "", Path(), DirEntryType.FILE, Stat(0, "", 0, datetime.now(UTC), datetime.now(UTC)), ""
     )
 
 

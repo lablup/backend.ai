@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import sqlalchemy as sa
@@ -189,8 +189,8 @@ class TestNotificationOptions:
                     config=config.model_dump(),
                     enabled=enabled,
                     created_by=test_user,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
+                    created_at=datetime.now(tz=UTC),
+                    updated_at=datetime.now(tz=UTC),
                 )
                 db_sess.add(channel)
                 channel_ids.append(channel_id)
@@ -206,7 +206,7 @@ class TestNotificationOptions:
     ) -> list[uuid.UUID]:
         """Create sample channels with different timestamps for order testing"""
         channel_ids: list[uuid.UUID] = []
-        base_time = datetime.now()
+        base_time = datetime.now(tz=UTC)
 
         async with db_with_cleanup.begin_session() as db_sess:
             channels_data = [
@@ -253,8 +253,8 @@ class TestNotificationOptions:
                 config=config.model_dump(),
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             db_sess.add(channel)
             await db_sess.commit()
@@ -290,8 +290,8 @@ class TestNotificationOptions:
                     message_template="Test message",
                     enabled=enabled,
                     created_by=test_user,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
+                    created_at=datetime.now(tz=UTC),
+                    updated_at=datetime.now(tz=UTC),
                 )
                 db_sess.add(rule)
                 rule_ids.append(rule_id)
@@ -308,7 +308,7 @@ class TestNotificationOptions:
     ) -> list[uuid.UUID]:
         """Create sample rules with different timestamps for order testing"""
         rule_ids: list[uuid.UUID] = []
-        base_time = datetime.now()
+        base_time = datetime.now(tz=UTC)
 
         async with db_with_cleanup.begin_session() as db_sess:
             rules_data = [
@@ -1042,7 +1042,7 @@ class TestNotificationCursorPagination:
         Created order (oldest to newest): Channel-1, Channel-2, Channel-3, Channel-4, Channel-5
         """
         channel_ids: list[uuid.UUID] = []
-        base_time = datetime.now()
+        base_time = datetime.now(tz=UTC)
 
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(1, 6):

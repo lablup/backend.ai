@@ -174,7 +174,7 @@ def migrate_data_etcd_to_psql() -> None:
 
         def backup(etcd_container_registries: Mapping[str, Any]):
             backup_path = Path(os.getenv("BACKEND_ETCD_BACKUP_PATH", "."))
-            backup_path /= ETCD_BACKUP_FILENAME_PATTERN.format(timestamp=datetime.now().isoformat())
+            backup_path /= ETCD_BACKUP_FILENAME_PATTERN.format(timestamp=datetime.now().isoformat())  # noqa: DTZ005
             with open(backup_path, "w") as f:
                 json.dump(dict(etcd_container_registries), f, indent=4)
 

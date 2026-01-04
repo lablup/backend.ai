@@ -5,7 +5,7 @@ Tests the service layer with mocked repository.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
@@ -178,7 +178,7 @@ def sample_image_data() -> ImageData:
         name=ImageCanonical("registry.example.com/test-project/python:3.9"),
         project="test-project",
         image="test-project/python",
-        created_at=datetime.now(),
+        created_at=datetime.now(tz=UTC),
         tag="3.9",
         registry="registry.example.com",
         registry_id=UUID("12345678-1234-5678-1234-567812345678"),

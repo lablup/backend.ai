@@ -4,7 +4,7 @@ import asyncio
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, cast
 
 from ai.backend.common.data.notification import NotifiableMessage
@@ -224,7 +224,7 @@ class NotificationService:
                 message_template=rule.message_template,
                 rule_type=rule.rule_type,
                 channel=rule.channel,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(UTC),
                 notification_data=validated_data,
             )
         )

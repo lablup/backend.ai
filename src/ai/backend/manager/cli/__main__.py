@@ -250,7 +250,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     """
     import asyncio
     import uuid
-    from datetime import datetime
+    from datetime import UTC, datetime
     from typing import cast
 
     import sqlalchemy as sa
@@ -265,7 +265,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     from .context import redis_ctx
 
     log = _get_logger()
-    today = datetime.now()
+    today = datetime.now(UTC)
     duration = TimeDuration()
     expiration_date = today - duration.check_and_return(retention)
     bootstrap_config = asyncio.run(cli_ctx.get_bootstrap_config())

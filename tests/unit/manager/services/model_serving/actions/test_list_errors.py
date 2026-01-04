@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
@@ -67,7 +67,7 @@ class TestListErrors:
                         ErrorInfo(
                             session_id=uuid.UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
                             error={
-                                "timestamp": datetime.utcnow().isoformat(),
+                                "timestamp": datetime.now(tz=UTC).isoformat(),
                                 "error_type": "OOMKilled",
                                 "message": "Container killed due to out of memory",
                             },
@@ -75,7 +75,7 @@ class TestListErrors:
                         ErrorInfo(
                             session_id=uuid.UUID("bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
                             error={
-                                "timestamp": datetime.utcnow().isoformat(),
+                                "timestamp": datetime.now(tz=UTC).isoformat(),
                                 "error_type": "ImagePullError",
                                 "message": "Failed to pull image",
                             },
@@ -100,7 +100,7 @@ class TestListErrors:
                         ErrorInfo(
                             session_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
                             error={
-                                "timestamp": datetime.utcnow().isoformat(),
+                                "timestamp": datetime.now(tz=UTC).isoformat(),
                                 "error_type": "OOMKilled",
                                 "message": "Container killed due to out of memory",
                             },

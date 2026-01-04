@@ -4,7 +4,7 @@ Tests the repository layer with mocked database operations.
 """
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -62,8 +62,8 @@ class TestUserRepository:
             description="Test Description",
             status=UserStatus.ACTIVE,
             status_info="admin-requested",
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             domain_name="default",
             role=UserRole.USER,
             resource_policy="default",
@@ -196,8 +196,8 @@ class TestUserRepository:
                 created_user_row.description = spec.description
                 created_user_row.need_password_change = spec.need_password_change
                 created_user_row.status_info = "admin-requested"
-                created_user_row.created_at = datetime.now()
-                created_user_row.modified_at = datetime.now()
+                created_user_row.created_at = datetime.now(tz=UTC)
+                created_user_row.modified_at = datetime.now(tz=UTC)
                 created_user_row.resource_policy = spec.resource_policy
                 created_user_row.allowed_client_ip = spec.allowed_client_ip
                 created_user_row.totp_activated = spec.totp_activated
@@ -518,8 +518,8 @@ class TestUserRepositoryIntegration:
             description="Test Description",
             status=UserStatus.ACTIVE,
             status_info="admin-requested",
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             domain_name="default",
             role=UserRole.USER,
             resource_policy="default",

@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
@@ -234,8 +234,8 @@ class Circuit(Base, BaseMixin):
         c.session_ids = [r.session_id for r in route_info]
         c.runtime_variant = runtime_variant
 
-        c.created_at = datetime.now()
-        c.updated_at = datetime.now()
+        c.created_at = datetime.now(UTC)
+        c.updated_at = datetime.now(UTC)
 
         return c
 

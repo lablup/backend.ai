@@ -10,7 +10,7 @@ import os
 from collections.abc import Awaitable, Callable, Iterator
 from contextlib import AbstractAsyncContextManager
 from contextlib import contextmanager as ctxmgr
-from datetime import datetime
+from datetime import UTC, datetime
 from http import HTTPStatus
 from pathlib import Path, PurePosixPath
 from typing import (
@@ -1074,7 +1074,7 @@ async def create_download_session(request: web.Request) -> web.Response:
             "volume": params["volume"],
             "vfid": str(params["vfid"]),
             "relpath": str(params["relpath"]),
-            "exp": datetime.utcnow() + ctx.local_config.storage_proxy.session_expire,
+            "exp": datetime.now(UTC) + ctx.local_config.storage_proxy.session_expire,
         }
         token = jwt.encode(
             token_data,
@@ -1120,7 +1120,7 @@ async def create_upload_session(request: web.Request) -> web.Response:
             "relpath": str(params["relpath"]),
             "size": params["size"],
             "session": session_id,
-            "exp": datetime.utcnow() + ctx.local_config.storage_proxy.session_expire,
+            "exp": datetime.now(UTC) + ctx.local_config.storage_proxy.session_expire,
         }
         token = jwt.encode(
             token_data,

@@ -11,7 +11,7 @@ import pwd
 import random
 import re
 import uuid
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Generator, Iterable, Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path as _Path
 from pathlib import PurePath as _PurePath
@@ -85,11 +85,13 @@ class AliasedKey(t.Key):
     or the renamed key set via ``to_name()`` method or the ``>>`` operator.
     """
 
+    names: Sequence[str]
+
     def __init__(self, names: Sequence[str], **kwargs) -> None:
         super().__init__(names[0], **kwargs)
         self.names = names
 
-    def __call__(self, data, context=None) -> tuple:
+    def __call__(self, data, context=None) -> Generator[tuple, None, None]:  # type: ignore[override]
         for name in self.names:
             if name in data:
                 key = name
@@ -98,21 +100,21 @@ class AliasedKey(t.Key):
             key = None
 
         if key is None:  # not specified
-            if self.default is not _empty:
-                default = self.default() if callable(self.default) else self.default
+            if self.default is not _empty:  # type: ignore[attr-defined]
+                default = self.default() if callable(self.default) else self.default  # type: ignore[attr-defined]
                 try:
-                    result = self.trafaret(default, context=context)
+                    result = self.trafaret(default, context=context)  # type: ignore[attr-defined]
                 except t.DataError as inner_error:
                     yield self.get_name(), inner_error, self.names
                 else:
                     yield self.get_name(), result, self.names
                 return
-            if not self.optional:
+            if not self.optional:  # type: ignore[attr-defined]
                 yield self.get_name(), t.DataError(error="is required"), self.names
             # if optional, just bypass
         else:
             try:
-                result = self.trafaret(data[key], context=context)
+                result = self.trafaret(data[key], context=context)  # type: ignore[attr-defined]
             except t.DataError as inner_error:
                 yield key, inner_error, self.names
             else:

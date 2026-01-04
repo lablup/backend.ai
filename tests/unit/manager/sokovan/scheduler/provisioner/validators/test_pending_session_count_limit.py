@@ -1,7 +1,7 @@
 """Tests for pending session count limit validator."""
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -60,12 +60,12 @@ class TestPendingSessionCountLimitValidator:
                         PendingSessionInfo(
                             session_id=SessionId(uuid.uuid4()),
                             requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
-                            creation_time=datetime.now(),
+                            creation_time=datetime.now(tz=UTC),
                         ),
                         PendingSessionInfo(
                             session_id=SessionId(uuid.uuid4()),
                             requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
-                            creation_time=datetime.now(),
+                            creation_time=datetime.now(tz=UTC),
                         ),
                     ]
                 }
@@ -108,12 +108,12 @@ class TestPendingSessionCountLimitValidator:
                         PendingSessionInfo(
                             session_id=SessionId(uuid.uuid4()),
                             requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
-                            creation_time=datetime.now(),
+                            creation_time=datetime.now(tz=UTC),
                         ),
                         PendingSessionInfo(
                             session_id=SessionId(uuid.uuid4()),
                             requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
-                            creation_time=datetime.now(),
+                            creation_time=datetime.now(tz=UTC),
                         ),
                     ]
                 }
@@ -157,7 +157,7 @@ class TestPendingSessionCountLimitValidator:
                         PendingSessionInfo(
                             session_id=SessionId(uuid.uuid4()),
                             requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
-                            creation_time=datetime.now(),
+                            creation_time=datetime.now(tz=UTC),
                         )
                         for _ in range(100)  # Many pending sessions
                     ]
@@ -192,7 +192,7 @@ class TestPendingSessionCountLimitValidator:
                         PendingSessionInfo(
                             session_id=SessionId(uuid.uuid4()),
                             requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
-                            creation_time=datetime.now(),
+                            creation_time=datetime.now(tz=UTC),
                         )
                         for _ in range(10)
                     ]

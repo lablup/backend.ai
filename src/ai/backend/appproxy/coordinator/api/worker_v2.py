@@ -5,7 +5,7 @@ import logging
 import textwrap
 import uuid
 from collections.abc import Iterable
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
@@ -212,7 +212,7 @@ async def update_worker(
             worker.wildcard_traffic_port = params.wildcard_traffic_port
             worker.filtered_apps_only = params.filtered_apps_only
             worker.traefik_last_used_marker_path = params.traefik_last_used_marker_path
-            worker.updated_at = datetime.now()
+            worker.updated_at = datetime.now(UTC)
             worker.nodes += 1
             worker.status = WorkerStatus.ALIVE
         except ObjectNotFound:
@@ -290,7 +290,7 @@ async def heartbeat_worker(request: web.Request) -> PydanticResponse[WorkerRespo
 
     async def _update(sess: SASession) -> dict:
         worker = await Worker.get(sess, worker_id)
-        worker.updated_at = datetime.now()
+        worker.updated_at = datetime.now(UTC)
         worker.status = WorkerStatus.ALIVE
         result = dict(worker.dump_model())
         result["slots"] = [

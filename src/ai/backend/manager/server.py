@@ -22,7 +22,7 @@ from collections.abc import (
 )
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from pprint import pformat
 from typing import (
@@ -553,7 +553,7 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             mgr_status = ManagerStatus.RUNNING
         log.info("Manager status: {}", mgr_status)
         tz = root_ctx.config_provider.config.system.timezone
-        log.info("Configured timezone: {}", tz.tzname(datetime.now()))
+        log.info("Configured timezone: {}", tz.tzname(datetime.now(UTC)))
     yield
 
 

@@ -26,7 +26,7 @@ class Terminal:
     """
 
     def __init__(self, shell_cmd, ev_term, sock_out, *, auto_restart=True, loop=None) -> None:
-        self._sorna_media = []
+        self._sorna_media: list = []
         self.zctx = sock_out.context
 
         self.ev_term = ev_term

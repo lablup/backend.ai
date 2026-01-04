@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import datetime
 import logging
 import uuid
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, overload
 
 import graphene
@@ -337,7 +337,7 @@ class ModifyNetwork(graphene.Mutation):
 
             async def _do_mutate() -> ModifyNetwork:
                 orm_set_if_set(props, row, "name")
-                row.updated_at = datetime.datetime.now()
+                row.updated_at = datetime.now(UTC)
                 return ModifyNetwork(
                     ok=True,
                     msg="Network altered",

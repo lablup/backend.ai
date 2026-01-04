@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -91,7 +91,7 @@ class TestGenerateToken:
                     service_id=uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"),
                     duration=None,
                     valid_until=None,
-                    expires_at=int(datetime.utcnow().timestamp()) + 86400,
+                    expires_at=int(datetime.now(tz=UTC).timestamp()) + 86400,
                 ),
                 GenerateTokenActionResult(
                     data=EndpointTokenData(
@@ -101,7 +101,7 @@ class TestGenerateToken:
                         session_owner=uuid.UUID("00000000-0000-0000-0000-000000000001"),
                         domain="default",
                         project=uuid.UUID("00000000-0000-0000-0000-000000000002"),
-                        created_at=datetime.utcnow(),
+                        created_at=datetime.now(tz=UTC),
                     ),
                 ),
             ),
@@ -127,7 +127,7 @@ class TestGenerateToken:
                         session_owner=uuid.UUID("00000000-0000-0000-0000-000000000001"),
                         domain="default",
                         project=uuid.UUID("00000000-0000-0000-0000-000000000002"),
-                        created_at=datetime.utcnow(),
+                        created_at=datetime.now(tz=UTC),
                     ),
                 ),
             ),
@@ -143,7 +143,7 @@ class TestGenerateToken:
                     service_id=uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff"),
                     duration=None,
                     valid_until=None,
-                    expires_at=int(datetime.utcnow().timestamp()) + 3600,
+                    expires_at=int(datetime.now(tz=UTC).timestamp()) + 3600,
                 ),
                 GenerateTokenActionResult(
                     data=EndpointTokenData(
@@ -153,7 +153,7 @@ class TestGenerateToken:
                         session_owner=uuid.UUID("00000000-0000-0000-0000-000000000001"),
                         domain="default",
                         project=uuid.UUID("00000000-0000-0000-0000-000000000002"),
-                        created_at=datetime.utcnow(),
+                        created_at=datetime.now(tz=UTC),
                     ),
                 ),
             ),

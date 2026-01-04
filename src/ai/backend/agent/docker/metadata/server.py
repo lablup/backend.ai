@@ -118,7 +118,7 @@ class MetadataServer(aobject):
         await prepare_kernel_metadata_uri_handling(local_config)
         self.app["docker-mode"] = local_config.agent.docker_mode
         log.info("Loading metadata plugin: meta-data")
-        metadata_plugin = ContainerMetadataPlugin({}, local_config)
+        metadata_plugin = ContainerMetadataPlugin({}, local_config.model_dump())
         await metadata_plugin.init(None)
         metadata_app, global_middlewares, route_structures = await metadata_plugin.create_app()
         self._init_subapp(

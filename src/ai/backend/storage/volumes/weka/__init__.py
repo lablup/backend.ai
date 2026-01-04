@@ -4,7 +4,7 @@ import asyncio
 import logging
 import os
 from collections.abc import Mapping
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional
 
@@ -199,7 +199,7 @@ class WekaVolume(BaseVolume):
         )
 
     async def get_performance_metric(self) -> FSPerfMetric:
-        start_time = datetime.now().replace(second=0, microsecond=0) - timedelta(
+        start_time = datetime.now(UTC).replace(second=0, microsecond=0) - timedelta(
             minutes=1,
         )
 

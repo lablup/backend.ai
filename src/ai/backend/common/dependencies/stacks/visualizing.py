@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import TextIO
 
@@ -122,7 +122,7 @@ class VisualizingDependencyStack(DependencyStack):
         event = DependencyEvent(
             stage_name=stage_name,
             status=status,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(UTC),
             error=error,
             depth=self._depth,
         )

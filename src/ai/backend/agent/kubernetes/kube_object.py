@@ -113,8 +113,8 @@ class NFSPersistentVolume(AbstractAPIObject):
         self.path = path
         self.name = name
         self.capacity = capacity
-        self.labels = {}
-        self.options = []
+        self.labels: dict[str, str] = {}
+        self.options: list[str] = []
 
     def label(self, k, v):
         self.labels[k] = v
@@ -146,8 +146,8 @@ class HostPathPersistentVolume(AbstractAPIObject):
         self.path = path
         self.name = name
         self.capacity = capacity
-        self.labels = {}
-        self.options = []
+        self.labels: dict[str, str] = {}
+        self.options: list[str] = []
 
     def label(self, k, v):
         self.labels[k] = v
@@ -178,7 +178,7 @@ class PersistentVolumeClaim(AbstractAPIObject):
         self.name = name
         self.pv_name = pv_name
         self.capacity = capacity
-        self.labels = {}
+        self.labels: dict[str, str] = {}
 
     def label(self, k, v):
         self.labels[k] = v

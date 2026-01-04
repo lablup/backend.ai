@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Optional, Self
 
 import graphene
@@ -223,7 +223,7 @@ class KeyPair(graphene.ObjectType):
         row_ts = await ctx.valkey_stat.get_keypair_last_used_time(self.access_key)
         if row_ts is None:
             return None
-        return datetime.fromtimestamp(row_ts)
+        return datetime.fromtimestamp(row_ts, tz=UTC)
 
     @classmethod
     async def load_all(

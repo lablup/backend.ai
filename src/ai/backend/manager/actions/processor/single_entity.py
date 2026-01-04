@@ -1,7 +1,7 @@
 import logging
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Generic, Optional
 
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -36,7 +36,7 @@ class SingleEntityActionProcessor(Generic[TSingleEntityAction, TSingleEntityActi
         self._validators = validators or []
 
     async def _run(self, action: TSingleEntityAction) -> TSingleEntityActionResult:
-        started_at = datetime.now()
+        started_at = datetime.now(UTC)
         action_id = uuid.uuid4()
         action_trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
         for validator in self._validators:

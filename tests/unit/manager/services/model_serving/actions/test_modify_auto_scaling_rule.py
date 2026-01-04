@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
@@ -214,7 +214,7 @@ class TestModifyAutoScalingRule:
                 cooldown_seconds=300,
                 min_replicas=2,
                 max_replicas=10,
-                created_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
                 last_triggered_at=None,
                 endpoint=uuid.UUID("11111111-1111-1111-1111-111111111111"),
             )

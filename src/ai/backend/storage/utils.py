@@ -28,7 +28,7 @@ class CheckParamSource(enum.Enum):
 
 
 def fstime2datetime(t: float | int) -> datetime:
-    return datetime.utcfromtimestamp(t).replace(tzinfo=UTC)
+    return datetime.fromtimestamp(t, tz=UTC)
 
 
 @actxmgr

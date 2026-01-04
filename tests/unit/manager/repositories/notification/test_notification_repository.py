@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 
@@ -178,8 +178,8 @@ class TestNotificationRepository:
                 config=config.model_dump(),
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             db_sess.add(channel)
             await db_sess.commit()
@@ -206,8 +206,8 @@ class TestNotificationRepository:
                 message_template="Session {{ session_id }} started",
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             db_sess.add(rule)
             await db_sess.commit()
@@ -234,8 +234,8 @@ class TestNotificationRepository:
                     config=config.model_dump(),
                     enabled=True,
                     created_by=test_user,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
+                    created_at=datetime.now(tz=UTC),
+                    updated_at=datetime.now(tz=UTC),
                 )
                 db_sess.add(channel)
                 channel_ids.append(channel_id)
@@ -263,8 +263,8 @@ class TestNotificationRepository:
                     config=config.model_dump(),
                     enabled=True,
                     created_by=test_user,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
+                    created_at=datetime.now(tz=UTC),
+                    updated_at=datetime.now(tz=UTC),
                 )
                 db_sess.add(channel)
                 channel_ids.append(channel_id)
@@ -292,8 +292,8 @@ class TestNotificationRepository:
                     config=config.model_dump(),
                     enabled=(i % 2 == 0),  # Even indexes enabled
                     created_by=test_user,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
+                    created_at=datetime.now(tz=UTC),
+                    updated_at=datetime.now(tz=UTC),
                 )
                 db_sess.add(channel)
                 channel_ids.append(channel_id)
@@ -321,8 +321,8 @@ class TestNotificationRepository:
                     config=config.model_dump(),
                     enabled=True,
                     created_by=test_user,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
+                    created_at=datetime.now(tz=UTC),
+                    updated_at=datetime.now(tz=UTC),
                 )
                 db_sess.add(channel)
                 channel_ids.append(channel_id)
@@ -437,7 +437,6 @@ class TestNotificationRepository:
         test_user: uuid.UUID,
     ) -> None:
         """Test listing all channels"""
-        from datetime import datetime
 
         config = WebhookConfig(url="https://example.com/webhook")
 
@@ -451,8 +450,8 @@ class TestNotificationRepository:
                 config=config.model_dump(),
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             disabled_channel = NotificationChannelRow(
                 id=uuid.uuid4(),
@@ -462,8 +461,8 @@ class TestNotificationRepository:
                 config=config.model_dump(),
                 enabled=False,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             db_sess.add(enabled_channel)
             db_sess.add(disabled_channel)
@@ -535,7 +534,6 @@ class TestNotificationRepository:
         test_user: uuid.UUID,
     ) -> None:
         """Test retrieving rules matching a rule type"""
-        from datetime import datetime
 
         # Create rules directly in DB
         async with db_with_cleanup.begin_session() as db_sess:
@@ -549,8 +547,8 @@ class TestNotificationRepository:
                 message_template="Session started",
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             # Create non-matching rule
             non_matching_rule = NotificationRuleRow(
@@ -562,8 +560,8 @@ class TestNotificationRepository:
                 message_template="Session terminated",
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             # Create disabled matching rule
             disabled_rule = NotificationRuleRow(
@@ -575,8 +573,8 @@ class TestNotificationRepository:
                 message_template="Disabled",
                 enabled=False,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             db_sess.add(matching_rule)
             db_sess.add(non_matching_rule)
@@ -638,7 +636,6 @@ class TestNotificationRepository:
         test_user: uuid.UUID,
     ) -> None:
         """Test listing notification rules with filters"""
-        from datetime import datetime
 
         # Create rules directly in DB
         async with db_with_cleanup.begin_session() as db_sess:
@@ -652,8 +649,8 @@ class TestNotificationRepository:
                 message_template="Test",
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             # Create another session.started rule (disabled)
             rule2 = NotificationRuleRow(
@@ -665,8 +662,8 @@ class TestNotificationRepository:
                 message_template="Test",
                 enabled=False,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             # Create session.terminated rule (enabled)
             rule3 = NotificationRuleRow(
@@ -678,8 +675,8 @@ class TestNotificationRepository:
                 message_template="Test",
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             db_sess.add(rule1)
             db_sess.add(rule2)
@@ -729,7 +726,6 @@ class TestNotificationRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Test deleting a channel that has associated rules"""
-        from datetime import datetime
 
         config = WebhookConfig(url="https://example.com/webhook")
         channel_id = uuid.uuid4()
@@ -745,8 +741,8 @@ class TestNotificationRepository:
                 config=config.model_dump(),
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             rule = NotificationRuleRow(
                 id=rule_id,
@@ -757,8 +753,8 @@ class TestNotificationRepository:
                 message_template="Test",
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             db_sess.add(channel)
             db_sess.add(rule)

@@ -1,7 +1,7 @@
 """Tests for DownloadStep implementations."""
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
@@ -181,8 +181,8 @@ def mock_model_info() -> ModelData:
         name="DialoGPT-medium",
         author="microsoft",
         tags=["pytorch", "text-generation"],
-        created_at=datetime(2021, 1, 1),
-        modified_at=datetime(2023, 6, 15),
+        created_at=datetime(2021, 1, 1, tzinfo=UTC),
+        modified_at=datetime(2023, 6, 15, tzinfo=UTC),
         size=2048000,
     )
 
@@ -328,8 +328,8 @@ class TestHuggingFaceDownloadStep:
         mock_hf_model.id = "microsoft/DialoGPT-medium"
         mock_hf_model.author = "microsoft"
         mock_hf_model.tags = ["pytorch", "text-generation"]
-        mock_hf_model.created_at = datetime(2021, 1, 1)
-        mock_hf_model.last_modified = datetime(2023, 6, 15)
+        mock_hf_model.created_at = datetime(2021, 1, 1, tzinfo=UTC)
+        mock_hf_model.last_modified = datetime(2023, 6, 15, tzinfo=UTC)
         mock_list_models.return_value = [mock_hf_model]
 
         scanner = hf_download_step._make_scanner("test_registry")
@@ -373,8 +373,8 @@ class TestHuggingFaceDownloadStep:
         mock_hf_model.id = "microsoft/DialoGPT-medium"
         mock_hf_model.author = "microsoft"
         mock_hf_model.tags = ["pytorch", "text-generation"]
-        mock_hf_model.created_at = datetime(2021, 1, 1)
-        mock_hf_model.last_modified = datetime(2023, 6, 15)
+        mock_hf_model.created_at = datetime(2021, 1, 1, tzinfo=UTC)
+        mock_hf_model.last_modified = datetime(2023, 6, 15, tzinfo=UTC)
         mock_model_info.return_value = mock_hf_model
 
         scanner = hf_download_step._make_scanner("test_registry")

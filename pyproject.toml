@@ -107,8 +107,7 @@ select = [
     "T20",    # flake8-print: detects print statements (should use logging)
     "TID252", # flake8-tidy-imports: prefer absolute imports over parent relative imports
     "ANN",    # flake8-annotations: enforces type annotations
-    # Deferred rules (require significant changes):
-    # "DTZ",  # flake8-datetimez: enforces timezone-aware datetime usage (208 violations)
+    "DTZ",    # flake8-datetimez: enforces timezone-aware datetime usage
 ]
 ignore = [
     "E203",   # whitespace before ':' - conflicts with Black formatter

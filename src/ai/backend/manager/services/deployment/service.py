@@ -1,7 +1,7 @@
 """Deployment service for managing model deployments."""
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
@@ -197,7 +197,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
             ],
             image_id=info.current_revision_id
             or info.id,  # Placeholder: actual image_id not in ImageIdentifier
-            created_at=info.metadata.created_at or datetime.now(),
+            created_at=info.metadata.created_at or datetime.now(UTC),
         )
 
     desired_count = info.replica_spec.desired_replica_count
@@ -212,8 +212,8 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
             tags=[info.metadata.tag] if info.metadata.tag else [],
             project_id=info.metadata.project,
             domain_name=info.metadata.domain,
-            created_at=info.metadata.created_at or datetime.now(),
-            updated_at=info.metadata.created_at or datetime.now(),
+            created_at=info.metadata.created_at or datetime.now(UTC),
+            updated_at=info.metadata.created_at or datetime.now(UTC),
         ),
         network_access=info.network,
         revision_history_ids=[info.current_revision_id] if info.current_revision_id else [],
@@ -693,7 +693,7 @@ class DeploymentService:
             id=token_row.id,
             token=token_row.token,
             valid_until=action.creator.valid_until,
-            created_at=token_row.created_at or datetime.now(),
+            created_at=token_row.created_at or datetime.now(UTC),
         )
         return CreateAccessTokenActionResult(data=data)
 

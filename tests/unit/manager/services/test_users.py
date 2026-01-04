@@ -8,7 +8,7 @@ Repository tests verify actual DB operations separately.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -90,8 +90,8 @@ class TestCreateUser:
             is_active=True,
             status=UserStatus.ACTIVE,
             status_info=None,
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             domain_name="default",
             role=UserRole.USER,
             resource_policy="default",
@@ -113,8 +113,8 @@ class TestCreateUser:
             secret_key=SecretKey("test-secret-key"),
             is_active=True,
             is_admin=False,
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             resource_policy_name="default",
             rate_limit=60000,
             ssh_public_key=None,
@@ -269,8 +269,8 @@ class TestModifyUser:
             is_active=True,
             status=UserStatus.ACTIVE,
             status_info=None,
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             domain_name="default",
             role=UserRole.USER,
             resource_policy="default",
@@ -443,8 +443,8 @@ class TestPurgeUser:
             is_active=True,
             status=UserStatus.ACTIVE,
             status_info=None,
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             domain_name="default",
             role=UserRole.USER,
             resource_policy="default",

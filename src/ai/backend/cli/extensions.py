@@ -75,8 +75,8 @@ class AliasGroupMixin(click.Group):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._commands = {}
-        self._aliases = {}
+        self._commands: dict[str, click.Command] = {}
+        self._aliases: dict[str, str] = {}
 
     def command(self, *args, **kwargs):
         aliases = kwargs.pop("aliases", [])

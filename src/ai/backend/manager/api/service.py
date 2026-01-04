@@ -2,7 +2,7 @@ import logging
 import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Optional, Self
 
@@ -1023,7 +1023,7 @@ class TokenRequestModel(LegacyBaseRequestModel):
 
     @model_validator(mode="after")
     def check_lifetime(self) -> Self:
-        now = datetime.now()
+        now = datetime.now(UTC)
         if self.valid_until is not None:
             self.expires_at = self.valid_until
         elif self.duration is not None:

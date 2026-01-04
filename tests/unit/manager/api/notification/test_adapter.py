@@ -5,7 +5,7 @@ Tests conversion from DTO objects to repository Querier objects.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import cast
 from uuid import uuid4
 
@@ -537,7 +537,7 @@ class TestNotificationChannelAdapterConversion:
 
     def test_convert_to_dto(self) -> None:
         """Test converting NotificationChannelData to NotificationChannelDTO"""
-        now = datetime.now()
+        now = datetime.now(tz=UTC)
         channel_id = uuid4()
         user_id = uuid4()
 
@@ -612,7 +612,7 @@ class TestNotificationRuleAdapterConversion:
 
     def test_convert_to_dto(self) -> None:
         """Test converting NotificationRuleData to NotificationRuleDTO"""
-        now = datetime.now()
+        now = datetime.now(tz=UTC)
         rule_id = uuid4()
         channel_id = uuid4()
         user_id = uuid4()

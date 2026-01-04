@@ -5,7 +5,7 @@ import pprint
 import time
 import traceback
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from types import TracebackType
 from typing import Any, TypeAlias, cast
 
@@ -61,7 +61,7 @@ class CustomJsonFormatter(JsonFormatter):
         super().add_fields(log_record, record, message_dict)
         if not log_record.get("timestamp"):
             # this doesn't use record.created, so it is slightly off
-            now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+            now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
             log_record["timestamp"] = now
         if loglevel := log_record.get("level"):
             log_record["level"] = loglevel.upper()

@@ -7,7 +7,7 @@ import subprocess
 import sys
 from collections import OrderedDict, defaultdict
 from collections.abc import Sequence
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from graphlib import TopologicalSorter
 from pathlib import Path
 from typing import IO, Literal, Optional
@@ -819,7 +819,7 @@ def ls(session_id, path):
             table = []
             headers = ["File name", "Size", "Modified", "Mode"]
             for file in files:
-                mdt = datetime.fromtimestamp(file["mtime"])
+                mdt = datetime.fromtimestamp(file["mtime"], tz=UTC)
                 fsize = naturalsize(file["size"], binary=True)
                 mtime = mdt.strftime("%b %d %Y %H:%M:%S")
                 row = [file["filename"], fsize, mtime, file["mode"]]
@@ -1544,8 +1544,8 @@ def get_dependency_session_tree(root_node: OrderedDict) -> treelib.Tree:
         if session["status_changed"] != "None":
             status_changed = datetime.strptime(
                 discard_below_dot(session["status_changed"]), "%Y-%m-%d %H:%M:%S"
-            )
-            delta = f" {discard_below_dot(str(datetime.now() - status_changed))} ago"
+            ).replace(tzinfo=UTC)
+            delta = f" {discard_below_dot(str(datetime.now(UTC) - status_changed))} ago"
 
         return f'{task_name} ("{status}"{delta})'
 

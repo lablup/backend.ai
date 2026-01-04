@@ -1,8 +1,8 @@
-import datetime
 import json
 import logging
 import uuid
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 import aiohttp_cors
@@ -74,7 +74,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 user_uuid = st["user_uuid"]
             query = session_templates.insert().values({
                 "id": template_id,
-                "created_at": datetime.datetime.now(),
+                "created_at": datetime.now(UTC),
                 "domain_name": params["domain"],
                 "group_id": group_id,
                 "user_uuid": user_uuid,

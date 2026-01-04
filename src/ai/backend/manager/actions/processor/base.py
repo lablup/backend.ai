@@ -1,7 +1,7 @@
 import logging
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Generic, Optional
 
 from ai.backend.common.exception import BackendAIError, ErrorCode
@@ -86,7 +86,7 @@ class ActionRunner(Generic[TAction, TActionResult]):
             entity_id = action.entity_id()
             if entity_id is None and result is not None:
                 entity_id = result.entity_id()
-            ended_at = datetime.now()
+            ended_at = datetime.now(UTC)
             duration = ended_at - started_at
             meta = BaseActionResultMeta(
                 action_id=action_id,
@@ -120,7 +120,7 @@ class ActionProcessor(Generic[TAction, TActionResult]):
         self._validators = validators or []
 
     async def _run(self, action: TAction) -> TActionResult:
-        started_at = datetime.now()
+        started_at = datetime.now(UTC)
         action_id = uuid.uuid4()
         action_trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
         for validator in self._validators:

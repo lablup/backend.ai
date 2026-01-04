@@ -4,7 +4,7 @@ import datetime as dt
 import logging
 import uuid
 from collections.abc import MutableMapping
-from datetime import datetime
+from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any
 
@@ -225,7 +225,7 @@ async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogClean
             "falling back to 90 days",
             raw_lifetime,
         )
-    boundary = datetime.now() - lifetime
+    boundary = datetime.now(UTC) - lifetime
     async with root_ctx.db.begin() as conn:
         query = sa.delete(error_logs).where(error_logs.c.created_at < boundary)
         result = await conn.execute(query)

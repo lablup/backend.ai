@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
@@ -201,7 +201,7 @@ async def test_authorize_with_password_expiry(
     )
 
     # Setup expired password
-    password_changed_at = datetime.now() - timedelta(days=100)
+    password_changed_at = datetime.now(tz=UTC) - timedelta(days=100)
     mock_auth_repository.check_credential_with_migration.return_value = {
         "uuid": UUID("12345678-1234-5678-1234-567812345678"),
         "email": "expired@example.com",
@@ -209,7 +209,7 @@ async def test_authorize_with_password_expiry(
         "status": UserStatus.ACTIVE,
         "password_changed_at": password_changed_at,
     }
-    mock_auth_repository.get_current_time.return_value = datetime.now()
+    mock_auth_repository.get_current_time.return_value = datetime.now(tz=UTC)
 
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
         status=HookResults.PASSED,

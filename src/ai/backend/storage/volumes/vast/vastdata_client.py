@@ -192,7 +192,7 @@ class VASTAPIClient:
                     "verify_signature": False,
                 },
             )
-            return datetime.fromtimestamp(decoded["exp"])
+            return datetime.fromtimestamp(decoded["exp"], tz=UTC)
 
         if self._auth_token is None:
             return await self._login()

@@ -843,10 +843,10 @@ class BinarySize(int):
             return f"{value:f}{suffix.lower()}"
         # use the given scale
         suffix = format_spec.lower()
-        multiplier = type(self).suffix_map.get(suffix)
-        if multiplier is None:
+        maybe_multiplier = type(self).suffix_map.get(suffix)
+        if maybe_multiplier is None:
             raise ValueError("Unsupported scale unit.", suffix)
-        value = self._quantize(self, multiplier)
+        value = self._quantize(self, maybe_multiplier)
         return f"{value:f}{suffix.lower()}".strip()
 
 

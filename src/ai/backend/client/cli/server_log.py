@@ -1,5 +1,5 @@
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 
 import click
 
@@ -32,7 +32,7 @@ def list(mark_read, page_size, page_number):
             if logs is not None:
                 print("Total log count:", count)
                 for log in logs:
-                    log_time = datetime.utcfromtimestamp(log["created_at"]).strftime(
+                    log_time = datetime.fromtimestamp(log["created_at"], tz=UTC).strftime(
                         "%Y-%m-%d %H:%M:%S"
                     )
                     print("----")

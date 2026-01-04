@@ -2,7 +2,7 @@
 
 import logging
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 from uuid import UUID
 
@@ -336,7 +336,7 @@ async def status(request: web.Request) -> PydanticResponse[StatusResponseModel]:
                     ha_setup=w.nodes > 1,
                 )
                 for w in workers
-                if (w.updated_at.timestamp() - datetime.now().timestamp()) <= 30
+                if (w.updated_at.timestamp() - datetime.now(UTC).timestamp()) <= 30
             ],
         )
     )

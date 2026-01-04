@@ -41,7 +41,7 @@ class StringSetFlag(enum.StrEnum):
 
     def __rxor__(self, other) -> set[str] | str:
         if isinstance(other, (set, frozenset)):
-            return other ^ {self.value}
+            return set(other) ^ {self.value}
         if isinstance(other, str):
             if other == self.value:
                 return set()

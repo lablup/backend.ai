@@ -1,7 +1,7 @@
 import enum
 import os
 import pwd
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from ipaddress import IPv4Address, ip_address
 from uuid import UUID
 
@@ -366,21 +366,21 @@ def test_slug_ascii() -> None:
 
 
 def test_slug_length() -> None:
-    iv = tx.Slug[2:4]  # type: ignore
-    assert iv._min_length == 2
-    assert iv._max_length == 4
+    iv = tx.Slug[2:4]  # type: ignore[valid-type]
+    assert iv._min_length == 2  # type: ignore[attr-defined]
+    assert iv._max_length == 4  # type: ignore[attr-defined]
 
     iv = tx.Slug(max_length=4)
-    assert iv._min_length is None
-    assert iv._max_length == 4
+    assert iv._min_length is None  # type: ignore[attr-defined]
+    assert iv._max_length == 4  # type: ignore[attr-defined]
     assert iv.check("abc") == "abc"
     assert iv.check("abcd") == "abcd"
     with pytest.raises(t.DataError):
         iv.check("abcde")
 
     iv = tx.Slug(min_length=4)
-    assert iv._min_length == 4
-    assert iv._max_length is None
+    assert iv._min_length == 4  # type: ignore[attr-defined]
+    assert iv._max_length is None  # type: ignore[attr-defined]
     with pytest.raises(t.DataError):
         iv.check("abc")
     assert iv.check("abcd") == "abcd"
@@ -501,7 +501,7 @@ def test_json_string() -> None:
 
 def test_time_duration() -> None:
     iv = tx.TimeDuration()
-    date = datetime(2020, 2, 29)
+    date = datetime(2020, 2, 29, tzinfo=UTC)
     with pytest.raises(t.DataError):
         iv.check("")
     assert iv.check(0) == timedelta(seconds=0)

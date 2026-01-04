@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import AsyncGenerator, Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Optional
 
 import pytest
@@ -110,7 +110,7 @@ class TestScalingGroupRepositoryDB:
                     description=f"Test scaling group {i:02d}",
                     is_active=is_active_func(i),
                     is_public=True,
-                    created_at=datetime.now(),
+                    created_at=datetime.now(tz=UTC),
                     wsproxy_addr=None,
                     wsproxy_api_token=None,
                     driver="static",
@@ -171,7 +171,7 @@ class TestScalingGroupRepositoryDB:
                 description="Test scaling group for purge",
                 is_active=True,
                 is_public=True,
-                created_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
                 wsproxy_addr=None,
                 wsproxy_api_token=None,
                 driver="static",
@@ -242,7 +242,7 @@ class TestScalingGroupRepositoryDB:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                created_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
                 domain_name=test_domain,
                 resource_policy=test_resource_policy,
             )
@@ -254,7 +254,7 @@ class TestScalingGroupRepositoryDB:
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 description="Test group for cascade delete",
                 is_active=True,
-                created_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
                 domain_name=test_domain,
                 total_resource_slots={},
                 allowed_vfolder_hosts={},
@@ -287,7 +287,7 @@ class TestScalingGroupRepositoryDB:
                 description="Test scaling group for cascade delete",
                 is_active=True,
                 is_public=True,
-                created_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
                 wsproxy_addr=None,
                 wsproxy_api_token=None,
                 driver="static",

@@ -3,7 +3,7 @@ Integration tests for auth service with real database.
 These tests verify that the service methods work correctly with actual database connections.
 """
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 import pytest
@@ -63,7 +63,7 @@ async def test_signup_and_authorize_flow(auth_service, database_fixture):
     # 1. Signup new user
     signup_action = SignupAction(
         domain_name="default",
-        email=f"integration_test_{datetime.now().timestamp()}@example.com",
+        email=f"integration_test_{datetime.now(tz=UTC).timestamp()}@example.com",
         password="secure_password123",
         username="integration_user",
         full_name="Integration Test User",
@@ -100,7 +100,7 @@ async def test_signup_and_authorize_flow(auth_service, database_fixture):
 
 async def test_duplicate_signup_fails(auth_service, database_fixture):
     """Test that duplicate email signup fails"""
-    email = f"duplicate_test_{datetime.now().timestamp()}@example.com"
+    email = f"duplicate_test_{datetime.now(tz=UTC).timestamp()}@example.com"
 
     # First signup
     signup_action = SignupAction(
@@ -123,7 +123,7 @@ async def test_duplicate_signup_fails(auth_service, database_fixture):
 async def test_update_password_flow(auth_service, database_fixture, database_engine):
     """Test password update flow"""
     # Create a user first
-    email = f"password_test_{datetime.now().timestamp()}@example.com"
+    email = f"password_test_{datetime.now(tz=UTC).timestamp()}@example.com"
     old_password = "old_password123"
     new_password = "new_password456"
 
@@ -190,7 +190,7 @@ async def test_update_password_flow(auth_service, database_fixture, database_eng
 async def test_signout_flow(auth_service, database_fixture, database_engine):
     """Test signout flow"""
     # Create a user first
-    email = f"signout_test_{datetime.now().timestamp()}@example.com"
+    email = f"signout_test_{datetime.now(tz=UTC).timestamp()}@example.com"
     password = "password123"
 
     signup_action = SignupAction(
@@ -244,7 +244,7 @@ async def test_signout_flow(auth_service, database_fixture, database_engine):
 async def test_password_expiry_check(auth_service, auth_repository, database_fixture):
     """Test password expiry check during authorization"""
     # Create a user with an old password change date
-    email = f"expiry_test_{datetime.now().timestamp()}@example.com"
+    email = f"expiry_test_{datetime.now(tz=UTC).timestamp()}@example.com"
     password = "password123"
 
     signup_action = SignupAction(
@@ -260,7 +260,7 @@ async def test_password_expiry_check(auth_service, auth_repository, database_fix
     await auth_service.signup(signup_action)
 
     # Manually update password_changed_at to be old
-    old_date = datetime.now() - timedelta(days=100)
+    old_date = datetime.now(tz=UTC) - timedelta(days=100)
     async with auth_repository._db.begin() as conn:
         await conn.execute(
             sa.update(UserRow).where(UserRow.email == email).values(password_changed_at=old_date)

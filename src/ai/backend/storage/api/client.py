@@ -10,7 +10,7 @@ import os
 import urllib.parse
 from collections.abc import Mapping, MutableMapping
 from contextlib import AbstractAsyncContextManager
-from datetime import datetime
+from datetime import UTC, datetime
 from http import HTTPStatus
 from pathlib import Path
 from typing import (
@@ -180,7 +180,7 @@ async def download(request: web.Request) -> web.StreamResponse:
         if request.method == "HEAD":
             ifrange: datetime | None = request.if_range
             mtime = os.stat(file_path).st_mtime
-            last_mdt = datetime.fromtimestamp(mtime)
+            last_mdt = datetime.fromtimestamp(mtime, tz=UTC)
             resp_status = 200
             if ifrange is not None and mtime <= ifrange.timestamp():
                 # Return partial content.

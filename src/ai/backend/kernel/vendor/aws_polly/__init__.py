@@ -20,8 +20,8 @@ class Runner(BaseRunner):
         super().__init__(*args, **kwargs)
         self.inproc_runner = None
         self.sentinel = object()
-        self.input_queue = None
-        self.output_queue = None
+        self.input_queue: janus.Queue | None = None
+        self.output_queue: janus.Queue | None = None
         # NOTE: If credentials are missing,
         #       boto3 will try to use the instance role.
         self.access_key = self.child_env.get("AWS_ACCESS_KEY_ID", None)
@@ -42,6 +42,8 @@ class Runner(BaseRunner):
 
     async def query(self, code_text) -> int:
         self.ensure_inproc_runner()
+        assert self.input_queue is not None
+        assert self.output_queue is not None
         await self.input_queue.async_q.put(code_text)
         # Read the generated outputs until done
         while True:
