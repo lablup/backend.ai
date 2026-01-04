@@ -9,13 +9,13 @@ import ssl
 import sys
 import time
 import traceback
-from collections.abc import MutableMapping, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Mapping, MutableMapping, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 from pprint import pprint
-from typing import Any, AsyncGenerator, AsyncIterator, Mapping, Optional, cast
+from typing import Any, Optional, cast
 from uuid import uuid4
 
 import aiohttp

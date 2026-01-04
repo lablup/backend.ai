@@ -1,7 +1,8 @@
 import logging
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any, Mapping, Optional, cast
+from typing import Any, Optional, cast
 from uuid import UUID
 
 import msgpack

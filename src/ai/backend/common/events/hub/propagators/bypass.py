@@ -1,7 +1,8 @@
 import asyncio
 import logging
 import uuid
-from typing import AsyncIterator, Optional
+from collections.abc import AsyncIterator
+from typing import Optional
 
 from ai.backend.common.events.dispatcher import AbstractEvent
 from ai.backend.common.events.hub.hub import EventPropagator

@@ -1,4 +1,5 @@
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from ai.backend.client.output.fields import group_fields, quota_scope_fields, user_fields
 from ai.backend.client.output.types import FieldSpec

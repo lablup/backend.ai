@@ -1,7 +1,7 @@
 import os
-from collections.abc import Collection
+from collections.abc import Collection, Iterable
 from pathlib import Path
-from typing import Iterable, Optional, Self
+from typing import Optional, Self
 
 from ai.backend.common.docker import KernelFeatures
 from ai.backend.common.types import KernelId

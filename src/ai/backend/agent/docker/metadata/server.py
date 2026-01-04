@@ -1,7 +1,7 @@
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, MutableMapping, Sequence
 from http import HTTPStatus
-from typing import Any, List, Mapping, MutableMapping, cast
+from typing import Any, List, cast
 from uuid import UUID
 
 import attr

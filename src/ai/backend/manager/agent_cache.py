@@ -3,9 +3,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
-from typing import AsyncIterator, Callable, Optional
+from typing import Optional
 
 import sqlalchemy as sa
 import zmq

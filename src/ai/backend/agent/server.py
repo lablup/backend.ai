@@ -11,22 +11,24 @@ import sys
 import time
 import traceback
 from collections import OrderedDict, defaultdict
-from collections.abc import AsyncIterator
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
+    Callable,
+    Coroutine,
+    Iterable,
+    Mapping,
+    Sequence,
+)
 from contextlib import AsyncExitStack, asynccontextmanager
 from ipaddress import ip_network
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import (
     Any,
-    AsyncGenerator,
-    Callable,
     ClassVar,
-    Coroutine,
-    Iterable,
     Literal,
-    Mapping,
     Optional,
-    Sequence,
     Set,
     cast,
 )

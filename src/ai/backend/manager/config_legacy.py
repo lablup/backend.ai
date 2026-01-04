@@ -7,17 +7,14 @@ import socket
 import sys
 from abc import abstractmethod
 from collections import UserDict
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Awaitable,
-    Callable,
     Final,
     List,
     Optional,
-    Sequence,
     TypeAlias,
 )
 

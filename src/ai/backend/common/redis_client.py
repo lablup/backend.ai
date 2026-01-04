@@ -1,7 +1,8 @@
 import asyncio
 import logging
 import socket
-from typing import Any, AsyncContextManager, AsyncIterator, Final, Optional, Sequence
+from collections.abc import AsyncIterator, Sequence
+from typing import Any, AsyncContextManager, Final, Optional
 
 import hiredis
 

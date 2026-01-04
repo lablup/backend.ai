@@ -1,5 +1,6 @@
 import textwrap
-from typing import Any, Iterable, Optional, Sequence
+from collections.abc import Iterable, Sequence
+from typing import Any, Optional
 
 from ai.backend.cli.types import Undefined, undefined
 from ai.backend.client.output.fields import group_fields

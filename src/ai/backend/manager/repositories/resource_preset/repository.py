@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from decimal import Decimal
-from typing import Mapping, Optional
+from typing import Optional
 from uuid import UUID
 
 import trafaret as t

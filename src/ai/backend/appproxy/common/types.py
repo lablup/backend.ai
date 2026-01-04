@@ -2,18 +2,14 @@ import dataclasses
 import enum
 import json
 import textwrap
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import (
     Annotated,
     Any,
-    Awaitable,
-    Callable,
     Generic,
-    Iterable,
-    Mapping,
     Optional,
-    Sequence,
     TypeAlias,
     TypeVar,
     Union,

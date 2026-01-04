@@ -1,5 +1,6 @@
 import re
-from typing import Iterator, List, Sequence, Set, Type
+from collections.abc import Iterator, Sequence
+from typing import List, Set, Type
 
 from .types import ServicePort, ServicePortProtocols
 

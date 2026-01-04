@@ -8,14 +8,13 @@ import logging
 import os
 import re
 import sys
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import (
     TYPE_CHECKING,
     Final,
-    Iterable,
     Literal,
-    Mapping,
     NamedTuple,
     Optional,
     Self,

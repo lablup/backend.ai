@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import enum
 from collections import defaultdict
-from collections.abc import Iterable
-from typing import TYPE_CHECKING, Optional, Sequence
+from collections.abc import Iterable, Sequence
+from typing import TYPE_CHECKING, Optional
 
 import attr
 import networkx as nx

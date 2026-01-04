@@ -60,16 +60,13 @@ import contextlib
 import enum
 import logging
 import uuid
-from collections.abc import Iterable
+from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import (
     Any,
-    AsyncIterator,
     List,
-    Mapping,
     NotRequired,
     Optional,
-    Sequence,
     TypeAlias,
     TypedDict,
 )

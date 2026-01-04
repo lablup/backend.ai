@@ -8,14 +8,14 @@ import logging
 import platform
 import re
 import resource
+from collections.abc import Mapping, MutableMapping
 from decimal import Decimal
 from pathlib import Path
 from typing import (
     Any,
     AsyncContextManager,
+    Final,
     List,
-    Mapping,
-    MutableMapping,
     NamedTuple,
     Optional,
     Protocol,
@@ -31,7 +31,6 @@ from uuid import UUID
 import aiodocker
 import trafaret as t
 from aiodocker.docker import DockerContainer
-from typing_extensions import Final
 
 from ai.backend.common import identity
 from ai.backend.common.cgroup import (

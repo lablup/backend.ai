@@ -5,10 +5,11 @@ import enum
 import importlib
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence, Type, TypeAlias
+from typing import TYPE_CHECKING, Any, Optional, Type, TypeAlias
 
 import attrs
 from aiohttp.typedefs import Middleware

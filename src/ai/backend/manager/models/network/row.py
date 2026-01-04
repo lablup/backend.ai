@@ -1,6 +1,7 @@
 import enum
 import uuid
-from typing import Any, Final, Mapping
+from collections.abc import Mapping
+from typing import Any, Final
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql

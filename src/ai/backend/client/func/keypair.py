@@ -1,4 +1,5 @@
-from typing import Any, Dict, Sequence
+from collections.abc import Sequence
+from typing import Any, Dict
 
 from ai.backend.cli.types import Undefined, undefined
 from ai.backend.client.output.fields import keypair_fields

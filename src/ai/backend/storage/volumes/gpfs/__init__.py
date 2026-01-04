@@ -1,6 +1,7 @@
 import logging
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, FrozenSet, Literal, Mapping, Optional
+from typing import Any, FrozenSet, Literal, Optional
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer

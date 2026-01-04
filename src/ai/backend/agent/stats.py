@@ -10,16 +10,13 @@ import logging
 import sys
 import time
 import uuid
+from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from decimal import Decimal, DecimalException
 from typing import (
     TYPE_CHECKING,
-    Callable,
     FrozenSet,
     List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
     Set,
     Tuple,
     cast,

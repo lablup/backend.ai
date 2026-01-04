@@ -1,7 +1,8 @@
 import logging
 from collections import defaultdict
+from collections.abc import Iterable, Sequence
 from decimal import Decimal
-from typing import DefaultDict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import DefaultDict, List, Optional, Set, Tuple
 
 from ai.backend.accelerator.rebellions.common.atom_api import ATOMAPI
 from ai.backend.accelerator.rebellions.common.plugin import AbstractATOMPlugin

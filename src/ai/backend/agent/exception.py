@@ -1,6 +1,7 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Optional, Sequence
+from typing import Optional
 
 from aiohttp import web
 

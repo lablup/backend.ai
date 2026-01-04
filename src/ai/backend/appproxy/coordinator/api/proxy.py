@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 import urllib.parse
-from typing import TYPE_CHECKING, Annotated, Iterable, Optional
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Annotated, Optional
 from uuid import UUID
 
 import jwt

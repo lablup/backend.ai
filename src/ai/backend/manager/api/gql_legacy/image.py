@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
-    Iterable,
     Optional,
     Self,
     cast,

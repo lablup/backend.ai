@@ -5,8 +5,9 @@ Provides CRUD endpoints for deployments and revisions.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from http import HTTPStatus
-from typing import Iterable, Tuple
+from typing import Tuple
 
 import aiohttp_cors
 from aiohttp import web

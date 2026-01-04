@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, AsyncContextManager, Callable, TypeAlias
+from collections.abc import Callable
+from typing import TYPE_CHECKING, AsyncContextManager, TypeAlias
 
 import aiohttp_cors
 import attrs

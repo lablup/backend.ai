@@ -5,14 +5,11 @@ import inspect
 import logging
 import socket
 import time
+from collections.abc import Awaitable, Callable, Mapping, MutableMapping
 
 # Import ValkeyStatClient with TYPE_CHECKING to avoid circular imports
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Mapping,
-    MutableMapping,
     Optional,
     Union,
     cast,

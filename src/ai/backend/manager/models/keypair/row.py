@@ -4,7 +4,8 @@ import base64
 import os
 import secrets
 import uuid
-from typing import Any, List, Optional, Self, Sequence, Tuple, TypedDict
+from collections.abc import Sequence
+from typing import Any, List, Optional, Self, Tuple, TypedDict
 
 import sqlalchemy as sa
 from cryptography.exceptions import InvalidSignature

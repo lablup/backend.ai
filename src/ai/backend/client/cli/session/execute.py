@@ -8,8 +8,9 @@ import string
 import sys
 import traceback
 import uuid
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
-from typing import Mapping, Optional, Sequence, Tuple
+from typing import Optional, Tuple
 
 import aiohttp
 import click

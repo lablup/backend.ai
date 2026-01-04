@@ -7,11 +7,9 @@ import secrets
 import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Callable, Coroutine, Sequence
 from typing import (
     Any,
-    Callable,
-    Coroutine,
     Generic,
     Optional,
     Protocol,

@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from collections.abc import Iterable
 from http import HTTPStatus
-from typing import Iterable, Tuple
+from typing import Tuple
 
 import aiohttp_cors
 from aiohttp import web

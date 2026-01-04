@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, AsyncGenerator, Mapping, Optional
+from collections.abc import AsyncGenerator, Mapping
+from typing import Any, Optional
 
 import aiohttp
 from yarl import URL

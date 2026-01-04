@@ -4,7 +4,8 @@ import decimal
 import json
 import textwrap
 from collections import defaultdict
-from typing import Any, Callable, Mapping, Optional
+from collections.abc import Callable, Mapping
+from typing import Any, Optional
 
 import humanize
 

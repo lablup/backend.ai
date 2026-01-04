@@ -7,19 +7,16 @@ import random
 import re
 import statistics
 from collections import defaultdict
+from collections.abc import Collection, Mapping, MutableMapping, Sequence
 from datetime import UTC, datetime
 from decimal import ROUND_DOWN, Decimal
 from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Collection,
     Dict,
     List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
     Set,
     Tuple,
     Type,

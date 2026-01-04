@@ -5,9 +5,9 @@ import logging
 import mimetypes
 import ssl
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Final, Optional, override
+from typing import Any, Final, Optional, override
 
 import aiohttp
 

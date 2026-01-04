@@ -4,6 +4,7 @@ import enum
 import logging
 import uuid
 from collections.abc import (
+    Callable,
     Mapping,
     Sequence,
 )
@@ -11,7 +12,6 @@ from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     ClassVar,
     Final,
     Generic,

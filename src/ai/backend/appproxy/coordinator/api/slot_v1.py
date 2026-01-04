@@ -1,7 +1,8 @@
 import json
 import logging
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Annotated, Iterable
+from typing import Annotated
 from uuid import UUID
 
 import aiohttp_cors

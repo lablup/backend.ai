@@ -4,7 +4,8 @@ import asyncio
 import logging
 import re
 from abc import ABCMeta, abstractmethod
-from typing import Any, ClassVar, Dict, Generic, Iterator, Mapping, Optional, Tuple, Type, TypeVar
+from collections.abc import Iterator, Mapping
+from typing import Any, ClassVar, Dict, Generic, Optional, Tuple, Type, TypeVar
 from weakref import WeakSet
 
 from ai.backend.common.asyncio import cancel_tasks

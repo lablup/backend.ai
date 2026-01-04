@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterable
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional, override
+from typing import Any, Optional, override
 
 import aioboto3
 

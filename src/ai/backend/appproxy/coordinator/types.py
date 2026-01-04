@@ -2,16 +2,15 @@ import asyncio
 import itertools
 import logging
 from collections import defaultdict
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import (
     Annotated,
     Any,
     AsyncContextManager,
-    Callable,
     Optional,
     Protocol,
     Self,
-    Sequence,
     TypeAlias,
 )
 from uuid import UUID

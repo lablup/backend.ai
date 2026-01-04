@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Optional,
     Self,
-    Sequence,
     cast,
 )
 from uuid import UUID

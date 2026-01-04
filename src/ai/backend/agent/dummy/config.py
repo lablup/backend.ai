@@ -1,6 +1,7 @@
+from collections.abc import Mapping
 from functools import cache
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import trafaret as t
 

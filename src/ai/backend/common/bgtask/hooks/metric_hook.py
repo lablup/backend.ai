@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import time
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator, Optional, Protocol
+from typing import Optional, Protocol
 
 from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.exception import ErrorCode

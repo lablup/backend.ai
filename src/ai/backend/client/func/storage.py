@@ -1,4 +1,5 @@
-from typing import Optional, Sequence
+from collections.abc import Sequence
+from typing import Optional
 
 from ai.backend.client.output.fields import storage_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult

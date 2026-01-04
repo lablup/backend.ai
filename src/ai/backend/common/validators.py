@@ -11,7 +11,7 @@ import pwd
 import random
 import re
 import uuid
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path as _Path
 from pathlib import PurePath as _PurePath
@@ -20,9 +20,7 @@ from typing import (
     Generic,
     List,
     Literal,
-    Mapping,
     Optional,
-    Sequence,
     Tuple,
     Type,
     TypeVar,

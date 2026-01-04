@@ -1,16 +1,13 @@
 import logging
+from collections.abc import Collection, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Collection,
     Dict,
     List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
     Set,
     Tuple,
 )

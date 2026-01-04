@@ -1,4 +1,5 @@
-from typing import Any, Mapping, Optional, Type, TypeAlias, Union
+from collections.abc import Mapping
+from typing import Any, Optional, Type, TypeAlias, Union
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree

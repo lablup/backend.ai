@@ -1,4 +1,5 @@
-from typing import Mapping, Sequence, Union
+from collections.abc import Mapping, Sequence
+from typing import Union
 
 from ai.backend.client.request import Request
 

@@ -1,7 +1,7 @@
 import asyncio
 import logging
-from collections.abc import Collection, Iterable
-from typing import Callable, Optional
+from collections.abc import Callable, Collection, Iterable
+from typing import Optional
 
 import sqlalchemy as sa
 

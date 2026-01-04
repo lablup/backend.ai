@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
-
-from typing_extensions import override
+from typing import Any, override
 
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.models.resource_preset import ResourcePresetRow

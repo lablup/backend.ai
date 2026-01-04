@@ -3,9 +3,10 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import uuid
+from collections.abc import MutableMapping
 from datetime import datetime
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, MutableMapping, Tuple
+from typing import TYPE_CHECKING, Any, Tuple
 
 import aiohttp_cors
 import attrs

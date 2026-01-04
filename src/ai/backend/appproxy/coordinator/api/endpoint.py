@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import textwrap
+from collections.abc import Iterable
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Iterable
+from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
 import aiohttp_cors

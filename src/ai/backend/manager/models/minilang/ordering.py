@@ -1,5 +1,6 @@
 import enum
-from typing import Mapping, NamedTuple, Optional, TypeAlias
+from collections.abc import Mapping
+from typing import NamedTuple, Optional, TypeAlias
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer

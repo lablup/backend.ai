@@ -12,13 +12,14 @@ import shutil
 import sys
 import tempfile
 from abc import ABCMeta, abstractmethod
+from collections.abc import AsyncIterator, Iterator, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, AsyncIterator, Final, Iterator, Sequence
+from typing import Any, Final
 
 import aiofiles
 import aiotools

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import textwrap
-from typing import Any, Dict, Final, Sequence, Tuple, TypeVar
+from collections.abc import Sequence
+from typing import Any, Dict, Final, Tuple, TypeVar
 
 from .exceptions import BackendAPIVersionError
 from .output.types import FieldSpec, PaginatedResult, RelayPaginatedResult

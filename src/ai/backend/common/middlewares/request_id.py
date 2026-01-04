@@ -1,4 +1,5 @@
-from typing import Awaitable, Callable, Optional, TypeAlias
+from collections.abc import Awaitable, Callable
+from typing import Optional, TypeAlias
 
 from aiohttp import web
 

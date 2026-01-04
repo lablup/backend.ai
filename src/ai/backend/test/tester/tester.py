@@ -1,7 +1,8 @@
 import asyncio
+from collections.abc import Mapping
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Any, Mapping, Optional, Type, cast
+from typing import Any, Optional, Type, cast
 
 import aiofiles
 import aiotools

@@ -3,9 +3,9 @@ from __future__ import annotations
 import logging
 import re
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
-from typing import Mapping, MutableMapping, Optional, Self, cast
+from typing import Optional, Self, cast
 from urllib.parse import urlparse
 
 import sqlalchemy as sa

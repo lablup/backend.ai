@@ -4,9 +4,10 @@ import functools
 import logging
 import secrets
 import uuid
+from collections.abc import Mapping, MutableMapping
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Any, Mapping, MutableMapping, Optional, Union, cast
+from typing import Any, Optional, Union, cast
 from urllib.parse import urlparse
 
 import aiohttp

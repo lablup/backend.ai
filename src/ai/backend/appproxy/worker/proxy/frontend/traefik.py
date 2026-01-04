@@ -5,7 +5,8 @@ import logging
 import os
 import time
 import uuid
-from typing import TYPE_CHECKING, Generic, Mapping, TypeAlias, Union
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Generic, TypeAlias, Union
 
 import aiotools
 from aiohttp import web

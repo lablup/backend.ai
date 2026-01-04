@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
-from typing import AsyncIterator
 
 from .base import AbstractTaskHook, TaskContext
 

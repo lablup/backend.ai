@@ -3,7 +3,8 @@ from __future__ import annotations
 import copy
 import logging
 import urllib.parse
-from typing import Any, AsyncIterator, Mapping, Optional, cast, override
+from collections.abc import AsyncIterator, Mapping
+from typing import Any, Optional, cast, override
 
 import aiohttp
 import aiohttp.client_exceptions

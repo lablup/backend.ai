@@ -1,8 +1,9 @@
 """Health monitoring API endpoints"""
 
 import logging
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Iterable, Literal
+from typing import Literal
 from uuid import UUID
 
 import aiohttp_cors

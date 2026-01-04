@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager as actxmgr
-from typing import Any, AsyncIterator, Optional
+from typing import Any, Optional
 from urllib.parse import quote
 
 import aiohttp

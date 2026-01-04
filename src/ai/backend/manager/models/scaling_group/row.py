@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Container, Iterable, Mapping, Sequence
+from collections.abc import Callable, Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import (
     Any,
-    Callable,
     Optional,
     Self,
     Set,

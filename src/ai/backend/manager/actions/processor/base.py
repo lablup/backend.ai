@@ -1,8 +1,8 @@
 import logging
 import uuid
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from datetime import datetime
-from typing import Awaitable, Callable, Generic, Optional
+from typing import Generic, Optional
 
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.logging.utils import BraceStyleAdapter

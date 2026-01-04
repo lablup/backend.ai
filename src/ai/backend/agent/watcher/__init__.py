@@ -5,11 +5,11 @@ import signal
 import ssl
 import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import AsyncGenerator, Sequence
 from http import HTTPStatus
 from pathlib import Path
 from pprint import pformat, pprint
-from typing import Any, AsyncGenerator
+from typing import Any
 
 import aiofiles
 import aiotools

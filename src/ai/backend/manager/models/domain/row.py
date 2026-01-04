@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Container, Iterable
+from collections.abc import Container, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import (
     List,
     Optional,
     Self,
-    Sequence,
     TypeAlias,
     TypedDict,
     cast,

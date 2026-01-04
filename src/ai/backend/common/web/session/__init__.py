@@ -2,15 +2,12 @@ import abc
 import json
 import logging
 import time
-from collections.abc import MutableMapping
+from collections.abc import Awaitable, Callable, Iterator, MutableMapping
 from datetime import UTC, datetime
 from typing import (
     Any,
-    Awaitable,
-    Callable,
     Dict,
     Final,
-    Iterator,
     Optional,
     TypedDict,
     Union,

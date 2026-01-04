@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 import sys
 import traceback
-from typing import TYPE_CHECKING, Any, Mapping, Optional, override
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, Optional, override
 
 from ai.backend.common.events.dispatcher import AbstractEvent
 from ai.backend.common.events.event_types.agent.anycast import AgentErrorEvent

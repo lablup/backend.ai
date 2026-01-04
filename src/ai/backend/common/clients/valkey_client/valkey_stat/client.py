@@ -1,12 +1,11 @@
 import json
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import (
     Any,
     Final,
     Optional,
     Self,
-    Sequence,
     Union,
     cast,
 )

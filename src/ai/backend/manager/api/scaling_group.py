@@ -1,8 +1,9 @@
 import json
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Iterable, Tuple
+from typing import TYPE_CHECKING, Any, Tuple
 
 import aiohttp
 import aiohttp_cors

@@ -13,17 +13,13 @@ import time
 import traceback
 import uuid
 from collections import defaultdict
+from collections.abc import Awaitable, Callable, Hashable, Mapping, MutableMapping
 from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    Awaitable,
-    Callable,
     Concatenate,
     Generic,
-    Hashable,
-    Mapping,
-    MutableMapping,
     Optional,
     ParamSpec,
     Protocol,

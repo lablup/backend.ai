@@ -3,11 +3,12 @@ from __future__ import annotations
 import logging
 import ssl
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field, fields
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Mapping, NewType, Optional, TypedDict
+from typing import Any, NewType, Optional, TypedDict
 
 import aiohttp
 import jwt

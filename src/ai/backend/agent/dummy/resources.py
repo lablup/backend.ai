@@ -1,6 +1,7 @@
 import logging
+from collections.abc import Mapping, MutableMapping
 from decimal import Decimal
-from typing import Any, Mapping, MutableMapping
+from typing import Any
 
 from ai.backend.agent.exception import InitializationError
 from ai.backend.agent.resources import (

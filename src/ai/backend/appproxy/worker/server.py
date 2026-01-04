@@ -14,10 +14,10 @@ import ssl
 import sys
 import traceback
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
-from typing import Any, AsyncIterator, Final, Iterable, Mapping, Sequence, cast
+from typing import Any, Final, cast
 
 import aiohttp_cors
 import aiohttp_jinja2

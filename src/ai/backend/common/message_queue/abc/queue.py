@@ -4,7 +4,8 @@ Use `ai.backend.common.message_queue.abc.{anycaster,broadcaster,consumer,subscri
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, AsyncGenerator, Mapping, Optional
+from collections.abc import AsyncGenerator, Mapping
+from typing import Any, Optional
 
 from ai.backend.common.message_queue.types import (
     BroadcastMessage,

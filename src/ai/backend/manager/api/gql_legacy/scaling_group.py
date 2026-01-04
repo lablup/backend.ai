@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
-    Mapping,
     Optional,
     Self,
     cast,

@@ -6,13 +6,10 @@ import inspect
 import queue
 import threading
 import warnings
+from collections.abc import AsyncIterator, Awaitable, Coroutine, Iterator
 from contextvars import Context, ContextVar, copy_context
 from typing import (
     Any,
-    AsyncIterator,
-    Awaitable,
-    Coroutine,
-    Iterator,
     Literal,
     Optional,
     Tuple,

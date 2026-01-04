@@ -1,9 +1,10 @@
 import logging
 import os
 import platform
+from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Dict, List, Optional
 
 import aiohttp
 from aiodocker.docker import Docker, DockerContainer

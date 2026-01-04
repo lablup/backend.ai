@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Iterable
-from typing import AsyncGenerator, Optional, Self, override
+from collections.abc import AsyncGenerator, Iterable
+from typing import Optional, Self, override
 
 import glide
 

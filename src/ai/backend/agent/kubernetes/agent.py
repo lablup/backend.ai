@@ -8,6 +8,7 @@ import shutil
 import signal
 import sys
 import uuid
+from collections.abc import Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from io import StringIO
 from pathlib import Path
@@ -16,10 +17,7 @@ from typing import (
     Any,
     FrozenSet,
     List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
     Tuple,
     Union,
     override,

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
-from typing import AsyncIterator, Mapping, Self, Type
+from typing import Self, Type
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer

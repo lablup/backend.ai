@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Iterable
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Iterable, Optional, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 import aiohttp_cors
 import sqlalchemy as sa

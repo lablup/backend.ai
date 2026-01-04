@@ -1,7 +1,7 @@
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 from datetime import datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, AsyncIterator, Optional, override
+from typing import Any, Optional, override
 
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE, NOOP_STORAGE_BACKEND_TYPE
 from ai.backend.common.etcd import AsyncEtcd

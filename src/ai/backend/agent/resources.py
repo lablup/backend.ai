@@ -9,6 +9,7 @@ from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from collections.abc import (
     Collection,
+    Iterable,
     Iterator,
     Mapping,
     MutableMapping,
@@ -21,7 +22,6 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Iterable,
     Optional,
     TextIO,
     Type,

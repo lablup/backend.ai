@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import collections
 import logging
+from collections.abc import AsyncGenerator, Iterable, Mapping
 from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncGenerator,
-    Iterable,
-    Mapping,
     cast,
 )
 

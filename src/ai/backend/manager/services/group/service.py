@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from datetime import datetime, timedelta
-from typing import Optional, Sequence
+from typing import Optional
 from uuid import UUID
 
 from dateutil.relativedelta import relativedelta

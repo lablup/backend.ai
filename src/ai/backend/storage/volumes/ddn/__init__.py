@@ -1,8 +1,9 @@
 import asyncio
 import logging
+from collections.abc import Mapping
 from pathlib import Path
 from subprocess import CalledProcessError
-from typing import Any, Final, FrozenSet, Mapping
+from typing import Any, Final, FrozenSet
 
 import aiofiles
 import aiofiles.os

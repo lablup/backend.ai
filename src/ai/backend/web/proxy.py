@@ -5,7 +5,8 @@ import base64
 import json
 import logging
 import random
-from typing import Final, Iterable, Optional, Tuple, Union, cast
+from collections.abc import Iterable
+from typing import Final, Optional, Tuple, Union, cast
 
 import aiohttp
 from aiohttp import web

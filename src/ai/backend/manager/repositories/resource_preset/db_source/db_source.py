@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import Mapping, Optional, cast
+from collections.abc import Mapping
+from typing import Optional, cast
 from uuid import UUID
 
 import sqlalchemy as sa

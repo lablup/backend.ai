@@ -7,10 +7,10 @@ import enum
 import os
 import pickle
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from decimal import Decimal
 from pathlib import PosixPath, PurePosixPath
-from typing import Any, Callable, Optional, Protocol
+from typing import Any, Optional, Protocol
 
 import msgpack as _msgpack
 import temporenc

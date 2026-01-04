@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Final, Iterable, Tuple
+from collections.abc import Iterable
+from typing import Final, Tuple
 
 import attrs
 from aiohttp import web

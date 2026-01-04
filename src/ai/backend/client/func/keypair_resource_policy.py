@@ -1,4 +1,5 @@
-from typing import Any, Iterable, Sequence
+from collections.abc import Iterable, Sequence
+from typing import Any
 
 from ai.backend.cli.types import Undefined, undefined
 from ai.backend.client.output.fields import keypair_resource_policy_fields

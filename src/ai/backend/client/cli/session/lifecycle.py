@@ -6,10 +6,11 @@ import secrets
 import subprocess
 import sys
 from collections import OrderedDict, defaultdict
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 from graphlib import TopologicalSorter
 from pathlib import Path
-from typing import IO, Literal, Optional, Sequence
+from typing import IO, Literal, Optional
 from uuid import UUID
 
 import click

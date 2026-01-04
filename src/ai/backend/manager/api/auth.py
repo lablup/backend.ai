@@ -5,10 +5,11 @@ import hashlib
 import hmac
 import logging
 import secrets
+from collections.abc import Iterable, Mapping
 from contextlib import ExitStack
 from datetime import datetime, timedelta
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Final, Iterable, Mapping, Tuple
+from typing import TYPE_CHECKING, Any, Final, Tuple
 from urllib.parse import urlparse
 
 import aiohttp_cors

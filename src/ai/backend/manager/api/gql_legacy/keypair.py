@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping, Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Self, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Optional, Self
 
 import graphene
 import sqlalchemy as sa

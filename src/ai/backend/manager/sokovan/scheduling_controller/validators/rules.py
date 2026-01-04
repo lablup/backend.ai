@@ -1,6 +1,7 @@
 """Validator rules for session creation."""
 
-from typing import Mapping, override
+from collections.abc import Mapping
+from typing import override
 
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.service_ports import parse_service_ports

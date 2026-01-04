@@ -1,6 +1,7 @@
 import json
+from collections.abc import Callable
 from http import HTTPStatus
-from typing import Any, Callable
+from typing import Any
 from unittest import mock
 from unittest.mock import AsyncMock
 

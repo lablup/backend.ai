@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import enum
 import os
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Dict, List, NotRequired, Optional, TypedDict, cast
+from typing import Any, Dict, List, NotRequired, Optional, TypedDict, cast
 
 import aiohttp
 

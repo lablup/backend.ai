@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator, Mapping
 from dataclasses import dataclass
-from typing import Any, AsyncGenerator, Mapping, Optional, Self, override
+from typing import Any, Optional, Self, override
 
 from ai.backend.common.message_queue.abc import (
     AbstractAnycaster,

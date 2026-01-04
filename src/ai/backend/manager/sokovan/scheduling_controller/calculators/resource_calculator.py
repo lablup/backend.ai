@@ -1,8 +1,9 @@
 """Stateless calculator for resource requirements."""
 
 import logging
+from collections.abc import Mapping
 from decimal import Decimal
-from typing import Any, Mapping, Optional
+from typing import Any, Optional
 
 from ai.backend.common.types import (
     BinarySize,

@@ -3,8 +3,9 @@ import os
 import sys
 import tempfile
 from asyncio import create_subprocess_exec, subprocess
+from collections.abc import Iterable, Mapping, MutableMapping
 from pathlib import Path
-from typing import Any, Iterable, Mapping, MutableMapping, Optional
+from typing import Any, Optional
 
 from .logging import BraceStyleAdapter
 

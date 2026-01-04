@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -12,7 +12,6 @@ from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
     List,
     Optional,
     Self,

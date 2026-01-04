@@ -2,9 +2,10 @@ import asyncio
 import gzip
 import logging
 import subprocess
+from collections.abc import Mapping
 from contextlib import closing
 from pathlib import Path
-from typing import Any, Final, Mapping, Optional, Tuple
+from typing import Any, Final, Optional, Tuple
 
 import pkg_resources
 from aiodocker.docker import Docker

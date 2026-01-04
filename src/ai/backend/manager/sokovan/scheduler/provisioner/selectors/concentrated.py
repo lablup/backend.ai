@@ -8,8 +8,9 @@ resource utilization by concentrating workloads.
 from __future__ import annotations
 
 import sys
+from collections.abc import Sequence
 from decimal import Decimal
-from typing import Sequence, Union
+from typing import Union
 
 from ai.backend.common.types import SessionTypes
 

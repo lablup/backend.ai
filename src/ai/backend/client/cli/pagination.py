@@ -1,6 +1,7 @@
 import shutil
 import sys
-from typing import Any, Callable, Iterator, List, Literal, Mapping, Optional, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from typing import Any, List, Literal, Optional
 
 import click
 from tabulate import tabulate

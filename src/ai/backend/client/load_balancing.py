@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import List, Mapping, Tuple, Type
+from collections.abc import Mapping
+from typing import List, Tuple, Type
 
 import attrs
 from yarl import URL

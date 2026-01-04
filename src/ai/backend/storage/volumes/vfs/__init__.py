@@ -9,8 +9,9 @@ import secrets
 import shutil
 import time
 from collections import deque
+from collections.abc import AsyncIterator, Sequence
 from pathlib import Path, PurePosixPath
-from typing import Any, AsyncIterator, FrozenSet, Optional, Sequence, Union, final, override
+from typing import Any, FrozenSet, Optional, Union, final, override
 
 import aiofiles.os
 import janus

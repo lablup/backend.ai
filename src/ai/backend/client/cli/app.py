@@ -2,7 +2,8 @@ import asyncio
 import json
 import shlex
 import sys
-from typing import Dict, List, MutableMapping, Optional, Sequence, Union
+from collections.abc import MutableMapping, Sequence
+from typing import Dict, List, Optional, Union
 
 import aiohttp
 import click

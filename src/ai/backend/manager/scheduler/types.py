@@ -2,17 +2,15 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Mapping, MutableMapping, Sequence
 from enum import StrEnum
 from typing import (
     TYPE_CHECKING,
     Any,
     Final,
     Generic,
-    Mapping,
-    MutableMapping,
     Optional,
     Self,
-    Sequence,
     Set,
     TypeVar,
     override,

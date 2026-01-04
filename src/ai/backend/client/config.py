@@ -2,9 +2,9 @@ import enum
 import os
 import random
 import re
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path
-from typing import Any, Callable, Optional, TypeVar, cast
+from typing import Any, Optional, TypeVar, cast
 
 import appdirs
 from dotenv import find_dotenv, load_dotenv

@@ -1,7 +1,8 @@
 from abc import ABCMeta, abstractmethod
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Generic, Iterable, Mapping, Set, TypeVar
+from typing import Any, Generic, Set, TypeVar
 
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext

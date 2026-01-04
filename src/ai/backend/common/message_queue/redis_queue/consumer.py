@@ -4,9 +4,9 @@ import asyncio
 import hashlib
 import logging
 import socket
-from collections.abc import Iterable
+from collections.abc import AsyncGenerator, Iterable
 from dataclasses import dataclass
-from typing import AsyncGenerator, Optional, Self, override
+from typing import Optional, Self, override
 
 import glide
 from aiotools.server import process_index

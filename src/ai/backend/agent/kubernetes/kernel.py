@@ -4,8 +4,9 @@ import lzma
 import os
 import shutil
 import textwrap
+from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, FrozenSet, Mapping, Optional, Tuple, override
+from typing import Any, Dict, FrozenSet, Optional, Tuple, override
 
 import pkg_resources
 import zmq

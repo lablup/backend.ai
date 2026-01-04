@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from collections.abc import Awaitable, Callable, Iterator
 from contextlib import contextmanager as ctxmgr
 from datetime import datetime
 from http import HTTPStatus
@@ -15,9 +16,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     AsyncContextManager,
-    Awaitable,
-    Callable,
-    Iterator,
     NotRequired,
     Optional,
     TypedDict,

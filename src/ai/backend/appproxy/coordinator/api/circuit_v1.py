@@ -1,5 +1,5 @@
 import logging
-from typing import Iterable
+from collections.abc import Iterable
 from uuid import UUID
 
 import aiohttp_cors

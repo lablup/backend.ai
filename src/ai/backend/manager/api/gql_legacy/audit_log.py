@@ -1,5 +1,6 @@
+from collections.abc import Mapping
 from datetime import timedelta
-from typing import TYPE_CHECKING, Mapping, Optional, Self, cast
+from typing import TYPE_CHECKING, Optional, Self, cast
 
 import graphene
 from dateutil.parser import parse as dtparse

@@ -3,7 +3,8 @@ from __future__ import annotations
 import enum
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import Any, Final, List, Optional, Protocol, Sequence, Tuple, Union
+from collections.abc import Sequence
+from typing import Any, Final, List, Optional, Protocol, Tuple, Union
 
 import attrs
 

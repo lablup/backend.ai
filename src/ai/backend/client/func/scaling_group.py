@@ -1,5 +1,6 @@
 import json
-from typing import Any, Iterable, Mapping, Optional, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any, Optional
 
 from ai.backend.cli.types import Undefined, undefined
 from ai.backend.client.output.fields import scaling_group_fields

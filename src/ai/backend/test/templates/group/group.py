@@ -1,6 +1,7 @@
 import asyncio
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import AsyncIterator, override
+from typing import override
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.test.contexts.client_session import ClientSessionContext

@@ -8,9 +8,10 @@ import logging
 import os
 import sys
 import zipfile
+from collections.abc import Iterable, Iterator
 from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
-from typing import Iterable, Iterator, Optional
+from typing import Optional
 
 log = logging.getLogger(__spec__.name)
 

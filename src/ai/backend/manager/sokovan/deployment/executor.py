@@ -2,8 +2,8 @@
 
 import asyncio
 import logging
-from collections.abc import Sequence
-from typing import Any, Coroutine, Optional
+from collections.abc import Coroutine, Sequence
+from typing import Any, Optional
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import (

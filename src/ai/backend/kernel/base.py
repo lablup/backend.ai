@@ -14,18 +14,15 @@ import urllib.error
 import urllib.request
 import uuid
 from abc import ABCMeta, abstractmethod
+from collections.abc import Awaitable, Mapping, MutableMapping, Sequence
 from functools import partial
 from pathlib import Path
 from typing import (
     Any,
-    Awaitable,
     ClassVar,
     Dict,
     List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
     TypeVar,
     Union,
 )

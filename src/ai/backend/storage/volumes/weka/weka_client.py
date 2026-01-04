@@ -2,9 +2,10 @@ import logging
 import ssl
 import time
 import urllib.parse
+from collections.abc import Iterable, Mapping, MutableMapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Iterable, Mapping, MutableMapping, Optional
+from typing import Any, Optional
 
 import aiohttp
 from aiohttp import web

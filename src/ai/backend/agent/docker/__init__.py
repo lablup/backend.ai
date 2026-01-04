@@ -1,5 +1,6 @@
+from collections.abc import Mapping
 from decimal import Decimal
-from typing import Any, Mapping, Type, override
+from typing import Any, Type, override
 
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.resources import AbstractComputePlugin

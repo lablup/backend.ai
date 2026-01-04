@@ -7,7 +7,8 @@ from __future__ import annotations
 import asyncio
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import Any, Callable, Coroutine, Optional, TypeVar, Union
+from collections.abc import Callable, Coroutine
+from typing import Any, Optional, TypeVar, Union
 
 import aiohttp
 import aiotools

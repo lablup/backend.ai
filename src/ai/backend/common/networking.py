@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import socket
+from collections.abc import Callable, Mapping
 from contextlib import closing
-from typing import TYPE_CHECKING, Callable, Mapping, Optional, TypeVar, overload
+from typing import TYPE_CHECKING, Optional, TypeVar, overload
 
 import aiohttp
 

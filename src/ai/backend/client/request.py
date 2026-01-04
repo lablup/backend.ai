@@ -8,20 +8,15 @@ import logging
 import sys
 import uuid
 from collections import namedtuple
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Mapping, Sequence
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 from pathlib import Path
 from typing import (
     Any,
-    AsyncIterator,
-    Awaitable,
-    Callable,
-    Iterable,
     List,
-    Mapping,
     Optional,
-    Sequence,
     Type,
     TypeVar,
     Union,

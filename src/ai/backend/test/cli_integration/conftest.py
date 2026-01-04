@@ -4,10 +4,11 @@ import os
 import re
 import secrets
 from collections import namedtuple
+from collections.abc import Callable, Generator, Iterator, Sequence
 from contextlib import closing
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Callable, Generator, Iterator, Sequence, Tuple
+from typing import Tuple
 
 import pexpect
 import pytest

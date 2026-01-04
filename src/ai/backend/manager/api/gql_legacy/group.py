@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
     Optional,
     Self,
-    Sequence,
 )
 
 import graphene

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Self, Sequence
+from collections.abc import Sequence
+from typing import Self
 
 import sqlalchemy as sa
 from sqlalchemy.orm import relationship

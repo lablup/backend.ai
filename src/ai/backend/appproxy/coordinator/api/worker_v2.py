@@ -4,8 +4,9 @@ import dataclasses
 import logging
 import textwrap
 import uuid
+from collections.abc import Iterable
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Annotated, Iterable
+from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
 import aiohttp_cors

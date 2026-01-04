@@ -4,17 +4,16 @@ import asyncio
 import dataclasses
 import enum
 import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
     AsyncContextManager,
-    Callable,
     Final,
     FrozenSet,
     Generic,
-    Mapping,
     Optional,
     Self,
     TypeAlias,

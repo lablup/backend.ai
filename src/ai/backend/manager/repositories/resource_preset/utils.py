@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Generator, Optional, Type
+from typing import Optional, Type
 
 from ai.backend.logging.utils import BraceStyleAdapter
 

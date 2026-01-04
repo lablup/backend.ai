@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
-from typing import Any, AsyncIterator, Mapping, Optional, cast
+from typing import Any, Optional, cast
 from uuid import UUID
 
 import sqlalchemy as sa

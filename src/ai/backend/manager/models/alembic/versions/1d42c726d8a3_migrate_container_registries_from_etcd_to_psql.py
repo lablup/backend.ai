@@ -13,12 +13,13 @@ import logging
 import os
 import sys
 import warnings
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from itertools import groupby
 from pathlib import Path
 from queue import Queue
-from typing import Any, Final, Mapping, cast
+from typing import Any, Final, cast
 
 import sqlalchemy as sa
 import trafaret as t

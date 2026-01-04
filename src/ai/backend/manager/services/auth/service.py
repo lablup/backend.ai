@@ -1,7 +1,8 @@
 import logging
 from collections import ChainMap
+from collections.abc import Mapping
 from datetime import datetime
-from typing import Mapping, Optional, cast
+from typing import Optional, cast
 
 from aiohttp import web
 

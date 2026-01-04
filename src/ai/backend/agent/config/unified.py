@@ -11,14 +11,13 @@ import logging
 import os
 import sys
 import textwrap
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import (
     Any,
-    Mapping,
     Optional,
     Self,
-    Sequence,
 )
 from uuid import uuid4
 

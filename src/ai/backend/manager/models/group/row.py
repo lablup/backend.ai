@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Container, Sequence
+from collections.abc import Callable, Container, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
-    Callable,
-    Iterable,
     Optional,
     Self,
     TypeAlias,

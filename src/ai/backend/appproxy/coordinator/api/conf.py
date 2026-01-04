@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import Iterable
+from collections.abc import Iterable
 
 import aiohttp_cors
 from aiohttp import web

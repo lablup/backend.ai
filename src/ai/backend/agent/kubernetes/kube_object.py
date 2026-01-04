@@ -1,4 +1,5 @@
-from typing import Any, Dict, Mapping, Optional
+from collections.abc import Mapping
+from typing import Any, Dict, Optional
 
 import attrs
 

@@ -8,6 +8,7 @@ import asyncio
 import logging
 import os
 import urllib.parse
+from collections.abc import Mapping, MutableMapping
 from datetime import datetime
 from http import HTTPStatus
 from pathlib import Path
@@ -17,8 +18,6 @@ from typing import (
     AsyncContextManager,
     Final,
     Literal,
-    Mapping,
-    MutableMapping,
     TypedDict,
     cast,
 )

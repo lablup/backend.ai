@@ -3,16 +3,14 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from collections.abc import Container, Iterable, Mapping
+from collections.abc import AsyncIterator, Container, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime, tzinfo
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
     Optional,
     Self,
-    Sequence,
     TypedDict,
     cast,
 )

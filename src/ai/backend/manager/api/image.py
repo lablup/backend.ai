@@ -1,4 +1,5 @@
-from typing import Iterable, Tuple
+from collections.abc import Iterable
+from typing import Tuple
 
 # import aiohttp_cors
 from aiohttp import web

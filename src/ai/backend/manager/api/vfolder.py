@@ -6,6 +6,7 @@ import logging
 import math
 import textwrap
 import uuid
+from collections.abc import Awaitable, Callable, Mapping, MutableMapping, Sequence
 from enum import StrEnum
 from http import HTTPStatus
 from pathlib import Path
@@ -13,14 +14,9 @@ from types import TracebackType
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
-    Callable,
     Concatenate,
     Dict,
-    Mapping,
-    MutableMapping,
     ParamSpec,
-    Sequence,
     Tuple,
     TypeAlias,
     cast,

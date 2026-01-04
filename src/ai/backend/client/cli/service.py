@@ -1,6 +1,7 @@
 import json
 import sys
-from typing import Literal, Optional, Sequence
+from collections.abc import Sequence
+from typing import Literal, Optional
 from uuid import UUID
 
 import click

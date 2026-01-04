@@ -1,9 +1,10 @@
 import asyncio
 import logging
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import suppress
 from datetime import datetime
-from typing import AsyncIterator, Mapping, override
+from typing import override
 
 import aiotools
 import sqlalchemy as sa

@@ -1,9 +1,9 @@
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal, Optional
 from uuid import UUID
+from warnings import deprecated
 
 from faker import Faker
-from typing_extensions import deprecated
 
 from ai.backend.client.exceptions import BackendClientError
 from ai.backend.client.output.fields import service_fields

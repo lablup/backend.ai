@@ -1,4 +1,5 @@
-from typing import Any, List, Mapping, Optional
+from collections.abc import Mapping
+from typing import Any, List, Optional
 
 from ai.backend.client.request import Request
 from ai.backend.client.session import api_session

@@ -1,5 +1,6 @@
 import uuid
-from typing import Any, Mapping, Self
+from collections.abc import Mapping
+from typing import Any, Self
 
 from aiohttp import web
 

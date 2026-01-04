@@ -2,16 +2,14 @@ from __future__ import annotations
 
 import logging
 from abc import ABCMeta, abstractmethod
+from collections.abc import AsyncIterator, Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import (
     Any,
-    AsyncIterator,
     ClassVar,
     Final,
     FrozenSet,
-    Mapping,
     Optional,
-    Sequence,
     final,
 )
 

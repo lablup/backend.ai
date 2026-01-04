@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+from collections.abc import Awaitable, Callable, Collection, Sequence
 from typing import (
     Any,
     AsyncContextManager,
-    Awaitable,
-    Callable,
-    Collection,
     Protocol,
-    Sequence,
     Tuple,
     Type,
     TypeVar,

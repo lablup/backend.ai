@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import Mapping
 from http import HTTPStatus
-from typing import Any, Mapping
+from typing import Any
 
 import aiodocker
 import trafaret as t

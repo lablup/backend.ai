@@ -1,6 +1,7 @@
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import Any, Callable, Coroutine, Mapping, MutableMapping, NamedTuple, Optional, Sequence
+from collections.abc import Callable, Coroutine, Mapping, MutableMapping, Sequence
+from typing import Any, NamedTuple, Optional
 
 from aiohttp import web
 

@@ -1,19 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from typing import (
     TYPE_CHECKING,
     AsyncContextManager,
-    Awaitable,
-    Callable,
-    Iterable,
-    Mapping,
     Tuple,
+    TypeAlias,
 )
 
 import aiohttp_cors
 from aiohttp import web
 from aiohttp.typedefs import Middleware
-from typing_extensions import TypeAlias
 
 if TYPE_CHECKING:
     from .context import RootContext

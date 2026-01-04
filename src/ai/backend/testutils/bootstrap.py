@@ -7,8 +7,9 @@ import os
 import secrets
 import socket
 import time
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Final, Iterator
+from typing import Final
 
 import pytest
 from testcontainers.core.container import DockerContainer

@@ -9,16 +9,13 @@ import re
 import sys
 import uuid
 from collections import OrderedDict
+from collections.abc import AsyncIterator, Iterable, Iterator, Mapping
 from datetime import timedelta
 from itertools import chain
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Iterable,
-    Iterator,
-    Mapping,
     Optional,
     Tuple,
     TypeVar,

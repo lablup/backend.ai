@@ -1,6 +1,7 @@
 import decimal
 import sys
-from typing import Any, Iterable, Optional
+from collections.abc import Iterable
+from typing import Any, Optional
 from uuid import UUID
 
 import click

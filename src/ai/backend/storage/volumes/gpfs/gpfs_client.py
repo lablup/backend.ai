@@ -2,9 +2,10 @@ import contextlib
 import json
 import logging
 import urllib.parse
+from collections.abc import AsyncIterator, Callable, Coroutine, Mapping
 from pathlib import Path
 from ssl import SSLContext
-from typing import Any, AsyncIterator, Callable, Coroutine, Dict, List, Mapping, Optional, TypeAlias
+from typing import Any, Dict, List, Optional, TypeAlias
 
 import aiohttp
 from aiohttp import BasicAuth, web

@@ -1,6 +1,7 @@
 import logging
 import shutil
 from abc import ABCMeta, abstractmethod
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from pprint import pformat
@@ -8,12 +9,8 @@ from typing import (
     Any,
     Dict,
     Generic,
-    Iterable,
     List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
     Set,
     Tuple,
     TypeVar,

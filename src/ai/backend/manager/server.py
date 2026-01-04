@@ -13,6 +13,8 @@ import ssl
 import sys
 import traceback
 from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
     Iterable,
     Mapping,
     MutableMapping,
@@ -26,8 +28,6 @@ from pprint import pformat
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncGenerator,
-    AsyncIterator,
     Final,
     Optional,
     cast,

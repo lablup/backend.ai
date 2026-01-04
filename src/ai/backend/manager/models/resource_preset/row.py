@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping, Sequence
-from typing import Any, Callable, Optional, Self
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any, Optional, Self
 from uuid import UUID
 
 import sqlalchemy as sa

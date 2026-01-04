@@ -3,10 +3,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from collections.abc import AsyncIterator
 from pathlib import Path
 from stat import S_IFDIR, S_IFLNK
 from subprocess import CalledProcessError
-from typing import AsyncIterator
 
 from ai.backend.common.json import load_json
 from ai.backend.common.types import BinarySize

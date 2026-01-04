@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Mapping, Optional, Sequence, TypeAlias, TypeVar, Union
+from typing import Any, Optional, TypeAlias, TypeVar, Union
 from uuid import UUID
 
 import aiohttp

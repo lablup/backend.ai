@@ -1,6 +1,6 @@
 import functools
 import inspect
-from typing import Iterable
+from collections.abc import Iterable
 
 from ai.backend.client.output.types import FieldSet, FieldSpec
 from ai.backend.client.session import AsyncSession, api_session

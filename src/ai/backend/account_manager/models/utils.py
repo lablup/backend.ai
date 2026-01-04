@@ -1,12 +1,10 @@
 import functools
 import json
 import logging
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from contextlib import asynccontextmanager as actxmgr
 from typing import (
-    AsyncIterator,
-    Awaitable,
-    Callable,
     Concatenate,
     ParamSpec,
     TypeVar,

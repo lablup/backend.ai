@@ -8,11 +8,12 @@ import logging
 import os
 import socket
 import uuid
+from collections.abc import Awaitable, Callable, Iterable
 from ipaddress import _BaseAddress as BaseIPAddress
 from ipaddress import _BaseNetwork as BaseIPNetwork
 from ipaddress import ip_address
 from pathlib import Path, PosixPath
-from typing import Awaitable, Callable, Iterable, Optional
+from typing import Optional
 
 import aiodns
 import aiohttp

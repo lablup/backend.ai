@@ -1,4 +1,4 @@
-from typing import Sequence
+from collections.abc import Sequence
 
 from ai.backend.client.output.fields import permission_fields
 from ai.backend.client.output.types import FieldSpec

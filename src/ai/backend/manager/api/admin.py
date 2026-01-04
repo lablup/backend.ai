@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import traceback
+from collections.abc import Iterable
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Iterable, Tuple, cast
+from typing import TYPE_CHECKING, Any, Tuple, cast
 
 import aiohttp_cors
 import attrs

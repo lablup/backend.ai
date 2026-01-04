@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import enum
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
 from datetime import UTC, datetime
 from pathlib import PurePath
-from typing import Any, AsyncIterator, Optional, Union
+from typing import Any, Optional, Union
 
 import trafaret as t
 from aiohttp import web

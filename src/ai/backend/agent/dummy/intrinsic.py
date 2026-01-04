@@ -1,6 +1,7 @@
+from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Collection, Mapping, Optional, Sequence
+from typing import Any, Optional
 
 import aiodocker
 

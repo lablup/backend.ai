@@ -1,9 +1,9 @@
 import logging
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from http import HTTPStatus
-from typing import Any, AsyncIterator, Final, Optional
+from typing import Any, Final, Optional
 
 import aiohttp
 import yarl

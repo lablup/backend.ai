@@ -2,7 +2,8 @@ import datetime
 import json
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Tuple
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, Dict, List, Tuple
 
 import aiohttp_cors
 import sqlalchemy as sa

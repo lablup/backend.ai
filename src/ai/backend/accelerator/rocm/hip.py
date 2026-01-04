@@ -2,7 +2,8 @@ import ctypes
 import logging
 import platform
 from abc import ABCMeta, abstractmethod
-from typing import Any, MutableMapping, Tuple
+from collections.abc import MutableMapping
+from typing import Any, Tuple
 
 from ai.backend.common.logging import BraceStyleAdapter
 

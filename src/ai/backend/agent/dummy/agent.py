@@ -1,14 +1,12 @@
 import asyncio
+from collections.abc import Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import (
     Any,
     FrozenSet,
     Literal,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
     Tuple,
     override,
 )

@@ -8,12 +8,12 @@ import functools
 import json
 import logging
 import re
+from collections.abc import Iterable
 from decimal import Decimal
 from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
-    Iterable,
     Tuple,
 )
 

@@ -4,8 +4,9 @@ import logging
 import uuid
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from collections.abc import MutableMapping
 from dataclasses import dataclass
-from typing import Final, MutableMapping
+from typing import Final
 
 from ai.backend.common.events.types import AbstractEvent, EventDomain
 from ai.backend.common.metrics.metric import EventPropagatorMetricObserver

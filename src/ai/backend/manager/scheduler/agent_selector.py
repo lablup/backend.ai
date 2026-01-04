@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import sys
+from collections.abc import Sequence
 from decimal import Decimal
-from typing import Optional, Sequence, override
+from typing import Optional, override
 
 import trafaret as t
 

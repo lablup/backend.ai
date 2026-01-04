@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import (
     TaskSetKey,

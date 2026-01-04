@@ -13,7 +13,9 @@ import time
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict, UserDict
 from collections.abc import (
+    Iterator,
     Mapping,
+    MutableMapping,
     Sequence,
 )
 from dataclasses import dataclass
@@ -21,10 +23,8 @@ from typing import (
     Any,
     Dict,
     FrozenSet,
-    Iterator,
     List,
     Literal,
-    MutableMapping,
     NotRequired,
     Optional,
     Set,

@@ -4,17 +4,15 @@ import asyncio
 import copy
 import logging
 from abc import ABCMeta, abstractmethod
+from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
     Dict,
     Final,
-    Mapping,
     Optional,
-    Sequence,
     cast,
 )
 

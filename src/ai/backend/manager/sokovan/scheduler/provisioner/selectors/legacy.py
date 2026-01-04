@@ -6,8 +6,9 @@ with fewer unutilized capabilities.
 """
 
 import sys
+from collections.abc import Sequence
 from decimal import Decimal
-from typing import Sequence, Union
+from typing import Union
 
 from .selector import (
     AbstractAgentSelector,

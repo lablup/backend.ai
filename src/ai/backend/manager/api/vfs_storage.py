@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import logging
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterable
 from http import HTTPStatus
-from typing import Iterable, Optional, Tuple, cast, override
+from typing import Optional, Tuple, cast, override
 
 import aiohttp_cors
 from aiohttp import ClientResponse, web

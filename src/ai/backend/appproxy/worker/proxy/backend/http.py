@@ -4,9 +4,10 @@ import asyncio
 import logging
 import random
 import time
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from functools import partial
-from typing import AsyncIterator, Final, override
+from typing import Final, override
 
 import aiohttp
 import aiotools

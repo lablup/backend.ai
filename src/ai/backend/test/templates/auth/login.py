@@ -1,8 +1,9 @@
 import shutil
 import tempfile
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
-from typing import AsyncIterator, Optional, override
+from typing import Optional, override
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession

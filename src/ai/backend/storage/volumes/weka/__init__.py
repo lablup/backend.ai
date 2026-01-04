@@ -3,9 +3,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, FrozenSet, Mapping, Optional
+from typing import Any, FrozenSet, Optional
 
 import aiofiles.os
 

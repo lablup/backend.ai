@@ -5,7 +5,8 @@ Provides reusable conversion logic for common patterns.
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
+from typing import Optional
 
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.manager.repositories.base import QueryCondition

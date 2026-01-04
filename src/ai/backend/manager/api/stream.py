@@ -15,16 +15,13 @@ import secrets
 import uuid
 import weakref
 from collections import defaultdict
+from collections.abc import AsyncIterator, Iterable, Mapping, MutableMapping
 from datetime import timedelta
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
     DefaultDict,
-    Iterable,
     List,
-    Mapping,
-    MutableMapping,
     Tuple,
     Union,
 )

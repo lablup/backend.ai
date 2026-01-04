@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from typing import Any, Callable, Optional, override
+from collections.abc import Callable
+from typing import Any, Optional, override
 
 from aiohttp import web
 

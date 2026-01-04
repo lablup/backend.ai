@@ -2,9 +2,10 @@ import asyncio
 import logging
 import re
 import subprocess
+from collections.abc import Collection, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Collection, List, Mapping, MutableMapping, Sequence, Set, Tuple
+from typing import Any, List, Set, Tuple
 
 import aiodocker
 

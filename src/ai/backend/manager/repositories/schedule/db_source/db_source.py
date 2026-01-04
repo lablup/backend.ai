@@ -2,8 +2,9 @@
 
 import logging
 from collections import defaultdict
+from collections.abc import Mapping
 from datetime import datetime
-from typing import Mapping, Optional, cast
+from typing import Optional, cast
 from uuid import UUID
 
 import sqlalchemy as sa

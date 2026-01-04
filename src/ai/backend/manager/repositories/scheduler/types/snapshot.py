@@ -1,7 +1,7 @@
 """Snapshot and resource policy types."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
 from uuid import UUID
 
 from ai.backend.common.types import AccessKey, ResourceSlot, SlotName, SlotTypes

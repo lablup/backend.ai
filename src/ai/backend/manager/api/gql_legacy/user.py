@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable, Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Iterable,
-    Mapping,
     Optional,
     Self,
-    Sequence,
     cast,
 )
 from uuid import UUID

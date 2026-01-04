@@ -1,5 +1,6 @@
 import dataclasses
-from typing import Annotated, Iterable
+from collections.abc import Iterable
+from typing import Annotated
 
 import aiohttp_cors
 from aiohttp import web

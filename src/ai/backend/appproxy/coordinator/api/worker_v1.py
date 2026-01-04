@@ -1,6 +1,7 @@
 import logging
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Annotated, Iterable
+from typing import Annotated
 
 import aiohttp_cors
 from aiohttp import web

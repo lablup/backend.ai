@@ -1,9 +1,8 @@
+from collections.abc import Collection, Sequence
 from pathlib import Path
 from typing import (
-    Collection,
     List,
     Optional,
-    Sequence,
     Set,
     Tuple,
 )

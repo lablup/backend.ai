@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import enum
 import uuid
-from typing import Any, Iterable, List, Mapping, Optional, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any, List, Optional
 
 import sqlalchemy as sa
 import trafaret as t

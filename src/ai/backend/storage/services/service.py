@@ -2,8 +2,9 @@ import asyncio
 import logging
 import uuid
 import weakref
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import AsyncIterator, Optional
+from typing import Optional
 
 from aiohttp import web
 

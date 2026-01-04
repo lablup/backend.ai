@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import enum
 import uuid
-from typing import Any, Iterable, Mapping, Sequence, Union
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any, Union
 
 from ai.backend.cli.types import Undefined, undefined
 from ai.backend.client.auth import AuthTokenTypes

@@ -4,8 +4,9 @@ Kernel object creation stage for kernel lifecycle.
 This stage handles creation of the final DockerKernel object.
 """
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Mapping, Sequence, override
+from typing import Any, override
 
 from ai.backend.agent.docker.kernel import DockerKernel
 from ai.backend.agent.resources import KernelResourceSpec

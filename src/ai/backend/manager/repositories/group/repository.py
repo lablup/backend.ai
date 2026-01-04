@@ -3,9 +3,10 @@ from __future__ import annotations
 import copy
 import logging
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, Sequence, cast
+from typing import Optional, cast
 from uuid import UUID
 
 import msgpack

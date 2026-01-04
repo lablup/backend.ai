@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from ai.backend.common.data.notification import NotifiableMessage
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent

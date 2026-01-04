@@ -3,7 +3,8 @@ from __future__ import annotations
 import datetime
 import decimal
 import uuid
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Self, Sequence, cast
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Optional, Self, cast
 from uuid import UUID
 
 import graphene

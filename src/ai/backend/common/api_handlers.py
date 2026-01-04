@@ -3,14 +3,11 @@ import functools
 import inspect
 import json
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Coroutine, Mapping
 from dataclasses import dataclass, field
 from inspect import Signature
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Coroutine,
     Generic,
     Optional,
     Self,

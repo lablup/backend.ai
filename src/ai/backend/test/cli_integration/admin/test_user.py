@@ -1,6 +1,7 @@
 import json
+from collections.abc import Callable
 from contextlib import closing
-from typing import Callable, Tuple
+from typing import Tuple
 
 from ai.backend.test.cli_integration.conftest import User
 from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode

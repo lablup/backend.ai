@@ -4,8 +4,9 @@ import secrets
 import signal
 import subprocess
 import sys
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator, List
+from typing import List
 
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.cli.pretty import print_fail, print_info

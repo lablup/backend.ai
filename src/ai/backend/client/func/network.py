@@ -1,4 +1,5 @@
-from typing import Self, Sequence
+from collections.abc import Sequence
+from typing import Self
 from uuid import UUID
 
 from ai.backend.client.output.fields import network_fields

@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 

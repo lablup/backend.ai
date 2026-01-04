@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Mapping, Optional
+from collections.abc import Mapping
+from typing import Optional
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient

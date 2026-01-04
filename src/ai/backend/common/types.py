@@ -11,7 +11,7 @@ import textwrap
 import uuid
 from abc import ABC, ABCMeta, abstractmethod
 from collections import UserDict, UserString, defaultdict, namedtuple
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -27,12 +27,10 @@ from typing import (
     Generic,
     List,
     Literal,
-    Mapping,
     NewType,
     NotRequired,
     Optional,
     Self,
-    Sequence,
     Tuple,
     Type,
     TypeAlias,

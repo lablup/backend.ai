@@ -1,7 +1,8 @@
 import logging
+from collections.abc import Mapping, MutableMapping
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Mapping, MutableMapping, Optional
+from typing import Any, Optional
 
 import aiofiles
 

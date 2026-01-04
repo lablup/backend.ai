@@ -3,13 +3,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from collections.abc import AsyncIterator, Iterable, Mapping
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
     Final,
-    Iterable,
-    Mapping,
     Optional,
     Tuple,
 )

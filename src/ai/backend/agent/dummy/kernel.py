@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import os
 from collections import OrderedDict
-from typing import Any, Dict, FrozenSet, Mapping, Sequence, override
+from collections.abc import Mapping, Sequence
+from typing import Any, Dict, FrozenSet, override
 
 from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel, NextResult, ResultRecord
 from ai.backend.agent.resources import KernelResourceSpec

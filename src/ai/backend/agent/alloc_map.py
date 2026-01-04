@@ -7,15 +7,12 @@ import logging
 import operator
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from decimal import ROUND_DOWN, Decimal
 from typing import (
     TYPE_CHECKING,
     FrozenSet,
-    Iterable,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
     TypeVar,
     final,
 )

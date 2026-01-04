@@ -2,7 +2,8 @@ import asyncio
 import hashlib
 import logging
 import socket
-from typing import AsyncGenerator, Mapping, Optional
+from collections.abc import AsyncGenerator, Mapping
+from typing import Optional
 
 import hiredis
 from aiotools.server import process_index

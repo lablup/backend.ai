@@ -1,5 +1,6 @@
 from abc import ABCMeta, abstractmethod
-from typing import Sequence, Tuple
+from collections.abc import Sequence
+from typing import Tuple
 
 from aiohttp import web
 

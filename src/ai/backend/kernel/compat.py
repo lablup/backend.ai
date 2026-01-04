@@ -1,6 +1,7 @@
 import asyncio
 import signal
-from typing import Awaitable, Callable, Collection, Optional, TypeVar
+from collections.abc import Awaitable, Callable, Collection
+from typing import Optional, TypeVar
 
 __all__ = ("current_loop",)
 

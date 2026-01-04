@@ -1,5 +1,6 @@
 import logging
-from typing import Iterable, List, Optional, Sequence, Set, Tuple
+from collections.abc import Iterable, Sequence
+from typing import List, Optional, Set, Tuple
 
 from ai.backend.accelerator.rebellions.common.atom_api import ATOMAPI
 from ai.backend.accelerator.rebellions.common.plugin import AbstractATOMPlugin

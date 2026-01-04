@@ -1,8 +1,9 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Final, Iterable, Optional, Self
+from typing import Any, Final, Optional, Self
 
 from aiotools import cancel_and_wait
 from glide import (

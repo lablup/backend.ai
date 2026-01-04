@@ -1,7 +1,8 @@
 import asyncio
 import functools
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Any, Callable, Mapping, Sequence, TypeVar
+from typing import Any, TypeVar
 
 
 async def host_pid_to_container_pid(container_id: str, host_pid: int) -> int:

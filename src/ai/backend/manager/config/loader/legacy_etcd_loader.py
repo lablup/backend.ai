@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import urllib
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from contextvars import ContextVar
-from typing import Any, Optional, Sequence, override
+from typing import Any, Optional, override
 
 import aiotools
 import yarl

@@ -3,7 +3,8 @@ from __future__ import annotations
 import datetime
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, Mapping, overload
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, overload
 
 import graphene
 import sqlalchemy as sa

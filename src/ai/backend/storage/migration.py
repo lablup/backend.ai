@@ -4,11 +4,12 @@ import enum
 import logging
 import os
 import re
+from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import AsyncIterator, Iterator, Optional, TypedDict
+from typing import Optional, TypedDict
 from uuid import UUID
 
 import aiofiles
