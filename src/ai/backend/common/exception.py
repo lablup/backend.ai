@@ -336,7 +336,9 @@ class BackendAIError(web.HTTPError, ABC):
     extra_msg: Optional[str]
     body_dict: dict[str, Any]
 
-    def __init__(self, extra_msg: str | None = None, extra_data: Optional[Any] = None, **kwargs):
+    def __init__(
+        self, extra_msg: str | None = None, extra_data: Optional[Any] = None, **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         self.args = (self.status_code, self.reason, self.error_type)
         self.empty_body = False
@@ -355,7 +357,7 @@ class BackendAIError(web.HTTPError, ABC):
         self.body_dict = body
         self.body = dump_json(body)
 
-    def __str__(self):
+    def __str__(self) -> str:
         lines = []
         if self.extra_msg:
             lines.append(f"{self.error_title} ({self.extra_msg})")
@@ -365,7 +367,7 @@ class BackendAIError(web.HTTPError, ABC):
             lines.append(" -> extra_data: " + repr(self.extra_data))
         return "\n".join(lines)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         lines = []
         if self.extra_msg:
             lines.append(
@@ -377,7 +379,7 @@ class BackendAIError(web.HTTPError, ABC):
             lines.append(" -> extra_data: " + repr(self.extra_data))
         return "\n".join(lines)
 
-    def __reduce__(self):
+    def __reduce__(self) -> tuple:
         return (
             type(self),
             (),  # empty the constructor args to make unpickler to use

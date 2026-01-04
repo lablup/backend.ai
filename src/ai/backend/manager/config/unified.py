@@ -2375,5 +2375,5 @@ class ManagerUnifiedConfig(BaseConfigSchema):
         extra="allow",
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return pformat(self.model_dump())

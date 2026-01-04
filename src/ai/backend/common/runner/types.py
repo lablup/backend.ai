@@ -29,7 +29,7 @@ class Runner:
     _resources: Sequence[AbstractResource]
     _closed_event: asyncio.Event
 
-    def __init__(self, resources: Sequence[AbstractResource]):
+    def __init__(self, resources: Sequence[AbstractResource]) -> None:
         self._resources = resources
         self._closed_event = asyncio.Event()
 

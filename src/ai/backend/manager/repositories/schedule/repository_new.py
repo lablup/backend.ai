@@ -58,7 +58,7 @@ class ScheduleRepository:
         db: ExtendedAsyncSAEngine,
         valkey_stat: ValkeyStatClient,
         config_provider: ManagerConfigProvider,
-    ):
+    ) -> None:
         self._db_source = ScheduleDBSource(db)
         self._cache_source = ScheduleCacheSource(valkey_stat)
         self._config_provider = config_provider

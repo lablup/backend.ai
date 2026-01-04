@@ -21,7 +21,7 @@ class SweepLostAgentKernelsHandler(SchedulerHandler):
         self,
         scheduler: Scheduler,
         repository: SchedulerRepository,
-    ):
+    ) -> None:
         self._scheduler = scheduler
         self._repository = repository
 

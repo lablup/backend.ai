@@ -47,7 +47,7 @@ class StorageProxyHTTPClient:
     _endpoint: yarl.URL
     _secret: str
 
-    def __init__(self, client_session: aiohttp.ClientSession, args: StorageProxyClientArgs):
+    def __init__(self, client_session: aiohttp.ClientSession, args: StorageProxyClientArgs) -> None:
         self._client_session = client_session
         self._endpoint = args.endpoint
         self._secret = args.secret

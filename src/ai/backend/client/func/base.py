@@ -82,7 +82,7 @@ class APIFunctionMeta(type):
 
     _async = True
 
-    def __init__(cls, name, bases, attrs, **kwargs):
+    def __init__(cls, name, bases, attrs, **kwargs) -> None:
         super().__init__(name, bases, attrs)
         for attr_name, attr_value in attrs.items():
             if hasattr(attr_value, "_backend_api"):

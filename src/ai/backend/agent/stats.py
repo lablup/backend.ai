@@ -208,7 +208,7 @@ class MovingStatistics:
     _max: Decimal
     _last: list[tuple[Decimal, float]]
 
-    def __init__(self, initial_value: Optional[Decimal] = None):
+    def __init__(self, initial_value: Optional[Decimal] = None) -> None:
         self._last = []
         if initial_value is None:
             self._sum = Decimal(0)

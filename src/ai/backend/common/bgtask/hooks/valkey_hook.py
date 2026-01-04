@@ -18,7 +18,7 @@ class ValkeyUnregisterHook(AbstractTaskHook):
         self,
         valkey_client: ValkeyBgtaskClient,
         task_set_key: TaskSetKey,
-    ):
+    ) -> None:
         self._valkey_client = valkey_client
         self._task_set_key = task_set_key
 

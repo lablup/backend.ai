@@ -73,7 +73,7 @@ class ReservoirVFSDownloadStreamReader(StreamReader):
         client: ManagerHTTPClient,
         storage_name: str,
         filepath: str,
-    ):
+    ) -> None:
         self._client = client
         self._storage_name = storage_name
         self._filepath = filepath
@@ -111,7 +111,7 @@ class ReservoirVFSFileDownloader:
         redis_client: ValkeyArtifactDownloadTrackingClient,
         model_id: str,
         revision: str,
-    ):
+    ) -> None:
         self._client = client
         self._storage_name = storage_name
         self._redis_client = redis_client
@@ -269,7 +269,7 @@ class ReservoirS3FileDownloadStreamReader(StreamReader):
         redis_client: ValkeyArtifactDownloadTrackingClient,
         model_id: str,
         revision: str,
-    ):
+    ) -> None:
         self._src_s3_client = src_s3_client
         self._key = key
         self._size = size
@@ -415,7 +415,7 @@ class ReservoirService:
     _manager_client_pool: ManagerHTTPClientPool
     _redis_client: ValkeyArtifactDownloadTrackingClient
 
-    def __init__(self, args: ReservoirServiceArgs):
+    def __init__(self, args: ReservoirServiceArgs) -> None:
         self._background_task_manager = args.background_task_manager
         self._event_producer = args.event_producer
         self._reservoir_registry_configs = args.reservoir_registry_configs
@@ -1094,7 +1094,7 @@ class TarExtractor:
 
     _stream_reader: StreamReader
 
-    def __init__(self, stream_reader: StreamReader):
+    def __init__(self, stream_reader: StreamReader) -> None:
         self._stream_reader = stream_reader
 
     async def extract_to(self, target_dir: Path) -> int:

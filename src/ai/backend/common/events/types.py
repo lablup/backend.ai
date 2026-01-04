@@ -131,7 +131,7 @@ class AbstractBroadcastEvent(AbstractEvent):
 
     _register_dict: dict[str, type["AbstractBroadcastEvent"]] = {}
 
-    def __init_subclass__(cls):
+    def __init_subclass__(cls) -> None:
         try:
             name = cls.event_name()
             if name in cls._register_dict:

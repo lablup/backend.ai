@@ -99,7 +99,7 @@ class ScheduleDBSource:
 
     _db: ExtendedAsyncSAEngine
 
-    def __init__(self, db: ExtendedAsyncSAEngine):
+    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
     async def get_scheduling_data(self, scaling_group: str, spec: SchedulingSpec) -> SchedulingData:

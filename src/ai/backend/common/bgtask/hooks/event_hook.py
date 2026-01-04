@@ -13,7 +13,7 @@ from .base import AbstractTaskHook, TaskContext
 class EventProducerHook(AbstractTaskHook):
     """Hook for producing task events."""
 
-    def __init__(self, event_producer: EventProducer):
+    def __init__(self, event_producer: EventProducer) -> None:
         self._event_producer = event_producer
 
     @asynccontextmanager

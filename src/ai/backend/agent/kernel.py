@@ -128,7 +128,7 @@ def _dump_json_bytes(obj: Any) -> bytes:
 class RunEvent(Exception):
     data: Any
 
-    def __init__(self, data=None):
+    def __init__(self, data=None) -> None:
         super().__init__()
         self.data = data
 
@@ -615,7 +615,7 @@ class SocketPair:
     input_sock: RobustSocket
     output_sock: RobustSocket
 
-    def __init__(self, input_sock: RobustSocket, output_sock: RobustSocket):
+    def __init__(self, input_sock: RobustSocket, output_sock: RobustSocket) -> None:
         self.input_sock = input_sock
         self.output_sock = output_sock
 
@@ -735,7 +735,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         loop = current_loop()
         self.read_task = loop.create_task(self.read_output())
 
-    def __getstate__(self):
+    def __getstate__(self) -> Mapping[str, Any]:
         props = self.__dict__.copy()
         del props["zctx"]
         del props["_sockets"]
@@ -754,7 +754,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         del props["event_producer"]
         return props
 
-    def __setstate__(self, props):
+    def __setstate__(self, props) -> None:
         global _zctx
         self.__dict__.update(props)
         if _zctx is None:

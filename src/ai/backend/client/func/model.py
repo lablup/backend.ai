@@ -22,7 +22,7 @@ _default_list_fields: Sequence[FieldSpec] = (
 class Model(BaseFunction):
     model_name: str
 
-    def __init__(self, model_name: UUID):
+    def __init__(self, model_name: UUID) -> None:
         self.model_name = str(model_name)
 
     @api_function

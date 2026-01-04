@@ -8,7 +8,7 @@ import logging
 import os
 import re
 import sys
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import (
@@ -380,10 +380,10 @@ class PlatformTagSet(Mapping):
                 value = ""
             self._data[key] = value
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.__str__()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"PlatformTagSet({self._data!s})"
 
     def has(self, key: str, version: Optional[str] = None):
@@ -392,16 +392,16 @@ class PlatformTagSet(Mapping):
         _v = self._data.get(key, None)
         return _v == version
 
-    def __getitem__(self, key: str):
+    def __getitem__(self, key: str) -> str:
         return self._data[key]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self._data)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._data)
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if isinstance(other, (set, frozenset)):
             return set(self._data.keys()) == other
         return self._data == other

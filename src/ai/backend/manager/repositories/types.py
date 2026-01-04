@@ -92,7 +92,7 @@ class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
         ordering_applier: OrderingApplier,
         model_converter: ModelConverter,
         cursor_type_name: str,
-    ):
+    ) -> None:
         self.model_class = model_class
         self.filter_applier = filter_applier
         self.ordering_applier = ordering_applier

@@ -40,7 +40,7 @@ class VFolderInviteProcessors(AbstractProcessorPackage):
         UpdateInvitedVFolderMountPermissionAction, UpdateInvitedVFolderMountPermissionActionResult
     ]
 
-    def __init__(self, service: VFolderInviteService, action_monitors: list[ActionMonitor]):
+    def __init__(self, service: VFolderInviteService, action_monitors: list[ActionMonitor]) -> None:
         self.invite_vfolder = ActionProcessor(service.invite, action_monitors)
         self.accept_invitation = ActionProcessor(service.accept_invitation, action_monitors)
         self.reject_invitation = ActionProcessor(service.reject_invitation, action_monitors)

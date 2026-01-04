@@ -14,7 +14,7 @@ class Runner(BaseRunner):
     log_prefix = "h2o-kernel"
     default_runtime_path = "/opt/h2oai/dai/python/bin/python"
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
     async def init_with_loop(self):

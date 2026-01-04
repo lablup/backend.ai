@@ -164,7 +164,7 @@ class WebSocketProxy:
         downstream_callback: Optional[AsyncCallback[str | bytes, None]] = None,
         upstream_callback: Optional[AsyncCallback[str | bytes, None]] = None,
         ping_callback: Optional[AsyncCallback[str | bytes, None]] = None,
-    ):
+    ) -> None:
         self.up_conn = up_conn
         self.down_conn = down_conn
         self.upstream_buffer = asyncio.Queue()

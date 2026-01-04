@@ -45,7 +45,7 @@ class SessionTemplate(BaseFunction):
         async with rqst.fetch() as resp:
             return await resp.json()
 
-    def __init__(self, template_id: str, owner_access_key: Optional[str] = None):
+    def __init__(self, template_id: str, owner_access_key: Optional[str] = None) -> None:
         self.template_id = template_id
         self.owner_access_key = owner_access_key
 

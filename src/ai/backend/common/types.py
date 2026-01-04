@@ -818,7 +818,7 @@ class BinarySize(int):
             value = d.quantize(Decimal(".00")).normalize()
         return value
 
-    def __str__(self):
+    def __str__(self) -> str:
         suffix_idx = self._preformat()
         if suffix_idx == 0:
             if self == 1:
@@ -829,7 +829,7 @@ class BinarySize(int):
         value = self._quantize(self, multiplier)
         return f"{value:f} {suffix.upper()}iB"
 
-    def __format__(self, format_spec):
+    def __format__(self, format_spec) -> str:
         if len(format_spec) != 1:
             raise ValueError("format-string for BinarySize can be only one character.")
         if format_spec == "s":
@@ -938,7 +938,7 @@ class ResourceSlot(UserDict[str, Decimal]):
         self.sync_keys(other)
         return type(self)({k: self.data[k] - other.get(k, 0) for k in self.keys()})
 
-    def __neg__(self):
+    def __neg__(self) -> ResourceSlot:
         return type(self)({k: -v for k, v in self.data.items()})
 
     def __eq__(self, other: object) -> bool:

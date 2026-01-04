@@ -10,7 +10,7 @@ _canvas_id_counter = 0
 
 
 class DrawingObject:
-    def __init__(self, canvas, id_, args):
+    def __init__(self, canvas, id_, args) -> None:
         self._canvas = canvas
         self._id = id_
         self._type = args[0]
@@ -69,7 +69,7 @@ class DrawingObject:
 
 
 class Canvas:
-    def __init__(self, width, height, bgcolor=Colors.White, fgcolor=Colors.Black):
+    def __init__(self, width, height, bgcolor=Colors.White, fgcolor=Colors.Black) -> None:
         global _canvas_id_counter
         self._id = _canvas_id_counter
         _canvas_id_counter += 1

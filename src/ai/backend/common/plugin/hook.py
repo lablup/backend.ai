@@ -60,7 +60,7 @@ class HookPlugin(AbstractPlugin, metaclass=ABCMeta):
 
 
 class Reject(Exception):
-    def __init__(self, reason: str):
+    def __init__(self, reason: str) -> None:
         super().__init__(reason)
         self.reason = reason
 

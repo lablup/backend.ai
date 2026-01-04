@@ -41,12 +41,12 @@ class Vec2D(tuple):
     def __getnewargs__(self):
         return (self[0], self[1])
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "(%.2f,%.2f)" % self
 
 
 class Turtle:
-    def __init__(self, canvas):
+    def __init__(self, canvas) -> None:
         self.canvas = canvas
         self.points = []
         self.pen = True

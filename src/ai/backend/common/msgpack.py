@@ -87,7 +87,7 @@ _DEFAULT_EXT_HOOK: Mapping[ExtTypes, ExtFunc] = {
 
 
 class _Deserializer:
-    def __init__(self, mapping: Optional[Mapping[int, ExtFunc]] = None):
+    def __init__(self, mapping: Optional[Mapping[int, ExtFunc]] = None) -> None:
         self._ext_hook: dict[int, ExtFunc] = {}
         mapping = mapping or {}
         self._ext_hook = {**mapping}

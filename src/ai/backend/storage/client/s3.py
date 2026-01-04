@@ -39,7 +39,7 @@ class S3DownloadStreamReader(StreamReader):
         target: _S3Target,
         credentials: _S3Credentials,
         config: _S3DownloadConfig,
-    ):
+    ) -> None:
         self._session = aioboto3.Session()
         self._target = target
         self._credentials = credentials
@@ -86,7 +86,7 @@ class S3Client:
         region_name: Optional[str],
         aws_access_key_id: Optional[str],
         aws_secret_access_key: Optional[str],
-    ):
+    ) -> None:
         self.bucket_name = bucket_name
         self.endpoint_url = endpoint_url
         self.region_name = region_name

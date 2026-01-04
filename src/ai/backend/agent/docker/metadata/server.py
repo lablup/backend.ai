@@ -113,7 +113,7 @@ class MetadataServer(aobject):
         self.loaded_apps = []
         self.route_structure = {"latest": {"extension": {}}}
 
-    async def __ainit__(self):
+    async def __ainit__(self) -> None:
         local_config = cast(AgentUnifiedConfig, self.app["_root.context"].local_config)
         await prepare_kernel_metadata_uri_handling(local_config)
         self.app["docker-mode"] = local_config.agent.docker_mode

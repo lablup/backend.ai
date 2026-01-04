@@ -85,7 +85,7 @@ class AuditLogRow(Base):
         request_id: Optional[str] = None,
         triggered_by: Optional[str] = None,
         duration: Optional[timedelta] = None,
-    ):
+    ) -> None:
         self.entity_type = entity_type
         self.operation = operation
         self.action_id = action_id

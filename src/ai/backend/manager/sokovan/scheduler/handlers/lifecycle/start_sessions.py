@@ -25,7 +25,7 @@ class StartSessionsHandler(SchedulerHandler):
         self,
         scheduler: Scheduler,
         event_producer: EventProducer,
-    ):
+    ) -> None:
         self._scheduler = scheduler
         self._event_producer = event_producer
 

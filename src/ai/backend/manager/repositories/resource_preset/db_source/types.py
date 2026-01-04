@@ -128,7 +128,7 @@ class ResourceOccupancyFilter(ABC):
 class AccessKeyFilter(ResourceOccupancyFilter):
     """Filter for access key."""
 
-    def __init__(self, access_key: AccessKey):
+    def __init__(self, access_key: AccessKey) -> None:
         self.access_key = access_key
 
     def get_condition(self) -> Any:
@@ -138,7 +138,7 @@ class AccessKeyFilter(ResourceOccupancyFilter):
 class GroupIdFilter(ResourceOccupancyFilter):
     """Filter for group ID."""
 
-    def __init__(self, group_id: UUID):
+    def __init__(self, group_id: UUID) -> None:
         self.group_id = group_id
 
     def get_condition(self) -> Any:
@@ -148,7 +148,7 @@ class GroupIdFilter(ResourceOccupancyFilter):
 class DomainNameFilter(ResourceOccupancyFilter):
     """Filter for domain name."""
 
-    def __init__(self, domain_name: str):
+    def __init__(self, domain_name: str) -> None:
         self.domain_name = domain_name
 
     def get_condition(self) -> Any:

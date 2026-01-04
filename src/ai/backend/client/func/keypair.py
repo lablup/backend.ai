@@ -41,7 +41,7 @@ class KeyPair(BaseFunction):
     Provides interactions with keypairs.
     """
 
-    def __init__(self, access_key: str):
+    def __init__(self, access_key: str) -> None:
         self.access_key = access_key
 
     @api_function

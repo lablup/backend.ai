@@ -79,10 +79,10 @@ class DockerKernel(AbstractKernel):
     async def close(self) -> None:
         pass
 
-    def __getstate__(self):
+    def __getstate__(self) -> Mapping[str, Any]:
         return super().__getstate__()
 
-    def __setstate__(self, props):
+    def __setstate__(self, props) -> None:
         if "network_driver" not in props:
             props["network_driver"] = "bridge"
         super().__setstate__(props)

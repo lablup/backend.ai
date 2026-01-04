@@ -21,7 +21,7 @@ class KeypairConcurrencyData:
 class SessionRowCache:
     """Cache for pre-fetched session rows with lazy loading support."""
 
-    def __init__(self, prefetched: dict[SessionId, SessionRow]):
+    def __init__(self, prefetched: dict[SessionId, SessionRow]) -> None:
         self._cache = prefetched
 
     async def get_or_fetch(self, db_sess: SASession, session_id: SessionId) -> SessionRow:

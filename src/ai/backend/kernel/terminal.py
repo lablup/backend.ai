@@ -25,7 +25,7 @@ class Terminal:
     A wrapper for a terminal-based app.
     """
 
-    def __init__(self, shell_cmd, ev_term, sock_out, *, auto_restart=True, loop=None):
+    def __init__(self, shell_cmd, ev_term, sock_out, *, auto_restart=True, loop=None) -> None:
         self._sorna_media = []
         self.zctx = sock_out.context
 

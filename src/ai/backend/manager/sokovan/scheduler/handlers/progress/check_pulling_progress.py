@@ -27,7 +27,7 @@ class CheckPullingProgressHandler(SchedulerHandler):
         scheduler: Scheduler,
         scheduling_controller: SchedulingController,
         event_producer: EventProducer,
-    ):
+    ) -> None:
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
         self._event_producer = event_producer

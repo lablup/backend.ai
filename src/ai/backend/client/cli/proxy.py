@@ -28,7 +28,9 @@ class WebSocketProxy:
 
     upstream_buffer: asyncio.Queue[tuple[str | bytes, aiohttp.WSMsgType]]
 
-    def __init__(self, up_conn: aiohttp.ClientWebSocketResponse, down_conn: web.WebSocketResponse):
+    def __init__(
+        self, up_conn: aiohttp.ClientWebSocketResponse, down_conn: web.WebSocketResponse
+    ) -> None:
         self.up_conn = up_conn
         self.down_conn = down_conn
         self.upstream_buffer = asyncio.Queue()

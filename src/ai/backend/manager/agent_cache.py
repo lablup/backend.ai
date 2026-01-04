@@ -32,12 +32,12 @@ class PeerInvoker(Peer):
         _cached_funcs: dict[str, Callable]
         order_key: ContextVar[Optional[str]]
 
-        def __init__(self, peer: Peer):
+        def __init__(self, peer: Peer) -> None:
             self._cached_funcs = {}
             self.peer = peer
             self.order_key = ContextVar("order_key", default=None)
 
-        def __getattr__(self, name: str):
+        def __getattr__(self, name: str) -> Callable:
             if f := self._cached_funcs.get(name, None):
                 return f
 

@@ -30,7 +30,7 @@ class LazyClickMixin:
     _import_name: str
     _loaded_impl: Optional[click.Command | click.Group]
 
-    def __init__(self, *, import_name, **kwargs):
+    def __init__(self, *, import_name, **kwargs) -> None:
         self._import_name = import_name
         self._loaded_impl = None
         super().__init__(**kwargs)
@@ -57,7 +57,7 @@ class LazyGroup(LazyClickMixin, click.Group):
 class EnumChoice(click.Choice):
     enum: type[Enum]
 
-    def __init__(self, enum: type[Enum]):
+    def __init__(self, enum: type[Enum]) -> None:
         enum_members = [e.name for e in enum]
         super().__init__(enum_members)
         self.enum = enum

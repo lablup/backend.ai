@@ -276,10 +276,10 @@ class FstabEntry:
         self.d = d
         self.p = p
 
-    def __eq__(self, o):
+    def __eq__(self, o) -> bool:
         return str(self) == str(o)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.device} {self.mountpoint} {self.fstype} {self.options} {self.d} {self.p}"
 
 

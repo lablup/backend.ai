@@ -106,9 +106,9 @@ select = [
     "RET",    # flake8-return: enforces consistent return statement usage
     "T20",    # flake8-print: detects print statements (should use logging)
     "TID252", # flake8-tidy-imports: prefer absolute imports over parent relative imports
+    "ANN",    # flake8-annotations: enforces type annotations
     # Deferred rules (require significant changes):
     # "DTZ",  # flake8-datetimez: enforces timezone-aware datetime usage (208 violations)
-    # "ANN",  # flake8-annotations: enforces type annotations
 ]
 ignore = [
     "E203",   # whitespace before ':' - conflicts with Black formatter
@@ -179,6 +179,15 @@ ignore = [
     "RET502",  # implicit-return-value - mixed implicit/explicit return (stylistic preference)
     "RET507",  # superfluous-else-continue - else after continue (can improve readability)
     "RET508",  # superfluous-else-break - else after break (can improve readability)
+    # ANN (annotations) - defer for gradual migration, mypy handles type checking
+    "ANN001",  # missing-type-function-argument - 1336 violations, defer for gradual migration
+    "ANN002",  # missing-type-args - *args type annotation, low practical value
+    "ANN003",  # missing-type-kwargs - **kwargs type annotation, low practical value
+    "ANN201",  # missing-return-type-undocumented-public-function - 597 violations, defer for gradual migration
+    "ANN202",  # missing-return-type-private-function - 258 violations, defer for gradual migration
+    "ANN205",  # missing-return-type-static-method - 21 violations, defer for gradual migration
+    "ANN206",  # missing-return-type-class-method - 119 violations, defer for gradual migration
+    "ANN401",  # dynamically-typed-expression - Any needed for GraphQL resolvers, dynamic APIs
 ]
 
 [tool.ruff.lint.isort]
@@ -203,9 +212,9 @@ split-on-trailing-comma = true
 "src/ai/backend/client/output/*.py" = ["T20"]
 # - Client func vfolder has progress printing
 "src/ai/backend/client/func/vfolder.py" = ["T20"]
-# - Alembic migrations may print progress
-"src/ai/backend/*/models/alembic/**/*.py" = ["T20"]
-"src/ai/backend/*/*/models/alembic/**/*.py" = ["T20"]
+# - Alembic migrations may print progress and have standard signatures
+"src/ai/backend/*/models/alembic/**/*.py" = ["T20", "ANN"]
+"src/ai/backend/*/*/models/alembic/**/*.py" = ["T20", "ANN"]
 # - Config files print debug info to stderr
 "src/ai/backend/*/config.py" = ["T20"]
 "src/ai/backend/*/*/config.py" = ["T20"]
@@ -234,9 +243,13 @@ split-on-trailing-comma = true
 "src/ai/backend/storage/migration.py" = ["T20"]
 # - Logging handler (prints to stderr by design)
 "src/ai/backend/logging/handler/**/*.py" = ["T20"]
-# - Test files may use print for debugging
-"tests/**/*.py" = ["T20"]
-"src/ai/backend/test/**/*.py" = ["T20"]
+# - Test files may use print for debugging and have flexible type annotations
+"tests/**/*.py" = ["T20", "ANN"]
+"src/ai/backend/test/**/*.py" = ["T20", "ANN"]
+# - Type stub files have their own conventions
+"stubs/**/*.pyi" = ["ANN"]
+# - Vec2D class intentionally overrides tuple operators with incompatible return types for vector math
+"src/ai/backend/kernel/python/drawing/turtle.py" = ["ANN204"]
 
 [tool.ruff.format]
 preview = true  # enable the black's preview style

@@ -51,7 +51,7 @@ class VFolderProcessors(AbstractProcessorPackage):
     clone_vfolder: SingleEntityActionProcessor[CloneVFolderAction, CloneVFolderActionResult]
     get_task_logs: SingleEntityActionProcessor[GetTaskLogsAction, GetTaskLogsActionResult]
 
-    def __init__(self, service: VFolderService, action_monitors: list[ActionMonitor]):
+    def __init__(self, service: VFolderService, action_monitors: list[ActionMonitor]) -> None:
         self.create_vfolder = ScopeActionProcessor(service.create, action_monitors)
         self.get_vfolder = SingleEntityActionProcessor(service.get, action_monitors)
         self.list_vfolder = ScopeActionProcessor(service.list, action_monitors)

@@ -47,7 +47,7 @@ ExtraVFolderMountEdge = Edge[ExtraVFolderMount]
 class ExtraVFolderMountConnection(Connection[ExtraVFolderMount]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs: Any):
+    def __init__(self, *args, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 

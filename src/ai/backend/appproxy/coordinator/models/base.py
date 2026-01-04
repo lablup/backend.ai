@@ -85,7 +85,7 @@ class EnumType(TypeDecorator, SchemaType):  # type: ignore
     impl = ENUM
     cache_ok = True
 
-    def __init__(self, enum_cls, **opts):
+    def __init__(self, enum_cls, **opts) -> None:
         if not issubclass(enum_cls, enum.Enum):
             raise InvalidEnumTypeError(f"Expected an Enum subclass, got {enum_cls}")
         if "name" not in opts:

@@ -24,7 +24,7 @@ class ProvisioningRouteHandler(RouteHandler):
         self,
         route_executor: RouteExecutor,
         event_producer: EventProducer,
-    ):
+    ) -> None:
         self._route_executor = route_executor
         self._event_producer = event_producer
 

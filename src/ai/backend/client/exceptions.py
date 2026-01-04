@@ -12,14 +12,14 @@ __all__ = (
 class BackendError(Exception):
     """Exception type to catch all ai.backend-related errors."""
 
-    def __str__(self):
+    def __str__(self) -> str:
         return repr(self)
 
 
 class BackendAPIError(BackendError):
     """Exceptions returned by the API gateway."""
 
-    def __init__(self, status: int, reason: str, data: Any):
+    def __init__(self, status: int, reason: str, data: Any) -> None:
         if isinstance(data, (str, bytes)):
             try:
                 data = json.loads(data)

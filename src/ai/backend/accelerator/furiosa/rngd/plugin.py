@@ -51,7 +51,7 @@ class RngdDevice(AbstractComputeDevice):
     model_name: str
     serial: str
 
-    def __init__(self, model_name: str, serial: str, *args, **kwargs):
+    def __init__(self, model_name: str, serial: str, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.model_name = model_name
         self.serial = serial

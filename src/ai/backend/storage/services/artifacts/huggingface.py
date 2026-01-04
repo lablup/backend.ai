@@ -339,7 +339,7 @@ class HuggingFaceService:
     _artifact_verifier_ctx: ArtifactVerifierContext
     _redis_client: ValkeyArtifactDownloadTrackingClient
 
-    def __init__(self, args: HuggingFaceServiceArgs):
+    def __init__(self, args: HuggingFaceServiceArgs) -> None:
         self._storage_pool = args.storage_pool
         self._background_task_manager = args.background_task_manager
         self._registry_configs = args.registry_configs

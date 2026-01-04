@@ -177,7 +177,7 @@ class ContainerLifecycleEvent:
     exit_code: Optional[int] = None
     suppress_events: bool = False
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.container_id:
             cid = self.container_id[:13]
         else:
@@ -215,7 +215,7 @@ class KernelOwnershipData:
     owner_user_id: Optional[uuid.UUID] = None
     owner_project_id: Optional[uuid.UUID] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         def to_uuid(value: Optional[str | uuid.UUID]) -> Optional[uuid.UUID]:
             if value is None:
                 return None

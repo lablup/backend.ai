@@ -106,7 +106,7 @@ class TriState(Generic[TVal]):
     _state: _TriStateEnum
     _value: Optional[TVal]
 
-    def __init__(self, state: _TriStateEnum, value: Optional[TVal]):
+    def __init__(self, state: _TriStateEnum, value: Optional[TVal]) -> None:
         """
         Initialize a TriState object with the given state and value.
         Do not call this constructor directly. Use the class methods instead.
@@ -179,7 +179,7 @@ class OptionalState(Generic[TVal]):
     _state: _TriStateEnum
     _value: Optional[TVal]
 
-    def __init__(self, state: _TriStateEnum, value: Optional[TVal]):
+    def __init__(self, state: _TriStateEnum, value: Optional[TVal]) -> None:
         if state == _TriStateEnum.NULLIFY:
             raise ValueError("OptionalState cannot be NULLIFY")
         self._state = state

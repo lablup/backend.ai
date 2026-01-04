@@ -446,10 +446,10 @@ class VFolderRow(Base):
             raise ObjectNotFound(object_name="VFolder")
         return result
 
-    def __contains__(self, key):
+    def __contains__(self, key) -> bool:
         return key in self.__dir__()
 
-    def __getitem__(self, item):
+    def __getitem__(self, item) -> Any:
         try:
             return getattr(self, item)
         except AttributeError:

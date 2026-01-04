@@ -131,7 +131,7 @@ class ScheduleDBSource:
 
     _db: ExtendedAsyncSAEngine
 
-    def __init__(self, db: ExtendedAsyncSAEngine):
+    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
     @actxmgr

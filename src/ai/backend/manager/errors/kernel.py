@@ -98,7 +98,7 @@ class TooManySessionsMatched(BackendAIError, web.HTTPNotFound):
         extra_msg: Optional[str] = None,
         extra_data: Optional[dict[str, Any]] = None,
         **kwargs,
-    ):
+    ) -> None:
         if extra_data is not None and (matches := extra_data.get("matches", None)) is not None:
             serializable_matches = [
                 {
@@ -171,7 +171,7 @@ class BackendAgentError(BackendAIError):
         self,
         agent_error_type: str,
         exc_info: str | AgentError | Exception | Mapping[str, Optional[str]] | None = None,
-    ):
+    ) -> None:
         super().__init__()
         agent_details: Mapping[str, Optional[str]]
         if not agent_error_type.startswith("https://"):
@@ -217,17 +217,17 @@ class BackendAgentError(BackendAIError):
             "agent-details": agent_details,
         })
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.agent_exception:
             return f"{self.agent_error_title} ({self.agent_exception})"
         return f"{self.agent_error_title}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if self.agent_exception:
             return f"<{type(self).__name__}: {self.agent_error_title} ({self.agent_exception})>"
         return f"<{type(self).__name__}: {self.agent_error_title}>"
 
-    def __reduce__(self):
+    def __reduce__(self) -> tuple:
         return (type(self), (self.agent_error_type, self.agent_details))
 
 

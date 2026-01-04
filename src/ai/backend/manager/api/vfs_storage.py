@@ -51,7 +51,7 @@ class VFSDirectoryDownloadProxyStreamReader(StreamReader):
         storage_name: str,
         req: VFSDownloadFileReq,
         filepath: str,
-    ):
+    ) -> None:
         self._storage_proxy_client = storage_proxy_client
         self._storage_name = storage_name
         self._req = req

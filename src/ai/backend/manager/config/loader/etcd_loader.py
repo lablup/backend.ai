@@ -8,7 +8,7 @@ from ai.backend.manager.config.loader.types import AbstractConfigLoader
 class EtcdCommonConfigLoader(AbstractConfigLoader):
     _etcd: AsyncEtcd
 
-    def __init__(self, etcd: AsyncEtcd):
+    def __init__(self, etcd: AsyncEtcd) -> None:
         self._etcd = etcd
 
     @override
@@ -19,7 +19,7 @@ class EtcdCommonConfigLoader(AbstractConfigLoader):
 class EtcdManagerConfigLoader(AbstractConfigLoader):
     _etcd: AsyncEtcd
 
-    def __init__(self, etcd: AsyncEtcd):
+    def __init__(self, etcd: AsyncEtcd) -> None:
         self._etcd = etcd
 
     @override

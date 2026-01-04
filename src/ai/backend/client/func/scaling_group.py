@@ -52,7 +52,7 @@ class ScalingGroup(BaseFunction):
     policies and operation standards to each partition of agent sets.
     """
 
-    def __init__(self, name: str):
+    def __init__(self, name: str) -> None:
         self.name = name
 
     @api_function

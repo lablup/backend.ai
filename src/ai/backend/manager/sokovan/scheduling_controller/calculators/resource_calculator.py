@@ -33,7 +33,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class ResourceCalculator:
     """Stateless calculator for resource requirements."""
 
-    def __init__(self, config_provider: ManagerConfigProvider):
+    def __init__(self, config_provider: ManagerConfigProvider) -> None:
         self._config_provider = config_provider
 
     async def calculate(

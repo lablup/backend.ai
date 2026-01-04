@@ -863,7 +863,7 @@ class InferenceSessionError(graphene.ObjectType):
 
 
 class AsyncPaginatedConnectionField(AsyncListConnectionField):
-    def __init__(self, type, *args, **kwargs):
+    def __init__(self, type, *args, **kwargs) -> None:
         kwargs.setdefault("filter", graphene.String())
         kwargs.setdefault("order", graphene.String())
         kwargs.setdefault("offset", graphene.Int())

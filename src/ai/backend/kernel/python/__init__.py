@@ -24,7 +24,7 @@ class Runner(BaseRunner):
     }
     jupyter_kspec_name = "python"
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.input_queue = None
         self.output_queue = None

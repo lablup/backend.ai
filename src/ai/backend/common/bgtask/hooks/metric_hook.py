@@ -33,7 +33,7 @@ class MetricObserverHook(AbstractTaskHook):
 
     _observer: BackgroundTaskObserver
 
-    def __init__(self, observer: BackgroundTaskObserver):
+    def __init__(self, observer: BackgroundTaskObserver) -> None:
         self._observer = observer
 
     @asynccontextmanager

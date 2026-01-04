@@ -76,7 +76,7 @@ class Dotfile(BaseFunction):
         owner_access_key: Optional[str] = None,
         group: Optional[str] = None,
         domain: Optional[str] = None,
-    ):
+    ) -> None:
         self.path = path
         self.owner_access_key = owner_access_key
         self.group = group

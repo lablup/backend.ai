@@ -51,7 +51,7 @@ class HuggingFaceClient:
     _endpoint: Optional[str]
     _api: HfApi
 
-    def __init__(self, args: HuggingFaceClientArgs):
+    def __init__(self, args: HuggingFaceClientArgs) -> None:
         """Initialize HuggingFace client.
 
         Args:
@@ -224,7 +224,7 @@ class HuggingFaceScanner:
 
     _client: HuggingFaceClient
 
-    def __init__(self, client: HuggingFaceClient):
+    def __init__(self, client: HuggingFaceClient) -> None:
         """Initialize HuggingFace scanner.
 
         Args:

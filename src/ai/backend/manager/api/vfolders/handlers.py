@@ -59,7 +59,7 @@ class VFolderServiceProtocol(Protocol):
 class VFolderHandler:
     _vfolder_service: VFolderServiceProtocol
 
-    def __init__(self, vfolder_service: VFolderServiceProtocol):
+    def __init__(self, vfolder_service: VFolderServiceProtocol) -> None:
         self._vfolder_service = vfolder_service
 
     @api_handler

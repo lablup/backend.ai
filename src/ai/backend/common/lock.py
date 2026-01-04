@@ -227,7 +227,7 @@ class RedisLock(AbstractDistributedLock):
         lifetime: Optional[float] = None,
         debug: bool = False,
         lock_retry_interval: Optional[float] = None,
-    ):
+    ) -> None:
         super().__init__(lifetime=lifetime)
         self.lock_name = lock_name
         self._redis = redis.client

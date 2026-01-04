@@ -264,7 +264,7 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
     async def __ainit__(self) -> None:
         return
 
-    def __setstate__(self, props):
+    def __setstate__(self, props) -> None:
         self.__dict__.update(props)
         self.zctx = None
         self.input_sock = None

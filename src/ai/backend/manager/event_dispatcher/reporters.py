@@ -9,7 +9,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
 class EventLogger(AbstractEventReporter):
-    def __init__(self, db: ExtendedAsyncSAEngine):
+    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
     async def prepare_event_report(

@@ -30,7 +30,7 @@ class NotifiableMessage(BaseModel):
 
     model_config = {"extra": "forbid"}  # Strict validation - reject unknown fields
 
-    def __init_subclass__(cls):
+    def __init_subclass__(cls) -> None:
         """Automatically register subclasses by their rule type."""
         try:
             rule_type = cls.rule_type()

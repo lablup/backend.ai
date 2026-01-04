@@ -63,7 +63,7 @@ class InsufficientResource(ResourceError):
             + f"allocating {self.requested_alloc} out of {self.total_allocatable})"
         )
 
-    def __reduce__(self):
+    def __reduce__(self) -> tuple:
         return (
             self.__class__,
             (
@@ -92,7 +92,7 @@ class FractionalResourceFragmented(ResourceError):
             + f"allocating {self.requested_alloc} from {self.dev_allocs})"
         )
 
-    def __reduce__(self):
+    def __reduce__(self) -> tuple:
         return (
             self.__class__,
             (
@@ -112,14 +112,14 @@ class UnsupportedBaseDistroError(RuntimeError):
 class ContainerCreationError(Exception):
     container_id: str
 
-    def __init__(self, container_id: str, message: str | None = None, *args, **kwargs):
+    def __init__(self, container_id: str, message: str | None = None, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.container_id = container_id
         self.message = message
 
 
 class K8sError(Exception):
-    def __init__(self, message):
+    def __init__(self, message) -> None:
         super().__init__(message)
         self.message = message
 
@@ -133,7 +133,7 @@ class AgentError(RuntimeError):
     the agent.
     """
 
-    def __init__(self, *args, exc_repr: Optional[str] = None):
+    def __init__(self, *args, exc_repr: Optional[str] = None) -> None:
         super().__init__(*args)
         self.exc_repr = exc_repr
 

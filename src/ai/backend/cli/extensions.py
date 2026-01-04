@@ -73,7 +73,7 @@ class AliasGroupMixin(click.Group):
     ref) https://github.com/click-contrib/click-aliases
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._commands = {}
         self._aliases = {}

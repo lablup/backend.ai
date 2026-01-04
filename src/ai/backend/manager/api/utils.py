@@ -364,25 +364,25 @@ def trim_text(value: str, maxlen: int) -> str:
 
 
 class _Infinity(numbers.Number):
-    def __lt__(self, o):
+    def __lt__(self, o) -> bool:
         return False
 
-    def __le__(self, o):
+    def __le__(self, o) -> bool:
         return False
 
-    def __gt__(self, o):
+    def __gt__(self, o) -> bool:
         return True
 
-    def __ge__(self, o):
+    def __ge__(self, o) -> bool:
         return False
 
-    def __float__(self):
+    def __float__(self) -> float:
         return float("inf")
 
-    def __int__(self):
+    def __int__(self) -> int:
         return 0xFFFF_FFFF_FFFF_FFFF  # a practical 64-bit maximum
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self)
 
 
@@ -522,7 +522,7 @@ async def call_non_bursty(
 class Singleton(type):
     _instances: MutableMapping[Any, Any] = {}
 
-    def __call__(cls, *args, **kwargs):
+    def __call__(cls, *args, **kwargs) -> Any:
         if cls not in cls._instances:
             cls._instances[cls] = super().__call__(*args, **kwargs)
         return cls._instances[cls]

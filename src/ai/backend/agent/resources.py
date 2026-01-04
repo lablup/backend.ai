@@ -848,7 +848,7 @@ class Mount:
     permission: MountPermission = MountPermission.READ_ONLY
     opts: Optional[Mapping[str, Any]] = None
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.source}:{self.target}:{self.permission.value}"
 
     @classmethod

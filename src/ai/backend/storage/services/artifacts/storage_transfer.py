@@ -20,7 +20,7 @@ class StorageTransferManager:
     Manages transferring files between different artifact storage backends.
     """
 
-    def __init__(self, storage_pool: StoragePool):
+    def __init__(self, storage_pool: StoragePool) -> None:
         self._storage_pool = storage_pool
 
     async def transfer_file(

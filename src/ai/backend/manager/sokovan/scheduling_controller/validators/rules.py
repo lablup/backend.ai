@@ -113,7 +113,7 @@ class ResourceLimitRule(SessionValidatorRule):
     def name(self) -> str:
         return "resource_limit"
 
-    def __init__(self, known_slot_types: Mapping[SlotName, SlotTypes] | None = None):
+    def __init__(self, known_slot_types: Mapping[SlotName, SlotTypes] | None = None) -> None:
         self._known_slot_types = known_slot_types
 
     @override
