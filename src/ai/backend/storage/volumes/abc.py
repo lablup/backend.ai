@@ -44,6 +44,8 @@ CAP_FAST_SCAN: Final = "fast-scan"
 # ability to scan vFolder size fast (e.g. by API)
 CAP_FAST_SIZE: Final = "fast-size"
 
+_CURRENT_DIR: Final = PurePosixPath(".")
+
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
@@ -247,7 +249,7 @@ class AbstractVolume(metaclass=ABCMeta):
     def sanitize_vfpath(
         self,
         vfid: VFolderID,
-        relpath: PurePosixPath = PurePosixPath("."),
+        relpath: PurePosixPath = _CURRENT_DIR,
     ) -> Path:
         vfpath = self.mangle_vfpath(vfid).resolve()
         if not (vfpath.exists() and vfpath.is_dir()):
@@ -321,7 +323,7 @@ class AbstractVolume(metaclass=ABCMeta):
     async def get_usage(
         self,
         vfid: VFolderID,
-        relpath: PurePosixPath = PurePosixPath("."),
+        relpath: PurePosixPath = _CURRENT_DIR,
     ) -> TreeUsage:
         pass
 

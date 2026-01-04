@@ -282,7 +282,7 @@ class BackgroundTaskManager:
         valkey_client: ValkeyBgtaskClient,
         server_id: str,
         tags: Optional[Iterable[str]] = None,
-        bgtask_observer: BackgroundTaskObserver = NopBackgroundTaskObserver(),
+        bgtask_observer: Optional[BackgroundTaskObserver] = None,
         task_registry: Optional[BackgroundTaskHandlerRegistry] = None,
     ) -> None:
         self._event_producer = event_producer
@@ -292,6 +292,8 @@ class BackgroundTaskManager:
         self._task_set_key = TaskSetKey(
             server_id=server_id, tags=set(tags) if tags is not None else set()
         )
+        if bgtask_observer is None:
+            bgtask_observer = NopBackgroundTaskObserver()
         self._metric_observer = bgtask_observer
         self._hook = CompositeTaskHook([
             MetricObserverHook(bgtask_observer),

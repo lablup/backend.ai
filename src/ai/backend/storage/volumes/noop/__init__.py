@@ -19,7 +19,12 @@ from ai.backend.storage.types import (
     VFolderID,
     VolumeInfo,
 )
-from ai.backend.storage.volumes.abc import AbstractFSOpModel, AbstractQuotaModel, AbstractVolume
+from ai.backend.storage.volumes.abc import (
+    AbstractFSOpModel,
+    AbstractQuotaModel,
+    AbstractVolume,
+    _CURRENT_DIR,
+)
 
 
 async def _return_empty_dir_entry() -> AsyncIterator[DirEntry]:
@@ -180,7 +185,7 @@ class NoopVolume(AbstractVolume):
     async def get_usage(
         self,
         vfid: VFolderID,
-        relpath: PurePosixPath = PurePosixPath("."),
+        relpath: PurePosixPath = _CURRENT_DIR,
     ) -> TreeUsage:
         return TreeUsage(0, 0)
 

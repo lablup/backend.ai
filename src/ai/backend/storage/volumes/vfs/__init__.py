@@ -48,6 +48,7 @@ from ai.backend.storage.volumes.abc import (
     AbstractFSOpModel,
     AbstractQuotaModel,
     AbstractVolume,
+    _CURRENT_DIR,
 )
 from ai.backend.storage.watcher import DeletePathTask, WatcherClient
 
@@ -505,7 +506,7 @@ class BaseVolume(AbstractVolume):
     async def get_usage(
         self,
         vfid: VFolderID,
-        relpath: PurePosixPath = PurePosixPath("."),
+        relpath: PurePosixPath = _CURRENT_DIR,
     ) -> TreeUsage:
         target_path = self.sanitize_vfpath(vfid, relpath)
         return await self.fsop_model.scan_tree_usage(target_path)

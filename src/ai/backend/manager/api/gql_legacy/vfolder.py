@@ -280,7 +280,7 @@ class VirtualFolderNode(graphene.ObjectType):
         cls,
         info: graphene.ResolveInfo,
         id: str,
-        scope_id: ScopeType = SystemScope(),
+        scope_id: Optional[ScopeType] = None,
         permission: VFolderRBACPermission = VFolderRBACPermission.READ_ATTRIBUTE,
     ) -> Optional[Self]:
         graph_ctx: GraphQueryContext = info.context
@@ -289,6 +289,8 @@ class VirtualFolderNode(graphene.ObjectType):
             joinedload(VFolderRow.user_row),
             joinedload(VFolderRow.group_row),
         )
+        if scope_id is None:
+            scope_id = SystemScope()
         async with graph_ctx.db.connect() as db_conn:
             user = graph_ctx.user
             client_ctx = ClientContext(

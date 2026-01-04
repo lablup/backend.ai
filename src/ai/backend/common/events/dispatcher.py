@@ -349,14 +349,14 @@ class EventDispatcher(EventDispatcherGroup):
         *,
         consumer_exception_handler: AsyncExceptionHandler | None = None,
         subscriber_exception_handler: AsyncExceptionHandler | None = None,
-        event_observer: EventObserver = NopEventObserver(),
+        event_observer: EventObserver | None = None,
     ) -> None:
         self._log_events = log_events
         self._closed = False
         self._consumers = defaultdict(set)
         self._subscribers = defaultdict(set)
         self._msg_queue = message_queue
-        self._metric_observer = event_observer
+        self._metric_observer = event_observer if event_observer is not None else NopEventObserver()
         self._consumer_taskgroup = PersistentTaskGroup(
             name="consumer_taskgroup",
             exception_handler=consumer_exception_handler,
