@@ -2,7 +2,6 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from tests.unit.manager.services.utils import ScenarioBase
 
 from ai.backend.common.data.endpoint.types import EndpointStatus
 from ai.backend.common.types import (
@@ -23,6 +22,7 @@ from ai.backend.manager.services.model_serving.exceptions import (
 from ai.backend.manager.services.model_serving.processors.auto_scaling import (
     ModelServingAutoScalingProcessors,
 )
+from ai.backend.testutils.scenario import ScenarioBase
 
 
 @pytest.fixture

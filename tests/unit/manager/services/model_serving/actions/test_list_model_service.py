@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pydantic import HttpUrl
-from tests.unit.manager.services.utils import ScenarioBase
 
 from ai.backend.manager.data.model_serving.types import CompactServiceInfo
 from ai.backend.manager.models.routing import RouteStatus
@@ -15,6 +14,7 @@ from ai.backend.manager.services.model_serving.actions.list_model_service import
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )
+from ai.backend.testutils.scenario import ScenarioBase
 
 
 @pytest.fixture
