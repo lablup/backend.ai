@@ -83,40 +83,32 @@ src = ["src"]
 
 [tool.ruff.lint]
 select = [
-    # Default
     "E",      # pycodestyle errors: PEP8 style violations
     "W",      # pycodestyle warnings: PEP8 style warnings
     "F",      # pyflakes: detects unused imports, undefined names, and other logical errors
     "I",      # isort: enforces consistent import ordering
-    # Phase 1: Zero violations
     "T10",    # flake8-debugger: prevents debugger statements (pdb, breakpoint) in production code
     "FA",     # flake8-future-annotations: enforces `from __future__ import annotations`
     "ISC",    # flake8-implicit-str-concat: detects implicit string concatenation bugs
     "EXE",    # flake8-executable: validates shebang and file permissions consistency
-    # Phase 2-3: Minimal violations (<50)
     "LOG",    # flake8-logging: enforces logging best practices (warn -> warning, etc.)
-    # Note: LOG015 (root-logger-call) is intentionally not ignored - root logger usage should be reviewed
     "FLY",    # flynt: converts old-style string formatting to f-strings
     "PIE",    # flake8-pie: catches misc. code smells (duplicate class fields, unnecessary pass, etc.)
     "FURB",   # refurb: suggests modern Python idioms (Path.read_text, etc.)
-    # "DTZ",  # flake8-datetimez: enforces timezone-aware datetime usage (208 violations - deferred)
-    # Phase 4: Raise statement validation
     "RSE",    # flake8-raise: enforces proper raise statement usage
-    # "T20",  # flake8-print: detects print statements (689 violations - deferred for careful review)
-    # Phase 5: Performance, simplification, and comprehensions
     "PERF",   # perflint: detects performance anti-patterns
     "SIM",    # flake8-simplify: suggests code simplification
     "RUF",    # ruff-specific: Ruff's own linting rules
     "C4",     # flake8-comprehensions: optimizes list/set/dict comprehensions
-    # Phase 6: Bug detection and code quality
     "B",      # flake8-bugbear: detects likely bugs and design issues
-    # Phase 7: Type annotations and modern syntax
     "UP",     # pyupgrade: modernizes Python syntax to latest version
     "A",      # flake8-builtins: prevents shadowing Python builtins
     "RET",    # flake8-return: enforces consistent return statement usage
     "T20",    # flake8-print: detects print statements (should use logging)
     "TID252", # flake8-tidy-imports: prefer absolute imports over parent relative imports
-    # "ANN",  # flake8-annotations: enforces type annotations (deferred)
+    # Deferred rules (require significant changes):
+    # "DTZ",  # flake8-datetimez: enforces timezone-aware datetime usage (208 violations)
+    # "ANN",  # flake8-annotations: enforces type annotations
 ]
 ignore = [
     "E203",   # whitespace before ':' - conflicts with Black formatter
