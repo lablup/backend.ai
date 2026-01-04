@@ -12,8 +12,7 @@ from ai.backend.manager.clients.agent.pool import AgentPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.plugin.network import NetworkPluginContext
-
-from ..types import SessionTransitionData
+from ai.backend.manager.sokovan.scheduler.types import SessionTransitionData
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 

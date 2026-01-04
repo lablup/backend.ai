@@ -28,18 +28,18 @@ from ai.backend.common.events.event_types.schedule.anycast import (
 )
 from ai.backend.common.types import PromMetric, PromMetricGroup, PromMetricPrimitive
 from ai.backend.logging import BraceStyleAdapter
-
-from .. import __version__
-from ..defs import DEFAULT_ROLE
-from ..errors.api import InvalidAPIParameters
-from ..errors.common import GenericBadRequest, ServerFrozen, ServiceUnavailable
-from ..errors.resource import InstanceNotFound
-from ..models import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, agents, kernels
-from ..models.health import (
+from ai.backend.manager import __version__
+from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import GenericBadRequest, ServerFrozen, ServiceUnavailable
+from ai.backend.manager.errors.resource import InstanceNotFound
+from ai.backend.manager.models import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, agents, kernels
+from ai.backend.manager.models.health import (
     SQLAlchemyConnectionInfo,
     get_manager_db_cxn_status,
     report_manager_status,
 )
+
 from . import ManagerStatus, SchedulerEvent
 from .auth import superadmin_required
 from .types import CORSOptions, WebMiddleware

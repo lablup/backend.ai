@@ -16,7 +16,7 @@ from ai.backend.common import msgpack
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from ..api.context import RootContext
+    from ai.backend.manager.api.context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

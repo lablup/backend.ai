@@ -8,8 +8,7 @@ from sqlalchemy.orm import foreign, relationship
 from ai.backend.common.exception import RelationNotLoadedError
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
-
-from ..base import (
+from ai.backend.manager.models.base import (
     Base,
     IDColumn,
 )

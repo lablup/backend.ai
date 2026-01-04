@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Mapping, Optional
 
-from ..types import BroadcastPayload
+from ai.backend.common.message_queue.types import BroadcastPayload
 
 
 class AbstractBroadcaster(ABC):

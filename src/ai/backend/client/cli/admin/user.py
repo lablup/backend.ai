@@ -9,13 +9,13 @@ import click
 from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.params import BoolExprType, CommaSeparatedListType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.pretty import print_fail, print_info
+from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.output.fields import user_fields
 from ai.backend.client.session import Session
 
-from ..extensions import pass_ctx_obj
-from ..pretty import print_fail, print_info
-from ..types import CLIContext
 from . import admin
 
 

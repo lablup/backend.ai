@@ -13,6 +13,24 @@ from typing import (
     override,
 )
 
+from ai.backend.agent.agent import (
+    ACTIVE_STATUS_SET,
+    AbstractAgent,
+    AbstractKernelCreationContext,
+    ScanImagesResult,
+)
+from ai.backend.agent.config.unified import AgentUnifiedConfig
+from ai.backend.agent.exception import UnsupportedResource
+from ai.backend.agent.kernel import AbstractKernel
+from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
+from ai.backend.agent.resources import (
+    AbstractComputePlugin,
+    ComputerContext,
+    KernelResourceSpec,
+    Mount,
+    known_slot_types,
+)
+from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
@@ -39,24 +57,6 @@ from ai.backend.common.types import (
     current_resource_slots,
 )
 
-from ..agent import (
-    ACTIVE_STATUS_SET,
-    AbstractAgent,
-    AbstractKernelCreationContext,
-    ScanImagesResult,
-)
-from ..config.unified import AgentUnifiedConfig
-from ..exception import UnsupportedResource
-from ..kernel import AbstractKernel
-from ..kernel_registry.writer.types import KernelRegistrySaveMetadata
-from ..resources import (
-    AbstractComputePlugin,
-    ComputerContext,
-    KernelResourceSpec,
-    Mount,
-    known_slot_types,
-)
-from ..types import Container, KernelOwnershipData, MountInfo
 from .config import read_dummy_config
 from .kernel import DummyKernel
 

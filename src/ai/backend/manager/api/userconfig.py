@@ -8,14 +8,13 @@ from aiohttp import web
 
 from ai.backend.common import msgpack
 from ai.backend.logging import BraceStyleAdapter
-
-from ..errors.api import InvalidAPIParameters
-from ..errors.storage import (
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.storage import (
     DotfileAlreadyExists,
     DotfileCreationFailed,
     DotfileNotFound,
 )
-from ..models import (
+from ai.backend.manager.models import (
     MAXIMUM_DOTFILE_SIZE,
     keypairs,
     query_accessible_vfolders,
@@ -24,6 +23,7 @@ from ..models import (
     verify_dotfile_name,
     vfolders,
 )
+
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware

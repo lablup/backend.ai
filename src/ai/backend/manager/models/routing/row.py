@@ -18,8 +18,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.model_serving.types import RoutingData
-
-from ..base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     EnumValueType,
@@ -28,7 +27,7 @@ from ..base import (
 )
 
 if TYPE_CHECKING:
-    from ..deployment_revision import DeploymentRevisionRow
+    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 
 
 __all__ = ("RouteStatus", "RoutingRow")

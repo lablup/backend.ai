@@ -20,9 +20,8 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-
-from ..errors import InvalidSubpathError, VFolderNotFoundError
-from ..types import (
+from ai.backend.storage.errors import InvalidSubpathError, VFolderNotFoundError
+from ai.backend.storage.types import (
     CapacityUsage,
     DirEntry,
     FSPerfMetric,
@@ -32,7 +31,7 @@ from ..types import (
     VFolderID,
     VolumeInfo,
 )
-from ..watcher import WatcherClient
+from ai.backend.storage.watcher import WatcherClient
 
 # Available capabilities of a volume implementation
 CAP_VFOLDER: Final = "vfolder"  # ability to create vfolder

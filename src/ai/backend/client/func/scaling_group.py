@@ -1,13 +1,14 @@
 import json
 from typing import Any, Iterable, Mapping, Optional, Sequence
 
-from ...cli.types import Undefined, undefined
-from ..output.fields import scaling_group_fields
-from ..output.types import FieldSpec
-from ..request import Request
-from ..session import api_session
-from ..types import set_if_set
-from ..utils import dedent as _d
+from ai.backend.cli.types import Undefined, undefined
+from ai.backend.client.output.fields import scaling_group_fields
+from ai.backend.client.output.types import FieldSpec
+from ai.backend.client.request import Request
+from ai.backend.client.session import api_session
+from ai.backend.client.types import set_if_set
+from ai.backend.client.utils import dedent as _d
+
 from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = ("ScalingGroup",)

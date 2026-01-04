@@ -36,7 +36,7 @@ __all__ = (
 
 from contextlib import asynccontextmanager as actxmgr
 
-from ..common.types import SSLContextType
+from ai.backend.common.types import SSLContextType
 
 api_session: ContextVar[BaseSession] = ContextVar("api_session")
 

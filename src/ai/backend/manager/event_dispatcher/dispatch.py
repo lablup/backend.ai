@@ -110,6 +110,7 @@ from ai.backend.manager.event_dispatcher.handlers.artifact_registry import (
 from ai.backend.manager.event_dispatcher.handlers.propagator import PropagatorEventHandler
 from ai.backend.manager.event_dispatcher.handlers.schedule import ScheduleEventHandler
 from ai.backend.manager.idle import IdleCheckerHost
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -120,7 +121,6 @@ from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordin
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
-from ..models.utils import ExtendedAsyncSAEngine
 from .handlers.agent import AgentEventHandler
 from .handlers.idle_check import IdleCheckEventHandler
 from .handlers.image import ImageEventHandler

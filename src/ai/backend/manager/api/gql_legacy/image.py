@@ -36,14 +36,29 @@ from ai.backend.manager.bgtask.tasks.purge_images import (
     PurgeImageSpec,
 )
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
+from ai.backend.manager.data.image.types import (
+    ImageData,
+    ImageStatus,
+    ImageType,
+    ImageWithAgentInstallStatus,
+)
+from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
+from ai.backend.manager.models.image import (
+    ImageIdentifier,
+    ImageLoadFilter,
+    ImageRow,
+    get_permission_ctx,
+)
 from ai.backend.manager.models.minilang import EnumFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,
     QueryFilterParser,
 )
+from ai.backend.manager.models.rbac import ScopeType
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
 from ai.backend.manager.services.container_registry.actions.clear_images import ClearImagesAction
 from ai.backend.manager.services.container_registry.actions.load_all_container_registries import (
@@ -82,16 +97,6 @@ from ai.backend.manager.services.image.actions.untag_image_from_registry import 
 )
 from ai.backend.manager.types import OptionalState, TriState
 
-from ...data.image.types import ImageData, ImageStatus, ImageType, ImageWithAgentInstallStatus
-from ...defs import DEFAULT_IMAGE_ARCH
-from ...models.image import (
-    ImageIdentifier,
-    ImageLoadFilter,
-    ImageRow,
-    get_permission_ctx,
-)
-from ...models.rbac import ScopeType
-from ...models.user import UserRole
 from .base import (
     BigInt,
     FilterExprArg,
@@ -321,7 +326,7 @@ class Image(graphene.ObjectType):
         items: Sequence[Image],
         domain_name: str,
     ) -> Sequence[Image]:
-        from ...models.domain import domains
+        from ai.backend.manager.models.domain import domains
 
         async with ctx.db.begin() as conn:
             query = (

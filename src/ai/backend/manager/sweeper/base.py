@@ -1,9 +1,8 @@
 import abc
 
 from ai.backend.common.metrics.metric import SweeperMetricObserver
-
-from ..models.utils import ExtendedAsyncSAEngine
-from ..registry import AgentRegistry
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.registry import AgentRegistry
 
 DEFAULT_SWEEP_INTERVAL_SEC = 60.0
 

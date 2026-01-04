@@ -6,7 +6,12 @@ Use `ai.backend.common.message_queue.abc.{anycaster,broadcaster,consumer,subscri
 from abc import ABC, abstractmethod
 from typing import Any, AsyncGenerator, Mapping, Optional
 
-from ..types import BroadcastMessage, BroadcastPayload, MessageId, MQMessage
+from ai.backend.common.message_queue.types import (
+    BroadcastMessage,
+    BroadcastPayload,
+    MessageId,
+    MQMessage,
+)
 
 
 class AbstractMessageQueue(ABC):

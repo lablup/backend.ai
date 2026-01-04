@@ -35,12 +35,11 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.errors.resource import InvalidSchedulerState
-
-from ..models import AgentRow, KernelRow, SessionRow
-from ..models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.models import AgentRow, KernelRow, SessionRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 
 if TYPE_CHECKING:
-    from ..registry import AgentRegistry
+    from ai.backend.manager.registry import AgentRegistry
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 

@@ -23,7 +23,8 @@ import aiodocker
 import trafaret as t
 from aiodocker import Docker
 
-from .. import __version__
+from ai.backend.accelerator.rebellions import __version__
+
 from .atom_api import ATOMAPI, ATOMDeviceStat, LibraryError
 from .types import AbstractATOMDevice
 

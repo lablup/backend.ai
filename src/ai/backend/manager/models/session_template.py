@@ -11,9 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common import validators as tx
 from ai.backend.common.types import SessionTypes
+from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.exceptions import InvalidArgument
 
-from ..defs import DEFAULT_ROLE
-from ..exceptions import InvalidArgument
 from .base import GUID, EnumType, IDColumn, metadata
 from .user import UserRole
 from .vfolder import verify_vfolder_name

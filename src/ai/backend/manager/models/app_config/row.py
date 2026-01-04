@@ -8,8 +8,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.app_config.types import AppConfigData, AppConfigScopeType
-
-from ..base import Base, IDColumn
+from ai.backend.manager.models.base import Base, IDColumn
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

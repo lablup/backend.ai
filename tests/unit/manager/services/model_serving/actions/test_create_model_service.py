@@ -3,6 +3,7 @@ from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from tests.unit.manager.services.utils import ScenarioBase
 
 from ai.backend.common.types import AccessKey, ClusterMode, RuntimeVariant
 from ai.backend.manager.data.model_serving.creator import ModelServiceCreator
@@ -21,8 +22,6 @@ from ai.backend.manager.services.model_serving.exceptions import InvalidAPIParam
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )
-
-from ...utils import ScenarioBase
 
 
 @pytest.fixture

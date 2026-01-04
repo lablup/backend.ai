@@ -112,6 +112,10 @@ from ai.backend.manager.repositories.deployment.creators import (
     DeploymentCreatorSpec,
     DeploymentPolicyCreatorSpec,
 )
+from ai.backend.manager.repositories.deployment.types import (
+    RouteData,
+    RouteServiceDiscoveryInfo,
+)
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ContainerUserContext,
     DeploymentContext,
@@ -119,11 +123,6 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     UserContext,
 )
 from ai.backend.manager.utils import query_userinfo_from_session
-
-from ..types import (
-    RouteData,
-    RouteServiceDiscoveryInfo,
-)
 
 
 @dataclass

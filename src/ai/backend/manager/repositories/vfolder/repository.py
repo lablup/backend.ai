@@ -53,11 +53,12 @@ from ai.backend.manager.models.vfolder import (
     query_accessible_vfolders,
     vfolders,
 )
-
-from ..base.creator import Creator
-from ..base.updater import Updater, execute_updater
-from ..permission_controller.creators import AssociationScopesEntitiesCreatorSpec
-from ..permission_controller.role_manager import RoleManager
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.permission_controller.creators import (
+    AssociationScopesEntitiesCreatorSpec,
+)
+from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 
 vfolder_repository_resilience = Resilience(
     policies=[

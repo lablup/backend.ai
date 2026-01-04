@@ -6,8 +6,7 @@ import click
 from tabulate import tabulate
 
 from ai.backend.client.output.types import FieldSpec
-
-from ..pagination import MAX_PAGE_SIZE
+from ai.backend.client.pagination import MAX_PAGE_SIZE
 
 
 def get_preferred_page_size() -> int:

@@ -8,11 +8,10 @@ from typing import Any, ClassVar, Dict, Generic, Iterator, Mapping, Optional, Tu
 from weakref import WeakSet
 
 from ai.backend.common.asyncio import cancel_tasks
+from ai.backend.common.etcd import AbstractKVStore
+from ai.backend.common.exception import ConfigurationError
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
-
-from ..etcd import AbstractKVStore
-from ..exception import ConfigurationError
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

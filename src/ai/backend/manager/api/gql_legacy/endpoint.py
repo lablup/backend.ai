@@ -43,7 +43,24 @@ from ai.backend.manager.data.model_serving.types import (
     RequesterCtx,
 )
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES
+from ai.backend.manager.errors.common import (
+    GenericForbidden,
+    ObjectNotFound,
+)
+from ai.backend.manager.errors.service import (
+    EndpointNotFound,
+    EndpointTokenNotFound,
+)
+from ai.backend.manager.models.endpoint import (
+    EndpointAutoScalingRuleRow,
+    EndpointLifecycle,
+    EndpointRow,
+    EndpointTokenRow,
+)
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_serving.updaters import (
@@ -62,23 +79,6 @@ from ai.backend.manager.services.model_serving.actions.modify_auto_scaling_rule 
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
 from ai.backend.manager.types import OptionalState, TriState
 
-from ...errors.common import (
-    GenericForbidden,
-    ObjectNotFound,
-)
-from ...errors.service import (
-    EndpointNotFound,
-    EndpointTokenNotFound,
-)
-from ...models.endpoint import (
-    EndpointAutoScalingRuleRow,
-    EndpointLifecycle,
-    EndpointRow,
-    EndpointTokenRow,
-)
-from ...models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ...models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
-from ...models.user import UserRole, UserRow
 from .base import (
     FilterExprArg,
     ImageRefType,

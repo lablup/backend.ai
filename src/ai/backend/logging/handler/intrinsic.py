@@ -11,7 +11,7 @@ import psutil
 import zmq
 
 if TYPE_CHECKING:
-    from ..logger import MsgpackOptions
+    from ai.backend.logging.logger import MsgpackOptions
 
 
 class RelayHandler(logging.Handler):

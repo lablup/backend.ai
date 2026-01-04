@@ -15,8 +15,7 @@ from ai.backend.manager.data.permission.permission_group import (
 from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
-
-from ...base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     IDColumn,
@@ -24,8 +23,11 @@ from ...base import (
 )
 
 if TYPE_CHECKING:
-    from ..association_scopes_entities import AssociationScopesEntitiesRow
-    from ..role import RoleRow
+    from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+        AssociationScopesEntitiesRow,
+    )
+    from ai.backend.manager.models.rbac_models.role import RoleRow
+
     from .permission import PermissionRow
 
 

@@ -1,11 +1,12 @@
 from typing import Any, Iterable, Sequence
 
-from ...cli.types import Undefined, undefined
-from ..output.fields import domain_fields
-from ..output.types import FieldSpec
-from ..session import api_session
-from ..types import set_if_set
-from ..utils import dedent as _d
+from ai.backend.cli.types import Undefined, undefined
+from ai.backend.client.output.fields import domain_fields
+from ai.backend.client.output.types import FieldSpec
+from ai.backend.client.session import api_session
+from ai.backend.client.types import set_if_set
+from ai.backend.client.utils import dedent as _d
+
 from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = ("Domain",)

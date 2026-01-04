@@ -8,16 +8,16 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
-from ....data.permission.id import ObjectId, ScopeId
-from ....data.permission.object_permission import (
+from ai.backend.manager.data.permission.id import ObjectId, ScopeId
+from ai.backend.manager.data.permission.object_permission import (
     ObjectPermissionCreateInputBeforeRoleCreation,
 )
-from ....data.permission.permission import ScopedPermissionCreateInput
-from ....data.permission.permission_group import (
+from ai.backend.manager.data.permission.permission import ScopedPermissionCreateInput
+from ai.backend.manager.data.permission.permission_group import (
     PermissionGroupCreator,
     PermissionGroupCreatorBeforeRoleCreation,
 )
-from ....data.permission.role import (
+from ai.backend.manager.data.permission.role import (
     AssignedUserData,
     AssignedUserListResult,
     RoleListResult,
@@ -25,25 +25,27 @@ from ....data.permission.role import (
     UserRoleAssignmentInput,
     UserRoleRevocationInput,
 )
-from ....data.permission.status import (
+from ai.backend.manager.data.permission.status import (
     RoleStatus,
 )
-from ....data.permission.types import OperationType, ScopeType
-from ....errors.common import ObjectNotFound
-from ....errors.permission import RoleAlreadyAssigned, RoleNotAssigned, RoleNotFound
-from ....models.rbac_models.association_scopes_entities import AssociationScopesEntitiesRow
-from ....models.rbac_models.permission.object_permission import ObjectPermissionRow
-from ....models.rbac_models.permission.permission import PermissionRow
-from ....models.rbac_models.permission.permission_group import PermissionGroupRow
-from ....models.rbac_models.role import RoleRow
-from ....models.rbac_models.user_role import UserRoleRow
-from ....models.user import UserRow
-from ....models.utils import ExtendedAsyncSAEngine
-from ....repositories.base.creator import Creator, execute_creator
-from ....repositories.base.purger import Purger, execute_purger
-from ....repositories.base.querier import BatchQuerier, execute_batch_querier
-from ....repositories.base.updater import Updater, execute_updater
-from ..creators import (
+from ai.backend.manager.data.permission.types import OperationType, ScopeType
+from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.permission import RoleAlreadyAssigned, RoleNotAssigned, RoleNotFound
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.purger import Purger, execute_purger
+from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.permission_controller.creators import (
     ObjectPermissionCreatorSpec,
     PermissionCreatorSpec,
     PermissionGroupCreatorSpec,

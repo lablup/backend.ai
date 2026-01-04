@@ -16,6 +16,7 @@ from ai.backend.common.data.artifact.types import (
     VerifierResult,
 )
 from ai.backend.common.data.storage.registries.types import ModelTarget as ModelTargetData
+from ai.backend.manager.api.gql.artifact_registry_meta import ArtifactRegistryMeta
 from ai.backend.manager.api.gql.base import (
     ByteSize,
     IntFilter,
@@ -58,8 +59,6 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
 from ai.backend.manager.services.artifact_revision.actions.get import GetArtifactRevisionAction
-
-from ..artifact_registry_meta import ArtifactRegistryMeta
 
 
 @strawberry.type(

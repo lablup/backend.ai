@@ -11,8 +11,7 @@ from ai.backend.manager.data.resource.types import (
     ProjectResourcePolicyData,
     UserResourcePolicyData,
 )
-
-from ..base import (
+from ai.backend.manager.models.base import (
     Base,
     EnumType,
     ResourceSlotColumn,

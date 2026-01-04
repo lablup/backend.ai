@@ -25,11 +25,10 @@ from ai.backend.appproxy.common.types import (
 from ai.backend.appproxy.common.utils import mime_match, pydantic_api_handler
 from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
 from ai.backend.appproxy.coordinator.errors import CircuitCreationError
+from ai.backend.appproxy.coordinator.models import Circuit, Token, Worker, add_circuit
+from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
+from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.logging import BraceStyleAdapter
-
-from ..models import Circuit, Token, Worker, add_circuit
-from ..models.utils import execute_with_txn_retry
-from ..types import RootContext
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession

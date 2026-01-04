@@ -3,6 +3,8 @@ from collections import defaultdict
 from decimal import Decimal
 from typing import DefaultDict, Iterable, List, Optional, Sequence, Set, Tuple
 
+from ai.backend.accelerator.rebellions.common.atom_api import ATOMAPI
+from ai.backend.accelerator.rebellions.common.plugin import AbstractATOMPlugin
 from ai.backend.agent.stats import (
     Measurement,
     MetricTypes,
@@ -19,8 +21,6 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 
-from ..common.atom_api import ATOMAPI
-from ..common.plugin import AbstractATOMPlugin
 from .types import ATOMMaxChildDevice, ATOMMaxDevice
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore

@@ -2,8 +2,8 @@ import json
 from contextlib import closing
 from typing import Tuple
 
-from ...utils.cli import EOF, ClientRunnerFunc, decode
-from ..conftest import KeypairOption, User
+from ai.backend.test.cli_integration.conftest import KeypairOption, User
+from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
 def test_add_keypair(

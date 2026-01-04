@@ -6,11 +6,10 @@ from typing import TYPE_CHECKING
 from ai.backend.common.types import (
     ResourceSlot,
 )
-
-from ..errors.common import GenericBadRequest
+from ai.backend.manager.errors.common import GenericBadRequest
 
 if TYPE_CHECKING:
-    from ..models.session import SessionRow
+    from ai.backend.manager.models.session import SessionRow
 
 
 def get_slot_index(slotname: str, agent_selection_resource_priority: list[str]) -> int:

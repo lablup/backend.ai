@@ -6,10 +6,10 @@ import click
 from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.params import BoolExprType, CommaSeparatedListType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.pretty import print_info
+from ai.backend.client.cli.types import CLIContext
 
-from ..extensions import pass_ctx_obj
-from ..pretty import print_info
-from ..types import CLIContext
 from . import admin
 
 
@@ -28,8 +28,8 @@ def info(ctx: CLIContext, name: str) -> None:
     Show the information about the given domain.
     If name is not give, user's own domain information will be retrieved.
     """
-    from ...func.domain import _default_detail_fields
-    from ...session import Session
+    from ai.backend.client.func.domain import _default_detail_fields
+    from ai.backend.client.session import Session
 
     with Session() as session:
         try:
@@ -47,8 +47,8 @@ def list(ctx: CLIContext) -> None:
     List and manage domains.
     (admin privilege required)
     """
-    from ...func.domain import _default_list_fields
-    from ...session import Session
+    from ai.backend.client.func.domain import _default_list_fields
+    from ai.backend.client.session import Session
 
     with Session() as session:
         try:
@@ -102,7 +102,7 @@ def add(
 
     NAME: Name of new domain.
     """
-    from ...session import Session
+    from ai.backend.client.session import Session
 
     with Session() as session:
         try:
@@ -194,7 +194,7 @@ def update(
 
     NAME: Name of new domain.
     """
-    from ...session import Session
+    from ai.backend.client.session import Session
 
     with Session() as session:
         try:
@@ -238,7 +238,7 @@ def delete(ctx: CLIContext, name: str) -> None:
 
     NAME: Name of a domain to inactive.
     """
-    from ...session import Session
+    from ai.backend.client.session import Session
 
     with Session() as session:
         try:
@@ -274,7 +274,7 @@ def purge(ctx: CLIContext, name: str) -> None:
 
     NAME: Name of a domain to delete.
     """
-    from ...session import Session
+    from ai.backend.client.session import Session
 
     with Session() as session:
         try:

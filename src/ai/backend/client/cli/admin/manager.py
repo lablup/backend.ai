@@ -9,8 +9,8 @@ from tabulate import tabulate
 
 from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.cli.pretty import print_done, print_error, print_fail, print_info, print_wait
 
-from ..pretty import print_done, print_error, print_fail, print_info, print_wait
 from . import admin
 
 
@@ -22,7 +22,7 @@ def manager():
 @manager.command()
 def status():
     """Show the manager's current status."""
-    from ..session.lifecycle import Session
+    from ai.backend.client.cli.session.lifecycle import Session
 
     try:
         with Session() as session:
@@ -51,7 +51,7 @@ def status():
 )
 def freeze(wait, force_kill):
     """Freeze manager."""
-    from ..session.lifecycle import Session
+    from ai.backend.client.cli.session.lifecycle import Session
 
     if wait and force_kill:
         print(
@@ -90,7 +90,7 @@ def freeze(wait, force_kill):
 @manager.command()
 def unfreeze():
     """Unfreeze manager."""
-    from ..session.lifecycle import Session
+    from ai.backend.client.cli.session.lifecycle import Session
 
     try:
         with Session() as session:
@@ -109,7 +109,7 @@ def announcement():
 @announcement.command()
 def get():
     """Get current announcement."""
-    from ..session.lifecycle import Session
+    from ai.backend.client.cli.session.lifecycle import Session
 
     try:
         with Session() as session:
@@ -132,7 +132,7 @@ def update(message):
 
     MESSAGE: Announcement message.
     """
-    from ..session.lifecycle import Session
+    from ai.backend.client.cli.session.lifecycle import Session
 
     try:
         with Session() as session:
@@ -153,7 +153,7 @@ def update(message):
 @announcement.command()
 def delete():
     """Delete current announcement."""
-    from ..session.lifecycle import Session
+    from ai.backend.client.cli.session.lifecycle import Session
 
     if not ask_yn():
         print_info("Cancelled.")
@@ -204,7 +204,7 @@ def include_agents(agent_ids):
     Include agents in scheduling, meaning that the given agents
     will be considered to be ready for creating new session containers.
     """
-    from ..session.lifecycle import Session
+    from ai.backend.client.cli.session.lifecycle import Session
 
     try:
         with Session() as session:
@@ -223,7 +223,7 @@ def exclude_agents(agent_ids):
     will no longer start new sessions unless they are "included" again,
     regardless of their restarts and rejoining events.
     """
-    from ..session.lifecycle import Session
+    from ai.backend.client.cli.session.lifecycle import Session
 
     try:
         with Session() as session:

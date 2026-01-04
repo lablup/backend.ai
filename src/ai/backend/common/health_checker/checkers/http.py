@@ -7,8 +7,14 @@ from http import HTTPMethod
 
 import aiohttp
 
-from ..abc import StaticServiceHealthChecker
-from ..types import API, ComponentHealthStatus, ComponentId, ServiceGroup, ServiceHealth
+from ai.backend.common.health_checker.abc import StaticServiceHealthChecker
+from ai.backend.common.health_checker.types import (
+    API,
+    ComponentHealthStatus,
+    ComponentId,
+    ServiceGroup,
+    ServiceHealth,
+)
 
 
 class HttpHealthChecker(StaticServiceHealthChecker):

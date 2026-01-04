@@ -9,11 +9,11 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import VolumeID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.config.unified import StorageProxyUnifiedConfig, VolumeInfoConfig
+from ai.backend.storage.errors import InvalidVolumeError
+from ai.backend.storage.plugin import StoragePluginContext
+from ai.backend.storage.types import VolumeInfo
 
-from ..config.unified import StorageProxyUnifiedConfig, VolumeInfoConfig
-from ..errors import InvalidVolumeError
-from ..plugin import StoragePluginContext
-from ..types import VolumeInfo
 from .abc import AbstractVolume
 from .cephfs import CephFSVolume
 from .ddn import EXAScalerFSVolume

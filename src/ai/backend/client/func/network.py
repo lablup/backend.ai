@@ -1,11 +1,12 @@
 from typing import Self, Sequence
 from uuid import UUID
 
-from ..output.fields import network_fields
-from ..output.types import FieldSpec, RelayPaginatedResult
-from ..pagination import execute_paginated_relay_query
-from ..session import api_session
-from ..utils import dedent as _d
+from ai.backend.client.output.fields import network_fields
+from ai.backend.client.output.types import FieldSpec, RelayPaginatedResult
+from ai.backend.client.pagination import execute_paginated_relay_query
+from ai.backend.client.session import api_session
+from ai.backend.client.utils import dedent as _d
+
 from .base import BaseFunction, api_function
 
 __all__ = ("Network",)

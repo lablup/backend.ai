@@ -9,9 +9,9 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.routing import RoutingRow
 
-from ...errors.service import RoutingNotFound
 from .base import InferenceSessionError, Item, PaginatedList
 
 if TYPE_CHECKING:

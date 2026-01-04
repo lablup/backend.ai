@@ -5,14 +5,13 @@ import os
 from collections import OrderedDict
 from typing import Any, Dict, FrozenSet, Mapping, Sequence, override
 
+from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel, NextResult, ResultRecord
+from ai.backend.agent.resources import KernelResourceSpec
+from ai.backend.agent.types import AgentEventData, KernelOwnershipData
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp, CodeCompletionResult
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import CommitStatus
-
-from ..kernel import AbstractCodeRunner, AbstractKernel, NextResult, ResultRecord
-from ..resources import KernelResourceSpec
-from ..types import AgentEventData, KernelOwnershipData
 
 
 class DummyKernel(AbstractKernel):

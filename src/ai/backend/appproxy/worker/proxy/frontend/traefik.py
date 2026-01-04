@@ -13,11 +13,9 @@ from aiohttp import web
 from ai.backend.appproxy.common.config import get_default_redis_key_ttl
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.common.types import RouteInfo
+from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError, MissingTraefikConfigError
 from ai.backend.appproxy.worker.proxy.backend.traefik import TraefikBackend
-from ai.backend.logging import BraceStyleAdapter
-
-from ...errors import InvalidFrontendTypeError, MissingTraefikConfigError
-from ...types import (
+from ai.backend.appproxy.worker.types import (
     LAST_USED_MARKER_SOCKET_NAME,
     Circuit,
     PortFrontendInfo,
@@ -25,6 +23,8 @@ from ...types import (
     SubdomainFrontendInfo,
     TCircuitKey,
 )
+from ai.backend.logging import BraceStyleAdapter
+
 from .base import BaseFrontend
 
 if TYPE_CHECKING:

@@ -1,4 +1,4 @@
-from ...exception import (
+from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
     ErrorDetail,

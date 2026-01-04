@@ -115,7 +115,7 @@ select = [
     "A",      # flake8-builtins: prevents shadowing Python builtins
     "RET",    # flake8-return: enforces consistent return statement usage
     "T20",    # flake8-print: detects print statements (should use logging)
-    # "TID252", # flake8-tidy-imports: conflicts with project policy (relative imports allowed)
+    "TID252", # flake8-tidy-imports: prefer absolute imports over parent relative imports
     # "ANN",  # flake8-annotations: enforces type annotations (deferred)
 ]
 ignore = [

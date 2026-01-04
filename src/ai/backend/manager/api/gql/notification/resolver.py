@@ -13,6 +13,7 @@ from strawberry.relay import Connection, Edge
 from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.errors.auth import InvalidAuthParameters
 from ai.backend.manager.repositories.notification.options import (
     NotificationChannelConditions,
@@ -35,7 +36,6 @@ from ai.backend.manager.services.notification.actions import (
     ValidateRuleAction,
 )
 
-from ..types import StrawberryGQLContext
 from .types import (
     CreateNotificationChannelInput,
     CreateNotificationChannelPayload,

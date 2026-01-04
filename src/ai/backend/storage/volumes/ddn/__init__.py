@@ -10,17 +10,16 @@ import aiofiles.os
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-
-from ...errors import (
+from ai.backend.storage.errors import (
     DDNCommandFailedError,
     QuotaScopeAlreadyExists,
     QuotaScopeNotFoundError,
     SubprocessStdoutNotAvailableError,
 )
-from ...subproc import run
-from ...types import Optional, QuotaConfig, QuotaUsage
-from ..abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
-from ..vfs import BaseQuotaModel, BaseVolume
+from ai.backend.storage.subproc import run
+from ai.backend.storage.types import Optional, QuotaConfig, QuotaUsage
+from ai.backend.storage.volumes.abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
+from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
 
 FIRST_PROJECT_ID: Final = 100
 PROJECT_MAIN_ID_KEY: Final = "ddn/main-project-id"

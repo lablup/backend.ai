@@ -176,7 +176,7 @@ def generate_api_keypair(cli_ctx: CLIContext) -> None:
     """
     Generate a manager API keypair and print it out to stdout.
     """
-    from ..models.keypair import generate_keypair as _gen_keypair
+    from ai.backend.manager.models.keypair import generate_keypair as _gen_keypair
 
     _get_logger().info("Generating a manager API keypair...")
     ak, sk = _gen_keypair()
@@ -210,7 +210,7 @@ def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) 
     """
     from zmq.auth.certs import create_certificates, load_certificate
 
-    from ..errors.resource import ConfigurationLoadFailed
+    from ai.backend.manager.errors.resource import ConfigurationLoadFailed
 
     _get_logger().info("Generating a RPC keypair...")
     public_key_path, secret_key_path = create_certificates(dst_dir, name)

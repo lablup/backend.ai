@@ -8,11 +8,11 @@ import humanize
 from tabulate import tabulate
 
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.pretty import print_error
+from ai.backend.client.cli.types import CLIContext
+from ai.backend.client.cli.vfolder import vfolder as user_vfolder
 
-from ..extensions import pass_ctx_obj
-from ..pretty import print_error
-from ..types import CLIContext
-from ..vfolder import vfolder as user_vfolder
 from . import admin
 
 

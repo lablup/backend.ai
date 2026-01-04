@@ -10,8 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.actions.types import OperationStatus
-
-from ..base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     IDColumn,

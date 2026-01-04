@@ -101,13 +101,12 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
-
-from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
-from ..errors.api import InvalidAPIParameters
-from ..errors.auth import InsufficientPrivilege
-from ..errors.kernel import InvalidSessionData, SessionNotFound
-from ..errors.resource import NoCurrentTaskContext
-from ..models import (
+from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.kernel import InvalidSessionData, SessionNotFound
+from ai.backend.manager.errors.resource import NoCurrentTaskContext
+from ai.backend.manager.models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     SessionDependencyRow,
     SessionRow,
@@ -115,7 +114,8 @@ from ..models import (
     kernels,
     keypairs,
 )
-from ..utils import query_userinfo as _query_userinfo
+from ai.backend.manager.utils import query_userinfo as _query_userinfo
+
 from .auth import auth_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware

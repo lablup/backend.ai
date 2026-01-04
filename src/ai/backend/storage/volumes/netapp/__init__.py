@@ -29,8 +29,7 @@ from tenacity import (
 
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-
-from ...errors import (
+from ai.backend.storage.errors import (
     InvalidAPIParameters,
     InvalidPathError,
     InvalidQuotaScopeError,
@@ -39,8 +38,8 @@ from ...errors import (
     QuotaScopeNotFoundError,
     SubprocessStdoutNotAvailableError,
 )
-from ...subproc import spawn_and_watch
-from ...types import (
+from ai.backend.storage.subproc import spawn_and_watch
+from ai.backend.storage.types import (
     SENTINEL,
     CapacityUsage,
     DirEntry,
@@ -52,8 +51,8 @@ from ...types import (
     Stat,
     TreeUsage,
 )
-from ...utils import fstime2datetime
-from ..abc import (
+from ai.backend.storage.utils import fstime2datetime
+from ai.backend.storage.volumes.abc import (
     CAP_FAST_FS_SIZE,
     CAP_FAST_SIZE,
     CAP_METRIC,
@@ -62,7 +61,8 @@ from ..abc import (
     AbstractFSOpModel,
     AbstractQuotaModel,
 )
-from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
+from ai.backend.storage.volumes.vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
+
 from .netappclient import JobResponseCode, NetAppClient, StorageID, VolumeID
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

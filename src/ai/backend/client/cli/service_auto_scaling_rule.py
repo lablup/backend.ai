@@ -11,11 +11,11 @@ from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.service import get_service_id
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.exceptions import BackendAPIError
+from ai.backend.client.func.service_auto_scaling_rule import _default_fields as _default_get_fields
+from ai.backend.client.output.fields import service_auto_scaling_rule_fields
 from ai.backend.client.session import Session
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
 
-from ..func.service_auto_scaling_rule import _default_fields as _default_get_fields
-from ..output.fields import service_auto_scaling_rule_fields
 from .pretty import print_done
 from .service import service
 

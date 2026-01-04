@@ -17,13 +17,13 @@ from ai.backend.appproxy.common.types import (
     WebMiddleware,
 )
 from ai.backend.appproxy.common.utils import pydantic_api_response_handler
+from ai.backend.appproxy.coordinator import __version__
+from ai.backend.appproxy.coordinator.models import Circuit, Endpoint, Worker
+from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
 from ai.backend.common.types import ModelServiceStatus
 from ai.backend.logging import BraceStyleAdapter
 
-from .. import __version__
-from ..models import Circuit, Endpoint, Worker
-from ..types import RootContext
 from .utils import auth_required
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]

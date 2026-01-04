@@ -26,16 +26,15 @@ from ai.backend.common import msgpack
 from ai.backend.common.types import VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.domain.types import DomainData
-
-from ...defs import RESERVED_DOTFILES
-from ..base import (
+from ai.backend.manager.defs import RESERVED_DOTFILES
+from ai.backend.manager.models.base import (
     Base,
     ResourceSlotColumn,
     SlugType,
     VFolderHostPermissionColumn,
     mapper_registry,
 )
-from ..rbac import (
+from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -46,8 +45,8 @@ from ..rbac import (
     get_predefined_roles_in_scope,
     required_permission,
 )
-from ..rbac.context import ClientContext
-from ..rbac.permission_defs import DomainPermission
+from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.rbac.permission_defs import DomainPermission
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

@@ -5,12 +5,11 @@ from typing import Any
 
 from typing_extensions import override
 
+from ai.backend.manager.data.permission.status import RoleStatus
+from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
-
-from ...data.permission.status import RoleStatus
-from ...data.permission.types import RoleSource
 
 
 @dataclass

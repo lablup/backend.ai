@@ -21,11 +21,11 @@ from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.api.gql.data_loader.registry import DataLoaderRegistry
+from ai.backend.manager.api.gql.schema import schema as strawberry_schema
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.errors.api import GraphQLError as BackendGQLError
 from ai.backend.manager.errors.auth import AuthorizationFailed
 
-from ..api.gql.schema import schema as strawberry_schema
-from ..errors.api import GraphQLError as BackendGQLError
 from .auth import auth_required
 from .gql_legacy.base import DataLoaderManager
 from .gql_legacy.schema import (

@@ -7,11 +7,11 @@ import click
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
+from ai.backend.client import __version__
+from ai.backend.client.config import get_config, local_state_path
+from ai.backend.client.exceptions import BackendClientError
+from ai.backend.client.session import Session
 
-from .. import __version__
-from ..config import get_config, local_state_path
-from ..exceptions import BackendClientError
-from ..session import Session
 from .pretty import print_done, print_error, print_fail, print_warn
 
 

@@ -8,7 +8,7 @@ from ai.backend.manager.services.metric.actions.container import (
 )
 
 if TYPE_CHECKING:
-    from ..schema import GraphQueryContext
+    from ai.backend.manager.api.gql_legacy.schema import GraphQueryContext
 
 
 class MetricResultValue(graphene.ObjectType):

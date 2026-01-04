@@ -20,11 +20,11 @@ from ai.backend.common.events.dispatcher import EventHandler
 from ai.backend.common.events.event_types.log.anycast import DoLogCleanupEvent
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter, LogLevel
+from ai.backend.manager.defs import LockID
+from ai.backend.manager.errors.resource import DBOperationFailed
+from ai.backend.manager.models import UserRole, error_logs, groups
+from ai.backend.manager.models import association_groups_users as agus
 
-from ..defs import LockID
-from ..errors.resource import DBOperationFailed
-from ..models import UserRole, error_logs, groups
-from ..models import association_groups_users as agus
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware

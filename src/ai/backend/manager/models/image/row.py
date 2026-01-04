@@ -42,6 +42,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.container_registry import get_container_registry_cls
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageData,
@@ -56,10 +57,8 @@ from ai.backend.manager.data.image.types import (
     ResourceLimit,
 )
 from ai.backend.manager.defs import INTRINSIC_SLOTS, INTRINSIC_SLOTS_MIN
-
-from ...container_registry import get_container_registry_cls
-from ...errors.image import ImageNotFound
-from ..base import (
+from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     ForeignKeyIDColumn,
@@ -67,8 +66,8 @@ from ..base import (
     StrEnumType,
     StructuredJSONColumn,
 )
-from ..container_registry import ContainerRegistryRow
-from ..rbac import (
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -77,11 +76,11 @@ from ..rbac import (
     UserScope,
     get_predefined_roles_in_scope,
 )
-from ..rbac.context import ClientContext
-from ..rbac.exceptions import InvalidScope
-from ..rbac.permission_defs import ImagePermission
-from ..user import UserRole, UserRow
-from ..utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.rbac.exceptions import InvalidScope
+from ai.backend.manager.models.rbac.permission_defs import ImagePermission
+from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask.bgtask import ProgressReporter
@@ -1271,8 +1270,8 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scope: DomainScope,
     ) -> ImagePermissionContext:
-        from ..container_registry import ContainerRegistryRow
-        from ..domain import DomainRow
+        from ai.backend.manager.models.container_registry import ContainerRegistryRow
+        from ai.backend.manager.models.domain import DomainRow
 
         permissions = await self.calculate_permission(ctx, scope)
         image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
@@ -1312,7 +1311,7 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scope: UserScope,
     ) -> list[ProjectScope]:
-        from ..group import AssocGroupUserRow
+        from ai.backend.manager.models.group import AssocGroupUserRow
 
         get_assoc_group_ids_stmt = sa.select(AssocGroupUserRow.group_id).where(
             AssocGroupUserRow.user_id == scope.user_id
@@ -1326,7 +1325,7 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scope: DomainScope,
     ) -> list[ProjectScope]:
-        from ..group import GroupRow
+        from ai.backend.manager.models.group import GroupRow
 
         stmt = sa.select(GroupRow.id).where(GroupRow.domain_name == scope.domain_name)
         project_ids = await self.db_session.scalars(stmt)
@@ -1335,7 +1334,7 @@ class ImagePermissionContextBuilder(
     async def _verify_project_scope_and_calculate_permission(
         self, ctx: ClientContext, scope: ProjectScope
     ) -> frozenset[ImagePermission]:
-        from ..group import GroupRow
+        from ai.backend.manager.models.group import GroupRow
 
         group_query_stmt = sa.select(GroupRow).where(GroupRow.id == scope.project_id)
         group_row = cast(Optional[GroupRow], await self.db_session.scalar(group_query_stmt))
@@ -1351,7 +1350,7 @@ class ImagePermissionContextBuilder(
         registry_condition_factory: Callable[[list[Any]], Any],
         filter_global_registry: bool = False,
     ) -> ImagePermissionContext:
-        from ..container_registry import ContainerRegistryRow
+        from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
         project_ids = [scope.project_id for scope in scopes]
         project_id_to_permission_map: dict[str, frozenset[ImagePermission]] = {}
@@ -1410,7 +1409,7 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scopes: list[ProjectScope],
     ) -> ImagePermissionContext:
-        from ..container_registry import ContainerRegistryRow
+        from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
         def global_registry_condition(project_ids: list[Any]):
             return ContainerRegistryRow.is_global == true()
@@ -1424,10 +1423,10 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scopes: list[ProjectScope],
     ) -> ImagePermissionContext:
-        from ..association_container_registries_groups import (
+        from ai.backend.manager.models.association_container_registries_groups import (
             AssociationContainerRegistriesGroupsRow,
         )
-        from ..container_registry import ContainerRegistryRow
+        from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
         def non_global_registry_condition(project_ids: list[Any]):
             return ContainerRegistryRow.association_container_registries_groups_rows.any(

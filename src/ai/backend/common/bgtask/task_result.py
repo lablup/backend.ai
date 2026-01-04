@@ -6,20 +6,20 @@ from dataclasses import dataclass
 from typing import Generic, Optional, TypeVar
 
 from ai.backend.common.bgtask.task.base import BaseBackgroundTaskResult
-
-from ..events.event_types.bgtask.broadcast import (
+from ai.backend.common.events.event_types.bgtask.broadcast import (
     BaseBgtaskDoneEvent,
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskFailedEvent,
 )
-from ..exception import (
+from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
     ErrorDetail,
     ErrorDomain,
     ErrorOperation,
 )
+
 from .types import BgtaskStatus
 
 R = TypeVar("R", bound=Optional[BaseBackgroundTaskResult])

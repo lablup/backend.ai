@@ -10,11 +10,10 @@ import pkg_resources
 from aiodocker.docker import Docker
 from aiodocker.exceptions import DockerError
 
+from ai.backend.agent.errors import SubprocessStreamError
+from ai.backend.agent.exception import InitializationError
+from ai.backend.agent.utils import closing_async, get_arch_name, update_nested_dict
 from ai.backend.logging import BraceStyleAdapter
-
-from ..errors import SubprocessStreamError
-from ..exception import InitializationError
-from ..utils import closing_async, get_arch_name, update_nested_dict
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

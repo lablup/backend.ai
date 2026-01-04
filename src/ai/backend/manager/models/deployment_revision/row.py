@@ -13,8 +13,7 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.logging import BraceStyleAdapter
-
-from ...data.deployment.types import (
+from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
     ExtraVFolderMountData,
     ModelMountConfigData,
@@ -22,7 +21,7 @@ from ...data.deployment.types import (
     ModelRuntimeConfigData,
     ResourceConfigData,
 )
-from ..base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     IDColumn,
@@ -33,7 +32,7 @@ from ..base import (
 )
 
 if TYPE_CHECKING:
-    from ..routing import RoutingRow
+    from ai.backend.manager.models.routing import RoutingRow
 
 __all__ = ("DeploymentRevisionRow",)
 

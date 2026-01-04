@@ -46,10 +46,9 @@ from ai.backend.common.exception import DatabaseError
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.bootstrap import DatabaseConfig
+from ai.backend.manager.defs import LockID
 from ai.backend.manager.errors.resource import DBOperationFailed
-
-from ..defs import LockID
-from ..types import Sentinel
+from ai.backend.manager.types import Sentinel
 
 if TYPE_CHECKING:
     from ai.backend.manager.config.bootstrap import BootstrapConfig

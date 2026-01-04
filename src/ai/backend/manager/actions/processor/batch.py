@@ -5,13 +5,13 @@ from datetime import datetime
 from typing import Awaitable, Callable, Generic, Optional
 
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.actions.validator.batch import BatchActionValidator
-
-from ..action import (
+from ai.backend.manager.actions.action import (
     BaseActionTriggerMeta,
 )
-from ..action.batch import TBatchAction, TBatchActionResult
-from ..monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.action.batch import TBatchAction, TBatchActionResult
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.validator.batch import BatchActionValidator
+
 from .base import ActionRunner
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

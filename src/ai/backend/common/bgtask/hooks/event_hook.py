@@ -3,9 +3,10 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
-from ...events.dispatcher import EventProducer
-from ...events.event_types.bgtask.broadcast import BgtaskUpdatedEvent
-from ...events.types import EventCacheDomain
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.bgtask.broadcast import BgtaskUpdatedEvent
+from ai.backend.common.events.types import EventCacheDomain
+
 from .base import AbstractTaskHook, TaskContext
 
 

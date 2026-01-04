@@ -11,6 +11,23 @@ from aiodocker.exceptions import DockerError
 from kubernetes_asyncio import client as K8sClient
 from kubernetes_asyncio import config as K8sConfig
 
+from ai.backend.agent import __version__  # pants: no-infer-dep
+from ai.backend.agent.alloc_map import AllocationStrategy
+from ai.backend.agent.errors import InvalidAllocMapTypeError, InvalidOvercommitFactorError
+from ai.backend.agent.resources import (
+    AbstractAllocMap,
+    AbstractComputeDevice,
+    AbstractComputePlugin,
+    DeviceSlotInfo,
+    DiscretePropertyAllocMap,
+    MountInfo,
+)
+from ai.backend.agent.stats import (
+    ContainerMeasurement,
+    NodeMeasurement,
+    ProcessMeasurement,
+    StatContext,
+)
 from ai.backend.common.types import (
     AcceleratorMetadata,
     ContainerId,
@@ -22,18 +39,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from .. import __version__  # pants: no-infer-dep
-from ..alloc_map import AllocationStrategy
-from ..errors import InvalidAllocMapTypeError, InvalidOvercommitFactorError
-from ..resources import (
-    AbstractAllocMap,
-    AbstractComputeDevice,
-    AbstractComputePlugin,
-    DeviceSlotInfo,
-    DiscretePropertyAllocMap,
-    MountInfo,
-)
-from ..stats import ContainerMeasurement, NodeMeasurement, ProcessMeasurement, StatContext
 from .agent import Container
 from .resources import get_resource_spec_from_container
 

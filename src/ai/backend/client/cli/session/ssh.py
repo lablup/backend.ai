@@ -8,8 +8,7 @@ from pathlib import Path
 from typing import Iterator, List
 
 from ai.backend.cli.types import ExitCode
-
-from ..pretty import print_fail, print_info
+from ai.backend.client.cli.pretty import print_fail, print_info
 
 CLI_EXECUTABLE: tuple[str, ...]
 if pex_path := os.environ.get("PEX", None):

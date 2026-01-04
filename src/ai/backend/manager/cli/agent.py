@@ -56,9 +56,8 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
     from zmq.auth.certs import load_certificate
 
     from ai.backend.common.auth import PublicKey, SecretKey
-
-    from ..agent_cache import AgentRPCCache
-    from ..models.utils import create_async_engine
+    from ai.backend.manager.agent_cache import AgentRPCCache
+    from ai.backend.manager.models.utils import create_async_engine
 
     async def _impl():
         bootstrap_config = await cli_ctx.get_bootstrap_config()

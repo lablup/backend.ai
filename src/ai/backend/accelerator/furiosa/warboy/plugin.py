@@ -8,7 +8,8 @@ from typing import Any, List, Mapping, MutableMapping, Optional, Sequence, Set, 
 
 import aiodocker
 
-from .. import __version__
+from ai.backend.accelerator.furiosa import __version__
+
 from .warboy_api import WarboyAPI
 
 try:

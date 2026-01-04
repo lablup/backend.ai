@@ -3,8 +3,7 @@ from typing import Self
 import sqlalchemy as sa
 
 from ai.backend.common.events.types import AbstractEvent, EventDomain
-
-from ..base import (
+from ai.backend.manager.models.base import (
     Base,
     IDColumn,
     StrEnumType,

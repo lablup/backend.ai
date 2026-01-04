@@ -9,12 +9,12 @@ import click
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.compat import asyncio_run, asyncio_run_forever
+from ai.backend.client.config import DEFAULT_CHUNK_SIZE
+from ai.backend.client.request import Request
+from ai.backend.client.session import AsyncSession
+from ai.backend.client.versioning import get_naming
 
-from ..compat import asyncio_run, asyncio_run_forever
-from ..config import DEFAULT_CHUNK_SIZE
-from ..request import Request
-from ..session import AsyncSession
-from ..versioning import get_naming
 from .pretty import print_error, print_fail, print_info, print_warn
 
 

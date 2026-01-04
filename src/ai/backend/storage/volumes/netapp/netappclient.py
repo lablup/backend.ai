@@ -77,9 +77,8 @@ from typing import (
 import aiohttp
 
 from ai.backend.logging import BraceStyleAdapter
-
-from ...errors import NetAppClientError, NetAppQTreeNotFoundError
-from ...types import QuotaConfig, QuotaUsage
+from ai.backend.storage.errors import NetAppClientError, NetAppQTreeNotFoundError
+from ai.backend.storage.types import QuotaConfig, QuotaUsage
 
 StorageID: TypeAlias = uuid.UUID
 VolumeID: TypeAlias = uuid.UUID

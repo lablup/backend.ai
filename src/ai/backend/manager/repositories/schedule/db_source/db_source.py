@@ -42,6 +42,26 @@ from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_merge,
 )
+from ai.backend.manager.repositories.schedule.types.agent import AgentMeta
+from ai.backend.manager.repositories.schedule.types.allocation import (
+    AllocationBatch,
+    SchedulingFailure,
+    SessionAllocation,
+)
+from ai.backend.manager.repositories.schedule.types.base import SchedulingSpec
+from ai.backend.manager.repositories.schedule.types.scaling_group import ScalingGroupMeta
+from ai.backend.manager.repositories.schedule.types.scheduling import SchedulingData
+from ai.backend.manager.repositories.schedule.types.session import (
+    KernelData,
+    MarkTerminatingResult,
+    PendingSessionData,
+    PendingSessions,
+    SessionTerminationResult,
+    SweptSessionInfo,
+    TerminatingKernelData,
+    TerminatingSessionData,
+)
+from ai.backend.manager.repositories.schedule.types.snapshot import ResourcePolicies, SnapshotData
 from ai.backend.manager.sokovan.scheduler.types import (
     AgentOccupancy,
     KeypairOccupancy,
@@ -52,26 +72,6 @@ from ai.backend.manager.sokovan.scheduler.types import (
     UserResourcePolicy,
 )
 
-from ..types.agent import AgentMeta
-from ..types.allocation import (
-    AllocationBatch,
-    SchedulingFailure,
-    SessionAllocation,
-)
-from ..types.base import SchedulingSpec
-from ..types.scaling_group import ScalingGroupMeta
-from ..types.scheduling import SchedulingData
-from ..types.session import (
-    KernelData,
-    MarkTerminatingResult,
-    PendingSessionData,
-    PendingSessions,
-    SessionTerminationResult,
-    SweptSessionInfo,
-    TerminatingKernelData,
-    TerminatingSessionData,
-)
-from ..types.snapshot import ResourcePolicies, SnapshotData
 from .types import SessionRowCache
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

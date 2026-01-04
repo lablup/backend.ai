@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import List
 
-from ..common.atom_api import ATOMDeviceStat
-from ..common.types import AbstractATOMDevice
+from ai.backend.accelerator.rebellions.common.atom_api import ATOMDeviceStat
+from ai.backend.accelerator.rebellions.common.types import AbstractATOMDevice
 
 __all__ = (
     "ATOMMaxChildDevice",

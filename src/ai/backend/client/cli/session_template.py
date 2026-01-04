@@ -5,8 +5,8 @@ from tabulate import tabulate
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.session import Session
 
-from ..session import Session
 from .pretty import print_error, print_info, print_warn
 
 

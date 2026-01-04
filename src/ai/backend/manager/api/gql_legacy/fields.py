@@ -6,11 +6,11 @@ from typing import (
 import graphene
 import graphql
 
-from ...models.rbac import (
+from ai.backend.manager.models.rbac import (
     ScopeType,
     deserialize_scope,
 )
-from ...models.rbac.permission_defs import AgentPermission
+from ai.backend.manager.models.rbac.permission_defs import AgentPermission
 
 
 class ScopeField(graphene.Scalar):

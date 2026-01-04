@@ -20,15 +20,15 @@ from tenacity import (
 from tqdm import tqdm
 from yarl import URL
 
+from ai.backend.client.compat import current_loop
+from ai.backend.client.config import DEFAULT_CHUNK_SIZE, MAX_INFLIGHT_CHUNKS
+from ai.backend.client.exceptions import BackendClientError
 from ai.backend.client.output.fields import vfolder_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
+from ai.backend.client.pagination import fetch_paginated_result
+from ai.backend.client.request import Request
 from ai.backend.common.types import ResultSet
 
-from ..compat import current_loop
-from ..config import DEFAULT_CHUNK_SIZE, MAX_INFLIGHT_CHUNKS
-from ..exceptions import BackendClientError
-from ..pagination import fetch_paginated_result
-from ..request import Request
 from .base import BaseFunction, api_function
 
 __all__ = ("VFolderByName",)

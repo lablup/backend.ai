@@ -37,10 +37,11 @@ __all__ = (
     "UserInfo",
 )
 
-from ...models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ...models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
-from ...models.user import UserRole
-from ...models.utils import agg_to_array
+from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.utils import agg_to_array
+
 from .base import (
     Item,
     PaginatedList,

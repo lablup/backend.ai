@@ -10,10 +10,17 @@ from graphql import GraphQLError, Undefined
 
 from ai.backend.common.container_registry import AllowedGroupsModel
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.container_registry import (
+    ContainerRegistryRow,
+    ContainerRegistryValidator,
+    ContainerRegistryValidatorArgs,
+)
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
+    handle_allowed_groups_update,
 )
 from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
     DeleteContainerRegistryAction,
@@ -23,13 +30,6 @@ from ai.backend.manager.services.container_registry.actions.modify_container_reg
 )
 from ai.backend.manager.types import OptionalState, TriState
 
-from ...models.container_registry import (
-    ContainerRegistryRow,
-    ContainerRegistryValidator,
-    ContainerRegistryValidatorArgs,
-)
-from ...models.user import UserRole
-from ...repositories.container_registry.updaters import handle_allowed_groups_update
 from .container_registry import (
     AllowedGroups,
     ContainerRegistryNode,

@@ -4,9 +4,8 @@ from ai.backend.common.events.reporter import (
     CompleteEventReportArgs,
     PrepareEventReportArgs,
 )
-
-from ..models.event_log import EventLogRow
-from ..models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.event_log import EventLogRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
 class EventLogger(AbstractEventReporter):

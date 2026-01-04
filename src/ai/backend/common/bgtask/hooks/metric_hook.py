@@ -5,8 +5,8 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator, Optional, Protocol
 
 from ai.backend.common.bgtask.types import BgtaskStatus
+from ai.backend.common.exception import ErrorCode
 
-from ...exception import ErrorCode
 from .base import AbstractTaskHook, TaskContext
 
 

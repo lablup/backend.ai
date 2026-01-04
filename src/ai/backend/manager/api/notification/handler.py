@@ -39,6 +39,8 @@ from ai.backend.common.dto.manager.notification import (
     ValidateNotificationRuleRequest,
     ValidateNotificationRuleResponse,
 )
+from ai.backend.manager.api.auth import auth_required_for_method
+from ai.backend.manager.api.types import CORSOptions, WebMiddleware
 from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.dto.notification_request import (
     DeleteNotificationChannelPathParam,
@@ -71,8 +73,6 @@ from ai.backend.manager.services.notification.actions import (
     ValidateRuleAction,
 )
 
-from ..auth import auth_required_for_method
-from ..types import CORSOptions, WebMiddleware
 from .adapter import NotificationChannelAdapter, NotificationRuleAdapter
 
 __all__ = ("create_app",)

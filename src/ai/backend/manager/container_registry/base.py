@@ -40,13 +40,16 @@ from ai.backend.common.json import read_json
 from ai.backend.common.types import SlotName, SSLContextType
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.image.types import ImageData, RescanImagesResult
+from ai.backend.manager.data.image.types import (
+    ImageData,
+    ImageStatus,
+    ImageType,
+    RescanImagesResult,
+)
 from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
-
-from ..data.image.types import ImageStatus, ImageType
-from ..exceptions import ScanImageError, ScanTagError
-from ..models.image import ImageIdentifier, ImageRow
-from ..models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.exceptions import ScanImageError, ScanTagError
+from ai.backend.manager.models.image import ImageIdentifier, ImageRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 concurrency_sema: ContextVar[asyncio.Semaphore] = ContextVar("concurrency_sema")
@@ -56,7 +59,7 @@ progress_reporter: ContextVar[Optional[ProgressReporter]] = ContextVar(
 all_updates: ContextVar[Dict[ImageIdentifier, Dict[str, Any]]] = ContextVar("all_updates")
 
 if TYPE_CHECKING:
-    from ..models.container_registry import ContainerRegistryRow
+    from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 
 class BaseContainerRegistry(metaclass=ABCMeta):

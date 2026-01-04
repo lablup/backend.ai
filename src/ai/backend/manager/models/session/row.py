@@ -89,9 +89,8 @@ from ai.backend.manager.data.session.types import (
     SessionNetwork,
     SessionStatus,
 )
-
-from ...defs import DEFAULT_ROLE
-from ...errors.kernel import (
+from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.kernel import (
     KernelCreationFailed,
     KernelDestructionFailed,
     KernelExecutionFailed,
@@ -102,8 +101,8 @@ from ...errors.kernel import (
     TooManyKernelsFound,
     TooManySessionsMatched,
 )
-from ...exceptions import AgentError
-from ..base import (
+from ai.backend.manager.exceptions import AgentError
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     EnumType,
@@ -114,12 +113,12 @@ from ..base import (
     StructuredJSONObjectListColumn,
     URLColumn,
 )
-from ..group import GroupRow
-from ..image import ImageRow
-from ..kernel import KernelRow
-from ..minilang.queryfilter import FieldSpecType, QueryFilterParser
-from ..network import NetworkRow, NetworkType
-from ..rbac import (
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
+from ai.backend.manager.models.network import NetworkRow, NetworkType
+from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -127,17 +126,17 @@ from ..rbac import (
     ScopeType,
     get_predefined_roles_in_scope,
 )
-from ..rbac import (
+from ai.backend.manager.models.rbac import (
     UserScope as UserRBACScope,
 )
-from ..rbac.context import ClientContext
-from ..rbac.permission_defs import ComputeSessionPermission
-from ..routing import RouteStatus, RoutingRow
-from ..types import (
+from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.rbac.permission_defs import ComputeSessionPermission
+from ai.backend.manager.models.routing import RouteStatus, RoutingRow
+from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
 )
-from ..utils import (
+from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     JSONCoalesceExpr,
     execute_with_retry,
@@ -146,7 +145,7 @@ from ..utils import (
 )
 
 if TYPE_CHECKING:
-    from ...registry import AgentRegistry
+    from ai.backend.manager.registry import AgentRegistry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -1990,7 +1989,7 @@ class ComputeSessionPermissionContextBuilder(
         self,
         ctx: ClientContext,
     ) -> ComputeSessionPermissionContext:
-        from ..domain import DomainRow
+        from ai.backend.manager.models.domain import DomainRow
 
         perm_ctx = ComputeSessionPermissionContext()
         _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))

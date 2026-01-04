@@ -16,13 +16,12 @@ from ai.backend.cli.params import (
     OptionalType,
 )
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.compat import asyncio_run
 from ai.backend.client.config import DEFAULT_CHUNK_SIZE, APIConfig
 from ai.backend.client.func.vfolder import _default_list_fields
-from ai.backend.client.session import Session
+from ai.backend.client.session import AsyncSession, Session
 from ai.backend.common.bgtask.types import BgtaskStatus
 
-from ..compat import asyncio_run
-from ..session import AsyncSession
 from .extensions import pass_ctx_obj
 from .pretty import (
     ProgressBarWithSpinner,

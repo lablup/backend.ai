@@ -4,6 +4,21 @@ from typing import Any, Collection, Mapping, Optional, Sequence
 
 import aiodocker
 
+from ai.backend.agent import __version__
+from ai.backend.agent.alloc_map import AllocationStrategy
+from ai.backend.agent.resources import (
+    AbstractAllocMap,
+    AbstractComputeDevice,
+    AbstractComputePlugin,
+    DeviceSlotInfo,
+    DiscretePropertyAllocMap,
+)
+from ai.backend.agent.stats import (
+    ContainerMeasurement,
+    NodeMeasurement,
+    ProcessMeasurement,
+    StatContext,
+)
 from ai.backend.agent.types import MountInfo
 from ai.backend.common.types import (
     AcceleratorMetadata,
@@ -14,21 +29,6 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 
-from .. import __version__
-from ..alloc_map import AllocationStrategy
-from ..resources import (
-    AbstractAllocMap,
-    AbstractComputeDevice,
-    AbstractComputePlugin,
-    DeviceSlotInfo,
-    DiscretePropertyAllocMap,
-)
-from ..stats import (
-    ContainerMeasurement,
-    NodeMeasurement,
-    ProcessMeasurement,
-    StatContext,
-)
 from .agent import Container
 
 

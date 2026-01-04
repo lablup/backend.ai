@@ -7,12 +7,11 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-
-from ...data.permission.id import ObjectId
-from ...data.permission.object_permission import ObjectPermissionData
-from ...data.permission.permission import PermissionData
-from ...data.permission.permission_group import PermissionGroupData
-from ...data.permission.role import (
+from ai.backend.manager.data.permission.id import ObjectId
+from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
+from ai.backend.manager.data.permission.permission import PermissionData
+from ai.backend.manager.data.permission.permission_group import PermissionGroupData
+from ai.backend.manager.data.permission.role import (
     AssignedUserListResult,
     BatchEntityPermissionCheckInput,
     RoleData,
@@ -26,15 +25,16 @@ from ...data.permission.role import (
     UserRoleRevocationData,
     UserRoleRevocationInput,
 )
-from ...models.rbac_models.permission.object_permission import ObjectPermissionRow
-from ...models.rbac_models.permission.permission import PermissionRow
-from ...models.rbac_models.permission.permission_group import PermissionGroupRow
-from ...models.rbac_models.role import RoleRow
-from ...models.utils import ExtendedAsyncSAEngine
-from ...repositories.base.creator import Creator
-from ...repositories.base.purger import Purger
-from ...repositories.base.querier import BatchQuerier
-from ...repositories.base.updater import Updater
+from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.base.updater import Updater
+
 from .db_source.db_source import CreateRoleInput, PermissionDBSource
 
 permission_controller_repository_resilience = Resilience(

@@ -10,9 +10,9 @@ from aiotools.server import process_index
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs
 from ai.backend.common.redis_client import RedisConnection
+from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
-from ..types import RedisTarget
 from .queue import AbstractMessageQueue
 from .types import BroadcastMessage, BroadcastPayload, MessageId, MQMessage
 

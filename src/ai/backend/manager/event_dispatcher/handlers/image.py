@@ -10,12 +10,11 @@ from ai.backend.common.types import (
     AgentId,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
-
-from ...models.utils import (
+from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
 )
+from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

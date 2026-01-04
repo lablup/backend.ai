@@ -9,18 +9,17 @@ import aiofiles.os
 
 from ai.backend.common.types import BinarySize, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-
-from ...errors import CephNotInstalledError, QuotaScopeNotFoundError
-from ...subproc import run
-from ...types import CapacityUsage, Optional, QuotaConfig, QuotaUsage, TreeUsage
-from ..abc import (
+from ai.backend.storage.errors import CephNotInstalledError, QuotaScopeNotFoundError
+from ai.backend.storage.subproc import run
+from ai.backend.storage.types import CapacityUsage, Optional, QuotaConfig, QuotaUsage, TreeUsage
+from ai.backend.storage.volumes.abc import (
     CAP_FAST_SIZE,
     CAP_QUOTA,
     CAP_VFOLDER,
     AbstractFSOpModel,
     AbstractQuotaModel,
 )
-from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
+from ai.backend.storage.volumes.vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

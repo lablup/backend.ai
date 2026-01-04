@@ -8,9 +8,9 @@ import aiotools
 import tomli
 
 from ai.backend.test.contexts.context import BaseTestContext, ContextName
+from ai.backend.test.testcases.spec_manager import TestSpec, TestSpecManager, TestTag
 from ai.backend.test.tester.config import TesterConfig
 
-from ..testcases.spec_manager import TestSpec, TestSpecManager, TestTag
 from .exporter import TestExporter
 from .runner import TestRunner
 

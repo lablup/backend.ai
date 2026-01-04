@@ -20,33 +20,33 @@ from aiohttp import hdrs
 from faker import Faker
 from tqdm import tqdm
 
+from ai.backend.cli.types import Undefined, undefined
+from ai.backend.client.compat import current_loop
+from ai.backend.client.config import DEFAULT_CHUNK_SIZE
+from ai.backend.client.exceptions import BackendClientError
 from ai.backend.client.output.fields import kernel_node_fields, session_fields, session_node_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
-from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import ClusterMode, SessionTypes
-
-from ...cli.types import Undefined, undefined
-from ..compat import current_loop
-from ..config import DEFAULT_CHUNK_SIZE
-from ..exceptions import BackendClientError
-from ..pagination import fetch_paginated_result
-from ..request import (
+from ai.backend.client.pagination import fetch_paginated_result
+from ai.backend.client.request import (
     AttachedFile,
     Request,
     SSEContextManager,
     WebSocketContextManager,
     WebSocketResponse,
 )
-from ..session import api_session
-from ..types import set_if_set
-from ..utils import (
+from ai.backend.client.session import api_session
+from ai.backend.client.types import set_if_set
+from ai.backend.client.utils import (
     ProgressReportingReader,
     create_connection_field,
     flatten_connection,
     to_global_id,
 )
-from ..utils import dedent as _d
-from ..versioning import get_id_or_name, get_naming
+from ai.backend.client.utils import dedent as _d
+from ai.backend.client.versioning import get_id_or_name, get_naming
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.types import ClusterMode, SessionTypes
+
 from .base import BaseFunction, api_function
 
 __all__ = ("ComputeSession", "InferenceSession")

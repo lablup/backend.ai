@@ -1,7 +1,8 @@
 from typing import Union
 from uuid import UUID
 
-from ..request import Request, SSEContextManager
+from ai.backend.client.request import Request, SSEContextManager
+
 from .base import BaseFunction
 
 

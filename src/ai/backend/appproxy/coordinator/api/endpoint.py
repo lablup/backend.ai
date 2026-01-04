@@ -27,12 +27,12 @@ from ai.backend.appproxy.common.utils import (
     pydantic_api_response_handler,
 )
 from ai.backend.appproxy.coordinator.errors import InvalidCircuitStateError, InvalidURLError
+from ai.backend.appproxy.coordinator.models import Circuit, Endpoint, Worker
+from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
 from ai.backend.appproxy.coordinator.models.worker import add_circuit
+from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.common.config import ModelHealthCheck
 
-from ..models import Circuit, Endpoint, Worker
-from ..models.utils import execute_with_txn_retry
-from ..types import RootContext
 from .types import SessionConfig, StubResponseModel
 from .utils import auth_required
 

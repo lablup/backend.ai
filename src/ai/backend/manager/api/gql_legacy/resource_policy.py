@@ -13,12 +13,8 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.types import OptionalState, TriState
-
-from ...models.keypair import keypairs
-from ...models.resource_policy import (
+from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
@@ -26,7 +22,11 @@ from ...models.resource_policy import (
     project_resource_policies,
     user_resource_policies,
 )
-from ...models.user import UserRole
+from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.types import OptionalState, TriState
+
 from .base import (
     BigInt,
     batch_result,
@@ -570,7 +570,7 @@ class UserResourcePolicy(graphene.ObjectType):
         ctx: GraphQueryContext,
         user_uuids: Sequence[uuid.UUID],
     ) -> Sequence[UserResourcePolicy]:
-        from ...models.user import UserRow
+        from ai.backend.manager.models.user import UserRow
 
         query = (
             sa.select(UserRow)
@@ -829,7 +829,7 @@ class ProjectResourcePolicy(graphene.ObjectType):
         ctx: GraphQueryContext,
         project_uuids: Sequence[uuid.UUID],
     ) -> Sequence[ProjectResourcePolicy]:
-        from ...models.group import GroupRow
+        from ai.backend.manager.models.group import GroupRow
 
         query = (
             sa.select(GroupRow)

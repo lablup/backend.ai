@@ -25,17 +25,8 @@ from tabulate import tabulate
 from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
-from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.bgtask.types import BgtaskStatus
-from ai.backend.common.types import ClusterMode
-
-from ...exceptions import BackendAPIError
-from ...func.session import ComputeSession
-from ...output.fields import network_fields, session_fields
-from ...output.types import FieldSpec
-from ...session import AsyncSession, Session
-from ..events import SubscribableEvents
-from ..pretty import (
+from ai.backend.client.cli.events import SubscribableEvents
+from ai.backend.client.cli.pretty import (
     ProgressBarWithSpinner,
     print_done,
     print_error,
@@ -44,6 +35,15 @@ from ..pretty import (
     print_wait,
     print_warn,
 )
+from ai.backend.client.exceptions import BackendAPIError
+from ai.backend.client.func.session import ComputeSession
+from ai.backend.client.output.fields import network_fields, session_fields
+from ai.backend.client.output.types import FieldSpec
+from ai.backend.client.session import AsyncSession, Session
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.bgtask.types import BgtaskStatus
+from ai.backend.common.types import ClusterMode
+
 from .args import click_start_option
 from .execute import (
     format_stats,

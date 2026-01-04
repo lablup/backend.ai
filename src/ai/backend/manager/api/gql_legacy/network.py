@@ -13,14 +13,18 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.errors.common import (
+    GenericForbidden,
+    ObjectNotFound,
+    ServerMisconfiguredError,
+)
+from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
+from ai.backend.manager.models.network import NetworkRow
+from ai.backend.manager.models.user import UserRole
 
-from ...errors.common import GenericForbidden, ObjectNotFound, ServerMisconfiguredError
-from ...models.group import AssocGroupUserRow, GroupRow
-from ...models.minilang import FieldSpecItem, OrderSpecItem
-from ...models.minilang.ordering import QueryOrderParser
-from ...models.minilang.queryfilter import QueryFilterParser
-from ...models.network import NetworkRow
-from ...models.user import UserRole
 from .base import (
     FilterExprArg,
     OrderExprArg,

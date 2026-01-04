@@ -10,23 +10,23 @@ from aiohttp import web
 from ai.backend.common import msgpack
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
-
-from ..errors.api import InvalidAPIParameters
-from ..errors.common import GenericForbidden
-from ..errors.resource import ProjectNotFound
-from ..errors.storage import (
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.errors.storage import (
     DotfileAlreadyExists,
     DotfileCreationFailed,
     DotfileNotFound,
 )
-from ..models import (
+from ai.backend.manager.models import (
     MAXIMUM_DOTFILE_SIZE,
     groups,
     query_group_domain,
     query_group_dotfiles,
     verify_dotfile_name,
 )
-from ..models import association_groups_users as agus
+from ai.backend.manager.models import association_groups_users as agus
+
 from .auth import admin_required, auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware

@@ -1,7 +1,8 @@
 from typing import Any, List, Mapping, Optional
 
-from ..request import Request
-from ..session import api_session
+from ai.backend.client.request import Request
+from ai.backend.client.session import api_session
+
 from .base import BaseFunction, api_function
 
 __all__ = ("SessionTemplate",)

@@ -47,8 +47,7 @@ from .actions import (
 if TYPE_CHECKING:
     from ai.backend.manager.data.notification.types import NotificationRuleData
     from ai.backend.manager.notification import NotificationCenter
-
-    from ...repositories.notification import NotificationRepository
+    from ai.backend.manager.repositories.notification import NotificationRepository
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 

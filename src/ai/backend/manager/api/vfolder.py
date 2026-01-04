@@ -60,14 +60,12 @@ from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.data.permission.types import ScopeType
-from ai.backend.manager.models.storage import StorageSessionManager
-
-from ..errors.api import InvalidAPIParameters
-from ..errors.auth import InsufficientPrivilege
-from ..errors.common import InternalServerError, ObjectNotFound
-from ..errors.kernel import BackendAgentError
-from ..errors.service import ModelServiceDependencyNotCleared
-from ..errors.storage import (
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.common import InternalServerError, ObjectNotFound
+from ai.backend.manager.errors.kernel import BackendAgentError
+from ai.backend.manager.errors.service import ModelServiceDependencyNotCleared
+from ai.backend.manager.errors.storage import (
     TooManyVFoldersFound,
     VFolderAlreadyExists,
     VFolderBadRequest,
@@ -77,7 +75,7 @@ from ..errors.storage import (
     VFolderNotFound,
     VFolderOperationFailed,
 )
-from ..models import (
+from ai.backend.manager.models import (
     ACTIVE_USER_STATUSES,
     EndpointRow,
     UserRole,
@@ -104,17 +102,18 @@ from ..models import (
     vfolder_status_map,
     vfolders,
 )
-from ..models.user import UserRow
-from ..models.utils import execute_with_retry, execute_with_txn_retry
-from ..models.vfolder import (
+from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.utils import execute_with_retry, execute_with_txn_retry
+from ai.backend.manager.models.vfolder import (
     VFolderPermissionRow,
     delete_vfolder_relation_rows,
     is_unmanaged,
 )
-from ..models.vfolder import VFolderRow as VFolderDBRow
-from ..repositories.base.updater import Updater
-from ..repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
-from ..services.vfolder.actions.base import (
+from ai.backend.manager.models.vfolder import VFolderRow as VFolderDBRow
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
+from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
     CreateVFolderAction,
     DeleteForeverVFolderAction,
@@ -125,7 +124,7 @@ from ..services.vfolder.actions.base import (
     RestoreVFolderFromTrashAction,
     UpdateVFolderAttributeAction,
 )
-from ..services.vfolder.actions.file import (
+from ai.backend.manager.services.vfolder.actions.file import (
     CreateDownloadSessionAction,
     CreateUploadSessionAction,
     DeleteFilesAction,
@@ -134,7 +133,7 @@ from ..services.vfolder.actions.file import (
     MkdirAction,
     RenameFileAction,
 )
-from ..services.vfolder.actions.invite import (
+from ai.backend.manager.services.vfolder.actions.invite import (
     AcceptInvitationAction,
     InviteVFolderAction,
     LeaveInvitedVFolderAction,
@@ -144,7 +143,8 @@ from ..services.vfolder.actions.invite import (
     UpdateInvitationAction,
     UpdateInvitedVFolderMountPermissionAction,
 )
-from ..types import OptionalState
+from ai.backend.manager.types import OptionalState
+
 from .auth import admin_required, auth_required, superadmin_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .utils import (
@@ -1559,7 +1559,7 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     if row["ownership_type"] != VFolderOwnershipType.GROUP:
         raise VFolderNotFound("Only project folders are directly sharable.")
     async with root_ctx.db.begin() as conn:
-        from ..models import association_groups_users as agus
+        from ai.backend.manager.models import association_groups_users as agus
 
         allowed_vfolder_types = (
             await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()

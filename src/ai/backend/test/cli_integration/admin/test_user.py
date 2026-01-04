@@ -2,8 +2,8 @@ import json
 from contextlib import closing
 from typing import Callable, Tuple
 
-from ...utils.cli import EOF, ClientRunnerFunc, decode
-from ..conftest import User
+from ai.backend.test.cli_integration.conftest import User
+from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
 def test_add_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):

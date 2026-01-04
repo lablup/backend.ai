@@ -6,12 +6,11 @@ from typing import TYPE_CHECKING, Callable
 from ai.backend.common.data.notification import NotifiableMessage
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.logging import BraceStyleAdapter
-
-from ...data.notification import NotificationRuleType
-from ...services.notification.actions import ProcessNotificationAction
+from ai.backend.manager.data.notification import NotificationRuleType
+from ai.backend.manager.services.notification.actions import ProcessNotificationAction
 
 if TYPE_CHECKING:
-    from ...services.processors import Processors
+    from ai.backend.manager.services.processors import Processors
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 

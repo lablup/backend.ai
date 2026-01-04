@@ -15,13 +15,35 @@ import psutil
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 
+from ai.backend.agent import __version__  # pants: no-infer-dep
+from ai.backend.agent.alloc_map import AllocationStrategy
 from ai.backend.agent.docker.kernel import DockerKernel
+from ai.backend.agent.errors import InvalidResourceConfigError
+from ai.backend.agent.exception import InvalidArgumentError
 from ai.backend.agent.plugin.network import (
     AbstractNetworkAgentPlugin,
     ContainerNetworkCapability,
     ContainerNetworkInfo,
 )
+from ai.backend.agent.resources import (
+    AbstractAllocMap,
+    AbstractComputeDevice,
+    AbstractComputePlugin,
+    DeviceSlotInfo,
+    DiscretePropertyAllocMap,
+)
+from ai.backend.agent.stats import (
+    ContainerMeasurement,
+    Measurement,
+    MetricTypes,
+    NodeMeasurement,
+    ProcessMeasurement,
+    StatContext,
+    StatModes,
+)
 from ai.backend.agent.types import MountInfo
+from ai.backend.agent.utils import closing_async, read_sysfs
+from ai.backend.agent.vendor.linux import libnuma
 from ai.backend.common.json import dump_json
 from ai.backend.common.netns import nsenter
 from ai.backend.common.types import (
@@ -38,28 +60,6 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import current_loop, nmget
 from ai.backend.logging import BraceStyleAdapter
 
-from .. import __version__  # pants: no-infer-dep
-from ..alloc_map import AllocationStrategy
-from ..errors import InvalidResourceConfigError
-from ..exception import InvalidArgumentError
-from ..resources import (
-    AbstractAllocMap,
-    AbstractComputeDevice,
-    AbstractComputePlugin,
-    DeviceSlotInfo,
-    DiscretePropertyAllocMap,
-)
-from ..stats import (
-    ContainerMeasurement,
-    Measurement,
-    MetricTypes,
-    NodeMeasurement,
-    ProcessMeasurement,
-    StatContext,
-    StatModes,
-)
-from ..utils import closing_async, read_sysfs
-from ..vendor.linux import libnuma
 from .agent import Container
 from .resources import get_resource_spec_from_container
 

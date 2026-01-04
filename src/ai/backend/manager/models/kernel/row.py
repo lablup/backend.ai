@@ -55,9 +55,8 @@ if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 
 from ai.backend.common.exception import BackendAIError
-
-from ...defs import DEFAULT_ROLE
-from ...errors.kernel import (
+from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.kernel import (
     KernelCreationFailed,
     KernelDestructionFailed,
     KernelExecutionFailed,
@@ -65,9 +64,9 @@ from ...errors.kernel import (
     KernelRestartFailed,
     SessionNotFound,
 )
-from ...errors.resource import DataTransformationFailed
-from ...exceptions import AgentError
-from ..base import (
+from ai.backend.manager.errors.resource import DataTransformationFailed
+from ai.backend.manager.exceptions import AgentError
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     EnumType,
@@ -78,9 +77,9 @@ from ..base import (
     StructuredJSONObjectListColumn,
     URLColumn,
 )
-from ..types import QueryCondition
-from ..user import users
-from ..utils import (
+from ai.backend.manager.models.types import QueryCondition
+from ai.backend.manager.models.user import users
+from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     JSONCoalesceExpr,
     execute_with_retry,
@@ -89,7 +88,7 @@ from ..utils import (
 )
 
 if TYPE_CHECKING:
-    from ..gql import GraphQueryContext
+    from ai.backend.manager.models.gql import GraphQueryContext
 
 __all__ = (
     "AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES",
@@ -622,7 +621,7 @@ class KernelRow(Base):
     async def get_kernel(
         db: ExtendedAsyncSAEngine, kern_id: uuid.UUID, allow_stale: bool = False
     ) -> KernelRow:
-        from ..agent import AgentStatus
+        from ai.backend.manager.models.agent import AgentStatus
 
         async def _query():
             async with db.begin_readonly_session() as db_sess:
@@ -1033,7 +1032,7 @@ async def recalc_concurrency_used(
     access_key: AccessKey,
 ) -> None:
     concurrency_used: int
-    from ..session import PRIVATE_SESSION_TYPES
+    from ai.backend.manager.models.session import PRIVATE_SESSION_TYPES
 
     async with db_sess.begin_nested():
         result = await db_sess.execute(

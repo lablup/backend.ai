@@ -11,6 +11,7 @@ from ai.backend.appproxy.common.errors import InvalidCredentials
 from ai.backend.appproxy.common.types import RouteInfo, WebRequestHandler
 from ai.backend.appproxy.common.utils import ensure_json_serializable, is_permit_valid, mime_match
 from ai.backend.appproxy.worker.proxy.backend.http import HTTPBackend
+from ai.backend.appproxy.worker.proxy.frontend.base import BaseFrontend
 from ai.backend.appproxy.worker.types import (
     Circuit,
     InferenceAppInfo,
@@ -20,8 +21,6 @@ from ai.backend.appproxy.worker.types import (
 )
 from ai.backend.common.exception import BackendAIError
 from ai.backend.logging import BraceStyleAdapter
-
-from ..base import BaseFrontend
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 

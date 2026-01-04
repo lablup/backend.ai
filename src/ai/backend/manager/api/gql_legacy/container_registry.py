@@ -13,11 +13,14 @@ from graphql import Undefined, UndefinedType
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
+from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from ai.backend.manager.models.rbac import (
     ContainerRegistryScope,
     ProjectScope,
@@ -37,9 +40,6 @@ from ai.backend.manager.services.container_registry.actions.modify_container_reg
 )
 from ai.backend.manager.types import OptionalState, TriState
 
-from ...defs import PASSWORD_PLACEHOLDER
-from ...models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ...models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .base import (
     BigInt,
     FilterExprArg,
@@ -54,7 +54,7 @@ from .group import GroupConnection, GroupNode
 
 if TYPE_CHECKING:
     from .schema import GraphQueryContext
-from ...models.user import UserRole
+from ai.backend.manager.models.user import UserRole
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 

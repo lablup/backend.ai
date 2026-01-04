@@ -15,8 +15,7 @@ from ai.backend.common.events.event_types.vfolder.anycast import (
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import QuotaConfig, VFolderID, VolumeID
 from ai.backend.logging.utils import BraceStyleAdapter
-
-from ..errors import (
+from ai.backend.storage.errors import (
     ExternalStorageServiceError,
     InvalidQuotaConfig,
     InvalidQuotaScopeError,
@@ -26,9 +25,9 @@ from ..errors import (
     ServiceNotInitializedError,
     VFolderNotFoundError,
 )
-from ..utils import log_manager_api_entry_new
-from ..volumes.pool import VolumePool
-from ..volumes.types import (
+from ai.backend.storage.utils import log_manager_api_entry_new
+from ai.backend.storage.volumes.pool import VolumePool
+from ai.backend.storage.volumes.types import (
     QuotaScopeKey,
     QuotaScopeMeta,
     VFolderKey,

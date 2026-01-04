@@ -21,8 +21,10 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionCreationContext,
     SessionCreationSpec,
 )
-
-from ..types import CalculatedResources, KernelResourceInfo
+from ai.backend.manager.sokovan.scheduling_controller.types import (
+    CalculatedResources,
+    KernelResourceInfo,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

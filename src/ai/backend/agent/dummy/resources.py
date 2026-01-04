@@ -2,16 +2,16 @@ import logging
 from decimal import Decimal
 from typing import Any, Mapping, MutableMapping
 
-from ai.backend.common.etcd import AbstractKVStore
-from ai.backend.common.types import DeviceName, SlotName
-from ai.backend.logging import BraceStyleAdapter
-
-from ..exception import InitializationError
-from ..resources import (
+from ai.backend.agent.exception import InitializationError
+from ai.backend.agent.resources import (
     AbstractComputePlugin,
     ComputePluginContext,
     known_slot_types,
 )
+from ai.backend.common.etcd import AbstractKVStore
+from ai.backend.common.types import DeviceName, SlotName
+from ai.backend.logging import BraceStyleAdapter
+
 from .config import read_dummy_config
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

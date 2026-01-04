@@ -34,6 +34,8 @@ from ai.backend.common.dto.manager.rbac import (
     UpdateRoleResponse,
 )
 from ai.backend.common.dto.manager.rbac.request import DeleteRoleRequest, PurgeRoleRequest
+from ai.backend.manager.api.auth import auth_required_for_method
+from ai.backend.manager.api.types import CORSOptions, WebMiddleware
 from ai.backend.manager.data.permission.role import UserRoleAssignmentInput, UserRoleRevocationInput
 from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -52,8 +54,6 @@ from ai.backend.manager.services.permission_contoller.actions import (
 )
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
 
-from ..auth import auth_required_for_method
-from ..types import CORSOptions, WebMiddleware
 from .assigned_user_adapter import AssignedUserAdapter
 from .role_adapter import RoleAdapter
 

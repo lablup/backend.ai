@@ -8,17 +8,21 @@ from typing import FrozenSet
 
 from ai.backend.common.types import HardwareMetadata
 from ai.backend.logging import BraceStyleAdapter
-
-from ...errors import MetricNotFoundError, PureStorageCommandFailedError, VolumeNotInitializedError
-from ...types import CapacityUsage, FSPerfMetric
-from ..abc import (
+from ai.backend.storage.errors import (
+    MetricNotFoundError,
+    PureStorageCommandFailedError,
+    VolumeNotInitializedError,
+)
+from ai.backend.storage.types import CapacityUsage, FSPerfMetric
+from ai.backend.storage.volumes.abc import (
     CAP_FAST_FS_SIZE,
     CAP_FAST_SCAN,
     CAP_METRIC,
     CAP_VFOLDER,
     AbstractFSOpModel,
 )
-from ..vfs import BaseVolume
+from ai.backend.storage.volumes.vfs import BaseVolume
+
 from .purity import PurityClient
 from .rapidfiles import RapidFileToolsFSOpModel
 from .rapidfiles_v2 import RapidFileToolsv2FSOpModel

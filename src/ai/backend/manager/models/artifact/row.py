@@ -12,14 +12,13 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactData,
     ArtifactType,
 )
-from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
-from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
-
-from ..base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     IDColumn,
 )
+from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
+from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -27,7 +26,7 @@ __all__ = ("ArtifactRow",)
 
 
 def _get_artifact_revision_join_cond():
-    from ..artifact_revision import ArtifactRevisionRow
+    from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 
     return foreign(ArtifactRevisionRow.artifact_id) == ArtifactRow.id
 

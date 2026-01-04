@@ -20,9 +20,8 @@ from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
 )
 from ai.backend.manager.scheduler.types import ScheduleType
-
-from ..results import ScheduledSessionData, ScheduleResult
-from ..types import SessionTransitionData
+from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData, ScheduleResult
+from ai.backend.manager.sokovan.scheduler.types import SessionTransitionData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

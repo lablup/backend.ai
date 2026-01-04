@@ -30,13 +30,13 @@ from ai.backend.appproxy.common.utils import (
     pydantic_api_handler,
     pydantic_api_response_handler,
 )
+from ai.backend.appproxy.coordinator.models import Token, Worker, WorkerAppFilter, WorkerStatus
+from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
+from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.common.events.dispatcher import EventHandler
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 
-from ..models import Token, Worker, WorkerAppFilter, WorkerStatus
-from ..models.utils import execute_with_txn_retry
-from ..types import RootContext
 from .types import CircuitListResponseModel, SlotModel, StubResponseModel
 from .utils import auth_required
 

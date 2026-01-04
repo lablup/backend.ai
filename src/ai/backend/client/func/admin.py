@@ -1,8 +1,9 @@
 from typing import Any, Mapping, Optional
 
-from ..exceptions import BackendAPIError
-from ..request import Request
-from ..session import api_session
+from ai.backend.client.exceptions import BackendAPIError
+from ai.backend.client.request import Request
+from ai.backend.client.session import api_session
+
 from .base import BaseFunction, api_function
 
 __all__ = ("Admin",)

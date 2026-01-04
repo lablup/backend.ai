@@ -38,15 +38,14 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.idle import IdleCheckerHost
-from ai.backend.manager.registry import AgentRegistry
-
-from ...models.endpoint import EndpointRow
-from ...models.routing import RouteStatus, RoutingRow
-from ...models.session import KernelLoadingStrategy, SessionRow
-from ...models.utils import (
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.routing import RouteStatus, RoutingRow
+from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
+from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
 )
+from ai.backend.manager.registry import AgentRegistry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

@@ -8,8 +8,8 @@ from typing import List
 
 import janus
 
-from .. import BaseRunner
-from ..base import promote_path
+from ai.backend.kernel import BaseRunner
+from ai.backend.kernel.base import promote_path
 
 log = logging.getLogger()
 

@@ -37,8 +37,8 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.list import
 from ai.backend.manager.services.artifact_registry.actions.reservoir.update import (
     UpdateReservoirRegistryAction,
 )
+from ai.backend.manager.types import OptionalState
 
-from ...types import OptionalState
 from .types import StrawberryGQLContext
 
 

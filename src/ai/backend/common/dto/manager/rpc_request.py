@@ -1,6 +1,6 @@
 from pydantic import Field
 
-from ...api_handlers import BaseRequestModel
+from ai.backend.common.api_handlers import BaseRequestModel
 
 
 class PurgeImagesReq(BaseRequestModel):

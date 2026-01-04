@@ -12,9 +12,9 @@ if TYPE_CHECKING:
 
 from ai.backend.common import msgpack
 from ai.backend.common.types import VFolderMount
+from ai.backend.manager.errors.storage import DotfileVFolderPathConflict
+from ai.backend.manager.types import UserScope
 
-from ..errors.storage import DotfileVFolderPathConflict
-from ..types import UserScope
 from .domain import query_domain_dotfiles
 from .group import query_group_dotfiles
 from .keypair import keypairs

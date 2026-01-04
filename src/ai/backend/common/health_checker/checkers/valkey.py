@@ -4,8 +4,14 @@ import asyncio
 from datetime import UTC, datetime
 from typing import Protocol, runtime_checkable
 
-from ..abc import StaticServiceHealthChecker
-from ..types import REDIS, ComponentHealthStatus, ComponentId, ServiceGroup, ServiceHealth
+from ai.backend.common.health_checker.abc import StaticServiceHealthChecker
+from ai.backend.common.health_checker.types import (
+    REDIS,
+    ComponentHealthStatus,
+    ComponentId,
+    ServiceGroup,
+    ServiceHealth,
+)
 
 
 @runtime_checkable

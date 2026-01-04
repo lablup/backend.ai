@@ -14,13 +14,13 @@ import jwt
 from yarl import URL
 
 from ai.backend.logging import BraceStyleAdapter
-
-from ...errors import (
+from ai.backend.storage.errors import (
     ExternalStorageServiceError,
     QuotaScopeAlreadyExists,
     VolumeNotInitializedError,
 )
-from ...types import CapacityUsage
+from ai.backend.storage.types import CapacityUsage
+
 from .config import APIVersion
 from .exceptions import (
     VASTAPIError,

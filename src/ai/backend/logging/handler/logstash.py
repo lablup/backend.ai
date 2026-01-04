@@ -10,7 +10,7 @@ from typing import override
 
 import zmq
 
-from ..exceptions import ConfigurationError
+from ai.backend.logging.exceptions import ConfigurationError
 
 
 class LogstashHandler(logging.Handler):

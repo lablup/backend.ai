@@ -14,7 +14,7 @@ from typing import Optional, Self
 from click import echo, style
 from tqdm import tqdm
 
-from ..exceptions import BackendAPIError
+from ai.backend.client.exceptions import BackendAPIError
 
 __all__ = (
     "PrintStatus",

@@ -48,10 +48,9 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.models.hasher.types import PasswordInfo
-
-from ..errors.api import InvalidAPIParameters
-from ..errors.resource import DataTransformationFailed
 
 if TYPE_CHECKING:
     from sqlalchemy.engine.interfaces import Dialect

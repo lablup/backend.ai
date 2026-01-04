@@ -4,8 +4,8 @@ from decimal import Decimal
 from typing import override
 
 from ai.backend.common.types import AccessKey, ResourceSlot
+from ai.backend.manager.sokovan.scheduler.types import SessionWorkload, SystemSnapshot
 
-from ...types import SessionWorkload, SystemSnapshot
 from .sequencer import WorkloadSequencer
 
 

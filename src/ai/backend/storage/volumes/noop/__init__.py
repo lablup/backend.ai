@@ -7,8 +7,7 @@ from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE, NOOP_STORAGE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
-
-from ...types import (
+from ai.backend.storage.types import (
     CapacityUsage,
     DirEntry,
     DirEntryType,
@@ -20,7 +19,7 @@ from ...types import (
     VFolderID,
     VolumeInfo,
 )
-from ..abc import AbstractFSOpModel, AbstractQuotaModel, AbstractVolume
+from ai.backend.storage.volumes.abc import AbstractFSOpModel, AbstractQuotaModel, AbstractVolume
 
 
 async def _return_empty_dir_entry() -> AsyncIterator[DirEntry]:

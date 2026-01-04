@@ -6,7 +6,8 @@ import threading
 
 import janus
 
-from ... import BaseRunner
+from ai.backend.kernel import BaseRunner
+
 from .inproc import PollyInprocRunner
 
 log = logging.getLogger()

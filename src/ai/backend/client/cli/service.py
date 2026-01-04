@@ -12,14 +12,14 @@ from ai.backend.client.cli.session.execute import (
     prepare_resource_arg,
 )
 from ai.backend.client.compat import asyncio_run
+from ai.backend.client.exceptions import BackendError
+from ai.backend.client.output.fields import routing_fields, service_fields
+from ai.backend.client.output.types import FieldSpec
 from ai.backend.client.session import AsyncSession, Session
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
-from ..exceptions import BackendError
-from ..output.fields import routing_fields, service_fields
-from ..output.types import FieldSpec
 from .extensions import pass_ctx_obj
 from .pretty import ProgressBarWithSpinner, print_done, print_fail, print_warn
 from .types import CLIContext

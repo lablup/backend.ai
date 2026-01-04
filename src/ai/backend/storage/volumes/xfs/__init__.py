@@ -21,22 +21,20 @@ from ai.backend.common.exception import InvalidConfigError
 from ai.backend.common.lock import FileLock
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-
-from ...errors import (
+from ai.backend.storage.errors import (
     InvalidQuotaFormatError,
     InvalidQuotaScopeError,
     QuotaDirectoryNotEmptyError,
     QuotaTreeNotFoundError,
 )
-from ...subproc import run
-from ...types import (
+from ai.backend.storage.subproc import run
+from ai.backend.storage.types import (
     QuotaConfig,
     QuotaUsage,
 )
-from ...volumes.abc import CAP_QUOTA, CAP_VFOLDER
-from ...watcher import WatcherClient
-from ..abc import AbstractQuotaModel
-from ..vfs import BaseQuotaModel, BaseVolume
+from ai.backend.storage.volumes.abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
+from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
+from ai.backend.storage.watcher import WatcherClient
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

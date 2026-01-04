@@ -4,6 +4,7 @@ from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from tests.unit.manager.services.utils import ScenarioBase
 
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
@@ -27,8 +28,6 @@ from ai.backend.manager.services.model_serving.processors.auto_scaling import (
     ModelServingAutoScalingProcessors,
 )
 from ai.backend.manager.types import OptionalState, TriState
-
-from ...utils import ScenarioBase
 
 
 @pytest.fixture

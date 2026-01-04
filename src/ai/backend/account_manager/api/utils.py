@@ -16,9 +16,8 @@ from aiohttp import web, web_response
 from aiohttp.typedefs import Handler
 from pydantic import BaseModel, ConfigDict, ValidationError
 
+from ai.backend.account_manager.exceptions import AuthorizationFailed, InvalidAPIParameters
 from ai.backend.logging import BraceStyleAdapter
-
-from ..exceptions import AuthorizationFailed, InvalidAPIParameters
 
 
 def auth_required(handler):

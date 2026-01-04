@@ -33,6 +33,9 @@ from pydantic import (
     model_validator,
 )
 
+from ai.backend.agent.affinity_map import AffinityPolicy
+from ai.backend.agent.stats import StatModes
+from ai.backend.agent.types import AgentBackend
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.configs.redis import RedisConfig
@@ -54,10 +57,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
-
-from ..affinity_map import AffinityPolicy
-from ..stats import StatModes
-from ..types import AgentBackend
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

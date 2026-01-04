@@ -27,26 +27,26 @@ from ai.backend.manager.bgtask.tasks.rescan_gpu_alloc_maps import RescanGPUAlloc
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.data.agent.types import AgentData
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
-
-from ...models.agent import (
+from ai.backend.manager.models.agent import (
     ADMIN_PERMISSIONS,
     AgentRow,
     AgentStatus,
     agents,
     get_permission_ctx,
 )
-from ...models.group import AssocGroupUserRow
-from ...models.kernel import KernelRow
-from ...models.keypair import keypairs
-from ...models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ...models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
-from ...models.rbac import (
+from ai.backend.manager.models.group import AssocGroupUserRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.rbac import (
     ScopeType,
 )
-from ...models.rbac.context import ClientContext
-from ...models.rbac.permission_defs import AgentPermission
-from ...models.user import UserRole, users
+from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.rbac.permission_defs import AgentPermission
+from ai.backend.manager.models.user import UserRole, users
+from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
+
 from .base import (
     FilterExprArg,
     Item,
@@ -653,7 +653,7 @@ async def _append_sgroup_from_clause(
     domain_name: str | None,
     scaling_group: str | None = None,
 ) -> sa.sql.Select:
-    from ...models.scaling_group import query_allowed_sgroups
+    from ai.backend.manager.models.scaling_group import query_allowed_sgroups
 
     if scaling_group is not None:
         query = query.where(AgentRow.scaling_group == scaling_group)

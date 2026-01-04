@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import Enum
 from typing import TextIO
 
-from ..base import (
+from ai.backend.common.dependencies.base import (
     DependencyComposer,
     DependencyProvider,
     DependencyStack,

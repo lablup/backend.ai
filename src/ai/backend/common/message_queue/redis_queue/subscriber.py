@@ -8,11 +8,10 @@ from typing import AsyncGenerator, Optional, Self, override
 import glide
 
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
+from ai.backend.common.message_queue.abc import AbstractSubscriber
+from ai.backend.common.message_queue.types import BroadcastMessage
 from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
-
-from ..abc import AbstractSubscriber
-from ..types import BroadcastMessage
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

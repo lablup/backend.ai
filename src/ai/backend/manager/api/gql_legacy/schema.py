@@ -62,9 +62,9 @@ set_input_object_type_default_value(Undefined)
 
 from ai.backend.common.types import QuotaScopeID, SessionId
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
+from ai.backend.manager.models.rbac import ContainerRegistryScope
 from ai.backend.manager.models.session import SessionRow
 
-from ...models.rbac import ContainerRegistryScope
 from .container_registry import (
     ContainerRegistry,
     CreateContainerRegistry,
@@ -88,41 +88,43 @@ if TYPE_CHECKING:
         SlotName,
         SlotTypes,
     )
+    from ai.backend.manager.api.api.manager import ManagerStatus
+    from ai.backend.manager.api.idle import IdleCheckerHost
+    from ai.backend.manager.api.models.utils import ExtendedAsyncSAEngine
+    from ai.backend.manager.api.registry import AgentRegistry
+    from ai.backend.manager.api.repositories.agent.repository import AgentRepository
+    from ai.backend.manager.api.repositories.scheduler.repository import SchedulerRepository
+    from ai.backend.manager.api.repositories.user.repository import UserRepository
+    from ai.backend.manager.models.storage import StorageSessionManager
 
-    from ...models.storage import StorageSessionManager
-    from ..api.manager import ManagerStatus
-    from ..idle import IdleCheckerHost
-    from ..models.utils import ExtendedAsyncSAEngine
-    from ..registry import AgentRegistry
-    from ..repositories.agent.repository import AgentRepository
-    from ..repositories.scheduler.repository import SchedulerRepository
-    from ..repositories.user.repository import UserRepository
-
-from ...data.image.types import ImageStatus
-from ...errors.api import InvalidAPIParameters
-from ...errors.auth import InsufficientPrivilege
-from ...errors.common import ObjectNotFound
-from ...errors.image import ImageNotFound
-from ...errors.kernel import TooManyKernelsFound
-from ...models.image.row import (
+from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.kernel import TooManyKernelsFound
+from ai.backend.manager.models.image.row import (
     ImageLoadFilter,
     PublicImageLoadFilter,
 )
-from ...models.rbac import ProjectScope, ScopeType, SystemScope
-from ...models.rbac.permission_defs import (
+from ai.backend.manager.models.rbac import ProjectScope, ScopeType, SystemScope
+from ai.backend.manager.models.rbac.permission_defs import (
     AgentPermission,
     ComputeSessionPermission,
     DomainPermission,
     ImagePermission,
     ProjectPermission,
 )
-from ...models.rbac.permission_defs import VFolderPermission as VFolderRBACPermission
-from ...models.scaling_group.row import (
+from ai.backend.manager.models.rbac.permission_defs import (
+    VFolderPermission as VFolderRBACPermission,
+)
+from ai.backend.manager.models.scaling_group.row import (
     ScalingGroupRow,
     and_names,
     query_allowed_sgroups,
 )
-from ...models.vfolder import ensure_quota_scope_accessible_by_user
+from ai.backend.manager.models.vfolder import ensure_quota_scope_accessible_by_user
+
 from .acl import PredefinedAtomicPermission
 from .agent import (
     Agent,

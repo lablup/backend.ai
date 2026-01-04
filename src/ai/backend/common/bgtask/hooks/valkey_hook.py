@@ -3,7 +3,11 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
-from ...clients.valkey_client.valkey_bgtask.client import TaskSetKey, ValkeyBgtaskClient
+from ai.backend.common.clients.valkey_client.valkey_bgtask.client import (
+    TaskSetKey,
+    ValkeyBgtaskClient,
+)
+
 from .base import AbstractTaskHook, TaskContext
 
 

@@ -21,6 +21,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.errors.image import (
     ContainerRegistryWebhookAuthorizationFailed,
+    HarborWebhookContainerRegistryRowNotFound,
 )
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
@@ -33,8 +34,6 @@ from ai.backend.manager.services.container_registry.actions.modify_container_reg
     ModifyContainerRegistryAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
-
-from ..errors.image import HarborWebhookContainerRegistryRowNotFound
 
 if TYPE_CHECKING:
     from .context import RootContext

@@ -4,8 +4,8 @@ from datetime import datetime
 import click
 
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.session import Session
 
-from ..session import Session
 from .pretty import print_error
 
 

@@ -10,8 +10,8 @@ from aiotools import apartial
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.errors.api import RateLimitExceeded
 
-from ..errors.api import RateLimitExceeded
 from .context import RootContext
 from .types import CORSOptions, WebMiddleware, WebRequestHandler
 

@@ -43,9 +43,8 @@ from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
 )
-
-from ..results import ScheduledSessionData, ScheduleResult
-from ..types import (
+from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData, ScheduleResult
+from ai.backend.manager.sokovan.scheduler.types import (
     ImageConfigData,
     KernelBindingData,
     NetworkSetup,

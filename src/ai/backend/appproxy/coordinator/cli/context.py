@@ -6,10 +6,9 @@ from typing import TYPE_CHECKING, Any, Optional, Self
 import click
 
 if TYPE_CHECKING:
+    from ai.backend.appproxy.coordinator.config import ServerConfig
     from ai.backend.logging import AbstractLogger
     from ai.backend.logging.types import LogLevel
-
-    from ..config import ServerConfig
 
 
 class CLIContext:
@@ -23,9 +22,8 @@ class CLIContext:
 
     @property
     def local_config(self) -> ServerConfig:
+        from ai.backend.appproxy.coordinator.config import load as load_config
         from ai.backend.common.config import find_config_file
-
-        from ..config import load as load_config
 
         # Lazy-load the configuration only when requested.
         if self.config_path is None:

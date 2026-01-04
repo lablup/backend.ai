@@ -2,10 +2,9 @@ import asyncio
 import logging
 from collections.abc import Sequence
 
+from ai.backend.common.observer.types import AbstractObserver
+from ai.backend.common.resource.types import AbstractResource
 from ai.backend.logging.utils import BraceStyleAdapter
-
-from ..observer.types import AbstractObserver
-from ..resource.types import AbstractResource
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

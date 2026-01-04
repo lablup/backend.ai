@@ -8,8 +8,7 @@ from sqlalchemy.orm import foreign, relationship
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
-
-from ..base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     IDColumn,

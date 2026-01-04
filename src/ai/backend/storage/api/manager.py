@@ -65,14 +65,13 @@ from ai.backend.common.types import (
     VolumeMountableNodeType,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage import __version__
+from ai.backend.storage.bgtask.tasks.clone import VFolderCloneManifest
+from ai.backend.storage.bgtask.tasks.delete import VFolderDeleteManifest
+from ai.backend.storage.bgtask.tasks.delete_files import FileDeleteManifest
 from ai.backend.storage.bgtask.types import StorageBgtaskName
-
-from .. import __version__
-from ..bgtask.tasks.clone import VFolderCloneManifest
-from ..bgtask.tasks.delete import VFolderDeleteManifest
-from ..bgtask.tasks.delete_files import FileDeleteManifest
-from ..dto.context import StorageRootCtx
-from ..errors import (
+from ai.backend.storage.dto.context import StorageRootCtx
+from ai.backend.storage.errors import (
     ExternalStorageServiceError,
     InvalidAPIParameters,
     InvalidQuotaConfig,
@@ -83,9 +82,10 @@ from ..errors import (
     StorageProxyError,
     VFolderNotFoundError,
 )
-from ..types import QuotaConfig, VFolderID
-from ..utils import check_params, log_manager_api_entry
-from ..watcher import ChownTask, MountTask, UmountTask
+from ai.backend.storage.types import QuotaConfig, VFolderID
+from ai.backend.storage.utils import check_params, log_manager_api_entry
+from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
+
 from .v1.registries.huggingface import create_app as create_huggingface_registries_app
 from .v1.registries.reservoir import create_app as create_reservoir_registries_app
 from .v1.storages.object_storage import create_app as create_object_storages_app
@@ -93,8 +93,8 @@ from .v1.storages.vfs_storage import create_app as create_vfs_storages_app
 from .vfolder.handler import VFolderHandler
 
 if TYPE_CHECKING:
-    from ..context import RootContext, ServiceContext
-    from ..volumes.abc import AbstractVolume
+    from ai.backend.storage.context import RootContext, ServiceContext
+    from ai.backend.storage.volumes.abc import AbstractVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

@@ -11,10 +11,10 @@ import click
 from aiohttp import web
 
 from ai.backend.cli.main import main
+from ai.backend.client.exceptions import BackendAPIError, BackendClientError
+from ai.backend.client.request import Request
+from ai.backend.client.session import AsyncSession
 
-from ..exceptions import BackendAPIError, BackendClientError
-from ..request import Request
-from ..session import AsyncSession
 from .pretty import print_error, print_fail, print_info
 
 

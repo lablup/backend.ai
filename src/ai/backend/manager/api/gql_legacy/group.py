@@ -25,7 +25,19 @@ from ai.backend.common.exception import (
 )
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.models.group import (
+    AssocGroupUserRow,
+    GroupRow,
+    ProjectType,
+    association_groups_users,
+    get_permission_ctx,
+    groups,
+)
+from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from ai.backend.manager.models.rbac import ProjectScope
+from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.rbac.permission_defs import ProjectPermission
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -41,18 +53,6 @@ from ai.backend.manager.services.group.actions.purge_group import (
 )
 from ai.backend.manager.types import OptionalState, TriState
 
-from ...models.group import (
-    AssocGroupUserRow,
-    GroupRow,
-    ProjectType,
-    association_groups_users,
-    get_permission_ctx,
-    groups,
-)
-from ...models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ...models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
-from ...models.rbac.context import ClientContext
-from ...models.rbac.permission_defs import ProjectPermission
 from .base import (
     BigInt,
     FilterExprArg,
@@ -71,7 +71,8 @@ from .gql_relay import (
 from .user import UserConnection, UserNode
 
 if TYPE_CHECKING:
-    from ...models.rbac import ContainerRegistryScope, ScopeType
+    from ai.backend.manager.models.rbac import ContainerRegistryScope, ScopeType
+
     from .scaling_group import ScalingGroup
     from .schema import GraphQueryContext
 
@@ -181,7 +182,7 @@ class GroupNode(graphene.ObjectType):
         before: str | None = None,
         last: int | None = None,
     ) -> ConnectionResolverResult[Self]:
-        from ...models.user import UserRow
+        from ai.backend.manager.models.user import UserRow
 
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (

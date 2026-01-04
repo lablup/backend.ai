@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 from typing import List
 
-from ... import BaseRunner
+from ai.backend.kernel import BaseRunner
 
 log = logging.getLogger()
 

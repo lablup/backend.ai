@@ -51,23 +51,21 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
 )
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
-
-from ...defs import (
+from ai.backend.manager.defs import (
     RESERVED_VFOLDER_PATTERNS,
     RESERVED_VFOLDERS,
     VFOLDER_DSTPATHS_MAP,
 )
-from ...errors.api import InvalidAPIParameters
-from ...errors.common import ObjectNotFound
-from ...errors.storage import (
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.storage import (
     InsufficientStoragePermission,
     VFolderGone,
     VFolderNotFound,
     VFolderOperationFailed,
     VFolderPermissionError,
 )
-from ...types import UserScope
-from ..base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     EnumValueType,
@@ -76,8 +74,8 @@ from ..base import (
     StrEnumType,
     metadata,
 )
-from ..group import AssocGroupUserRow, GroupRow
-from ..rbac import (
+from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -86,26 +84,31 @@ from ..rbac import (
     StorageHost,
     get_predefined_roles_in_scope,
 )
-from ..rbac import (
+from ai.backend.manager.models.rbac import (
     UserScope as UserRBACScope,
 )
-from ..rbac.context import ClientContext
-from ..rbac.exceptions import NotEnoughPermission
-from ..rbac.permission_defs import StorageHostPermission
-from ..rbac.permission_defs import VFolderPermission as VFolderRBACPermission
-from ..session import DEAD_SESSION_STATUSES, SessionRow
-from ..storage import PermissionContext as StorageHostPermissionContext
-from ..storage import PermissionContextBuilder as StorageHostPermissionContextBuilder
-from ..user import UserRole, UserRow
-from ..utils import (
+from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.rbac.exceptions import NotEnoughPermission
+from ai.backend.manager.models.rbac.permission_defs import StorageHostPermission
+from ai.backend.manager.models.rbac.permission_defs import (
+    VFolderPermission as VFolderRBACPermission,
+)
+from ai.backend.manager.models.session import DEAD_SESSION_STATUSES, SessionRow
+from ai.backend.manager.models.storage import PermissionContext as StorageHostPermissionContext
+from ai.backend.manager.models.storage import (
+    PermissionContextBuilder as StorageHostPermissionContextBuilder,
+)
+from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
     execute_with_txn_retry,
     sql_json_merge,
 )
+from ai.backend.manager.types import UserScope
 
 if TYPE_CHECKING:
-    from ..storage import StorageSessionManager
+    from ai.backend.manager.models.storage import StorageSessionManager
 
 __all__: Sequence[str] = (
     "DEAD_VFOLDER_STATUSES",
@@ -704,7 +707,7 @@ async def get_allowed_vfolder_hosts_by_group(
     If `group_id` is not None, `allowed_vfolder_hosts` from the group is also merged.
     If the requester is a domain admin, gather all `allowed_vfolder_hosts` of the domain groups.
     """
-    from .. import domains, groups
+    from ai.backend.manager.models import domains, groups
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
@@ -738,7 +741,7 @@ async def get_allowed_vfolder_hosts_by_user(
 
     All available `allowed_vfolder_hosts` of groups which requester associated will be merged.
     """
-    from .. import association_groups_users, domains, groups
+    from ai.backend.manager.models import association_groups_users, domains, groups
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
@@ -1149,7 +1152,7 @@ async def ensure_host_permission_allowed(
     domain_name: str,
     group_id: Optional[uuid.UUID] = None,
 ) -> None:
-    from ..storage import StorageSessionManager
+    from ai.backend.manager.models.storage import StorageSessionManager
 
     if StorageSessionManager.is_noop_host(folder_host):
         return
@@ -1542,7 +1545,7 @@ class VFolderPermissionContextBuilder(
         self,
         ctx: ClientContext,
     ) -> VFolderPermissionContext:
-        from ..domain import DomainRow
+        from ai.backend.manager.models.domain import DomainRow
 
         perm_ctx = VFolderPermissionContext()
         _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))

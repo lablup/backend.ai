@@ -3,9 +3,14 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from ai.backend.common.etcd import AsyncEtcd
-
-from ..abc import StaticServiceHealthChecker
-from ..types import CID_ETCD, ETCD, ComponentHealthStatus, ServiceGroup, ServiceHealth
+from ai.backend.common.health_checker.abc import StaticServiceHealthChecker
+from ai.backend.common.health_checker.types import (
+    CID_ETCD,
+    ETCD,
+    ComponentHealthStatus,
+    ServiceGroup,
+    ServiceHealth,
+)
 
 
 class EtcdHealthChecker(StaticServiceHealthChecker):

@@ -56,6 +56,16 @@ from ai.backend.manager.data.model_serving.types import (
     ServiceConfig,
     ServiceInfo,
 )
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.auth import InvalidAuthParameters
+from ai.backend.manager.errors.storage import VFolderNotFound
+from ai.backend.manager.models import (
+    ModelServiceHelper,
+    UserRole,
+    UserRow,
+    query_accessible_vfolders,
+    vfolders,
+)
 from ai.backend.manager.services.deployment.actions.create_legacy_deployment import (
     CreateLegacyDeploymentAction,
     CreateLegacyDeploymentActionResult,
@@ -91,18 +101,8 @@ from ai.backend.manager.services.model_serving.actions.scale_service_replicas im
     ScaleServiceReplicasAction,
 )
 from ai.backend.manager.services.model_serving.actions.update_route import UpdateRouteAction
+from ai.backend.manager.types import MountOptionModel, UserScope
 
-from ..errors.api import InvalidAPIParameters
-from ..errors.auth import InvalidAuthParameters
-from ..errors.storage import VFolderNotFound
-from ..models import (
-    ModelServiceHelper,
-    UserRole,
-    UserRow,
-    query_accessible_vfolders,
-    vfolders,
-)
-from ..types import MountOptionModel, UserScope
 from .auth import auth_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo

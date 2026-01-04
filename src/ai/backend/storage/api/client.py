@@ -36,15 +36,14 @@ from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.types import BinarySize, VFolderID
 from ai.backend.logging import BraceStyleAdapter
-
-from .. import __version__
-from ..errors import InvalidAPIParameters
-from ..types import SENTINEL
-from ..utils import CheckParamSource, check_params
+from ai.backend.storage import __version__
+from ai.backend.storage.errors import InvalidAPIParameters
+from ai.backend.storage.types import SENTINEL
+from ai.backend.storage.utils import CheckParamSource, check_params
 
 if TYPE_CHECKING:
-    from ..context import RootContext
-    from ..volumes.abc import AbstractVolume
+    from ai.backend.storage.context import RootContext
+    from ai.backend.storage.volumes.abc import AbstractVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

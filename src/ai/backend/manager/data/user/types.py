@@ -10,6 +10,7 @@ from uuid import UUID
 from sqlalchemy.engine import Row
 
 from ai.backend.common.types import AccessKey, CIStrEnum
+from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import (
     EntityType,
@@ -17,8 +18,6 @@ from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.errors.resource import DataTransformationFailed
-
-from ..keypair.types import KeyPairData
 
 
 class UserStatus(enum.StrEnum):

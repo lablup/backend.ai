@@ -17,8 +17,8 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 from ai.backend.common.json import dump_json
+from ai.backend.manager.exceptions import AgentError
 
-from ..exceptions import AgentError
 from .common import ObjectNotFound
 
 if TYPE_CHECKING:

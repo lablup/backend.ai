@@ -1,8 +1,9 @@
 import sqlalchemy as sa
 from sqlalchemy.orm import relationship
 
-from ..types import UserRole, UserStatus
-from ..utils import verify_password
+from ai.backend.account_manager.types import UserRole, UserStatus
+from ai.backend.account_manager.utils import verify_password
+
 from .base import GUID, Base, IDColumn, PasswordColumn, StrEnumType
 
 __all__: tuple[str, ...] = ("UserProfileRow",)

@@ -5,8 +5,8 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import AsyncIterator, Optional
 
-from ..task_result import TaskResult
-from ..types import BgtaskNameBase, TaskID
+from ai.backend.common.bgtask.task_result import TaskResult
+from ai.backend.common.bgtask.types import BgtaskNameBase, TaskID
 
 
 @dataclass

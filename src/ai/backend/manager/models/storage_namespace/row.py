@@ -7,8 +7,7 @@ from sqlalchemy.orm import foreign, relationship
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
-
-from ..base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     IDColumn,
@@ -20,7 +19,7 @@ __all__ = ("StorageNamespaceRow",)
 
 
 def _get_storage_namespace_join_cond():
-    from ..object_storage import ObjectStorageRow
+    from ai.backend.manager.models.object_storage import ObjectStorageRow
 
     return foreign(StorageNamespaceRow.storage_id) == ObjectStorageRow.id
 

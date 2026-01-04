@@ -599,7 +599,8 @@ async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def health_check_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from ..common.events import DoHealthCheckEvent
+    from ai.backend.appproxy.common.events import DoHealthCheckEvent
+
     from .health_checker import HealthCheckEngine
 
     health_engine = HealthCheckEngine(

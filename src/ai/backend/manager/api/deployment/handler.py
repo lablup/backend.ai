@@ -38,6 +38,8 @@ from ai.backend.common.dto.manager.deployment import (
     UpdateRouteTrafficStatusRequest,
     UpdateRouteTrafficStatusResponse,
 )
+from ai.backend.manager.api.auth import auth_required_for_method
+from ai.backend.manager.api.types import CORSOptions, WebMiddleware
 from ai.backend.manager.data.deployment.types import RouteTrafficStatus as ManagerRouteTrafficStatus
 from ai.backend.manager.dto.context import ProcessorsCtx, UserContext
 from ai.backend.manager.models.endpoint import EndpointRow
@@ -82,8 +84,6 @@ from ai.backend.manager.services.deployment.processors import DeploymentProcesso
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.types import OptionalState
 
-from ..auth import auth_required_for_method
-from ..types import CORSOptions, WebMiddleware
 from .adapter import (
     CreateDeploymentAdapter,
     CreateRevisionAdapter,

@@ -22,8 +22,7 @@ from ai.backend.manager.errors.container_registry import (
     InvalidContainerRegistryProject,
     InvalidContainerRegistryURL,
 )
-
-from ..base import (
+from ai.backend.manager.models.base import (
     Base,
     IDColumn,
     StrEnumType,

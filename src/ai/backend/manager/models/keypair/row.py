@@ -20,14 +20,13 @@ from sqlalchemy.sql.expression import false
 from ai.backend.common import msgpack
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
-from ai.backend.manager.models.session import SessionRow
-
-from ...defs import RESERVED_DOTFILES
-from ..base import (
+from ai.backend.manager.defs import RESERVED_DOTFILES
+from ai.backend.manager.models.base import (
     Base,
     ForeignKeyIDColumn,
     mapper_registry,
 )
+from ai.backend.manager.models.session import SessionRow
 
 __all__: Sequence[str] = (
     "MAXIMUM_DOTFILE_SIZE",

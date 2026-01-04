@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator
 
-from ..types import MessageId, MQMessage
+from ai.backend.common.message_queue.types import MessageId, MQMessage
 
 
 class AbstractConsumer(ABC):

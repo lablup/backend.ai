@@ -1,12 +1,13 @@
 from typing import Any, Dict, Sequence
 
-from ...cli.types import Undefined, undefined
-from ..output.fields import keypair_fields
-from ..output.types import FieldSpec, PaginatedResult
-from ..pagination import fetch_paginated_result
-from ..session import api_session
-from ..types import set_if_set
-from ..utils import dedent as _d
+from ai.backend.cli.types import Undefined, undefined
+from ai.backend.client.output.fields import keypair_fields
+from ai.backend.client.output.types import FieldSpec, PaginatedResult
+from ai.backend.client.pagination import fetch_paginated_result
+from ai.backend.client.session import api_session
+from ai.backend.client.types import set_if_set
+from ai.backend.client.utils import dedent as _d
+
 from .base import BaseFunction, api_function
 
 __all__ = ("KeyPair",)

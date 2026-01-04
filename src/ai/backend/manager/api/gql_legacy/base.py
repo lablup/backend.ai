@@ -44,12 +44,16 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import DeclarativeMeta
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import GenericForbidden, ObjectNotFound
+from ai.backend.manager.models.minilang.ordering import (
+    OrderDirection,
+    OrderingItem,
+    QueryOrderParser,
+)
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser, WhereClauseType
+from ai.backend.manager.models.utils import execute_with_retry
 
-from ...errors.api import InvalidAPIParameters
-from ...errors.common import GenericForbidden, ObjectNotFound
-from ...models.minilang.ordering import OrderDirection, OrderingItem, QueryOrderParser
-from ...models.minilang.queryfilter import QueryFilterParser, WhereClauseType
-from ...models.utils import execute_with_retry
 from .gql_relay import (
     AsyncListConnectionField,
     AsyncNode,
@@ -60,7 +64,8 @@ if TYPE_CHECKING:
     from sqlalchemy.orm.attributes import InstrumentedAttribute
     from sqlalchemy.sql.selectable import ScalarSelect
 
-    from ...models.user import UserRole
+    from ai.backend.manager.models.user import UserRole
+
     from .schema import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -528,7 +533,7 @@ def privileged_query(required_role: UserRole):
             *args,
             **kwargs,
         ) -> Any:
-            from ...models.user import UserRole
+            from ai.backend.manager.models.user import UserRole
 
             ctx: GraphQueryContext = info.context
             if ctx.user["role"] != UserRole.SUPERADMIN:
@@ -564,7 +569,7 @@ def scoped_query(
             *args,
             **kwargs,
         ) -> Any:
-            from ...models.user import UserRole
+            from ai.backend.manager.models.user import UserRole
 
             ctx: GraphQueryContext = info.context
             client_role = ctx.user["role"]
@@ -622,8 +627,8 @@ def privileged_mutation(required_role, target_func=None):
     def wrap(func):
         @functools.wraps(func)
         async def wrapped(cls, root, info: graphene.ResolveInfo, *args, **kwargs) -> Any:
-            from ...models.group import groups  # , association_groups_users
-            from ...models.user import UserRole
+            from ai.backend.manager.models.group import groups  # , association_groups_users
+            from ai.backend.manager.models.user import UserRole
 
             ctx: GraphQueryContext = info.context
             permitted = False

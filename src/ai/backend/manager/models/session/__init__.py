@@ -1,7 +1,7 @@
 from ai.backend.common.types import SessionId, SessionResult, SessionTypes
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.models.types import QueryCondition, QueryOption
 
-from ..types import QueryCondition, QueryOption
 from .row import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE,

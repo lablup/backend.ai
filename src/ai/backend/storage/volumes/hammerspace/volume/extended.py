@@ -19,24 +19,28 @@ from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.event_types.volume.broadcast import DoVolumeMountEvent
 from ai.backend.common.types import QuotaConfig, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.watcher import WatcherClient
-
-from ....types import CapacityUsage, QuotaUsage
-from ...abc import (
+from ai.backend.storage.types import CapacityUsage, QuotaUsage
+from ai.backend.storage.volumes.abc import (
     CAP_QUOTA,
     CAP_VFOLDER,
     AbstractQuotaModel,
 )
-from ...vfs import BaseQuotaModel
-from ..client import HammerspaceAPIClient
-from ..exception import (
+from ai.backend.storage.volumes.hammerspace.client import HammerspaceAPIClient
+from ai.backend.storage.volumes.hammerspace.exception import (
     AuthenticationError,
     ConfigurationError,
 )
-from ..request import ClusterMetricParams, CreateShareParams, GetShareParams
-from ..schema.metric import ValidClusterMetricRow
-from ..schema.share import Share, SimpleShare
-from ..types import APIConnectionInfo, SSLConfig
+from ai.backend.storage.volumes.hammerspace.request import (
+    ClusterMetricParams,
+    CreateShareParams,
+    GetShareParams,
+)
+from ai.backend.storage.volumes.hammerspace.schema.metric import ValidClusterMetricRow
+from ai.backend.storage.volumes.hammerspace.schema.share import Share, SimpleShare
+from ai.backend.storage.volumes.hammerspace.types import APIConnectionInfo, SSLConfig
+from ai.backend.storage.volumes.vfs import BaseQuotaModel
+from ai.backend.storage.watcher import WatcherClient
+
 from .base import BaseHammerspaceVolume
 
 METRIC_PRECEDING_DURATION = "1h"

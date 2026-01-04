@@ -6,7 +6,7 @@ which do not provide query/batch-mode code execution.
 import logging
 from typing import List
 
-from .. import BaseRunner
+from ai.backend.kernel import BaseRunner
 
 log = logging.getLogger()
 

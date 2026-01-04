@@ -8,14 +8,14 @@ import click
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.pretty import print_fail
+from ai.backend.client.cli.session.lifecycle import session as user_session
+from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.output.fields import session_fields, session_fields_v5
 from ai.backend.client.output.types import FieldSpec
 from ai.backend.client.session import Session
 
-from ..extensions import pass_ctx_obj
-from ..pretty import print_fail
-from ..session.lifecycle import session as user_session
-from ..types import CLIContext
 from . import admin
 
 SessionItem = Dict[str, Any]

@@ -4,13 +4,13 @@ import click
 
 from ai.backend.cli.params import BoolExprType, JSONParamType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.pretty import print_done
+from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.func.scaling_group import _default_detail_fields, _default_list_fields
 from ai.backend.client.output.fields import scaling_group_fields
 from ai.backend.client.session import Session
 
-from ..extensions import pass_ctx_obj
-from ..pretty import print_done
-from ..types import CLIContext
 from . import admin
 
 

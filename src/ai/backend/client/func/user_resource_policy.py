@@ -1,10 +1,11 @@
 from collections.abc import Sequence
 from typing import Optional
 
-from ..output.fields import user_resource_policy_fields
-from ..output.types import FieldSpec
-from ..session import api_session
-from ..utils import dedent as _d
+from ai.backend.client.output.fields import user_resource_policy_fields
+from ai.backend.client.output.types import FieldSpec
+from ai.backend.client.session import api_session
+from ai.backend.client.utils import dedent as _d
+
 from .base import BaseFunction, api_function
 
 _default_list_fields = (

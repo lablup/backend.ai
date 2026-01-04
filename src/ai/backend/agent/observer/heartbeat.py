@@ -11,7 +11,7 @@ from ai.backend.common.types import ContainerId, ContainerStatus, KernelContaine
 from ai.backend.logging.utils import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from ..agent import AbstractAgent
+    from ai.backend.agent.agent import AbstractAgent
 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

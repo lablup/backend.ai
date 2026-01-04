@@ -1,6 +1,8 @@
 import logging
 from typing import Iterable, List, Optional, Sequence, Set, Tuple
 
+from ai.backend.accelerator.rebellions.common.atom_api import ATOMAPI
+from ai.backend.accelerator.rebellions.common.plugin import AbstractATOMPlugin
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AcceleratorMetadata,
@@ -10,8 +12,6 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 
-from ..common.atom_api import ATOMAPI
-from ..common.plugin import AbstractATOMPlugin
 from .types import ATOMPlusDevice
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore

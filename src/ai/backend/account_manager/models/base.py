@@ -17,9 +17,8 @@ from sqlalchemy.engine.interfaces import Dialect
 from sqlalchemy.orm import registry
 from sqlalchemy.types import CHAR, VARCHAR, TypeDecorator
 
+from ai.backend.account_manager.utils import hash_password
 from ai.backend.logging import BraceStyleAdapter
-
-from ..utils import hash_password
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 

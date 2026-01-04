@@ -14,8 +14,7 @@ import aiotools
 from aiohttp import WSCloseCode, web
 
 from ai.backend.logging import BraceStyleAdapter
-
-from ..config_legacy import DEFAULT_CHUNK_SIZE
+from ai.backend.manager.config_legacy import DEFAULT_CHUNK_SIZE
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

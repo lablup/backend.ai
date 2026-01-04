@@ -8,9 +8,9 @@ from ai.backend.cli.types import ExitCode
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.exceptions import BackendAPIError
+from ai.backend.client.output.fields import network_fields
 from ai.backend.client.session import Session
 
-from ..output.fields import network_fields
 from .pretty import print_done
 
 _default_list_fields = (

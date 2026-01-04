@@ -30,10 +30,9 @@ from tenacity import (
 )
 from yarl import URL
 
+from ai.backend.account_manager.config import ServerConfig
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging import BraceStyleAdapter
-
-from ..config import ServerConfig
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 

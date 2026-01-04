@@ -28,24 +28,24 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.minilang import JSONFieldItem
-from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
-from ai.backend.manager.models.minilang.queryfilter import (
-    FieldSpecType,
-    QueryFilterParser,
-)
-
-from ...defs import DEFAULT_ROLE
-from ...models.kernel import (
+from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEFAULT_KERNEL_ORDERING,
     LIVE_STATUS,
     KernelRow,
     kernels,
 )
-from ...models.user import UserRole, users
+from ai.backend.manager.models.minilang import JSONFieldItem
+from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import (
+    FieldSpecType,
+    QueryFilterParser,
+)
+from ai.backend.manager.models.user import UserRole, users
+
 from .base import (
     BigInt,
     Item,

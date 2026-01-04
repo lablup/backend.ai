@@ -13,8 +13,8 @@ from ai.backend.common.events.event_types.model_serving.anycast import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.sokovan.scheduler.types import SessionTransitionData
 
-from ..types import SessionTransitionData
 from .base import AbstractSessionHook
 
 log = BraceStyleAdapter(logging.getLogger(__name__))

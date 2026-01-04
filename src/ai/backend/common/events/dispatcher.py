@@ -39,11 +39,11 @@ from ai.backend.common.message_queue.types import (
     MessagePayload,
     MQMessage,
 )
-from ai.backend.logging import BraceStyleAdapter
-
-from ..types import (
+from ai.backend.common.types import (
     AgentId,
 )
+from ai.backend.logging import BraceStyleAdapter
+
 from .reporter import AbstractEventReporter, CompleteEventReportArgs, PrepareEventReportArgs
 from .types import AbstractAnycastEvent, AbstractBroadcastEvent, AbstractEvent
 

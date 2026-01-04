@@ -54,6 +54,32 @@ from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_merge,
 )
+from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
+from ai.backend.manager.repositories.scheduler.types.base import SchedulingSpec
+from ai.backend.manager.repositories.scheduler.types.scaling_group import ScalingGroupMeta
+from ai.backend.manager.repositories.scheduler.types.scheduling import SchedulingData
+from ai.backend.manager.repositories.scheduler.types.session import (
+    KernelData,
+    KernelTerminationResult,
+    MarkTerminatingResult,
+    PendingSessionData,
+    PendingSessions,
+    SessionTerminationResult,
+    SweptSessionInfo,
+    TerminatingKernelData,
+    TerminatingKernelWithAgentData,
+    TerminatingSessionData,
+)
+from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    AllowedScalingGroup,
+    ContainerUserInfo,
+    ImageInfo,
+    ScalingGroupNetworkInfo,
+    SessionCreationContext,
+    SessionCreationSpec,
+    SessionEnqueueData,
+)
+from ai.backend.manager.repositories.scheduler.types.snapshot import ResourcePolicies, SnapshotData
 from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
 from ai.backend.manager.sokovan.scheduler.types import (
     AgentOccupancy,
@@ -78,32 +104,6 @@ from ai.backend.manager.sokovan.scheduler.types import (
     UserResourcePolicy,
 )
 
-from ..types.agent import AgentMeta
-from ..types.base import SchedulingSpec
-from ..types.scaling_group import ScalingGroupMeta
-from ..types.scheduling import SchedulingData
-from ..types.session import (
-    KernelData,
-    KernelTerminationResult,
-    MarkTerminatingResult,
-    PendingSessionData,
-    PendingSessions,
-    SessionTerminationResult,
-    SweptSessionInfo,
-    TerminatingKernelData,
-    TerminatingKernelWithAgentData,
-    TerminatingSessionData,
-)
-from ..types.session_creation import (
-    AllowedScalingGroup,
-    ContainerUserInfo,
-    ImageInfo,
-    ScalingGroupNetworkInfo,
-    SessionCreationContext,
-    SessionCreationSpec,
-    SessionEnqueueData,
-)
-from ..types.snapshot import ResourcePolicies, SnapshotData
 from .types import KeypairConcurrencyData, SessionRowCache
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

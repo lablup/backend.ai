@@ -3,8 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-
-from ..actions.invite import (
+from ai.backend.manager.services.vfolder.actions.invite import (
     AcceptInvitationAction,
     AcceptInvitationActionResult,
     InviteVFolderAction,
@@ -22,7 +21,7 @@ from ..actions.invite import (
     UpdateInvitedVFolderMountPermissionAction,
     UpdateInvitedVFolderMountPermissionActionResult,
 )
-from ..services.invite import VFolderInviteService
+from ai.backend.manager.services.vfolder.services.invite import VFolderInviteService
 
 
 class VFolderInviteProcessors(AbstractProcessorPackage):

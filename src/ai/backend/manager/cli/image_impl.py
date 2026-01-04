@@ -13,11 +13,11 @@ from ai.backend.common.docker import validate_image_labels
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import ImageAlias, ImageID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.models.image import ImageAliasRow, ImageIdentifier, ImageRow
+from ai.backend.manager.models.image import rescan_images as rescan_images_func
+from ai.backend.manager.models.utils import connect_database
 
-from ..data.image.types import ImageStatus
-from ..models.image import ImageAliasRow, ImageIdentifier, ImageRow
-from ..models.image import rescan_images as rescan_images_func
-from ..models.utils import connect_database
 from .context import CLIContext, redis_ctx
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

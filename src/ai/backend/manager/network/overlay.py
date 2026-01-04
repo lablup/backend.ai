@@ -9,7 +9,7 @@ import aiodocker
 import trafaret as t
 from aiodocker.exceptions import DockerError
 
-from ..plugin.network import AbstractNetworkManagerPlugin, NetworkInfo
+from ai.backend.manager.plugin.network import AbstractNetworkManagerPlugin, NetworkInfo
 
 plugin_config_iv = t.Dict({
     t.Key("mtu", default=1500): t.Null | t.ToInt,

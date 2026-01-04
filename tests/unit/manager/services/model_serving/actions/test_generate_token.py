@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from aioresponses import aioresponses
+from tests.unit.manager.services.utils import ScenarioBase
 
 from ai.backend.common.data.endpoint.types import EndpointStatus
 from ai.backend.manager.data.model_serving.types import EndpointTokenData, RequesterCtx
@@ -16,8 +17,6 @@ from ai.backend.manager.services.model_serving.actions.generate_token import (
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )
-
-from ...utils import ScenarioBase
 
 
 @pytest.fixture

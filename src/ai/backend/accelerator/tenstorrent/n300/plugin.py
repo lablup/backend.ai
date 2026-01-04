@@ -17,9 +17,9 @@ from typing import (
 import aiodocker
 from aiodocker import Docker
 
+from ai.backend.accelerator.tenstorrent import __version__
 from ai.backend.accelerator.tenstorrent.utils import resolve_pci_sysfs_path
 
-from .. import __version__
 from .types import TTn300Device
 
 try:

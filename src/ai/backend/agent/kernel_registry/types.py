@@ -5,12 +5,11 @@ from typing import TYPE_CHECKING, Self
 
 from pydantic import BaseModel, Field
 
+from ai.backend.agent.kernel import KernelOwnershipData
+from ai.backend.agent.proxy import DomainSocketPathPair
+from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AgentId, KernelId, ServicePort, SessionTypes
-
-from ..kernel import KernelOwnershipData
-from ..proxy import DomainSocketPathPair
-from ..resources import KernelResourceSpec
 
 if TYPE_CHECKING:
     from ai.backend.agent.docker.kernel import DockerKernel

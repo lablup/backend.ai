@@ -1,6 +1,7 @@
 from six.moves import builtins
 
-from ..types import MediaRecord
+from ai.backend.kernel.python.types import MediaRecord
+
 from .color import Colors
 from .encoding import encode_commands
 from .turtle import Turtle

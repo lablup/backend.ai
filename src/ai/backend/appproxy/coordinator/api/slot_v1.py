@@ -16,10 +16,10 @@ from ai.backend.appproxy.common.types import (
 from ai.backend.appproxy.common.utils import (
     pydantic_api_response_handler,
 )
+from ai.backend.appproxy.coordinator.models import Circuit
+from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.logging import BraceStyleAdapter
 
-from ..models import Circuit
-from ..types import RootContext
 from .utils import auth_required
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]

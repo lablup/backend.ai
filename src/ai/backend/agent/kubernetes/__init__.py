@@ -1,12 +1,12 @@
 from decimal import Decimal
 from typing import Any, Mapping, Type, override
 
+from ai.backend.agent.agent import AbstractAgent
+from ai.backend.agent.resources import AbstractComputePlugin
+from ai.backend.agent.types import AbstractAgentDiscovery
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.types import DeviceName, SlotName
 
-from ..agent import AbstractAgent
-from ..resources import AbstractComputePlugin
-from ..types import AbstractAgentDiscovery
 from .agent import KubernetesAgent
 from .kernel import prepare_krunner_env
 from .resources import load_resources, scan_available_resources

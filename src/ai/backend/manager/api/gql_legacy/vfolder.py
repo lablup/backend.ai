@@ -36,25 +36,26 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.user.types import UserRole
-from ai.backend.manager.errors.storage import QuotaScopeNotFoundError
-
-from ...errors.resource import DataTransformationFailed
-from ...errors.storage import (
+from ai.backend.manager.errors.resource import DataTransformationFailed
+from ai.backend.manager.errors.storage import (
     ModelCardParseError,
+    QuotaScopeNotFoundError,
     VFolderBadRequest,
     VFolderOperationFailed,
 )
-from ...models.group import GroupRow, ProjectType
-from ...models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ...models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
-from ...models.rbac import (
+from ai.backend.manager.models.group import GroupRow, ProjectType
+from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.rbac import (
     ScopeType,
     SystemScope,
 )
-from ...models.rbac.context import ClientContext
-from ...models.rbac.permission_defs import VFolderPermission as VFolderRBACPermission
-from ...models.user import UserRow
-from ...models.vfolder import (
+from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.rbac.permission_defs import (
+    VFolderPermission as VFolderRBACPermission,
+)
+from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.vfolder import (
     DEAD_VFOLDER_STATUSES,
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -993,8 +994,8 @@ class VirtualFolder(graphene.ObjectType):
         user_id: Optional[uuid.UUID] = None,
         filter: Optional[str] = None,
     ) -> int:
-        from ...models.group import groups
-        from ...models.user import users
+        from ai.backend.manager.models.group import groups
+        from ai.backend.manager.models.user import users
 
         j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
             groups, vfolders.c.group == groups.c.id, isouter=True
@@ -1026,8 +1027,8 @@ class VirtualFolder(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> Sequence[VirtualFolder]:
-        from ...models.group import groups
-        from ...models.user import users
+        from ai.backend.manager.models.group import groups
+        from ai.backend.manager.models.user import users
 
         j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
             groups, vfolders.c.group == groups.c.id, isouter=True
@@ -1104,7 +1105,7 @@ class VirtualFolder(graphene.ObjectType):
         domain_name: Optional[str] = None,
         group_id: Optional[uuid.UUID] = None,
     ) -> Sequence[Sequence[VirtualFolder]]:
-        from ...models.user import users
+        from ai.backend.manager.models.user import users
 
         # TODO: num_attached count group-by
         j = sa.join(vfolders, users, vfolders.c.user == users.c.uuid)
@@ -1138,7 +1139,7 @@ class VirtualFolder(graphene.ObjectType):
         user_id: Optional[uuid.UUID] = None,
         filter: Optional[str] = None,
     ) -> int:
-        from ...models.user import users
+        from ai.backend.manager.models.user import users
 
         j = vfolders.join(
             vfolder_permissions,
@@ -1177,7 +1178,7 @@ class VirtualFolder(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> list[VirtualFolder]:
-        from ...models.user import users
+        from ai.backend.manager.models.user import users
 
         j = vfolders.join(
             vfolder_permissions,
@@ -1223,8 +1224,8 @@ class VirtualFolder(graphene.ObjectType):
         user_id: Optional[uuid.UUID] = None,
         filter: Optional[str] = None,
     ) -> int:
-        from ...models.group import association_groups_users as agus
-        from ...models.group import groups
+        from ai.backend.manager.models.group import association_groups_users as agus
+        from ai.backend.manager.models.group import groups
 
         query = sa.select([agus.c.group_id]).select_from(agus).where(agus.c.user_id == user_id)
 
@@ -1258,8 +1259,8 @@ class VirtualFolder(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> list[VirtualFolder]:
-        from ...models.group import association_groups_users as agus
-        from ...models.group import groups
+        from ai.backend.manager.models.group import association_groups_users as agus
+        from ai.backend.manager.models.group import groups
 
         query = sa.select([agus.c.group_id]).select_from(agus).where(agus.c.user_id == user_id)
         async with graph_ctx.db.begin_readonly() as conn:
@@ -1351,7 +1352,7 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):
         user_id: Optional[uuid.UUID] = None,
         filter: Optional[str] = None,
     ) -> int:
-        from ...models.user import users
+        from ai.backend.manager.models.user import users
 
         j = vfolder_permissions.join(vfolders, vfolders.c.id == vfolder_permissions.c.vfolder).join(
             users, users.c.uuid == vfolder_permissions.c.user
@@ -1377,7 +1378,7 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> list[VirtualFolderPermissionGQL]:
-        from ...models.user import users
+        from ai.backend.manager.models.user import users
 
         j = vfolder_permissions.join(vfolders, vfolders.c.id == vfolder_permissions.c.vfolder).join(
             users, users.c.uuid == vfolder_permissions.c.user

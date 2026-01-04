@@ -39,8 +39,8 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.list impo
 from ai.backend.manager.services.artifact_registry.actions.huggingface.update import (
     UpdateHuggingFaceRegistryAction,
 )
+from ai.backend.manager.types import OptionalState
 
-from ...types import OptionalState
 from .types import StrawberryGQLContext
 
 

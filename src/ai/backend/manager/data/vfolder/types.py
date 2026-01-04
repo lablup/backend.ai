@@ -12,9 +12,8 @@ from ai.backend.common.dto.manager.field import (
     VFolderPermissionField,
 )
 from ai.backend.common.types import CIStrEnum, QuotaScopeID, VFolderID, VFolderUsageMode
+from ai.backend.manager.data.permission.types import OperationType
 from ai.backend.manager.errors.resource import DataTransformationFailed
-
-from ..permission.types import OperationType
 
 
 class VFolderOwnershipType(CIStrEnum):

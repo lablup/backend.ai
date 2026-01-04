@@ -12,9 +12,8 @@ from ai.backend.common.clients.http_client.client_pool import ClientKey
 from ai.backend.common.data.notification import WebhookConfig
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.notification import NotificationProcessingFailure
-
-from ...types import NotificationMessage, SendResult
-from ..base import AbstractNotificationChannel
+from ai.backend.manager.notification.channels.base import AbstractNotificationChannel
+from ai.backend.manager.notification.types import NotificationMessage, SendResult
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 

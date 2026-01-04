@@ -20,15 +20,7 @@ from tabulate import tabulate
 from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, RangeExprOptionType
 from ai.backend.cli.types import ExitCode
-from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import ClusterMode, MountExpression
-
-from ...compat import asyncio_run, current_loop
-from ...config import local_cache_path
-from ...exceptions import BackendError
-from ...output.fields import network_fields
-from ...session import AsyncSession
-from ..pretty import (
+from ai.backend.client.cli.pretty import (
     format_info,
     print_done,
     print_error,
@@ -37,6 +29,14 @@ from ..pretty import (
     print_wait,
     print_warn,
 )
+from ai.backend.client.compat import asyncio_run, current_loop
+from ai.backend.client.config import local_cache_path
+from ai.backend.client.exceptions import BackendError
+from ai.backend.client.output.fields import network_fields
+from ai.backend.client.session import AsyncSession
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.types import ClusterMode, MountExpression
+
 from .args import click_start_option
 
 tabulate_mod.PRESERVE_WHITESPACE = True

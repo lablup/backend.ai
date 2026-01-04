@@ -1,4 +1,5 @@
-from ..request import Request
+from ai.backend.client.request import Request
+
 from .base import BaseFunction, api_function
 
 __all__ = ("EtcdConfig",)

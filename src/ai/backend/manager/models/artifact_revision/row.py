@@ -15,8 +15,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactStatus,
 )
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
-
-from ..base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     IDColumn,
@@ -28,7 +27,7 @@ __all__ = ("ArtifactRevisionRow",)
 
 
 def _get_artifact_join_cond():
-    from ..artifact import ArtifactRow
+    from ai.backend.manager.models.artifact import ArtifactRow
 
     return foreign(ArtifactRevisionRow.artifact_id) == ArtifactRow.id
 

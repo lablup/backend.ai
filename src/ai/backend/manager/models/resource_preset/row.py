@@ -11,8 +11,7 @@ from sqlalchemy.orm import relationship
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
-
-from ..base import (
+from ai.backend.manager.models.base import (
     Base,
     IDColumn,
     ResourceSlotColumn,

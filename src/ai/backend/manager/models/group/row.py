@@ -29,13 +29,12 @@ from sqlalchemy.orm.exc import NoResultFound
 from ai.backend.common import msgpack
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.group.types import GroupData, ProjectType
+from ai.backend.manager.defs import RESERVED_DOTFILES
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
-
-from ...defs import RESERVED_DOTFILES
-from ...errors.common import ObjectNotFound
-from ..base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     EnumValueType,
@@ -46,7 +45,7 @@ from ..base import (
     VFolderHostPermissionColumn,
     mapper_registry,
 )
-from ..rbac import (
+from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -57,17 +56,17 @@ from ..rbac import (
     get_predefined_roles_in_scope,
     required_permission,
 )
-from ..rbac.context import ClientContext
-from ..rbac.permission_defs import ProjectPermission
-from ..types import (
+from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.rbac.permission_defs import ProjectPermission
+from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
     load_related_field,
 )
-from ..utils import ExtendedAsyncSAEngine, execute_with_txn_retry
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
-    from ..rbac import ContainerRegistryScope
+    from ai.backend.manager.models.rbac import ContainerRegistryScope
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -577,7 +576,7 @@ class ProjectPermissionContextBuilder(
         self,
         ctx: ClientContext,
     ) -> ProjectPermissionContext:
-        from ..domain import DomainRow
+        from ai.backend.manager.models.domain import DomainRow
 
         perm_ctx = ProjectPermissionContext()
         _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))

@@ -10,6 +10,7 @@ from typing import (
 
 import pyhlml
 
+from ai.backend.accelerator.habana.plugin import AbstractGaudiPlugin
 from ai.backend.common.types import (
     AcceleratorMetadata,
     DeviceId,
@@ -18,7 +19,6 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 
-from ..plugin import AbstractGaudiPlugin
 from .types import Gaudi2Device
 
 __all__ = (

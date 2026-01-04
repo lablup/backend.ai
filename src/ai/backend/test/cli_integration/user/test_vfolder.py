@@ -5,7 +5,7 @@ from io import TextIOWrapper
 
 import pytest
 
-from ...utils.cli import EOF, ClientRunnerFunc, decode
+from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
 @pytest.mark.dependency()

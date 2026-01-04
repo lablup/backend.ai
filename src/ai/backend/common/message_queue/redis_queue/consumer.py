@@ -13,11 +13,11 @@ from aiotools.server import process_index
 
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.message_queue.abc import AbstractConsumer
+from ai.backend.common.message_queue.types import MessageId, MQMessage
 from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
-from ..abc import AbstractConsumer
-from ..types import MessageId, MQMessage
 from .exceptions import MessageQueueClosedError
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

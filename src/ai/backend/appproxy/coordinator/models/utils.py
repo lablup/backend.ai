@@ -39,18 +39,16 @@ from tenacity import (
 from yarl import URL
 
 from ai.backend.appproxy.common.errors import DatabaseError
+from ai.backend.appproxy.coordinator.config import DBConfig
 from ai.backend.appproxy.coordinator.errors import TransactionResultError
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging import BraceStyleAdapter
 
-from ..config import DBConfig
-
 if TYPE_CHECKING:
     pass
 
+from ai.backend.appproxy.coordinator.defs import LockID
 from ai.backend.common.types import Sentinel
-
-from ..defs import LockID
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 column_constraints = ["nullable", "index", "unique", "primary_key"]

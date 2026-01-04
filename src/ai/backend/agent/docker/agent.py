@@ -48,7 +48,69 @@ from aiomonitor.task import preserve_termination_log
 from aiotools import TaskGroup
 from async_timeout import timeout
 
+from ai.backend.agent.agent import (
+    ACTIVE_STATUS_SET,
+    AbstractAgent,
+    AbstractKernelCreationContext,
+    AgentClass,
+    ScanImagesResult,
+)
+from ai.backend.agent.config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchType
 from ai.backend.agent.etcd import AgentEtcdClientView
+from ai.backend.agent.exception import (
+    ContainerCreationError,
+    InvalidArgumentError,
+    UnsupportedResource,
+)
+from ai.backend.agent.fs import create_scratch_filesystem, destroy_scratch_filesystem
+from ai.backend.agent.kernel import AbstractKernel, KernelRegistry
+from ai.backend.agent.kernel_registry.adapter import (
+    KernelRecoveryDataAdapter,
+    KernelRecoveryDataAdapterTarget,
+)
+from ai.backend.agent.kernel_registry.container.creator import (
+    ContainerBasedKernelRegistryCreatorArgs,
+    ContainerBasedLoaderWriterCreator,
+)
+from ai.backend.agent.kernel_registry.pickle.creator import (
+    PickleBasedKernelRegistryCreatorArgs,
+    PickleBasedLoaderWriterCreator,
+)
+from ai.backend.agent.kernel_registry.recovery.docker_recovery import (
+    DockerKernelRegistryRecovery,
+)
+from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
+from ai.backend.agent.plugin.network import (
+    ContainerNetworkCapability,
+    ContainerNetworkInfo,
+    NetworkPluginContext,
+)
+from ai.backend.agent.proxy import DomainSocketProxy, proxy_connection
+from ai.backend.agent.resources import (
+    AbstractComputePlugin,
+    ComputerContext,
+    KernelResourceSpec,
+    Mount,
+    known_slot_types,
+)
+from ai.backend.agent.scratch import create_loop_filesystem, destroy_loop_filesystem
+from ai.backend.agent.types import (
+    AgentEventData,
+    Container,
+    KernelOwnershipData,
+    LifecycleEvent,
+    MountInfo,
+    Port,
+    VolumeInfo,
+)
+from ai.backend.agent.utils import (
+    closing_async,
+    container_pid_to_host_pid,
+    get_kernel_id_from_container,
+    get_safe_ulimit,
+    host_pid_to_container_pid,
+    update_nested_dict,
+)
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.data.image.types import InstalledImageInfo
 from ai.backend.common.docker import (
@@ -100,57 +162,6 @@ from ai.backend.common.utils import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.formatter import pretty
 
-from ..agent import (
-    ACTIVE_STATUS_SET,
-    AbstractAgent,
-    AbstractKernelCreationContext,
-    AgentClass,
-    ScanImagesResult,
-)
-from ..config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchType
-from ..exception import ContainerCreationError, InvalidArgumentError, UnsupportedResource
-from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
-from ..kernel import AbstractKernel, KernelRegistry
-from ..kernel_registry.adapter import KernelRecoveryDataAdapter, KernelRecoveryDataAdapterTarget
-from ..kernel_registry.container.creator import (
-    ContainerBasedKernelRegistryCreatorArgs,
-    ContainerBasedLoaderWriterCreator,
-)
-from ..kernel_registry.pickle.creator import (
-    PickleBasedKernelRegistryCreatorArgs,
-    PickleBasedLoaderWriterCreator,
-)
-from ..kernel_registry.recovery.docker_recovery import (
-    DockerKernelRegistryRecovery,
-)
-from ..kernel_registry.writer.types import KernelRegistrySaveMetadata
-from ..plugin.network import ContainerNetworkCapability, ContainerNetworkInfo, NetworkPluginContext
-from ..proxy import DomainSocketProxy, proxy_connection
-from ..resources import (
-    AbstractComputePlugin,
-    ComputerContext,
-    KernelResourceSpec,
-    Mount,
-    known_slot_types,
-)
-from ..scratch import create_loop_filesystem, destroy_loop_filesystem
-from ..types import (
-    AgentEventData,
-    Container,
-    KernelOwnershipData,
-    LifecycleEvent,
-    MountInfo,
-    Port,
-    VolumeInfo,
-)
-from ..utils import (
-    closing_async,
-    container_pid_to_host_pid,
-    get_kernel_id_from_container,
-    get_safe_ulimit,
-    host_pid_to_container_pid,
-    update_nested_dict,
-)
 from .kernel import DockerKernel
 from .utils import PersistentServiceContainer
 

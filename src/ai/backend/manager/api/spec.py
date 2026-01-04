@@ -8,9 +8,9 @@ import aiohttp_cors
 from aiohttp import web
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.openapi import generate_openapi
 
-from ..errors.common import GenericForbidden
 from .auth import auth_required
 from .types import CORSOptions, Iterable, WebMiddleware
 

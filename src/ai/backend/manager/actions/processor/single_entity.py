@@ -5,13 +5,16 @@ from datetime import datetime
 from typing import Awaitable, Callable, Generic, Optional
 
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
-
-from ..action import (
+from ai.backend.manager.actions.action import (
     BaseActionTriggerMeta,
 )
-from ..action.single_entity import TSingleEntityAction, TSingleEntityActionResult
-from ..monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.action.single_entity import (
+    TSingleEntityAction,
+    TSingleEntityActionResult,
+)
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
+
 from .base import ActionRunner
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

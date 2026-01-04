@@ -8,10 +8,13 @@ from collections.abc import MutableMapping
 from pathlib import Path
 from typing import TYPE_CHECKING, override
 
+from ai.backend.agent.kernel_registry.exception import (
+    KernelRegistryLoadError,
+    KernelRegistryNotFound,
+)
 from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
 
-from ..exception import KernelRegistryLoadError, KernelRegistryNotFound
 from .abc import AbstractKernelRegistryLoader
 
 if TYPE_CHECKING:

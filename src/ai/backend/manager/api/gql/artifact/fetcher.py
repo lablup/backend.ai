@@ -11,6 +11,7 @@ from strawberry.dataloader import DataLoader
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
+from ai.backend.manager.api.gql.artifact_registry_meta import ArtifactRegistryMeta
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -24,7 +25,6 @@ from ai.backend.manager.services.artifact_revision.actions.search import (
     SearchArtifactRevisionsAction,
 )
 
-from ..artifact_registry_meta import ArtifactRegistryMeta
 from .types import (
     Artifact,
     ArtifactConnection,

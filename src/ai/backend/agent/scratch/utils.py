@@ -9,10 +9,10 @@ from typing import Optional
 
 import aiofiles
 
+from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.common.json import load_json
 from ai.backend.common.types import KernelId
 
-from ..resources import KernelResourceSpec
 from .types import KernelRecoveryScratchData
 
 

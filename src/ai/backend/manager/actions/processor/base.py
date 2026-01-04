@@ -6,17 +6,16 @@ from typing import Awaitable, Callable, Generic, Optional
 
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.actions.types import OperationStatus
-from ai.backend.manager.actions.validator.base import ActionValidator
-
-from ..action import (
+from ai.backend.manager.actions.action import (
     BaseActionResultMeta,
     BaseActionTriggerMeta,
     ProcessResult,
     TAction,
     TActionResult,
 )
-from ..monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.actions.validator.base import ActionValidator
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
