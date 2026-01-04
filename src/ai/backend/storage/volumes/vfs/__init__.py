@@ -44,11 +44,11 @@ from ai.backend.storage.types import (
 )
 from ai.backend.storage.utils import fstime2datetime
 from ai.backend.storage.volumes.abc import (
+    _CURRENT_DIR,
     CAP_VFOLDER,
     AbstractFSOpModel,
     AbstractQuotaModel,
     AbstractVolume,
-    _CURRENT_DIR,
 )
 from ai.backend.storage.watcher import DeletePathTask, WatcherClient
 

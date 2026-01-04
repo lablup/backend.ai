@@ -20,10 +20,10 @@ from ai.backend.storage.types import (
     VolumeInfo,
 )
 from ai.backend.storage.volumes.abc import (
+    _CURRENT_DIR,
     AbstractFSOpModel,
     AbstractQuotaModel,
     AbstractVolume,
-    _CURRENT_DIR,
 )
 
 

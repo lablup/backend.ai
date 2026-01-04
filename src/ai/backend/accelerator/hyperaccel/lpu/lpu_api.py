@@ -21,8 +21,8 @@ async def list_devices() -> List[LPUDevice]:
         slot, func = slot_func.split(".")[:2]
         display_driver_path = (folder / ".." / f"{domain}:{bus}:{slot}.1").resolve()
         renderD_files = await blocking_job(
-            lambda: [
-                x for x in (display_driver_path / "drm").iterdir() if x.name.startswith("renderD")
+            lambda ddp=display_driver_path: [
+                x for x in (ddp / "drm").iterdir() if x.name.startswith("renderD")
             ],
         )
         assert len(renderD_files) == 1, (

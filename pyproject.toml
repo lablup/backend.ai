@@ -157,7 +157,7 @@ ignore = [
     "B010",  # set-attr-with-constant - setattr with constant needed for mypy compatibility on dynamic attributes
     "B012",  # return-in-finally - intentional pattern in some response handlers
     "B017",  # assert-raises-exception - testing generic Exception is sometimes needed
-    "B023",  # function-uses-loop-variable - defer for gradual review (46 violations, some intentional)
+    "B023",  # function-uses-loop-variable - many false positives with for-else, nested functions
     "B024",  # abstract-base-class-without-abstract-method - intentional design pattern
     "B027",  # empty-method-without-abstract-decorator - intentional empty methods for extensibility
     "B028",  # no-explicit-stacklevel - stacklevel can be omitted in many logging calls
@@ -175,9 +175,9 @@ ignore = [
     "UP045",  # non-pep604-annotation-optional - Optional[X] -> X | None (5392 violations, defer)
     "UP046",  # non-pep695-generic-class - Python 3.12+ generic syntax (93 violations, defer)
     "UP047",  # non-pep695-generic-function - Python 3.12+ type parameter syntax (24 violations, defer)
-    # A (builtins) - defer common builtin shadowing for gradual adoption
-    "A001",  # builtin-variable-shadowing - variable shadows builtin (75 violations, defer)
-    "A002",  # builtin-argument-shadowing - argument shadows builtin (297 violations, defer)
+    # A (builtins) - GraphQL API uses id/filter/input as standard parameter names
+    "A001",  # builtin-variable-shadowing - mostly id/filter/input in GraphQL (75 violations)
+    "A002",  # builtin-argument-shadowing - mostly id/filter/input in GraphQL (297 violations)
     # RET (return) - stylistic rules that may reduce readability
     "RET502",  # implicit-return-value - mixed implicit/explicit return (stylistic preference)
     "RET507",  # superfluous-else-continue - else after continue (can improve readability)

@@ -86,7 +86,7 @@ class AffinityMap(nx.Graph):
             subgraph = nx.subgraph_view(
                 self,
                 filter_node=lambda u: u.device_name == device_name,
-                filter_edge=lambda u, v: self.edges[u, v]["weight"] == weight,
+                filter_edge=lambda u, v, w=weight: self.edges[u, v]["weight"] == w,
             )
             components: Iterable[set[AbstractComputeDevice]] = nx.connected_components(subgraph)
             for component in components:
