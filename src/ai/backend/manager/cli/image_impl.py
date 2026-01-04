@@ -42,7 +42,7 @@ async def list_images(cli_ctx: CLIContext, short, installed_only):
                 installed_counts = await redis_conn_set.image.get_agent_counts_for_images(image_ids)
                 installed_items: list[ImageRow] = []
 
-                for item, installed_count in zip(items, installed_counts):
+                for item, installed_count in zip(items, installed_counts, strict=True):
                     if installed_count > 0:
                         installed_items.append(item)
 
@@ -52,7 +52,7 @@ async def list_images(cli_ctx: CLIContext, short, installed_only):
                 )
 
                 for item, installed_agents in zip(
-                    installed_items, agents_per_installed_items.values()
+                    installed_items, agents_per_installed_items.values(), strict=True
                 ):
                     formatted_installed_agents = " ".join(str(installed_agents))
                     if short:

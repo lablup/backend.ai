@@ -121,7 +121,7 @@ class DeploymentExecutor:
 
         if registration_tasks:
             results = await asyncio.gather(*registration_tasks, return_exceptions=True)
-            for deployment, result in zip(deployments, results):
+            for deployment, result in zip(deployments, results, strict=True):
                 if isinstance(result, BaseException):
                     log.error(
                         "Failed to register endpoint for deployment {}: {}",

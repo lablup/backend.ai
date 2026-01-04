@@ -695,7 +695,7 @@ class SchedulerDispatcher(aobject):
         def _check(cnt: int) -> bool:
             return max_container_count > cnt
 
-        return [ag for ag, count in zip(candidate_agents, raw_counts) if _check(count)]
+        return [ag for ag, count in zip(candidate_agents, raw_counts, strict=True) if _check(count)]
 
     async def _schedule_single_node_session(
         self,

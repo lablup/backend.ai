@@ -306,7 +306,9 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
                             raw_examples = handler_attrs.get("request_examples") or []
                             examples = {
                                 f"{operation_id}_Example{i}": {"value": e}
-                                for e, i in zip(raw_examples, range(1, len(raw_examples) + 1))
+                                for e, i in zip(
+                                    raw_examples, range(1, len(raw_examples) + 1), strict=True
+                                )
                             }
                             route_def["requestBody"] = {
                                 "content": {

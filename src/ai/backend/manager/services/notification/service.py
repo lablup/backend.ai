@@ -378,7 +378,7 @@ class NotificationService:
         successes: list[ProcessedRuleSuccess] = []
         errors: list[BaseException] = []
 
-        for rule, result in zip(rules, results):
+        for rule, result in zip(rules, results, strict=True):
             if isinstance(result, BaseException):
                 errors.append(result)
                 log.error(

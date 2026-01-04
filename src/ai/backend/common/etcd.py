@@ -575,7 +575,7 @@ class AsyncEtcd(AbstractKVStore):
 
         configs = [
             make_dict_from_pairs(f"{_slash(scope_prefix)}{key_prefix}", pairs, "/")
-            for scope_prefix, pairs in zip(scope_prefixes, pair_sets)
+            for scope_prefix, pairs in zip(scope_prefixes, pair_sets, strict=True)
         ]
         return ChainMap(*configs)
 

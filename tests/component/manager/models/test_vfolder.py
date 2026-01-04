@@ -232,7 +232,7 @@ async def test_batch_load_by_id(
     )
 
     assert len(result) == len(expected_result)
-    for res, expected_id in zip(result, expected_result):
+    for res, expected_id in zip(result, expected_result, strict=True):
         if expected_id is None:
             assert res is None
         else:

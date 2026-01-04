@@ -172,7 +172,9 @@ def create_mock_session(
                 cluster_idx=role_idx,
                 local_rank=local_rank,
             )
-            for kopt, (role_name, role_idx, local_rank) in zip(kernel_opts, generate_role())
+            for kopt, (role_name, role_idx, local_rank) in zip(
+                kernel_opts, generate_role(), strict=True
+            )
         ],
         priority=priority,
         access_key=access_key,

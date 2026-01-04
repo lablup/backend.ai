@@ -498,7 +498,7 @@ async def parse_resource_usage_groups(
 
     kernel_ids_str = [str(kern_id) for kern_id in stat_empty_kerns]
     raw_stats = await valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids_str)
-    for kern_id, raw_stat in zip(stat_empty_kerns, raw_stats):
+    for kern_id, raw_stat in zip(stat_empty_kerns, raw_stats, strict=True):
         if raw_stat is None:
             continue
         stat_map[kern_id] = msgpack.unpackb(raw_stat)

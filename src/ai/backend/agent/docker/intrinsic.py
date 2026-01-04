@@ -293,7 +293,7 @@ class CPUPlugin(AbstractComputePlugin):
         for cid in container_ids:
             tasks.append(asyncio.create_task(impl(cid)))
         results = await asyncio.gather(*tasks)
-        for cid, cpu_used in zip(container_ids, results):
+        for cid, cpu_used in zip(container_ids, results, strict=True):
             if cpu_used is None:
                 continue
             per_container_cpu_used[cid] = Measurement(Decimal(cpu_used).quantize(q))
@@ -359,7 +359,7 @@ class CPUPlugin(AbstractComputePlugin):
                     psutil_tasks.append(asyncio.create_task(psutil_impl(pid, cid)))
                 results = await asyncio.gather(*psutil_tasks)
 
-        for (pid, cid), cpu_used in zip(pid_map_list, results):
+        for (pid, cid), cpu_used in zip(pid_map_list, results, strict=True):
             if cpu_used is None:
                 continue
             per_process_cpu_util[pid] = Measurement(
@@ -767,7 +767,7 @@ class MemoryPlugin(AbstractComputePlugin):
         for cid in container_ids:
             tasks.append(asyncio.create_task(impl(cid)))
         results = await asyncio.gather(*tasks)
-        for cid, result in zip(container_ids, results):
+        for cid, result in zip(container_ids, results, strict=True):
             if result is None:
                 continue
             per_container_mem_used_bytes[cid] = Measurement(
@@ -879,7 +879,7 @@ class MemoryPlugin(AbstractComputePlugin):
                     psutil_tasks.append(asyncio.create_task(psutil_impl(pid, cid)))
                 results = await asyncio.gather(*psutil_tasks)
 
-        for (pid, _), result in zip(pid_map_list, results):
+        for (pid, _), result in zip(pid_map_list, results, strict=True):
             mem, io_read, io_write = result
             if mem is not None:
                 per_process_mem_used_bytes[pid] = Measurement(Decimal(mem))

@@ -138,7 +138,9 @@ class HealthProbe:
         results_or_exc = await asyncio.gather(*check_tasks, return_exceptions=True)
 
         results: dict[ServiceGroup, ServiceHealth] = {}
-        for (service_group, _), result_or_exc in zip(registered.items(), results_or_exc):
+        for (service_group, _), result_or_exc in zip(
+            registered.items(), results_or_exc, strict=True
+        ):
             if isinstance(result_or_exc, BaseException):
                 log.error(f"Unexpected error checking {service_group}: {result_or_exc}")
                 continue

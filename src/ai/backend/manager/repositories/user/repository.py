@@ -562,7 +562,7 @@ class UserRepository:
         kernel_ids = [str(row["id"]) for row in rows]
         raw_stats = await valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids)
 
-        for row, raw_stat in zip(rows, raw_stats):
+        for row, raw_stat in zip(rows, raw_stats, strict=True):
             if raw_stat is not None:
                 last_stat = msgpack.unpackb(raw_stat)
                 io_read_byte = int(nmget(last_stat, "io_read.current", 0))

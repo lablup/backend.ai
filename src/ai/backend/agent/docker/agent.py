@@ -1081,7 +1081,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     str(container_bind_host),
                     [
                         (host_port, container_port)
-                        for host_port, container_port in zip(host_ports, exposed_ports)
+                        for host_port, container_port in zip(host_ports, exposed_ports, strict=True)
                     ],
                 )
 
@@ -1121,7 +1121,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 "Init": True,
                 "PortBindings": {
                     f"{eport}/tcp": [{"HostPort": str(hport), "HostIp": hip}]
-                    for eport, hport, hip in zip(exposed_ports, host_ports, host_ips)
+                    for eport, hport, hip in zip(exposed_ports, host_ports, host_ips, strict=True)
                 },
                 "PublishAllPorts": False,  # we manage port mapping manually!
                 "CapAdd": [
@@ -1300,7 +1300,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         str(container_bind_host),
                         [
                             (host_port, container_port)
-                            for host_port, container_port in zip(host_ports, exposed_ports)
+                            for host_port, container_port in zip(
+                                host_ports, exposed_ports, strict=True
+                            )
                         ],
                     )
 

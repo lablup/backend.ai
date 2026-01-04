@@ -251,7 +251,7 @@ class GroupRepository:
         objs_per_group = {}
         local_tz = self._config_provider.config.system.timezone
 
-        for row, raw_stat in zip(rows, raw_stats):
+        for row, raw_stat in zip(rows, raw_stats, strict=True):
             group_id = str(row["group_id"])
             last_stat = row["last_stat"]
             if not last_stat:

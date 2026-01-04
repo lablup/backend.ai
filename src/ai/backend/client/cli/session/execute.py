@@ -474,14 +474,16 @@ def run(
     exec_ranges = {v: r for v, r in exec_range}
 
     env_var_maps = [
-        dict(zip(env_ranges.keys(), values)) for values in itertools.product(*env_ranges.values())
+        dict(zip(env_ranges.keys(), values, strict=True))
+        for values in itertools.product(*env_ranges.values())
     ]
     build_var_maps = [
-        dict(zip(build_ranges.keys(), values))
+        dict(zip(build_ranges.keys(), values, strict=True))
         for values in itertools.product(*build_ranges.values())
     ]
     exec_var_maps = [
-        dict(zip(exec_ranges.keys(), values)) for values in itertools.product(*exec_ranges.values())
+        dict(zip(exec_ranges.keys(), values, strict=True))
+        for values in itertools.product(*exec_ranges.values())
     ]
     case_set = collections.OrderedDict()
     vmaps_product = itertools.product(env_var_maps, build_var_maps, exec_var_maps)

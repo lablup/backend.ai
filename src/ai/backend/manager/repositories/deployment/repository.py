@@ -697,7 +697,9 @@ class DeploymentRepository:
             )
             kernel_statistics_by_id = {
                 kernel_id: metric
-                for kernel_id, metric in zip(metric_requested_kernels, kernel_live_stats)
+                for kernel_id, metric in zip(
+                    metric_requested_kernels, kernel_live_stats, strict=True
+                )
             }
 
         if metric_requested_endpoints:
@@ -707,7 +709,9 @@ class DeploymentRepository:
             )
             endpoint_statistics_by_id = {
                 endpoint_id: metric
-                for endpoint_id, metric in zip(metric_requested_endpoints, endpoint_live_stats)
+                for endpoint_id, metric in zip(
+                    metric_requested_endpoints, endpoint_live_stats, strict=True
+                )
             }
 
         return AutoScalingMetricsData(

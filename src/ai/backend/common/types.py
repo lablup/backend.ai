@@ -983,14 +983,14 @@ class ResourceSlot(UserDict[str, Decimal]):
         self.sync_keys(other)
         self_values = [self.data[k] for k in self.keys()]
         other_values = [other.data[k] for k in self.keys()]
-        return not any(s > o for s, o in zip(self_values, other_values))
+        return not any(s > o for s, o in zip(self_values, other_values, strict=True))
 
     def __lt__(self, other: ResourceSlot) -> bool:
         assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         self.sync_keys(other)
         self_values = [self.data[k] for k in self.keys()]
         other_values = [other.data[k] for k in self.keys()]
-        return not any(s > o for s, o in zip(self_values, other_values)) and not (
+        return not any(s > o for s, o in zip(self_values, other_values, strict=True)) and not (
             self_values == other_values
         )
 
@@ -999,14 +999,14 @@ class ResourceSlot(UserDict[str, Decimal]):
         self.sync_keys(other)
         self_values = [self.data[k] for k in other.keys()]
         other_values = [other.data[k] for k in other.keys()]
-        return not any(s < o for s, o in zip(self_values, other_values))
+        return not any(s < o for s, o in zip(self_values, other_values, strict=True))
 
     def __gt__(self, other: ResourceSlot) -> bool:
         assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         self.sync_keys(other)
         self_values = [self.data[k] for k in other.keys()]
         other_values = [other.data[k] for k in other.keys()]
-        return not any(s < o for s, o in zip(self_values, other_values)) and not (
+        return not any(s < o for s, o in zip(self_values, other_values, strict=True)) and not (
             self_values == other_values
         )
 

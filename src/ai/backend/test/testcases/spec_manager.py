@@ -63,7 +63,7 @@ class TestSpec:
             return None
         keys = list(self.parametrizes.keys())
         values_product = product(*(self.parametrizes[key] for key in keys))
-        return [dict(zip(keys, combination)) for combination in values_product]
+        return [dict(zip(keys, combination, strict=True)) for combination in values_product]
 
 
 class TestSpecManager:

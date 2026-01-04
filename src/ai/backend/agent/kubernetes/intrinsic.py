@@ -129,7 +129,7 @@ class CPUPlugin(AbstractComputePlugin):
                 memory_size=0,
                 processing_units=int(node["status"]["capacity"]["cpu"]) * overcommit_factor,
             )
-            for i, node in zip(range(len(nodes)), nodes)
+            for i, node in enumerate(nodes)
             # if 'node-role.kubernetes.io/master' not in node['metadata']['labels'].keys()
         ]
 

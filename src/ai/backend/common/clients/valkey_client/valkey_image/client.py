@@ -259,7 +259,7 @@ class ValkeyImageClient:
         final_results: dict[ImageID, set[AgentId]] = {}
         if not results:
             return final_results
-        for image_id, result in zip(image_ids, results):
+        for image_id, result in zip(image_ids, results, strict=True):
             result = cast(set[bytes], result)
             final_results[image_id] = {AgentId(member.decode()) for member in result}
         return final_results

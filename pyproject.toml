@@ -154,7 +154,6 @@ ignore = [
     "C417",  # unnecessary-map - map() is valid Python and sometimes preferred
     # B (bugbear)
     "B007",  # unused-loop-control-variable - intentional in many cases (e.g., async for chunk in stream)
-    "B008",  # function-call-in-default-argument - defer for gradual review (18 violations)
     "B010",  # set-attr-with-constant - setattr with constant needed for mypy compatibility on dynamic attributes
     "B012",  # return-in-finally - intentional pattern in some response handlers
     "B017",  # assert-raises-exception - testing generic Exception is sometimes needed
@@ -162,8 +161,8 @@ ignore = [
     "B024",  # abstract-base-class-without-abstract-method - intentional design pattern
     "B027",  # empty-method-without-abstract-decorator - intentional empty methods for extensibility
     "B028",  # no-explicit-stacklevel - stacklevel can be omitted in many logging calls
-    "B904",  # raise-without-from-inside-except - extensive legacy codebase, defer for gradual migration
-    "B905",  # zip-without-explicit-strict - Python 3.10+ feature, defer for gradual adoption
+    # B904 - raise-without-from-inside-except: 361 violations, no auto-fix, defer for gradual migration
+    "B904",
     "B911",  # batched-without-explicit-strict - Python 3.13+ feature
     # UP (pyupgrade) - defer large-scale changes for gradual adoption
     "UP006",  # non-pep585-annotation - typing.List -> list (633 violations, defer)

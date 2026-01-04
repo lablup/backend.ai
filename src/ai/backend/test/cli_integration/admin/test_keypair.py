@@ -69,7 +69,7 @@ def test_add_keypair(
         assert response.get("ok") is True, "cannot add users to group"
 
     # Create keypair
-    for i, (user, keypair_option) in enumerate(zip(users, keypair_options)):
+    for i, (user, keypair_option) in enumerate(zip(users, keypair_options, strict=True)):
         keypair_add_arguments = [
             "--output=json",
             "admin",
@@ -96,7 +96,7 @@ def test_add_keypair(
         keypair_list = loaded.get("items")
         assert isinstance(keypair_list, list), "List not printed properly!"
 
-    for i, (user, keypair_option) in enumerate(zip(users, keypair_options)):
+    for i, (user, keypair_option) in enumerate(zip(users, keypair_options, strict=True)):
         keypair = get_keypair_from_list(keypair_list, user.email)
         assert "access_key" in keypair, f"Keypair#{i + 1} doesn't exist"
         assert keypair.get("is_active") is keypair_option.is_active, (
@@ -129,7 +129,7 @@ def test_update_keypair(
         keypair_list = loaded.get("items")
         assert isinstance(keypair_list, list), "List not printed properly!"
 
-    for i, (user, new_keypair_option) in enumerate(zip(users, new_keypair_options)):
+    for i, (user, new_keypair_option) in enumerate(zip(users, new_keypair_options, strict=True)):
         keypair = get_keypair_from_list(keypair_list, user.email)
         assert "access_key" in keypair, f"Keypair#{i + 1} info doesn't exist"
 
@@ -160,7 +160,7 @@ def test_update_keypair(
         updated_keypair_list = loaded.get("items")
         assert isinstance(updated_keypair_list, list), "List not printed properly!"
 
-    for i, (user, new_keypair_option) in enumerate(zip(users, new_keypair_options)):
+    for i, (user, new_keypair_option) in enumerate(zip(users, new_keypair_options, strict=True)):
         updated_keypair = get_keypair_from_list(updated_keypair_list, user.email)
         assert "access_key" in updated_keypair, f"Keypair#{i + 1} doesn't exist"
         assert updated_keypair.get("is_active") is new_keypair_option.is_active, (

@@ -64,6 +64,7 @@ def distribute(num_items: int, groups: Sequence[T]) -> Mapping[T, int]:
         zip(
             groups,
             ((base + (1 if i < extra else 0)) for i in range(len(groups))),
+            strict=True,
         )
     )
 

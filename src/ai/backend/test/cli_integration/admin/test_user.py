@@ -48,7 +48,7 @@ def test_add_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
     assert isinstance(user_list, list), "Expected user list"
     added_users = tuple(get_user_from_list(user_list, user.username) for user in users)
 
-    for i, (added_user, user) in enumerate(zip(added_users, users)):
+    for i, (added_user, user) in enumerate(zip(added_users, users, strict=True)):
         assert bool(added_user), f"Added account doesn't exist: Account#{i + 1}"
         assert added_user.get("email") == user.email, f"E-mail mismatch: Account#{i + 1}"
         assert added_user.get("full_name") == user.full_name, f"Full name mismatch: Account#{i + 1}"
@@ -88,7 +88,7 @@ def test_update_user(
     )
 
     # Update user
-    for updated_user, user in zip(updated_users, users):
+    for updated_user, user in zip(updated_users, users, strict=True):
         update_arguments = [
             "--output=json",
             "admin",

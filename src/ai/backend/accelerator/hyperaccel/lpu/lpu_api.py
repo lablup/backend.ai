@@ -16,7 +16,7 @@ async def list_devices() -> List[LPUDevice]:
         ),
     )
 
-    for idx, folder in zip(range(len(folders)), folders):
+    for idx, folder in enumerate(folders):
         domain, bus, slot_func = folder.name.split(":")[:3]
         slot, func = slot_func.split(".")[:2]
         display_driver_path = (folder / ".." / f"{domain}:{bus}:{slot}.1").resolve()

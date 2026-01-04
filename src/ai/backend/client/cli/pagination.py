@@ -37,7 +37,10 @@ def tabulate_items(
     def _tabulate_buffer() -> Iterator[str]:
         table = tabulate(
             [
-                [f.formatter.format_console(v, f) for f, v in zip(fields, item.values())]
+                [
+                    f.formatter.format_console(v, f)
+                    for f, v in zip(fields, item.values(), strict=True)
+                ]
                 for item in buffered_items
             ],
             headers=([] if tablefmt == "plain" else [field.humanized_name for field in fields]),

@@ -79,7 +79,7 @@ def last_execution_time(
                 results = [result]
             match format:
                 case "plain":
-                    for scheduler, resp in zip(schedulers, results):
+                    for scheduler, resp in zip(schedulers, results, strict=True):
                         print(
                             tabulate([("scheduler", scheduler)] + [(k, v) for k, v in resp.items()])
                         )
@@ -94,7 +94,7 @@ def last_execution_time(
                             "extras",
                         ],
                     )
-                    for scheduler, resp in zip(schedulers, results):
+                    for scheduler, resp in zip(schedulers, results, strict=True):
                         row = {
                             "scheduler": scheduler,
                             "trigger_event": resp["trigger_event"],
@@ -109,7 +109,7 @@ def last_execution_time(
                         json.dumps(
                             [
                                 {"scheduler": scheduler, **resp}
-                                for scheduler, resp in zip(schedulers, results)
+                                for scheduler, resp in zip(schedulers, results, strict=True)
                             ],
                             ensure_ascii=False,
                             indent=2,

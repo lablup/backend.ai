@@ -196,7 +196,7 @@ class RedisClient(aobject):
                     self._prev_buf = _buf
 
                 if self.verbose:
-                    for request, response in zip(commands, results):
+                    for request, response in zip(commands, results, strict=True):
                         log.debug("{} -> {}", request, response)
 
                 return results

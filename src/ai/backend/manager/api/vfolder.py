@@ -668,7 +668,10 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
             "sftp_scaling_groups": sftp_scaling_groups,
         }
         for (proxy_name, volume_data), usage, sftp_scaling_groups in zip(
-            volumes, fetch_exposed_volume_fields_results, get_sftp_scaling_groups_results
+            volumes,
+            fetch_exposed_volume_fields_results,
+            get_sftp_scaling_groups_results,
+            strict=True,
         )
     }
     resp = {
@@ -2375,7 +2378,7 @@ async def list_mounts(request: web.Request) -> web.Response:
         },
         "storage-proxy": {
             "success": True,
-            "mounts": [*zip(all_vfolder_hosts, all_mounts)],
+            "mounts": [*zip(all_vfolder_hosts, all_mounts, strict=True)],
             "message": "",
         },
         "agents": {},

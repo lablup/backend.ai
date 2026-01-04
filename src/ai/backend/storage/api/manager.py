@@ -895,7 +895,7 @@ async def mkdir(request: web.Request) -> web.Response:
             result_group = await asyncio.gather(*mkdir_tasks, return_exceptions=True)
             failed_cases = [isinstance(res, BaseException) for res in result_group]
 
-        for relpath, result_or_exception in zip(relpaths, result_group):
+        for relpath, result_or_exception in zip(relpaths, result_group, strict=True):
             if isinstance(result_or_exception, BaseException):
                 log.error(
                     "Failed to create the directory {!r} in vol:{}/vfid:{}:",

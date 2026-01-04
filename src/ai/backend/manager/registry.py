@@ -3433,7 +3433,7 @@ class AgentRegistry:
 
         return {
             kernel_id: str(result, "utf-8") if result is not None else CommitStatus.READY.value
-            for kernel_id, result in zip(kernel_ids, commit_statuses)
+            for kernel_id, result in zip(kernel_ids, commit_statuses, strict=True)
         }
 
     async def commit_session(

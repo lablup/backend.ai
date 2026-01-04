@@ -399,7 +399,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
     @override
     async def process_mounts(self, mounts: Sequence[Mount]):
-        for i, mount in zip(range(len(mounts)), mounts):
+        for i, mount in enumerate(mounts):
             if mount.type == MountTypes.K8S_GENERIC:
                 name = (mount.opts or {})["name"]
                 self.volume_mounts.append(
@@ -732,7 +732,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             f"kernel-{self.kernel_id}-expose",
             [
                 (port, f"kernel-{self.kernel_id}-svc-{index}")
-                for index, port in zip(range(len(exposed_ports)), exposed_ports)
+                for index, port in enumerate(exposed_ports)
             ],
         )
 
