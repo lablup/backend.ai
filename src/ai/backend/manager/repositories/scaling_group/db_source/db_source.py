@@ -164,3 +164,23 @@ class ScalingGroupDBSource:
         """Disassociates a single scaling group from a domain."""
         async with self._db.begin_session() as session:
             await execute_batch_purger(session, purger)
+
+    async def check_scaling_group_domain_association_exists(
+        self,
+        scaling_group: str,
+        domain: str,
+    ) -> bool:
+        """Checks if a scaling group is associated with a domain."""
+        async with self._db.begin_readonly_session() as session:
+            query = (
+                sa.select(sa.func.count())
+                .select_from(ScalingGroupForDomainRow)
+                .where(
+                    sa.and_(
+                        ScalingGroupForDomainRow.scaling_group == scaling_group,
+                        ScalingGroupForDomainRow.domain == domain,
+                    )
+                )
+            )
+            result = await session.scalar(query)
+            return (result or 0) > 0

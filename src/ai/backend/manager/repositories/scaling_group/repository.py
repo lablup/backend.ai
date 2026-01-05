@@ -103,3 +103,14 @@ class ScalingGroupRepository:
     ) -> None:
         """Disassociates a single scaling group from a domain."""
         await self._db_source.disassociate_scaling_group_with_domain(purger)
+
+    async def check_scaling_group_domain_association_exists(
+        self,
+        scaling_group: str,
+        domain: str,
+    ) -> bool:
+        """Checks if a scaling group is associated with a domain."""
+        return await self._db_source.check_scaling_group_domain_association_exists(
+            scaling_group=scaling_group,
+            domain=domain,
+        )
