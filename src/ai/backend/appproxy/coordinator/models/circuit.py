@@ -420,11 +420,11 @@ class Circuit(Base, BaseMixin):
     ) -> str:
         payload = dict(self.dump_model())
 
-        # inject extra informations
+        # inject extra information
         payload["app_url"] = str(await self.get_endpoint_url(session=db_sess))
         payload["user"] = str(created_user)
         payload["exp"] = exp
-        # mask unrelated & sensitive informations
+        # mask unrelated & sensitive information
         del payload["config"]
         del payload["route_info"]
 
