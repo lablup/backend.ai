@@ -1,18 +1,27 @@
 from abc import abstractmethod
-from typing import Optional, TypeVar, override
+from typing import TypeVar, override
 
-from ai.backend.manager.data.permission.types import OperationType
+from ai.backend.common.data.permission.types import EntityType, OperationType
 
 from .base import BaseAction, BaseActionResult
 
 
 class BaseSingleEntityAction(BaseAction):
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @abstractmethod
     def target_entity_id(self) -> str:
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def root_entity_type(cls) -> EntityType | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def root_entity_id(self) -> str | None:
         raise NotImplementedError
 
     @classmethod
@@ -23,7 +32,7 @@ class BaseSingleEntityAction(BaseAction):
 
 class BaseSingleEntityActionResult(BaseActionResult):
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @abstractmethod
