@@ -121,9 +121,7 @@ class PasswordInfo:
         """
         if self.algorithm != hash_info.algorithm:
             return True
-        if self.rounds != hash_info.rounds:
-            return True
-        return False
+        return self.rounds != hash_info.rounds
 
 
 class PasswordColumn(TypeDecorator):

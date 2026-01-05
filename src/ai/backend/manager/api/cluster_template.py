@@ -13,18 +13,20 @@ from aiohttp import web
 from ai.backend.common import validators as tx
 from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
-from ..errors.api import InvalidAPIParameters
-from ..errors.resource import DBOperationFailed, TaskTemplateNotFound
-from ..models.domain import domains
-from ..models.group import association_groups_users as agus, groups
-from ..models.keypair import keypairs
-from ..models.session_template import (
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.resource import DBOperationFailed, TaskTemplateNotFound
+from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.group import association_groups_users as agus
+from ai.backend.manager.models.group import groups
+from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.session_template import (
     TemplateType,
     check_cluster_template,
     query_accessible_session_templates,
     session_templates,
 )
-from ..models.user import UserRole, users
+from ai.backend.manager.models.user import UserRole, users
+
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware

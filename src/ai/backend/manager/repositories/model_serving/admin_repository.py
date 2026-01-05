@@ -227,8 +227,7 @@ class AdminModelServingRepository:
                 return None
 
             result = await execute_creator(session, creator)
-            data = result.row.to_dataclass()
-        return data
+            return result.row.to_dataclass()
 
     async def _get_endpoint_by_id(
         self,

@@ -22,10 +22,8 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_serving.types import UserData as ModelServingUserData
 from ai.backend.manager.data.user.types import UserData, UserRole, UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed
-from ai.backend.manager.models.hasher.types import HashInfo, PasswordColumn, PasswordInfo
-
-from ...errors.common import ObjectNotFound
-from ..base import (
+from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.models.base import (
     Base,
     EnumValueType,
     IDColumn,
@@ -33,7 +31,7 @@ from ..base import (
     mapper_registry,
 )
 from ai.backend.manager.models.hasher import PasswordHasherFactory
-from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
+from ai.backend.manager.models.hasher.types import HashInfo, PasswordColumn, PasswordInfo
 from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
@@ -141,7 +139,7 @@ def _get_kernel_row_join_condition():
 
 class UserRow(Base):
     __table__ = users
-    # from ..keypair import KeyPairRow
+    # from ai.backend.manager.models.keypair import KeyPairRow
 
     sessions = relationship(
         "SessionRow",

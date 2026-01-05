@@ -13,13 +13,14 @@ from aiohttp import web
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
-from ..errors.common import (
+from ai.backend.manager.errors.common import (
     InternalServerError,
     ObjectNotFound,
     ServerMisconfiguredError,
 )
-from ..models.scaling_group import query_allowed_sgroups
-from ..models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.scaling_group import query_allowed_sgroups
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware

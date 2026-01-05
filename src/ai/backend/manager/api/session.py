@@ -101,62 +101,17 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.kernel import InvalidSessionData, SessionNotFound
+from ai.backend.manager.errors.resource import NoCurrentTaskContext
+from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
+from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.utils import query_userinfo as _query_userinfo
 
-from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
-from ..errors.api import InvalidAPIParameters
-from ..errors.auth import InsufficientPrivilege
-from ..errors.kernel import InvalidSessionData, SessionNotFound
-from ..errors.resource import NoCurrentTaskContext
-from ..models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
-from ..models.keypair import keypairs
-from ..models.session import SessionDependencyRow, SessionRow
-from ..models.user import UserRole
-from ..services.agent.actions.sync_agent_registry import SyncAgentRegistryAction
-from ..services.session.actions.check_and_transit_status import (
-    CheckAndTransitStatusAction,
-)
-from ..services.session.actions.commit_session import CommitSessionAction
-from ..services.session.actions.complete import CompleteAction
-from ..services.session.actions.convert_session_to_image import (
-    ConvertSessionToImageAction,
-)
-from ..services.session.actions.create_cluster import CreateClusterAction
-from ..services.session.actions.create_from_params import (
-    CreateFromParamsAction,
-    CreateFromParamsActionParams,
-)
-from ..services.session.actions.create_from_template import (
-    CreateFromTemplateAction,
-    CreateFromTemplateActionParams,
-)
-from ..services.session.actions.destroy_session import DestroySessionAction
-from ..services.session.actions.download_file import DownloadFileAction
-from ..services.session.actions.download_files import DownloadFilesAction
-from ..services.session.actions.execute_session import (
-    ExecuteSessionAction,
-    ExecuteSessionActionParams,
-)
-from ..services.session.actions.get_abusing_report import GetAbusingReportAction
-from ..services.session.actions.get_commit_status import GetCommitStatusAction
-from ..services.session.actions.get_container_logs import GetContainerLogsAction
-from ..services.session.actions.get_dependency_graph import (
-    GetDependencyGraphAction,
-)
-from ..services.session.actions.get_direct_access_info import (
-    GetDirectAccessInfoAction,
-)
-from ..services.session.actions.get_session_info import GetSessionInfoAction
-from ..services.session.actions.get_status_history import GetStatusHistoryAction
-from ..services.session.actions.interrupt_session import InterruptSessionAction
-from ..services.session.actions.list_files import ListFilesAction
-from ..services.session.actions.match_sessions import MatchSessionsAction
-from ..services.session.actions.rename_session import RenameSessionAction
-from ..services.session.actions.restart_session import RestartSessionAction
-from ..services.session.actions.shutdown_service import ShutdownServiceAction
-from ..services.session.actions.start_service import StartServiceAction
-from ..services.session.actions.upload_files import UploadFilesAction
-from ..services.vfolder.actions.base import GetTaskLogsAction
-from ..utils import query_userinfo as _query_userinfo
 from .auth import auth_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware

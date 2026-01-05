@@ -18,13 +18,16 @@ from ai.backend.manager.errors.storage import (
     DotfileCreationFailed,
     DotfileNotFound,
 )
-from ..models.domain import MAXIMUM_DOTFILE_SIZE, verify_dotfile_name
-from ..models.group import (
+from ai.backend.manager.models.domain import MAXIMUM_DOTFILE_SIZE, verify_dotfile_name
+from ai.backend.manager.models.group import (
     association_groups_users as agus,
+)
+from ai.backend.manager.models.group import (
     groups,
     query_group_domain,
     query_group_dotfiles,
 )
+
 from .auth import admin_required, auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware

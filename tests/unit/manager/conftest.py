@@ -3,9 +3,9 @@ from __future__ import annotations
 import logging
 import os
 import secrets
+from collections.abc import Callable
 from functools import partial
 from pathlib import Path
-from typing import Callable
 
 import pytest
 

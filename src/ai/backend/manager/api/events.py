@@ -49,15 +49,16 @@ from ai.backend.common.events.types import EventCacheDomain, EventDomain
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
-from ..errors.common import GenericForbidden
-from ..errors.kernel import SessionNotFound
-from ..errors.resource import NoCurrentTaskContext, ProjectNotFound
-from ..events.hub.propagators.session import SessionEventPropagator
-from ..exceptions import InvalidArgument
-from ..models.group import groups
-from ..models.session import SessionRow
-from ..models.user import UserRole
-from ..types import Sentinel
+from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.errors.resource import NoCurrentTaskContext, ProjectNotFound
+from ai.backend.manager.events.hub.propagators.session import SessionEventPropagator
+from ai.backend.manager.exceptions import InvalidArgument
+from ai.backend.manager.models.group import groups
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.types import Sentinel
+
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .utils import check_api_params

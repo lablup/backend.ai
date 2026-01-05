@@ -13,12 +13,11 @@ from sqlalchemy.orm import load_only, noload
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.data.kernel.types import KernelStatus
-
-from ..api.context import RootContext
-from ..models.kernel import DEAD_KERNEL_STATUSES, KernelRow
-from ..models.session import DEAD_SESSION_STATUSES, SessionRow
-from .base import DEFAULT_SWEEP_INTERVAL_SEC, AbstractSweeper
+from ai.backend.manager.models.kernel import DEAD_KERNEL_STATUSES, KernelRow
+from ai.backend.manager.models.session import DEAD_SESSION_STATUSES, SessionRow
+from ai.backend.manager.sweeper.base import DEFAULT_SWEEP_INTERVAL_SEC, AbstractSweeper
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

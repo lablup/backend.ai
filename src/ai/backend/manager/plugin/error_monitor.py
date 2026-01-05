@@ -12,8 +12,7 @@ from ai.backend.common.plugin.event import AbstractEventDispatcherPlugin
 from ai.backend.common.plugin.monitor import AbstractErrorReporterPlugin
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter, LogLevel
-
-from ..models.error_logs import error_logs
+from ai.backend.manager.models.error_logs import error_logs
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.context import RootContext

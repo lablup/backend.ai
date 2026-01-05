@@ -354,7 +354,7 @@ class TestUserRepository:
         )
         creator = Creator(spec=spec)
 
-        with pytest.raises(UserCreationBadRequest, match="Domain.*does not exist"):
+        with pytest.raises(UserCreationBadRequest, match=r"Domain.*does not exist"):
             await user_repository.create_user_validated(creator, group_ids=[])
 
     @pytest.mark.asyncio
@@ -387,7 +387,7 @@ class TestUserRepository:
         )
         creator = Creator(spec=spec)
 
-        with pytest.raises(UserConflict, match="User with email.*or username.*already exists"):
+        with pytest.raises(UserConflict, match=r"User with email.*or username.*already exists"):
             await user_repository.create_user_validated(creator, group_ids=[])
 
     @pytest.mark.asyncio
@@ -419,7 +419,7 @@ class TestUserRepository:
         )
         creator = Creator(spec=spec)
 
-        with pytest.raises(UserConflict, match="User with email.*or username.*already exists"):
+        with pytest.raises(UserConflict, match=r"User with email.*or username.*already exists"):
             await user_repository.create_user_validated(creator, group_ids=[])
 
     @pytest.mark.asyncio

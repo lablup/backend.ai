@@ -704,8 +704,8 @@ async def get_allowed_vfolder_hosts_by_group(
     If `group_id` is not None, `allowed_vfolder_hosts` from the group is also merged.
     If the requester is a domain admin, gather all `allowed_vfolder_hosts` of the domain groups.
     """
-    from ..domain import domains
-    from ..group import groups
+    from ai.backend.manager.models.domain import domains
+    from ai.backend.manager.models.group import groups
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
@@ -739,8 +739,8 @@ async def get_allowed_vfolder_hosts_by_user(
 
     All available `allowed_vfolder_hosts` of groups which requester associated will be merged.
     """
-    from ..domain import domains
-    from ..group import association_groups_users, groups
+    from ai.backend.manager.models.domain import domains
+    from ai.backend.manager.models.group import association_groups_users, groups
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
