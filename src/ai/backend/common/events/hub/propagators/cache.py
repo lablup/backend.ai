@@ -1,13 +1,13 @@
 import asyncio
 import logging
 import uuid
-from typing import AsyncIterator, Optional
+from collections.abc import AsyncIterator
+from typing import Optional
 
+from ai.backend.common.events.dispatcher import AbstractEvent
 from ai.backend.common.events.fetcher import EventFetcher
+from ai.backend.common.events.hub.hub import EventPropagator
 from ai.backend.logging.utils import BraceStyleAdapter
-
-from ...dispatcher import AbstractEvent
-from ..hub import EventPropagator
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -67,7 +67,7 @@ class WithCachePropagator(EventPropagator):
                 if event is None:
                     break
                 yield event
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # On timeout, check for cached event again
                 cached_event = await self._fetch_cached_event_safe(cache_id)
                 if cached_event is not None:

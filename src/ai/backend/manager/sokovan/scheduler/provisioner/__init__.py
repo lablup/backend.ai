@@ -13,10 +13,10 @@ from . import allocators, selectors, sequencers, validators
 from .provisioner import SessionProvisioner, SessionProvisionerArgs
 
 __all__ = [
+    "SessionProvisioner",
+    "SessionProvisionerArgs",
     "allocators",
     "selectors",
     "sequencers",
     "validators",
-    "SessionProvisioner",
-    "SessionProvisionerArgs",
 ]

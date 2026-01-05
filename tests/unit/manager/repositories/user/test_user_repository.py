@@ -4,7 +4,7 @@ Tests the repository layer with mocked database operations.
 """
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -62,8 +62,8 @@ class TestUserRepository:
             description="Test Description",
             status=UserStatus.ACTIVE,
             status_info="admin-requested",
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             domain_name="default",
             role=UserRole.USER,
             resource_policy="default",
@@ -136,11 +136,13 @@ class TestUserRepository:
         mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
 
         # Mock the _get_user_by_email method to raise UserNotFound
-        with patch.object(
-            user_repository, "_get_user_by_email", side_effect=UserNotFound("User not found")
+        with (
+            patch.object(
+                user_repository, "_get_user_by_email", side_effect=UserNotFound("User not found")
+            ),
+            pytest.raises(UserNotFound),
         ):
-            with pytest.raises(UserNotFound):
-                await user_repository.get_by_email_validated("nonexistent@example.com")
+            await user_repository.get_by_email_validated("nonexistent@example.com")
 
     @pytest.mark.asyncio
     async def test_get_by_email_validated_access_denied(
@@ -194,8 +196,8 @@ class TestUserRepository:
                 created_user_row.description = spec.description
                 created_user_row.need_password_change = spec.need_password_change
                 created_user_row.status_info = "admin-requested"
-                created_user_row.created_at = datetime.now()
-                created_user_row.modified_at = datetime.now()
+                created_user_row.created_at = datetime.now(tz=UTC)
+                created_user_row.modified_at = datetime.now(tz=UTC)
                 created_user_row.resource_policy = spec.resource_policy
                 created_user_row.allowed_client_ip = spec.allowed_client_ip
                 created_user_row.totp_activated = spec.totp_activated
@@ -208,7 +210,7 @@ class TestUserRepository:
 
                 # Mock to_data method
                 def to_data():
-                    user_data = UserData(
+                    return UserData(
                         id=created_user_row.uuid,
                         uuid=created_user_row.uuid,
                         is_active=created_user_row.status == UserStatus.ACTIVE,
@@ -233,7 +235,6 @@ class TestUserRepository:
                         container_main_gid=created_user_row.container_main_gid,
                         container_gids=created_user_row.container_gids,
                     )
-                    return user_data
 
                 created_user_row.to_data = to_data
 
@@ -289,7 +290,7 @@ class TestUserRepository:
         with patch.object(user_repository, "_check_domain_exists", return_value=False):
             from ai.backend.manager.errors.user import UserCreationBadRequest
 
-            with pytest.raises(UserCreationBadRequest, match="Domain.*does not exist"):
+            with pytest.raises(UserCreationBadRequest, match=r"Domain.*does not exist"):
                 await user_repository.create_user_validated(sample_user_creator, group_ids=[])
 
         # Test 2: User with same email or username already exists
@@ -300,7 +301,7 @@ class TestUserRepository:
                 from ai.backend.manager.errors.user import UserConflict
 
                 with pytest.raises(
-                    UserConflict, match="User with email.*or username.*already exists"
+                    UserConflict, match=r"User with email.*or username.*already exists"
                 ):
                     await user_repository.create_user_validated(sample_user_creator, group_ids=[])
 
@@ -339,32 +340,34 @@ class TestUserRepository:
         mock_db_engine.begin.return_value.__aenter__.return_value = mock_conn
 
         # Mock the methods
-        with patch.object(
-            user_repository, "_get_user_by_email_with_conn", return_value=sample_user_row
+        with (
+            patch.object(
+                user_repository, "_get_user_by_email_with_conn", return_value=sample_user_row
+            ),
+            patch.object(user_repository, "_validate_user_access", return_value=True),
         ):
-            with patch.object(user_repository, "_validate_user_access", return_value=True):
-                with patch.object(user_repository, "_update_user_groups", return_value=None):
-                    # Mock execute to return updated user
-                    mock_result = MagicMock()
-                    mock_result.first.return_value = sample_user_row
-                    mock_conn.execute.return_value = mock_result
+            with patch.object(user_repository, "_update_user_groups", return_value=None):
+                # Mock execute to return updated user
+                mock_result = MagicMock()
+                mock_result.first.return_value = sample_user_row
+                mock_conn.execute.return_value = mock_result
 
-                    from ai.backend.manager.types import OptionalState
+                from ai.backend.manager.types import OptionalState
 
-                    updater_spec = UserUpdaterSpec(
-                        full_name=OptionalState.update("Updated Name"),
-                        description=OptionalState.update("Updated Description"),
-                    )
-                    updater = Updater(spec=updater_spec, pk_value="test@example.com")
+                updater_spec = UserUpdaterSpec(
+                    full_name=OptionalState.update("Updated Name"),
+                    description=OptionalState.update("Updated Description"),
+                )
+                updater = Updater(spec=updater_spec, pk_value="test@example.com")
 
-                    result = await user_repository.update_user_validated(
-                        email="test@example.com",
-                        updater=updater,
-                        requester_uuid=None,
-                    )
+                result = await user_repository.update_user_validated(
+                    email="test@example.com",
+                    updater=updater,
+                    requester_uuid=None,
+                )
 
-                    assert result is not None
-                    assert isinstance(result, UserData)
+                assert result is not None
+                assert isinstance(result, UserData)
 
     @pytest.mark.asyncio
     async def test_update_user_validated_not_found(
@@ -376,23 +379,25 @@ class TestUserRepository:
         mock_db_engine.begin.return_value.__aenter__.return_value = mock_conn
 
         # Mock the _get_user_by_email_with_conn method to raise UserNotFound
-        with patch.object(
-            user_repository,
-            "_get_user_by_email_with_conn",
-            side_effect=UserNotFound("User not found"),
+        with (
+            patch.object(
+                user_repository,
+                "_get_user_by_email_with_conn",
+                side_effect=UserNotFound("User not found"),
+            ),
+            pytest.raises(UserNotFound),
         ):
-            with pytest.raises(UserNotFound):
-                from ai.backend.manager.types import OptionalState
+            from ai.backend.manager.types import OptionalState
 
-                updater_spec = UserUpdaterSpec(
-                    full_name=OptionalState.update("Updated Name"),
-                )
-                updater = Updater(spec=updater_spec, pk_value="nonexistent@example.com")
-                await user_repository.update_user_validated(
-                    email="nonexistent@example.com",
-                    updater=updater,
-                    requester_uuid=None,
-                )
+            updater_spec = UserUpdaterSpec(
+                full_name=OptionalState.update("Updated Name"),
+            )
+            updater = Updater(spec=updater_spec, pk_value="nonexistent@example.com")
+            await user_repository.update_user_validated(
+                email="nonexistent@example.com",
+                updater=updater,
+                requester_uuid=None,
+            )
 
     @pytest.mark.asyncio
     async def test_update_user_validated_access_denied(
@@ -413,16 +418,18 @@ class TestUserRepository:
         mock_db_engine.begin.return_value.__aenter__.return_value = mock_conn
 
         # Mock the methods
-        with patch.object(
-            user_repository, "_get_user_by_email_with_conn", return_value=sample_user_row
+        with (
+            patch.object(
+                user_repository, "_get_user_by_email_with_conn", return_value=sample_user_row
+            ),
+            patch.object(user_repository, "_validate_user_access", return_value=True),
         ):
-            with patch.object(user_repository, "_validate_user_access", return_value=True):
-                await user_repository.soft_delete_user_validated(
-                    email="test@example.com", requester_uuid=None
-                )
+            await user_repository.soft_delete_user_validated(
+                email="test@example.com", requester_uuid=None
+            )
 
-                # Verify the soft delete method was called
-                assert mock_conn.execute.called
+            # Verify the soft delete method was called
+            assert mock_conn.execute.called
 
     @pytest.mark.asyncio
     async def test_get_user_time_binned_monthly_stats(
@@ -511,8 +518,8 @@ class TestUserRepositoryIntegration:
             description="Test Description",
             status=UserStatus.ACTIVE,
             status_info="admin-requested",
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             domain_name="default",
             role=UserRole.USER,
             resource_policy="default",

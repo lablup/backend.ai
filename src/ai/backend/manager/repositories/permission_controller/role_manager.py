@@ -15,6 +15,10 @@ from ai.backend.manager.data.permission.permission_group import (
     PermissionGroupCreator,
     PermissionGroupData,
 )
+from ai.backend.manager.data.permission.role import (
+    RoleData,
+)
+from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
@@ -33,11 +37,6 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     ObjectPermissionCreatorSpec,
     RoleCreatorSpec,
 )
-
-from ...data.permission.role import (
-    RoleData,
-)
-from ...data.permission.status import RoleStatus
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 

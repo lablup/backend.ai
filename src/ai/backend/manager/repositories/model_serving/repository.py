@@ -155,9 +155,7 @@ class ModelServingRepository:
             )
             result = await session.execute(query)
             rows = cast(list[EndpointRow], result.scalars().all())
-            data_list = [row.to_data() for row in rows]
-
-            return data_list
+            return [row.to_data() for row in rows]
 
     @model_serving_repository_resilience.apply()
     async def check_endpoint_name_uniqueness(self, name: str) -> bool:
@@ -196,9 +194,7 @@ class ModelServingRepository:
             endpoint_row.url = await registry.create_appproxy_endpoint(
                 db_sess, endpoint_before_assign_url
             )
-            data = endpoint_row.to_data()
-
-        return data
+            return endpoint_row.to_data()
 
     @model_serving_repository_resilience.apply()
     async def update_endpoint_lifecycle_validated(
@@ -397,7 +393,7 @@ class ModelServingRepository:
             query = (
                 sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
                 .select_from(scaling_groups)
-                .where((scaling_groups.c.name == scaling_group_name))
+                .where(scaling_groups.c.name == scaling_group_name)
             )
             result = await session.execute(query)
             row = result.first()
@@ -968,7 +964,7 @@ class ModelServingRepository:
         except StatementError as e:
             orig_exc = e.orig
             return MutationResult(success=False, message=str(orig_exc), data=None)
-        except (asyncio.CancelledError, asyncio.TimeoutError):
+        except (TimeoutError, asyncio.CancelledError):
             raise
         except Exception:
             raise

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping, Sequence
-from typing import Any, Callable, Optional, Self
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any, Optional, Self
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -11,8 +11,7 @@ from sqlalchemy.orm import relationship
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
-
-from ..base import (
+from ai.backend.manager.models.base import (
     Base,
     IDColumn,
     ResourceSlotColumn,

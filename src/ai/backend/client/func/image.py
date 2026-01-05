@@ -1,10 +1,11 @@
-from typing import Optional, Sequence
+from collections.abc import Sequence
+from typing import Optional
 
 from ai.backend.client.output.fields import image_fields
 from ai.backend.client.output.types import FieldSpec
+from ai.backend.client.session import api_session
+from ai.backend.client.utils import dedent as _d
 
-from ..session import api_session
-from ..utils import dedent as _d
 from .base import BaseFunction, api_function
 
 __all__ = ("Image",)

@@ -8,7 +8,7 @@ Repository tests verify actual DB operations separately.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -76,8 +76,8 @@ class TestCreateGroup:
             name="test_create_group",
             description="test group description",
             is_active=True,
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             integration_id=None,
             domain_name="default",
             total_resource_slots=ResourceSlot.from_user_input({}, None),
@@ -206,8 +206,8 @@ class TestModifyGroup:
             name="modified_name",
             description="modified description",
             is_active=False,
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             integration_id=None,
             domain_name="default",
             total_resource_slots=ResourceSlot.from_user_input({}, None),

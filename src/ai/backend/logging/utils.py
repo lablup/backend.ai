@@ -4,12 +4,15 @@ import logging
 from collections.abc import Iterable, Iterator, Mapping, MutableMapping
 from contextlib import contextmanager
 from contextvars import ContextVar
-from types import TracebackType
+from types import MappingProxyType, TracebackType
 from typing import Any, LiteralString, TypeAlias, TypedDict, cast, override
 
 from ai.backend.logging.otel import OpenTelemetrySpec
 
-_log_context_fields: ContextVar[Mapping[str, Any]] = ContextVar("log_context_fields", default={})
+_EMPTY_MAPPING: Mapping[str, Any] = MappingProxyType({})
+_log_context_fields: ContextVar[Mapping[str, Any]] = ContextVar(
+    "log_context_fields", default=_EMPTY_MAPPING
+)
 
 __all__ = (
     "BraceMessage",
@@ -42,7 +45,7 @@ class ContextKWArgs(TypedDict):
 
 
 class BraceMessage:
-    __slots__ = ("fmt", "args", "kwargs")
+    __slots__ = ("args", "fmt", "kwargs")
 
     def __init__(self, fmt: str, args: tuple[Any, ...], kwargs: Mapping[str, Any]) -> None:
         self.fmt = fmt

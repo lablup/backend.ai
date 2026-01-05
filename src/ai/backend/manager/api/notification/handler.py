@@ -5,8 +5,8 @@ Provides CRUD endpoints for notification channels and rules.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from http import HTTPStatus
-from typing import Iterable, Tuple
 
 import aiohttp_cors
 from aiohttp import web
@@ -39,6 +39,8 @@ from ai.backend.common.dto.manager.notification import (
     ValidateNotificationRuleRequest,
     ValidateNotificationRuleResponse,
 )
+from ai.backend.manager.api.auth import auth_required_for_method
+from ai.backend.manager.api.types import CORSOptions, WebMiddleware
 from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.dto.notification_request import (
     DeleteNotificationChannelPathParam,
@@ -71,8 +73,6 @@ from ai.backend.manager.services.notification.actions import (
     ValidateRuleAction,
 )
 
-from ..auth import auth_required_for_method
-from ..types import CORSOptions, WebMiddleware
 from .adapter import NotificationChannelAdapter, NotificationRuleAdapter
 
 __all__ = ("create_app",)
@@ -469,7 +469,7 @@ class NotificationAPIHandler:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     """Create aiohttp application for notification API endpoints."""
     app = web.Application()
     app["api_versions"] = (4, 5)

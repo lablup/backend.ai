@@ -338,8 +338,7 @@ class AdminUserRepository:
                 result = await conn.execute(update_query)
                 rowcount += result.rowcount
             return rowcount
-        else:
-            return 0
+        return 0
 
     async def _delete_vfolders(
         self,
@@ -383,8 +382,7 @@ class AdminUserRepository:
         except VFolderOperationFailed:
             raise
 
-        deleted_count = len(target_vfs)
-        return deleted_count
+        return len(target_vfs)
 
     async def _delete_keypairs_with_valkey(
         self,

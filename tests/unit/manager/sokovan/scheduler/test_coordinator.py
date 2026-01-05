@@ -44,15 +44,13 @@ def mock_valkey_schedule():
 @pytest.fixture
 def mock_event_producer():
     """Mock EventProducer for testing."""
-    mock = MagicMock(spec=EventProducer)
-    return mock
+    return MagicMock(spec=EventProducer)
 
 
 @pytest.fixture
 def mock_scheduler_dispatcher():
     """Mock SchedulerDispatcher for testing."""
-    mock = MagicMock(spec=SchedulerDispatcher)
-    return mock
+    return MagicMock(spec=SchedulerDispatcher)
 
 
 @pytest.fixture

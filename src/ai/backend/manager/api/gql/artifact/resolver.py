@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import uuid
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
+from typing import Optional
 
 import strawberry
 from strawberry import ID, Info
@@ -109,7 +110,7 @@ from .types import (
 )
 async def artifacts(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ArtifactFilter] = ArtifactFilter(availability=[ArtifactAvailability.ALIVE]),
+    filter: Optional[ArtifactFilter] = None,
     order_by: Optional[list[ArtifactOrderBy]] = None,
     before: Optional[str] = None,
     after: Optional[str] = None,
@@ -118,6 +119,8 @@ async def artifacts(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ArtifactConnection:
+    if filter is None:
+        filter = ArtifactFilter(availability=[ArtifactAvailability.ALIVE])
     return await fetch_artifacts(
         info,
         filter,

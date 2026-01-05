@@ -20,8 +20,7 @@ from ai.backend.manager.data.permission.status import (
     RoleStatus,
 )
 from ai.backend.manager.data.permission.types import RoleSource
-
-from ..base import (
+from ai.backend.manager.models.base import (
     Base,
     IDColumn,
     StrEnumType,

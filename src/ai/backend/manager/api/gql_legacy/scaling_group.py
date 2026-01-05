@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    Mapping,
     Optional,
     Self,
     cast,
@@ -24,6 +22,17 @@ from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentStatus
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForDomainRow,
+    ScalingGroupForKeypairsRow,
+    ScalingGroupForProjectRow,
+    ScalingGroupOpts,
+    ScalingGroupRow,
+    scaling_groups,
+    sgroups_for_domains,
+    sgroups_for_groups,
+    sgroups_for_keypairs,
+)
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
@@ -35,17 +44,6 @@ from ai.backend.manager.services.scaling_group.actions.purge_scaling_group impor
     PurgeScalingGroupAction,
 )
 
-from ...models.scaling_group import (
-    ScalingGroupForDomainRow,
-    ScalingGroupForKeypairsRow,
-    ScalingGroupForProjectRow,
-    ScalingGroupOpts,
-    ScalingGroupRow,
-    scaling_groups,
-    sgroups_for_domains,
-    sgroups_for_groups,
-    sgroups_for_keypairs,
-)
 from .base import (
     batch_multiresult,
     batch_multiresult_in_scalar_stream,
@@ -62,26 +60,26 @@ if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
 __all__ = (
-    "ScalingGroup",
-    "ScalingGroupNode",
-    "ScalingGroupConnection",
-    "CreateScalingGroup",
-    "ModifyScalingGroup",
-    "DeleteScalingGroup",
     "AssociateScalingGroupWithDomain",
-    "AssociateScalingGroupsWithDomain",
-    "DisassociateScalingGroupWithDomain",
-    "DisassociateScalingGroupsWithDomain",
-    "DisassociateAllScalingGroupsWithDomain",
-    "AssociateScalingGroupWithUserGroup",
-    "AssociateScalingGroupsWithUserGroup",
-    "DisassociateScalingGroupWithUserGroup",
-    "DisassociateScalingGroupsWithUserGroup",
-    "DisassociateAllScalingGroupsWithGroup",
     "AssociateScalingGroupWithKeyPair",
+    "AssociateScalingGroupWithUserGroup",
+    "AssociateScalingGroupsWithDomain",
     "AssociateScalingGroupsWithKeyPair",
+    "AssociateScalingGroupsWithUserGroup",
+    "CreateScalingGroup",
+    "DeleteScalingGroup",
+    "DisassociateAllScalingGroupsWithDomain",
+    "DisassociateAllScalingGroupsWithGroup",
+    "DisassociateScalingGroupWithDomain",
     "DisassociateScalingGroupWithKeyPair",
+    "DisassociateScalingGroupWithUserGroup",
+    "DisassociateScalingGroupsWithDomain",
     "DisassociateScalingGroupsWithKeyPair",
+    "DisassociateScalingGroupsWithUserGroup",
+    "ModifyScalingGroup",
+    "ScalingGroup",
+    "ScalingGroupConnection",
+    "ScalingGroupNode",
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -128,7 +126,7 @@ class ScalingGroupNode(graphene.ObjectType):
         )
 
     # TODO: Refactor with action-processor structure, check permission
-    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> "ScalingGroupNode":
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> ScalingGroupNode:
         _, scaling_group_name = AsyncNode.resolve_global_id(info, self.id)
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_readonly_session() as db_session:
@@ -331,7 +329,7 @@ class ScalingGroup(graphene.ObjectType):
     async def resolve_resource_allocation_limit_for_sessions(
         self, info: graphene.ResolveInfo
     ) -> dict[str, Any]:
-        from ...models.agent import AgentRow
+        from ai.backend.manager.models.agent import AgentRow
 
         # TODO: Allow admins to set which value to return here among "min", "max", "custom"
         graph_ctx: GraphQueryContext = info.context
@@ -357,7 +355,11 @@ class ScalingGroup(graphene.ObjectType):
     async def resolve_own_session_occupied_resource_slots(
         self, info: graphene.ResolveInfo
     ) -> Mapping[str, Any]:
-        from ...models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
+        from ai.backend.manager.models.kernel import (
+            AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+            KernelRow,
+        )
+
         from .agent import AgentRow
 
         graph_ctx: GraphQueryContext = info.context
@@ -683,7 +685,7 @@ class ModifyScalingGroup(graphene.Mutation):
         name: str,
         props: ModifyScalingGroupInput,
     ) -> ModifyScalingGroup:
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
         set_if_set(props, data, "description")
         set_if_set(props, data, "is_active")
         set_if_set(props, data, "is_public")

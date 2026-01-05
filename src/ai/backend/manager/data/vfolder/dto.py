@@ -1,6 +1,7 @@
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional, Self
+from typing import Any, Optional, Self
 
 from ai.backend.common.dto.manager.context import KeypairCtx, UserIdentityCtx
 from ai.backend.common.dto.manager.field import (

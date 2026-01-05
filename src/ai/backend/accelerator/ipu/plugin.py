@@ -2,19 +2,13 @@ import asyncio
 import ipaddress
 import json
 import logging
+from collections.abc import Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Dict,
-    List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
-    Set,
-    Tuple,
 )
 
 import aiodocker
@@ -66,7 +60,7 @@ _config_iv = t.Dict({
 }).allow_extra("*")
 
 
-async def exec_command(command: str, args: List[str]) -> Tuple[bytes, bytes]:
+async def exec_command(command: str, args: list[str]) -> tuple[bytes, bytes]:
     proc = await asyncio.create_subprocess_exec(
         command, *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
@@ -75,15 +69,15 @@ async def exec_command(command: str, args: List[str]) -> Tuple[bytes, bytes]:
 
 class IPUPlugin(AbstractComputePlugin):
     key = DeviceName("ipu")
-    slot_types: Sequence[Tuple[SlotName, SlotTypes]] = (
+    slot_types: Sequence[tuple[SlotName, SlotTypes]] = (
         (SlotName("ipu.device"), SlotTypes("count")),
     )
-    exclusive_slot_types: Set[str] = {"ipu.device"}
+    exclusive_slot_types: set[str] = {"ipu.device"}
 
     device_mask: Sequence[DeviceId] = []
     enabled: bool = True
 
-    ipu_config: Dict[str, Any]
+    ipu_config: dict[str, Any]
 
     _all_devices: Optional[list[IPUDevice]]
     ipuof_devices: Mapping[str, Any]
@@ -103,7 +97,7 @@ class IPUPlugin(AbstractComputePlugin):
         log.info("Read IPU device configs from {}", cfg_src_path)
 
         def _read_json():
-            with open(self.ipu_config["ipuof-config-path"], "r") as fr:
+            with open(self.ipu_config["ipuof-config-path"]) as fr:
                 return json.loads(fr.read())
 
         try:
@@ -129,7 +123,7 @@ class IPUPlugin(AbstractComputePlugin):
             log.warning("error while preparing docker networks: " + e.args[0])
             self.enabled = False
 
-    async def list_devices(self) -> List[IPUDevice]:
+    async def list_devices(self) -> list[IPUDevice]:
         if self._all_devices is not None:
             return self._all_devices
         graphcore_info = await GraphcoreAPI.get_monitor_info()
@@ -160,7 +154,7 @@ class IPUPlugin(AbstractComputePlugin):
     async def prepare_networks(self) -> None:
         self.subnet_network_map = {}
         docker_network_identifiers = self.ipu_config["docker-networks"]
-        network_map: Dict[str, Any] = {}
+        network_map: dict[str, Any] = {}
         async with aiodocker.Docker() as docker:
             networks = await docker.networks.list()
             for network in networks:
@@ -255,10 +249,10 @@ class IPUPlugin(AbstractComputePlugin):
         ctx: StatContext,
         container_ids: Sequence[str],
     ) -> Sequence[ContainerMeasurement]:
-        mem_stats: Dict[str, int] = {}
-        mem_sizes: Dict[str, int] = {}
-        util_stats: Dict[str, Decimal] = {}
-        number_of_devices_per_container: Dict[str, int] = {}
+        mem_stats: dict[str, int] = {}
+        mem_sizes: dict[str, int] = {}
+        util_stats: dict[str, Decimal] = {}
+        number_of_devices_per_container: dict[str, int] = {}
         if self.enabled:
             inventory_map: dict[DeviceId, dict[str, str]] = {
                 DeviceId(i["id"]): i for i in await GraphcoreAPI.get_inventories()
@@ -334,20 +328,19 @@ class IPUPlugin(AbstractComputePlugin):
 
     async def create_alloc_map(self) -> DiscretePropertyAllocMap:
         devices = await self.list_devices()
-        dpam = DiscretePropertyAllocMap(
+        return DiscretePropertyAllocMap(
             device_slots={
                 dev.device_id: DeviceSlotInfo(SlotTypes.COUNT, SlotName("ipu.device"), Decimal(1))
                 for dev in devices
             },
             exclusive_slot_types=self.exclusive_slot_types,
         )
-        return dpam
 
     async def generate_mounts(
         self,
         source_path: Path,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         devices = await self.list_devices()
         target_devices_ipuof_config = [
             self.ipuof_devices[d.hw_location]
@@ -378,7 +371,7 @@ class IPUPlugin(AbstractComputePlugin):
 
     async def get_docker_networks(
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[str]:
+    ) -> list[str]:
         devices = await self.list_devices()
 
         return list({
@@ -413,11 +406,11 @@ class IPUPlugin(AbstractComputePlugin):
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Sequence[DeviceModelInfo]:
-        device_ids: List[DeviceId] = []
+        device_ids: list[DeviceId] = []
         if SlotName("ipu.device") in device_alloc:
             device_ids.extend(device_alloc[SlotName("ipu.device")].keys())
         available_devices = await self.list_devices()
-        attached_devices: List[DeviceModelInfo] = []
+        attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
                 proc = device.processing_units
@@ -476,7 +469,7 @@ class IPUPlugin(AbstractComputePlugin):
         if not self.enabled:
             return data
 
-        active_device_id_set: Set[DeviceId] = set()
+        active_device_id_set: set[DeviceId] = set()
         for slot_type, per_device_alloc in device_alloc.items():
             for dev_id, alloc in per_device_alloc.items():
                 if alloc > 0:

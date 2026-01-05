@@ -19,14 +19,13 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
     SubStepResult,
 )
-
-from ..base import GUID, Base, IDColumn
+from ai.backend.manager.models.base import GUID, Base, IDColumn
 
 __all__ = (
-    "SessionSchedulingHistoryRow",
-    "KernelSchedulingHistoryRow",
     "DeploymentHistoryRow",
+    "KernelSchedulingHistoryRow",
     "RouteHistoryRow",
+    "SessionSchedulingHistoryRow",
 )
 
 

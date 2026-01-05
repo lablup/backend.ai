@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ai.backend.common.dto.internal.health import (
     ComponentConnectivityStatus,
@@ -10,7 +10,7 @@ from ai.backend.common.dto.internal.health import (
 
 def test_component_health_status_creation() -> None:
     """Test ComponentConnectivityStatus Pydantic model creation."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     status = ComponentConnectivityStatus(
         service_group="manager",
         component_id="postgres",
@@ -28,7 +28,7 @@ def test_component_health_status_creation() -> None:
 
 def test_component_health_status_with_error() -> None:
     """Test ComponentConnectivityStatus with error message."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     error_msg = "Connection failed"
 
     status = ComponentConnectivityStatus(
@@ -45,7 +45,7 @@ def test_component_health_status_with_error() -> None:
 
 def test_component_health_status_serialization() -> None:
     """Test ComponentConnectivityStatus JSON serialization and deserialization."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     status = ComponentConnectivityStatus(
         service_group="manager",
         component_id="postgres",
@@ -84,7 +84,7 @@ def test_component_health_status_has_field_descriptions() -> None:
 
 def test_health_check_response_creation() -> None:
     """Test ConnectivityCheckResponse Pydantic model creation."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     component1 = ComponentConnectivityStatus(
         service_group="manager",
@@ -115,7 +115,7 @@ def test_health_check_response_creation() -> None:
 
 def test_health_check_response_with_unhealthy_components() -> None:
     """Test ConnectivityCheckResponse with unhealthy components."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     component1 = ComponentConnectivityStatus(
         service_group="manager",
@@ -145,7 +145,7 @@ def test_health_check_response_with_unhealthy_components() -> None:
 
 def test_health_check_response_serialization() -> None:
     """Test ConnectivityCheckResponse JSON serialization and deserialization."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     component = ComponentConnectivityStatus(
         service_group="manager",
@@ -188,7 +188,7 @@ def test_health_check_response_has_field_descriptions() -> None:
 
 def test_health_check_response_empty_components() -> None:
     """Test ConnectivityCheckResponse with no components."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     response = ConnectivityCheckResponse(
         overall_healthy=True,

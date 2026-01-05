@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
     Optional,
     Self,
-    Sequence,
 )
 
 import graphene
@@ -25,7 +24,19 @@ from ai.backend.common.exception import (
 )
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.models.group import (
+    AssocGroupUserRow,
+    GroupRow,
+    ProjectType,
+    association_groups_users,
+    get_permission_ctx,
+    groups,
+)
+from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from ai.backend.manager.models.rbac import ProjectScope
+from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.rbac.permission_defs import ProjectPermission
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -41,18 +52,6 @@ from ai.backend.manager.services.group.actions.purge_group import (
 )
 from ai.backend.manager.types import OptionalState, TriState
 
-from ...models.group import (
-    AssocGroupUserRow,
-    GroupRow,
-    ProjectType,
-    association_groups_users,
-    get_permission_ctx,
-    groups,
-)
-from ...models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ...models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
-from ...models.rbac.context import ClientContext
-from ...models.rbac.permission_defs import ProjectPermission
 from .base import (
     BigInt,
     FilterExprArg,
@@ -71,22 +70,23 @@ from .gql_relay import (
 from .user import UserConnection, UserNode
 
 if TYPE_CHECKING:
-    from ...models.rbac import ContainerRegistryScope, ScopeType
+    from ai.backend.manager.models.rbac import ContainerRegistryScope, ScopeType
+
     from .scaling_group import ScalingGroup
     from .schema import GraphQueryContext
 
 
 __all__ = (
-    "GroupNode",
-    "GroupConnection",
-    "Group",
-    "GroupInput",
-    "ModifyGroupInput",
     "CreateGroup",
-    "ModifyGroup",
     "DeleteGroup",
-    "PurgeGroup",
+    "Group",
+    "GroupConnection",
+    "GroupInput",
+    "GroupNode",
     "GroupPermissionField",
+    "ModifyGroup",
+    "ModifyGroupInput",
+    "PurgeGroup",
 )
 
 
@@ -181,7 +181,7 @@ class GroupNode(graphene.ObjectType):
         before: str | None = None,
         last: int | None = None,
     ) -> ConnectionResolverResult[Self]:
-        from ...models.user import UserRow
+        from ai.backend.manager.models.user import UserRow
 
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
@@ -333,6 +333,7 @@ class GroupPermissionField(graphene.Scalar):
     def parse_literal(node: Any, _variables=None):
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ProjectPermission(node.value)
+        return None
 
     @staticmethod
     def parse_value(value: str) -> ProjectPermission:
@@ -418,8 +419,10 @@ class Group(graphene.ObjectType):
         *,
         domain_name: Optional[str] = None,
         is_active: Optional[bool] = None,
-        type: list[ProjectType] = [ProjectType.GENERAL],
+        type: list[ProjectType] | None = None,
     ) -> Sequence[Group]:
+        if type is None:
+            type = [ProjectType.GENERAL]
         query = sa.select([groups]).select_from(groups).where(groups.c.type.in_(type))
         if domain_name is not None:
             query = query.where(groups.c.domain_name == domain_name)

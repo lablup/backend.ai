@@ -5,14 +5,14 @@ from typing import TYPE_CHECKING
 import sqlalchemy as sa
 from sqlalchemy.orm import relationship
 
-from ...data.notification import (
+from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationChannelType,
     NotificationRuleData,
     NotificationRuleType,
     WebhookConfig,
 )
-from ..base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     IDColumn,
@@ -23,10 +23,10 @@ if TYPE_CHECKING:
 
 
 __all__ = (
-    "NotificationChannelType",
-    "WebhookConfig",
     "NotificationChannelRow",
+    "NotificationChannelType",
     "NotificationRuleRow",
+    "WebhookConfig",
 )
 
 

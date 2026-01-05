@@ -27,7 +27,7 @@ class DestroyingDeploymentHandler(DeploymentHandler):
         deployment_executor: DeploymentExecutor,
         deployment_controller: DeploymentController,
         route_controller: RouteController,
-    ):
+    ) -> None:
         self._deployment_executor = deployment_executor
         self._deployment_controller = deployment_controller
         self._route_controller = route_controller

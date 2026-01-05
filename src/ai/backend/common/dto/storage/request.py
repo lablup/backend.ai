@@ -4,12 +4,11 @@ from typing import Optional
 
 from pydantic import Field
 
+from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
-
-from ...api_handlers import BaseRequestModel
-from ...data.storage.registries.types import ModelSortKey, ModelTarget
-from ...type_adapters import VFolderIDField
-from ...types import QuotaConfig
+from ai.backend.common.type_adapters import VFolderIDField
+from ai.backend.common.types import QuotaConfig
 
 
 class QuotaScopeReq(BaseRequestModel):

@@ -15,10 +15,10 @@ import sys
 import time
 import traceback
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, AsyncIterator, Final, Iterable, Mapping, Sequence, cast
+from typing import TYPE_CHECKING, Any, Final, cast
 from uuid import UUID
 
 import aiohttp_cors
@@ -158,8 +158,7 @@ async def request_context_aware_middleware(
     request["request_id"] = request_id
     if _current_task := asyncio.current_task():
         setattr(_current_task, "request_id", request_id)
-    resp = await handler(request)
-    return resp
+    return await handler(request)
 
 
 @web.middleware
@@ -177,8 +176,7 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
     if ex is not None:
         # handled by exception_middleware
         raise ex
-    resp = await _handler(request)
-    return resp
+    return await _handler(request)
 
 
 @web.middleware
@@ -201,13 +199,12 @@ async def exception_middleware(
                 status=ex.status_code,
                 headers={"Access-Control-Allow-Origin": "*"},
             )
-        else:
-            return aiohttp_jinja2.render_template(
-                "error",
-                request,
-                ex.body_dict,
-                status=ex.status_code,
-            )
+        return aiohttp_jinja2.render_template(
+            "error",
+            request,
+            ex.body_dict,
+            status=ex.status_code,
+        )
     except web.HTTPException as ex:
         if ex.status_code == 404:
             raise URLNotFound(extra_data=request.path)
@@ -227,8 +224,7 @@ async def exception_middleware(
         log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
         if root_ctx.local_config.debug.enabled:
             raise InternalServerError(traceback.format_exc())
-        else:
-            raise InternalServerError()
+        raise InternalServerError()
     else:
         return resp
 
@@ -306,11 +302,10 @@ async def _make_message_queue(
             stream_redis_target,
             args,
         )
-    else:
-        return await RedisQueue.create(
-            stream_redis_target,
-            args,
-        )
+    return await RedisQueue.create(
+        stream_redis_target,
+        args,
+    )
 
 
 @asynccontextmanager
@@ -604,7 +599,8 @@ async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def health_check_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from ..common.events import DoHealthCheckEvent
+    from ai.backend.appproxy.common.events import DoHealthCheckEvent
+
     from .health_checker import HealthCheckEngine
 
     health_engine = HealthCheckEngine(
@@ -656,7 +652,7 @@ async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[Non
                 if len(non_inference_http_circuits) == 0:
                     return []
                 last_access = await root_ctx.valkey_live.get_multiple_live_data([
-                    f"circuit.{str(c.id)}.last_access" for c in non_inference_http_circuits
+                    f"circuit.{c.id!s}.last_access" for c in non_inference_http_circuits
                 ])
                 unused_circuits: list[Circuit] = []
 
@@ -828,11 +824,10 @@ async def metrics(request: web.Request) -> web.Response:
     except ValueError:
         raise GenericForbidden
 
-    response = web.Response(
+    return web.Response(
         text=root_ctx.metrics.to_prometheus(),
         content_type="text/plain",
     )
-    return response
 
 
 async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
@@ -1011,7 +1006,7 @@ def build_root_app(
         if pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.appproxy.coordinator.api")
-        init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+        init_subapp(pkg_name, app, subapp_mod.create_app)
     return app
 
 

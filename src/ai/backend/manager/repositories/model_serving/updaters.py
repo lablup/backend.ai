@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any
-
-from typing_extensions import override
+from typing import Any, override
 
 from ai.backend.common.types import (
     AutoScalingMetricComparator,

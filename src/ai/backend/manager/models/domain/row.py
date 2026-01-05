@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Container, Iterable
+from collections.abc import Container, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import (
-    List,
     Optional,
     Self,
-    Sequence,
     TypeAlias,
     TypedDict,
     cast,
@@ -26,16 +24,15 @@ from ai.backend.common import msgpack
 from ai.backend.common.types import VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.domain.types import DomainData
-
-from ...defs import RESERVED_DOTFILES
-from ..base import (
+from ai.backend.manager.defs import RESERVED_DOTFILES
+from ai.backend.manager.models.base import (
     Base,
     ResourceSlotColumn,
     SlugType,
     VFolderHostPermissionColumn,
     mapper_registry,
 )
-from ..rbac import (
+from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -46,17 +43,17 @@ from ..rbac import (
     get_predefined_roles_in_scope,
     required_permission,
 )
-from ..rbac.context import ClientContext
-from ..rbac.permission_defs import DomainPermission
+from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.rbac.permission_defs import DomainPermission
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 __all__: Sequence[str] = (
-    "domains",
-    "DomainRow",
-    "DomainDotfile",
     "MAXIMUM_DOTFILE_SIZE",
+    "DomainDotfile",
+    "DomainRow",
+    "domains",
     "query_domain_dotfiles",
     "verify_dotfile_name",
 )
@@ -201,7 +198,7 @@ class DomainDotfile(TypedDict):
 async def query_domain_dotfiles(
     conn: SAConnection,
     name: str,
-) -> tuple[List[DomainDotfile], int]:
+) -> tuple[list[DomainDotfile], int]:
     query = sa.select([domains.c.dotfiles]).select_from(domains).where(domains.c.name == name)
     packed_dotfile = await conn.scalar(query)
     if packed_dotfile is None:
@@ -211,9 +208,7 @@ async def query_domain_dotfiles(
 
 
 def verify_dotfile_name(dotfile: str) -> bool:
-    if dotfile in RESERVED_DOTFILES:
-        return False
-    return True
+    return dotfile not in RESERVED_DOTFILES
 
 
 ALL_DOMAIN_PERMISSIONS = frozenset([perm for perm in DomainPermission])
@@ -290,8 +285,7 @@ class DomainPermissionContextBuilder(
         target_scope: ScopeType,
     ) -> frozenset[DomainPermission]:
         roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
-        permissions = await self._calculate_permission_by_predefined_roles(roles)
-        return permissions
+        return await self._calculate_permission_by_predefined_roles(roles)
 
     @override
     async def build_ctx_in_system_scope(
@@ -372,8 +366,7 @@ async def get_permission_ctx(
     db_session: SASession,
 ) -> DomainPermissionContext:
     builder = DomainPermissionContextBuilder(db_session)
-    permission_ctx = await builder.build(ctx, target_scope, requested_permission)
-    return permission_ctx
+    return await builder.build(ctx, target_scope, requested_permission)
 
 
 async def get_domains(

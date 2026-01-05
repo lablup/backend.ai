@@ -1,4 +1,5 @@
-from typing import Awaitable, Callable, Generic, Optional, Self, TypeVar
+from collections.abc import Awaitable, Callable
+from typing import Generic, Optional, Self, TypeVar
 
 import pytest
 
@@ -20,7 +21,7 @@ class ScenarioBase(Generic[TInput, TResult]):
         input: TInput,
         expected: Optional[TResult],
         expected_exception: Optional[TException],
-    ):
+    ) -> None:
         self.description = description
         self.input = input
         self.expected = expected
@@ -37,8 +38,7 @@ class ScenarioBase(Generic[TInput, TResult]):
     async def test(self, fn: Callable[[TInput], Awaitable[Optional[TResult]]]) -> None:
         if self.expected_exception is not None:
             with pytest.raises(self.expected_exception):
-                result = await fn(self.input)
-                print(f"error result: {result}")
+                await fn(self.input)
         else:
             result = await fn(self.input)
             assert result == self.expected

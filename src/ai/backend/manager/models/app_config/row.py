@@ -1,22 +1,21 @@
 from __future__ import annotations
 
 import logging
-from typing import Sequence
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.app_config.types import AppConfigData, AppConfigScopeType
-
-from ..base import Base, IDColumn
+from ai.backend.manager.models.base import Base, IDColumn
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 __all__: Sequence[str] = (
-    "AppConfigScopeType",
     "AppConfigRow",
+    "AppConfigScopeType",
 )
 
 

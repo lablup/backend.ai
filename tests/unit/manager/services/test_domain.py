@@ -7,7 +7,7 @@ Repository tests verify actual DB operations separately.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
@@ -98,8 +98,8 @@ class TestCreateDomain:
             name="test-create-domain",
             description="Test domain",
             is_active=True,
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             total_resource_slots=ResourceSlot.from_user_input({}, None),
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],
@@ -113,8 +113,8 @@ class TestCreateDomain:
             name="test-complex-resources",
             description="Test domain with complex resource slots",
             is_active=True,
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             total_resource_slots=ResourceSlot.from_user_input(
                 {"cpu": "10", "mem": "64G", "cuda.device": "2"}, None
             ),
@@ -281,8 +281,8 @@ class TestModifyDomain:
             name="test-modify-domain",
             description="Domain Description Modified",
             is_active=True,
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             total_resource_slots=ResourceSlot.from_user_input({}, None),
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],
@@ -296,8 +296,8 @@ class TestModifyDomain:
             name="test-domain",
             description="Test domain",
             is_active=False,
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             total_resource_slots=ResourceSlot.from_user_input({}, None),
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],
@@ -311,8 +311,8 @@ class TestModifyDomain:
             name="test-nullify-domain",
             description=None,
             is_active=True,
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             total_resource_slots=ResourceSlot.from_user_input({}, None),
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],
@@ -664,8 +664,8 @@ class TestCreateDomainNode:
             name="test-domain-node",
             description="Test domain node",
             is_active=True,
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             total_resource_slots=ResourceSlot.from_user_input({}, None),
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],
@@ -801,8 +801,8 @@ class TestModifyDomainNode:
             name="test-domain-node",
             description="Modified description",
             is_active=True,
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             total_resource_slots=ResourceSlot.from_user_input({}, None),
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],
@@ -816,8 +816,8 @@ class TestModifyDomainNode:
             name="test-domain",
             description="Test domain",
             is_active=True,
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             total_resource_slots=ResourceSlot.from_user_input({}, None),
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],

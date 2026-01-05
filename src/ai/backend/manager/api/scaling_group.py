@@ -1,8 +1,9 @@
 import json
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Iterable, Tuple
+from typing import TYPE_CHECKING, Any
 
 import aiohttp
 import aiohttp_cors
@@ -17,9 +18,9 @@ from ai.backend.manager.errors.common import (
     ObjectNotFound,
     ServerMisconfiguredError,
 )
+from ai.backend.manager.models import query_allowed_sgroups
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-from ..models import query_allowed_sgroups
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
@@ -40,17 +41,19 @@ class WSProxyVersionQueryParams:
 async def query_wsproxy_status(
     wsproxy_addr: str,
 ) -> dict[str, Any]:
-    async with aiohttp.ClientSession() as session:
-        async with session.get(
+    async with (
+        aiohttp.ClientSession() as session,
+        session.get(
             wsproxy_addr + "/status",
             headers={"Accept": "application/json"},
-        ) as resp:
-            try:
-                result = await resp.json()
-            except (aiohttp.ContentTypeError, json.JSONDecodeError) as e:
-                log.error("Failed to parse wsproxy status response from {}: {}", wsproxy_addr, e)
-                raise InternalServerError("Got invalid response from wsproxy when querying status")
-            return result
+        ) as resp,
+    ):
+        try:
+            result = await resp.json()
+        except (aiohttp.ContentTypeError, json.JSONDecodeError) as e:
+            log.error("Failed to parse wsproxy status response from {}: {}", wsproxy_addr, e)
+            raise InternalServerError("Got invalid response from wsproxy when querying status")
+        return result
 
 
 @auth_required
@@ -130,7 +133,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["prefix"] = "scaling-groups"
     app["api_versions"] = (2, 3, 4)

@@ -16,15 +16,15 @@ from ai.backend.manager.data.permission.role import (
     UserRoleAssignmentData,
     UserRoleAssignmentInput,
 )
-
-from ..base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     IDColumn,
 )
 
 if TYPE_CHECKING:
-    from ..user import UserRow
+    from ai.backend.manager.models.user import UserRow
+
     from .role import RoleRow
 
 

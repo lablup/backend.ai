@@ -4,7 +4,8 @@ Tests the complete user service with real database connections and processors.
 """
 
 import uuid
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
 
 import pytest
 import sqlalchemy as sa

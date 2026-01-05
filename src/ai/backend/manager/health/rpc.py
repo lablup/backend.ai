@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from aiohttp import web
 
@@ -66,7 +66,7 @@ class AgentRpcHealthChecker(StaticServiceHealthChecker):
         Returns:
             ServiceHealth containing status for the agent RPC connection
         """
-        check_time = datetime.now(timezone.utc)
+        check_time = datetime.now(UTC)
         component_id = ComponentId(str(self._agent_client.agent_id))
 
         try:

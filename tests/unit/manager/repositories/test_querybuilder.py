@@ -61,7 +61,12 @@ class TestGenericQueryBuilder:
     def mock_model_class(self):
         """Create mock model class with SQLAlchemy-like attributes"""
         mock_model = MagicMock()
-        mock_model.id = MagicMock()
+        # Configure id column with comparison operators for cursor conditions
+        mock_id = MagicMock()
+        mock_id.__gt__ = MagicMock(return_value=MagicMock())
+        mock_id.__lt__ = MagicMock(return_value=MagicMock())
+        mock_id.__eq__ = MagicMock(return_value=MagicMock())
+        mock_model.id = mock_id
         mock_model.name = MagicMock()
         mock_model.created_at = MagicMock()
         return mock_model
@@ -156,16 +161,10 @@ class TestGenericQueryBuilder:
         assert result["name"] == "test-model"
         assert result["converted"]
 
-    @patch("ai.backend.manager.repositories.types.getattr")
-    def test_build_lexicographic_cursor_conditions_structure(self, mock_getattr, generic_paginator):
+    def test_build_lexicographic_cursor_conditions_structure(self, generic_paginator):
         """Test that cursor condition building has correct structure without SQLAlchemy operations"""
-        # Mock getattr to return mock columns that don't perform actual SQL operations
-        mock_id_column = MagicMock()
-        mock_getattr.return_value = mock_id_column
-
-        # Mock the comparison operations to return mock objects instead of actual SQL
-        mock_id_column.__gt__ = MagicMock(return_value=MagicMock())
-        mock_id_column.__lt__ = MagicMock(return_value=MagicMock())
+        # Get the mock id column from the paginator's model class
+        mock_id_column = generic_paginator.model_class.id
 
         cursor_uuid = uuid.uuid4()
 
@@ -191,30 +190,18 @@ class TestGenericQueryBuilder:
         assert len(conditions) == 1
         mock_id_column.__lt__.assert_called_once_with(cursor_uuid)
 
-    @patch("ai.backend.manager.repositories.types.getattr")
     @patch("sqlalchemy.select")
     @patch("sqlalchemy.and_")
     @patch("sqlalchemy.or_")
     def test_build_lexicographic_cursor_conditions_with_ordering(
-        self, mock_or, mock_and, mock_select, mock_getattr, generic_paginator
+        self, mock_or, mock_and, mock_select, generic_paginator
     ):
         """Test cursor condition building with order clauses"""
-        # Mock getattr to return different columns
-        mock_id_column = MagicMock()
+        # Create mock column for ordering with comparison operators
         mock_other_column = MagicMock()
-
-        def getattr_side_effect(obj, attr, default=None):
-            if attr == "id":
-                return mock_id_column
-            return mock_other_column
-
-        mock_getattr.side_effect = getattr_side_effect
-
-        # Mock column comparison operations
-        for column in [mock_id_column, mock_other_column]:
-            column.__gt__ = MagicMock(return_value=MagicMock())
-            column.__lt__ = MagicMock(return_value=MagicMock())
-            column.__eq__ = MagicMock(return_value=MagicMock())
+        mock_other_column.__gt__ = MagicMock(return_value=MagicMock())
+        mock_other_column.__lt__ = MagicMock(return_value=MagicMock())
+        mock_other_column.__eq__ = MagicMock(return_value=MagicMock())
 
         # Mock select to return a mock subquery
         mock_select.return_value.where.return_value.scalar_subquery.return_value = MagicMock()

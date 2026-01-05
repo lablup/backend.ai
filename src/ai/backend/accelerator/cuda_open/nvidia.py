@@ -50,16 +50,16 @@ class LibraryError(RuntimeError):
     func: str
     code: int
 
-    def __init__(self, lib: str, func: str, code: int):
+    def __init__(self, lib: str, func: str, code: int) -> None:
         super().__init__(lib, func, code)
         self.lib = lib
         self.func = func
         self.code = code
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"LibraryError: {self.lib}::{self.func}() returned error {self.code}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         args = ", ".join(map(repr, self.args))
         return f"LibraryError({args})"
 
@@ -522,8 +522,7 @@ def _load_library(name):
     try:
         if platform.system() == "Windows":
             return ctypes.windll.LoadLibrary(name)
-        else:
-            return ctypes.cdll.LoadLibrary(name)
+        return ctypes.cdll.LoadLibrary(name)
     except OSError:
         pass
     return None
@@ -693,13 +692,12 @@ class libnvml(LibraryBase):
         system_type = platform.system()
         if system_type == "Windows":
             return _load_library("libnvidia-ml.dll")
-        elif system_type == "Darwin":
+        if system_type == "Darwin":
             return _load_library("libnvidia-ml.dylib")
-        else:
-            lib = _load_library("libnvidia-ml.so")
-            if lib is None:
-                lib = _load_library("libnvidia-ml.so.1")
-            return lib
+        lib = _load_library("libnvidia-ml.so")
+        if lib is None:
+            lib = _load_library("libnvidia-ml.so.1")
+        return lib
         return None
 
     @classmethod

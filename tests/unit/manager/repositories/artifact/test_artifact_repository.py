@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -155,7 +155,7 @@ class TestArtifactRepository:
     ) -> AsyncGenerator[list[uuid.UUID], None]:
         """Create 25 sample artifacts for pagination testing"""
         artifact_ids = []
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(25):

@@ -13,8 +13,7 @@ from yarl import URL
 from ai.backend.cli.types import ExitCode
 from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
-
-from ..models.base import populate_fixture
+from ai.backend.manager.models.base import populate_fixture
 
 if TYPE_CHECKING:
     from .context import CLIContext

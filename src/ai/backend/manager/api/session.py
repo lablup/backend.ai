@@ -101,13 +101,12 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
-
-from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
-from ..errors.api import InvalidAPIParameters
-from ..errors.auth import InsufficientPrivilege
-from ..errors.kernel import InvalidSessionData, SessionNotFound
-from ..errors.resource import NoCurrentTaskContext
-from ..models import (
+from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.kernel import InvalidSessionData, SessionNotFound
+from ai.backend.manager.errors.resource import NoCurrentTaskContext
+from ai.backend.manager.models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     SessionDependencyRow,
     SessionRow,
@@ -115,7 +114,8 @@ from ..models import (
     kernels,
     keypairs,
 )
-from ..utils import query_userinfo as _query_userinfo
+from ai.backend.manager.utils import query_userinfo as _query_userinfo
+
 from .auth import auth_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
@@ -143,9 +143,8 @@ class UndefChecker(t.Trafaret):
     def check_and_return(self, value: Any) -> object:
         if value == undefined:
             return value
-        else:
-            self._failure("Invalid Undef format", value=value)
-            return None
+        self._failure("Invalid Undef format", value=value)
+        return None
 
 
 resource_opts_iv = t.Dict({
@@ -343,7 +342,7 @@ overwritten_param_check = t.Dict({
 
 def sub(d, old, new):
     for k, v in d.items():
-        if isinstance(v, Mapping) or isinstance(v, dict):
+        if isinstance(v, (Mapping, dict)):
             d[k] = sub(v, old, new)
         elif d[k] == old:
             d[k] = new
@@ -353,7 +352,7 @@ def sub(d, old, new):
 def drop_undefined(d):
     newd = {}
     for k, v in d.items():
-        if isinstance(v, Mapping) or isinstance(v, dict):
+        if isinstance(v, (Mapping, dict)):
             newval = drop_undefined(v)
             if len(newval.keys()) > 0:  # exclude empty dict always
                 newd[k] = newval
@@ -445,13 +444,13 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 
     api_version = request["api_version"]
     try:
-        if 8 <= api_version[0]:
+        if api_version[0] >= 8:
             params["config"] = creation_config_v6_template.check(params["config"])
-        elif 6 <= api_version[0]:
+        elif api_version[0] >= 6:
             params["config"] = creation_config_v5_template.check(params["config"])
-        elif 5 <= api_version[0]:
+        elif api_version[0] >= 5:
             params["config"] = creation_config_v4_template.check(params["config"])
-        elif (4, "20190315") <= api_version:
+        elif api_version >= (4, "20190315"):
             params["config"] = creation_config_v3_template.check(params["config"])
     except t.DataError as e:
         log.debug("Validation error: {0}", e.as_dict())
@@ -558,15 +557,15 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
             f"Requested session ID {params['session_name']} is reserved word"
         )
     api_version = request["api_version"]
-    if 9 <= api_version[0]:
+    if api_version[0] >= 9:
         creation_config = creation_config_v7.check(params["config"])
-    elif 8 <= api_version[0]:
+    elif api_version[0] >= 8:
         creation_config = creation_config_v6.check(params["config"])
-    elif 6 <= api_version[0]:
+    elif api_version[0] >= 6:
         creation_config = creation_config_v5.check(params["config"])
-    elif 5 <= api_version[0]:
+    elif api_version[0] >= 5:
         creation_config = creation_config_v4.check(params["config"])
-    elif (4, "20190315") <= api_version:
+    elif api_version >= (4, "20190315"):
         creation_config = creation_config_v3.check(params["config"])
     elif 2 <= api_version[0] <= 4:
         creation_config = creation_config_v2.check(params["config"])
@@ -1533,7 +1532,7 @@ async def list_files(request: web.Request) -> web.Response:
                 owner_access_key=owner_access_key,
             )
         )
-    except (asyncio.TimeoutError, AssertionError, json.decoder.JSONDecodeError) as e:
+    except (TimeoutError, AssertionError, json.decoder.JSONDecodeError) as e:
         log.warning("LIST_FILES: invalid/missing parameters, {0!r}", e)
         raise InvalidAPIParameters(extra_msg=str(e.args[0]))
 

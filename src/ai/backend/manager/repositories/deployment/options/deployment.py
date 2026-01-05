@@ -166,12 +166,10 @@ class DeploymentOrders:
     def name(ascending: bool = True) -> QueryOrder:
         if ascending:
             return EndpointRow.name.asc()
-        else:
-            return EndpointRow.name.desc()
+        return EndpointRow.name.desc()
 
     @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return EndpointRow.created_at.asc()
-        else:
-            return EndpointRow.created_at.desc()
+        return EndpointRow.created_at.desc()

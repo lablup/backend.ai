@@ -5,7 +5,7 @@ Tests for AuthRepository functionality.
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
@@ -496,6 +496,6 @@ class TestAuthRepository:
 
         assert isinstance(result, datetime)
         # Verify it's reasonably close to current time (within 1 second)
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         time_diff = abs((now_utc - result).total_seconds())
         assert time_diff < 1.0

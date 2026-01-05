@@ -2,7 +2,7 @@ import logging
 import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Optional, Self
 
@@ -56,6 +56,16 @@ from ai.backend.manager.data.model_serving.types import (
     ServiceConfig,
     ServiceInfo,
 )
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.auth import InvalidAuthParameters
+from ai.backend.manager.errors.storage import VFolderNotFound
+from ai.backend.manager.models import (
+    ModelServiceHelper,
+    UserRole,
+    UserRow,
+    query_accessible_vfolders,
+    vfolders,
+)
 from ai.backend.manager.services.deployment.actions.create_legacy_deployment import (
     CreateLegacyDeploymentAction,
     CreateLegacyDeploymentActionResult,
@@ -91,18 +101,8 @@ from ai.backend.manager.services.model_serving.actions.scale_service_replicas im
     ScaleServiceReplicasAction,
 )
 from ai.backend.manager.services.model_serving.actions.update_route import UpdateRouteAction
+from ai.backend.manager.types import MountOptionModel, UserScope
 
-from ..errors.api import InvalidAPIParameters
-from ..errors.auth import InvalidAuthParameters
-from ..errors.storage import VFolderNotFound
-from ..models import (
-    ModelServiceHelper,
-    UserRole,
-    UserRow,
-    query_accessible_vfolders,
-    vfolders,
-)
-from ..types import MountOptionModel, UserScope
 from .auth import auth_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
@@ -129,13 +129,12 @@ async def is_user_allowed_to_access_resource(
 ) -> bool:
     if request["user"]["is_superadmin"]:
         return True
-    elif request["user"]["is_admin"]:
+    if request["user"]["is_admin"]:
         query = sa.select(UserRow).filter(UserRow.uuid == resource_owner)
         result = await db_sess.execute(query)
         user = result.scalar()
         return user.domain_name == request["user"]["domain_name"]
-    else:
-        return request["user"]["uyud"] == resource_owner
+    return request["user"]["uyud"] == resource_owner
 
 
 class ListServeRequestModel(LegacyBaseRequestModel):
@@ -650,7 +649,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         except Exception as e:
             # just catching ValueError | VFolderNotFound will raise
             # TypeError: catching classes that do not inherit from BaseException is not allowed
-            if isinstance(e, ValueError) or isinstance(e, VFolderNotFound):
+            if isinstance(e, (ValueError, VFolderNotFound)):
                 try:
                     extra_vf_conds = (vfolders.c.name == params.config.model) & (
                         vfolders.c.usage_mode == VFolderUsageMode.MODEL
@@ -775,17 +774,16 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
             )
         )
         return ServeInfoModel.from_deployment_info(deployment_result.data)
-    else:
-        # Fall back to model_serving
-        action = params.to_create_action(
-            validation_result=validation_result,
-            request_user_id=request["user"]["uuid"],
-            sudo_session_enabled=request["user"]["sudo_session_enabled"],
-        )
-        result: CreateModelServiceActionResult = (
-            await root_ctx.processors.model_serving.create_model_service.wait_for_complete(action)
-        )
-        return ServeInfoModel.from_dto(result.data)
+    # Fall back to model_serving
+    action = params.to_create_action(
+        validation_result=validation_result,
+        request_user_id=request["user"]["uuid"],
+        sudo_session_enabled=request["user"]["sudo_session_enabled"],
+    )
+    result: CreateModelServiceActionResult = (
+        await root_ctx.processors.model_serving.create_model_service.wait_for_complete(action)
+    )
+    return ServeInfoModel.from_dto(result.data)
 
 
 class TryStartResponseModel(LegacyBaseResponseModel):
@@ -841,21 +839,18 @@ async def delete(request: web.Request) -> SuccessResponseModel:
             )
         )
         return SuccessResponseModel(success=deployment_result.success)
-    else:
-        # Fall back to model_serving
-        action = DeleteModelServiceAction(
-            service_id=service_id,
-            requester_ctx=RequesterCtx(
-                is_authorized=request["is_authorized"],
-                user_id=request["user"]["uuid"],
-                user_role=request["user"]["role"],
-                domain_name=request["user"]["domain_name"],
-            ),
-        )
-        result = await root_ctx.processors.model_serving.delete_model_service.wait_for_complete(
-            action
-        )
-        return SuccessResponseModel(success=result.success)
+    # Fall back to model_serving
+    action = DeleteModelServiceAction(
+        service_id=service_id,
+        requester_ctx=RequesterCtx(
+            is_authorized=request["is_authorized"],
+            user_id=request["user"]["uuid"],
+            user_role=request["user"]["role"],
+            domain_name=request["user"]["domain_name"],
+        ),
+    )
+    result = await root_ctx.processors.model_serving.delete_model_service.wait_for_complete(action)
+    return SuccessResponseModel(success=result.success)
 
 
 @auth_required
@@ -1028,7 +1023,7 @@ class TokenRequestModel(LegacyBaseRequestModel):
 
     @model_validator(mode="after")
     def check_lifetime(self) -> Self:
-        now = datetime.now()
+        now = datetime.now(UTC)
         if self.valid_until is not None:
             self.expires_at = self.valid_until
         elif self.duration is not None:

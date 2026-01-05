@@ -5,9 +5,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Optional
-
-from typing_extensions import override
+from typing import Optional, override
 
 from ai.backend.common.types import (
     AutoScalingMetricComparator,

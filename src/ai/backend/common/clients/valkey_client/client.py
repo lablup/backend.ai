@@ -1,8 +1,9 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Final, Iterable, Optional, Self
+from typing import Any, Final, Optional, Self
 
 from aiotools import cancel_and_wait
 from glide import (
@@ -19,10 +20,9 @@ from glide.exceptions import ClosingError
 from redis.asyncio.sentinel import Sentinel
 
 from ai.backend.common.exception import ClientNotConnectedError, ValkeySentinelMasterNotFound
+from ai.backend.common.types import ValkeyTarget
 from ai.backend.common.utils import addr_to_hostport_pair
 from ai.backend.logging import BraceStyleAdapter
-
-from ...types import ValkeyTarget
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

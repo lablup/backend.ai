@@ -147,12 +147,11 @@ class RoleAdapter(BaseFilterAdapter):
 
         if order.field == RoleOrderField.NAME:
             return RoleOrders.name(ascending=ascending)
-        elif order.field == RoleOrderField.CREATED_AT:
+        if order.field == RoleOrderField.CREATED_AT:
             return RoleOrders.created_at(ascending=ascending)
-        elif order.field == RoleOrderField.UPDATED_AT:
+        if order.field == RoleOrderField.UPDATED_AT:
             return RoleOrders.updated_at(ascending=ascending)
-        else:
-            raise ValueError(f"Unknown order field: {order.field}")
+        raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""

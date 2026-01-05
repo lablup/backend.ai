@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, AsyncContextManager, Generic, Optional, TypeVar, final
+from contextlib import AbstractAsyncContextManager
+from typing import TYPE_CHECKING, Generic, Optional, TypeVar, final
 
 if TYPE_CHECKING:
     from ai.backend.common.health_checker import ServiceHealthChecker
@@ -33,7 +34,7 @@ class DependencyProvider(ABC, Generic[SetupInputT, ResourceT]):
         raise NotImplementedError
 
     @abstractmethod
-    def provide(self, setup_input: SetupInputT) -> AsyncContextManager[ResourceT]:
+    def provide(self, setup_input: SetupInputT) -> AbstractAsyncContextManager[ResourceT]:
         """Return an async context manager for the dependency.
 
         Args:
@@ -81,7 +82,7 @@ class NonMonitorableDependencyProvider(DependencyProvider[SetupInputT, ResourceT
         Returns:
             None indicating no health checks
         """
-        return None
+        return
 
 
 class DependencyComposer(ABC, Generic[SetupInputT, ResourcesT]):
@@ -106,7 +107,7 @@ class DependencyComposer(ABC, Generic[SetupInputT, ResourcesT]):
         self,
         stack: DependencyStack,
         setup_input: SetupInputT,
-    ) -> AsyncContextManager[ResourcesT]:
+    ) -> AbstractAsyncContextManager[ResourcesT]:
         """Compose multiple dependencies using the provided stack.
 
         Args:

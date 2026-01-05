@@ -18,7 +18,6 @@ from functools import partial
 from typing import (
     Any,
     Optional,
-    Union,
     cast,
 )
 
@@ -73,19 +72,15 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
-from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
-from ai.backend.manager.types import DistributedLockFactory
-from ai.backend.plugin.entrypoint import scan_entrypoints
-
-from ..defs import SERVICE_MAX_RETRIES, START_SESSION_TIMEOUT_SEC, LockID
-from ..errors.common import (
+from ai.backend.manager.defs import SERVICE_MAX_RETRIES, START_SESSION_TIMEOUT_SEC, LockID
+from ai.backend.manager.errors.common import (
     GenericBadRequest,
     GenericForbidden,
 )
-from ..errors.kernel import SessionNotFound
-from ..errors.resource import InstanceNotAvailable
-from ..exceptions import convert_to_status_data
-from ..models import (
+from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.errors.resource import InstanceNotAvailable
+from ai.backend.manager.exceptions import convert_to_status_data
+from ai.backend.manager.models import (
     AgentRow,
     EndpointRow,
     KernelRow,
@@ -93,12 +88,16 @@ from ..models import (
     ScalingGroupOpts,
     SessionRow,
 )
-from ..models.utils import (
+from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
+from ai.backend.manager.models.utils import (
     execute_with_retry,
     retry_txn,
 )
-from ..registry import AgentRegistry
-from ..repositories.schedule.repository import ScheduleRepository
+from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
+from ai.backend.manager.types import DistributedLockFactory
+from ai.backend.plugin.entrypoint import scan_entrypoints
+
 from .predicates import (
     check_concurrency,
     check_dependencies,
@@ -124,9 +123,9 @@ from .types import (
 )
 
 __all__ = (
-    "load_scheduler",
-    "load_agent_selector",
     "SchedulerDispatcher",
+    "load_agent_selector",
+    "load_scheduler",
 )
 
 # Memoization cache for scheduler and agent selector classes
@@ -695,7 +694,7 @@ class SchedulerDispatcher(aobject):
         def _check(cnt: int) -> bool:
             return max_container_count > cnt
 
-        return [ag for ag, count in zip(candidate_agents, raw_counts) if _check(count)]
+        return [ag for ag, count in zip(candidate_agents, raw_counts, strict=True) if _check(count)]
 
     async def _schedule_single_node_session(
         self,
@@ -704,7 +703,7 @@ class SchedulerDispatcher(aobject):
         sgroup_name: str,
         candidate_agents: Sequence[AgentRow],
         sess_ctx: SessionRow,
-        check_results: list[tuple[str, Union[Exception, PredicateResult]]],
+        check_results: list[tuple[str, Exception | PredicateResult]],
     ) -> None:
         """
         Finds and assigns an agent having resources enough to host the entire session.
@@ -713,7 +712,7 @@ class SchedulerDispatcher(aobject):
         log_args = _log_args.get(tuple())
 
         try:
-            requested_architectures = set(k.architecture for k in sess_ctx.kernels)
+            requested_architectures = {k.architecture for k in sess_ctx.kernels}
             if len(requested_architectures) > 1:
                 raise GenericBadRequest(
                     "Cannot assign multiple kernels with different architectures' single node session",
@@ -839,7 +838,7 @@ class SchedulerDispatcher(aobject):
         sgroup_name: str,
         candidate_agents: Sequence[AgentRow],
         sess_ctx: SessionRow,
-        check_results: list[tuple[str, Union[Exception, PredicateResult]]],
+        check_results: list[tuple[str, Exception | PredicateResult]],
     ) -> None:
         """
         Finds and assigns agents having resources enough to host each kernel in the session.
@@ -1035,7 +1034,7 @@ class SchedulerDispatcher(aobject):
                 )
                 raise asyncio.CancelledError()
             raise
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log.warning("check_precond(): timeout while executing start_session()")
 
     async def start(
@@ -1100,7 +1099,7 @@ class SchedulerDispatcher(aobject):
                 )
                 raise asyncio.CancelledError()
             raise
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log.warning("start(): timeout while executing start_session()")
 
     async def scale_services(
@@ -1138,15 +1137,13 @@ class SchedulerDispatcher(aobject):
                 # we do not expect sessions to be spawned when the endpoint is about to be destroyed
                 # so also delete routes in provisioning status
 
-                routes_to_destroy += list(
-                    sorted(
-                        [
-                            route
-                            for route in active_routings
-                            if route.status in endpoint.terminatable_route_statuses
-                        ],
-                        key=lambda r: r.status == RouteStatus.UNHEALTHY,
-                    )
+                routes_to_destroy += sorted(
+                    [
+                        route
+                        for route in active_routings
+                        if route.status in endpoint.terminatable_route_statuses
+                    ],
+                    key=lambda r: r.status == RouteStatus.UNHEALTHY,
                 )[:destroy_count]
                 log.debug(
                     "Shrinking {} from {} to {}",
@@ -1203,7 +1200,7 @@ class SchedulerDispatcher(aobject):
         await self._update_scheduler_mark(
             ScheduleType.SCALE_SERVICES,
             {
-                "up": dump_json_str([str(e.id) for e in endpoints_to_expand.keys()]),
+                "up": dump_json_str([str(e.id) for e in endpoints_to_expand]),
                 "finish_time": datetime.now(tzutc()).isoformat(),
             },
         )
@@ -1316,8 +1313,8 @@ class SchedulerDispatcher(aobject):
         pending_sess: SessionRow,
         *,
         exc_handler: Callable[[Exception], None] | None = None,
-    ) -> list[tuple[str, Union[Exception, PredicateResult]]]:
-        check_results: list[tuple[str, Union[Exception, PredicateResult]]] = []
+    ) -> list[tuple[str, Exception | PredicateResult]]:
+        check_results: list[tuple[str, Exception | PredicateResult]] = []
         async with self.registry.db.begin_session() as db_sess:
             predicates: list[tuple[str, Awaitable[PredicateResult]]] = [
                 (
@@ -1385,7 +1382,7 @@ class SchedulerDispatcher(aobject):
         Returns the Redis key for the given schedule type.
         """
         manager_id = self.config_provider.config.manager.id
-        return f"manager.{manager_id}.{str(schedule_type)}"
+        return f"manager.{manager_id}.{schedule_type!s}"
 
     async def _mark_scheduler_start(
         self,

@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Container, Iterable, Mapping, Sequence
+from collections.abc import Callable, Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import (
     Any,
-    Callable,
     Optional,
     Self,
-    Set,
     TypeAlias,
     cast,
     overload,
@@ -34,14 +32,13 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
-
-from ..base import (
+from ai.backend.manager.models.base import (
     Base,
     IDColumn,
     StructuredJSONObjectColumn,
 )
-from ..group import resolve_group_name_or_id, resolve_groups
-from ..rbac import (
+from ai.backend.manager.models.group import resolve_group_name_or_id, resolve_groups
+from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -51,11 +48,11 @@ from ..rbac import (
     UserScope,
     get_predefined_roles_in_scope,
 )
-from ..rbac.context import ClientContext
-from ..rbac.permission_defs import ScalingGroupPermission
-from ..types import QueryCondition
-from ..user import UserRole
-from ..utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.rbac.permission_defs import ScalingGroupPermission
+from ai.backend.manager.models.types import QueryCondition
+from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 __all__: Sequence[str] = (
     # table defs
@@ -446,7 +443,7 @@ async def query_allowed_sgroups(
                 group_ids = []
         case list() | tuple() | set():
             group_ids = await resolve_groups(db_conn, domain_name, cast(Iterable, group))
-    from_group: Set[str]
+    from_group: set[str]
     if not group_ids:
         from_group = set()  # empty
     else:
@@ -584,7 +581,7 @@ class ScalingGroupPermissionContextBuilder(
         self,
         ctx: ClientContext,
     ) -> ScalingGroupPermissionContext:
-        from ..domain import DomainRow
+        from ai.backend.manager.models.domain import DomainRow
 
         perm_ctx = ScalingGroupPermissionContext()
         _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
@@ -599,7 +596,7 @@ class ScalingGroupPermissionContextBuilder(
         ctx: ClientContext,
         scope: DomainScope,
     ) -> ScalingGroupPermissionContext:
-        from ..domain import DomainRow
+        from ai.backend.manager.models.domain import DomainRow
 
         permissions = await self.calculate_permission(ctx, scope)
         if not permissions:
@@ -615,12 +612,11 @@ class ScalingGroupPermissionContextBuilder(
         if domain_row is None:
             return ScalingGroupPermissionContext()
         scaling_groups = cast(list[ScalingGroupForDomainRow], domain_row.sgroup_for_domains_rows)
-        result = ScalingGroupPermissionContext(
+        return ScalingGroupPermissionContext(
             object_id_to_additional_permission_map={
                 row.scaling_group: permissions for row in scaling_groups
             }
         )
-        return result
 
     @override
     async def build_ctx_in_project_scope(
@@ -628,7 +624,7 @@ class ScalingGroupPermissionContextBuilder(
         ctx: ClientContext,
         scope: ProjectScope,
     ) -> ScalingGroupPermissionContext:
-        from ..group import GroupRow
+        from ai.backend.manager.models.group import GroupRow
 
         project_permissions = await self.calculate_permission(ctx, scope)
         if not project_permissions:
@@ -644,12 +640,11 @@ class ScalingGroupPermissionContextBuilder(
         if project_row is None:
             return ScalingGroupPermissionContext()
         scaling_groups = cast(list[ScalingGroupForProjectRow], project_row.sgroup_for_groups_rows)
-        result = ScalingGroupPermissionContext(
+        return ScalingGroupPermissionContext(
             object_id_to_additional_permission_map={
                 row.scaling_group: project_permissions for row in scaling_groups
             }
         )
-        return result
 
     @override
     async def build_ctx_in_user_scope(
@@ -657,8 +652,8 @@ class ScalingGroupPermissionContextBuilder(
         ctx: ClientContext,
         scope: UserScope,
     ) -> ScalingGroupPermissionContext:
-        from ..keypair import KeyPairRow
-        from ..user import UserRow
+        from ai.backend.manager.models.keypair import KeyPairRow
+        from ai.backend.manager.models.user import UserRow
 
         user_permissions = await self.calculate_permission(ctx, scope)
         if not user_permissions:
@@ -686,10 +681,9 @@ class ScalingGroupPermissionContextBuilder(
             for sg in scaling_groups:
                 if sg.scaling_group not in object_id_to_additional_permission_map:
                     object_id_to_additional_permission_map[sg.scaling_group] = user_permissions
-        result = ScalingGroupPermissionContext(
+        return ScalingGroupPermissionContext(
             object_id_to_additional_permission_map=object_id_to_additional_permission_map
         )
-        return result
 
     @override
     @classmethod

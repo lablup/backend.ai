@@ -4,8 +4,8 @@ import sys
 import click
 
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.cli.pretty import print_error, print_fail, print_pretty
 
-from ..pretty import print_error, print_fail, print_pretty
 from . import admin
 
 
@@ -28,7 +28,7 @@ def get(key, prefix):
 
     KEY: Name of ETCD key.
     """
-    from ...session import Session
+    from ai.backend.client.session import Session
 
     with Session() as session:
         try:
@@ -50,7 +50,7 @@ def set(key, value):
     KEY: Name of ETCD key.
     VALUE: Value to set.
     """
-    from ...session import Session
+    from ai.backend.client.session import Session
 
     with Session() as session:
         try:
@@ -84,7 +84,7 @@ def delete(key, prefix):
 
     KEY: Name of ETCD key.
     """
-    from ...session import Session
+    from ai.backend.client.session import Session
 
     with Session() as session:
         try:

@@ -178,11 +178,11 @@ import os
 import secrets
 import socket
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from ipaddress import IPv4Network
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal, Optional
 
 from pydantic import (
     AliasChoices,
@@ -1198,7 +1198,7 @@ class DebugConfig(BaseConfigSchema):
 
 class SystemConfig(BaseConfigSchema):
     timezone: TimeZone = Field(
-        default_factory=lambda: timezone.utc,
+        default_factory=lambda: UTC,
         description="""
         Timezone setting for the manager.
         Uses pytz-compatible timezone names.
@@ -2056,7 +2056,7 @@ class ReservoirVFSStorageConfig(BaseConfigSchema):
     )
 
 
-StorageSpecificConfig = Union[ReservoirObjectStorageConfig, ReservoirVFSStorageConfig]
+StorageSpecificConfig = ReservoirObjectStorageConfig | ReservoirVFSStorageConfig
 
 
 class ReservoirConfig(BaseConfigSchema):
@@ -2375,5 +2375,5 @@ class ManagerUnifiedConfig(BaseConfigSchema):
         extra="allow",
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return pformat(self.model_dump())

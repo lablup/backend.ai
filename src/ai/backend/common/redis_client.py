@@ -1,7 +1,9 @@
 import asyncio
 import logging
 import socket
-from typing import Any, AsyncContextManager, AsyncIterator, Final, Optional, Sequence
+from collections.abc import AsyncIterator, Sequence
+from contextlib import AbstractAsyncContextManager
+from typing import Any, Final, Optional
 
 import hiredis
 
@@ -30,7 +32,7 @@ if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
     _keepalive_options[_TCP_KEEPCNT] = 3
 
 
-class Ellipsis(object):
+class Ellipsis:
     pass
 
 
@@ -128,7 +130,7 @@ class RedisClient(aobject):
         while True:
             try:
                 hiredis_reader = hiredis.Reader(notEnoughData=ellipsis)
-                _blobs = bytes()
+                _blobs = b""
                 for command in commands:
                     request_blob = hiredis.pack_command(tuple(command))  # type: ignore[arg-type]
                     self.writer.write(request_blob)
@@ -143,7 +145,7 @@ class RedisClient(aobject):
                 results = []
                 first_result = ellipsis
 
-                _buf = bytes()
+                _buf = b""
 
                 met_unexpected_eof = False
 
@@ -180,7 +182,7 @@ class RedisClient(aobject):
                     results.append(next_result)
 
                 try:
-                    if not len(results) == len(commands):
+                    if len(results) != len(commands):
                         log.warning("requests: {}", commands)
                         log.warning("responses: {}", results)
                         log.warning("raw request: {}", _blobs)
@@ -196,7 +198,7 @@ class RedisClient(aobject):
                     self._prev_buf = _buf
 
                 if self.verbose:
-                    for request, response in zip(commands, results):
+                    for request, response in zip(commands, results, strict=True):
                         log.debug("{} -> {}", request, response)
 
                 return results
@@ -206,7 +208,7 @@ class RedisClient(aobject):
                 await asyncio.sleep(0)
 
 
-class RedisConnection(AsyncContextManager[RedisClient]):
+class RedisConnection(AbstractAsyncContextManager[RedisClient]):
     _redis_target: RedisTarget
     _db: int
 

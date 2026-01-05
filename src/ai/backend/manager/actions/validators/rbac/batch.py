@@ -2,11 +2,10 @@ from typing import override
 
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.batch import BaseBatchAction
+from ai.backend.manager.actions.validator.batch import BatchActionValidator
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
-
-from ...validator.batch import BatchActionValidator
 
 
 class BatchActionRBACValidator(BatchActionValidator):

@@ -51,7 +51,7 @@ class HuggingFaceClient:
     _endpoint: Optional[str]
     _api: HfApi
 
-    def __init__(self, args: HuggingFaceClientArgs):
+    def __init__(self, args: HuggingFaceClientArgs) -> None:
         """Initialize HuggingFace client.
 
         Args:
@@ -88,7 +88,7 @@ class HuggingFaceClient:
             )
             return list(models)
         except Exception as e:
-            raise HuggingFaceAPIError(f"Failed to list models: {str(e)}") from e
+            raise HuggingFaceAPIError(f"Failed to list models: {e!s}") from e
 
     async def list_model_revisions(self, model_id: str) -> list[str]:
         """List all available revisions (branches and tags) for a model.
@@ -115,7 +115,7 @@ class HuggingFaceClient:
         except Exception as e:
             # TODO: Improve exception handling
             log.warning(
-                f"Failed to list revisions for {model_id}: {str(e)}, skipping and fallback to main..."
+                f"Failed to list revisions for {model_id}: {e!s}, skipping and fallback to main..."
             )
             # Fall back to main revision if revision listing fails
             return ["main"]
@@ -132,12 +132,11 @@ class HuggingFaceClient:
         model_id = model.model_id
         revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
         try:
-            result = await asyncio.get_event_loop().run_in_executor(
+            return await asyncio.get_event_loop().run_in_executor(
                 None, lambda: model_info(model_id, revision=revision, token=self._token)
             )
-            return result
         except Exception as e:
-            raise HuggingFaceAPIError(f"Failed to get model info for {model}: {str(e)}") from e
+            raise HuggingFaceAPIError(f"Failed to get model info for {model}: {e!s}") from e
 
     async def get_model_commit_hash(self, model: ModelTarget) -> Optional[str]:
         """Get the commit hash for a specific model revision.
@@ -156,7 +155,7 @@ class HuggingFaceClient:
             )
             return result.sha
         except Exception as e:
-            raise HuggingFaceAPIError(f"Failed to get commit hash for {model}: {str(e)}") from e
+            raise HuggingFaceAPIError(f"Failed to get commit hash for {model}: {e!s}") from e
 
     async def list_model_filepaths(self, model: ModelTarget) -> list[str]:
         """List files in a model repository.
@@ -170,12 +169,11 @@ class HuggingFaceClient:
         model_id = model.model_id
         revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
         try:
-            filepaths = await asyncio.get_event_loop().run_in_executor(
+            return await asyncio.get_event_loop().run_in_executor(
                 None, lambda: list_repo_files(model_id, revision=revision, token=self._token)
             )
-            return filepaths
         except Exception as e:
-            raise HuggingFaceAPIError(f"Failed to list files for {model}: {str(e)}") from e
+            raise HuggingFaceAPIError(f"Failed to list files for {model}: {e!s}") from e
 
     async def list_model_files_info(
         self, model: ModelTarget, paths: list[str]
@@ -193,15 +191,14 @@ class HuggingFaceClient:
         revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
 
         try:
-            info = await asyncio.get_event_loop().run_in_executor(
+            return await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: self._api.get_paths_info(
                     model_id, paths=paths, revision=revision, repo_type="model"
                 ),
             )
-            return info
         except Exception as e:
-            raise HuggingFaceAPIError(f'Failed to get paths info for "{model}": {str(e)}') from e
+            raise HuggingFaceAPIError(f'Failed to get paths info for "{model}": {e!s}') from e
 
     def get_download_url(self, model: ModelTarget, filename: str) -> str:
         """Generate download URL for a specific file.
@@ -227,7 +224,7 @@ class HuggingFaceScanner:
 
     _client: HuggingFaceClient
 
-    def __init__(self, client: HuggingFaceClient):
+    def __init__(self, client: HuggingFaceClient) -> None:
         """Initialize HuggingFace scanner.
 
         Args:
@@ -276,7 +273,7 @@ class HuggingFaceScanner:
                 except Exception as e:
                     # Log and skip this entire model if we can't get revisions
                     log.warning(
-                        f"Failed to get revisions for model: model_id={model.id}, error={str(e)}"
+                        f"Failed to get revisions for model: model_id={model.id}, error={e!s}"
                     )
 
                 return model_data_list
@@ -294,7 +291,7 @@ class HuggingFaceScanner:
             return result
 
         except Exception as e:
-            raise HuggingFaceAPIError(f"Failed to scan models: {str(e)}") from e
+            raise HuggingFaceAPIError(f"Failed to scan models: {e!s}") from e
 
     async def scan_model(self, model: ModelTarget) -> ModelData:
         """Scan a specific model by ID.
@@ -332,7 +329,7 @@ class HuggingFaceScanner:
             return result
 
         except Exception as e:
-            raise HuggingFaceAPIError(f"Failed to scan model {model}: {str(e)}") from e
+            raise HuggingFaceAPIError(f"Failed to scan model {model}: {e!s}") from e
 
     async def scan_model_without_metadata(self, model: ModelTarget) -> ModelData:
         """Scan a specific model by ID without README and size metadata.
@@ -368,7 +365,7 @@ class HuggingFaceScanner:
             return result
 
         except Exception as e:
-            raise HuggingFaceAPIError(f"Failed to scan model {model}: {str(e)}") from e
+            raise HuggingFaceAPIError(f"Failed to scan model {model}: {e!s}") from e
 
     def get_download_url(self, model: ModelTarget, filename: str) -> str:
         """Generate download URL for a specific file.
@@ -432,14 +429,14 @@ class HuggingFaceScanner:
                 except Exception as e:
                     path = getattr(file, "path", "unknown")
                     log.error(
-                        f"Error processing file {path} info for model {model}. Details: {str(e)}"
+                        f"Error processing file {path} info for model {model}. Details: {e!s}"
                     )
                     continue
 
             return file_infos
 
         except Exception as e:
-            raise HuggingFaceAPIError(f"Failed to list files for model {model}: {str(e)}") from e
+            raise HuggingFaceAPIError(f"Failed to list files for model {model}: {e!s}") from e
 
     async def download_metadata_batch(
         self,
@@ -504,10 +501,8 @@ class HuggingFaceScanner:
             async with aiohttp.ClientSession() as session:
                 async with session.get(readme_url) as response:
                     if response.status == 200:
-                        content = await response.text()
-                        return content
-                    else:
-                        return None
+                        return await response.text()
+                    return None
 
         except Exception:
             return None

@@ -1,6 +1,6 @@
 import asyncio
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Optional
 
 from dataclasses_json import DataClassJsonMixin
 
@@ -55,8 +55,8 @@ class ATOMContext(DataClassJsonMixin):
 @dataclass
 class ATOMStat(DataClassJsonMixin):
     KMD_version: str
-    devices: List[ATOMDeviceStat]
-    contexts: Optional[List[ATOMContext]] = None
+    devices: list[ATOMDeviceStat]
+    contexts: Optional[list[ATOMContext]] = None
 
 
 class ATOMAPI:
@@ -76,11 +76,11 @@ class ATOMAPI:
         return ATOMStat.from_json(out.decode("utf-8"))
 
     @classmethod
-    async def list_devices(cls, exec_path: str) -> List[ATOMDeviceStat]:
+    async def list_devices(cls, exec_path: str) -> list[ATOMDeviceStat]:
         return (await cls.get_stats(exec_path)).devices
 
     @classmethod
-    async def create_group(cls, exec_path: str, member_indexes: List[int]) -> int:
+    async def create_group(cls, exec_path: str, member_indexes: list[int]) -> int:
         """
         Creates new NPU group (RSD) and returns the group index
         """
@@ -88,7 +88,7 @@ class ATOMAPI:
             raise LibraryError("Group member not specified")
 
         stats = await cls.get_stats(exec_path)
-        groups = set([int(d.group_id) for d in stats.devices])
+        groups = {int(d.group_id) for d in stats.devices}
         new_group_id = -1
         for i in range(1, 256):
             if i not in groups:
@@ -114,7 +114,7 @@ class ATOMAPI:
         return new_group_id
 
     @classmethod
-    async def destroy_groups(cls, exec_path: str, group_ids: List[int]) -> None:
+    async def destroy_groups(cls, exec_path: str, group_ids: list[int]) -> None:
         if len(group_ids) == 0:
             return
         args = ["group", "-d", ",".join([str(x) for x in group_ids])]

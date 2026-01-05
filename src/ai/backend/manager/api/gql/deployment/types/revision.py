@@ -338,7 +338,7 @@ class ActivateRevisionInputGQL:
     description="Added in 25.19.0. Result of activating a revision.",
 )
 class ActivateRevisionPayloadGQL:
-    deployment: Annotated["ModelDeployment", strawberry.lazy(".deployment")]
+    deployment: Annotated[ModelDeployment, strawberry.lazy(".deployment")]
     previous_revision_id: Optional[ID]
     activated_revision_id: ID
 

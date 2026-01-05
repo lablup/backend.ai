@@ -25,19 +25,19 @@ from .types import (
 )
 
 __all__ = (
-    "CreateRoleRequest",
-    "UpdateRoleRequest",
-    "SearchRolesRequest",
     "AssignRoleRequest",
-    "RevokeRoleRequest",
-    "SearchUsersAssignedToRoleRequest",
-    "CreatePermissionRequest",
-    "CreateObjectPermissionRequest",
-    "StringFilter",
-    "RoleFilter",
-    "RoleOrder",
     "AssignedUserFilter",
     "AssignedUserOrder",
+    "CreateObjectPermissionRequest",
+    "CreatePermissionRequest",
+    "CreateRoleRequest",
+    "RevokeRoleRequest",
+    "RoleFilter",
+    "RoleOrder",
+    "SearchRolesRequest",
+    "SearchUsersAssignedToRoleRequest",
+    "StringFilter",
+    "UpdateRoleRequest",
 )
 
 

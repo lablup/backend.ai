@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import AsyncGenerator
 from enum import StrEnum
-from typing import TYPE_CHECKING, AsyncGenerator
+from typing import TYPE_CHECKING
 
 import strawberry
 from strawberry import Info
@@ -75,7 +76,7 @@ class SchedulingBroadcastEventPayload:
     @strawberry.field(
         description="The session ID associated with the replica. This can be null right after replica creation."
     )
-    async def session(self, info: Info[StrawberryGQLContext]) -> "Session":
+    async def session(self, info: Info[StrawberryGQLContext]) -> Session:
         session_global_id = to_global_id(
             ComputeSessionNode, self._session_id, is_target_graphene_object=True
         )

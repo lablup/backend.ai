@@ -34,9 +34,8 @@ from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistryArgs,
 )
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
-
-from ..scheduling_controller import SchedulingController
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -111,10 +110,9 @@ class DeploymentController:
             SessionValidationSpec.from_revision(model_revision=model_revision)
         )
 
-        deployment_info = await self._deployment_repository.create_endpoint_legacy(
+        return await self._deployment_repository.create_endpoint_legacy(
             draft.to_creator(model_revision)
         )
-        return deployment_info
 
     async def update_deployment(
         self,

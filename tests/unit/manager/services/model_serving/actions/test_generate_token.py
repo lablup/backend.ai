@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -16,8 +16,7 @@ from ai.backend.manager.services.model_serving.actions.generate_token import (
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )
-
-from ...utils import ScenarioBase
+from ai.backend.testutils.scenario import ScenarioBase
 
 
 @pytest.fixture
@@ -33,52 +32,47 @@ def mock_check_requester_access_token(mocker, model_serving_service):
 
 @pytest.fixture
 def mock_get_endpoint_by_id_force_token(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.admin_repository,
         "get_endpoint_by_id_force",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
 def mock_create_endpoint_token_force(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.admin_repository,
         "create_endpoint_token_force",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
 def mock_get_endpoint_by_id_validated_token(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.repository,
         "get_endpoint_by_id_validated",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
 def mock_create_endpoint_token_validated(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.repository,
         "create_endpoint_token_validated",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
 def mock_get_scaling_group_info_token(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.repository,
         "get_scaling_group_info",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 class TestGenerateToken:
@@ -97,7 +91,7 @@ class TestGenerateToken:
                     service_id=uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"),
                     duration=None,
                     valid_until=None,
-                    expires_at=int(datetime.utcnow().timestamp()) + 86400,
+                    expires_at=int(datetime.now(tz=UTC).timestamp()) + 86400,
                 ),
                 GenerateTokenActionResult(
                     data=EndpointTokenData(
@@ -107,7 +101,7 @@ class TestGenerateToken:
                         session_owner=uuid.UUID("00000000-0000-0000-0000-000000000001"),
                         domain="default",
                         project=uuid.UUID("00000000-0000-0000-0000-000000000002"),
-                        created_at=datetime.utcnow(),
+                        created_at=datetime.now(tz=UTC),
                     ),
                 ),
             ),
@@ -133,7 +127,7 @@ class TestGenerateToken:
                         session_owner=uuid.UUID("00000000-0000-0000-0000-000000000001"),
                         domain="default",
                         project=uuid.UUID("00000000-0000-0000-0000-000000000002"),
-                        created_at=datetime.utcnow(),
+                        created_at=datetime.now(tz=UTC),
                     ),
                 ),
             ),
@@ -149,7 +143,7 @@ class TestGenerateToken:
                     service_id=uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff"),
                     duration=None,
                     valid_until=None,
-                    expires_at=int(datetime.utcnow().timestamp()) + 3600,
+                    expires_at=int(datetime.now(tz=UTC).timestamp()) + 3600,
                 ),
                 GenerateTokenActionResult(
                     data=EndpointTokenData(
@@ -159,7 +153,7 @@ class TestGenerateToken:
                         session_owner=uuid.UUID("00000000-0000-0000-0000-000000000001"),
                         domain="default",
                         project=uuid.UUID("00000000-0000-0000-0000-000000000002"),
-                        created_at=datetime.utcnow(),
+                        created_at=datetime.now(tz=UTC),
                     ),
                 ),
             ),

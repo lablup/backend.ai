@@ -1,7 +1,7 @@
-from typing import Union
 from uuid import UUID
 
-from ..request import Request, SSEContextManager
+from ai.backend.client.request import Request, SSEContextManager
+
 from .base import BaseFunction
 
 
@@ -12,7 +12,7 @@ class BackgroundTask(BaseFunction):
 
     task_id: UUID
 
-    def __init__(self, task_id: Union[UUID, str]) -> None:
+    def __init__(self, task_id: UUID | str) -> None:
         self.task_id = task_id if isinstance(task_id, UUID) else UUID(task_id)
 
     # only supported in AsyncAPISession

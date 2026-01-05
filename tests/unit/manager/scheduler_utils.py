@@ -8,6 +8,7 @@ from collections.abc import (
 )
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from itertools import islice
 from typing import (
     Any,
     Final,
@@ -146,11 +147,14 @@ def create_mock_kernel(
     )
 
 
+_DEFAULT_ACCESS_KEY = AccessKey("user01")
+
+
 def create_mock_session(
     session_id: SessionId,
     requested_slots: ResourceSlot,
     *,
-    access_key: AccessKey = AccessKey("user01"),
+    access_key: AccessKey = _DEFAULT_ACCESS_KEY,
     status: SessionStatus = SessionStatus.PENDING,
     status_data: dict[str, Any] | None = None,
     kernel_opts: Sequence[KernelOpt] | None = None,
@@ -172,7 +176,9 @@ def create_mock_session(
                 cluster_idx=role_idx,
                 local_rank=local_rank,
             )
-            for kopt, (role_name, role_idx, local_rank) in zip(kernel_opts, generate_role())
+            for kopt, (role_name, role_idx, local_rank) in zip(
+                kernel_opts, islice(generate_role(), len(kernel_opts)), strict=True
+            )
         ],
         priority=priority,
         access_key=access_key,
@@ -197,12 +203,15 @@ def create_mock_session(
     )
 
 
+_EMPTY_RESOURCE_SLOT = ResourceSlot()
+
+
 def create_mock_agent(
     id: AgentId,
     *,
     scaling_group: str = example_sgroup_name1,
     available_slots: ResourceSlot,
-    occupied_slots: ResourceSlot = ResourceSlot(),
+    occupied_slots: ResourceSlot = _EMPTY_RESOURCE_SLOT,
 ) -> AgentRow:
     return AgentRow(
         id=id,

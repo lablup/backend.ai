@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import logging
-from typing import Sequence
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from sqlalchemy.orm import relationship
 
 from ai.backend.logging import BraceStyleAdapter
-
-from ..base import GUID, Base, IDColumn
+from ai.backend.manager.models.base import GUID, Base, IDColumn
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 

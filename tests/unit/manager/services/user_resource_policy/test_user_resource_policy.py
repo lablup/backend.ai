@@ -38,8 +38,7 @@ from ai.backend.manager.types import OptionalState
 @pytest.fixture
 def mock_repository():
     """Mock repository for testing"""
-    mock_repo = AsyncMock(spec=UserResourcePolicyRepository)
-    return mock_repo
+    return AsyncMock(spec=UserResourcePolicyRepository)
 
 
 @pytest.fixture

@@ -963,13 +963,12 @@ class TestGetDefaultArchitectureFromScalingGroup:
         test_scaling_group_name: str,
     ) -> AgentId:
         """Create a single aarch64 agent."""
-        agent_id = await self._create_agent(
+        return await self._create_agent(
             db_with_cleanup,
             test_scaling_group_name,
             "aarch64",
             suffix="single",
         )
-        return agent_id
 
     @pytest.fixture
     async def alive_x86_and_lost_aarch64_agents(
@@ -1344,9 +1343,7 @@ class TestDeploymentRevisionOperations:
             )
             db_sess.add(image)
             await db_sess.commit()
-            image_id = image.id
-
-        return image_id
+            return image.id
 
     @pytest.fixture
     async def test_endpoint_id(

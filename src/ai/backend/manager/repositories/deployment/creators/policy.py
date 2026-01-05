@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-
-from typing_extensions import override
+from typing import override
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.models.deployment_policy import (

@@ -8,23 +8,15 @@ import logging
 import sys
 import uuid
 from collections import namedtuple
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Mapping, Sequence
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 from pathlib import Path
 from typing import (
     Any,
-    AsyncIterator,
-    Awaitable,
-    Callable,
-    Iterable,
-    List,
-    Mapping,
     Optional,
-    Sequence,
-    Type,
     TypeVar,
-    Union,
     cast,
 )
 
@@ -47,26 +39,19 @@ from .session import Session as SyncSession
 log = logging.getLogger(__spec__.name)
 
 __all__ = [
-    "Request",
-    "BaseResponse",
-    "Response",
-    "WebSocketResponse",
-    "SSEResponse",
-    "FetchContextManager",
-    "WebSocketContextManager",
-    "SSEContextManager",
     "AttachedFile",
+    "BaseResponse",
+    "FetchContextManager",
+    "Request",
+    "Response",
+    "SSEContextManager",
+    "SSEResponse",
+    "WebSocketContextManager",
+    "WebSocketResponse",
 ]
 
 
-RequestContent = Union[
-    bytes,
-    bytearray,
-    str,
-    aiohttp.StreamReader,
-    io.IOBase,
-    None,
-]
+RequestContent = bytes | bytearray | str | aiohttp.StreamReader | io.IOBase | None
 """
 The type alias for the set of allowed types for request content.
 """
@@ -116,19 +101,19 @@ class Request:
     """
 
     __slots__ = (
+        "_attached_files",
+        "_content",
+        "_session_mode",
+        "api_version",
         "config",
-        "session",
-        "method",
-        "path",
+        "content_type",
         "date",
         "headers",
+        "method",
         "params",
-        "content_type",
-        "api_version",
-        "_content",
-        "_attached_files",
+        "path",
         "reporthook",
-        "_session_mode",
+        "session",
     )
 
     _content: RequestContent
@@ -146,7 +131,7 @@ class Request:
         content: Optional[RequestContent] = None,
         *,
         content_type: Optional[str] = None,
-        params: Optional[Mapping[str, Union[str, int]]] = None,
+        params: Optional[Mapping[str, str | int]] = None,
         reporthook: Optional[Callable] = None,
         override_api_version: Optional[str] = None,
         session_mode: SessionMode = SessionMode.CLIENT,
@@ -278,12 +263,12 @@ class Request:
             try:
                 cookie_jar = cast(aiohttp.CookieJar, self.session.aiohttp_session.cookie_jar)
                 cookie_jar.load(local_state_path / "cookie.dat")
-            except (IOError, PermissionError):
+            except (OSError, PermissionError):
                 pass
         else:
             raise ValueError("unsupported endpoint type")
 
-    def _pack_content(self) -> Union[RequestContent, aiohttp.FormData]:
+    def _pack_content(self) -> RequestContent | aiohttp.FormData:
         if self._attached_files is not None:
             data = aiohttp.FormData()
             for f in self._attached_files:
@@ -293,16 +278,15 @@ class Request:
             # multipart boundaries.
             self.headers.pop("Content-Type", None)
             return data
-        else:
-            return self._content
+        return self._content
 
     def _build_url(self) -> URL:
         base_url = self.config.endpoint.path.rstrip("/")
         query_path = self.path.lstrip("/") if self.path is not None and len(self.path) > 0 else ""
         if self.config.endpoint_type == "session":
             if not query_path.startswith("server"):
-                query_path = "func/{0}".format(query_path)
-        path = "{0}/{1}".format(base_url, query_path)
+                query_path = f"func/{query_path}"
+        path = f"{base_url}/{query_path}"
         url = self.config.endpoint.with_path(path)
         if self.params:
             url = url.with_query(self.params)
@@ -327,9 +311,7 @@ class Request:
             async with rqst.fetch() as resp:
               print(await resp.text())
         """
-        assert self.method in self._allowed_methods, "Disallowed HTTP method: {}".format(
-            self.method
-        )
+        assert self.method in self._allowed_methods, f"Disallowed HTTP method: {self.method}"
         self.date = datetime.now(tzutc())
         assert self.date is not None
         self.headers["Date"] = self.date.isoformat()
@@ -503,9 +485,9 @@ class BaseResponse:
     """
 
     __slots__ = (
-        "_session",
-        "_raw_response",
         "_async_mode",
+        "_raw_response",
+        "_session",
     )
 
     _session: BaseSession
@@ -571,13 +553,13 @@ class FetchContextManager:
     """
 
     __slots__ = (
-        "session",
-        "rqst_ctx_builder",
-        "_session_mode",
-        "response_cls",
-        "check_status",
         "_async_mode",
         "_rqst_ctx",
+        "_session_mode",
+        "check_status",
+        "response_cls",
+        "rqst_ctx_builder",
+        "session",
     )
 
     _rqst_ctx: Optional[_RequestContextManager]
@@ -588,7 +570,7 @@ class FetchContextManager:
         rqst_ctx_builder: Callable[[], _RequestContextManager],
         session_mode: SessionMode = SessionMode.CLIENT,
         *,
-        response_cls: Type[Response] = Response,
+        response_cls: type[Response] = Response,
         check_status: bool = True,
     ) -> None:
         self.session = session
@@ -624,14 +606,13 @@ class FetchContextManager:
                     msg = (
                         "Request to the API endpoint has failed.\n"
                         "Check your network connection and/or the server status.\n"
-                        "\u279c {!r}".format(e)
+                        f"\u279c {e!r}"
                     )
                     raise BackendClientError(msg) from e
-                else:
-                    self.session.config.rotate_endpoints()
-                    continue
+                self.session.config.rotate_endpoints()
+                continue
             except aiohttp.ClientResponseError as e:
-                msg = "API endpoint response error.\n\u279c {!r}".format(e)
+                msg = f"API endpoint response error.\n\u279c {e!r}"
                 if raw_resp is not None:
                     await raw_resp.__aexit__(*sys.exc_info())
                 raise BackendClientError(msg) from e
@@ -729,11 +710,11 @@ class WebSocketContextManager:
     """
 
     __slots__ = (
+        "_ws_ctx",
+        "on_enter",
+        "response_cls",
         "session",
         "ws_ctx_builder",
-        "response_cls",
-        "on_enter",
-        "_ws_ctx",
     )
 
     _ws_ctx: Optional[_WSRequestContextManager]
@@ -744,7 +725,7 @@ class WebSocketContextManager:
         ws_ctx_builder: Callable[[], _WSRequestContextManager],
         *,
         on_enter: Optional[Callable] = None,
-        response_cls: Type[WebSocketResponse] = WebSocketResponse,
+        response_cls: type[WebSocketResponse] = WebSocketResponse,
     ) -> None:
         self.session = session
         self.ws_ctx_builder = ws_ctx_builder
@@ -766,14 +747,13 @@ class WebSocketContextManager:
                     msg = (
                         "Request to the API endpoint has failed.\n"
                         "Check your network connection and/or the server status.\n"
-                        "Error detail: {!r}".format(e)
+                        f"Error detail: {e!r}"
                     )
                     raise BackendClientError(msg) from e
-                else:
-                    self.session.config.rotate_endpoints()
-                    continue
+                self.session.config.rotate_endpoints()
+                continue
             except aiohttp.ClientResponseError as e:
-                msg = "API endpoint response error.\n\u279c {!r}".format(e)
+                msg = f"API endpoint response error.\n\u279c {e!r}"
                 raise BackendClientError(msg) from e
             else:
                 break
@@ -803,8 +783,8 @@ class SSEMessage:
 class SSEResponse(BaseResponse):
     __slots__ = (
         "_auto_reconnect",
-        "_retry",
         "_connector",
+        "_retry",
     )
 
     def __init__(
@@ -823,7 +803,7 @@ class SSEResponse(BaseResponse):
         self._connector = connector
 
     async def fetch_events(self) -> AsyncIterator[SSEMessage]:
-        msg_lines: List[str] = []
+        msg_lines: list[str] = []
         server_closed = False
         while True:
             received_line = await self._raw_response.content.readline()
@@ -884,10 +864,10 @@ class SSEResponse(BaseResponse):
 
 class SSEContextManager:
     __slots__ = (
-        "session",
-        "rqst_ctx_builder",
-        "response_cls",
         "_rqst_ctx",
+        "response_cls",
+        "rqst_ctx_builder",
+        "session",
     )
 
     _rqst_ctx: Optional[_RequestContextManager]
@@ -897,7 +877,7 @@ class SSEContextManager:
         session: BaseSession,
         rqst_ctx_builder: Callable[[], _RequestContextManager],
         *,
-        response_cls: Type[SSEResponse] = SSEResponse,
+        response_cls: type[SSEResponse] = SSEResponse,
     ) -> None:
         self.session = session
         self.rqst_ctx_builder = rqst_ctx_builder
@@ -928,14 +908,13 @@ class SSEContextManager:
                     msg = (
                         "Request to the API endpoint has failed.\n"
                         "Check your network connection and/or the server status.\n"
-                        "\u279c {!r}".format(e)
+                        f"\u279c {e!r}"
                     )
                     raise BackendClientError(msg) from e
-                else:
-                    self.session.config.rotate_endpoints()
-                    continue
+                self.session.config.rotate_endpoints()
+                continue
             except aiohttp.ClientResponseError as e:
-                msg = "API endpoint response error.\n\u279c {!r}".format(e)
+                msg = f"API endpoint response error.\n\u279c {e!r}"
                 raise BackendClientError(msg) from e
             finally:
                 self.session.config.load_balance_endpoints()

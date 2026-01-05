@@ -5,8 +5,8 @@ Provides CRUD endpoints for role management and role assignment operations.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from http import HTTPStatus
-from typing import Iterable, Tuple
 
 import aiohttp_cors
 from aiohttp import web
@@ -34,6 +34,8 @@ from ai.backend.common.dto.manager.rbac import (
     UpdateRoleResponse,
 )
 from ai.backend.common.dto.manager.rbac.request import DeleteRoleRequest, PurgeRoleRequest
+from ai.backend.manager.api.auth import auth_required_for_method
+from ai.backend.manager.api.types import CORSOptions, WebMiddleware
 from ai.backend.manager.data.permission.role import UserRoleAssignmentInput, UserRoleRevocationInput
 from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -52,8 +54,6 @@ from ai.backend.manager.services.permission_contoller.actions import (
 )
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
 
-from ..auth import auth_required_for_method
-from ..types import CORSOptions, WebMiddleware
 from .assigned_user_adapter import AssignedUserAdapter
 from .role_adapter import RoleAdapter
 
@@ -340,7 +340,7 @@ class RBACAPIHandler:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     """Create aiohttp application for RBAC API endpoints."""
     app = web.Application()
     app["api_versions"] = (4, 5)

@@ -33,8 +33,7 @@ def load_local_config(
         override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     try:
-        local_config = StorageProxyUnifiedConfig.model_validate(raw_cfg)
-        return local_config
+        return StorageProxyUnifiedConfig.model_validate(raw_cfg)
     except Exception as e:
         print(
             f"ConfigurationError: Validation of storage-proxy local config has failed, {e}",
@@ -58,10 +57,9 @@ def make_etcd(local_config: StorageProxyUnifiedConfig) -> AsyncEtcd:
     }
 
     etcd_config_data = local_config.etcd.to_dataclass()
-    etcd = AsyncEtcd(
+    return AsyncEtcd(
         [addr.to_legacy() for addr in etcd_config_data.addrs],
         local_config.etcd.namespace,
         scope_prefix_map,
         credentials=etcd_credentials,
     )
-    return etcd

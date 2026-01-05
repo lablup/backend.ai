@@ -1,11 +1,11 @@
 import logging
 from typing import Optional
 
-import click  # noqa: E402
+import click
 
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-from .main import main  # noqa: E402
+from .main import main
 
 log = logging.getLogger(__spec__.name)
 

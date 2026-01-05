@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Self, Sequence
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Optional, Self
 
 import graphene
 import sqlalchemy as sa
@@ -9,9 +10,9 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.routing import RoutingRow
 
-from ...errors.service import RoutingNotFound
 from .base import InferenceSessionError, Item, PaginatedList
 
 if TYPE_CHECKING:
@@ -37,7 +38,7 @@ class Routing(graphene.ObjectType):
 
     live_stat = graphene.JSONString(description="Added in 24.12.0.")
 
-    _endpoint_row: "EndpointRow"
+    _endpoint_row: EndpointRow
 
     @classmethod
     def from_dto(cls, dto) -> Optional[Self]:  # type: ignore
@@ -58,7 +59,7 @@ class Routing(graphene.ObjectType):
         cls,
         ctx,  # ctx: GraphQueryContext,
         row: RoutingRow,
-        endpoint: Optional["EndpointRow"] = None,
+        endpoint: Optional[EndpointRow] = None,
     ) -> Routing:
         ret = cls(
             routing_id=row.id,
@@ -193,7 +194,7 @@ class Routing(graphene.ObjectType):
         )
 
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
-        graph_ctx: "GraphQueryContext" = info.context
+        graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "EndpointStatistics.by_replica")
         return await loader.load((self._endpoint_row.id, self.routing_id))
 

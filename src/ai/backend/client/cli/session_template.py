@@ -5,8 +5,8 @@ from tabulate import tabulate
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.session import Session
 
-from ..session import Session
 from .pretty import print_error, print_info, print_warn
 
 
@@ -59,7 +59,7 @@ def create(template_path, domain, group, owner_access_key):
     """
 
     if template_path:
-        with open(template_path, "r") as fr:
+        with open(template_path) as fr:
             body = fr.read()
     else:
         body = ""
@@ -166,7 +166,7 @@ def update(template_id, template_path, owner_access_key):
     """
 
     if template_path:
-        with open(template_path, "r") as fr:
+        with open(template_path) as fr:
             body = fr.read()
     else:
         body = ""

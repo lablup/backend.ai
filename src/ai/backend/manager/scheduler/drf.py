@@ -14,9 +14,9 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models import KernelRow, SessionRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 
-from ..models import KernelRow, SessionRow
-from ..models.scaling_group import ScalingGroupOpts
 from .types import AbstractScheduler
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))

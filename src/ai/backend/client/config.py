@@ -2,22 +2,22 @@ import enum
 import os
 import random
 import re
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path
-from typing import Any, Callable, Optional, TypeVar, cast
+from typing import Any, Optional, TypeVar, cast
 
 import appdirs
 from dotenv import find_dotenv, load_dotenv
 from yarl import URL
 
 __all__ = [
-    "parse_api_version",
-    "get_config",
-    "set_config",
-    "APIConfig",
     "API_VERSION",
     "DEFAULT_CHUNK_SIZE",
     "MAX_INFLIGHT_CHUNKS",
+    "APIConfig",
+    "get_config",
+    "parse_api_version",
+    "set_config",
 ]
 
 
@@ -103,7 +103,7 @@ def _clean_urls(v: URL | str) -> list[URL]:
         for entry in v.split(","):
             url = URL(entry)
             if not url.is_absolute():
-                raise ValueError("URL {} is not absolute.".format(url))
+                raise ValueError(f"URL {url} is not absolute.")
             urls.append(url)
     return urls
 

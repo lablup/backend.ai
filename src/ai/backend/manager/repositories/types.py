@@ -34,7 +34,7 @@ class RepositoryArgs:
 
 
 # Generic types for pagination
-TModel = TypeVar("TModel")
+TModel = TypeVar("TModel", bound="PaginatableModel")
 TData = TypeVar("TData")
 TFilters = TypeVar("TFilters")
 TOrdering = TypeVar("TOrdering")
@@ -92,7 +92,7 @@ class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
         ordering_applier: OrderingApplier,
         model_converter: ModelConverter,
         cursor_type_name: str,
-    ):
+    ) -> None:
         self.model_class = model_class
         self.filter_applier = filter_applier
         self.ordering_applier = ordering_applier
@@ -111,11 +111,10 @@ class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
         """
         if not order_clauses:
             # Handle empty order_clauses case - compare by ID only
-            id_column = getattr(self.model_class, "id")
+            id_column = self.model_class.id
             if pagination_order == ConnectionPaginationOrder.FORWARD:
                 return [id_column > cursor_uuid]
-            else:
-                return [id_column < cursor_uuid]
+            return [id_column < cursor_uuid]
 
         conditions = []
 
@@ -125,7 +124,7 @@ class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
         def get_cursor_value_subquery(column):
             """Get or create cached subquery for cursor value"""
             if column not in subquery_cache:
-                id_column = getattr(self.model_class, "id")
+                id_column = self.model_class.id
                 subquery_cache[column] = (
                     sa.select(column).where(id_column == cursor_uuid).scalar_subquery()
                 )
@@ -162,7 +161,7 @@ class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
                 condition_parts.append(inequality_cond)
             else:
                 # Final condition: all fields equal, compare by ID
-                id_column = getattr(self.model_class, "id")
+                id_column = self.model_class.id
                 if pagination_order == ConnectionPaginationOrder.FORWARD:
                     id_inequality_cond = id_column > cursor_uuid
                 else:  # BACKWARD
@@ -218,7 +217,7 @@ class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
                 stmt, _ = self.ordering_applier.apply_ordering(stmt, ordering)
 
             # Default order by id for consistent pagination
-            id_column = getattr(self.model_class, "id")
+            id_column = self.model_class.id
             stmt = stmt.order_by(id_column.asc())
 
             # Apply pagination
@@ -267,7 +266,7 @@ class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
 
             # Apply ordering based on pagination direction
             final_order_clauses = []
-            id_column = getattr(self.model_class, "id")
+            id_column = self.model_class.id
 
             if pagination_order == ConnectionPaginationOrder.BACKWARD:
                 # Reverse ordering for backward pagination

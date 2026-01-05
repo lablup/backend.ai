@@ -4,20 +4,17 @@ import enum
 import logging
 import os.path
 import uuid
-from collections.abc import Container, Iterable, Mapping
+from collections.abc import Callable, Container, Iterable, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Final,
-    List,
     NamedTuple,
     Optional,
-    Sequence,
     TypeAlias,
     cast,
     overload,
@@ -51,23 +48,21 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
 )
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
-
-from ...defs import (
+from ai.backend.manager.defs import (
     RESERVED_VFOLDER_PATTERNS,
     RESERVED_VFOLDERS,
     VFOLDER_DSTPATHS_MAP,
 )
-from ...errors.api import InvalidAPIParameters
-from ...errors.common import ObjectNotFound
-from ...errors.storage import (
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.storage import (
     InsufficientStoragePermission,
     VFolderGone,
     VFolderNotFound,
     VFolderOperationFailed,
     VFolderPermissionError,
 )
-from ...types import UserScope
-from ..base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     EnumValueType,
@@ -76,8 +71,8 @@ from ..base import (
     StrEnumType,
     metadata,
 )
-from ..group import AssocGroupUserRow, GroupRow
-from ..rbac import (
+from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -86,55 +81,60 @@ from ..rbac import (
     StorageHost,
     get_predefined_roles_in_scope,
 )
-from ..rbac import (
+from ai.backend.manager.models.rbac import (
     UserScope as UserRBACScope,
 )
-from ..rbac.context import ClientContext
-from ..rbac.exceptions import NotEnoughPermission
-from ..rbac.permission_defs import StorageHostPermission
-from ..rbac.permission_defs import VFolderPermission as VFolderRBACPermission
-from ..session import DEAD_SESSION_STATUSES, SessionRow
-from ..storage import PermissionContext as StorageHostPermissionContext
-from ..storage import PermissionContextBuilder as StorageHostPermissionContextBuilder
-from ..user import UserRole, UserRow
-from ..utils import (
+from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.rbac.exceptions import NotEnoughPermission
+from ai.backend.manager.models.rbac.permission_defs import StorageHostPermission
+from ai.backend.manager.models.rbac.permission_defs import (
+    VFolderPermission as VFolderRBACPermission,
+)
+from ai.backend.manager.models.session import DEAD_SESSION_STATUSES, SessionRow
+from ai.backend.manager.models.storage import PermissionContext as StorageHostPermissionContext
+from ai.backend.manager.models.storage import (
+    PermissionContextBuilder as StorageHostPermissionContextBuilder,
+)
+from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
     execute_with_txn_retry,
     sql_json_merge,
 )
+from ai.backend.manager.types import UserScope
 
 if TYPE_CHECKING:
-    from ..storage import StorageSessionManager
+    from ai.backend.manager.models.storage import StorageSessionManager
 
 __all__: Sequence[str] = (
-    "vfolders",
-    "vfolder_invitations",
-    "vfolder_permissions",
-    "VFolderOwnershipType",
-    "VFolderInvitationState",
-    "VFolderPermission",
-    "VFolderPermissionValidator",
-    "VFolderOperationStatus",
-    "VFolderStatusSet",
     "DEAD_VFOLDER_STATUSES",
+    "DEAD_VFOLDER_STATUSES",
+    "HARD_DELETED_VFOLDER_STATUSES",
+    "SOFT_DELETED_VFOLDER_STATUSES",
     "VFolderCloneInfo",
     "VFolderDeletionInfo",
+    "VFolderInvitationState",
+    "VFolderOperationStatus",
+    "VFolderOwnershipType",
+    "VFolderPermission",
+    "VFolderPermissionSetAlias",
+    "VFolderPermissionValidator",
     "VFolderRow",
-    "query_accessible_vfolders",
-    "initiate_vfolder_deletion",
+    "VFolderStatusSet",
+    "ensure_host_permission_allowed",
+    "filter_host_allowed_permission",
     "get_allowed_vfolder_hosts_by_group",
     "get_allowed_vfolder_hosts_by_user",
-    "verify_vfolder_name",
+    "initiate_vfolder_deletion",
     "prepare_vfolder_mounts",
+    "query_accessible_vfolders",
     "update_vfolder_status",
-    "filter_host_allowed_permission",
-    "ensure_host_permission_allowed",
+    "verify_vfolder_name",
+    "vfolder_invitations",
+    "vfolder_permissions",
     "vfolder_status_map",
-    "DEAD_VFOLDER_STATUSES",
-    "SOFT_DELETED_VFOLDER_STATUSES",
-    "HARD_DELETED_VFOLDER_STATUSES",
-    "VFolderPermissionSetAlias",
+    "vfolders",
 )
 
 
@@ -446,10 +446,10 @@ class VFolderRow(Base):
             raise ObjectNotFound(object_name="VFolder")
         return result
 
-    def __contains__(self, key):
+    def __contains__(self, key) -> bool:
         return key in self.__dir__()
 
-    def __getitem__(self, item):
+    def __getitem__(self, item) -> Any:
         try:
             return getattr(self, item)
         except AttributeError:
@@ -580,7 +580,7 @@ async def query_accessible_vfolders(
                 "cur_size": row.vfolders_cur_size,
             })
 
-    entries: List[dict] = []
+    entries: list[dict] = []
     # User vfolders.
     if "user" in allowed_vfolder_types:
         # Scan vfolders on requester's behalf.
@@ -704,7 +704,7 @@ async def get_allowed_vfolder_hosts_by_group(
     If `group_id` is not None, `allowed_vfolder_hosts` from the group is also merged.
     If the requester is a domain admin, gather all `allowed_vfolder_hosts` of the domain groups.
     """
-    from .. import domains, groups
+    from ai.backend.manager.models import domains, groups
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
@@ -723,8 +723,7 @@ async def get_allowed_vfolder_hosts_by_group(
         if values := await conn.scalar(query):
             allowed_hosts = allowed_hosts | values
     # Keypair Resource Policy's allowed_vfolder_hosts
-    allowed_hosts = allowed_hosts | resource_policy["allowed_vfolder_hosts"]
-    return allowed_hosts
+    return allowed_hosts | resource_policy["allowed_vfolder_hosts"]
 
 
 async def get_allowed_vfolder_hosts_by_user(
@@ -739,7 +738,7 @@ async def get_allowed_vfolder_hosts_by_user(
 
     All available `allowed_vfolder_hosts` of groups which requester associated will be merged.
     """
-    from .. import association_groups_users, domains, groups
+    from ai.backend.manager.models import association_groups_users, domains, groups
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
@@ -777,8 +776,7 @@ async def get_allowed_vfolder_hosts_by_user(
         for row in rows:
             allowed_hosts = allowed_hosts | row.allowed_vfolder_hosts
     # Keypair Resource Policy's allowed_vfolder_hosts
-    allowed_hosts = allowed_hosts | resource_policy["allowed_vfolder_hosts"]
-    return allowed_hosts
+    return allowed_hosts | resource_policy["allowed_vfolder_hosts"]
 
 
 @overload
@@ -906,8 +904,7 @@ async def prepare_vfolder_mounts(
     if not accessible_vfolders:
         if requested_vfolder_names:
             raise VFolderNotFound("There is no accessible vfolders at all.")
-        else:
-            return []
+        return []
 
     requested_names = set(requested_vfolder_names.values())
     for row in accessible_vfolders:
@@ -1084,11 +1081,11 @@ async def update_vfolder_status(
     vfolder_info_len = len(vfolder_ids)
     cond = vfolders.c.id.in_(vfolder_ids)
     if vfolder_info_len == 0:
-        return None
-    elif vfolder_info_len == 1:
+        return
+    if vfolder_info_len == 1:
         cond = vfolders.c.id == vfolder_ids[0]
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if update_status.is_deletable(force):
         select_stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
@@ -1152,7 +1149,7 @@ async def ensure_host_permission_allowed(
     domain_name: str,
     group_id: Optional[uuid.UUID] = None,
 ) -> None:
-    from ..storage import StorageSessionManager
+    from ai.backend.manager.models.storage import StorageSessionManager
 
     if StorageSessionManager.is_noop_host(folder_host):
         return
@@ -1232,11 +1229,8 @@ async def initiate_vfolder_deletion(
     """Purges VFolder content from storage host."""
     vfolder_info_len = len(requested_vfolders)
     vfolder_ids = tuple(vf_id.folder_id for vf_id, _, _ in requested_vfolders)
-    vfolders.c.id.in_(vfolder_ids)
     if vfolder_info_len == 0:
         return 0
-    elif vfolder_info_len == 1:
-        vfolders.c.id == vfolder_ids[0]
 
     async with db_engine.connect() as db_conn:
         await delete_vfolder_relation_rows(db_conn, db_engine.begin_session, vfolder_ids)
@@ -1541,15 +1535,14 @@ class VFolderPermissionContextBuilder(
         target_scope: ScopeType,
     ) -> frozenset[VFolderRBACPermission]:
         roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
-        permissions = await self._calculate_permission_by_predefined_roles(roles)
-        return permissions
+        return await self._calculate_permission_by_predefined_roles(roles)
 
     @override
     async def build_ctx_in_system_scope(
         self,
         ctx: ClientContext,
     ) -> VFolderPermissionContext:
-        from ..domain import DomainRow
+        from ai.backend.manager.models.domain import DomainRow
 
         perm_ctx = VFolderPermissionContext()
         _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
@@ -1586,8 +1579,7 @@ class VFolderPermissionContextBuilder(
     async def build_ctx_in_user_scope(
         self, ctx: ClientContext, scope: UserRBACScope
     ) -> VFolderPermissionContext:
-        permission_ctx = await self._build_at_user_scope_non_recursively(ctx, scope.user_id)
-        return permission_ctx
+        return await self._build_at_user_scope_non_recursively(ctx, scope.user_id)
 
     async def _build_at_domain_scope_non_recursively(
         self,
@@ -1595,10 +1587,9 @@ class VFolderPermissionContextBuilder(
         domain_name: str,
     ) -> VFolderPermissionContext:
         domain_permissions = await self.calculate_permission(ctx, DomainScope(domain_name))
-        result = VFolderPermissionContext(
+        return VFolderPermissionContext(
             domain_name_to_permission_map={domain_name: domain_permissions}
         )
-        return result
 
     async def _build_at_project_scopes_in_domain(
         self,
@@ -1830,7 +1821,7 @@ async def validate_permission(
         vfolder_id=vfolder_id,
     )
     if not vfolders:
-        raise NotEnoughPermission(f"'{permission.name}' not allowed in {str(target_scope)}")
+        raise NotEnoughPermission(f"'{permission.name}' not allowed in {target_scope!s}")
 
 
 async def get_permission_ctx(
@@ -1841,14 +1832,13 @@ async def get_permission_ctx(
 ) -> VFolderPermissionContext:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         builder = VFolderPermissionContextBuilder(db_session)
-        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
+        return await builder.build(ctx, target_scope, requested_permission)
         # TODO: Plan how to check storage host permission with recursive scopes
         # host_permission = _VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP[requested_permission]
         # host_permission_ctx = await StorageHostPermissionContextBuilder(db_session).build(
         #     ctx, target_scope, host_permission
         # )
         # permission_ctx.apply_host_permission_ctx(host_permission_ctx)
-    return permission_ctx
 
 
 def is_mount_duplicate(

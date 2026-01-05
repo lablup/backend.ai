@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ai.backend.common.health_checker import (
     AGENT,
@@ -41,7 +41,7 @@ def test_component_id_newtype() -> None:
 
 def test_component_health_status_creation() -> None:
     """Test ComponentHealthStatus dataclass creation."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     status = ComponentHealthStatus(
         is_healthy=True,
         last_checked_at=now,
@@ -55,7 +55,7 @@ def test_component_health_status_creation() -> None:
 
 def test_component_health_status_with_error() -> None:
     """Test ComponentHealthStatus with error message."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     error_msg = "Connection failed"
     status = ComponentHealthStatus(
         is_healthy=False,

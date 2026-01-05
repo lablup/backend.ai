@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Self, Sequence
+from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any, Optional, Self
 
 import graphene
 import sqlalchemy as sa
@@ -27,20 +28,21 @@ if TYPE_CHECKING:
     from .vfolder import VirtualFolder
 
 __all__ = (
-    "UserInfo",
+    "CreateKeyPair",
+    "DeleteKeyPair",
     "KeyPair",
     "KeyPairInput",
     "KeyPairList",
-    "ModifyKeyPairInput",
-    "CreateKeyPair",
     "ModifyKeyPair",
-    "DeleteKeyPair",
+    "ModifyKeyPairInput",
+    "UserInfo",
 )
 
-from ...models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ...models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
-from ...models.user import UserRole
-from ...models.utils import agg_to_array
+from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.utils import agg_to_array
+
 from .base import (
     Item,
     PaginatedList,
@@ -221,7 +223,7 @@ class KeyPair(graphene.ObjectType):
         row_ts = await ctx.valkey_stat.get_keypair_last_used_time(self.access_key)
         if row_ts is None:
             return None
-        return datetime.fromtimestamp(row_ts)
+        return datetime.fromtimestamp(row_ts, tz=UTC)
 
     @classmethod
     async def load_all(
@@ -504,7 +506,7 @@ class CreateKeyPair(graphene.Mutation):
         user_id: str,
         props: KeyPairInput,
     ) -> CreateKeyPair:
-        from .user import users  # noqa
+        from .user import users
 
         graph_ctx: GraphQueryContext = info.context
         data = prepare_new_keypair(user_id, props.to_creator())
@@ -534,7 +536,7 @@ class ModifyKeyPair(graphene.Mutation):
         props: ModifyKeyPairInput,
     ) -> ModifyKeyPair:
         ctx: GraphQueryContext = info.context
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
         set_if_set(props, data, "is_active")
         set_if_set(props, data, "is_admin")
         set_if_set(props, data, "resource_policy")

@@ -14,8 +14,7 @@ from sqlalchemy.orm import relationship
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.deployment import InvalidDeploymentStrategy
-
-from ..base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     IDColumn,
@@ -26,10 +25,10 @@ if TYPE_CHECKING:
     pass
 
 __all__ = (
-    "DeploymentPolicyRow",
-    "DeploymentPolicyData",
-    "RollingUpdateSpec",
     "BlueGreenSpec",
+    "DeploymentPolicyData",
+    "DeploymentPolicyRow",
+    "RollingUpdateSpec",
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]

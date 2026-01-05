@@ -106,7 +106,7 @@ class TriState(Generic[TVal]):
     _state: _TriStateEnum
     _value: Optional[TVal]
 
-    def __init__(self, state: _TriStateEnum, value: Optional[TVal]):
+    def __init__(self, state: _TriStateEnum, value: Optional[TVal]) -> None:
         """
         Initialize a TriState object with the given state and value.
         Do not call this constructor directly. Use the class methods instead.
@@ -118,7 +118,7 @@ class TriState(Generic[TVal]):
     def from_graphql(cls, value: Optional[TVal] | UndefinedType) -> TriState[TVal]:
         if value is None:
             return cls.nullify()
-        if isinstance(value, UndefinedType) or isinstance(value, UnsetType):
+        if isinstance(value, (UndefinedType, UnsetType)):
             return cls.nop()
         return cls.update(value)
 
@@ -179,7 +179,7 @@ class OptionalState(Generic[TVal]):
     _state: _TriStateEnum
     _value: Optional[TVal]
 
-    def __init__(self, state: _TriStateEnum, value: Optional[TVal]):
+    def __init__(self, state: _TriStateEnum, value: Optional[TVal]) -> None:
         if state == _TriStateEnum.NULLIFY:
             raise ValueError("OptionalState cannot be NULLIFY")
         self._state = state
@@ -187,7 +187,7 @@ class OptionalState(Generic[TVal]):
 
     @classmethod
     def from_graphql(cls, value: Optional[TVal] | UndefinedType | UnsetType) -> OptionalState[TVal]:
-        if isinstance(value, UndefinedType) or isinstance(value, UnsetType):
+        if isinstance(value, (UndefinedType, UnsetType)):
             return OptionalState.nop()
         if value is None:
             raise ValueError("OptionalState cannot be NULLIFY")

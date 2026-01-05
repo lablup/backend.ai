@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import (
-    Mapping,
     cast,
     override,
 )
@@ -41,8 +41,8 @@ from .user import UserRow
 # Left this for compatibility with existing code
 __all__ = (
     "StorageProxyInfo",
-    "VolumeInfo",
     "StorageSessionManager",
+    "VolumeInfo",
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -137,8 +137,7 @@ class PermissionContextBuilder(
         target_scope: ScopeType,
     ) -> frozenset[StorageHostPermission]:
         roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
-        permissions = await self._calculate_permission_by_predefined_roles(roles)
-        return permissions
+        return await self._calculate_permission_by_predefined_roles(roles)
 
     @override
     async def build_ctx_in_system_scope(
@@ -176,13 +175,12 @@ class PermissionContextBuilder(
         if domain_row is None:
             return PermissionContext()
         host_permissions = cast(VFolderHostPermissionMap, domain_row.allowed_vfolder_hosts)
-        result = PermissionContext(
+        return PermissionContext(
             object_id_to_additional_permission_map={
                 host: _legacy_vf_perms_to_host_rbac_perms(perms)
                 for host, perms in host_permissions.items()
             }
         )
-        return result
 
     @override
     async def build_ctx_in_project_scope(
@@ -206,13 +204,12 @@ class PermissionContextBuilder(
         if project_row is None:
             return PermissionContext()
         host_permissions = cast(VFolderHostPermissionMap, project_row.allowed_vfolder_hosts)
-        result = PermissionContext(
+        return PermissionContext(
             object_id_to_additional_permission_map={
                 host: _legacy_vf_perms_to_host_rbac_perms(perms)
                 for host, perms in host_permissions.items()
             }
         )
-        return result
 
     @override
     async def build_ctx_in_user_scope(
@@ -255,10 +252,9 @@ class PermissionContextBuilder(
                     perms
                 )
 
-        result = PermissionContext(
+        return PermissionContext(
             object_id_to_additional_permission_map=object_id_to_additional_permission_map
         )
-        return result
 
     @override
     @classmethod

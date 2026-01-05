@@ -18,17 +18,16 @@ from ai.backend.manager.data.agent.types import (
     AgentStatus,
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
-
-from ..base import (
+from ai.backend.manager.models.base import (
     Base,
     CurvePublicKeyColumn,
     EnumType,
     ResourceSlotColumn,
     mapper_registry,
 )
-from ..kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
-from ..keypair import KeyPairRow
-from ..rbac import (
+from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -37,16 +36,16 @@ from ..rbac import (
     UserScope,
     get_predefined_roles_in_scope,
 )
-from ..rbac.context import ClientContext
-from ..rbac.permission_defs import AgentPermission, ScalingGroupPermission
-from ..types import QueryCondition
-from ..utils import ExtendedAsyncSAEngine, execute_with_txn_retry
+from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.rbac.permission_defs import AgentPermission, ScalingGroupPermission
+from ai.backend.manager.models.types import QueryCondition
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 __all__: Sequence[str] = (
-    "agents",
     "AgentRow",
-    "recalc_agent_resource_occupancy",
+    "agents",
     "list_schedulable_agents_by_sgroup",
+    "recalc_agent_resource_occupancy",
 )
 
 
@@ -102,10 +101,9 @@ class AgentRow(Base):
                 if kernel.status in KernelStatus.resource_occupied_statuses()
             ],
         )
-        actual_occupied_slots = sum(
+        return sum(
             (kernel.occupied_slots for kernel in resource_occupied_kernel_rows), ResourceSlot()
         )
-        return actual_occupied_slots
 
     def to_data(self) -> AgentData:
         return AgentData(
@@ -305,7 +303,7 @@ MEMBER_PERMISSIONS: frozenset[AgentPermission] = frozenset([
 
 @dataclass
 class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow, AgentId]):
-    from ..scaling_group import ScalingGroupPermissionContext
+    from ai.backend.manager.models.scaling_group import ScalingGroupPermissionContext
 
     sgroup_permission_ctx: Optional[ScalingGroupPermissionContext] = None
 
@@ -381,15 +379,14 @@ class AgentPermissionContextBuilder(
         target_scope: ScopeType,
     ) -> frozenset[AgentPermission]:
         roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
-        permissions = await self._calculate_permission_by_predefined_roles(roles)
-        return permissions
+        return await self._calculate_permission_by_predefined_roles(roles)
 
     @override
     async def build_ctx_in_system_scope(
         self,
         ctx: ClientContext,
     ) -> AgentPermissionContext:
-        from ..domain import DomainRow
+        from ai.backend.manager.models.domain import DomainRow
 
         perm_ctx = AgentPermissionContext()
         _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
@@ -404,7 +401,10 @@ class AgentPermissionContextBuilder(
         ctx: ClientContext,
         scope: DomainScope,
     ) -> AgentPermissionContext:
-        from ..scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
+        from ai.backend.manager.models.scaling_group import (
+            ScalingGroupForDomainRow,
+            ScalingGroupRow,
+        )
 
         permissions = await self.calculate_permission(ctx, scope)
         aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
@@ -430,7 +430,10 @@ class AgentPermissionContextBuilder(
         ctx: ClientContext,
         scope: ProjectScope,
     ) -> AgentPermissionContext:
-        from ..scaling_group import ScalingGroupForProjectRow, ScalingGroupRow
+        from ai.backend.manager.models.scaling_group import (
+            ScalingGroupForProjectRow,
+            ScalingGroupRow,
+        )
 
         permissions = await self.calculate_permission(ctx, scope)
         aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
@@ -456,7 +459,10 @@ class AgentPermissionContextBuilder(
         ctx: ClientContext,
         scope: UserScope,
     ) -> AgentPermissionContext:
-        from ..scaling_group import ScalingGroupForKeypairsRow, ScalingGroupRow
+        from ai.backend.manager.models.scaling_group import (
+            ScalingGroupForKeypairsRow,
+            ScalingGroupRow,
+        )
 
         permissions = await self.calculate_permission(ctx, scope)
         aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
@@ -526,7 +532,7 @@ async def get_permission_ctx(
     target_scope: ScopeType,
     requested_permission: AgentPermission,
 ) -> AgentPermissionContext:
-    from ..scaling_group import ScalingGroupPermissionContextBuilder
+    from ai.backend.manager.models.scaling_group import ScalingGroupPermissionContextBuilder
 
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         sgroup_perm_ctx = await ScalingGroupPermissionContextBuilder(db_session).build(

@@ -9,28 +9,28 @@ from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.models.object_storage import ObjectStorageRow
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.object_storage import ObjectStorageCreatorSpec
+from ai.backend.manager.repositories.object_storage.updaters import ObjectStorageUpdaterSpec
+from ai.backend.manager.services.object_storage.actions.create import CreateObjectStorageAction
+from ai.backend.manager.services.object_storage.actions.delete import DeleteObjectStorageAction
+from ai.backend.manager.services.object_storage.actions.get import GetObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
 )
 from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url import (
     GetUploadPresignedURLAction,
 )
+from ai.backend.manager.services.object_storage.actions.list import ListObjectStorageAction
+from ai.backend.manager.services.object_storage.actions.update import UpdateObjectStorageAction
 from ai.backend.manager.services.storage_namespace.actions.get_multi import (
     GetNamespacesAction,
 )
+from ai.backend.manager.types import OptionalState
 
-from ...data.object_storage.types import ObjectStorageData
-from ...models.object_storage import ObjectStorageRow
-from ...repositories.base.creator import Creator
-from ...repositories.base.updater import Updater
-from ...repositories.object_storage import ObjectStorageCreatorSpec
-from ...repositories.object_storage.updaters import ObjectStorageUpdaterSpec
-from ...services.object_storage.actions.create import CreateObjectStorageAction
-from ...services.object_storage.actions.delete import DeleteObjectStorageAction
-from ...services.object_storage.actions.get import GetObjectStorageAction
-from ...services.object_storage.actions.list import ListObjectStorageAction
-from ...services.object_storage.actions.update import UpdateObjectStorageAction
-from ...types import OptionalState
 from .storage_namespace import StorageNamespace, StorageNamespaceConnection, StorageNamespaceEdge
 from .types import StrawberryGQLContext
 

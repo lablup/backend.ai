@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Awaitable
 from dataclasses import dataclass
-from typing import Awaitable
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import HealthCheckStatus
@@ -20,9 +20,8 @@ from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
 )
 from ai.backend.manager.scheduler.types import ScheduleType
-
-from ..results import ScheduledSessionData, ScheduleResult
-from ..types import SessionTransitionData
+from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData, ScheduleResult
+from ai.backend.manager.sokovan.scheduler.types import SessionTransitionData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

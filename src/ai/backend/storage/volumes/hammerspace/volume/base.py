@@ -7,12 +7,11 @@ from typing import (
 )
 
 from ai.backend.logging import BraceStyleAdapter
-
-from ....types import CapacityUsage
-from ...abc import (
+from ai.backend.storage.types import CapacityUsage
+from ai.backend.storage.volumes.abc import (
     CAP_VFOLDER,
 )
-from ...vfs import BaseVolume
+from ai.backend.storage.volumes.vfs import BaseVolume
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 

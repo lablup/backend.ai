@@ -70,10 +70,10 @@ def create_session_workload(
     scaling_group = kwargs.get("scaling_group", "default")
     priority = kwargs.get("priority", 0)
     session_type = kwargs.get("session_type", SessionTypes.INTERACTIVE)
-    starts_at = kwargs.get("starts_at", None)
+    starts_at = kwargs.get("starts_at")
     is_private = kwargs.get("is_private", False)
     kernels = kernels or []
-    kernel_counts_at_endpoint = kwargs.get("kernel_counts_at_endpoint", None)
+    kernel_counts_at_endpoint = kwargs.get("kernel_counts_at_endpoint")
 
     return SessionWorkload(
         session_id=session_id,

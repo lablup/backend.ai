@@ -73,7 +73,7 @@ class TestRlimMiddleware:
         def getitem(key):
             if key == "is_authorized":
                 return True
-            elif key == "keypair":
+            if key == "keypair":
                 return keypair_data
             return None
 

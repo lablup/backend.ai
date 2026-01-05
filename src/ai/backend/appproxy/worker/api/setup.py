@@ -1,5 +1,5 @@
 import urllib.parse
-from typing import Iterable
+from collections.abc import Iterable
 from uuid import UUID
 
 import aiohttp
@@ -24,16 +24,15 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.appproxy.common.types import SerializableCircuit as Circuit
 from ai.backend.appproxy.common.utils import calculate_permit_hash, pydantic_api_handler
-
-from ..config import (
+from ai.backend.appproxy.worker.config import (
     PortProxyConfig,
     TraefikPortProxyConfig,
     TraefikWildcardDomainConfig,
     WildcardDomainConfig,
 )
-from ..coordinator_client import get_circuit_info
-from ..errors import MissingPortConfigError
-from ..types import FrontendServerMode, InteractiveAppInfo, RootContext
+from ai.backend.appproxy.worker.coordinator_client import get_circuit_info
+from ai.backend.appproxy.worker.errors import MissingPortConfigError
+from ai.backend.appproxy.worker.types import FrontendServerMode, InteractiveAppInfo, RootContext
 
 
 def generate_proxy_url(
@@ -193,18 +192,17 @@ async def setup(
                     f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}",
                     headers=cors_headers,
                 )
-            else:
-                return PydanticResponse(
-                    ProxySetupResponseModel(
-                        redirect=AnyUrl(
-                            f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}"
-                        ),
-                        redirectURI=AnyUrl(
-                            f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}"
-                        ),
+            return PydanticResponse(
+                ProxySetupResponseModel(
+                    redirect=AnyUrl(
+                        f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}"
                     ),
-                    headers=cors_headers,
-                )
+                    redirectURI=AnyUrl(
+                        f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}"
+                    ),
+                ),
+                headers=cors_headers,
+            )
         case _:
             raise InvalidAPIParameters("E20002: Protocol not available as interactive app")
 

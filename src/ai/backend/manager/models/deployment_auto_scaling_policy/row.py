@@ -12,8 +12,7 @@ from sqlalchemy.orm import relationship
 
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
 from ai.backend.logging import BraceStyleAdapter
-
-from ..base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     DecimalType,

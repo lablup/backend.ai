@@ -1,7 +1,8 @@
 import json
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, List, Mapping, Tuple
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
 
 import aiohttp_cors
 import sqlalchemy as sa
@@ -12,10 +13,9 @@ from aiohttp import web
 from ai.backend.common import validators as tx
 from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
-
-from ..errors.api import InvalidAPIParameters
-from ..errors.resource import DBOperationFailed, TaskTemplateNotFound
-from ..models import (
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.resource import DBOperationFailed, TaskTemplateNotFound
+from ai.backend.manager.models import (
     TemplateType,
     UserRole,
     domains,
@@ -25,8 +25,9 @@ from ..models import (
     session_templates,
     users,
 )
-from ..models import association_groups_users as agus
-from ..models.session_template import check_cluster_template
+from ai.backend.manager.models import association_groups_users as agus
+from ai.backend.manager.models.session_template import check_cluster_template
+
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware
@@ -190,7 +191,7 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
 
     log.info("CLUSTER_TEMPLATE.LIST (ak:{})", access_key)
     async with root_ctx.db.begin() as conn:
-        entries: List[Mapping[str, Any]]
+        entries: list[Mapping[str, Any]]
         if request["is_superadmin"] and params["all"]:
             j = session_templates.join(
                 users, session_templates.c.user_uuid == users.c.uuid, isouter=True
@@ -206,7 +207,7 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
             result = await conn.execute(query)
             entries = []
             for row in result:
-                is_owner = True if row.session_templates_user == user_uuid else False
+                is_owner = row.session_templates_user == user_uuid
                 entries.append({
                     "name": row.session_templates_name,
                     "id": row.session_templates_id,
@@ -292,8 +293,7 @@ async def get(request: web.Request, params: Any) -> web.Response:
     if params["format"] == "yaml":
         body = yaml.dump(template)
         return web.Response(text=body, content_type="text/yaml")
-    else:
-        return web.json_response(template)
+    return web.json_response(template)
 
 
 @auth_required
@@ -338,7 +338,7 @@ async def put(request: web.Request, params: Any) -> web.Response:
         query = (
             sa.update(session_templates)
             .values(template=template_data, name=template_data["metadata"]["name"])
-            .where((session_templates.c.id == template_id))
+            .where(session_templates.c.id == template_id)
         )
         result = await conn.execute(query)
         if result.rowcount != 1:
@@ -382,7 +382,7 @@ async def delete(request: web.Request, params: Any) -> web.Response:
         query = (
             sa.update(session_templates)
             .values(is_active=False)
-            .where((session_templates.c.id == template_id))
+            .where(session_templates.c.id == template_id)
         )
         result = await conn.execute(query)
         if result.rowcount != 1:
@@ -401,7 +401,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)

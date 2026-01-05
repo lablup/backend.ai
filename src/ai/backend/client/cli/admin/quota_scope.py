@@ -8,16 +8,15 @@ import click
 
 from ai.backend.cli.params import ByteSizeParamType
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.types import CLIContext
 from ai.backend.common.types import QuotaScopeType
 
-from ...cli.extensions import pass_ctx_obj
-from ...cli.types import CLIContext
 from . import admin
 
 if TYPE_CHECKING:
+    from ai.backend.client.session import Session
     from ai.backend.common.types import QuotaScopeID
-
-    from ...session import Session
 
 
 @admin.group()
@@ -32,9 +31,8 @@ def _get_qsid_from_identifier(
     domain_name: str,
     session: Session,
 ) -> QuotaScopeID | None:
+    from ai.backend.client.output.fields import group_fields, user_fields
     from ai.backend.common.types import QuotaScopeID
-
-    from ...output.fields import group_fields, user_fields
 
     _user_query_fields = (
         user_fields["uuid"],
@@ -115,8 +113,8 @@ def get(
     HOST: Name of the vfolder host (storage volume) to query the quota scope.
     IDENTIFIER: ID or email for user, ID or name for project.
     """
-    from ...output.fields import quota_scope_fields
-    from ...session import Session
+    from ai.backend.client.output.fields import quota_scope_fields
+    from ai.backend.client.session import Session
 
     qs_query_fields = (
         quota_scope_fields["usage_bytes"],
@@ -182,9 +180,8 @@ def set_(
     IDENTIFIER: ID or email for user, ID or name for project.
     LIMIT_BYTES: Byte-size to be allocated to quota scope of a user or project. (e.g., 1t, 500g)
     """
+    from ai.backend.client.session import Session
     from ai.backend.common.types import QuotaConfig
-
-    from ...session import Session
 
     with Session() as session:
         try:
@@ -241,7 +238,7 @@ def unset(
     HOST: Name of the vfolder host (storage volume) to unset the given quota scope.
     IDENTIFIER: ID or email for user, ID or name for project.
     """
-    from ...session import Session
+    from ai.backend.client.session import Session
 
     with Session() as session:
         try:

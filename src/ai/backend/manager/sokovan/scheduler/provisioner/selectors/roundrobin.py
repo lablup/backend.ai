@@ -5,7 +5,7 @@ This selector distributes workloads evenly across agents using
 a simple round-robin index.
 """
 
-from typing import Sequence
+from collections.abc import Sequence
 
 from .selector import (
     AbstractAgentSelector,

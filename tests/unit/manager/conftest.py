@@ -12,23 +12,13 @@ import shutil
 import tempfile
 import textwrap
 import uuid
+from collections.abc import AsyncIterator, Callable, Iterator, Mapping, Sequence
+from contextlib import AbstractAsyncContextManager
 from datetime import datetime
 from decimal import Decimal
 from functools import partial, update_wrapper
 from pathlib import Path
-from typing import (
-    Any,
-    AsyncContextManager,
-    AsyncIterator,
-    Callable,
-    Iterator,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-)
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import aiofiles.os
@@ -166,7 +156,7 @@ def vfolder_mount(test_id):
     yield ret
     try:
         shutil.rmtree(ret.parent)
-    except IOError:
+    except OSError:
         pass
 
 
@@ -289,7 +279,7 @@ def bootstrap_config(
     yield bootstrap_config
     try:
         shutil.rmtree(ipc_base_path)
-    except IOError:
+    except OSError:
         pass
 
 
@@ -578,7 +568,7 @@ async def database_fixture(
             return str(obj)
         if isinstance(obj, datetime):
             return str(obj)
-        if isinstance(obj, enum.Enum) or isinstance(obj, enum.StrEnum):
+        if isinstance(obj, (enum.Enum, enum.StrEnum)):
             return obj.value
         if isinstance(obj, yarl.URL):
             return str(obj)
@@ -630,18 +620,18 @@ async def database_fixture(
         )
         try:
             async with engine.begin() as conn:
-                await conn.execute((vfolders.delete()))
-                await conn.execute((kernels.delete()))
-                await conn.execute((SessionRow.__table__.delete()))
-                await conn.execute((agents.delete()))
-                await conn.execute((session_templates.delete()))
-                await conn.execute((keypairs.delete()))
-                await conn.execute((users.delete()))
-                await conn.execute((scaling_groups.delete()))
-                await conn.execute((domains.delete()))
-                await conn.execute((ImageAliasRow.__table__.delete()))
-                await conn.execute((ImageRow.__table__.delete()))
-                await conn.execute((ContainerRegistryRow.__table__.delete()))
+                await conn.execute(vfolders.delete())
+                await conn.execute(kernels.delete())
+                await conn.execute(SessionRow.__table__.delete())
+                await conn.execute(agents.delete())
+                await conn.execute(session_templates.delete())
+                await conn.execute(keypairs.delete())
+                await conn.execute(users.delete())
+                await conn.execute(scaling_groups.delete())
+                await conn.execute(domains.delete())
+                await conn.execute(ImageAliasRow.__table__.delete())
+                await conn.execute(ImageRow.__table__.delete())
+                await conn.execute(ContainerRegistryRow.__table__.delete())
         finally:
             await engine.dispose()
 
@@ -730,23 +720,23 @@ async def create_app_and_client(bootstrap_config) -> AsyncIterator:
     client: Client | None = None
     client_session: aiohttp.ClientSession | None = None
     runner: web.BaseRunner | None = None
-    _outer_ctxs: List[AsyncContextManager] = []
+    _outer_ctxs: list[AbstractAsyncContextManager] = []
 
     async def app_builder(
-        cleanup_contexts: Optional[Sequence[CleanupContext]] = None,
-        subapp_pkgs: Optional[Sequence[str]] = None,
-        scheduler_opts: Optional[Mapping[str, Any]] = None,
-    ) -> Tuple[web.Application, Client]:
+        cleanup_contexts: Sequence[CleanupContext] | None = None,
+        subapp_pkgs: Sequence[str] | None = None,
+        scheduler_opts: Mapping[str, Any] | None = None,
+    ) -> tuple[web.Application, Client]:
         nonlocal client, client_session, runner
         nonlocal _outer_ctxs
 
         if scheduler_opts is None:
             scheduler_opts = {}
         _cleanup_ctxs = []
-        _outer_ctx_classes: List[Type[AsyncContextManager]] = []
+        _outer_ctx_classes: list[type[AbstractAsyncContextManager]] = []
         if cleanup_contexts is not None:
             for ctx in cleanup_contexts:
-                # if isinstance(ctx, AsyncContextManager):
+                # if isinstance(ctx, AbstractAsyncContextManager):
                 if ctx.__name__ in ["webapp_plugins_ctx"]:
                     _outer_ctx_classes.append(ctx)  # type: ignore
                 else:
@@ -880,7 +870,7 @@ def get_headers(app, default_keypair, bootstrap_config):
         signature = hmac.new(sign_key, sign_bytes, hash_type).hexdigest()
         headers["Authorization"] = (
             f"BackendAI signMethod=HMAC-{hash_type.upper()}, "
-            + f"credential={keypair['access_key']}:{signature}"
+            f"credential={keypair['access_key']}:{signature}"
         )
         return headers
 

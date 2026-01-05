@@ -9,6 +9,7 @@ from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from collections.abc import (
     Collection,
+    Iterable,
     Iterator,
     Mapping,
     MutableMapping,
@@ -21,10 +22,8 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Iterable,
     Optional,
     TextIO,
-    Type,
     TypeAlias,
     cast,
 )
@@ -64,11 +63,11 @@ from ai.backend.logging import BraceStyleAdapter
 
 # Expose legacy import names for plugins
 from .affinity_map import AffinityHint, AffinityMap, AffinityPolicy
-from .alloc_map import AbstractAllocMap as AbstractAllocMap  # noqa: F401
-from .alloc_map import AllocationStrategy as AllocationStrategy  # noqa: F401
-from .alloc_map import DeviceSlotInfo as DeviceSlotInfo  # noqa: F401
-from .alloc_map import DiscretePropertyAllocMap as DiscretePropertyAllocMap  # noqa: F401
-from .alloc_map import FractionAllocMap as FractionAllocMap  # noqa: F401
+from .alloc_map import AbstractAllocMap as AbstractAllocMap
+from .alloc_map import AllocationStrategy as AllocationStrategy
+from .alloc_map import DeviceSlotInfo as DeviceSlotInfo
+from .alloc_map import DiscretePropertyAllocMap as DiscretePropertyAllocMap
+from .alloc_map import FractionAllocMap as FractionAllocMap
 from .exception import ResourceError
 from .stats import ContainerMeasurement, NodeMeasurement, ProcessMeasurement, StatContext
 from .types import AbstractAgentDiscovery, MountInfo, get_agent_discovery
@@ -132,7 +131,7 @@ class KernelResourceSpec:
     scratch_disk_size: int
     """The size of scratch disk. (not implemented yet)"""
 
-    mounts: list["Mount"] = attrs.Factory(list)
+    mounts: list[Mount] = attrs.Factory(list)
     """The mounted vfolder list."""
 
     unified_devices: Iterable[tuple[DeviceName, SlotName]] = attrs.Factory(list)
@@ -204,7 +203,7 @@ class KernelResourceSpec:
         file.write(self.write_to_string())
 
     @classmethod
-    def read_from_string(cls, text: str) -> "KernelResourceSpec":
+    def read_from_string(cls, text: str) -> KernelResourceSpec:
         kvpairs = {}
         for line in text.split("\n"):
             if "=" not in line:
@@ -252,12 +251,12 @@ class KernelResourceSpec:
         )
 
     @classmethod
-    def read_from_file(cls, file: TextIOWrapper) -> "KernelResourceSpec":
+    def read_from_file(cls, file: TextIOWrapper) -> KernelResourceSpec:
         text = "\n".join(file.readlines())
         return cls.read_from_string(text)
 
     @classmethod
-    async def aread_from_file(cls, file: AsyncTextIOWrapper) -> "KernelResourceSpec":
+    async def aread_from_file(cls, file: AsyncTextIOWrapper) -> KernelResourceSpec:
         text = "\n".join(await file.readlines())  # type: ignore
         return cls.read_from_string(text)
 
@@ -416,7 +415,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def create_alloc_map(self) -> "AbstractAllocMap":
+    async def create_alloc_map(self) -> AbstractAllocMap:
         """
         Create and return an allocation map for this plugin.
         """
@@ -704,7 +703,7 @@ class ResourceAllocator(aobject):
         slot_name: SlotName,
         agent_idx: int,
         agent_config: AgentUnifiedConfig,
-        alloc_map_type: Type[AbstractAllocMap],
+        alloc_map_type: type[AbstractAllocMap],
     ) -> Decimal:
         match agent_config.resource.allocation_mode:
             case ResourceAllocationMode.SHARED:
@@ -720,7 +719,7 @@ class ResourceAllocator(aobject):
     def _calculate_device_slot_auto_split(
         self,
         slot_name: SlotName,
-        alloc_map_type: Type[AbstractAllocMap],
+        alloc_map_type: type[AbstractAllocMap],
         agent_idx: int,
     ) -> Decimal:
         available_total_slot = self.available_total_slots[slot_name]
@@ -728,10 +727,9 @@ class ResourceAllocator(aobject):
             slot, slot_extra = divmod(available_total_slot, self.num_agents)
             remainder_value = Decimal(1 if agent_idx < slot_extra else 0)
             return slot + remainder_value
-        elif alloc_map_type is FractionAllocMap:
+        if alloc_map_type is FractionAllocMap:
             return available_total_slot / self.num_agents
-        else:
-            raise NotImplementedError(f"Unrecognized AbstractAllocMap type {alloc_map_type}")
+        raise NotImplementedError(f"Unrecognized AbstractAllocMap type {alloc_map_type}")
 
     def _calculate_device_slot_manual(
         self,
@@ -744,14 +742,13 @@ class ResourceAllocator(aobject):
 
         if slot_name == SlotName("cpu"):
             return Decimal(resource_config.allocations.cpu)
-        elif slot_name == SlotName("mem"):
+        if slot_name == SlotName("mem"):
             return Decimal(resource_config.allocations.mem)
-        else:
-            if slot_name not in resource_config.allocations.devices:
-                raise ValueError(
-                    f"{slot_name=} not found in config {resource_config.allocations.devices!r}"
-                )
-            return resource_config.allocations.devices[slot_name]
+        if slot_name not in resource_config.allocations.devices:
+            raise ValueError(
+                f"{slot_name=} not found in config {resource_config.allocations.devices!r}"
+            )
+        return resource_config.allocations.devices[slot_name]
 
     def _calculate_reserved_slots(self, device_slots: SlotsMap, total_slots: SlotsMap) -> SlotsMap:
         reserved_slots: dict[SlotName, Decimal] = {}
@@ -777,11 +774,10 @@ class ResourceAllocator(aobject):
                     or SlotName("mem") not in self.available_total_slots
                 ):
                     raise ValueError("Memory not in allocated or total slots seen")
-                scaling_factor = {
+                return {
                     slot_name: slot / self.available_total_slots[slot_name]
                     for slot_name, slot in allocated_slots.items()
                 }
-                return scaling_factor
 
     def _ensure_slots_are_not_overallocated(self) -> None:
         if self.local_config.resource.allocation_mode != ResourceAllocationMode.MANUAL:
@@ -828,7 +824,7 @@ class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
         plugin_group: str,
         allowlist: Optional[set[str]] = None,
         blocklist: Optional[set[str]] = None,
-    ) -> Iterator[tuple[str, Type[AbstractComputePlugin]]]:
+    ) -> Iterator[tuple[str, type[AbstractComputePlugin]]]:
         scanned_plugins = [*super().discover_plugins(plugin_group, allowlist, blocklist)]
 
         def accel_lt_intrinsic(item):
@@ -852,7 +848,7 @@ class Mount:
     permission: MountPermission = MountPermission.READ_ONLY
     opts: Optional[Mapping[str, Any]] = None
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.source}:{self.target}:{self.permission.value}"
 
     @classmethod
@@ -945,7 +941,7 @@ async def scan_gpu_alloc_map(
 
         except Exception as e:
             setattr(e, "kernel_id", kernel_id)
-            raise e
+            raise
 
         return alloc_map
 

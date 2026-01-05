@@ -1,21 +1,14 @@
 import logging
 import shutil
 from abc import ABCMeta, abstractmethod
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Dict,
     Generic,
-    Iterable,
-    List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
-    Set,
-    Tuple,
     TypeVar,
 )
 
@@ -23,7 +16,8 @@ import aiodocker
 import trafaret as t
 from aiodocker import Docker
 
-from .. import __version__
+from ai.backend.accelerator.rebellions import __version__
+
 from .atom_api import ATOMAPI, ATOMDeviceStat, LibraryError
 from .types import AbstractATOMDevice
 
@@ -76,17 +70,17 @@ TATOMDevice = TypeVar("TATOMDevice", bound=AbstractATOMDevice)
 
 class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=ABCMeta):
     key = DeviceName("atom")
-    slot_types: Sequence[Tuple[SlotName, SlotTypes]] = (
+    slot_types: Sequence[tuple[SlotName, SlotTypes]] = (
         (SlotName("atom.device"), SlotTypes("count")),
     )
-    exclusive_slot_types: Set[str] = {"atom.device"}
+    exclusive_slot_types: set[str] = {"atom.device"}
 
     device_mask: Sequence[DeviceId] = []
     enabled: bool = True
     atom_config: Any
 
     _rbln_stat_path: str
-    _all_devices: Optional[List[TATOMDevice]]
+    _all_devices: Optional[list[TATOMDevice]]
 
     async def init(self, context: Any = None) -> None:
         self._all_devices = None
@@ -115,16 +109,15 @@ class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=
             log.warning("could not find {} devices with VID 1eff.", self.key)
             self.enabled = False
 
-    async def list_devices(self) -> List[TATOMDevice]:
+    async def list_devices(self) -> list[TATOMDevice]:
         if self._all_devices is None:
             devices = await self._list_devices()
             self._all_devices = devices
             return devices
-        else:
-            return self._all_devices
+        return self._all_devices
 
     @abstractmethod
-    async def _list_devices(self) -> List[TATOMDevice]:
+    async def _list_devices(self) -> list[TATOMDevice]:
         raise NotImplementedError
 
     async def available_slots(self) -> Mapping[SlotName, Decimal]:
@@ -197,15 +190,15 @@ class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=
         ctx: StatContext,
         container_ids: Sequence[str],
     ) -> Sequence[ContainerMeasurement]:
-        mem_stats: Dict[str, int] = {}
-        mem_sizes: Dict[str, int] = {}
-        util_stats: Dict[str, Decimal] = {}
-        number_of_devices_per_container: Dict[str, int] = {}
+        mem_stats: dict[str, int] = {}
+        mem_sizes: dict[str, int] = {}
+        util_stats: dict[str, Decimal] = {}
+        number_of_devices_per_container: dict[str, int] = {}
         stat_prefix = self.key.replace("-", "_")
 
         if self.enabled:
             stats = await ATOMAPI.get_stats(self._rbln_stat_path)
-            device_stats_by_device_filename: Dict[str, ATOMDeviceStat] = {
+            device_stats_by_device_filename: dict[str, ATOMDeviceStat] = {
                 "/dev/" + device.device: device for device in stats.devices
             }
             for cid in container_ids:
@@ -253,27 +246,25 @@ class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=
 
     async def create_alloc_map(self) -> DiscretePropertyAllocMap:
         devices = await self.list_devices()
-        dpam = DiscretePropertyAllocMap(
+        return DiscretePropertyAllocMap(
             device_slots={
                 dev.device_id: DeviceSlotInfo(SlotTypes.COUNT, self.slot_types[0][0], Decimal(1))
                 for dev in devices
             },
             exclusive_slot_types=self.exclusive_slot_types,
         )
-        return dpam
 
     async def generate_mounts(
         self,
         source_path: Path,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         binpath = Path("/usr/local/bin")
         if self.slot_types[0][0] in device_alloc:
             return [
                 MountInfo(MountTypes.BIND, binpath / "rbln-stat", binpath / "rbln-stat"),
             ]
-        else:
-            return []
+        return []
 
     @abstractmethod
     async def list_device_files(
@@ -287,8 +278,8 @@ class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=
         docker: aiodocker.docker.Docker,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Mapping[str, Any]:
-        assigned_devices: List[TATOMDevice] = []
-        device_files: List[Path] = []
+        assigned_devices: list[TATOMDevice] = []
+        device_files: list[Path] = []
         additional_device_files = [Path("/dev/rmda")]
 
         numa_node_indexes: set[int] = set()
@@ -309,7 +300,7 @@ class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=
             log.debug("Created NPU Group {} with members {}", group_idx, assigned_devices)
             additional_device_files.append(Path(f"/dev/rsd{group_idx}"))
         except LibraryError as e:
-            log.warning(f"Failed to create NPU Group: {str(e)}, starting kernel without NPU group")
+            log.warning(f"Failed to create NPU Group: {e!s}, starting kernel without NPU group")
             additional_device_files.append(Path("/dev/rsd0"))
 
         for filename in additional_device_files:
@@ -348,11 +339,11 @@ class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Sequence[DeviceModelInfo]:
-        device_ids: List[DeviceId] = []
+        device_ids: list[DeviceId] = []
         if self.slot_types[0][0] in device_alloc:
             device_ids.extend(device_alloc[self.slot_types[0][0]].keys())
         available_devices = await self.list_devices()
-        attached_devices: List[DeviceModelInfo] = []
+        attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
                 proc = device.processing_units
@@ -411,7 +402,7 @@ class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=
         if not self.enabled:
             return data
 
-        active_device_id_set: Set[DeviceId] = set()
+        active_device_id_set: set[DeviceId] = set()
         for slot_type, per_device_alloc in device_alloc.items():
             for dev_id, alloc in per_device_alloc.items():
                 if alloc > 0:
@@ -423,7 +414,7 @@ class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=
         return data
 
     @abstractmethod
-    async def group_npus(self, devices: List[TATOMDevice]) -> int:
+    async def group_npus(self, devices: list[TATOMDevice]) -> int:
         raise NotImplementedError
 
     async def cleanup(self) -> None:
@@ -438,7 +429,7 @@ class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=
     async def get_docker_networks(
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
-    ) -> List[str]:
+    ) -> list[str]:
         return []
 
     async def gather_process_measures(

@@ -18,8 +18,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.model_serving.types import RoutingData
-
-from ..base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     EnumValueType,
@@ -28,10 +27,10 @@ from ..base import (
 )
 
 if TYPE_CHECKING:
-    from ..deployment_revision import DeploymentRevisionRow
+    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 
 
-__all__ = ("RoutingRow", "RouteStatus")
+__all__ = ("RouteStatus", "RoutingRow")
 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
@@ -94,7 +93,7 @@ class RoutingRow(Base):
 
     endpoint_row = relationship("EndpointRow", back_populates="routings")
     session_row = relationship("SessionRow", back_populates="routing")
-    revision_row: "DeploymentRevisionRow" = relationship(
+    revision_row: DeploymentRevisionRow = relationship(
         "DeploymentRevisionRow",
         primaryjoin="RoutingRow.revision == DeploymentRevisionRow.id",
         foreign_keys="RoutingRow.revision",
@@ -136,7 +135,7 @@ class RoutingRow(Base):
         endpoint_id: uuid.UUID,
         load_endpoint: bool = False,
         load_session: bool = False,
-        status_filter: list[RouteStatus] = list(RouteStatus.active_route_statuses()),
+        status_filter: list[RouteStatus] | None = None,
         project: Optional[uuid.UUID] = None,
         domain: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
@@ -144,6 +143,8 @@ class RoutingRow(Base):
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
         """
+        if status_filter is None:
+            status_filter = list(RouteStatus.active_route_statuses())
         query = (
             sa.select(RoutingRow)
             .filter(RoutingRow.endpoint == endpoint_id)
@@ -161,8 +162,7 @@ class RoutingRow(Base):
         if user_uuid:
             query = query.filter(RoutingRow.session_owner == user_uuid)
         result = await db_sess.execute(query)
-        rows = result.scalars().all()
-        return rows
+        return result.scalars().all()
 
     @classmethod
     async def get(

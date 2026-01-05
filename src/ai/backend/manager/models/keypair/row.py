@@ -4,7 +4,8 @@ import base64
 import os
 import secrets
 import uuid
-from typing import Any, List, Optional, Self, Sequence, Tuple, TypedDict
+from collections.abc import Sequence
+from typing import Any, Optional, Self, TypedDict
 
 import sqlalchemy as sa
 from cryptography.exceptions import InvalidSignature
@@ -20,22 +21,21 @@ from sqlalchemy.sql.expression import false
 from ai.backend.common import msgpack
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
-from ai.backend.manager.models.session import SessionRow
-
-from ...defs import RESERVED_DOTFILES
-from ..base import (
+from ai.backend.manager.defs import RESERVED_DOTFILES
+from ai.backend.manager.models.base import (
     Base,
     ForeignKeyIDColumn,
     mapper_registry,
 )
+from ai.backend.manager.models.session import SessionRow
 
 __all__: Sequence[str] = (
-    "keypairs",
-    "KeyPairRow",
-    "Dotfile",
     "MAXIMUM_DOTFILE_SIZE",
-    "query_owned_dotfiles",
+    "Dotfile",
+    "KeyPairRow",
+    "keypairs",
     "query_bootstrap_script",
+    "query_owned_dotfiles",
     "verify_dotfile_name",
 )
 
@@ -163,7 +163,7 @@ class Dotfile(TypedDict):
     perm: str
 
 
-def generate_keypair() -> Tuple[AccessKey, SecretKey]:
+def generate_keypair() -> tuple[AccessKey, SecretKey]:
     """
     AWS-like access key and secret key generation.
     """
@@ -172,7 +172,7 @@ def generate_keypair() -> Tuple[AccessKey, SecretKey]:
     return AccessKey(ak), SecretKey(sk)
 
 
-def generate_ssh_keypair() -> Tuple[str, str]:
+def generate_ssh_keypair() -> tuple[str, str]:
     """
     Generate RSA keypair for SSH/SFTP connection.
     """
@@ -202,7 +202,7 @@ def generate_ssh_keypair() -> Tuple[str, str]:
 def prepare_new_keypair(user_email: str, creator: KeyPairCreator) -> dict[str, Any]:
     ak, sk = generate_keypair()
     pubkey, privkey = generate_ssh_keypair()
-    data = {
+    return {
         "user_id": user_email,
         "access_key": ak,
         "secret_key": sk,
@@ -214,7 +214,6 @@ def prepare_new_keypair(user_email: str, creator: KeyPairCreator) -> dict[str, A
         "ssh_public_key": pubkey,
         "ssh_private_key": privkey,
     }
-    return data
 
 
 def generate_keypair_data() -> GeneratedKeyPairData:
@@ -306,7 +305,7 @@ def validate_ssh_keypair(
 async def query_owned_dotfiles(
     conn: SAConnection,
     access_key: AccessKey,
-) -> Tuple[List[Dotfile], int]:
+) -> tuple[list[Dotfile], int]:
     query = (
         sa.select([keypairs.c.dotfiles])
         .select_from(keypairs)
@@ -320,7 +319,7 @@ async def query_owned_dotfiles(
 async def query_bootstrap_script(
     conn: SAConnection,
     access_key: AccessKey,
-) -> Tuple[str, int]:
+) -> tuple[str, int]:
     query = (
         sa.select([keypairs.c.bootstrap_script])
         .select_from(keypairs)
@@ -331,6 +330,4 @@ async def query_bootstrap_script(
 
 
 def verify_dotfile_name(dotfile: str) -> bool:
-    if dotfile in RESERVED_DOTFILES:
-        return False
-    return True
+    return dotfile not in RESERVED_DOTFILES

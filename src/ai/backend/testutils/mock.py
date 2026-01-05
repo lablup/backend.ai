@@ -1,6 +1,7 @@
 import json
+from collections.abc import Callable
 from http import HTTPStatus
-from typing import Any, Callable
+from typing import Any
 from unittest import mock
 from unittest.mock import AsyncMock
 
@@ -40,15 +41,15 @@ class AsyncContextManagerMock:
     passing `kwargs`.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         self.context = kwargs
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "AsyncMock":
         return AsyncMock(**self.context)
 
-    async def __aexit__(self, exc_type, exc_value, exc_tb):
+    async def __aexit__(self, exc_type, exc_value, exc_tb) -> None:
         pass
 
 
@@ -108,10 +109,10 @@ class AsyncContextMock(mock.Mock):
             # result is {'hello': 'world'}
     """
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "AsyncContextMock":
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         pass
 
 
@@ -123,10 +124,10 @@ class AsyncContextMagicMock(mock.MagicMock):
           ...
     """
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "AsyncContextMagicMock":
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         pass
 
 
@@ -155,10 +156,10 @@ class AsyncContextCoroutineMock(AsyncMock):
             # result is {'hello': 'world'}
     """
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "AsyncContextCoroutineMock":
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         pass
 
 

@@ -524,7 +524,7 @@ class ValkeyScheduleClient:
 
         results = await self._client.client.exec(batch, raise_on_error=False)
         if results is None:
-            return {route_id: None for route_id in route_ids}
+            return dict.fromkeys(route_ids)
 
         # Process results - every 3rd result is the hgetall response
         health_statuses: dict[str, Optional[HealthStatus]] = {}
@@ -711,7 +711,7 @@ class ValkeyScheduleClient:
 
         results = await self._client.client.exec(batch, raise_on_error=False)
         if results is None:
-            return {kernel_id: None for kernel_id in kernel_ids}
+            return dict.fromkeys(kernel_ids)
 
         # Process results - every 3rd result is the hgetall response
         # Kernel results come first (3 ops each), then agent results (1 op each)
@@ -790,7 +790,7 @@ class ValkeyScheduleClient:
 
         results = await self._client.client.exec(batch, raise_on_error=False)
         if results is None:
-            return {kernel_id: None for kernel_id in kernel_ids}
+            return dict.fromkeys(kernel_ids)
 
         result: dict[KernelId, KernelStatus | None] = {}
         for i, kernel_id in enumerate(kernel_ids):

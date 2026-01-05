@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Iterable, Optional, cast
+from collections.abc import Iterable
+from typing import Optional, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -39,8 +40,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
-
-from ..permission_controller.role_manager import RoleManager
+from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 
 domain_repository_resilience = Resilience(
     policies=[
@@ -352,7 +352,7 @@ class DomainRepository:
             db_session=db_session,
             ctx=client_ctx,
         )
-        not_allowed_sgroups = set(sgroup_names) - set([sg.name for sg in sgroup_models])
+        not_allowed_sgroups = set(sgroup_names) - {sg.name for sg in sgroup_models}
         if not_allowed_sgroups:
             raise InvalidDomainConfiguration(
                 f"Not allowed to associate the domain with given scaling groups(s:{not_allowed_sgroups})"

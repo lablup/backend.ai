@@ -1,6 +1,7 @@
 import enum
 import uuid
-from typing import Any, Final, Mapping
+from collections.abc import Mapping
+from typing import Any, Final
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -8,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
-from ..base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     IDColumn,
@@ -16,8 +17,8 @@ from ..base import (
 )
 
 __all__: Final[tuple[str, ...]] = (
-    "NetworkType",
     "NetworkRow",
+    "NetworkType",
 )
 
 

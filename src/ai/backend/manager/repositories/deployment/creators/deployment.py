@@ -6,10 +6,9 @@ import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, override
 
 import yarl
-from typing_extensions import override
 
 from ai.backend.common.types import (
     ClusterMode,

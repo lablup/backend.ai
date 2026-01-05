@@ -10,8 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.actions.types import OperationStatus
-
-from ..base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     IDColumn,
@@ -86,7 +85,7 @@ class AuditLogRow(Base):
         request_id: Optional[str] = None,
         triggered_by: Optional[str] = None,
         duration: Optional[timedelta] = None,
-    ):
+    ) -> None:
         self.entity_type = entity_type
         self.operation = operation
         self.action_id = action_id

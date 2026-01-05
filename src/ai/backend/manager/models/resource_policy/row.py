@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Self, Sequence
+from collections.abc import Sequence
+from typing import Self
 
 import sqlalchemy as sa
 from sqlalchemy.orm import relationship
@@ -11,8 +12,7 @@ from ai.backend.manager.data.resource.types import (
     ProjectResourcePolicyData,
     UserResourcePolicyData,
 )
-
-from ..base import (
+from ai.backend.manager.models.base import (
     Base,
     EnumType,
     ResourceSlotColumn,
@@ -21,13 +21,13 @@ from ..base import (
 )
 
 __all__: Sequence[str] = (
-    "keypair_resource_policies",
-    "user_resource_policies",
-    "project_resource_policies",
-    "KeyPairResourcePolicyRow",
-    "UserResourcePolicyRow",
-    "ProjectResourcePolicyRow",
     "DefaultForUnspecified",
+    "KeyPairResourcePolicyRow",
+    "ProjectResourcePolicyRow",
+    "UserResourcePolicyRow",
+    "keypair_resource_policies",
+    "project_resource_policies",
+    "user_resource_policies",
 )
 
 

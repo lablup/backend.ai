@@ -11,6 +11,7 @@ from strawberry.relay import Connection, Edge
 
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.repositories.scaling_group.options import (
     ScalingGroupConditions,
     ScalingGroupOrders,
@@ -19,7 +20,6 @@ from ai.backend.manager.services.scaling_group.actions.list_scaling_groups impor
     SearchScalingGroupsAction,
 )
 
-from ..types import StrawberryGQLContext
 from .types import (
     ScalingGroupFilterGQL,
     ScalingGroupOrderByGQL,
@@ -48,7 +48,7 @@ ScalingGroupV2Edge = Edge[ScalingGroupV2GQL]
 class ScalingGroupV2Connection(Connection[ScalingGroupV2GQL]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs):
+    def __init__(self, *args, count: int, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 

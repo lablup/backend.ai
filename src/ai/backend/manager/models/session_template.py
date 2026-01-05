@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import enum
 import uuid
-from typing import Any, Iterable, List, Mapping, Optional, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any, Optional
 
 import sqlalchemy as sa
 import trafaret as t
@@ -11,17 +12,17 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common import validators as tx
 from ai.backend.common.types import SessionTypes
+from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.exceptions import InvalidArgument
 
-from ..defs import DEFAULT_ROLE
-from ..exceptions import InvalidArgument
 from .base import GUID, EnumType, IDColumn, metadata
 from .user import UserRole
 from .vfolder import verify_vfolder_name
 
 __all__: Sequence[str] = (
     "TemplateType",
-    "session_templates",
     "query_accessible_session_templates",
+    "session_templates",
 )
 
 
@@ -123,7 +124,7 @@ cluster_template_v1 = t.Dict({
 
 def check_cluster_template(raw_data: Mapping[str, Any]) -> Mapping[str, Any]:
     data = cluster_template_v1.check(raw_data)
-    defined_roles: List[str] = []
+    defined_roles: list[str] = []
     for node in data["spec"]["nodes"]:
         node["session_template"] = str(node["session_template"])
         if node["role"] in defined_roles:
@@ -149,12 +150,12 @@ async def query_accessible_session_templates(
     domain_name: Optional[str] = None,
     allowed_types: Iterable[str] = ["user"],
     extra_conds=None,
-) -> List[Mapping[str, Any]]:
+) -> list[Mapping[str, Any]]:
     from .group import association_groups_users as agus
     from .group import groups
     from .user import users
 
-    entries: List[Mapping[str, Any]] = []
+    entries: list[Mapping[str, Any]] = []
     if "user" in allowed_types:
         # Query user templates
         j = session_templates.join(users, session_templates.c.user_uuid == users.c.uuid)

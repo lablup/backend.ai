@@ -6,8 +6,8 @@ Tests the repository layer with real database operations for artifact revisions.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
 
 import pytest
 
@@ -173,7 +173,7 @@ class TestArtifactRevisionRepository:
     ) -> AsyncGenerator[list[uuid.UUID], None]:
         """Create 25 sample revisions for pagination testing"""
         revision_ids = []
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(25):
@@ -568,7 +568,7 @@ class TestArtifactRevisionRepository:
         """Test approving artifact revision (changing status to AVAILABLE)"""
         # First create a revision with NEEDS_APPROVAL status
         revision_id = uuid.uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         async with db_with_cleanup.begin_session() as db_sess:
             revision = ArtifactRevisionRow(
@@ -598,7 +598,7 @@ class TestArtifactRevisionRepository:
         """Test rejecting artifact revision (changing status to REJECTED)"""
         # First create a revision with NEEDS_APPROVAL status
         revision_id = uuid.uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         async with db_with_cleanup.begin_session() as db_sess:
             revision = ArtifactRevisionRow(

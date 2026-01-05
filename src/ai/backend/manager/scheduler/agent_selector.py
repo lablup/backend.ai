@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import sys
+from collections.abc import Sequence
 from decimal import Decimal
-from typing import Optional, Sequence, override
+from typing import Optional, override
 
 import trafaret as t
 
@@ -13,8 +14,8 @@ from ai.backend.common.types import (
     ResourceSlot,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models import AgentRow, KernelRow, SessionRow
 
-from ..models import AgentRow, KernelRow, SessionRow
 from .types import (
     AbstractAgentSelector,
     NullAgentSelectorState,

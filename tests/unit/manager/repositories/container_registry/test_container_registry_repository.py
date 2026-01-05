@@ -181,9 +181,7 @@ class TestContainerRegistryRepository:
             session.add(registry)
             await session.commit()
             await session.refresh(registry)  # Ensure all attributes are loaded
-            registry_data = registry.to_dataclass()
-
-        return registry_data
+            return registry.to_dataclass()
 
     @pytest.fixture
     async def test_registry_with_custom_props(
@@ -208,9 +206,7 @@ class TestContainerRegistryRepository:
             session.add(registry)
             await session.commit()
             await session.refresh(registry)  # Ensure all attributes are loaded
-            registry_data = registry.to_dataclass()
-
-        return registry_data
+            return registry.to_dataclass()
 
     @pytest.fixture
     async def sample_registry(

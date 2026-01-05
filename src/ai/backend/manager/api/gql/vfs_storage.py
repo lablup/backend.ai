@@ -8,19 +8,19 @@ from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.data.vfs_storage.types import VFSStorageData
+from ai.backend.manager.models.vfs_storage import VFSStorageRow
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.vfs_storage import VFSStorageCreatorSpec
+from ai.backend.manager.repositories.vfs_storage.updaters import VFSStorageUpdaterSpec
+from ai.backend.manager.services.vfs_storage.actions.create import CreateVFSStorageAction
+from ai.backend.manager.services.vfs_storage.actions.delete import DeleteVFSStorageAction
+from ai.backend.manager.services.vfs_storage.actions.get import GetVFSStorageAction
+from ai.backend.manager.services.vfs_storage.actions.list import ListVFSStorageAction
+from ai.backend.manager.services.vfs_storage.actions.update import UpdateVFSStorageAction
+from ai.backend.manager.types import OptionalState
 
-from ...data.vfs_storage.types import VFSStorageData
-from ...models.vfs_storage import VFSStorageRow
-from ...repositories.base.creator import Creator
-from ...repositories.base.updater import Updater
-from ...repositories.vfs_storage import VFSStorageCreatorSpec
-from ...repositories.vfs_storage.updaters import VFSStorageUpdaterSpec
-from ...services.vfs_storage.actions.create import CreateVFSStorageAction
-from ...services.vfs_storage.actions.delete import DeleteVFSStorageAction
-from ...services.vfs_storage.actions.get import GetVFSStorageAction
-from ...services.vfs_storage.actions.list import ListVFSStorageAction
-from ...services.vfs_storage.actions.update import UpdateVFSStorageAction
-from ...types import OptionalState
 from .types import StrawberryGQLContext
 
 

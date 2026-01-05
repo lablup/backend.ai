@@ -1,14 +1,16 @@
 import asyncio
 import glob
 import logging
+from collections.abc import Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from pprint import pformat
-from typing import Any, List, Mapping, MutableMapping, Optional, Sequence, Set, Tuple
+from typing import Any, Optional
 
 import aiodocker
 
-from .. import __version__
+from ai.backend.accelerator.furiosa import __version__
+
 from .rngd_api import RngdAPI
 
 try:
@@ -49,7 +51,7 @@ class RngdDevice(AbstractComputeDevice):
     model_name: str
     serial: str
 
-    def __init__(self, model_name: str, serial: str, *args, **kwargs):
+    def __init__(self, model_name: str, serial: str, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.model_name = model_name
         self.serial = serial
@@ -63,10 +65,10 @@ class RngdDevice(AbstractComputeDevice):
 
 class RngdPlugin(AbstractComputePlugin):
     key = DeviceName("rngd")
-    slot_types: Sequence[Tuple[SlotName, SlotTypes]] = (
+    slot_types: Sequence[tuple[SlotName, SlotTypes]] = (
         (SlotName("rngd.device"), SlotTypes("count")),
     )
-    exclusive_slot_types: Set[str] = {"rngd.device"}
+    exclusive_slot_types: set[str] = {"rngd.device"}
 
     device_mask: Sequence[DeviceId] = []
     enabled: bool = True
@@ -92,10 +94,10 @@ class RngdPlugin(AbstractComputePlugin):
             log.warning("could not find Furiosa devices.")
             self.enabled = False
 
-    async def list_devices(self) -> List[RngdDevice]:
+    async def list_devices(self) -> list[RngdDevice]:
         if self._all_devices is not None:
             return self._all_devices
-        devices: List[RngdDevice] = []
+        devices: list[RngdDevice] = []
         cnt = 0
         async for device_info in RngdAPI.list_devices():
             devices.append(
@@ -142,7 +144,7 @@ class RngdPlugin(AbstractComputePlugin):
 
     async def create_alloc_map(self) -> DiscretePropertyAllocMap:
         devices = await self.list_devices()
-        dpam = DiscretePropertyAllocMap(
+        return DiscretePropertyAllocMap(
             device_slots={
                 dev.device_id: (
                     DeviceSlotInfo(SlotTypes.COUNT, SlotName("rngd.device"), Decimal(1))
@@ -151,11 +153,10 @@ class RngdPlugin(AbstractComputePlugin):
             },
             exclusive_slot_types=self.exclusive_slot_types,
         )
-        return dpam
 
     async def generate_mounts(
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         return []
 
     async def generate_docker_args(
@@ -199,11 +200,11 @@ class RngdPlugin(AbstractComputePlugin):
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Sequence[DeviceModelInfo]:
-        device_ids: List[DeviceId] = []
+        device_ids: list[DeviceId] = []
         if SlotName("rngd.device") in device_alloc:
             device_ids.extend(device_alloc[SlotName("rngd.device")].keys())
         available_devices = await self.list_devices()
-        attached_devices: List[DeviceModelInfo] = []
+        attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
                 proc = device.processing_units
@@ -262,7 +263,7 @@ class RngdPlugin(AbstractComputePlugin):
         if not self.enabled:
             return data
 
-        active_device_id_set: Set[DeviceId] = set()
+        active_device_id_set: set[DeviceId] = set()
         for slot_type, per_device_alloc in device_alloc.items():
             for dev_id, alloc in per_device_alloc.items():
                 if alloc > 0:
@@ -284,7 +285,7 @@ class RngdPlugin(AbstractComputePlugin):
 
     async def get_docker_networks(
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[str]:
+    ) -> list[str]:
         return []
 
     async def gather_process_measures(

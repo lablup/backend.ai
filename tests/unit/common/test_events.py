@@ -1,7 +1,7 @@
 import asyncio
 from dataclasses import dataclass
 from types import TracebackType
-from typing import Optional, Type
+from typing import Optional
 
 import aiotools
 import pytest
@@ -97,7 +97,7 @@ async def test_error_on_dispatch(test_valkey_stream_mq, test_node_id) -> None:
     exception_log: list[str] = []
 
     async def handle_exception(
-        et: Type[Exception],
+        et: type[Exception],
         exc: Exception,
         tb: TracebackType,
     ) -> None:

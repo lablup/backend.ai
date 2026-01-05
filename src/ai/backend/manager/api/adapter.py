@@ -5,7 +5,8 @@ Provides reusable conversion logic for common patterns.
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
+from typing import Optional
 
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.manager.repositories.base import QueryCondition
@@ -33,10 +34,10 @@ class BaseFilterAdapter:
         """
         if string_filter.equals is not None:
             return equals_fn(string_filter.equals, False)
-        elif string_filter.i_equals is not None:
+        if string_filter.i_equals is not None:
             return equals_fn(string_filter.i_equals, True)
-        elif string_filter.contains is not None:
+        if string_filter.contains is not None:
             return contains_fn(string_filter.contains, False)
-        elif string_filter.i_contains is not None:
+        if string_filter.i_contains is not None:
             return contains_fn(string_filter.i_contains, True)
         return None

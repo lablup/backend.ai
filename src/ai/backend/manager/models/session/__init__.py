@@ -1,7 +1,7 @@
 from ai.backend.common.types import SessionId, SessionResult, SessionTypes
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.models.types import QueryCondition, QueryOption
 
-from ..types import QueryCondition, QueryOption
 from .row import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE,
@@ -38,20 +38,20 @@ __all__ = (
     "DEAD_SESSION_STATUSES",
     "DEFAULT_SESSION_ORDERING",
     "PRIVATE_SESSION_TYPES",
-    "QueryCondition",
-    "QueryOption",
     "SESSION_KERNEL_STATUS_MAPPING",
     "SESSION_STATUS_TRANSITION_MAP",
-    "SessionId",
-    "SessionResult",
-    "SessionStatus",
-    "SessionTypes",
     "USER_RESOURCE_OCCUPYING_SESSION_STATUSES",
     "ConcurrencyUsed",
     "KernelLoadingStrategy",
+    "QueryCondition",
+    "QueryOption",
     "SessionDependencyRow",
+    "SessionId",
     "SessionLifecycleManager",
+    "SessionResult",
     "SessionRow",
+    "SessionStatus",
+    "SessionTypes",
     "by_domain_name",
     "by_raw_filter",
     "by_resource_group_name",

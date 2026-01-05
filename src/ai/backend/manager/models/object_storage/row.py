@@ -8,8 +8,7 @@ from sqlalchemy.orm import foreign, relationship
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
-
-from ..base import (
+from ai.backend.manager.models.base import (
     Base,
     IDColumn,
 )
@@ -24,7 +23,7 @@ def _get_object_storage_association_artifact_join_cond():
 
 
 def _get_object_storage_namespace_join_cond():
-    from ..storage_namespace import StorageNamespaceRow
+    from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 
     return foreign(StorageNamespaceRow.storage_id) == ObjectStorageRow.id
 

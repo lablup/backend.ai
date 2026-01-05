@@ -70,8 +70,8 @@ async def test_volume_get_usage(volume: AbstractVolume, empty_vfolder: VFolderID
     (vfpath / "inner").mkdir()
     (vfpath / "inner" / "hello.txt").write_bytes(b"678")
     (vfpath / "inner" / "world.txt").write_bytes(b"901")
-    (vfpath / "test2.txt").symlink_to((vfpath / "inner" / "hello.txt"))
-    (vfpath / "inner2").symlink_to((vfpath / "inner"))
+    (vfpath / "test2.txt").symlink_to(vfpath / "inner" / "hello.txt")
+    (vfpath / "inner2").symlink_to(vfpath / "inner")
     usage = await volume.get_usage(empty_vfolder)
     # Depending on the backend, the top directory may be included or not.
     assert usage.file_count in (6, 7)  # including directories
@@ -86,8 +86,8 @@ async def test_volume_scandir(volume: AbstractVolume, empty_vfolder: VFolderID) 
     (vfpath / "inner").mkdir()
     (vfpath / "inner" / "hello.txt").write_bytes(b"678")
     (vfpath / "inner" / "world.txt").write_bytes(b"901")
-    (vfpath / "test2.txt").symlink_to((vfpath / "inner" / "hello.txt"))
-    (vfpath / "inner2").symlink_to((vfpath / "inner"))
+    (vfpath / "test2.txt").symlink_to(vfpath / "inner" / "hello.txt")
+    (vfpath / "inner2").symlink_to(vfpath / "inner")
     entries = []
     async for entry in volume.scandir(empty_vfolder, PurePosixPath(".")):
         entries.append(entry)

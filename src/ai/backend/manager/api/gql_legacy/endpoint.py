@@ -3,7 +3,8 @@ from __future__ import annotations
 import datetime
 import decimal
 import uuid
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Self, Sequence, cast
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Optional, Self, cast
 from uuid import UUID
 
 import graphene
@@ -43,7 +44,24 @@ from ai.backend.manager.data.model_serving.types import (
     RequesterCtx,
 )
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES
+from ai.backend.manager.errors.common import (
+    GenericForbidden,
+    ObjectNotFound,
+)
+from ai.backend.manager.errors.service import (
+    EndpointNotFound,
+    EndpointTokenNotFound,
+)
+from ai.backend.manager.models.endpoint import (
+    EndpointAutoScalingRuleRow,
+    EndpointLifecycle,
+    EndpointRow,
+    EndpointTokenRow,
+)
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_serving.updaters import (
@@ -62,23 +80,6 @@ from ai.backend.manager.services.model_serving.actions.modify_auto_scaling_rule 
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
 from ai.backend.manager.types import OptionalState, TriState
 
-from ...errors.common import (
-    GenericForbidden,
-    ObjectNotFound,
-)
-from ...errors.service import (
-    EndpointNotFound,
-    EndpointTokenNotFound,
-)
-from ...models.endpoint import (
-    EndpointAutoScalingRuleRow,
-    EndpointLifecycle,
-    EndpointRow,
-    EndpointTokenRow,
-)
-from ...models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ...models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
-from ...models.user import UserRole, UserRow
 from .base import (
     FilterExprArg,
     ImageRefType,
@@ -372,7 +373,7 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
         ) -> decimal.Decimal | UndefinedType:
             if isinstance(value, UndefinedType):
                 return value
-            elif value is None:
+            if value is None:
                 raise InvalidAPIParameters("Threshold cannot be None")
 
             try:
@@ -910,9 +911,9 @@ class Endpoint(graphene.ObjectType):
             case _:
                 if len(self.routings) == 0:
                     return EndpointStatus.READY
-                elif self.retries > SERVICE_MAX_RETRIES:
+                if self.retries > SERVICE_MAX_RETRIES:
                     return EndpointStatus.UNHEALTHY
-                elif (spawned_service_count := len([r for r in self.routings])) > 0:
+                if (spawned_service_count := len([r for r in self.routings])) > 0:
                     healthy_service_count = len([
                         r for r in self.routings if r.status == RouteStatus.HEALTHY.name
                     ])
@@ -1066,7 +1067,7 @@ class ModifyEndpointInput(graphene.InputObjectType):
         ) -> RuntimeVariant | UndefinedType:
             if isinstance(value, UndefinedType):
                 return value
-            elif value is None:
+            if value is None:
                 raise InvalidAPIParameters("Runtime variant cannot be None")
 
             try:
@@ -1084,7 +1085,7 @@ class ModifyEndpointInput(graphene.InputObjectType):
         ) -> list[ExtraMount] | UndefinedType:
             if isinstance(extra_mounts_gql, UndefinedType):
                 return extra_mounts_gql
-            elif extra_mounts_gql is None:
+            if extra_mounts_gql is None:
                 raise InvalidAPIParameters("Extra mounts cannot be None")
 
             return [extra_mount.to_action_field(info) for extra_mount in extra_mounts_gql]

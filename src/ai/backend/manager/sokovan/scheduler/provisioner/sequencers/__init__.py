@@ -4,8 +4,8 @@ from .lifo import LIFOSequencer
 from .sequencer import WorkloadSequencer
 
 __all__ = [
-    "WorkloadSequencer",
+    "DRFSequencer",
     "FIFOSequencer",
     "LIFOSequencer",
-    "DRFSequencer",
+    "WorkloadSequencer",
 ]

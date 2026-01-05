@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
-from typing import Any, AsyncIterator, Mapping, Optional, cast
+from typing import Any, Optional, cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -54,6 +55,32 @@ from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_merge,
 )
+from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
+from ai.backend.manager.repositories.scheduler.types.base import SchedulingSpec
+from ai.backend.manager.repositories.scheduler.types.scaling_group import ScalingGroupMeta
+from ai.backend.manager.repositories.scheduler.types.scheduling import SchedulingData
+from ai.backend.manager.repositories.scheduler.types.session import (
+    KernelData,
+    KernelTerminationResult,
+    MarkTerminatingResult,
+    PendingSessionData,
+    PendingSessions,
+    SessionTerminationResult,
+    SweptSessionInfo,
+    TerminatingKernelData,
+    TerminatingKernelWithAgentData,
+    TerminatingSessionData,
+)
+from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    AllowedScalingGroup,
+    ContainerUserInfo,
+    ImageInfo,
+    ScalingGroupNetworkInfo,
+    SessionCreationContext,
+    SessionCreationSpec,
+    SessionEnqueueData,
+)
+from ai.backend.manager.repositories.scheduler.types.snapshot import ResourcePolicies, SnapshotData
 from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
 from ai.backend.manager.sokovan.scheduler.types import (
     AgentOccupancy,
@@ -78,32 +105,6 @@ from ai.backend.manager.sokovan.scheduler.types import (
     UserResourcePolicy,
 )
 
-from ..types.agent import AgentMeta
-from ..types.base import SchedulingSpec
-from ..types.scaling_group import ScalingGroupMeta
-from ..types.scheduling import SchedulingData
-from ..types.session import (
-    KernelData,
-    KernelTerminationResult,
-    MarkTerminatingResult,
-    PendingSessionData,
-    PendingSessions,
-    SessionTerminationResult,
-    SweptSessionInfo,
-    TerminatingKernelData,
-    TerminatingKernelWithAgentData,
-    TerminatingSessionData,
-)
-from ..types.session_creation import (
-    AllowedScalingGroup,
-    ContainerUserInfo,
-    ImageInfo,
-    ScalingGroupNetworkInfo,
-    SessionCreationContext,
-    SessionCreationSpec,
-    SessionEnqueueData,
-)
-from ..types.snapshot import ResourcePolicies, SnapshotData
 from .types import KeypairConcurrencyData, SessionRowCache
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -130,7 +131,7 @@ class ScheduleDBSource:
 
     _db: ExtendedAsyncSAEngine
 
-    def __init__(self, db: ExtendedAsyncSAEngine):
+    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
     @actxmgr
@@ -1094,7 +1095,7 @@ class ScheduleDBSource:
         scaling_group_name: str,
         storage_manager,
         allowed_vfolder_types: list[str],
-    ) -> "SessionCreationContext":
+    ) -> SessionCreationContext:
         """
         Fetch all data needed for session creation in a single DB session.
 
@@ -1241,7 +1242,7 @@ class ScheduleDBSource:
 
     async def _resolve_image_info(
         self, db_sess: SASession, image_refs: list[ImageRef]
-    ) -> dict[str, "ImageInfo"]:
+    ) -> dict[str, ImageInfo]:
         """
         Resolve image references to image information.
 
@@ -2314,8 +2315,7 @@ class ScheduleDBSource:
                 .returning(KernelRow.session_id)
             )
             result = await db_sess.execute(stmt)
-            affected_session_ids = {row.session_id for row in result}
-            return affected_session_ids
+            return {row.session_id for row in result}
 
     async def check_and_cancel_session_if_needed(self, session_id: SessionId) -> bool:
         """
@@ -3325,26 +3325,25 @@ class ScheduleDBSource:
                 "Session {} exceeded max retries ({}), moved to PENDING", session_id, max_retries
             )
             return False  # Should not retry
-        else:
-            # Update with incremented retry count
-            status_data = {"retries": new_retries}
+        # Update with incremented retry count
+        status_data = {"retries": new_retries}
 
-            # Just update retry count, keep current status
-            update_stmt = (
-                sa.update(SessionRow)
-                .where(SessionRow.id == session_id)
-                .values(
-                    status_data=sql_json_merge(
-                        SessionRow.status_data,
-                        ("scheduler",),
-                        obj=status_data,
-                    ),
-                )
+        # Just update retry count, keep current status
+        update_stmt = (
+            sa.update(SessionRow)
+            .where(SessionRow.id == session_id)
+            .values(
+                status_data=sql_json_merge(
+                    SessionRow.status_data,
+                    ("scheduler",),
+                    obj=status_data,
+                ),
             )
-            await db_sess.execute(update_stmt)
+        )
+        await db_sess.execute(update_stmt)
 
-            log.debug("Session {} retry count incremented to {}", session_id, new_retries)
-            return True  # Should continue retrying
+        log.debug("Session {} retry count incremented to {}", session_id, new_retries)
+        return True  # Should continue retrying
 
     async def batch_update_stuck_session_retries(
         self, session_ids: list[SessionId], max_retries: int = 5

@@ -39,8 +39,8 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.list impo
 from ai.backend.manager.services.artifact_registry.actions.huggingface.update import (
     UpdateHuggingFaceRegistryAction,
 )
+from ai.backend.manager.types import OptionalState
 
-from ...types import OptionalState
 from .types import StrawberryGQLContext
 
 
@@ -63,7 +63,7 @@ class HuggingFaceRegistry(Node):
     @classmethod
     async def load_by_id(
         cls, ctx: StrawberryGQLContext, registry_ids: Sequence[uuid.UUID]
-    ) -> list["HuggingFaceRegistry"]:
+    ) -> list[HuggingFaceRegistry]:
         action_result = (
             await ctx.processors.artifact_registry.get_huggingface_registries.wait_for_complete(
                 GetHuggingFaceRegistriesAction(registry_ids=list(registry_ids))

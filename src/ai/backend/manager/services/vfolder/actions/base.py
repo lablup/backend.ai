@@ -25,8 +25,11 @@ from ai.backend.manager.models.vfolder import (
     VFolderRow,
 )
 from ai.backend.manager.repositories.base.updater import Updater
-
-from ..types import VFolderBaseInfo, VFolderOwnershipInfo, VFolderUsageInfo
+from ai.backend.manager.services.vfolder.types import (
+    VFolderBaseInfo,
+    VFolderOwnershipInfo,
+    VFolderUsageInfo,
+)
 
 
 class VFolderAction(BaseAction):

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -321,7 +321,7 @@ class TestSearchAutoScalingRulesValidated:
                     cooldown_seconds=300 + i * 60,
                     min_replicas=1,
                     max_replicas=10 + i,
-                    created_at=datetime.now(timezone.utc),
+                    created_at=datetime.now(UTC),
                 )
                 db_sess.add(rule)
                 rule_ids.append(rule_id)
@@ -352,7 +352,7 @@ class TestSearchAutoScalingRulesValidated:
                     cooldown_seconds=300,
                     min_replicas=1,
                     max_replicas=10,
-                    created_at=datetime.now(timezone.utc),
+                    created_at=datetime.now(UTC),
                 )
                 db_sess.add(rule)
                 rule_ids.append(rule_id)

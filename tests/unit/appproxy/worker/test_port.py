@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
@@ -53,13 +53,13 @@ def create_circuit(port: int) -> Circuit:
                 protocol=ProxyProtocol.HTTP,
                 traffic_ratio=1.0,
                 health_status=ModelServiceStatus.HEALTHY,
-                last_health_check=datetime(2024, 7, 16, 5, 45, 45, 982450).timestamp(),
+                last_health_check=datetime(2024, 7, 16, 5, 45, 45, 982450, tzinfo=UTC).timestamp(),
                 consecutive_failures=0,
             )
         ],
         session_ids=[UUID("f5cd34ba-ae53-4537-a813-09f38496443d")],
-        created_at=datetime(2024, 7, 16, 5, 45, 45, 982446),
-        updated_at=datetime(2024, 7, 16, 5, 45, 45, 982452),
+        created_at=datetime(2024, 7, 16, 5, 45, 45, 982446, tzinfo=UTC),
+        updated_at=datetime(2024, 7, 16, 5, 45, 45, 982452, tzinfo=UTC),
     )
 
 

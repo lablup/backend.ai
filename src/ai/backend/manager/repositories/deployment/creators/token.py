@@ -5,8 +5,7 @@ from __future__ import annotations
 import secrets
 import uuid
 from dataclasses import dataclass
-
-from typing_extensions import override
+from typing import override
 
 from ai.backend.manager.models.endpoint import EndpointTokenRow
 from ai.backend.manager.repositories.base import CreatorSpec

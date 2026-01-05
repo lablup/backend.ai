@@ -1,8 +1,9 @@
-import datetime
 import json
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Tuple
+from collections.abc import Mapping
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 import aiohttp_cors
 import sqlalchemy as sa
@@ -13,11 +14,11 @@ from aiohttp import web
 from ai.backend.common import validators as tx
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.resource import DBOperationFailed, TaskTemplateNotFound
+from ai.backend.manager.models import TemplateType, groups, session_templates, users
+from ai.backend.manager.models.session_template import check_task_template
 
-from ..errors.api import InvalidAPIParameters
-from ..errors.resource import DBOperationFailed, TaskTemplateNotFound
-from ..models import TemplateType, groups, session_templates, users
-from ..models.session_template import check_task_template
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .session import query_userinfo
@@ -73,7 +74,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 user_uuid = st["user_uuid"]
             query = session_templates.insert().values({
                 "id": template_id,
-                "created_at": datetime.datetime.now(),
+                "created_at": datetime.now(UTC),
                 "domain_name": params["domain"],
                 "group_id": group_id,
                 "user_uuid": user_uuid,
@@ -107,7 +108,7 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
     log.info("SESSION_TEMPLATE.LIST (ak:{})", access_key)
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin() as conn:
-        entries: List[Mapping[str, Any]]
+        entries: list[Mapping[str, Any]]
         j = session_templates.join(
             users, session_templates.c.user_uuid == users.c.uuid, isouter=True
         ).join(groups, session_templates.c.group_id == groups.c.id, isouter=True)
@@ -121,7 +122,7 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
         result = await conn.execute(query)
         entries = []
         for row in result.fetchall():
-            is_owner = True if row.session_templates_user_uuid == user_uuid else False
+            is_owner = row.session_templates_user_uuid == user_uuid
             entries.append({
                 "name": row.session_templates_name,
                 "id": row.session_templates_id,
@@ -169,7 +170,7 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
 async def get(request: web.Request, params: Any) -> web.Response:
     if params["format"] not in ["yaml", "json"]:
         raise InvalidAPIParameters('format should be "yaml" or "json"')
-    resp: Dict[str, Any] = {}
+    resp: dict[str, Any] = {}
     domain_name = request["user"]["domain_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
     log.info(
@@ -267,7 +268,7 @@ async def put(request: web.Request, params: Any) -> web.Response:
                     "name": name,
                     "template": template_data,
                 })
-                .where((session_templates.c.id == template_id))
+                .where(session_templates.c.id == template_id)
             )
             result = await conn.execute(query)
             if result.rowcount != 1:
@@ -307,7 +308,7 @@ async def delete(request: web.Request, params: Any) -> web.Response:
         query = (
             sa.update(session_templates)
             .values(is_active=False)
-            .where((session_templates.c.id == template_id))
+            .where(session_templates.c.id == template_id)
         )
         result = await conn.execute(query)
         if result.rowcount != 1:
@@ -326,7 +327,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)

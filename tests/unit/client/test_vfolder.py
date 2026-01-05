@@ -1,6 +1,6 @@
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from http import HTTPStatus
-from typing import Mapping, Optional, Union
+from typing import Optional
 from unittest import mock
 from uuid import UUID
 
@@ -14,11 +14,11 @@ from ai.backend.testutils.mock import AsyncMock
 
 
 def build_url(
-    config: APIConfig, path: str, params: Optional[Mapping[str, Union[str, int]]] = None
+    config: APIConfig, path: str, params: Optional[Mapping[str, str | int]] = None
 ) -> URL:
     base_url = config.endpoint.path.rstrip("/")
     query_path = path.lstrip("/") if len(path) > 0 else ""
-    path = "{0}/{1}".format(base_url, query_path)
+    path = f"{base_url}/{query_path}"
     canonical_url = config.endpoint.with_path(path)
     if params:
         canonical_url = canonical_url.with_query(params)
@@ -113,7 +113,7 @@ def test_vfolder_get_info() -> None:
             payload={"id": source_vfolder_uuid.hex},
         )
         m.get(
-            build_url(session.config, "/folders/{}".format(source_vfolder_uuid.hex)),
+            build_url(session.config, f"/folders/{source_vfolder_uuid.hex}"),
             status=HTTPStatus.OK,
             payload=payload,
         )
@@ -132,7 +132,7 @@ def test_vfolder_delete_files() -> None:
             payload={"id": source_vfolder_uuid.hex},
         )
         m.delete(
-            build_url(session.config, "/folders/{}/delete-files".format(source_vfolder_uuid.hex)),
+            build_url(session.config, f"/folders/{source_vfolder_uuid.hex}/delete-files"),
             status=HTTPStatus.OK,
             payload={},
         )
@@ -173,7 +173,7 @@ def test_vfolder_list_files() -> None:
         m.get(
             build_url(
                 session.config,
-                "/folders/{}/files".format(source_vfolder_uuid.hex),
+                f"/folders/{source_vfolder_uuid.hex}/files",
                 params={"path": "."},
             ),
             status=HTTPStatus.OK,
@@ -195,7 +195,7 @@ def test_vfolder_invite() -> None:
             payload={"id": source_vfolder_uuid.hex},
         )
         m.post(
-            build_url(session.config, "/folders/{}/invite".format(source_vfolder_uuid.hex)),
+            build_url(session.config, f"/folders/{source_vfolder_uuid.hex}/invite"),
             status=HTTPStatus.CREATED,
             payload=payload,
         )
@@ -267,7 +267,7 @@ def test_vfolder_clone() -> None:
             payload={"id": source_vfolder_uuid.hex},
         )
         m.post(
-            build_url(session.config, "/folders/{}/clone".format(source_vfolder_uuid.hex)),
+            build_url(session.config, f"/folders/{source_vfolder_uuid.hex}/clone"),
             status=HTTPStatus.CREATED,
             payload=payload,
         )
@@ -284,7 +284,7 @@ def test_vfolder_force_delete() -> None:
             payload={"id": vfolder_uuid.hex},
         )
         m.delete(
-            build_url(session.config, "/folders/{}/force".format(vfolder_uuid.hex)),
+            build_url(session.config, f"/folders/{vfolder_uuid.hex}/force"),
             status=HTTPStatus.NO_CONTENT,
             payload={},
         )

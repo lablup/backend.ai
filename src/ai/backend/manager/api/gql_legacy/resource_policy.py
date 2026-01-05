@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, Sequence
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any
 
 import graphene
 import sqlalchemy as sa
@@ -13,12 +14,8 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.types import OptionalState, TriState
-
-from ...models.keypair import keypairs
-from ...models.resource_policy import (
+from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
@@ -26,7 +23,11 @@ from ...models.resource_policy import (
     project_resource_policies,
     user_resource_policies,
 )
-from ...models.user import UserRole
+from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.types import OptionalState, TriState
+
 from .base import (
     BigInt,
     batch_result,
@@ -106,18 +107,18 @@ def _get_user_resource_policy_updater_spec() -> type[UserResourcePolicyUpdaterSp
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 __all__ = (
-    "KeyPairResourcePolicy",
     "CreateKeyPairResourcePolicy",
-    "ModifyKeyPairResourcePolicy",
-    "DeleteKeyPairResourcePolicy",
-    "UserResourcePolicy",
-    "CreateUserResourcePolicy",
-    "ModifyUserResourcePolicy",
-    "DeleteUserResourcePolicy",
-    "ProjectResourcePolicy",
     "CreateProjectResourcePolicy",
-    "ModifyProjectResourcePolicy",
+    "CreateUserResourcePolicy",
+    "DeleteKeyPairResourcePolicy",
     "DeleteProjectResourcePolicy",
+    "DeleteUserResourcePolicy",
+    "KeyPairResourcePolicy",
+    "ModifyKeyPairResourcePolicy",
+    "ModifyProjectResourcePolicy",
+    "ModifyUserResourcePolicy",
+    "ProjectResourcePolicy",
+    "UserResourcePolicy",
 )
 
 
@@ -275,7 +276,7 @@ class KeyPairResourcePolicy(graphene.ObjectType):
         query = (
             sa.select([keypair_resource_policies])
             .select_from(j)
-            .where((keypairs.c.access_key.in_(access_keys)))
+            .where(keypairs.c.access_key.in_(access_keys))
             .order_by(keypair_resource_policies.c.name)
         )
         async with ctx.db.begin_readonly() as conn:
@@ -570,11 +571,11 @@ class UserResourcePolicy(graphene.ObjectType):
         ctx: GraphQueryContext,
         user_uuids: Sequence[uuid.UUID],
     ) -> Sequence[UserResourcePolicy]:
-        from ...models.user import UserRow
+        from ai.backend.manager.models.user import UserRow
 
         query = (
             sa.select(UserRow)
-            .where((UserRow.uuid.in_(user_uuids)))
+            .where(UserRow.uuid.in_(user_uuids))
             .options(selectinload(UserRow.resource_policy_row))
             .order_by(UserRow.resource_policy)
         )
@@ -829,11 +830,11 @@ class ProjectResourcePolicy(graphene.ObjectType):
         ctx: GraphQueryContext,
         project_uuids: Sequence[uuid.UUID],
     ) -> Sequence[ProjectResourcePolicy]:
-        from ...models.group import GroupRow
+        from ai.backend.manager.models.group import GroupRow
 
         query = (
             sa.select(GroupRow)
-            .where((GroupRow.id.in_(project_uuids)))
+            .where(GroupRow.id.in_(project_uuids))
             .order_by(GroupRow.resource_policy)
             .options(selectinload(GroupRow.resource_policy_row))
         )

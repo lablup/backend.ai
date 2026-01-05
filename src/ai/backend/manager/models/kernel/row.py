@@ -3,16 +3,14 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from collections.abc import Container, Iterable, Mapping
+from collections.abc import AsyncIterator, Container, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime, tzinfo
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
     Optional,
     Self,
-    Sequence,
     TypedDict,
     cast,
 )
@@ -55,9 +53,8 @@ if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 
 from ai.backend.common.exception import BackendAIError
-
-from ...defs import DEFAULT_ROLE
-from ...errors.kernel import (
+from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.kernel import (
     KernelCreationFailed,
     KernelDestructionFailed,
     KernelExecutionFailed,
@@ -65,9 +62,9 @@ from ...errors.kernel import (
     KernelRestartFailed,
     SessionNotFound,
 )
-from ...errors.resource import DataTransformationFailed
-from ...exceptions import AgentError
-from ..base import (
+from ai.backend.manager.errors.resource import DataTransformationFailed
+from ai.backend.manager.exceptions import AgentError
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     EnumType,
@@ -78,9 +75,9 @@ from ..base import (
     StructuredJSONObjectListColumn,
     URLColumn,
 )
-from ..types import QueryCondition
-from ..user import users
-from ..utils import (
+from ai.backend.manager.models.types import QueryCondition
+from ai.backend.manager.models.user import users
+from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     JSONCoalesceExpr,
     execute_with_retry,
@@ -89,20 +86,20 @@ from ..utils import (
 )
 
 if TYPE_CHECKING:
-    from ..gql import GraphQueryContext
+    from ai.backend.manager.models.gql import GraphQueryContext
 
 __all__ = (
+    "AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES",
+    "DEAD_KERNEL_STATUSES",
+    "KERNEL_STATUS_TRANSITION_MAP",
+    "LIVE_STATUS",
+    "RESOURCE_USAGE_KERNEL_STATUSES",
+    "USER_RESOURCE_OCCUPYING_KERNEL_STATUSES",
+    "KernelRow",
+    "KernelStatistics",
     "get_user_email",
     "handle_kernel_exception",
     "kernels",
-    "KernelRow",
-    "KERNEL_STATUS_TRANSITION_MAP",
-    "KernelStatistics",
-    "AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES",
-    "USER_RESOURCE_OCCUPYING_KERNEL_STATUSES",
-    "RESOURCE_USAGE_KERNEL_STATUSES",
-    "DEAD_KERNEL_STATUSES",
-    "LIVE_STATUS",
     "recalc_concurrency_used",
 )
 
@@ -170,8 +167,7 @@ async def get_user_email(
     query = sa.select([users.c.email]).select_from(users).where(users.c.uuid == kernel["user_uuid"])
     result = await db_session.execute(query)
     user_email = str(result.scalar())
-    user_email = user_email.replace("@", "_")
-    return user_email
+    return user_email.replace("@", "_")
 
 
 def default_hostname(context) -> str:
@@ -286,7 +282,7 @@ async def handle_kernel_exception(
     # NOTE: Error logging is done outside of this actxmanager.
     try:
         yield
-    except asyncio.TimeoutError:
+    except TimeoutError:
         if set_error:
             await KernelRow.set_kernel_status(
                 db,
@@ -623,7 +619,7 @@ class KernelRow(Base):
     async def get_kernel(
         db: ExtendedAsyncSAEngine, kern_id: uuid.UUID, allow_stale: bool = False
     ) -> KernelRow:
-        from ..agent import AgentStatus
+        from ai.backend.manager.models.agent import AgentStatus
 
         async def _query():
             async with db.begin_readonly_session() as db_sess:
@@ -1034,7 +1030,7 @@ async def recalc_concurrency_used(
     access_key: AccessKey,
 ) -> None:
     concurrency_used: int
-    from ..session import PRIVATE_SESSION_TYPES
+    from ai.backend.manager.models.session import PRIVATE_SESSION_TYPES
 
     async with db_sess.begin_nested():
         result = await db_sess.execute(

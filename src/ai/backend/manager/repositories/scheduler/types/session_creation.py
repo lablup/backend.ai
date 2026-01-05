@@ -153,7 +153,7 @@ class SessionCreationSpec:
 
         return cls(
             session_creation_id=session_creation_id,
-            session_name=f"{deployment_info.metadata.name}-{str(route_id)}",
+            session_name=f"{deployment_info.metadata.name}-{route_id!s}",
             access_key=context.session_owner.access_key,
             user_scope=UserScope(
                 domain_name=deployment_info.metadata.domain,

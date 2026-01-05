@@ -151,12 +151,14 @@ async def test_upload_ssh_keypair_invalid_keys(
     )
 
     # Mock failed validation
-    with patch(
-        "ai.backend.manager.services.auth.service.validate_ssh_keypair",
-        return_value=(False, "Invalid SSH keypair format"),
+    with (
+        patch(
+            "ai.backend.manager.services.auth.service.validate_ssh_keypair",
+            return_value=(False, "Invalid SSH keypair format"),
+        ),
+        pytest.raises(InvalidAPIParameters),
     ):
-        with pytest.raises(InvalidAPIParameters):
-            await auth_service.upload_ssh_keypair(action)
+        await auth_service.upload_ssh_keypair(action)
 
     # Verify repository was NOT called for invalid keys
     mock_auth_repository.update_ssh_keypair.assert_not_called()

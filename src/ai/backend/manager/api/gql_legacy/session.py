@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
-    Mapping,
     Optional,
     Self,
     cast,
@@ -37,26 +36,19 @@ from ai.backend.common.types import (
 from ai.backend.manager.api.gql.base import resolve_global_id
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.idle import ReportInfo
 from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.utils import agg_to_array
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
-from ai.backend.manager.services.session.actions.check_and_transit_status import (
-    CheckAndTransitStatusAction,
+from ai.backend.manager.models.minilang import ArrayFieldItem, JSONFieldItem, ORMFieldItem
+from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
+from ai.backend.manager.models.rbac import ScopeType, SystemScope
+from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.rbac.permission_defs import ComputeSessionPermission
+from ai.backend.manager.models.rbac.permission_defs import (
+    VFolderPermission as VFolderRBACPermission,
 )
-from ai.backend.manager.services.session.actions.modify_session import ModifySessionAction
-from ai.backend.manager.types import OptionalState
-
-from ...errors.resource import DataTransformationFailed
-from ...models.minilang import ArrayFieldItem, JSONFieldItem, ORMFieldItem
-from ...models.minilang.ordering import ColumnMapType, QueryOrderParser
-from ...models.minilang.queryfilter import FieldSpecType, QueryFilterParser
-from ...models.rbac import ScopeType, SystemScope
-from ...models.rbac.context import ClientContext
-from ...models.rbac.permission_defs import ComputeSessionPermission
-from ...models.rbac.permission_defs import VFolderPermission as VFolderRBACPermission
-from ...models.session import (
+from ai.backend.manager.models.session import (
     DEFAULT_SESSION_ORDERING,
     SessionDependencyRow,
     SessionRow,
@@ -67,15 +59,24 @@ from ...models.session import (
     by_status,
     get_permission_ctx,
 )
-from ...models.types import (
+from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
     join_by_related_field,
     load_related_field,
 )
-from ...models.user import UserRole, UserRow
-from ...models.vfolder import VFolderRow
-from ...models.vfolder import get_permission_ctx as get_vfolder_permission_ctx
+from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.utils import agg_to_array
+from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder import get_permission_ctx as get_vfolder_permission_ctx
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
+from ai.backend.manager.services.session.actions.check_and_transit_status import (
+    CheckAndTransitStatusAction,
+)
+from ai.backend.manager.services.session.actions.modify_session import ModifySessionAction
+from ai.backend.manager.types import OptionalState
+
 from .base import (
     BigInt,
     FilterExprArg,
@@ -103,14 +104,14 @@ if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
 __all__ = (
-    "ComputeSessionNode",
-    "ComputeSessionConnection",
-    "ModifyComputeSession",
-    "ModifyComputeSession",
     "ComputeSession",
+    "ComputeSessionConnection",
     "ComputeSessionList",
+    "ComputeSessionNode",
     "InferenceSession",
     "InferenceSessionList",
+    "ModifyComputeSession",
+    "ModifyComputeSession",
 )
 
 
@@ -185,6 +186,7 @@ class SessionPermissionValueField(graphene.Scalar):
     def parse_literal(node: Any, _variables=None):
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ComputeSessionPermission(node.value)
+        return None
 
     @staticmethod
     def parse_value(value: str) -> ComputeSessionPermission:
@@ -327,8 +329,7 @@ class ComputeSessionNode(graphene.ObjectType):
     async def _batch_load_queue_position(
         self, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
     ) -> list[Optional[int]]:
-        positions = await ctx.valkey_schedule.get_queue_positions(session_ids)
-        return positions
+        return await ctx.valkey_schedule.get_queue_positions(session_ids)
 
     @classmethod
     def from_row(
@@ -451,7 +452,7 @@ class ComputeSessionNode(graphene.ObjectType):
 
     async def __resolve_reference(
         self, info: graphene.ResolveInfo, **kwargs
-    ) -> Optional["ComputeSessionNode"]:
+    ) -> Optional[ComputeSessionNode]:
         # TODO: Confirm if scope and permsission are correct
         # Parse the global ID from Federation (converts base64 encoded string to tuple)
         resolved_id = resolve_global_id(self.id)
@@ -553,7 +554,7 @@ class ComputeSessionNode(graphene.ObjectType):
         self,
         info: graphene.ResolveInfo,
     ) -> ConnectionResolverResult[Self]:
-        from ...models.session import SessionDependencyRow, SessionRow
+        from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 
         ctx: GraphQueryContext = info.context
 
@@ -604,7 +605,7 @@ class ComputeSessionNode(graphene.ObjectType):
     async def batch_load_by_dependee_id(
         cls, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
     ) -> Sequence[Sequence[Self]]:
-        from ...models.session import SessionDependencyRow, SessionRow
+        from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 
         async with ctx.db.begin_readonly_session() as db_sess:
             j = sa.join(
@@ -628,7 +629,7 @@ class ComputeSessionNode(graphene.ObjectType):
     async def batch_load_by_dependent_id(
         cls, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
     ) -> Sequence[Sequence[Self]]:
-        from ...models.session import SessionDependencyRow, SessionRow
+        from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 
         async with ctx.db.begin_readonly_session() as db_sess:
             j = sa.join(
@@ -669,12 +670,11 @@ class ComputeSessionNode(graphene.ObjectType):
             query = cls._add_basic_options_to_query(query)
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 session_row = await db_session.scalar(query)
-        result = cls.from_row(
+        return cls.from_row(
             graph_ctx,
             session_row,
             permissions=await permission_ctx.calculate_final_permission(session_row),
         )
-        return result
 
     @classmethod
     async def get_accessible_connection(
@@ -1000,9 +1000,9 @@ class ComputeSession(graphene.ObjectType):
     def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
         if row is None:
             raise DataTransformationFailed("Session row cannot be None")
-        email = getattr(row, "email")
-        full_name = getattr(row, "full_name")
-        group_name = getattr(row, "group_name")
+        email = row.email
+        full_name = row.full_name
+        group_name = row.group_name
         row = row.SessionRow
         status_history = row.status_history or {}
         raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)

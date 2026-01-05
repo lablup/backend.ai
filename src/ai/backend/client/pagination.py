@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import textwrap
-from typing import Any, Dict, Final, Sequence, Tuple, TypeVar
+from collections.abc import Sequence
+from typing import Any, Final, TypeVar
 
 from .exceptions import BackendAPIVersionError
 from .output.types import FieldSpec, PaginatedResult, RelayPaginatedResult
@@ -15,7 +16,7 @@ T = TypeVar("T")
 
 async def execute_paginated_query(
     root_field: str,
-    variables: Dict[str, Tuple[Any, str]],
+    variables: dict[str, tuple[Any, str]],
     fields: Sequence[FieldSpec],
     *,
     limit: int,
@@ -41,7 +42,7 @@ async def execute_paginated_query(
     )
     query = query.replace(
         "$var_args",
-        ", ".join(f"{key}:${key}" for key in variables.keys()),
+        ", ".join(f"{key}:${key}" for key in variables),
     )
     query = textwrap.dedent(query).strip()
     var_values = {key: value[0] for key, value in variables.items()}
@@ -57,7 +58,7 @@ async def execute_paginated_query(
 
 async def execute_paginated_relay_query(
     root_field: str,
-    variables: Dict[str, Tuple[Any, str]],
+    variables: dict[str, tuple[Any, str]],
     fields: Sequence[FieldSpec],
     *,
     limit: int | None = None,
@@ -85,7 +86,7 @@ async def execute_paginated_relay_query(
     )
     query = query.replace(
         "$var_args",
-        ", ".join(f"{key}:${key}" for key in variables.keys()),
+        ", ".join(f"{key}:${key}" for key in variables),
     )
     query = textwrap.dedent(query).strip()
     var_values = {key: value[0] for key, value in variables.items()}
@@ -106,7 +107,7 @@ async def execute_paginated_relay_query(
 
 async def fetch_paginated_result(
     root_field: str,
-    variables: Dict[str, Tuple[Any, str]],
+    variables: dict[str, tuple[Any, str]],
     fields: Sequence[FieldSpec],
     *,
     page_offset: int,
@@ -124,11 +125,10 @@ async def fetch_paginated_result(
         # should remove to work with older managers
         variables.pop("filter")
         variables.pop("order")
-    result = await execute_paginated_query(
+    return await execute_paginated_query(
         root_field,
         variables,
         fields,
         limit=page_size,
         offset=page_offset,
     )
-    return result

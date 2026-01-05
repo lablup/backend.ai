@@ -27,7 +27,7 @@ class ScalingDeploymentHandler(DeploymentHandler):
         deployment_executor: DeploymentExecutor,
         deployment_controller: DeploymentController,
         route_controller: RouteController,
-    ):
+    ) -> None:
         self._deployment_executor = deployment_executor
         self._deployment_controller = deployment_controller
         self._route_controller = route_controller
@@ -61,8 +61,7 @@ class ScalingDeploymentHandler(DeploymentHandler):
         log.debug("Checking for deployment scaling requirements")
 
         # Execute scaling logic via executor
-        result = await self._deployment_executor.scale_deployment(deployments)
-        return result
+        return await self._deployment_executor.scale_deployment(deployments)
 
     async def post_process(self, result: DeploymentExecutionResult) -> None:
         """Handle post-processing after scaling deployments."""

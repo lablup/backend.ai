@@ -4,19 +4,15 @@ import asyncio
 import functools
 import json
 import logging
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from contextlib import asynccontextmanager as actxmgr
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Awaitable,
-    Callable,
     Concatenate,
-    Mapping,
     Optional,
     ParamSpec,
-    Tuple,
     TypeAlias,
     TypeVar,
     cast,
@@ -46,10 +42,9 @@ from ai.backend.common.exception import DatabaseError
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.bootstrap import DatabaseConfig
+from ai.backend.manager.defs import LockID
 from ai.backend.manager.errors.resource import DBOperationFailed
-
-from ..defs import LockID
-from ..types import Sentinel
+from ai.backend.manager.types import Sentinel
 
 if TYPE_CHECKING:
     from ai.backend.manager.config.bootstrap import BootstrapConfig
@@ -141,9 +136,8 @@ class ExtendedAsyncSAEngine(SAEngine):
     @actxmgr
     async def begin(self, bind: SAConnection | None = None) -> AsyncIterator[SAConnection]:
         if bind is None:
-            async with self.connect() as _bind:
-                async with self._begin(_bind) as conn:
-                    yield conn
+            async with self.connect() as _bind, self._begin(_bind) as conn:
+                yield conn
         else:
             async with self._begin(bind) as conn:
                 yield conn
@@ -225,9 +219,8 @@ class ExtendedAsyncSAEngine(SAEngine):
                     await session.commit()
 
         if bind is None:
-            async with self.connect() as _bind:
-                async with _begin_session(_bind) as sess:
-                    yield sess
+            async with self.connect() as _bind, _begin_session(_bind) as sess:
+                yield sess
         else:
             async with _begin_session(bind) as sess:
                 yield sess
@@ -392,9 +385,7 @@ async def execute_with_txn_retry(
                         raise TryAgain
                     raise
     except RetryError:
-        raise asyncio.TimeoutError(
-            f"DB serialization failed after {max_attempts} retry transactions"
-        )
+        raise TimeoutError(f"DB serialization failed after {max_attempts} retry transactions")
     if result is Sentinel.TOKEN:
         raise DBOperationFailed("Transaction completed but no result was returned")
     return result
@@ -543,7 +534,7 @@ JSONCoalesceExpr: TypeAlias = sa.sql.elements.BinaryExpression
 
 def sql_json_merge(
     col,
-    key: Tuple[str, ...],
+    key: tuple[str, ...],
     obj: Mapping[str, Any],
     *,
     _depth: int = 0,
@@ -555,7 +546,7 @@ def sql_json_merge(
 
     Note that the existing value must be also an object, not a primitive value.
     """
-    expr = sa.func.coalesce(
+    return sa.func.coalesce(
         col if _depth == 0 else col[key[:_depth]],
         sa.text("'{}'::jsonb"),
     ).concat(
@@ -574,12 +565,11 @@ def sql_json_merge(
             else sa.func.cast(obj, psql.JSONB)
         ),
     )
-    return expr
 
 
 def sql_json_increment(
     col,
-    key: Tuple[str, ...],
+    key: tuple[str, ...],
     *,
     parent_updates: Optional[Mapping[str, Any]] = None,
     _depth: int = 0,

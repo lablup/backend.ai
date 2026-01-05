@@ -2,18 +2,15 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Container, Sequence
+from collections.abc import Callable, Container, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
-    Callable,
-    Iterable,
     Optional,
     Self,
     TypeAlias,
     TypedDict,
-    Union,
     cast,
     overload,
     override,
@@ -29,13 +26,12 @@ from sqlalchemy.orm.exc import NoResultFound
 from ai.backend.common import msgpack
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.group.types import GroupData, ProjectType
+from ai.backend.manager.defs import RESERVED_DOTFILES
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
-
-from ...defs import RESERVED_DOTFILES
-from ...errors.common import ObjectNotFound
-from ..base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     EnumValueType,
@@ -46,7 +42,7 @@ from ..base import (
     VFolderHostPermissionColumn,
     mapper_registry,
 )
-from ..rbac import (
+from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -57,32 +53,32 @@ from ..rbac import (
     get_predefined_roles_in_scope,
     required_permission,
 )
-from ..rbac.context import ClientContext
-from ..rbac.permission_defs import ProjectPermission
-from ..types import (
+from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.rbac.permission_defs import ProjectPermission
+from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
     load_related_field,
 )
-from ..utils import ExtendedAsyncSAEngine, execute_with_txn_retry
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
-    from ..rbac import ContainerRegistryScope
+    from ai.backend.manager.models.rbac import ContainerRegistryScope
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 __all__: Sequence[str] = (
-    "groups",
-    "GroupRow",
-    "association_groups_users",
-    "AssocGroupUserRow",
-    "resolve_group_name_or_id",
-    "GroupDotfile",
-    "ProjectType",
     "MAXIMUM_DOTFILE_SIZE",
-    "query_group_dotfiles",
+    "AssocGroupUserRow",
+    "GroupDotfile",
+    "GroupRow",
+    "ProjectType",
+    "association_groups_users",
+    "groups",
     "query_group_domain",
+    "query_group_dotfiles",
+    "resolve_group_name_or_id",
     "verify_dotfile_name",
 )
 
@@ -225,7 +221,7 @@ class GroupRow(Base):
         session: AsyncSession,
         project_id: uuid.UUID,
         load_resource_policy=False,
-    ) -> "GroupRow":
+    ) -> GroupRow:
         query = sa.select(GroupRow).filter(GroupRow.id == project_id)
         if load_resource_policy:
             query = query.options(selectinload(GroupRow.resource_policy_row))
@@ -386,20 +382,19 @@ class ProjectModel(RBACModel[ProjectPermission]):
 
 
 def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:
-    query = (
+    return (
         sa.select([groups.c.id])
         .select_from(groups)
         .where(
             cond & (groups.c.domain_name == domain_name),
         )
     )
-    return query
 
 
 async def resolve_group_name_or_id(
     db_conn: SAConnection,
     domain_name: str,
-    value: Union[str, uuid.UUID],
+    value: str | uuid.UUID,
 ) -> Optional[uuid.UUID]:
     match value:
         case uuid.UUID():
@@ -445,9 +440,7 @@ async def resolve_groups(
             raise TypeError("unexpected type for group_name_or_id")
 
     rows = (await db_conn.execute(query)).fetchall()
-    return_val = [row["id"] for row in rows]
-
-    return return_val
+    return [row["id"] for row in rows]
 
 
 class GroupDotfile(TypedDict):
@@ -458,7 +451,7 @@ class GroupDotfile(TypedDict):
 
 async def query_group_dotfiles(
     db_conn: SAConnection,
-    group_id: Union[GUID, uuid.UUID],
+    group_id: GUID | uuid.UUID,
 ) -> tuple[list[GroupDotfile], int]:
     query = sa.select([groups.c.dotfiles]).select_from(groups).where(groups.c.id == group_id)
     packed_dotfile = await db_conn.scalar(query)
@@ -470,17 +463,14 @@ async def query_group_dotfiles(
 
 async def query_group_domain(
     db_conn: SAConnection,
-    group_id: Union[GUID, uuid.UUID],
+    group_id: GUID | uuid.UUID,
 ) -> str:
     query = sa.select([groups.c.domain_name]).select_from(groups).where(groups.c.id == group_id)
-    domain = await db_conn.scalar(query)
-    return domain
+    return await db_conn.scalar(query)
 
 
 def verify_dotfile_name(dotfile: str) -> bool:
-    if dotfile in RESERVED_DOTFILES:
-        return False
-    return True
+    return dotfile not in RESERVED_DOTFILES
 
 
 ALL_PROJECT_PERMISSIONS = frozenset([perm for perm in ProjectPermission])
@@ -576,15 +566,14 @@ class ProjectPermissionContextBuilder(
         target_scope: ScopeType,
     ) -> frozenset[ProjectPermission]:
         roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
-        permissions = await self._calculate_permission_by_predefined_roles(roles)
-        return permissions
+        return await self._calculate_permission_by_predefined_roles(roles)
 
     @override
     async def build_ctx_in_system_scope(
         self,
         ctx: ClientContext,
     ) -> ProjectPermissionContext:
-        from ..domain import DomainRow
+        from ai.backend.manager.models.domain import DomainRow
 
         perm_ctx = ProjectPermissionContext()
         _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
@@ -703,5 +692,4 @@ async def get_permission_ctx(
             return await builder.build_ctx_in_container_registry_scope(
                 ctx, container_registry_scope
             )
-        else:
-            return await builder.build(ctx, target_scope, requested_permission)
+        return await builder.build(ctx, target_scope, requested_permission)

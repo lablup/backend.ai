@@ -62,9 +62,9 @@ set_input_object_type_default_value(Undefined)
 
 from ai.backend.common.types import QuotaScopeID, SessionId
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
+from ai.backend.manager.models.rbac import ContainerRegistryScope
 from ai.backend.manager.models.session import SessionRow
 
-from ...models.rbac import ContainerRegistryScope
 from .container_registry import (
     ContainerRegistry,
     CreateContainerRegistry,
@@ -88,41 +88,43 @@ if TYPE_CHECKING:
         SlotName,
         SlotTypes,
     )
+    from ai.backend.manager.api.api.manager import ManagerStatus
+    from ai.backend.manager.api.idle import IdleCheckerHost
+    from ai.backend.manager.api.models.utils import ExtendedAsyncSAEngine
+    from ai.backend.manager.api.registry import AgentRegistry
+    from ai.backend.manager.api.repositories.agent.repository import AgentRepository
+    from ai.backend.manager.api.repositories.scheduler.repository import SchedulerRepository
+    from ai.backend.manager.api.repositories.user.repository import UserRepository
+    from ai.backend.manager.models.storage import StorageSessionManager
 
-    from ...models.storage import StorageSessionManager
-    from ..api.manager import ManagerStatus
-    from ..idle import IdleCheckerHost
-    from ..models.utils import ExtendedAsyncSAEngine
-    from ..registry import AgentRegistry
-    from ..repositories.agent.repository import AgentRepository
-    from ..repositories.scheduler.repository import SchedulerRepository
-    from ..repositories.user.repository import UserRepository
-
-from ...data.image.types import ImageStatus
-from ...errors.api import InvalidAPIParameters
-from ...errors.auth import InsufficientPrivilege
-from ...errors.common import ObjectNotFound
-from ...errors.image import ImageNotFound
-from ...errors.kernel import TooManyKernelsFound
-from ...models.image.row import (
+from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.kernel import TooManyKernelsFound
+from ai.backend.manager.models.image.row import (
     ImageLoadFilter,
     PublicImageLoadFilter,
 )
-from ...models.rbac import ProjectScope, ScopeType, SystemScope
-from ...models.rbac.permission_defs import (
+from ai.backend.manager.models.rbac import ProjectScope, ScopeType, SystemScope
+from ai.backend.manager.models.rbac.permission_defs import (
     AgentPermission,
     ComputeSessionPermission,
     DomainPermission,
     ImagePermission,
     ProjectPermission,
 )
-from ...models.rbac.permission_defs import VFolderPermission as VFolderRBACPermission
-from ...models.scaling_group.row import (
+from ai.backend.manager.models.rbac.permission_defs import (
+    VFolderPermission as VFolderRBACPermission,
+)
+from ai.backend.manager.models.scaling_group.row import (
     ScalingGroupRow,
     and_names,
     query_allowed_sgroups,
 )
-from ...models.vfolder import ensure_quota_scope_accessible_by_user
+from ai.backend.manager.models.vfolder import ensure_quota_scope_accessible_by_user
+
 from .acl import PredefinedAtomicPermission
 from .agent import (
     Agent,
@@ -295,7 +297,7 @@ def _is_legacy_mutation(mutation_cls: Any) -> bool:
     """
     Checks whether the GraphQL mutation is in the legacy format with the fields `ok` and `msg`.
     """
-    fields = getattr(mutation_cls, "_meta").fields
+    fields = mutation_cls._meta.fields
     return {"ok", "msg"}.issubset(fields)
 
 
@@ -1552,8 +1554,10 @@ class Query(graphene.ObjectType):
         id: uuid.UUID,
         *,
         domain_name: str | None = None,
-        type: list[str] = [ProjectType.GENERAL.name],
+        type: list[str] | None = None,
     ) -> Group:
+        if type is None:
+            type = [ProjectType.GENERAL.name]
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
@@ -1638,7 +1642,7 @@ class Query(graphene.ObjectType):
                 "Group.by_user",
             )
             client_groups = await loader.load(client_user_id)
-            client_group_ids = set(g.id for g in client_groups)
+            client_group_ids = {g.id for g in client_groups}
             groups = filter(lambda g: g.id in client_group_ids, groups)
         else:
             raise InvalidAPIParameters("Unknown client role")
@@ -1651,8 +1655,10 @@ class Query(graphene.ObjectType):
         *,
         domain_name: Optional[str] = None,
         is_active: Optional[bool] = None,
-        type: list[str] = [ProjectType.GENERAL.name],
+        type: list[str] | None = None,
     ) -> Sequence[Group]:
+        if type is None:
+            type = [ProjectType.GENERAL.name]
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
@@ -1723,7 +1729,7 @@ class Query(graphene.ObjectType):
         client_domain = ctx.user["domain_name"]
         items = await Image.load_all(
             ctx,
-            types=set((ImageLoadFilter.CUSTOMIZED,)),
+            types={ImageLoadFilter.CUSTOMIZED},
         )
         if client_role == UserRole.SUPERADMIN:
             pass
@@ -1750,10 +1756,12 @@ class Query(graphene.ObjectType):
         *,
         is_installed: bool | None = None,
         is_operation=False,
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
         load_filters: list[str] | None = None,
         image_filters: list[str] | None = None,
     ) -> Sequence[Image]:
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
@@ -1804,8 +1812,7 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
     ) -> Optional[Viewer]:
-        viewer = await Viewer.get_viewer(info)
-        return viewer
+        return await Viewer.get_viewer(info)
 
     @staticmethod
     @scoped_query(autofill_user=True, user_key="email")
@@ -1980,7 +1987,7 @@ class Query(graphene.ObjectType):
         info: graphene.ResolveInfo,
         *,
         scope_id: ScopeType,
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
         permission: ImagePermission = ImagePermission.READ_ATTRIBUTE,
         filter: Optional[str] = None,
         order: Optional[str] = None,
@@ -1990,6 +1997,8 @@ class Query(graphene.ObjectType):
         before: Optional[str] = None,
         last: Optional[int] = None,
     ) -> ConnectionResolverResult[ImageNode]:
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         return await ImageNode.get_connection(
             info,
             scope_id,
@@ -2039,14 +2048,13 @@ class Query(graphene.ObjectType):
                 is_active=is_active,
                 limit=100,
             )
-        else:
-            loader = ctx.dataloader_manager.get_loader(
-                ctx,
-                "KeyPair.by_email",
-                domain_name=domain_name,
-                is_active=is_active,
-            )
-            return await loader.load(email)
+        loader = ctx.dataloader_manager.get_loader(
+            ctx,
+            "KeyPair.by_email",
+            domain_name=domain_name,
+            is_active=is_active,
+        )
+        return await loader.load(email)
 
     @staticmethod
     @scoped_query(autofill_user=False, user_key="email")
@@ -2095,12 +2103,11 @@ class Query(graphene.ObjectType):
                 "KeyPairResourcePolicy.by_ak",
             )
             return await loader.load(client_access_key)
-        else:
-            loader = ctx.dataloader_manager.get_loader(
-                ctx,
-                "KeyPairResourcePolicy.by_name",
-            )
-            return await loader.load(name)
+        loader = ctx.dataloader_manager.get_loader(
+            ctx,
+            "KeyPairResourcePolicy.by_name",
+        )
+        return await loader.load(name)
 
     @staticmethod
     async def resolve_keypair_resource_policies(
@@ -2112,16 +2119,15 @@ class Query(graphene.ObjectType):
         client_access_key = ctx.access_key
         if client_role == UserRole.SUPERADMIN:
             return await KeyPairResourcePolicy.load_all(info.context)
-        elif client_role == UserRole.ADMIN:
+        if client_role == UserRole.ADMIN:
             # TODO: filter resource policies by domains?
             return await KeyPairResourcePolicy.load_all(info.context)
-        elif client_role == UserRole.USER:
+        if client_role == UserRole.USER:
             return await KeyPairResourcePolicy.load_all_user(
                 info.context,
                 client_access_key,
             )
-        else:
-            raise InvalidAPIParameters("Unknown client role")
+        raise InvalidAPIParameters("Unknown client role")
 
     @staticmethod
     async def resolve_user_resource_policy(
@@ -2137,12 +2143,11 @@ class Query(graphene.ObjectType):
                 "UserResourcePolicy.by_user",
             )
             return await loader.load(user_uuid)
-        else:
-            loader = ctx.dataloader_manager.get_loader(
-                ctx,
-                "UserResourcePolicy.by_name",
-            )
-            return await loader.load(name)
+        loader = ctx.dataloader_manager.get_loader(
+            ctx,
+            "UserResourcePolicy.by_name",
+        )
+        return await loader.load(name)
 
     @staticmethod
     async def resolve_user_resource_policies(
@@ -2154,16 +2159,15 @@ class Query(graphene.ObjectType):
         user_uuid = ctx.user["uuid"]
         if client_role == UserRole.SUPERADMIN:
             return await UserResourcePolicy.load_all(info.context)
-        elif client_role == UserRole.ADMIN:
+        if client_role == UserRole.ADMIN:
             # TODO: filter resource policies by domains?
             return await UserResourcePolicy.load_all(info.context)
-        elif client_role == UserRole.USER:
+        if client_role == UserRole.USER:
             return await UserResourcePolicy.batch_load_by_user(
                 info.context,
                 [user_uuid],
             )
-        else:
-            raise InvalidAPIParameters("Unknown client role")
+        raise InvalidAPIParameters("Unknown client role")
 
     @staticmethod
     async def resolve_project_resource_policy(
@@ -2187,11 +2191,10 @@ class Query(graphene.ObjectType):
         client_role = ctx.user["role"]
         if client_role == UserRole.SUPERADMIN:
             return await ProjectResourcePolicy.load_all(info.context)
-        elif client_role == UserRole.ADMIN:
+        if client_role == UserRole.ADMIN:
             # TODO: filter resource policies by domains?
             return await ProjectResourcePolicy.load_all(info.context)
-        else:
-            raise InvalidAPIParameters("Unknown client role")
+        raise InvalidAPIParameters("Unknown client role")
 
     @staticmethod
     async def resolve_resource_preset(
@@ -2817,10 +2820,9 @@ class Query(graphene.ObjectType):
         matches = await loader.load(SessionId(uuid.UUID(sess_id)))
         if len(matches) == 0:
             return None
-        elif len(matches) == 1:
+        if len(matches) == 1:
             return matches[0]
-        else:
-            raise TooManyKernelsFound
+        raise TooManyKernelsFound
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -3293,7 +3295,7 @@ class GQLMutationPrivilegeCheckMiddleware:
     def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
         graph_ctx: GraphQueryContext = info.context
         if info.operation.operation == OperationType.MUTATION:
-            mutation_field: GraphQLField | None = getattr(Mutation, info.field_name, None)  # noqa
+            mutation_field: GraphQLField | None = getattr(Mutation, info.field_name, None)
             if mutation_field is None:
                 return next(root, info, **args)
             mutation_cls = mutation_field.type
@@ -3343,7 +3345,6 @@ class GQLMetricMiddleware:
         )
         start = time.perf_counter()
         try:
-            info.field_name
             res = next(root, info, **args)
             graph_ctx.metric_observer.observe_request(
                 operation_type=operation_type,

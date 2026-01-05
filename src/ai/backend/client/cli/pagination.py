@@ -1,13 +1,13 @@
 import shutil
 import sys
-from typing import Any, Callable, Iterator, List, Literal, Mapping, Optional, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from typing import Any, Literal, Optional
 
 import click
 from tabulate import tabulate
 
 from ai.backend.client.output.types import FieldSpec
-
-from ..pagination import MAX_PAGE_SIZE
+from ai.backend.client.pagination import MAX_PAGE_SIZE
 
 
 def get_preferred_page_size() -> int:
@@ -27,7 +27,7 @@ def tabulate_items(
 ) -> Iterator[str]:
     is_first = True
     output_count = 0
-    buffered_items: List[_Item] = []
+    buffered_items: list[_Item] = []
 
     # check table header/footer sizes
     header_height = 0
@@ -38,7 +38,10 @@ def tabulate_items(
     def _tabulate_buffer() -> Iterator[str]:
         table = tabulate(
             [
-                [f.formatter.format_console(v, f) for f, v in zip(fields, item.values())]
+                [
+                    f.formatter.format_console(v, f)
+                    for f, v in zip(fields, item.values(), strict=True)
+                ]
                 for item in buffered_items
             ],
             headers=([] if tablefmt == "plain" else [field.humanized_name for field in fields]),

@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Tuple
+from typing import TYPE_CHECKING, Any
 
 import aiohttp_cors
 import trafaret as t
@@ -8,14 +8,13 @@ from aiohttp import web
 
 from ai.backend.common import msgpack
 from ai.backend.logging import BraceStyleAdapter
-
-from ..errors.api import InvalidAPIParameters
-from ..errors.storage import (
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.storage import (
     DotfileAlreadyExists,
     DotfileCreationFailed,
     DotfileNotFound,
 )
-from ..models import (
+from ai.backend.manager.models import (
     MAXIMUM_DOTFILE_SIZE,
     keypairs,
     query_accessible_vfolders,
@@ -24,6 +23,7 @@ from ..models import (
     verify_dotfile_name,
     vfolders,
 )
+
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware
@@ -114,15 +114,14 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
                 if dotfile["path"] == params["path"]:
                     return web.json_response(dotfile)
             raise DotfileNotFound
-        else:
-            dotfiles, _ = await query_owned_dotfiles(conn, access_key)
-            for entry in dotfiles:
-                resp.append({
-                    "path": entry["path"],
-                    "permission": entry["perm"],
-                    "data": entry["data"],
-                })
-            return web.json_response(resp)
+        dotfiles, _ = await query_owned_dotfiles(conn, access_key)
+        for entry in dotfiles:
+            resp.append({
+                "path": entry["path"],
+                "permission": entry["perm"],
+                "data": entry["data"],
+            })
+        return web.json_response(resp)
 
 
 @server_status_required(READ_ALLOWED)
@@ -245,7 +244,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)

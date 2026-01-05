@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Any, Dict, Optional, Union
+from typing import Any, Optional
 
 import pytest
 import sqlalchemy
@@ -15,7 +15,7 @@ from ai.backend.manager.models.utils import agg_to_array, agg_to_str, sql_json_m
 
 async def _select_kernel_row(
     conn: sqlalchemy.ext.asyncio.engine.AsyncConnection,
-    session_id: Union[str, uuid.UUID],
+    session_id: str | uuid.UUID,
 ) -> Row:
     query = kernels.select().select_from(kernels).where(kernels.c.session_id == session_id)
     kernel, *_ = await conn.execute(query)
@@ -25,7 +25,7 @@ async def _select_kernel_row(
 @pytest.mark.asyncio
 async def test_sql_json_merge__default(session_info) -> None:
     session_id, conn = session_info
-    expected: Optional[Dict[str, Any]] = None
+    expected: Optional[dict[str, Any]] = None
     kernel = await _select_kernel_row(conn, session_id)
     assert kernel is not None
     assert kernel.status_history == expected

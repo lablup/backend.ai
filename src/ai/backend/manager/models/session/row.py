@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -12,12 +12,9 @@ from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    List,
     Optional,
     Self,
     TypeAlias,
-    Union,
     cast,
     override,
 )
@@ -89,9 +86,8 @@ from ai.backend.manager.data.session.types import (
     SessionNetwork,
     SessionStatus,
 )
-
-from ...defs import DEFAULT_ROLE
-from ...errors.kernel import (
+from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.kernel import (
     KernelCreationFailed,
     KernelDestructionFailed,
     KernelExecutionFailed,
@@ -102,8 +98,8 @@ from ...errors.kernel import (
     TooManyKernelsFound,
     TooManySessionsMatched,
 )
-from ...exceptions import AgentError
-from ..base import (
+from ai.backend.manager.exceptions import AgentError
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     EnumType,
@@ -114,12 +110,12 @@ from ..base import (
     StructuredJSONObjectListColumn,
     URLColumn,
 )
-from ..group import GroupRow
-from ..image import ImageRow
-from ..kernel import KernelRow
-from ..minilang.queryfilter import FieldSpecType, QueryFilterParser
-from ..network import NetworkRow, NetworkType
-from ..rbac import (
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
+from ai.backend.manager.models.network import NetworkRow, NetworkType
+from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -127,17 +123,17 @@ from ..rbac import (
     ScopeType,
     get_predefined_roles_in_scope,
 )
-from ..rbac import (
+from ai.backend.manager.models.rbac import (
     UserScope as UserRBACScope,
 )
-from ..rbac.context import ClientContext
-from ..rbac.permission_defs import ComputeSessionPermission
-from ..routing import RouteStatus, RoutingRow
-from ..types import (
+from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.rbac.permission_defs import ComputeSessionPermission
+from ai.backend.manager.models.routing import RouteStatus, RoutingRow
+from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
 )
-from ..utils import (
+from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     JSONCoalesceExpr,
     execute_with_retry,
@@ -146,23 +142,23 @@ from ..utils import (
 )
 
 if TYPE_CHECKING:
-    from ...registry import AgentRegistry
+    from ai.backend.manager.registry import AgentRegistry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
-    "determine_session_status_by_kernels",
-    "handle_session_exception",
+    "AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES",
     "ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE",
+    "DEAD_SESSION_STATUSES",
     "PRIVATE_SESSION_TYPES",
     "SESSION_STATUS_TRANSITION_MAP",
-    "DEAD_SESSION_STATUSES",
-    "AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES",
     "USER_RESOURCE_OCCUPYING_SESSION_STATUSES",
-    "SessionRow",
-    "SessionDependencyRow",
-    "check_all_dependencies",
     "KernelLoadingStrategy",
+    "SessionDependencyRow",
+    "SessionRow",
+    "check_all_dependencies",
+    "determine_session_status_by_kernels",
+    "handle_session_exception",
 )
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.session"))
@@ -456,7 +452,7 @@ async def handle_session_exception(
     exc_class = OP_EXC[op]
     try:
         yield
-    except asyncio.TimeoutError:
+    except TimeoutError:
         if set_error:
             await SessionRow.set_session_status(
                 db,
@@ -556,7 +552,7 @@ async def _match_sessions_by_id(
     for_update: bool = False,
     max_matches: Optional[int] = None,
     eager_loading_op: Optional[Sequence] = None,
-) -> List[SessionRow]:
+) -> list[SessionRow]:
     if isinstance(session_id_or_list, list):
         cond = SessionRow.id.in_(session_id_or_list)
     else:
@@ -587,7 +583,7 @@ async def _match_sessions_by_name(
     for_update: bool = False,
     max_matches: Optional[int] = None,
     eager_loading_op: Optional[Sequence] = None,
-) -> List[SessionRow]:
+) -> list[SessionRow]:
     if allow_prefix:
         cond = sa.sql.expression.cast(SessionRow.name, sa.String).like(f"{session_name}%")
     else:
@@ -1320,7 +1316,7 @@ class SessionRow(Base):
         for_update: bool = False,
         max_matches: Optional[int] = 10,
         eager_loading_op: Optional[Sequence] = None,
-    ) -> List[SessionRow]:
+    ) -> list[SessionRow]:
         """
         Match the prefix of session ID or session name among the sessions
         that belongs to the given access key, and return the list of SessionRow.
@@ -1383,7 +1379,7 @@ class SessionRow(Base):
     async def get_session(
         cls,
         db_session: SASession,
-        session_name_or_id: Union[str, UUID],
+        session_name_or_id: str | UUID,
         access_key: Optional[AccessKey] = None,
         *,
         allow_stale: bool = False,
@@ -1530,7 +1526,7 @@ class SessionRow(Base):
         cls,
         db_sess: SASession,
         sgroup_name: str,
-    ) -> List[SessionRow]:
+    ) -> list[SessionRow]:
         candidate_statues = (SessionStatus.PENDING, *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES)
         query = (
             sa.select(SessionRow)
@@ -1784,7 +1780,7 @@ class SessionLifecycleManager:
             redis.exceptions.RedisClusterException,
             redis.exceptions.ChildDeadlockedError,
         ) as e:
-            log.warning(f"Failed to update session status to redis, skip. (e:{repr(e)})")
+            log.warning(f"Failed to update session status to redis, skip. (e:{e!r})")
         await self.event_producer.anycast_event(DoUpdateSessionStatusEvent())
 
     async def get_status_updatable_sessions(self) -> set[SessionId]:
@@ -1797,7 +1793,7 @@ class SessionLifecycleManager:
             redis.exceptions.RedisClusterException,
             redis.exceptions.ChildDeadlockedError,
         ) as e:
-            log.warning(f"Failed to fetch session status data from redis, skip. (e:{repr(e)})")
+            log.warning(f"Failed to fetch session status data from redis, skip. (e:{e!r})")
             results = []
         result: list[SessionId] = []
         for raw_session_id in results:
@@ -1832,7 +1828,7 @@ class SessionLifecycleManager:
             redis.exceptions.RedisClusterException,
             redis.exceptions.ChildDeadlockedError,
         ) as e:
-            log.warning(f"Failed to remove session status data from redis, skip. (e:{repr(e)})")
+            log.warning(f"Failed to remove session status data from redis, skip. (e:{e!r})")
             return 0
         return ret
 
@@ -1863,7 +1859,7 @@ class SessionDependencyRow(Base):
 async def check_all_dependencies(
     db_session: SASession,
     sess_ctx: SessionRow,
-) -> List[SessionRow]:
+) -> list[SessionRow]:
     j = sa.join(
         SessionDependencyRow,
         SessionRow,
@@ -1876,10 +1872,9 @@ async def check_all_dependencies(
     )
     result = await db_session.execute(query)
     rows = result.scalars().all()
-    pending_dependencies = [
+    return [
         sess_row for sess_row in rows if SessionResult(sess_row.result) != SessionResult.SUCCESS
     ]
-    return pending_dependencies
 
 
 DEFAULT_SESSION_ORDERING = [
@@ -1984,15 +1979,14 @@ class ComputeSessionPermissionContextBuilder(
         target_scope: ScopeType,
     ) -> frozenset[ComputeSessionPermission]:
         roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
-        permissions = await self._calculate_permission_by_predefined_roles(roles)
-        return permissions
+        return await self._calculate_permission_by_predefined_roles(roles)
 
     @override
     async def build_ctx_in_system_scope(
         self,
         ctx: ClientContext,
     ) -> ComputeSessionPermissionContext:
-        from ..domain import DomainRow
+        from ai.backend.manager.models.domain import DomainRow
 
         perm_ctx = ComputeSessionPermissionContext()
         _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
@@ -2043,10 +2037,9 @@ class ComputeSessionPermissionContextBuilder(
         domain_name: str,
     ) -> ComputeSessionPermissionContext:
         permissions = await self.calculate_permission(ctx, DomainScope(domain_name))
-        result = ComputeSessionPermissionContext(
+        return ComputeSessionPermissionContext(
             domain_name_to_permission_map={domain_name: permissions}
         )
-        return result
 
     async def _build_at_user_scope_in_domain(
         self,
@@ -2065,10 +2058,9 @@ class ComputeSessionPermissionContextBuilder(
         own_folder_map = {
             row.id: permissions for row in await self.db_session.scalars(_vfolder_stmt)
         }
-        result = ComputeSessionPermissionContext(
+        return ComputeSessionPermissionContext(
             object_id_to_additional_permission_map=own_folder_map
         )
-        return result
 
     async def _build_at_user_scope_in_project(
         self,
@@ -2086,10 +2078,9 @@ class ComputeSessionPermissionContextBuilder(
         own_folder_map = {
             row.id: permissions for row in await self.db_session.scalars(_vfolder_stmt)
         }
-        result = ComputeSessionPermissionContext(
+        return ComputeSessionPermissionContext(
             object_id_to_additional_permission_map=own_folder_map
         )
-        return result
 
     async def _build_at_project_scopes_in_domain(
         self,
@@ -2115,10 +2106,9 @@ class ComputeSessionPermissionContextBuilder(
         project_id: UUID,
     ) -> ComputeSessionPermissionContext:
         permissions = await self.calculate_permission(ctx, ProjectScope(project_id))
-        result = ComputeSessionPermissionContext(
+        return ComputeSessionPermissionContext(
             project_id_to_permission_map={project_id: permissions}
         )
-        return result
 
     async def _build_at_user_scope_non_recursively(
         self,
@@ -2126,8 +2116,7 @@ class ComputeSessionPermissionContextBuilder(
         user_id: UUID,
     ) -> ComputeSessionPermissionContext:
         permissions = await self.calculate_permission(ctx, UserRBACScope(user_id))
-        result = ComputeSessionPermissionContext(user_id_to_permission_map={user_id: permissions})
-        return result
+        return ComputeSessionPermissionContext(user_id_to_permission_map={user_id: permissions})
 
     @override
     @classmethod
@@ -2173,5 +2162,4 @@ async def get_permission_ctx(
 ) -> ComputeSessionPermissionContext:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         builder = ComputeSessionPermissionContextBuilder(db_session)
-        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
-    return permission_ctx
+        return await builder.build(ctx, target_scope, requested_permission)

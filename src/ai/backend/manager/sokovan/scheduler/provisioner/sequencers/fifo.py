@@ -1,7 +1,8 @@
 from collections.abc import Sequence
 from typing import override
 
-from ...types import SessionWorkload, SystemSnapshot
+from ai.backend.manager.sokovan.scheduler.types import SessionWorkload, SystemSnapshot
+
 from .sequencer import WorkloadSequencer
 
 

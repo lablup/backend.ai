@@ -31,7 +31,7 @@ def test_session_command(
     """
 
     api_port = unused_tcp_port_factory()
-    api_url = "http://127.0.0.1:{}".format(api_port)
+    api_url = f"http://127.0.0.1:{api_port}"
 
     set_config(None)
     monkeypatch.setenv("BACKEND_ACCESS_KEY", example_keypair[0])

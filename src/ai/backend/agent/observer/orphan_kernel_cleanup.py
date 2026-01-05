@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Optional, override
 
+from ai.backend.agent.types import LifecycleEvent
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
     ORPHAN_KERNEL_THRESHOLD_SEC,
@@ -12,10 +13,8 @@ from ai.backend.common.observer.types import AbstractObserver
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 
-from ..types import LifecycleEvent
-
 if TYPE_CHECKING:
-    from ..agent import AbstractAgent
+    from ai.backend.agent.agent import AbstractAgent
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

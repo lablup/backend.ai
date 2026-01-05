@@ -44,12 +44,16 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import DeclarativeMeta
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import GenericForbidden, ObjectNotFound
+from ai.backend.manager.models.minilang.ordering import (
+    OrderDirection,
+    OrderingItem,
+    QueryOrderParser,
+)
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser, WhereClauseType
+from ai.backend.manager.models.utils import execute_with_retry
 
-from ...errors.api import InvalidAPIParameters
-from ...errors.common import GenericForbidden, ObjectNotFound
-from ...models.minilang.ordering import OrderDirection, OrderingItem, QueryOrderParser
-from ...models.minilang.queryfilter import QueryFilterParser, WhereClauseType
-from ...models.utils import execute_with_retry
 from .gql_relay import (
     AsyncListConnectionField,
     AsyncNode,
@@ -60,7 +64,8 @@ if TYPE_CHECKING:
     from sqlalchemy.orm.attributes import InstrumentedAttribute
     from sqlalchemy.sql.selectable import ScalarSelect
 
-    from ...models.user import UserRole
+    from ai.backend.manager.models.user import UserRole
+
     from .schema import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -128,6 +133,7 @@ class BigInt(Scalar):
                 # treat as float
                 return float(int(num))
             return num
+        return None
 
 
 class Bytes(Scalar):
@@ -164,7 +170,7 @@ class UUIDFloatMap(Scalar):
     @staticmethod
     def serialize(value: Any) -> dict[str, float]:
         if not isinstance(value, dict):
-            raise GraphQLError(f"UUIDFloatMap cannot represent non-dict value: {repr(value)}")
+            raise GraphQLError(f"UUIDFloatMap cannot represent non-dict value: {value!r}")
 
         validated: dict[str, float] = {}
         for k, v in value.items():
@@ -201,7 +207,7 @@ class UUIDFloatMap(Scalar):
     @staticmethod
     def parse_value(value: Any) -> dict[str, float]:
         if not isinstance(value, dict):
-            raise GraphQLError(f"UUIDFloatMap cannot represent non-dict value: {repr(value)}")
+            raise GraphQLError(f"UUIDFloatMap cannot represent non-dict value: {value!r}")
         validated: dict[str, float] = {}
         for k, v in value.items():
             try:
@@ -527,7 +533,7 @@ def privileged_query(required_role: UserRole):
             *args,
             **kwargs,
         ) -> Any:
-            from ...models.user import UserRole
+            from ai.backend.manager.models.user import UserRole
 
             ctx: GraphQueryContext = info.context
             if ctx.user["role"] != UserRole.SUPERADMIN:
@@ -563,7 +569,7 @@ def scoped_query(
             *args,
             **kwargs,
         ) -> Any:
-            from ...models.user import UserRole
+            from ai.backend.manager.models.user import UserRole
 
             ctx: GraphQueryContext = info.context
             client_role = ctx.user["role"]
@@ -574,9 +580,9 @@ def scoped_query(
             else:
                 client_user_id = ctx.user["uuid"]
             client_domain = ctx.user["domain_name"]
-            domain_name = kwargs.get("domain_name", None)
-            group_id = kwargs.get("group_id", None) or kwargs.get("project_id", None)
-            user_id = kwargs.get(user_key, None)
+            domain_name = kwargs.get("domain_name")
+            group_id = kwargs.get("group_id") or kwargs.get("project_id")
+            user_id = kwargs.get(user_key)
             if client_role == UserRole.SUPERADMIN:
                 if autofill_user:
                     if user_id is None:
@@ -607,7 +613,7 @@ def scoped_query(
             kwargs["domain_name"] = domain_name
             if group_id is not None:
                 kwargs["group_id"] = group_id
-            if kwargs.get("project", None) is not None:
+            if kwargs.get("project") is not None:
                 kwargs["project"] = group_id
             kwargs[user_key] = user_id
             return await resolve_func(root, info, *args, **kwargs)
@@ -621,8 +627,8 @@ def privileged_mutation(required_role, target_func=None):
     def wrap(func):
         @functools.wraps(func)
         async def wrapped(cls, root, info: graphene.ResolveInfo, *args, **kwargs) -> Any:
-            from ...models.group import groups  # , association_groups_users
-            from ...models.user import UserRole
+            from ai.backend.manager.models.group import groups  # , association_groups_users
+            from ai.backend.manager.models.user import UserRole
 
             ctx: GraphQueryContext = info.context
             permitted = False
@@ -700,7 +706,7 @@ async def gql_mutation_wrapper(
         )
         orig_exc = e.orig
         return result_cls(False, str(orig_exc), None)
-    except (asyncio.CancelledError, asyncio.TimeoutError):
+    except (TimeoutError, asyncio.CancelledError):
         raise
     except Exception as e:
         log.exception("gql_mutation_wrapper(): other error")
@@ -735,8 +741,7 @@ async def simple_db_mutate(
                 await post_func(conn, result)
         if result.rowcount > 0:
             return result_cls(True, "success")
-        else:
-            return result_cls(False, f"no matching {result_cls.__name__.lower()}")
+        return result_cls(False, f"no matching {result_cls.__name__.lower()}")
 
     return await gql_mutation_wrapper(result_cls, _do_mutate)
 
@@ -787,8 +792,7 @@ async def simple_db_mutate_returning_item(
                 row = result.first()
             if result.rowcount > 0:
                 return result_cls(True, "success", item_cls.from_row(graph_ctx, row))
-            else:
-                return result_cls(False, f"no matching {result_cls.__name__.lower()}", None)
+            return result_cls(False, f"no matching {result_cls.__name__.lower()}", None)
 
     return await gql_mutation_wrapper(result_cls, _do_mutate)
 
@@ -844,8 +848,7 @@ def orm_set_if_set(
 def filter_gql_undefined[T](val: T, *, default_value: Optional[T] = None) -> Optional[T]:
     if val is Undefined:
         return default_value
-    else:
-        return val
+    return val
 
 
 class InferenceSessionError(graphene.ObjectType):
@@ -860,7 +863,7 @@ class InferenceSessionError(graphene.ObjectType):
 
 
 class AsyncPaginatedConnectionField(AsyncListConnectionField):
-    def __init__(self, type, *args, **kwargs):
+    def __init__(self, type, *args, **kwargs) -> None:
         kwargs.setdefault("filter", graphene.String())
         kwargs.setdefault("order", graphene.String())
         kwargs.setdefault("offset", graphene.Int())

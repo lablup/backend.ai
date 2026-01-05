@@ -18,11 +18,9 @@ from typing import (
     Any,
     ClassVar,
     Final,
-    List,
     NamedTuple,
     Optional,
     Self,
-    Type,
     TypedDict,
     cast,
     override,
@@ -333,7 +331,7 @@ class IdleCheckerHost:
                 check_results = await aiotools.gather_safe(check_tasks)
                 terminated = False
                 errors: list[BaseException] = []
-                for checker, result in zip(self._checkers, check_results):
+                for checker, result in zip(self._checkers, check_results, strict=True):
                     if isinstance(result, BaseExceptionGroup):
                         errors.extend(result.exceptions)
                         continue
@@ -388,7 +386,7 @@ class IdleCheckerHost:
         reports = await self._valkey_live.get_multiple_live_data(key_list)
 
         ret: dict[SessionId, dict[str, ReportInfo]] = {}
-        for key, report in zip(key_list, reports):
+        for key, report in zip(key_list, reports, strict=True):
             session_id, checker, report_type = key_session_report_map[key]
             if session_id not in ret:
                 ret[session_id] = {}
@@ -728,7 +726,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
     ).allow_extra("*")
 
     idle_timeout: timedelta
-    _evhandlers: List[EventHandler[None, AbstractEvent]]
+    _evhandlers: list[EventHandler[None, AbstractEvent]]
 
     @override
     def terminate_reason(self) -> KernelLifecycleEventReason:
@@ -959,7 +957,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
     thresholds_check_operator: ThresholdOperator
     time_window: timedelta
     initial_grace_period: timedelta
-    _evhandlers: List[EventHandler[None, AbstractEvent]]
+    _evhandlers: list[EventHandler[None, AbstractEvent]]
 
     @override
     def terminate_reason(self) -> KernelLifecycleEventReason:
@@ -1254,8 +1252,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             if kernel_counter == 0:
                 return None
             divider = kernel_counter
-            total_utilizations = {k: v / divider for k, v in utilizations.items()}
-            return total_utilizations
+            return {k: v / divider for k, v in utilizations.items()}
         except Exception as e:
             _msg = f"Unable to collect utilization for idleness check (kernels:{kernel_ids})"
             log.warning(_msg, exc_info=e)
@@ -1271,7 +1268,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         return msgpack.unpackb(data) if data is not None else None
 
 
-checker_registry: Mapping[str, Type[BaseIdleChecker]] = {
+checker_registry: Mapping[str, type[BaseIdleChecker]] = {
     NetworkTimeoutIdleChecker.name: NetworkTimeoutIdleChecker,
     UtilizationIdleChecker.name: UtilizationIdleChecker,
 }

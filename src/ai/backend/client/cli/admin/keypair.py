@@ -4,9 +4,9 @@ import click
 
 from ai.backend.cli.params import BoolExprType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.types import CLIContext
 
-from ..extensions import pass_ctx_obj
-from ..types import CLIContext
 from . import admin
 
 
@@ -23,8 +23,8 @@ def info(ctx: CLIContext) -> None:
     """
     Show the server-side information of the currently configured access key.
     """
-    from ...output.fields import keypair_fields
-    from ...session import Session
+    from ai.backend.client.output.fields import keypair_fields
+    from ai.backend.client.session import Session
 
     fields = [
         keypair_fields["user_id"],
@@ -75,8 +75,8 @@ def list(ctx: CLIContext, user_id, is_active, filter_, order, offset, limit) -> 
     privilege.
     (admin privilege required)
     """
-    from ...output.fields import keypair_fields
-    from ...session import Session
+    from ai.backend.client.output.fields import keypair_fields
+    from ai.backend.client.session import Session
 
     fields = [
         keypair_fields["user_id"],
@@ -150,7 +150,7 @@ def add(
     USER_ID: User ID of a new key pair.
     RESOURCE_POLICY: resource policy for new key pair.
     """
-    from ...session import Session
+    from ai.backend.client.session import Session
 
     with Session() as session:
         try:
@@ -226,7 +226,7 @@ def update(
 
     ACCESS_KEY: Access key of an existing key pair.
     """
-    from ...session import Session
+    from ai.backend.client.session import Session
 
     with Session() as session:
         try:
@@ -268,7 +268,7 @@ def delete(ctx: CLIContext, access_key: str) -> None:
 
     ACCESSKEY: ACCESSKEY for a keypair to delete.
     """
-    from ...session import Session
+    from ai.backend.client.session import Session
 
     with Session() as session:
         try:
@@ -304,7 +304,7 @@ def activate(ctx: CLIContext, access_key: str) -> None:
 
     ACCESS_KEY: Access key of an existing key pair.
     """
-    from ...session import Session
+    from ai.backend.client.session import Session
 
     with Session() as session:
         try:
@@ -340,7 +340,7 @@ def deactivate(ctx: CLIContext, access_key: str) -> None:
 
     ACCESS_KEY: Access key of an existing key pair.
     """
-    from ...session import Session
+    from ai.backend.client.session import Session
 
     with Session() as session:
         try:

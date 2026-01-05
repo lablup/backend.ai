@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    List,
     Optional,
     Self,
     TypeAlias,
@@ -75,12 +74,10 @@ from ai.backend.manager.data.model_serving.types import (
     EndpointTokenData,
 )
 from ai.backend.manager.data.session.types import SessionStatus
-
-from ...errors.api import InvalidAPIParameters
-from ...errors.common import ObjectNotFound, ServiceUnavailable
-from ...errors.resource import DataTransformationFailed
-from ...types import MountOptionModel, UserScope
-from ..base import (
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import ObjectNotFound, ServiceUnavailable
+from ai.backend.manager.errors.resource import DataTransformationFailed
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     DecimalType,
@@ -92,27 +89,27 @@ from ..base import (
     StructuredJSONObjectListColumn,
     URLColumn,
 )
-from ..image import ImageRow
-from ..routing import RouteStatus
-from ..scaling_group import scaling_groups
-from ..storage import StorageSessionManager
-from ..user import UserRow
-from ..vfolder import prepare_vfolder_mounts
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.routing import RouteStatus
+from ai.backend.manager.models.scaling_group import scaling_groups
+from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.vfolder import prepare_vfolder_mounts
+from ai.backend.manager.types import MountOptionModel, UserScope
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
     from ai.backend.manager.data.deployment.creator import DeploymentCreator
-
-    from ..deployment_revision import DeploymentRevisionRow
-    from ..gql import GraphQueryContext
+    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+    from ai.backend.manager.models.gql import GraphQueryContext
 
 __all__ = (
-    "EndpointRow",
-    "ModelServiceHelper",
-    "EndpointStatistics",
-    "EndpointTokenRow",
     "EndpointAutoScalingRuleRow",
     "EndpointLifecycle",
+    "EndpointRow",
+    "EndpointStatistics",
+    "EndpointTokenRow",
+    "ModelServiceHelper",
 )
 
 
@@ -500,12 +497,11 @@ class EndpointRow(Base):
                 RouteStatus.UNHEALTHY,
                 RouteStatus.FAILED_TO_START,
             }
-        else:
-            return {
-                RouteStatus.HEALTHY,
-                RouteStatus.UNHEALTHY,
-                RouteStatus.FAILED_TO_START,
-            }
+        return {
+            RouteStatus.HEALTHY,
+            RouteStatus.UNHEALTHY,
+            RouteStatus.FAILED_TO_START,
+        }
 
     @staticmethod
     async def delegate_endpoint_ownership(
@@ -514,8 +510,8 @@ class EndpointRow(Base):
         target_user_uuid: UUID,
         target_access_key: AccessKey,
     ) -> None:
-        from ..routing import RoutingRow
-        from ..session import KernelLoadingStrategy, SessionRow
+        from ai.backend.manager.models.routing import RoutingRow
+        from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 
         endpoint_rows = await EndpointRow.list(
             db_session,
@@ -524,7 +520,7 @@ class EndpointRow(Base):
             load_routes=True,
             load_tokens=True,
         )
-        session_ids: List[UUID] = []
+        session_ids: list[UUID] = []
         for row in endpoint_rows:
             row.session_owner = target_user_uuid
             for token_row in cast(list[EndpointTokenRow], row.tokens):
@@ -541,8 +537,8 @@ class EndpointRow(Base):
     async def generate_route_info(
         self, db_sess: AsyncSession
     ) -> ModelServiceSerializableConnectionInfo:
-        from ..kernel import KernelRow
-        from ..routing import RoutingRow
+        from ai.backend.manager.models.kernel import KernelRow
+        from ai.backend.manager.models.routing import RoutingRow
 
         active_routes = await RoutingRow.list(db_sess, self.id, load_session=True)
         running_main_kernels = await KernelRow.batch_load_main_kernels_by_session_id(
@@ -1006,7 +1002,7 @@ class EndpointAutoScalingRuleRow(Base):
     @classmethod
     async def get(
         cls, session: AsyncSession, id: UUID, load_endpoint: bool = False
-    ) -> "EndpointAutoScalingRuleRow":
+    ) -> EndpointAutoScalingRuleRow:
         query = sa.select(EndpointAutoScalingRuleRow).filter(EndpointAutoScalingRuleRow.id == id)
         if load_endpoint:
             query = query.options(selectinload(EndpointAutoScalingRuleRow.endpoint_row))
@@ -1190,7 +1186,7 @@ class ModelServiceHelper:
         query = (
             sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
             .select_from(scaling_groups)
-            .where((scaling_groups.c.name == checked_scaling_group))
+            .where(scaling_groups.c.name == checked_scaling_group)
         )
 
         result = await conn.execute(query)
@@ -1389,7 +1385,7 @@ class EndpointStatistics:
     @classmethod
     async def batch_load_by_endpoint(
         cls,
-        ctx: "GraphQueryContext",
+        ctx: GraphQueryContext,
         endpoint_ids: Sequence[UUID],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
         return await cls.batch_load_by_endpoint_impl(ctx.valkey_stat, endpoint_ids)

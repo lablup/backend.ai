@@ -5,7 +5,7 @@ Tests the repository layer with real database operations.
 
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -164,8 +164,8 @@ class TestDomainRepository:
                 "description": "Model store group for sample-domain",
                 "domain_name": "sample-domain",
                 "is_active": True,
-                "created_at": datetime.now(),
-                "modified_at": datetime.now(),
+                "created_at": datetime.now(tz=UTC),
+                "modified_at": datetime.now(tz=UTC),
                 "type": "GENERAL",
                 "total_resource_slots": {},
                 "allowed_vfolder_hosts": {},
@@ -445,8 +445,8 @@ class TestDomainRepository:
                 "status": UserStatus.ACTIVE,
                 "domain_name": domain_name,
                 "role": UserRole.USER,
-                "created_at": datetime.now(),
-                "modified_at": datetime.now(),
+                "created_at": datetime.now(tz=UTC),
+                "modified_at": datetime.now(tz=UTC),
                 "allowed_client_ip": None,
                 "resource_policy": "default",
                 "totp_activated": False,

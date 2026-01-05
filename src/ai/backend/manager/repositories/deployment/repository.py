@@ -5,7 +5,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal, DecimalException
 from typing import Any, Optional, cast
 
@@ -697,7 +697,9 @@ class DeploymentRepository:
             )
             kernel_statistics_by_id = {
                 kernel_id: metric
-                for kernel_id, metric in zip(metric_requested_kernels, kernel_live_stats)
+                for kernel_id, metric in zip(
+                    metric_requested_kernels, kernel_live_stats, strict=True
+                )
             }
 
         if metric_requested_endpoints:
@@ -707,7 +709,9 @@ class DeploymentRepository:
             )
             endpoint_statistics_by_id = {
                 endpoint_id: metric
-                for endpoint_id, metric in zip(metric_requested_endpoints, endpoint_live_stats)
+                for endpoint_id, metric in zip(
+                    metric_requested_endpoints, endpoint_live_stats, strict=True
+                )
             }
 
         return AutoScalingMetricsData(
@@ -737,7 +741,7 @@ class DeploymentRepository:
         if not auto_scaling_rules:
             return None
 
-        current_datetime = datetime.now(timezone.utc)
+        current_datetime = datetime.now(UTC)
         current_replica_count = deployment.replica_spec.target_replica_count
         routes = metrics_data.routes_by_endpoint.get(deployment.id, [])
 

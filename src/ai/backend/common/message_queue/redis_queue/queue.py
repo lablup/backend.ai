@@ -1,13 +1,24 @@
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator, Mapping
 from dataclasses import dataclass
-from typing import Any, AsyncGenerator, Mapping, Optional, Self, override
+from typing import Any, Optional, Self, override
 
+from ai.backend.common.message_queue.abc import (
+    AbstractAnycaster,
+    AbstractBroadcaster,
+    AbstractConsumer,
+    AbstractSubscriber,
+)
+from ai.backend.common.message_queue.abc.queue import AbstractMessageQueue
+from ai.backend.common.message_queue.types import (
+    BroadcastMessage,
+    BroadcastPayload,
+    MessageId,
+    MQMessage,
+)
 from ai.backend.common.types import RedisTarget
 
-from ..abc import AbstractAnycaster, AbstractBroadcaster, AbstractConsumer, AbstractSubscriber
-from ..abc.queue import AbstractMessageQueue
-from ..types import BroadcastMessage, BroadcastPayload, MessageId, MQMessage
 from .anycaster import RedisAnycaster
 from .broadcaster import RedisBroadcaster
 from .consumer import RedisConsumer, RedisConsumerArgs

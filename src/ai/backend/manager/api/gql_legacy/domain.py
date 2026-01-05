@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Optional,
     Self,
-    Sequence,
     cast,
 )
 
@@ -29,6 +27,17 @@ from ai.backend.manager.data.domain.types import (
     DomainData,
     UserInfo,
 )
+from ai.backend.manager.models.domain import DomainRow, domains, get_permission_ctx
+from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.rbac import (
+    ClientContext,
+    ScopeType,
+    SystemScope,
+)
+from ai.backend.manager.models.rbac.permission_defs import DomainPermission, ScalingGroupPermission
+from ai.backend.manager.models.scaling_group import get_scaling_groups
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
@@ -47,17 +56,6 @@ from ai.backend.manager.services.domain.actions.modify_domain_node import (
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
 from ai.backend.manager.types import OptionalState, TriState
 
-from ...models.domain import DomainRow, domains, get_permission_ctx
-from ...models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ...models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
-from ...models.rbac import (
-    ClientContext,
-    ScopeType,
-    SystemScope,
-)
-from ...models.rbac.permission_defs import DomainPermission, ScalingGroupPermission
-from ...models.scaling_group import get_scaling_groups
-from ...models.user import UserRole
 from .base import (
     Bytes,
     FilterExprArg,
@@ -76,24 +74,25 @@ from .gql_relay import (
 from .scaling_group import ScalingGroup, ScalingGroupConnection
 
 if TYPE_CHECKING:
-    from ...models.domain import DomainModel
+    from ai.backend.manager.models.domain import DomainModel
+
     from .scaling_group import ScalingGroupNode
     from .schema import GraphQueryContext
 
 
 __all__ = (
-    "DomainNode",
-    "DomainConnection",
-    "DomainPermissionValueField",
-    "CreateDomainNodeInput",
-    "CreateDomainNode",
-    "ModifyDomainNodeInput",
-    "ModifyDomainNode",
-    "Domain",
-    "DomainInput",
     "CreateDomain",
-    "ModifyDomain",
+    "CreateDomainNode",
+    "CreateDomainNodeInput",
     "DeleteDomain",
+    "Domain",
+    "DomainConnection",
+    "DomainInput",
+    "DomainNode",
+    "DomainPermissionValueField",
+    "ModifyDomain",
+    "ModifyDomainNode",
+    "ModifyDomainNodeInput",
     "PurgeDomain",
 )
 
@@ -110,6 +109,7 @@ class DomainPermissionValueField(graphene.Scalar):
     def parse_literal(node: Any, _variables=None):
         if isinstance(node, graphql.language.ast.StringValueNode):
             return DomainPermission(node.value)
+        return None
 
     @staticmethod
     def parse_value(value: str) -> DomainPermission:
@@ -231,7 +231,7 @@ class DomainNode(graphene.ObjectType):
         id: str,
         permission: DomainPermission = DomainPermission.READ_ATTRIBUTE,
     ) -> Optional[Self]:
-        from ...models.domain import DomainModel
+        from ai.backend.manager.models.domain import DomainModel
 
         graph_ctx: GraphQueryContext = info.context
         _, domain_name = AsyncNode.resolve_global_id(info, id)
@@ -263,7 +263,7 @@ class DomainNode(graphene.ObjectType):
         before: Optional[str] = None,
         last: Optional[int] = None,
     ) -> ConnectionResolverResult[Self]:
-        from ...models.domain import DomainModel
+        from ai.backend.manager.models.domain import DomainModel
 
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
@@ -345,7 +345,7 @@ async def _ensure_sgroup_permission(
         db_session=db_session,
         ctx=client_ctx,
     )
-    not_allowed_sgroups = set(sgroup_names) - set([sg.name for sg in sgroup_models])
+    not_allowed_sgroups = set(sgroup_names) - {sg.name for sg in sgroup_models}
     if not_allowed_sgroups:
         raise ValueError(
             f"Not allowed to associate the domain with given scaling groups(s:{not_allowed_sgroups})"

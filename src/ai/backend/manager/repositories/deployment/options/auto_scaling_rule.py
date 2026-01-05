@@ -124,5 +124,4 @@ class AutoScalingRuleOrders:
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return EndpointAutoScalingRuleRow.created_at.asc()
-        else:
-            return EndpointAutoScalingRuleRow.created_at.desc()
+        return EndpointAutoScalingRuleRow.created_at.desc()

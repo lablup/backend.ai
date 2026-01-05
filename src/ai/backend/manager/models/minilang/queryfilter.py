@@ -1,4 +1,5 @@
-from typing import Any, Mapping, Optional, Type, TypeAlias, Union
+from collections.abc import Mapping
+from typing import Any, Optional, TypeAlias
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
@@ -55,7 +56,7 @@ _parser = Lark(
     maybe_placeholders=False,
 )
 
-FilterableSQLQuery = Union[sa.sql.Select, sa.sql.Update, sa.sql.Delete]
+FilterableSQLQuery: TypeAlias = sa.sql.Select | sa.sql.Update | sa.sql.Delete
 FieldSpecType: TypeAlias = Mapping[str, FieldSpecItem] | None
 WhereClauseType: TypeAlias = (
     sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
@@ -81,13 +82,13 @@ class QueryFilterTransformer(Transformer):
 
     array = list
 
-    def atom(self, token: list[Token]) -> Type[sa.sql.elements.SingletonConstant]:
+    def atom(self, token: list[Token]) -> type[sa.sql.elements.SingletonConstant]:
         a = token[0]
         if a.value == "null":
             return sa.null()
-        elif a.value == "true":
+        if a.value == "true":
             return sa.true()
-        elif a.value == "false":
+        if a.value == "false":
             return sa.false()
         raise ValueError("Unknown/unsupported atomic token", a.value)
 
@@ -98,8 +99,7 @@ class QueryFilterTransformer(Transformer):
             except KeyError:
                 raise ValueError("Unknown/unsupported field name", col_name)
             return func(value) if func is not None else value
-        else:
-            return value
+        return value
 
     def _transform_val(self, col_name: str, op: str, value: Any) -> Any:
         if isinstance(value, Tree):
@@ -204,7 +204,7 @@ class QueryFilterTransformer(Transformer):
         expr2 = children[2]
         if op == "&":
             return sa.and_(expr1, expr2)
-        elif op == "|":
+        if op == "|":
             return sa.or_(expr1, expr2)
         return args
 
@@ -241,9 +241,7 @@ class QueryFilterParser:
         """
         if isinstance(sa_query, sa.sql.Select):
             table = sa_query.froms[0]
-        elif isinstance(sa_query, sa.sql.Delete):
-            table = sa_query.table
-        elif isinstance(sa_query, sa.sql.Update):
+        elif isinstance(sa_query, (sa.sql.Delete, sa.sql.Update)):
             table = sa_query.table
         else:
             raise ValueError("Unsupported SQLAlchemy query object type")

@@ -3,7 +3,8 @@ import logging
 import time
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any, Final, Optional, Self, Sequence
+from collections.abc import Sequence
+from typing import Any, Final, Optional, Self
 
 from pydantic import BaseModel, Field
 

@@ -1,8 +1,9 @@
 import json
 from typing import Any, Optional
 
-from ..auth import encrypt_payload
-from ..request import Request
+from ai.backend.client.auth import encrypt_payload
+from ai.backend.client.request import Request
+
 from .base import BaseFunction, api_function
 
 __all__ = ("Auth",)

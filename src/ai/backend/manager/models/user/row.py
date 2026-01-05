@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Optional,
     Self,
-    Sequence,
     cast,
 )
 from uuid import UUID
@@ -24,40 +23,39 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_serving.types import UserData as ModelServingUserData
 from ai.backend.manager.data.user.types import UserData, UserRole, UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed
-from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
-
-from ...errors.common import ObjectNotFound
-from ..base import (
+from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.models.base import (
     Base,
     EnumValueType,
     IDColumn,
     IPColumn,
     mapper_registry,
 )
-from ..hasher import PasswordHasherFactory
-from ..types import (
+from ai.backend.manager.models.hasher import PasswordHasherFactory
+from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
+from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
     load_related_field,
 )
-from ..utils import ExtendedAsyncSAEngine, execute_with_txn_retry
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
-    from ..keypair import KeyPairRow
+    from ai.backend.manager.models.keypair import KeyPairRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = (
-    "users",
-    "UserRow",
-    "UserRole",  # For compatibility with existing code
-    "UserStatus",  # For compatibility with existing code
     "ACTIVE_USER_STATUSES",
     "INACTIVE_USER_STATUSES",
     "PasswordHashAlgorithm",
-    "compare_to_hashed_password",
-    "check_credential_with_migration",
+    "UserRole",  # For compatibility with existing code
+    "UserRow",
+    "UserStatus",  # For compatibility with existing code
     "check_credential",
+    "check_credential_with_migration",
+    "compare_to_hashed_password",
+    "users",
 )
 
 
@@ -212,13 +210,13 @@ class UserRow(Base):
 
     @classmethod
     def load_keypairs(cls) -> Callable:
-        from ..keypair import KeyPairRow
+        from ai.backend.manager.models.keypair import KeyPairRow
 
         return selectinload(UserRow.keypairs).options(joinedload(KeyPairRow.resource_policy_row))
 
     @classmethod
     def load_main_keypair(cls) -> Callable:
-        from ..keypair import KeyPairRow
+        from ai.backend.manager.models.keypair import KeyPairRow
 
         return joinedload(UserRow.main_keypair).options(joinedload(KeyPairRow.resource_policy_row))
 
@@ -294,7 +292,7 @@ class UserRow(Base):
 
     def get_main_keypair_row(self) -> Optional[KeyPairRow]:
         # `cast()` requires import of KeyPairRow
-        from ..keypair import KeyPairRow
+        from ai.backend.manager.models.keypair import KeyPairRow
 
         keypair_candidate: Optional[KeyPairRow] = None
         main_keypair_row = cast(Optional[KeyPairRow], self.main_keypair)

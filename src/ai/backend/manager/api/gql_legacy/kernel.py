@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Mapping,
     Optional,
     Self,
-    Type,
     TypeVar,
     cast,
 )
@@ -28,24 +26,24 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.minilang import JSONFieldItem
-from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
-from ai.backend.manager.models.minilang.queryfilter import (
-    FieldSpecType,
-    QueryFilterParser,
-)
-
-from ...defs import DEFAULT_ROLE
-from ...models.kernel import (
+from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEFAULT_KERNEL_ORDERING,
     LIVE_STATUS,
     KernelRow,
     kernels,
 )
-from ...models.user import UserRole, users
+from ai.backend.manager.models.minilang import JSONFieldItem
+from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import (
+    FieldSpecType,
+    QueryFilterParser,
+)
+from ai.backend.manager.models.user import UserRole, users
+
 from .base import (
     BigInt,
     Item,
@@ -61,10 +59,10 @@ if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
 __all__ = (
-    "KernelNode",
-    "KernelConnection",
     "ComputeContainer",
     "ComputeContainerList",
+    "KernelConnection",
+    "KernelNode",
     "LegacyComputeSession",
     "LegacyComputeSessionList",
 )
@@ -620,7 +618,7 @@ class LegacyComputeSession(graphene.ObjectType):
         info: graphene.ResolveInfo,
         metric_key: str,
         metric_field: str,
-        convert_type: Type[MetricValueType],
+        convert_type: type[MetricValueType],
     ) -> Optional[MetricValueType]:
         if not hasattr(self, "status"):
             return None
@@ -635,20 +633,17 @@ class LegacyComputeSession(graphene.ObjectType):
             if value is None:
                 return convert_type(0)
             return convert_type(value)
-        else:
-            loader = graph_ctx.dataloader_manager.get_loader(
-                graph_ctx, "KernelStatistics.by_kernel"
-            )
-            kstat = await loader.load(self.id)
-            if kstat is None:
-                return convert_type(0)
-            metric = kstat.get(metric_key)
-            if metric is None:
-                return convert_type(0)
-            value = metric.get(metric_field)
-            if value is None:
-                return convert_type(0)
-            return convert_type(value)
+        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "KernelStatistics.by_kernel")
+        kstat = await loader.load(self.id)
+        if kstat is None:
+            return convert_type(0)
+        metric = kstat.get(metric_key)
+        if metric is None:
+            return convert_type(0)
+        value = metric.get(metric_field)
+        if value is None:
+            return convert_type(0)
+        return convert_type(value)
 
     async def resolve_cpu_used(self, info: graphene.ResolveInfo) -> Optional[float]:
         return await self._resolve_legacy_metric(info, "cpu_used", "current", float)

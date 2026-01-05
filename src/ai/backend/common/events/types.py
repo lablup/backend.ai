@@ -7,12 +7,12 @@ from ai.backend.common.message_queue.types import MessagePayload
 from .user_event.user_event import UserEvent
 
 __all__ = (
-    "EventDomain",
-    "DeliveryPattern",
-    "AbstractEvent",
     "AbstractAnycastEvent",
     "AbstractBroadcastEvent",
+    "AbstractEvent",
     "BatchBroadcastEvent",
+    "DeliveryPattern",
+    "EventDomain",
 )
 
 
@@ -131,7 +131,7 @@ class AbstractBroadcastEvent(AbstractEvent):
 
     _register_dict: dict[str, type["AbstractBroadcastEvent"]] = {}
 
-    def __init_subclass__(cls):
+    def __init_subclass__(cls) -> None:
         try:
             name = cls.event_name()
             if name in cls._register_dict:

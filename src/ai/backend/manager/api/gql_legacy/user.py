@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable, Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Iterable,
-    Mapping,
     Optional,
     Self,
-    Sequence,
     cast,
 )
 from uuid import UUID
@@ -26,8 +24,20 @@ from ai.backend.manager.data.user.types import (
     UserData,
     UserInfoContext,
 )
+from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow, groups
+from ai.backend.manager.models.group import association_groups_users as agus
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.minilang import ExternalTableFilterSpec, ORMFieldItem
+from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.user import (
+    ACTIVE_USER_STATUSES,
+    INACTIVE_USER_STATUSES,
+    UserRole,
+    UserRow,
+    UserStatus,
+    users,
+)
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
@@ -47,18 +57,6 @@ from ai.backend.manager.services.user.actions.purge_user import (
 )
 from ai.backend.manager.types import OptionalState, TriState
 
-from ...models.group import AssocGroupUserRow, GroupRow, groups
-from ...models.group import association_groups_users as agus
-from ...models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ...models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
-from ...models.user import (
-    ACTIVE_USER_STATUSES,
-    INACTIVE_USER_STATUSES,
-    UserRole,
-    UserRow,
-    UserStatus,
-    users,
-)
 from .base import (
     FilterExprArg,
     Item,
@@ -77,18 +75,18 @@ if TYPE_CHECKING:
 
 
 __all__ = (
-    "UserNode",
-    "UserConnection",
-    "User",
-    "UserGroup",
-    "UserList",
-    "UserInput",
-    "ModifyUserInput",
-    "PurgeUserInput",
     "CreateUser",
-    "ModifyUser",
     "DeleteUser",
+    "ModifyUser",
+    "ModifyUserInput",
     "PurgeUser",
+    "PurgeUserInput",
+    "User",
+    "UserConnection",
+    "UserGroup",
+    "UserInput",
+    "UserList",
+    "UserNode",
 )
 
 
@@ -416,7 +414,8 @@ class UserNode(graphene.ObjectType):
         before: Optional[str] = None,
         last: Optional[int] = None,
     ) -> ConnectionResolverResult[GroupNode]:
-        from ...models.group import AssocGroupUserRow, GroupRow
+        from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+
         from .group import GroupNode
 
         graph_ctx: GraphQueryContext = info.context
@@ -460,7 +459,7 @@ class UserNode(graphene.ObjectType):
                 result.append(GroupNode.from_row(graph_ctx, prj_row))
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
-    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> "UserNode":
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> UserNode:
         return await UserNode.get_node(info, self.id)
 
 
@@ -595,7 +594,7 @@ class User(graphene.ObjectType):
             need_password_change=row["need_password_change"],
             full_name=row["full_name"],
             description=row["description"],
-            is_active=True if row["status"] == UserStatus.ACTIVE else False,  # legacy
+            is_active=row["status"] == UserStatus.ACTIVE,  # legacy
             status=row["status"],
             status_info=row["status_info"],
             created_at=row["created_at"],

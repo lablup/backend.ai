@@ -4,17 +4,14 @@ import enum
 import functools
 import logging
 import uuid
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    List,
     Optional,
     Self,
-    Tuple,
     TypeAlias,
     cast,
     override,
@@ -42,6 +39,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.container_registry import get_container_registry_cls
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageData,
@@ -56,10 +54,8 @@ from ai.backend.manager.data.image.types import (
     ResourceLimit,
 )
 from ai.backend.manager.defs import INTRINSIC_SLOTS, INTRINSIC_SLOTS_MIN
-
-from ...container_registry import get_container_registry_cls
-from ...errors.image import ImageNotFound
-from ..base import (
+from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     ForeignKeyIDColumn,
@@ -67,8 +63,8 @@ from ..base import (
     StrEnumType,
     StructuredJSONColumn,
 )
-from ..container_registry import ContainerRegistryRow
-from ..rbac import (
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
@@ -77,11 +73,11 @@ from ..rbac import (
     UserScope,
     get_predefined_roles_in_scope,
 )
-from ..rbac.context import ClientContext
-from ..rbac.exceptions import InvalidScope
-from ..rbac.permission_defs import ImagePermission
-from ..user import UserRole, UserRow
-from ..utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.rbac.exceptions import InvalidScope
+from ai.backend.manager.models.rbac.permission_defs import ImagePermission
+from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask.bgtask import ProgressReporter
@@ -90,12 +86,12 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 __all__ = (
-    "rescan_images",
     "ImageAliasRow",
+    "ImageIdentifier",
     "ImageLoadFilter",
     "ImageRow",
-    "ImageIdentifier",
     "PublicImageLoadFilter",
+    "rescan_images",
 )
 
 
@@ -439,10 +435,12 @@ class ImageRow(Base):
         session: AsyncSession,
         alias: str,
         load_aliases: bool = False,
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> Self:
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         query = (
             sa.select(ImageRow)
             .select_from(ImageRow)
@@ -457,8 +455,7 @@ class ImageRow(Base):
         result = await session.scalar(query)
         if result is not None:
             return result
-        else:
-            raise UnknownImageReference
+        raise UnknownImageReference
 
     @classmethod
     async def from_image_identifier(
@@ -466,10 +463,12 @@ class ImageRow(Base):
         session: AsyncSession,
         identifier: ImageIdentifier,
         load_aliases: bool = True,
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> Self:
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         query = sa.select(ImageRow).where(
             (ImageRow.name == identifier.canonical)
             & (ImageRow.architecture == identifier.architecture)
@@ -483,7 +482,7 @@ class ImageRow(Base):
         query = _apply_loading_option(query, loading_options)
 
         result = await session.execute(query)
-        candidates: List[ImageRow] = result.scalars().all()
+        candidates: list[ImageRow] = result.scalars().all()
 
         if len(candidates) <= 0:
             raise UnknownImageReference(identifier.canonical)
@@ -498,7 +497,7 @@ class ImageRow(Base):
         *,
         strict_arch: bool = False,
         load_aliases: bool = False,
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> Self:
         """
@@ -508,6 +507,8 @@ class ImageRow(Base):
         with respect to requested canonical, this function will
         return that row regardless of the image architecture.
         """
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         query = sa.select(ImageRow).where(ImageRow.name == ref.canonical)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
@@ -517,7 +518,7 @@ class ImageRow(Base):
         query = _apply_loading_option(query, loading_options)
 
         result = await session.execute(query)
-        candidates: List[ImageRow] = result.scalars().all()
+        candidates: list[ImageRow] = result.scalars().all()
 
         if len(candidates) == 0:
             raise UnknownImageReference(ref)
@@ -586,7 +587,7 @@ class ImageRow(Base):
         reference_candidates: list[ImageAlias | ImageRef | ImageIdentifier],
         *,
         strict_arch: bool = False,
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
         load_aliases: bool = True,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> Self:
@@ -623,6 +624,8 @@ class ImageRow(Base):
         When *load_aliases* is True, it tries to resolve the alias chain.
         Otherwise it finds only the direct image references.
         """
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         searched_refs = []
         for reference in reference_candidates:
             resolver_func: Any = None
@@ -679,9 +682,11 @@ class ImageRow(Base):
         cls,
         session: AsyncSession,
         image_id: UUID,
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
         load_aliases: bool = False,
     ) -> Optional[Self]:
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         query = sa.select(ImageRow).where(ImageRow.id == image_id)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
@@ -695,9 +700,11 @@ class ImageRow(Base):
     async def list(
         cls,
         session: AsyncSession,
-        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        filter_by_statuses: Optional[list[ImageStatus]] = None,
         load_aliases: bool = False,
     ) -> list[Self]:
+        if filter_by_statuses is None:
+            filter_by_statuses = [ImageStatus.ALIVE]
         query = sa.select(ImageRow)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
@@ -834,7 +841,7 @@ class ImageRow(Base):
     def set_resource_limit(
         self,
         slot_type: str,
-        value_range: Tuple[Optional[Decimal], Optional[Decimal]],
+        value_range: tuple[Optional[Decimal], Optional[Decimal]],
     ):
         resources = self._resources
         if resources.get(slot_type) is None:
@@ -1091,9 +1098,7 @@ class ImageAccessCriteria:
         """
         if image.registry not in self.allowed_registries:
             return False
-        if image.customized and not image.is_owned_by(self.user_id):
-            return False
-        return True
+        return not (image.customized and not image.is_owned_by(self.user_id))
 
 
 class ImagePermissionContextBuilder(
@@ -1262,8 +1267,8 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scope: DomainScope,
     ) -> ImagePermissionContext:
-        from ..container_registry import ContainerRegistryRow
-        from ..domain import DomainRow
+        from ai.backend.manager.models.container_registry import ContainerRegistryRow
+        from ai.backend.manager.models.domain import DomainRow
 
         permissions = await self.calculate_permission(ctx, scope)
         image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
@@ -1303,7 +1308,7 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scope: UserScope,
     ) -> list[ProjectScope]:
-        from ..group import AssocGroupUserRow
+        from ai.backend.manager.models.group import AssocGroupUserRow
 
         get_assoc_group_ids_stmt = sa.select(AssocGroupUserRow.group_id).where(
             AssocGroupUserRow.user_id == scope.user_id
@@ -1317,7 +1322,7 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scope: DomainScope,
     ) -> list[ProjectScope]:
-        from ..group import GroupRow
+        from ai.backend.manager.models.group import GroupRow
 
         stmt = sa.select(GroupRow.id).where(GroupRow.domain_name == scope.domain_name)
         project_ids = await self.db_session.scalars(stmt)
@@ -1326,7 +1331,7 @@ class ImagePermissionContextBuilder(
     async def _verify_project_scope_and_calculate_permission(
         self, ctx: ClientContext, scope: ProjectScope
     ) -> frozenset[ImagePermission]:
-        from ..group import GroupRow
+        from ai.backend.manager.models.group import GroupRow
 
         group_query_stmt = sa.select(GroupRow).where(GroupRow.id == scope.project_id)
         group_row = cast(Optional[GroupRow], await self.db_session.scalar(group_query_stmt))
@@ -1342,7 +1347,7 @@ class ImagePermissionContextBuilder(
         registry_condition_factory: Callable[[list[Any]], Any],
         filter_global_registry: bool = False,
     ) -> ImagePermissionContext:
-        from ..container_registry import ContainerRegistryRow
+        from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
         project_ids = [scope.project_id for scope in scopes]
         project_id_to_permission_map: dict[str, frozenset[ImagePermission]] = {}
@@ -1401,7 +1406,7 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scopes: list[ProjectScope],
     ) -> ImagePermissionContext:
-        from ..container_registry import ContainerRegistryRow
+        from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
         def global_registry_condition(project_ids: list[Any]):
             return ContainerRegistryRow.is_global == true()
@@ -1415,10 +1420,10 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scopes: list[ProjectScope],
     ) -> ImagePermissionContext:
-        from ..association_container_registries_groups import (
+        from ai.backend.manager.models.association_container_registries_groups import (
             AssociationContainerRegistriesGroupsRow,
         )
-        from ..container_registry import ContainerRegistryRow
+        from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
         def non_global_registry_condition(project_ids: list[Any]):
             return ContainerRegistryRow.association_container_registries_groups_rows.any(
@@ -1473,5 +1478,4 @@ async def get_permission_ctx(
 ) -> ImagePermissionContext:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         builder = ImagePermissionContextBuilder(db_session)
-        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
-    return permission_ctx
+        return await builder.build(ctx, target_scope, requested_permission)
