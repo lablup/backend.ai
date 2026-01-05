@@ -88,6 +88,7 @@ class TestScalingGroupRepositoryDB:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
+                ScalingGroupForKeypairsRow,  # depends on ScalingGroupRow and KeyPairRow
                 GroupRow,
                 ImageRow,
                 VFolderRow,
