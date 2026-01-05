@@ -821,6 +821,44 @@ class OverridableContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("swarm-enabled", "swarm_enabled"),
         serialization_alias="swarm-enabled",
     )
+    cpu_boost_enabled: bool = Field(
+        default=False,
+        description=textwrap.dedent("""
+        Whether to enable CPU boost for container initial loading.
+        When enabled, containers will be allocated additional CPU resources
+        at startup, which will be reduced to the requested amount after
+        cpu_boost_duration seconds.
+        """),
+        examples=[True, False],
+        validation_alias=AliasChoices("cpu-boost-enabled", "cpu_boost_enabled"),
+        serialization_alias="cpu-boost-enabled",
+    )
+    cpu_boost_factor: float = Field(
+        default=2.0,
+        ge=1.0,
+        le=10.0,
+        description=textwrap.dedent("""
+        CPU boost multiplication factor.
+        The requested CPU will be multiplied by this factor during the boost period.
+        For example, with a factor of 2.0, a container requesting 2 CPUs will
+        initially receive 4 CPUs.
+        """),
+        examples=[1.5, 2.0, 3.0],
+        validation_alias=AliasChoices("cpu-boost-factor", "cpu_boost_factor"),
+        serialization_alias="cpu-boost-factor",
+    )
+    cpu_boost_duration: float = Field(
+        default=60.0,
+        ge=1.0,
+        description=textwrap.dedent("""
+        Duration in seconds for which the CPU boost should be active.
+        After this period, the CPU allocation will be reduced to the originally
+        requested amount.
+        """),
+        examples=[30.0, 60.0, 120.0],
+        validation_alias=AliasChoices("cpu-boost-duration", "cpu_boost_duration"),
+        serialization_alias="cpu-boost-duration",
+    )
 
     model_config = ConfigDict(
         extra="allow",

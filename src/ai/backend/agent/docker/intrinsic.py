@@ -398,6 +398,40 @@ class CPUPlugin(AbstractComputePlugin):
         # TODO: move the sysconf hook in libbaihook.so here
         return []
 
+    def apply_cpu_boost(
+        self,
+        num_cores: int,
+        boost_enabled: bool,
+        boost_factor: float,
+    ) -> int:
+        """
+        Apply CPU boost factor to the number of cores.
+
+        Args:
+            num_cores: Original number of CPU cores requested
+            boost_enabled: Whether CPU boost is enabled
+            boost_factor: Multiplication factor for CPU boost
+
+        Returns:
+            Boosted number of CPU cores (or original if boost is disabled).
+            When boost is enabled, returns at least num_cores + 1.
+        """
+        if not boost_enabled:
+            return num_cores
+
+        boosted_cores = int(num_cores * boost_factor)
+        # Ensure at least +1 core boost when enabled
+        min_boosted_cores = num_cores + 1
+        boosted_cores = max(boosted_cores, min_boosted_cores)
+
+        log.info(
+            "Applying CPU boost: {} cores -> {} cores (factor: {})",
+            num_cores,
+            boosted_cores,
+            boost_factor,
+        )
+        return boosted_cores
+
     async def generate_docker_args(
         self,
         docker: Docker,
@@ -405,9 +439,16 @@ class CPUPlugin(AbstractComputePlugin):
     ) -> Mapping[str, Any]:
         cores = [*map(int, device_alloc["cpu"].keys())]
         sorted_core_ids = [*map(str, sorted(cores))]
+        num_cores = len(cores)
+
+        # Apply CPU boost if enabled in container config
+        boost_enabled = self.local_config["container"].get("cpu-boost-enabled", False)
+        boost_factor = self.local_config["container"].get("cpu-boost-factor", 2.0)
+        boosted_cores = self.apply_cpu_boost(num_cores, boost_enabled, boost_factor)
+
         return {
             "HostConfig": {
-                "Cpus": len(cores),
+                "Cpus": boosted_cores,
                 "CpusetCpus": ",".join(sorted_core_ids),
                 # 'CpusetMems': f'{resource_spec.numa_node}',
             },
