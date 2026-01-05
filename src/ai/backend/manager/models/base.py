@@ -697,7 +697,7 @@ async def populate_fixture(
         if not rows:
             return
         log.debug("Loading the fixture table {0} (mode:{1})", table_name, op_mode.name)
-        from .user import PasswordColumn
+        from .hasher.types import PasswordColumn
 
         async with engine.begin() as conn:
             # Apply typedecorator manually for required columns

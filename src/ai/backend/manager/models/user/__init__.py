@@ -1,9 +1,8 @@
-from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.hasher.types import PasswordColumn, PasswordInfo
 
 from .row import (
     ACTIVE_USER_STATUSES,
     INACTIVE_USER_STATUSES,
-    PasswordColumn,
     PasswordHashAlgorithm,
     UserRole,
     UserRow,

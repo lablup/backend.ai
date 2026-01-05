@@ -17,7 +17,6 @@ from typing import (
 import attr
 from graphql import UndefinedType
 from pydantic import AliasChoices, BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from strawberry.types.unset import UnsetType
 
 from ai.backend.common.types import MountPermission, MountTypes
@@ -26,11 +25,6 @@ if TYPE_CHECKING:
     from ai.backend.common.lock import AbstractDistributedLock
 
     from .defs import LockID
-    from .models.session import SessionRow
-
-
-class SessionGetter(Protocol):
-    def __call__(self, *, db_session: SASession) -> SessionRow: ...
 
 
 # Sentinel is a special object that indicates a special status instead of a value
