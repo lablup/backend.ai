@@ -6,7 +6,8 @@ Tests the repository layer with real database operations.
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
