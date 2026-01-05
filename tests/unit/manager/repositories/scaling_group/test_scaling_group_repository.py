@@ -1095,7 +1095,6 @@ class TestScalingGroupRepositoryDB:
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_purge: str,
         test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
-        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Test associating a scaling group with a user group (project)."""
         # Given: A scaling group and a project (group)
@@ -1111,40 +1110,43 @@ class TestScalingGroupRepositoryDB:
         )
         await scaling_group_repository.associate_scaling_group_with_user_group(creator)
 
-        # Then: Association should exist in the database
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            query = sa.select(ScalingGroupForProjectRow).where(
-                sa.and_(
-                    ScalingGroupForProjectRow.scaling_group == sgroup_name,
-                    ScalingGroupForProjectRow.group == project_id,
-                )
+        # Then: Association should exist
+        association_exists = (
+            await scaling_group_repository.check_scaling_group_user_group_association_exists(
+                scaling_group=sgroup_name,
+                user_group=project_id,
             )
-            result = await db_sess.execute(query)
-            row = result.scalar_one_or_none()
-            assert row is not None
-            assert row.scaling_group == sgroup_name
-            assert row.group == project_id
+        )
+        assert association_exists is True
 
     async def test_disassociate_scaling_group_with_user_group_success(
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_purge: str,
         test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
-        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Test disassociating a scaling group from a user group (project)."""
         # Given: A scaling group associated with a project
         sgroup_name = sample_scaling_group_for_purge
         _, _, project_id = test_user_domain_group
 
-        # First, associate the scaling group with the project
-        async with db_with_cleanup.begin_session() as db_sess:
-            association = ScalingGroupForProjectRow(
+        # First, associate the scaling group with the project using repository
+        creator = Creator(
+            spec=ScalingGroupForProjectCreatorSpec(
                 scaling_group=sgroup_name,
-                group=project_id,
+                project=project_id,
             )
-            db_sess.add(association)
-            await db_sess.flush()
+        )
+        await scaling_group_repository.associate_scaling_group_with_user_group(creator)
+
+        # Verify association exists
+        association_exists = (
+            await scaling_group_repository.check_scaling_group_user_group_association_exists(
+                scaling_group=sgroup_name,
+                user_group=project_id,
+            )
+        )
+        assert association_exists is True
 
         # When: Disassociate the scaling group from the project
         purger = create_scaling_group_for_project_purger(
@@ -1153,17 +1155,14 @@ class TestScalingGroupRepositoryDB:
         )
         await scaling_group_repository.disassociate_scaling_group_with_user_group(purger)
 
-        # Then: Association should no longer exist in the database
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            query = sa.select(ScalingGroupForProjectRow).where(
-                sa.and_(
-                    ScalingGroupForProjectRow.scaling_group == sgroup_name,
-                    ScalingGroupForProjectRow.group == project_id,
-                )
+        # Then: Association should no longer exist
+        association_exists = (
+            await scaling_group_repository.check_scaling_group_user_group_association_exists(
+                scaling_group=sgroup_name,
+                user_group=project_id,
             )
-            result = await db_sess.execute(query)
-            row = result.scalar_one_or_none()
-            assert row is None
+        )
+        assert association_exists is False
 
     async def test_disassociate_nonexistent_scaling_group_with_user_group(
         self,

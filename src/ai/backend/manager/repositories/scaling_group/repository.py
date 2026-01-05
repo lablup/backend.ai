@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from typing import TYPE_CHECKING
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -158,3 +159,14 @@ class ScalingGroupRepository:
     ) -> None:
         """Disassociates a single scaling group from a user group (project)."""
         await self._db_source.disassociate_scaling_group_with_user_group(purger)
+
+    async def check_scaling_group_user_group_association_exists(
+        self,
+        scaling_group: str,
+        user_group: uuid.UUID,
+    ) -> bool:
+        """Checks if a scaling group is associated with a user group (project)."""
+        return await self._db_source.check_scaling_group_user_group_association_exists(
+            scaling_group=scaling_group,
+            user_group=user_group,
+        )
