@@ -210,7 +210,7 @@ class ScalingGroupDBSource:
         async with self._db.begin_session() as session:
             await execute_batch_purger(session, purger)
 
-    async def is_scaling_group_associated_with_keypair(
+    async def check_scaling_group_keypair_association_exists(
         self,
         scaling_group_name: str,
         access_key: str,

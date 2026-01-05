@@ -133,12 +133,12 @@ class ScalingGroupRepository:
         """Disassociates a single scaling group from a keypair."""
         await self._db_source.disassociate_scaling_group_with_keypair(purger)
 
-    async def is_scaling_group_associated_with_keypair(
+    async def check_scaling_group_keypair_association_exists(
         self,
         scaling_group_name: str,
         access_key: str,
     ) -> bool:
         """Checks if a scaling group is associated with a keypair."""
-        return await self._db_source.is_scaling_group_associated_with_keypair(
+        return await self._db_source.check_scaling_group_keypair_association_exists(
             scaling_group_name, access_key
         )

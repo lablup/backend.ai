@@ -1011,31 +1011,40 @@ class TestScalingGroupRepositoryDB:
         await scaling_group_repository.associate_scaling_group_with_keypair(creator)
 
         # Then: Association should exist
-        is_associated = await scaling_group_repository.is_scaling_group_associated_with_keypair(
-            sgroup_name, access_key
+        association_exists = (
+            await scaling_group_repository.check_scaling_group_keypair_association_exists(
+                sgroup_name, access_key
+            )
         )
-        assert is_associated is True
+        assert association_exists is True
 
     async def test_disassociate_scaling_group_with_keypair_success(
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_purge: str,
         sample_keypair: AccessKey,
-        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Test disassociating a scaling group from a keypair."""
         # Given: A scaling group associated with a keypair
         sgroup_name = sample_scaling_group_for_purge
         access_key = sample_keypair
 
-        # First, associate the scaling group with the keypair
-        async with db_with_cleanup.begin_session() as db_sess:
-            association = ScalingGroupForKeypairsRow(
+        # First, associate the scaling group with the keypair using repository
+        creator = Creator(
+            spec=ScalingGroupForKeypairsCreatorSpec(
                 scaling_group=sgroup_name,
                 access_key=access_key,
             )
-            db_sess.add(association)
-            await db_sess.flush()
+        )
+        await scaling_group_repository.associate_scaling_group_with_keypair(creator)
+
+        # Verify association exists
+        association_exists = (
+            await scaling_group_repository.check_scaling_group_keypair_association_exists(
+                sgroup_name, access_key
+            )
+        )
+        assert association_exists is True
 
         # When: Disassociate the scaling group from the keypair
         purger = create_scaling_group_for_keypairs_purger(
@@ -1045,10 +1054,12 @@ class TestScalingGroupRepositoryDB:
         await scaling_group_repository.disassociate_scaling_group_with_keypair(purger)
 
         # Then: Association should no longer exist
-        is_associated = await scaling_group_repository.is_scaling_group_associated_with_keypair(
-            sgroup_name, access_key
+        association_exists = (
+            await scaling_group_repository.check_scaling_group_keypair_association_exists(
+                sgroup_name, access_key
+            )
         )
-        assert is_associated is False
+        assert association_exists is False
 
     async def test_disassociate_nonexistent_scaling_group_with_keypair(
         self,
