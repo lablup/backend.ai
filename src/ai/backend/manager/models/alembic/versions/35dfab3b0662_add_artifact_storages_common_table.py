@@ -1,7 +1,7 @@
 """Add artifact_storages common table
 
 Revision ID: 35dfab3b0662
-Revises: b0fb0eb6b6bc
+Revises: d0a3c0716970
 Create Date: 2025-12-02 09:24:21.050932
 
 """
@@ -13,7 +13,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "35dfab3b0662"
-down_revision = "b0fb0eb6b6bc"
+down_revision = "d0a3c0716970"
 branch_labels = None
 depends_on = None
 
