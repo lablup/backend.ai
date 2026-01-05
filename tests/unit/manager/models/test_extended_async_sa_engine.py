@@ -47,17 +47,17 @@ class TestExtendedAsyncSAEngineReadCommitted:
     @pytest.fixture(autouse=True)
     async def test_table_in_db(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         test_table_metadata: sa.MetaData,
     ) -> AsyncIterator[sa.Table]:
         """Create test table in database and clean up after test."""
-        async with database_engine.begin() as conn:
+        async with database_connection.begin() as conn:
             await conn.run_sync(test_table_metadata.create_all)
 
         table = test_table_metadata.tables["test_isolation_data"]
         yield table
 
-        async with database_engine.begin() as conn:
+        async with database_connection.begin() as conn:
             await conn.run_sync(test_table_metadata.drop_all)
 
     async def _insert_test_data_returning_id(
@@ -91,7 +91,7 @@ class TestExtendedAsyncSAEngineReadCommitted:
     @pytest.mark.asyncio
     async def test_begin_read_committed_basic(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         test_table_in_db: sa.Table,
     ) -> None:
         """Test basic functionality of begin_read_committed."""
@@ -99,7 +99,7 @@ class TestExtendedAsyncSAEngineReadCommitted:
         expected_version = 1
 
         # Insert and read data using READ COMMITTED connection
-        async with database_engine.begin_read_committed() as conn:
+        async with database_connection.begin_read_committed() as conn:
             row_id = await self._insert_test_data_returning_id(conn, test_table_in_db, test_value)
             data = await self._get_row_data_by_id(conn, test_table_in_db, row_id)
 
@@ -110,12 +110,12 @@ class TestExtendedAsyncSAEngineReadCommitted:
     @pytest.mark.asyncio
     async def test_begin_read_committed_isolation_level(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> None:
         """Verify that the connection uses READ COMMITTED isolation level."""
         expected_isolation_level = "read committed"
 
-        async with database_engine.begin_read_committed() as conn:
+        async with database_connection.begin_read_committed() as conn:
             # Query the current isolation level from PostgreSQL
             result = await conn.execute(sa.text("SHOW transaction_isolation;"))
             isolation_level = result.scalar()
@@ -125,7 +125,7 @@ class TestExtendedAsyncSAEngineReadCommitted:
     @pytest.mark.asyncio
     async def test_begin_read_committed_can_write(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         test_table_in_db: sa.Table,
     ) -> None:
         """Verify that read-write connection can perform writes."""
@@ -133,11 +133,11 @@ class TestExtendedAsyncSAEngineReadCommitted:
         expected_version = 1
 
         # Insert data using READ COMMITTED connection
-        async with database_engine.begin_read_committed() as conn:
+        async with database_connection.begin_read_committed() as conn:
             row_id = await self._insert_test_data_returning_id(conn, test_table_in_db, test_value)
 
         # Verify data was committed
-        async with database_engine.begin() as conn:
+        async with database_connection.begin() as conn:
             data = await self._get_row_data_by_id(conn, test_table_in_db, row_id)
 
         assert data is not None
@@ -147,7 +147,7 @@ class TestExtendedAsyncSAEngineReadCommitted:
     @pytest.mark.asyncio
     async def test_begin_readonly_read_committed_basic(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         test_table_in_db: sa.Table,
     ) -> None:
         """Test basic functionality of begin_readonly_read_committed."""
@@ -155,11 +155,11 @@ class TestExtendedAsyncSAEngineReadCommitted:
         expected_version = 1
 
         # First insert some data using regular connection
-        async with database_engine.begin() as conn:
+        async with database_connection.begin() as conn:
             row_id = await self._insert_test_data_returning_id(conn, test_table_in_db, test_value)
 
         # Now read using READ COMMITTED read-only connection
-        async with database_engine.begin_readonly_read_committed() as conn:
+        async with database_connection.begin_readonly_read_committed() as conn:
             data = await self._get_row_data_by_id(conn, test_table_in_db, row_id)
 
         assert data is not None
@@ -169,12 +169,12 @@ class TestExtendedAsyncSAEngineReadCommitted:
     @pytest.mark.asyncio
     async def test_begin_readonly_read_committed_isolation_level(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> None:
         """Verify that the connection uses READ COMMITTED isolation level."""
         expected_isolation_level = "read committed"
 
-        async with database_engine.begin_readonly_read_committed() as conn:
+        async with database_connection.begin_readonly_read_committed() as conn:
             # Query the current isolation level from PostgreSQL
             result = await conn.execute(sa.text("SHOW transaction_isolation;"))
             isolation_level = result.scalar()
@@ -184,14 +184,14 @@ class TestExtendedAsyncSAEngineReadCommitted:
     @pytest.mark.asyncio
     async def test_begin_readonly_read_committed_cannot_write(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         test_table_in_db: sa.Table,
     ) -> None:
         """Verify that read-only connection cannot perform writes."""
         test_value = "should_fail"
 
         with pytest.raises(sa.exc.DBAPIError) as exc_info:
-            async with database_engine.begin_readonly_read_committed() as conn:
+            async with database_connection.begin_readonly_read_committed() as conn:
                 await conn.execute(sa.insert(test_table_in_db).values(value=test_value, version=1))
 
         # PostgreSQL raises "cannot execute INSERT in a read-only transaction"
@@ -200,7 +200,7 @@ class TestExtendedAsyncSAEngineReadCommitted:
     @pytest.mark.asyncio
     async def test_begin_session_read_committed_basic(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         test_table_in_db: sa.Table,
     ) -> None:
         """Test basic functionality of begin_session_read_committed."""
@@ -208,7 +208,7 @@ class TestExtendedAsyncSAEngineReadCommitted:
         expected_version = 1
 
         # Insert and read data using READ COMMITTED session
-        async with database_engine.begin_session_read_committed() as session:
+        async with database_connection.begin_session_read_committed() as session:
             result = await session.execute(
                 sa.insert(test_table_in_db)
                 .values(value=test_value, version=expected_version)
@@ -231,12 +231,12 @@ class TestExtendedAsyncSAEngineReadCommitted:
     @pytest.mark.asyncio
     async def test_begin_session_read_committed_isolation_level(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> None:
         """Verify that the session uses READ COMMITTED isolation level."""
         expected_isolation_level = "read committed"
 
-        async with database_engine.begin_session_read_committed() as session:
+        async with database_connection.begin_session_read_committed() as session:
             # Query the current isolation level
             result = await session.execute(sa.text("SHOW transaction_isolation;"))
             isolation_level = result.scalar()
@@ -246,14 +246,14 @@ class TestExtendedAsyncSAEngineReadCommitted:
     @pytest.mark.asyncio
     async def test_begin_session_read_committed_auto_commit(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         test_table_in_db: sa.Table,
     ) -> None:
         """Verify that session auto-commits on exit."""
         test_value = "auto_commit_test"
 
         # Insert in session
-        async with database_engine.begin_session_read_committed() as session:
+        async with database_connection.begin_session_read_committed() as session:
             result = await session.execute(
                 sa.insert(test_table_in_db)
                 .values(value=test_value, version=1)
@@ -262,7 +262,7 @@ class TestExtendedAsyncSAEngineReadCommitted:
             row_id = result.scalar_one()
 
         # Verify data persisted after session exit
-        async with database_engine.begin_readonly() as conn:
+        async with database_connection.begin_readonly() as conn:
             data = await self._get_row_data_by_id(conn, test_table_in_db, row_id)
 
         assert data is not None
@@ -271,7 +271,7 @@ class TestExtendedAsyncSAEngineReadCommitted:
     @pytest.mark.asyncio
     async def test_begin_readonly_session_read_committed_basic(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         test_table_in_db: sa.Table,
     ) -> None:
         """Test basic functionality of begin_readonly_session_read_committed."""
@@ -279,11 +279,11 @@ class TestExtendedAsyncSAEngineReadCommitted:
         expected_version = 1
 
         # Insert test data
-        async with database_engine.begin() as conn:
+        async with database_connection.begin() as conn:
             row_id = await self._insert_test_data_returning_id(conn, test_table_in_db, test_value)
 
         # Read using READ COMMITTED read-only session
-        async with database_engine.begin_readonly_session_read_committed() as session:
+        async with database_connection.begin_readonly_session_read_committed() as session:
             result = await session.execute(
                 sa.select(test_table_in_db.c.value, test_table_in_db.c.version).where(
                     test_table_in_db.c.id == row_id
@@ -298,12 +298,12 @@ class TestExtendedAsyncSAEngineReadCommitted:
     @pytest.mark.asyncio
     async def test_begin_readonly_session_read_committed_isolation_level(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> None:
         """Verify that the read-only session uses READ COMMITTED isolation level."""
         expected_isolation_level = "read committed"
 
-        async with database_engine.begin_readonly_session_read_committed() as session:
+        async with database_connection.begin_readonly_session_read_committed() as session:
             # Query the current isolation level
             result = await session.execute(sa.text("SHOW transaction_isolation;"))
             isolation_level = result.scalar()
@@ -313,14 +313,14 @@ class TestExtendedAsyncSAEngineReadCommitted:
     @pytest.mark.asyncio
     async def test_begin_readonly_session_read_committed_cannot_write(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         test_table_in_db: sa.Table,
     ) -> None:
         """Verify that read-only session cannot perform writes."""
         test_value = "should_fail"
 
         with pytest.raises(sa.exc.DBAPIError) as exc_info:
-            async with database_engine.begin_readonly_session_read_committed() as session:
+            async with database_connection.begin_readonly_session_read_committed() as session:
                 await session.execute(
                     sa.insert(test_table_in_db).values(value=test_value, version=1)
                 )
@@ -331,7 +331,7 @@ class TestExtendedAsyncSAEngineReadCommitted:
     @pytest.mark.asyncio
     async def test_read_committed_sees_committed_changes(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         test_table_in_db: sa.Table,
     ) -> None:
         """
@@ -345,13 +345,13 @@ class TestExtendedAsyncSAEngineReadCommitted:
         updated_version = 2
 
         # Insert initial data using READ COMMITTED connection
-        async with database_engine.begin_read_committed() as conn:
+        async with database_connection.begin_read_committed() as conn:
             row_id = await self._insert_test_data_returning_id(
                 conn, test_table_in_db, initial_value
             )
 
         # Start a READ COMMITTED read-only connection
-        async with database_engine.begin_readonly_read_committed() as read_conn:
+        async with database_connection.begin_readonly_read_committed() as read_conn:
             # Read initial value
             data = await self._get_row_data_by_id(read_conn, test_table_in_db, row_id)
             assert data is not None
@@ -359,7 +359,7 @@ class TestExtendedAsyncSAEngineReadCommitted:
             assert data.version == initial_version
 
             # Update value in a separate READ COMMITTED transaction
-            async with database_engine.begin_read_committed() as write_conn:
+            async with database_connection.begin_read_committed() as write_conn:
                 await write_conn.execute(
                     sa.update(test_table_in_db)
                     .where(test_table_in_db.c.id == row_id)
@@ -375,21 +375,21 @@ class TestExtendedAsyncSAEngineReadCommitted:
     @pytest.mark.asyncio
     async def test_multiple_concurrent_readonly_read_committed_connections(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         test_table_in_db: sa.Table,
     ) -> None:
         """Test multiple concurrent READ COMMITTED read-only connections."""
         test_value = "concurrent_test"
 
         # Insert test data using READ COMMITTED connection
-        async with database_engine.begin_read_committed() as conn:
+        async with database_connection.begin_read_committed() as conn:
             row_id = await self._insert_test_data_returning_id(conn, test_table_in_db, test_value)
 
         # Open multiple READ COMMITTED connections concurrently
         async with (
-            database_engine.begin_readonly_read_committed() as conn1,
-            database_engine.begin_readonly_read_committed() as conn2,
-            database_engine.begin_readonly_read_committed() as conn3,
+            database_connection.begin_readonly_read_committed() as conn1,
+            database_connection.begin_readonly_read_committed() as conn2,
+            database_connection.begin_readonly_read_committed() as conn3,
         ):
             # All should be able to read the same data
             data1 = await self._get_row_data_by_id(conn1, test_table_in_db, row_id)
@@ -403,7 +403,7 @@ class TestExtendedAsyncSAEngineReadCommitted:
     @pytest.mark.asyncio
     async def test_read_committed_prevents_dirty_reads(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         test_table_in_db: sa.Table,
     ) -> None:
         """
@@ -416,13 +416,13 @@ class TestExtendedAsyncSAEngineReadCommitted:
         uncommitted_version = 2
 
         # Insert initial data using READ COMMITTED connection
-        async with database_engine.begin_read_committed() as conn:
+        async with database_connection.begin_read_committed() as conn:
             row_id = await self._insert_test_data_returning_id(
                 conn, test_table_in_db, initial_value
             )
 
         # Start a write transaction but don't commit it yet
-        async with database_engine.begin() as write_conn:
+        async with database_connection.begin() as write_conn:
             # Update value but don't commit
             await write_conn.execute(
                 sa.update(test_table_in_db)
@@ -431,7 +431,7 @@ class TestExtendedAsyncSAEngineReadCommitted:
             )
 
             # Start a READ COMMITTED read-only connection while write transaction is still open
-            async with database_engine.begin_readonly_read_committed() as read_conn:
+            async with database_connection.begin_readonly_read_committed() as read_conn:
                 # Should NOT see uncommitted changes (dirty read)
                 data = await self._get_row_data_by_id(read_conn, test_table_in_db, row_id)
                 assert data is not None
@@ -446,7 +446,7 @@ class TestExtendedAsyncSAEngineReadCommitted:
             await write_conn.rollback()
 
         # Verify final state is still the initial value
-        async with database_engine.begin_readonly_read_committed() as final_conn:
+        async with database_connection.begin_readonly_read_committed() as final_conn:
             final_data = await self._get_row_data_by_id(final_conn, test_table_in_db, row_id)
             assert final_data is not None
             assert final_data.value == initial_value
@@ -455,7 +455,7 @@ class TestExtendedAsyncSAEngineReadCommitted:
     @pytest.mark.asyncio
     async def test_read_committed_allows_phantom_reads(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         test_table_in_db: sa.Table,
     ) -> None:
         """
@@ -466,11 +466,11 @@ class TestExtendedAsyncSAEngineReadCommitted:
         value2 = "phantom_row_test_category"
 
         # Insert initial data using READ COMMITTED connection
-        async with database_engine.begin_read_committed() as conn:
+        async with database_connection.begin_read_committed() as conn:
             await self._insert_test_data_returning_id(conn, test_table_in_db, value1)
 
         # Start a READ COMMITTED read-only connection
-        async with database_engine.begin_readonly_read_committed() as read_conn:
+        async with database_connection.begin_readonly_read_committed() as read_conn:
             # First query: count rows with specific category
             initial_result = await read_conn.execute(
                 sa.select(sa.func.count())
@@ -489,7 +489,7 @@ class TestExtendedAsyncSAEngineReadCommitted:
             initial_ids = {row.id for row in initial_rows}
 
             # Another transaction inserts a new row and commits using READ COMMITTED
-            async with database_engine.begin_read_committed() as write_conn:
+            async with database_connection.begin_read_committed() as write_conn:
                 await self._insert_test_data_returning_id(write_conn, test_table_in_db, value2)
 
             # Second query in same READ COMMITTED transaction
@@ -519,7 +519,7 @@ class TestExtendedAsyncSAEngineReadCommitted:
     @pytest.mark.asyncio
     async def test_read_committed_phantom_read_with_range_query(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         test_table_in_db: sa.Table,
     ) -> None:
         """
@@ -529,14 +529,14 @@ class TestExtendedAsyncSAEngineReadCommitted:
         which is a common scenario where phantom reads occur.
         """
         # Insert initial data with versions 1-3 using READ COMMITTED connection
-        async with database_engine.begin_read_committed() as conn:
+        async with database_connection.begin_read_committed() as conn:
             for version in range(1, 4):
                 await self._insert_test_data_returning_id(
                     conn, test_table_in_db, f"value_{version}", version
                 )
 
         # Start a READ COMMITTED transaction
-        async with database_engine.begin_readonly_read_committed() as read_conn:
+        async with database_connection.begin_readonly_read_committed() as read_conn:
             # First range query: get rows with version >= 1 and <= 3
             initial_result = await read_conn.execute(
                 sa.select(test_table_in_db.c.id, test_table_in_db.c.version)
@@ -549,7 +549,7 @@ class TestExtendedAsyncSAEngineReadCommitted:
             assert initial_versions == [1, 2, 3]
 
             # Another transaction inserts rows with versions 4 and 5 using READ COMMITTED
-            async with database_engine.begin_read_committed() as write_conn:
+            async with database_connection.begin_read_committed() as write_conn:
                 for version in [4, 5]:
                     await write_conn.execute(
                         sa.insert(test_table_in_db).values(

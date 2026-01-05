@@ -186,49 +186,41 @@ from .errors.resource import (
     SessionNotAllocated,
 )
 from .exceptions import MultiAgentError
-from .models import (
+from .models.agent import AgentRow, agents
+from .models.container_registry import ContainerRegistryRow
+from .models.domain import domains
+from .models.dotfile import prepare_dotfiles
+from .models.endpoint import EndpointRow
+from .models.image import (
+    ImageRow,
+    bulk_get_image_configs,
+)
+from .models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    KernelRow,
+    kernels,
+)
+from .models.keypair import KeyPairRow, query_bootstrap_script
+from .models.network import NetworkRow, NetworkType
+from .models.resource_policy import KeyPairResourcePolicyRow
+from .models.routing import RouteStatus, RoutingRow
+from .models.scaling_group import ScalingGroupRow, query_allowed_sgroups, scaling_groups
+from .models.session import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE,
     PRIVATE_SESSION_TYPES,
-    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
-    AgentRow,
-    EndpointRow,
-    ImageRow,
-    KernelLoadingStrategy,
-    KernelRow,
-    KeyPairResourcePolicyRow,
-    KeyPairRow,
-    NetworkRow,
-    NetworkType,
-    RouteStatus,
-    RoutingRow,
-    ScalingGroupRow,
-    SessionDependencyRow,
-    SessionRow,
-    UserRole,
-    UserRow,
-    VFolderRow,
-    agents,
-    domains,
-    handle_session_exception,
-    kernels,
-    prepare_dotfiles,
-    prepare_vfolder_mounts,
-    query_allowed_sgroups,
-    query_bootstrap_script,
-    scaling_groups,
-    verify_vfolder_name,
-)
-from .models.container_registry import ContainerRegistryRow
-from .models.image import bulk_get_image_configs
-from .models.session import (
     SESSION_KERNEL_STATUS_MAPPING,
+    USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     ConcurrencyUsed,
+    KernelLoadingStrategy,
+    SessionDependencyRow,
     SessionLifecycleManager,
+    SessionRow,
+    handle_session_exception,
 )
 from .models.storage import StorageSessionManager
+from .models.user import UserRole, UserRow
 from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
@@ -236,6 +228,7 @@ from .models.utils import (
     reenter_txn_session,
     sql_json_merge,
 )
+from .models.vfolder import VFolderRow, prepare_vfolder_mounts, verify_vfolder_name
 from .scheduler.types import AgentAllocationContext, KernelAgentBinding, SchedulingContext
 from .types import UserScope
 

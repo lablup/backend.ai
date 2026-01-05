@@ -7,7 +7,7 @@ from ai.backend.manager.models.utils import agg_to_array
 
 
 @pytest.fixture
-async def virtual_grid_db(database_engine):
+async def virtual_grid_db(database_connection):
     base = declarative_base()
     metadata = base.metadata
     grid = sa.Table(
@@ -32,7 +32,7 @@ async def virtual_grid_db(database_engine):
     def _drop_tables(conn, *args, **kwargs):
         return metadata.drop_all(conn, [grid, foreign_grid])
 
-    async with database_engine.begin() as conn:
+    async with database_connection.begin() as conn:
         await conn.run_sync(_create_tables)
         await conn.execute(
             grid.insert(),

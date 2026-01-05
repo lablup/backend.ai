@@ -9,16 +9,15 @@ from sqlalchemy.orm import load_only, noload
 from ai.backend.common.types import ResourceSlot, SessionResult, SessionTypes
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models import (
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_policy import (
     DefaultForUnspecified,
-    DomainRow,
-    GroupRow,
     KeyPairResourcePolicyRow,
-    KeyPairRow,
-    SessionDependencyRow,
-    SessionRow,
-    UserRow,
 )
+from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import execute_with_retry
 
 from .types import PredicateResult, SchedulingContext

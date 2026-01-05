@@ -106,14 +106,10 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.kernel import InvalidSessionData, SessionNotFound
 from ai.backend.manager.errors.resource import NoCurrentTaskContext
-from ai.backend.manager.models import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    SessionDependencyRow,
-    SessionRow,
-    UserRole,
-    kernels,
-    keypairs,
-)
+from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
+from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.utils import query_userinfo as _query_userinfo
 
 from .auth import auth_required

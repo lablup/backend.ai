@@ -16,7 +16,6 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import foreign, joinedload, relationship, selectinload
-from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -32,7 +31,7 @@ from ai.backend.manager.models.base import (
     mapper_registry,
 )
 from ai.backend.manager.models.hasher import PasswordHasherFactory
-from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
+from ai.backend.manager.models.hasher.types import HashInfo, PasswordColumn, PasswordInfo
 from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
@@ -48,6 +47,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 __all__: Sequence[str] = (
     "ACTIVE_USER_STATUSES",
     "INACTIVE_USER_STATUSES",
+    "PasswordColumn",  # Re-exported from hasher/types.py
     "PasswordHashAlgorithm",
     "UserRole",  # For compatibility with existing code
     "UserRow",
@@ -57,31 +57,6 @@ __all__: Sequence[str] = (
     "compare_to_hashed_password",
     "users",
 )
-
-
-class PasswordColumn(TypeDecorator):
-    """Custom column type that prevents direct password assignment.
-
-    Passwords should be set using proper functions that have access to config:
-    - Use check_credential() for login with gradual migration
-    - Use explicit UPDATE queries with pre-hashed passwords
-
-    This column type is kept for backward compatibility but should not be used
-    for setting passwords directly.
-    """
-
-    impl = VARCHAR
-    cache_ok = True
-
-    def process_bind_param(self, value: Any, dialect: Any) -> Optional[str]:
-        if value is None:
-            return None
-
-        if not isinstance(value, PasswordInfo):
-            raise ValueError("Password must be set using PasswordInfo for hashing.")
-
-        hash_info = value.generate_new_hash()
-        return hash_info.to_string()
 
 
 ACTIVE_USER_STATUSES = (UserStatus.ACTIVE,)
@@ -164,7 +139,7 @@ def _get_kernel_row_join_condition():
 
 class UserRow(Base):
     __table__ = users
-    # from ..keypair import KeyPairRow
+    # from ai.backend.manager.models.keypair import KeyPairRow
 
     sessions = relationship(
         "SessionRow",

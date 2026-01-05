@@ -23,8 +23,10 @@ from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.errors.resource import DBOperationFailed
-from ai.backend.manager.models import UserRole, error_logs, groups
-from ai.backend.manager.models import association_groups_users as agus
+from ai.backend.manager.models.error_logs import error_logs
+from ai.backend.manager.models.group import association_groups_users as agus
+from ai.backend.manager.models.group import groups
+from ai.backend.manager.models.user import UserRole
 
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required

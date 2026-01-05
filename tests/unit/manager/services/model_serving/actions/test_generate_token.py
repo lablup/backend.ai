@@ -8,7 +8,7 @@ from aioresponses import aioresponses
 
 from ai.backend.common.data.endpoint.types import EndpointStatus
 from ai.backend.manager.data.model_serving.types import EndpointTokenData, RequesterCtx
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.data.user.types import UserRole
 from ai.backend.manager.services.model_serving.actions.generate_token import (
     GenerateTokenAction,
     GenerateTokenActionResult,

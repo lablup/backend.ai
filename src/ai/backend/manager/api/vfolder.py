@@ -69,40 +69,40 @@ from ai.backend.manager.errors.storage import (
     VFolderNotFound,
     VFolderOperationFailed,
 )
-from ai.backend.manager.models import (
+from ai.backend.manager.models.agent import agents
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.kernel import kernels
+from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.resource_policy import keypair_resource_policies
+from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.models.user import (
     ACTIVE_USER_STATUSES,
-    EndpointRow,
     UserRole,
+    UserRow,
     UserStatus,
+    users,
+)
+from ai.backend.manager.models.utils import execute_with_retry, execute_with_txn_retry
+from ai.backend.manager.models.vfolder import (
     VFolderInvitationState,
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
+    VFolderPermissionRow,
     VFolderPermissionSetAlias,
     VFolderPermissionValidator,
     VFolderStatusSet,
-    agents,
+    delete_vfolder_relation_rows,
     ensure_host_permission_allowed,
     get_allowed_vfolder_hosts_by_group,
     get_allowed_vfolder_hosts_by_user,
-    kernels,
-    keypair_resource_policies,
-    keypairs,
+    is_unmanaged,
     query_accessible_vfolders,
     update_vfolder_status,
-    users,
     vfolder_invitations,
     vfolder_permissions,
     vfolder_status_map,
     vfolders,
-)
-from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.models.utils import execute_with_retry, execute_with_txn_retry
-from ai.backend.manager.models.vfolder import (
-    VFolderPermissionRow,
-    delete_vfolder_relation_rows,
-    is_unmanaged,
 )
 from ai.backend.manager.models.vfolder import VFolderRow as VFolderDBRow
 from ai.backend.manager.repositories.base.updater import Updater
@@ -1556,7 +1556,7 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     if row["ownership_type"] != VFolderOwnershipType.GROUP:
         raise VFolderNotFound("Only project folders are directly sharable.")
     async with root_ctx.db.begin() as conn:
-        from ai.backend.manager.models import association_groups_users as agus
+        from ai.backend.manager.models.group import association_groups_users as agus
 
         allowed_vfolder_types = (
             await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()

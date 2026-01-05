@@ -44,7 +44,7 @@ from ai.backend.manager.errors.api import (
     NotImplementedAPI,
 )
 from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.models import UserRole, users
+from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.utils import (
     check_if_requester_is_eligible_to_act_as_target_access_key,
     check_if_requester_is_eligible_to_act_as_target_user_uuid,

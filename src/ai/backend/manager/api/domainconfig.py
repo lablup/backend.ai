@@ -16,7 +16,7 @@ from ai.backend.manager.errors.storage import (
     DotfileCreationFailed,
     DotfileNotFound,
 )
-from ai.backend.manager.models import (
+from ai.backend.manager.models.domain import (
     MAXIMUM_DOTFILE_SIZE,
     domains,
     query_domain_dotfiles,

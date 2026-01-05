@@ -18,7 +18,7 @@ from ai.backend.manager.errors.common import (
     ObjectNotFound,
     ServerMisconfiguredError,
 )
-from ai.backend.manager.models import query_allowed_sgroups
+from ai.backend.manager.models.scaling_group import query_allowed_sgroups
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from .auth import auth_required

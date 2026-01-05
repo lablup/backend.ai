@@ -41,13 +41,12 @@ from yarl import URL
 from ai.backend.common.exception import DatabaseError
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.config.bootstrap import DatabaseConfig
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.errors.resource import DBOperationFailed
 from ai.backend.manager.types import Sentinel
 
 if TYPE_CHECKING:
-    from ai.backend.manager.config.bootstrap import BootstrapConfig
+    from ai.backend.manager.config.bootstrap import BootstrapConfig, DatabaseConfig
 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

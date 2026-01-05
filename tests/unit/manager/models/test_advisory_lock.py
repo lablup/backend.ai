@@ -7,7 +7,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
 @pytest.mark.asyncio
-async def test_lock(database_engine: ExtendedAsyncSAEngine) -> None:
+async def test_lock(database_connection: ExtendedAsyncSAEngine) -> None:
     enter_count = 0
     done_count = 0
 
@@ -21,13 +21,13 @@ async def test_lock(database_engine: ExtendedAsyncSAEngine) -> None:
     for idx in range(5):
         tasks.append(
             asyncio.create_task(
-                critical_section(database_engine),
+                critical_section(database_connection),
                 name=f"critical-section-{idx}",
             ),
         )
     await asyncio.sleep(0.5)
 
-    async with database_engine.connect() as conn:
+    async with database_connection.connect() as conn:
         result = await conn.exec_driver_sql(
             "SELECT objid, granted, pid FROM pg_locks WHERE locktype = 'advisory' AND objid = 42;",
         )
@@ -56,7 +56,7 @@ async def test_lock(database_engine: ExtendedAsyncSAEngine) -> None:
     assert enter_count >= done_count
 
     # Check all tasks have unlocked.
-    async with database_engine.connect() as conn:
+    async with database_connection.connect() as conn:
         result = await conn.exec_driver_sql(
             "SELECT objid, granted, pid FROM pg_locks "
             "WHERE locktype = 'advisory' AND objid = 42 AND granted = 't';",
@@ -67,11 +67,11 @@ async def test_lock(database_engine: ExtendedAsyncSAEngine) -> None:
 
 
 @pytest.mark.asyncio
-async def test_lock_timeout(database_engine: ExtendedAsyncSAEngine) -> None:
+async def test_lock_timeout(database_connection: ExtendedAsyncSAEngine) -> None:
     lock_connection_timeout = 0.5
     sleep = 1
 
     with pytest.raises(asyncio.TimeoutError):
-        database_engine.lock_conn_timeout = lock_connection_timeout
-        async with database_engine.advisory_lock(LockID.LOCKID_TEST):
+        database_connection.lock_conn_timeout = lock_connection_timeout
+        async with database_connection.advisory_lock(LockID.LOCKID_TEST):
             await asyncio.sleep(sleep)

@@ -54,8 +54,9 @@ from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.resource import NoCurrentTaskContext, ProjectNotFound
 from ai.backend.manager.events.hub.propagators.session import SessionEventPropagator
 from ai.backend.manager.exceptions import InvalidArgument
-from ai.backend.manager.models import UserRole, groups
+from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.types import Sentinel
 
 from .auth import auth_required

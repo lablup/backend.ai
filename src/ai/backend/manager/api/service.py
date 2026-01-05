@@ -59,13 +59,9 @@ from ai.backend.manager.data.model_serving.types import (
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import InvalidAuthParameters
 from ai.backend.manager.errors.storage import VFolderNotFound
-from ai.backend.manager.models import (
-    ModelServiceHelper,
-    UserRole,
-    UserRow,
-    query_accessible_vfolders,
-    vfolders,
-)
+from ai.backend.manager.models.endpoint import ModelServiceHelper
+from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.vfolder import query_accessible_vfolders, vfolders
 from ai.backend.manager.services.deployment.actions.create_legacy_deployment import (
     CreateLegacyDeploymentAction,
     CreateLegacyDeploymentActionResult,

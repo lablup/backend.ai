@@ -15,18 +15,17 @@ from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.resource import DBOperationFailed, TaskTemplateNotFound
-from ai.backend.manager.models import (
+from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.group import association_groups_users as agus
+from ai.backend.manager.models.group import groups
+from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.session_template import (
     TemplateType,
-    UserRole,
-    domains,
-    groups,
-    keypairs,
+    check_cluster_template,
     query_accessible_session_templates,
     session_templates,
-    users,
 )
-from ai.backend.manager.models import association_groups_users as agus
-from ai.backend.manager.models.session_template import check_cluster_template
+from ai.backend.manager.models.user import UserRole, users
 
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required

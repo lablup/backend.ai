@@ -80,15 +80,12 @@ from ai.backend.manager.errors.common import (
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.resource import InstanceNotAvailable
 from ai.backend.manager.exceptions import convert_to_status_data
-from ai.backend.manager.models import (
-    AgentRow,
-    EndpointRow,
-    KernelRow,
-    RouteStatus,
-    ScalingGroupOpts,
-    SessionRow,
-)
-from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
+from ai.backend.manager.models.routing import RouteStatus
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import (
     execute_with_retry,
     retry_txn,

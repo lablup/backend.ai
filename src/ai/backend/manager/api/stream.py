@@ -50,7 +50,8 @@ from ai.backend.manager.errors.kernel import (
 from ai.backend.manager.errors.resource import AppNotFound, NoCurrentTaskContext
 from ai.backend.manager.errors.service import AppServiceStartFailed
 from ai.backend.manager.idle import AppStreamingStatus
-from ai.backend.manager.models import KernelLoadingStrategy, KernelRow, SessionRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required

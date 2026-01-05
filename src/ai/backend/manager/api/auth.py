@@ -39,12 +39,12 @@ from ai.backend.manager.errors.auth import (
     InvalidClientIPConfig,
 )
 from ai.backend.manager.errors.common import RejectedByHook
-from ai.backend.manager.models import (
+from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.resource_policy import (
     keypair_resource_policies,
-    keypairs,
     user_resource_policies,
-    users,
 )
+from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import execute_with_retry
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
 from ai.backend.manager.services.auth.actions.generate_ssh_keypair import GenerateSSHKeypairAction
