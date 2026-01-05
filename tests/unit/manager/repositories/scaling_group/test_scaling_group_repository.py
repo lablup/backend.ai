@@ -223,7 +223,7 @@ class TestScalingGroupRepositoryDB:
                 description="Test scaling group for update",
                 is_active=True,
                 is_public=True,
-                created_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
                 wsproxy_addr=None,
                 wsproxy_api_token=None,
                 driver="static",
