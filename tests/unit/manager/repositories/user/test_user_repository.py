@@ -61,15 +61,16 @@ class TestUserRepository:
         database_engine: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         """Database engine that auto-cleans test data after each test"""
-        yield database_engine
-
-        # Cleanup in FK-safe order
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(KeyPairRow))
-            await db_sess.execute(sa.delete(UserRow))
-            await db_sess.execute(sa.delete(UserResourcePolicyRow))
-            await db_sess.execute(sa.delete(DomainRow))
-            await db_sess.execute(sa.delete(KeyPairResourcePolicyRow))
+        try:
+            yield database_engine
+        finally:
+            # Cleanup in FK-safe order
+            async with database_engine.begin_session() as db_sess:
+                await db_sess.execute(sa.delete(KeyPairRow))
+                await db_sess.execute(sa.delete(UserRow))
+                await db_sess.execute(sa.delete(UserResourcePolicyRow))
+                await db_sess.execute(sa.delete(DomainRow))
+                await db_sess.execute(sa.delete(KeyPairResourcePolicyRow))
 
     @pytest.fixture
     async def default_keypair_resource_policy(
