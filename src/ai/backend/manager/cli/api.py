@@ -10,10 +10,9 @@ import aiofiles
 import click
 
 from ai.backend.common.json import pretty_json_str
+from ai.backend.manager.api.gql.schema import schema as strawberry_schema
+from ai.backend.manager.api.gql_legacy.schema import graphene_schema
 from ai.backend.manager.openapi import generate
-
-from ..api.gql.schema import schema as strawberry_schema
-from ..models.gql import graphene_schema
 
 if TYPE_CHECKING:
     from .context import CLIContext

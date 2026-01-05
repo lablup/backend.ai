@@ -39,8 +39,8 @@ def generate_example_configuration(output: Path) -> None:
     """
     import tomlkit
 
-    from ..config import ServerConfig, generate_example_json
-    from ..utils import ensure_json_serializable
+    from ai.backend.account_manager.config import ServerConfig, generate_example_json
+    from ai.backend.account_manager.utils import ensure_json_serializable
 
     generated_example = generate_example_json(ServerConfig)
     if output == "-" or output is None:

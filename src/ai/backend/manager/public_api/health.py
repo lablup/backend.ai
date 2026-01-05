@@ -12,17 +12,17 @@ from aiohttp import web
 from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
 from ai.backend.common.types import PromMetric, PromMetricGroup, PromMetricPrimitive
 from ai.backend.logging import BraceStyleAdapter
-
-from .. import __version__
-from ..models.health import (
+from ai.backend.manager import __version__
+from ai.backend.manager.models.health import (
     SQLAlchemyConnectionInfo,
     get_manager_db_cxn_status,
     report_manager_status,
 )
+
 from .types import CORSOptions
 
 if TYPE_CHECKING:
-    from ..api.context import RootContext
+    from ai.backend.manager.api.context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -37,7 +37,7 @@ async def report_status_bgtask(root_ctx: RootContext) -> None:
             except asyncio.CancelledError:
                 raise
             except Exception as e:
-                log.exception(f"Failed to report manager health status (e:{str(e)})")
+                log.exception(f"Failed to report manager health status (e:{e!s})")
     except asyncio.CancelledError:
         pass
 

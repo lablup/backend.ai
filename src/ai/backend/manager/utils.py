@@ -7,15 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.types import AccessKey
 
-from .models import (
-    UserRole,
-    domains,
-    groups,
-    keypair_resource_policies,
-    keypairs,
-    users,
-)
-from .models import association_groups_users as agus
+from .models.domain import domains
+from .models.group import association_groups_users as agus
+from .models.group import groups
+from .models.keypair import keypairs
+from .models.resource_policy import keypair_resource_policies
+from .models.user import UserRole, users
 
 
 def check_if_requester_is_eligible_to_act_as_target_user(

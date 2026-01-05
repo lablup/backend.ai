@@ -5,10 +5,9 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Optional, override
 
 import yarl
-from typing_extensions import override
 
 from ai.backend.common.types import (
     ClusterMode,
@@ -16,7 +15,7 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
-from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.repositories.base import CreatorSpec
 
 
@@ -77,4 +76,27 @@ class EndpointCreatorSpec(CreatorSpec[EndpointRow]):
             environ=self.environ,
             resource_opts=self.resource_opts,
             open_to_public=self.open_to_public,
+        )
+
+
+@dataclass
+class EndpointTokenCreatorSpec(CreatorSpec[EndpointTokenRow]):
+    """CreatorSpec for endpoint token creation."""
+
+    id: uuid.UUID
+    token: str
+    endpoint: uuid.UUID
+    domain: str
+    project: uuid.UUID
+    session_owner: uuid.UUID
+
+    @override
+    def build_row(self) -> EndpointTokenRow:
+        return EndpointTokenRow(
+            id=self.id,
+            token=self.token,
+            endpoint=self.endpoint,
+            domain=self.domain,
+            project=self.project,
+            session_owner=self.session_owner,
         )

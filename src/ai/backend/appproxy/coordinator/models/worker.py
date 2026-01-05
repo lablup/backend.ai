@@ -39,8 +39,8 @@ __all__ = [
     "Worker",
     "WorkerAppFilter",
     "WorkerStatus",
-    "pick_worker",
     "add_circuit",
+    "pick_worker",
 ]
 
 
@@ -388,7 +388,7 @@ async def add_circuit(
     mode: AppMode,
     routes: list[RouteInfo],
     *,
-    envs: dict[str, Any] = {},
+    envs: dict[str, Any] | None = None,
     args: str | None = None,
     open_to_public=False,
     allowed_client_ips: str | None = None,
@@ -396,6 +396,8 @@ async def add_circuit(
     preferred_subdomain: str | None = None,
     worker_id: UUID | None = None,
 ) -> tuple[Circuit, Worker]:
+    if envs is None:
+        envs = {}
     if worker_id:
         worker = await Worker.get(session, worker_id, load_circuits=True)
         if worker.available_slots - worker.occupied_slots <= 0 and worker.available_slots >= 0:
@@ -418,7 +420,7 @@ async def add_circuit(
             subdomain = f"{_requested_subdomain}-{sub_id}"
         circuit_params["subdomain"] = subdomain
     else:
-        acquired_ports = set([c.port for c in worker.circuits])
+        acquired_ports = {c.port for c in worker.circuits}
         port_range = worker.port_range
         if not port_range:
             raise MissingFrontendConfigError("Port range is required for PORT frontend mode")

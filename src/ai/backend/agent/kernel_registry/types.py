@@ -5,12 +5,11 @@ from typing import TYPE_CHECKING, Self
 
 from pydantic import BaseModel, Field
 
+from ai.backend.agent.kernel import KernelOwnershipData
+from ai.backend.agent.proxy import DomainSocketPathPair
+from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AgentId, KernelId, ServicePort, SessionTypes
-
-from ..kernel import KernelOwnershipData
-from ..proxy import DomainSocketPathPair
-from ..resources import KernelResourceSpec
 
 if TYPE_CHECKING:
     from ai.backend.agent.docker.kernel import DockerKernel
@@ -57,7 +56,7 @@ class KernelRecoveryData(BaseModel):
 
     @classmethod
     def from_docker_kernel(cls, kernel: DockerKernel) -> Self:
-        result = cls(
+        return cls(
             id=kernel.kernel_id,
             agent_id=kernel.agent_id,
             image_ref=kernel.image,
@@ -74,7 +73,6 @@ class KernelRecoveryData(BaseModel):
             repl_in_port=kernel.data["repl_in_port"],
             repl_out_port=kernel.data["repl_out_port"],
         )
-        return result
 
     def to_docker_kernel(self) -> DockerKernel:
         from ai.backend.agent.docker.kernel import DockerKernel

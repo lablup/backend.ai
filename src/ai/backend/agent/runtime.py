@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import signal
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
-from typing import TYPE_CHECKING, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Optional
 
 import aiotools
 

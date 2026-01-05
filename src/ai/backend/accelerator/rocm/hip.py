@@ -2,7 +2,8 @@ import ctypes
 import logging
 import platform
 from abc import ABCMeta, abstractmethod
-from typing import Any, MutableMapping, Tuple
+from collections.abc import MutableMapping
+from typing import Any
 
 from ai.backend.common.logging import BraceStyleAdapter
 
@@ -162,8 +163,7 @@ def _load_library(name):
     try:
         if platform.system() == "Windows":
             return ctypes.windll.LoadLibrary(name)
-        else:
-            return ctypes.cdll.LoadLibrary(name)
+        return ctypes.cdll.LoadLibrary(name)
     except OSError:
         pass
     return None
@@ -219,11 +219,10 @@ class libhip(LibraryBase):
                 if _dll:
                     return _dll
             return None
-        else:
-            raise NotImplementedError()
+        raise NotImplementedError
 
     @classmethod
-    def get_version(cls) -> Tuple[int, int]:
+    def get_version(cls) -> tuple[int, int]:
         if cls._runtime_version == (0, 0):
             raw_ver = ctypes.c_int()
             cls.invoke("hipRuntimeGetVersion", ctypes.byref(raw_ver))
@@ -232,7 +231,7 @@ class libhip(LibraryBase):
         return cls._runtime_version
 
     @classmethod
-    def get_driver_version(cls) -> Tuple[int, int]:
+    def get_driver_version(cls) -> tuple[int, int]:
         if cls._driver_version == (0, 0):
             raw_ver = ctypes.c_int()
             cls.invoke("hipDriverGetVersion", ctypes.byref(raw_ver))
@@ -281,11 +280,10 @@ class librocm_smi(LibraryBase):
                 if _dll:
                     return _dll
             return None
-        else:
-            raise NotImplementedError()
+        raise NotImplementedError
 
     @classmethod
-    def get_version(cls) -> Tuple[int, int, int]:
+    def get_version(cls) -> tuple[int, int, int]:
         if cls._version == (0, 0, 0):
             ver_struct = rsmiVersionProp()
             cls.invoke("rsmi_version_get", ctypes.byref(ver_struct))
@@ -362,8 +360,7 @@ class librocm_smi(LibraryBase):
         vbios = cls.get_gpu_vbios_version(device_idx)
         if vbios.count("-") == 2 and len(str(vbios.split("-")[1])) > 1:
             return vbios.split("-")[1]
-        else:
-            return "unknown"
+        return "unknown"
 
     @classmethod
     def get_gpu_uuid(cls, device_idx: int) -> str:

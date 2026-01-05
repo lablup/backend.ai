@@ -5,11 +5,11 @@ import signal
 import ssl
 import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import AsyncGenerator, Sequence
 from http import HTTPStatus
 from pathlib import Path
 from pprint import pformat, pprint
-from typing import Any, AsyncGenerator
+from typing import Any
 
 import aiofiles
 import aiotools
@@ -131,7 +131,7 @@ async def handle_fstab_detail(request: web.Request) -> web.Response:
     log.info("HANDLE_FSTAB_DETAIL")
     params = request.query
     fstab_path = params.get("fstab_path", "/etc/fstab")
-    async with aiofiles.open(fstab_path, mode="r") as fp:
+    async with aiofiles.open(fstab_path) as fp:
         content = await fp.read()
         return web.Response(text=content)
 

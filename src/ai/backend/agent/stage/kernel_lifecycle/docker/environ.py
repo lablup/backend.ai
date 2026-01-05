@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Final, Optional, Self, override
 
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
+from ai.backend.agent.stage.kernel_lifecycle.defs import LIBBAIHOOK_MOUNT_PATH
 from ai.backend.common.docker import KernelFeatures, LabelName
 from ai.backend.common.stage.types import (
     ArgsSpecGenerator,
@@ -16,8 +17,6 @@ from ai.backend.common.types import (
     KernelCreationConfig,
     SlotName,
 )
-
-from ..defs import LIBBAIHOOK_MOUNT_PATH
 
 LD_PRELOAD: Final[str] = "LD_PRELOAD"
 LOCAL_USER_ID: Final[str] = "LOCAL_USER_ID"

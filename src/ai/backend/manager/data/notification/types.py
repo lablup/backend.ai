@@ -2,10 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, override
 from uuid import UUID
-
-from typing_extensions import override
 
 from ai.backend.common.data.notification import (
     NotificationChannelType,

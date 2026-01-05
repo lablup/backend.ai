@@ -1,8 +1,9 @@
 import asyncio
 import logging
+from collections.abc import Mapping
 from pathlib import Path
 from subprocess import CalledProcessError
-from typing import Any, Final, FrozenSet, Mapping
+from typing import Any, Final
 
 import aiofiles
 import aiofiles.os
@@ -10,17 +11,16 @@ import aiofiles.os
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-
-from ...errors import (
+from ai.backend.storage.errors import (
     DDNCommandFailedError,
     QuotaScopeAlreadyExists,
     QuotaScopeNotFoundError,
     SubprocessStdoutNotAvailableError,
 )
-from ...subproc import run
-from ...types import Optional, QuotaConfig, QuotaUsage
-from ..abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
-from ..vfs import BaseQuotaModel, BaseVolume
+from ai.backend.storage.subproc import run
+from ai.backend.storage.types import Optional, QuotaConfig, QuotaUsage
+from ai.backend.storage.volumes.abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
+from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
 
 FIRST_PROJECT_ID: Final = 100
 PROJECT_MAIN_ID_KEY: Final = "ddn/main-project-id"
@@ -48,7 +48,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
     async def _read_project_id(self, pid_file_path: str | Path) -> int | None:
         def _read():
             try:
-                with open(pid_file_path, "r") as f:
+                with open(pid_file_path) as f:
                     return int(f.read())
             except FileNotFoundError:
                 return None
@@ -118,8 +118,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
                     # words[1] is soft_limit
                     if hard_limit == 0:
                         return None
-                    if raw_used_bytes.endswith("*"):
-                        raw_used_bytes = raw_used_bytes[:-1]
+                    raw_used_bytes = raw_used_bytes.removesuffix("*")
                     used_bytes = _kilobyte_to_byte(int(raw_used_bytes))
                     limit_bytes = _kilobyte_to_byte(hard_limit)
                     if used_bytes < 0 or limit_bytes < 0:
@@ -235,5 +234,5 @@ class EXAScalerFSVolume(BaseVolume):
     async def create_quota_model(self) -> AbstractQuotaModel:
         return EXAScalerQuotaModel(self.mount_path, self.local_config, self.etcd)
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA])

@@ -46,8 +46,9 @@ Example: Adding a new service → Read `services/README.md` → Follow patterns 
 * Minimize state and side effects
 * Use the simplest solution that could possibly work
 * Make dependencies explicit
-  - Use relative imports when referring to modules in a subtree under `src` sharing a single BUILD file
-  - Use absolute imports when referring to modules in other subtrees under `src`, 3rd-party packages, and Python intrinsic packages
+  - Use child relative imports (`from .submodule`) only for modules within the same package directory
+  - Use absolute imports (`from ai.backend.package.module`) for parent modules and cross-package references
+  - Never use parent relative imports (`from ..module`) - always convert to absolute imports
 * Express intent clearly through naming and structure
 * Name things with meaningful, predictable, and explicit but concise tones
   - When reading codes, variable names should align with what intermediate-level developers could expect from them.
@@ -125,6 +126,33 @@ Example: Adding a new service → Read `services/README.md` → Follow patterns 
   - When using partial data structures, use `typing.cast()` to minimal scopes.
 * Add BUILD files including `python_tests()` and `python_test_utils()` appropriately depending on the directory contents
 * Prefer pytest-style module-level test functions rather than unittest-style test classes
+
+### Database Tests with `with_tables`
+
+When writing repository tests that use real database with `with_tables` from `ai.backend.testutils.db`:
+
+* **Include all Row dependencies**: SQLAlchemy ORM uses string-based relationship references.
+  When a Row model has relationships to other Row models, all related models must be imported
+  AND included in `with_tables` to ensure proper mapper initialization.
+  ```python
+  # Example: If UserRow has relationship to EndpointRow
+  from ai.backend.manager.models.user import UserRow
+  from ai.backend.manager.models.endpoint import EndpointRow  # Required for UserRow's relationship
+
+  async with with_tables(db, [
+      DomainRow,
+      UserRow,
+      EndpointRow,  # Must be included, not just imported
+      # ... other dependencies
+  ]):
+  ```
+* **Order by FK dependencies**: Tables must be ordered with parent tables before children
+  to satisfy foreign key constraints during table creation.
+* **Trace relationship chains**: If `RowA` → `RowB` → `RowC` via relationships,
+  all three must be in `with_tables`. Check each Row's `relationship()` definitions
+  for string references to other Row classes.
+* **Do NOT use `# noqa: F401` for mapper-only imports**: All Row models needed for mapper
+  configuration should also be in `with_tables` to avoid FK constraint errors.
 
 ## Build System & Development Commands
 

@@ -69,10 +69,9 @@ class HostPortPair(BaseConfigModel):
     def __getitem__(self, *args) -> int | str:
         if args[0] == 0:
             return self.host
-        elif args[0] == 1:
+        if args[0] == 1:
             return self.port
-        else:
-            raise KeyError(*args)
+        raise KeyError(*args)
 
 
 class ConsoleConfig(BaseConfigModel):

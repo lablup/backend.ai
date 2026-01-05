@@ -15,6 +15,10 @@ from ai.backend.manager.data.permission.permission_group import (
     PermissionGroupCreator,
     PermissionGroupData,
 )
+from ai.backend.manager.data.permission.role import (
+    RoleData,
+)
+from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
@@ -31,13 +35,8 @@ from ai.backend.manager.repositories.base.creator import Creator, execute_creato
 from ai.backend.manager.repositories.permission_controller.creators import (
     AssociationScopesEntitiesCreatorSpec,
     ObjectPermissionCreatorSpec,
+    RoleCreatorSpec,
 )
-
-from ...data.permission.role import (
-    RoleCreateInput,
-    RoleData,
-)
-from ...models.rbac_models.role import RoleRow
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -67,15 +66,15 @@ class RoleManager:
     async def _create_system_role(
         self, db_session: SASession, data: ScopeSystemRoleData
     ) -> RoleData:
-        input = RoleCreateInput(
-            name=data.role_name(),
-            source=RoleSource.SYSTEM,
+        creator = Creator(
+            spec=RoleCreatorSpec(
+                name=data.role_name(),
+                source=RoleSource.SYSTEM,
+                status=RoleStatus.ACTIVE,
+            )
         )
-        row = RoleRow.from_input(input)
-        db_session.add(row)
-        await db_session.flush()
-        await db_session.refresh(row)
-        return row.to_data()
+        result = await execute_creator(db_session, creator)
+        return result.row.to_data()
 
     async def _create_permission_group(
         self, db_session: SASession, data: ScopeSystemRoleData, role: RoleData

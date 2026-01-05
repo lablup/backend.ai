@@ -85,7 +85,7 @@ class PerProjectContainerRegistryQuotaService(AbstractPerProjectContainerRegistr
         self,
         repository: PerProjectRegistryQuotaRepository,
         client_pool: PerProjectContainerRegistryQuotaClientPool,
-    ):
+    ) -> None:
         self._repository = repository
         self._client_pool = client_pool
 

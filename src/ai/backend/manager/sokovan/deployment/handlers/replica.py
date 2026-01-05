@@ -27,7 +27,7 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
         self,
         deployment_executor: DeploymentExecutor,
         deployment_controller: DeploymentController,
-    ):
+    ) -> None:
         self._deployment_executor = deployment_executor
         self._deployment_controller = deployment_controller
 

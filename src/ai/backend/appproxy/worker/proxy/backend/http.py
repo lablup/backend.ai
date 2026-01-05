@@ -4,9 +4,10 @@ import asyncio
 import logging
 import random
 import time
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from functools import partial
-from typing import AsyncIterator, Final, override
+from typing import Final, override
 
 import aiohttp
 import aiotools
@@ -69,7 +70,7 @@ class HTTPBackend(BaseBackend):
     def selected_route(self) -> RouteInfo:
         if len(self.routes) == 0:
             raise WorkerNotAvailable
-        elif len(self.routes) == 1:
+        if len(self.routes) == 1:
             selected_route = self.routes[0]
             if selected_route.traffic_ratio == 0:
                 raise WorkerNotAvailable
@@ -114,8 +115,10 @@ class HTTPBackend(BaseBackend):
 
     @asynccontextmanager
     async def connect_websocket(
-        self, route: RouteInfo, request: web.Request, protocols: list[str] = []
+        self, route: RouteInfo, request: web.Request, protocols: list[str] | None = None
     ) -> AsyncIterator[aiohttp.ClientWebSocketResponse]:
+        if protocols is None:
+            protocols = []
         client_key = ClientKey(
             endpoint=f"http://{route.current_kernel_host}:{route.kernel_port}",
             domain=str(route.route_id),

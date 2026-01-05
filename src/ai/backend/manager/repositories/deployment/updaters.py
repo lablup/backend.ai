@@ -55,6 +55,7 @@ class ReplicaSpecUpdaterSpec(UpdaterSpec[EndpointRow]):
     """UpdaterSpec for replica specification updates."""
 
     replica_count: OptionalState[int] = field(default_factory=OptionalState[int].nop)
+    desired_replica_count: OptionalState[int] = field(default_factory=OptionalState[int].nop)
 
     @property
     @override
@@ -64,8 +65,9 @@ class ReplicaSpecUpdaterSpec(UpdaterSpec[EndpointRow]):
     @override
     def build_values(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
-        # Use the actual database column name "replicas"
+        # Use the actual database column names
         self.replica_count.update_dict(to_update, "replicas")
+        self.desired_replica_count.update_dict(to_update, "desired_replicas")
         return to_update
 
 
@@ -116,6 +118,7 @@ class RevisionStateUpdaterSpec(UpdaterSpec[EndpointRow]):
 
     current_revision: TriState[UUID] = field(default_factory=TriState[UUID].nop)
     deploying_revision: TriState[UUID] = field(default_factory=TriState[UUID].nop)
+    revision_history_limit: OptionalState[int] = field(default_factory=OptionalState[int].nop)
 
     @property
     @override
@@ -127,6 +130,7 @@ class RevisionStateUpdaterSpec(UpdaterSpec[EndpointRow]):
         to_update: dict[str, Any] = {}
         self.current_revision.update_dict(to_update, "current_revision")
         self.deploying_revision.update_dict(to_update, "deploying_revision")
+        self.revision_history_limit.update_dict(to_update, "revision_history_limit")
         return to_update
 
 
@@ -161,44 +165,6 @@ class DeploymentUpdaterSpec(UpdaterSpec[EndpointRow]):
             to_update.update(self.mount.build_values())
         if self.revision_state:
             to_update.update(self.revision_state.build_values())
-        return to_update
-
-
-@dataclass
-class NewDeploymentUpdaterSpec(UpdaterSpec[EndpointRow]):
-    """UpdaterSpec for new deployment API updates."""
-
-    name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-    tags: OptionalState[list[str]] = field(default_factory=OptionalState[list[str]].nop)
-    desired_replica_count: OptionalState[int] = field(default_factory=OptionalState[int].nop)
-    open_to_public: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
-    preferred_domain_name: TriState[str] = field(default_factory=TriState[str].nop)
-    default_deployment_strategy: OptionalState[DeploymentStrategy] = field(
-        default_factory=OptionalState[DeploymentStrategy].nop
-    )
-    active_revision_id: OptionalState[UUID] = field(
-        default_factory=OptionalState[UUID].nop
-    )  # TODO: Check if TriState is more appropriate
-    revision_history_limit: OptionalState[int] = field(default_factory=OptionalState[int].nop)
-
-    @property
-    @override
-    def row_class(self) -> type[EndpointRow]:
-        return EndpointRow
-
-    @override
-    def build_values(self) -> dict[str, Any]:
-        to_update: dict[str, Any] = {}
-        self.name.update_dict(to_update, "name")
-        tag = self.tags.optional_value()
-        if tag is not None:
-            to_update["tags"] = ",".join(tag)
-        self.desired_replica_count.update_dict(to_update, "desired_replica_count")
-        self.open_to_public.update_dict(to_update, "open_to_public")
-        self.preferred_domain_name.update_dict(to_update, "preferred_domain_name")
-        self.default_deployment_strategy.update_dict(to_update, "default_deployment_strategy")
-        self.active_revision_id.update_dict(to_update, "current_revision_id")
-        self.revision_history_limit.update_dict(to_update, "revision_history_limit")
         return to_update
 
 

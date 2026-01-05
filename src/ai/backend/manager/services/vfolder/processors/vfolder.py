@@ -4,8 +4,7 @@ from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-
-from ..actions.base import (
+from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
     CloneVFolderActionResult,
     CreateVFolderAction,
@@ -27,7 +26,7 @@ from ..actions.base import (
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
-from ..services.vfolder import VFolderService
+from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 
 
 class VFolderProcessors(AbstractProcessorPackage):
@@ -52,7 +51,7 @@ class VFolderProcessors(AbstractProcessorPackage):
     clone_vfolder: SingleEntityActionProcessor[CloneVFolderAction, CloneVFolderActionResult]
     get_task_logs: SingleEntityActionProcessor[GetTaskLogsAction, GetTaskLogsActionResult]
 
-    def __init__(self, service: VFolderService, action_monitors: list[ActionMonitor]):
+    def __init__(self, service: VFolderService, action_monitors: list[ActionMonitor]) -> None:
         self.create_vfolder = ScopeActionProcessor(service.create, action_monitors)
         self.get_vfolder = SingleEntityActionProcessor(service.get, action_monitors)
         self.list_vfolder = ScopeActionProcessor(service.list, action_monitors)

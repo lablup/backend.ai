@@ -1,6 +1,6 @@
 import logging
-from collections.abc import Sequence
-from typing import Any, Mapping, cast
+from collections.abc import Mapping, Sequence
+from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.orm import contains_eager

@@ -38,8 +38,8 @@ if TYPE_CHECKING:
 
 
 __all__ = (
-    "NotificationDBSource",
     "NotificationChannelListResult",
+    "NotificationDBSource",
     "NotificationRuleListResult",
 )
 

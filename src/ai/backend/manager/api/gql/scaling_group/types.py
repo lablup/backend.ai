@@ -34,17 +34,17 @@ from ai.backend.manager.repositories.scaling_group.options import (
 )
 
 __all__ = (
-    "ScalingGroupStatusGQL",
+    "ScalingGroupDriverConfigGQL",
+    "ScalingGroupFilterGQL",
     "ScalingGroupMetadataGQL",
     "ScalingGroupNetworkConfigGQL",
-    "ScalingGroupDriverConfigGQL",
-    "ScalingGroupSchedulerOptionsGQL",
-    "ScalingGroupSchedulerTypeGQL",
-    "ScalingGroupSchedulerConfigGQL",
-    "ScalingGroupV2GQL",
-    "ScalingGroupFilterGQL",
     "ScalingGroupOrderByGQL",
     "ScalingGroupOrderFieldGQL",
+    "ScalingGroupSchedulerConfigGQL",
+    "ScalingGroupSchedulerOptionsGQL",
+    "ScalingGroupSchedulerTypeGQL",
+    "ScalingGroupStatusGQL",
+    "ScalingGroupV2GQL",
 )
 
 
@@ -359,9 +359,9 @@ class ScalingGroupFilterGQL(GQLFilter):
     scheduler: Optional[str] = None
     use_host_network: Optional[bool] = None
 
-    AND: Optional[list["ScalingGroupFilterGQL"]] = None
-    OR: Optional[list["ScalingGroupFilterGQL"]] = None
-    NOT: Optional[list["ScalingGroupFilterGQL"]] = None
+    AND: Optional[list[ScalingGroupFilterGQL]] = None
+    OR: Optional[list[ScalingGroupFilterGQL]] = None
+    NOT: Optional[list[ScalingGroupFilterGQL]] = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:

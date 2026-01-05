@@ -1,25 +1,19 @@
 import logging
+from collections.abc import Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Dict,
-    List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
-    Set,
-    Tuple,
 )
 
 import aiodocker
 from aiodocker import Docker
 
+from ai.backend.accelerator.tenstorrent import __version__
 from ai.backend.accelerator.tenstorrent.utils import resolve_pci_sysfs_path
 
-from .. import __version__
 from .types import TTn300Device
 
 try:
@@ -68,15 +62,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 class TTn300Plugin(AbstractComputePlugin):
     key = DeviceName("tt-n300")
-    slot_types: Sequence[Tuple[SlotName, SlotTypes]] = (
+    slot_types: Sequence[tuple[SlotName, SlotTypes]] = (
         (SlotName("tt-n300.device"), SlotTypes("count")),
     )
-    exclusive_slot_types: Set[str] = {"tt-n300.device"}
+    exclusive_slot_types: set[str] = {"tt-n300.device"}
 
     device_mask: Sequence[DeviceId] = []
     enabled: bool = True
 
-    _all_devices: Optional[List[TTn300Device]]
+    _all_devices: Optional[list[TTn300Device]]
 
     _tt_devices: list[PciChip]
     _tt_backend: TTSMIBackend
@@ -98,11 +92,11 @@ class TTn300Plugin(AbstractComputePlugin):
             log.warning("could not find Tenstorrent devices with VID 1eff.")
             self.enabled = False
 
-    async def list_devices(self) -> List[TTn300Device]:
+    async def list_devices(self) -> list[TTn300Device]:
         if self._all_devices is not None:
             return self._all_devices
 
-        devices: List[TTn300Device] = []
+        devices: list[TTn300Device] = []
 
         tt_devices = detect_chips_with_callback(print_status=False)
         backend = TTSMIBackend(tt_devices, pretty_output=False)
@@ -201,12 +195,12 @@ class TTn300Plugin(AbstractComputePlugin):
         ctx: StatContext,
         container_ids: Sequence[str],
     ) -> Sequence[ContainerMeasurement]:
-        power_stats: Dict[str, Decimal] = {}
-        number_of_devices_per_container: Dict[str, int] = {}
+        power_stats: dict[str, Decimal] = {}
+        number_of_devices_per_container: dict[str, int] = {}
         stat_prefix = self.key.replace("-", "_")
 
         if self.enabled:
-            device_stats_by_device_filename: Dict[str, Tuple[Dict, Dict]] = {
+            device_stats_by_device_filename: dict[str, tuple[dict, dict]] = {
                 f"/dev/tenstorrent/{device.device_number}": (
                     self._tt_backend.get_chip_telemetry(device.tt_device_idx),
                     self._tt_backend.get_chip_telemetry(device.tt_device_idx + 1),
@@ -244,7 +238,7 @@ class TTn300Plugin(AbstractComputePlugin):
 
     async def create_alloc_map(self) -> DiscretePropertyAllocMap:
         devices = await self.list_devices()
-        dpam = DiscretePropertyAllocMap(
+        return DiscretePropertyAllocMap(
             device_slots={
                 DeviceId(str(dev.device_id)): DeviceSlotInfo(
                     SlotTypes.COUNT, self.slot_types[0][0], Decimal(1)
@@ -253,13 +247,12 @@ class TTn300Plugin(AbstractComputePlugin):
             },
             exclusive_slot_types=self.exclusive_slot_types,
         )
-        return dpam
 
     async def generate_mounts(
         self,
         source_path: Path,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         return []
 
     async def generate_docker_args(
@@ -320,11 +313,11 @@ class TTn300Plugin(AbstractComputePlugin):
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Sequence[DeviceModelInfo]:
-        device_ids: List[DeviceId] = []
+        device_ids: list[DeviceId] = []
         if self.slot_types[0][0] in device_alloc:
             device_ids.extend(device_alloc[self.slot_types[0][0]].keys())
         available_devices = await self.list_devices()
-        attached_devices: List[DeviceModelInfo] = []
+        attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
                 proc = device.processing_units
@@ -383,7 +376,7 @@ class TTn300Plugin(AbstractComputePlugin):
         if not self.enabled:
             return data
 
-        active_device_id_set: Set[DeviceId] = set()
+        active_device_id_set: set[DeviceId] = set()
         for slot_type, per_device_alloc in device_alloc.items():
             for dev_id, alloc in per_device_alloc.items():
                 if alloc > 0:
@@ -406,7 +399,7 @@ class TTn300Plugin(AbstractComputePlugin):
     async def get_docker_networks(
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
-    ) -> List[str]:
+    ) -> list[str]:
         return []
 
     async def gather_process_measures(

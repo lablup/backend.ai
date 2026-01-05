@@ -3050,13 +3050,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d57701248d040ad456092820e6fde56c930f17749956ac47f4f655c0c547bfff",
-              "url": "https://files.pythonhosted.org/packages/c3/5b/9512c5fb6c8218332b530f13500c6ff5f3ce3342f35e0dd7be9ac3856fd3/humanize-4.14.0-py3-none-any.whl"
+              "hash": "b1186eb9f5a9749cd9cb8565aee77919dd7c8d076161cf44d70e59e3301e1769",
+              "url": "https://files.pythonhosted.org/packages/c5/7b/bca5613a0c3b542420cf92bd5e5fb8ebd5435ce1011a091f66bb7693285e/humanize-4.15.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "2fa092705ea640d605c435b1ca82b2866a1b601cdf96f076d70b79a855eba90d",
-              "url": "https://files.pythonhosted.org/packages/b6/43/50033d25ad96a7f3845f40999b4778f753c3901a11808a584fed7c00d9f5/humanize-4.14.0.tar.gz"
+              "hash": "1dd098483eb1c7ee8e32eb2e99ad1910baefa4b75c3aff3a82f4d78688993b10",
+              "url": "https://files.pythonhosted.org/packages/ba/66/a3921783d54be8a6870ac4ccffcd15c4dc0dd7fcce51c6d63b8c63935276/humanize-4.15.0.tar.gz"
             }
           ],
           "project_name": "humanize",
@@ -3066,7 +3066,7 @@
             "pytest; extra == \"tests\""
           ],
           "requires_python": ">=3.10",
-          "version": "4.14.0"
+          "version": "4.15.0"
         },
         {
           "artifacts": [
@@ -3133,41 +3133,40 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "e5dd1551894c77868a30651cef00984d50e1002d06942a7101d34870c5f02afd",
-              "url": "https://files.pythonhosted.org/packages/20/b0/36bd937216ec521246249be3bf9855081de4c5e06a0c9b4219dbeda50373/importlib_metadata-8.7.0-py3-none-any.whl"
+              "hash": "5a1f80bf1daa489495071efbb095d75a634cf28a8bc299581244063b53176151",
+              "url": "https://files.pythonhosted.org/packages/fa/5e/f8e9a1d23b9c20a551a8a02ea3637b4642e22c2626e3a13a9a29cdea99eb/importlib_metadata-8.7.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d13b81ad223b890aa16c5471f2ac3056cf76c5f10f82d6f9292f0b415f389000",
-              "url": "https://files.pythonhosted.org/packages/76/66/650a33bd90f786193e4de4b3ad86ea60b53c89b669a5c7be931fac31cdb0/importlib_metadata-8.7.0.tar.gz"
+              "hash": "49fef1ae6440c182052f407c8d34a68f72efc36db9ca90dc0113398f2fdde8bb",
+              "url": "https://files.pythonhosted.org/packages/f3/49/3b30cad09e7771a4982d9975a8cbf64f00d4a1ececb53297f1d9a7be1b10/importlib_metadata-8.7.1.tar.gz"
             }
           ],
           "project_name": "importlib-metadata",
           "requires_dists": [
             "flufl.flake8; extra == \"test\"",
             "furo; extra == \"doc\"",
-            "importlib_resources>=1.3; python_version < \"3.9\" and extra == \"test\"",
             "ipython; extra == \"perf\"",
             "jaraco.packaging>=9.3; extra == \"doc\"",
             "jaraco.test>=5.4; extra == \"test\"",
             "jaraco.tidelift>=1.4; extra == \"doc\"",
+            "mypy<1.19; platform_python_implementation == \"PyPy\" and extra == \"type\"",
             "packaging; extra == \"test\"",
             "pyfakefs; extra == \"test\"",
             "pytest!=8.1.*,>=6; extra == \"test\"",
             "pytest-checkdocs>=2.4; extra == \"check\"",
             "pytest-cov; extra == \"cover\"",
-            "pytest-enabler>=2.2; extra == \"enabler\"",
-            "pytest-mypy; extra == \"type\"",
+            "pytest-enabler>=3.4; extra == \"enabler\"",
+            "pytest-mypy>=1.0.1; extra == \"type\"",
             "pytest-perf>=0.9.2; extra == \"test\"",
             "pytest-ruff>=0.2.1; sys_platform != \"cygwin\" and extra == \"check\"",
             "rst.linker>=1.9; extra == \"doc\"",
             "sphinx-lint; extra == \"doc\"",
             "sphinx>=3.5; extra == \"doc\"",
-            "typing-extensions>=3.6.4; python_version < \"3.8\"",
             "zipp>=3.20"
           ],
           "requires_python": ">=3.9",
-          "version": "8.7.0"
+          "version": "8.7.1"
         },
         {
           "artifacts": [
@@ -4154,19 +4153,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "ba11c9782d29c27c70ffbdda2d7415098754709be8a7056d79a737cd901155c9",
-              "url": "https://files.pythonhosted.org/packages/d2/1d/1b658dbd2b9fa9c4c9f32accbfc0205d532c8c6194dc0f2a4c0428e7128a/nodeenv-1.9.1-py2.py3-none-any.whl"
+              "hash": "5bb13e3eed2923615535339b3c620e76779af4cb4c6a90deccc9e36b274d3827",
+              "url": "https://files.pythonhosted.org/packages/88/b2/d0896bdcdc8d28a7fc5717c305f1a861c26e18c05047949fb371034d98bd/nodeenv-1.10.0-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6ec12890a2dab7946721edbfbcd91f3319c6ccc9aec47be7c7e6b7011ee6645f",
-              "url": "https://files.pythonhosted.org/packages/43/16/fc88b08840de0e0a72a2f9d8c6bae36be573e475a6326ae854bcc549fc45/nodeenv-1.9.1.tar.gz"
+              "hash": "996c191ad80897d076bdfba80a41994c2b47c68e224c542b48feba42ba00f8bb",
+              "url": "https://files.pythonhosted.org/packages/24/bf/d1bda4f6168e0b2e9e5958945e01910052158313224ada5ce1fb2e1113b8/nodeenv-1.10.0.tar.gz"
             }
           ],
           "project_name": "nodeenv",
           "requires_dists": [],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7",
-          "version": "1.9.1"
+          "version": "1.10.0"
         },
         {
           "artifacts": [
@@ -4603,13 +4602,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "25e2ce09595174d9c97860a95609f9f852c0614ba602de3561e267547f2335e1",
-              "url": "https://files.pythonhosted.org/packages/5d/c4/b2d28e9d2edf4f1713eb3c29307f1a63f3d67cf09bdda29715a36a68921a/pre_commit-4.5.0-py2.py3-none-any.whl"
+              "hash": "3b3afd891e97337708c1674210f8eba659b52a38ea5f822ff142d10786221f77",
+              "url": "https://files.pythonhosted.org/packages/5d/19/fd3ef348460c80af7bb4669ea7926651d1f95c23ff2df18b9d24bab4f3fa/pre_commit-4.5.1-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "dc5a065e932b19fc1d4c653c6939068fe54325af8e741e74e88db4d28a4dd66b",
-              "url": "https://files.pythonhosted.org/packages/f4/9b/6a4ffb4ed980519da959e1cf3122fc6cb41211daa58dbae1c73c0e519a37/pre_commit-4.5.0.tar.gz"
+              "hash": "eb545fcff725875197837263e977ea257a402056661f09dae08e4b149b030a61",
+              "url": "https://files.pythonhosted.org/packages/40/f1/6d86a29246dfd2e9b6237f0b5823717f60cad94d47ddc26afa916d21f525/pre_commit-4.5.1.tar.gz"
             }
           ],
           "project_name": "pre-commit",
@@ -4621,7 +4620,7 @@
             "virtualenv>=20.10.0"
           ],
           "requires_python": ">=3.10",
-          "version": "4.5.0"
+          "version": "4.5.1"
         },
         {
           "artifacts": [
@@ -5871,24 +5870,24 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "048f26d64245bae57a4f9ef6feb5b552a386830ef7a826f235ffb804c59efbba",
-              "url": "https://files.pythonhosted.org/packages/0f/73/bb1bc2529f852e7bf64a2dec885e89ff9f5cc7bbf6c9340eed30ff2c69c5/ruamel.yaml-0.18.16-py3-none-any.whl"
+              "hash": "9c8ba9eb3e793efdf924b60d521820869d5bf0cb9c6f1b82d82de8295e290b9d",
+              "url": "https://files.pythonhosted.org/packages/af/fe/b6045c782f1fd1ae317d2a6ca1884857ce5c20f59befe6ab25a8603c43a7/ruamel_yaml-0.18.17-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a6e587512f3c998b2225d68aa1f35111c29fad14aed561a26e73fab729ec5e5a",
-              "url": "https://files.pythonhosted.org/packages/9f/c7/ee630b29e04a672ecfc9b63227c87fd7a37eb67c1bf30fe95376437f897c/ruamel.yaml-0.18.16.tar.gz"
+              "hash": "9091cd6e2d93a3a4b157ddb8fabf348c3de7f1fb1381346d985b6b247dcd8d3c",
+              "url": "https://files.pythonhosted.org/packages/3a/2b/7a1f1ebcd6b3f14febdc003e658778d81e76b40df2267904ee6b13f0c5c6/ruamel_yaml-0.18.17.tar.gz"
             }
           ],
           "project_name": "ruamel-yaml",
           "requires_dists": [
             "mercurial>5.7; extra == \"docs\"",
-            "ruamel.yaml.clib>=0.2.7; platform_python_implementation == \"CPython\" and python_version < \"3.14\"",
+            "ruamel.yaml.clib>=0.2.15; platform_python_implementation == \"CPython\" and python_version < \"3.15\"",
             "ruamel.yaml.jinja2>=0.2; extra == \"jinja2\"",
             "ryd; extra == \"docs\""
           ],
-          "requires_python": ">=3.8",
-          "version": "0.18.16"
+          "requires_python": ">=3.9",
+          "version": "0.18.17"
         },
         {
           "artifacts": [
@@ -7023,19 +7022,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "53bf881cb9d7e46ed12c76ef76c0aaf28cfe6211d3fab12e0b83620b1a8642c3",
-              "url": "https://files.pythonhosted.org/packages/b6/2d/475bf15c1cdc172e7a0d665b6e373ebfb1e9bf734d3f2f543d668b07a142/types_setuptools-80.9.0.20250822-py3-none-any.whl"
+              "hash": "fecf4b9ebfc4cdd9cd38b898b653ad197507d7a62d465a168b709c56e94b02c4",
+              "url": "https://files.pythonhosted.org/packages/58/40/999a63965aaf1f67988ddf64a9ba602fde041a4199840d256dd60c7f9fa9/types_setuptools-80.9.0.20251221-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "070ea7716968ec67a84c7f7768d9952ff24d28b65b6594797a464f1b3066f965",
-              "url": "https://files.pythonhosted.org/packages/19/bd/1e5f949b7cb740c9f0feaac430e301b8f1c5f11a81e26324299ea671a237/types_setuptools-80.9.0.20250822.tar.gz"
+              "hash": "05da599f5a062bbee3e83d60318576ba23111a768b7a2e46aa11644109c5d17f",
+              "url": "https://files.pythonhosted.org/packages/1b/49/cefdde98e1783c09a100f18ade39335e654e8e3364650e200d39069de701/types_setuptools-80.9.0.20251221.tar.gz"
             }
           ],
           "project_name": "types-setuptools",
           "requires_dists": [],
           "requires_python": ">=3.9",
-          "version": "80.9.0.20250822"
+          "version": "80.9.0.20251221"
         },
         {
           "artifacts": [
@@ -7276,28 +7275,28 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "daac6714dada4983ffa16c9e4f731720b158a4924d68c0789c5e294974530ac0",
-              "url": "https://files.pythonhosted.org/packages/cb/86/72f21276ee308560d0e3d601e87db672b636d856c5597da878121e00d0c6/valkey_glide-2.2.2-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "a1e37a3b71c7cb923b54af21a9a50eab1cbf9423ecbf9be096abd77f19f8a7ad",
+              "url": "https://files.pythonhosted.org/packages/89/23/dad9c15aa6ed4e5ab8779afe1fa947c04a87b75f8cc11ddf7ddb15724b35/valkey_glide-2.2.3-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "9286e83c48bfb360af1cbe812b6575736bc2028ce19a784a3e9312d66b74a71a",
-              "url": "https://files.pythonhosted.org/packages/22/ac/5beb80aeea58b8593e82f74e26e14d980c9a49692b77a183328d0f6e741b/valkey_glide-2.2.2.tar.gz"
+              "hash": "1b21ea0b8baf4512c94d6aeb16bf05746237b29000c1542eb831d4d3e7254645",
+              "url": "https://files.pythonhosted.org/packages/2a/d3/5b2fe03205ceda7f5d8643cc09b5fb8aa147a2900a9ed496f93e1d6b8757/valkey_glide-2.2.3-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7ba60dc59e4ece0339b2d14dc115846d4448b89cc02f9cea57c1735654a9ca42",
-              "url": "https://files.pythonhosted.org/packages/33/07/bfe429afe90e8971c252a0b58271a0921ca27e21aae34296dcacd0b2d0e8/valkey_glide-2.2.2-cp313-cp313-macosx_11_0_arm64.whl"
+              "hash": "dba0ce2cee2c74b5bdf6c971e3d615e8e56952e77e3d40b800f57dd6e18e0928",
+              "url": "https://files.pythonhosted.org/packages/57/22/2e1094949eef4ffba0d6dc3f592468767a67cf9a03c3586673e5558ca2c4/valkey_glide-2.2.3-cp313-cp313-macosx_11_0_arm64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "cee93a511474f9e950149e78f6ab58a7bba26a8b1c8e457c272dd4afa426e371",
-              "url": "https://files.pythonhosted.org/packages/36/16/cada422c1b983a0e078f001b75d2b46b56c425a19ecbac65325874883424/valkey_glide-2.2.2-cp313-cp313-macosx_10_7_x86_64.whl"
+              "hash": "1c0ab1df2b5cfb73814fc2685a3455568aa43e76f21a7bf514c8b2aef5c7be3f",
+              "url": "https://files.pythonhosted.org/packages/74/2f/eeaf576ff279eb89e6f341edcff16c5d1ef8fc2589223a51075e17514bb9/valkey_glide-2.2.3-cp313-cp313-macosx_10_7_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "456fa61238609f768b8b64c20440eb8bb63de86728a199a6ce500688ed4b2f13",
-              "url": "https://files.pythonhosted.org/packages/4f/a9/5c7f868b98f1e41a416c351ed77f8e895e4397e2908aebb2f28829fd4caa/valkey_glide-2.2.2-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "24fba62939b58b15476f7b0f7e0c8beea18a2aaec18c353a21a5776252814dea",
+              "url": "https://files.pythonhosted.org/packages/cd/6c/2f0ed839a9b82fc3677f5a7de11d7b9d6e0ecc4f5be60911737e0e994cbe/valkey_glide-2.2.3.tar.gz"
             }
           ],
           "project_name": "valkey-glide",
@@ -7308,7 +7307,7 @@
             "typing-extensions>=4.8.0; python_version < \"3.11\""
           ],
           "requires_python": ">=3.9",
-          "version": "2.2.2"
+          "version": "2.2.3"
         },
         {
           "artifacts": [

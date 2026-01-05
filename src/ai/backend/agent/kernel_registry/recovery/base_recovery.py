@@ -3,13 +3,12 @@ from __future__ import annotations
 import logging
 from collections.abc import MutableMapping
 
+from ai.backend.agent.kernel import AbstractKernel
+from ai.backend.agent.kernel_registry.loader.abc import AbstractKernelRegistryLoader
+from ai.backend.agent.kernel_registry.writer.abc import AbstractKernelRegistryWriter
+from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
-
-from ...kernel import AbstractKernel
-from ..loader.abc import AbstractKernelRegistryLoader
-from ..writer.abc import AbstractKernelRegistryWriter
-from ..writer.types import KernelRegistrySaveMetadata
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

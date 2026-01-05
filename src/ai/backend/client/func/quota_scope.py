@@ -1,12 +1,13 @@
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
+from ai.backend.client.output.fields import group_fields, quota_scope_fields, user_fields
+from ai.backend.client.output.types import FieldSpec
+from ai.backend.client.session import api_session
+from ai.backend.client.types import set_if_set
+from ai.backend.client.utils import dedent as _d
 from ai.backend.common.types import QuotaConfig, QuotaScopeID
 
-from ..output.fields import group_fields, quota_scope_fields, user_fields
-from ..output.types import FieldSpec
-from ..session import api_session
-from ..types import set_if_set
-from ..utils import dedent as _d
 from .base import BaseFunction, api_function
 
 _default_user_fields = (

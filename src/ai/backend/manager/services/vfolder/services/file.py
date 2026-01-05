@@ -13,8 +13,7 @@ from ai.backend.manager.models.vfolder import (
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-
-from ..actions.file import (
+from ai.backend.manager.services.vfolder.actions.file import (
     CreateDownloadSessionAction,
     CreateDownloadSessionActionResult,
     CreateUploadSessionAction,
@@ -30,7 +29,7 @@ from ..actions.file import (
     RenameFileAction,
     RenameFileActionResult,
 )
-from ..types import FileInfo
+from ai.backend.manager.services.vfolder.types import FileInfo
 
 
 class VFolderFileService:

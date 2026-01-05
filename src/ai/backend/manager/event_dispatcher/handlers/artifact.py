@@ -1,4 +1,5 @@
 import logging
+from datetime import UTC
 from uuid import UUID
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
@@ -101,7 +102,7 @@ class ArtifactEventHandler:
         verification_result: VerificationStepResult | None,
     ) -> None:
         """Produce notification event for artifact download completion."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from ai.backend.common.data.notification import NotificationRuleType
         from ai.backend.common.data.notification.messages import ArtifactDownloadCompletedMessage
@@ -124,7 +125,7 @@ class ArtifactEventHandler:
             )
             event = NotificationTriggeredEvent(
                 rule_type=NotificationRuleType.ARTIFACT_DOWNLOAD_COMPLETED.value,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 notification_data=message.model_dump(),
             )
             await self._event_producer.anycast_event(event)

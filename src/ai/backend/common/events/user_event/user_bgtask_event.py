@@ -1,5 +1,6 @@
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
-from typing import Any, Mapping, Optional, override
+from typing import Any, Optional, override
 
 from .user_event import UserEvent
 

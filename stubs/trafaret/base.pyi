@@ -1,6 +1,6 @@
+from collections.abc import Hashable
 from typing import Any as _Any
-from typing import Hashable, NoReturn, Optional
-from typing import Type as _Type
+from typing import NoReturn, Optional
 
 from trafaret.dataerror import DataError
 
@@ -74,7 +74,7 @@ class Forward(Trafaret): ...
 class List(Trafaret, metclass=SquareBracketsMeta):
     def __init__(
         self,
-        trafaret: Trafaret | _Type[Trafaret],
+        trafaret: Trafaret | type[Trafaret],
         min_length: int = 0,
         max_length: Optional[int] = None,
     ) -> None: ...

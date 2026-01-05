@@ -11,14 +11,12 @@ import ssl
 import sys
 import traceback
 import uuid
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from logging import LoggerAdapter
 from pathlib import Path
 from typing import (
     Any,
-    AsyncGenerator,
-    AsyncIterator,
     Final,
     Optional,
     cast,
@@ -83,8 +81,7 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
     request_id = request.headers.get("X-BackendAI-RequestID", str(uuid.uuid4()))
     request["request_id"] = request_id
     request["log"] = BraceStyleAdapter(logging.getLogger(f"{__spec__.name} - #{request_id}"))  # type: ignore[name-defined]
-    resp = await _handler(request)
-    return resp
+    return await _handler(request)
 
 
 @web.middleware
@@ -119,8 +116,7 @@ async def exception_middleware(
         log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
         if root_ctx.local_config.debug.enabled:
             raise InternalServerError(traceback.format_exc())
-        else:
-            raise InternalServerError()
+        raise InternalServerError()
     else:
         return resp
 

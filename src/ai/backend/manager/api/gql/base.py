@@ -3,8 +3,9 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Optional, Protocol, Type, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Optional, Protocol, TypeVar, cast
 
 import graphene
 import strawberry
@@ -15,9 +16,9 @@ from strawberry.types import get_object_definition, has_object_definition
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.common.types import IntFilterData, StringFilterData
-from ai.backend.manager.repositories.base import QueryCondition
 
 if TYPE_CHECKING:
+    from ai.backend.manager.repositories.base import QueryCondition
     from ai.backend.manager.types import (
         PaginationOptions,
     )
@@ -37,8 +38,7 @@ class ByteSize(str):
     def parse_literal(ast) -> str:
         if not isinstance(ast, StringValueNode):
             raise ValueError("ByteSize must be provided as a string literal")
-        value = ast.value
-        return value
+        return ast.value
 
 
 @strawberry.input
@@ -85,11 +85,11 @@ class StringFilter:
         """
         if self.equals:
             return equals_factory(self.equals, False)
-        elif self.i_equals:
+        if self.i_equals:
             return equals_factory(self.i_equals, True)
-        elif self.contains:
+        if self.contains:
             return contains_factory(self.contains, False)
-        elif self.i_contains:
+        if self.i_contains:
             return contains_factory(self.i_contains, True)
         return None
 
@@ -112,6 +112,40 @@ class IntFilter:
             less_than=self.less_than,
             less_than_or_equal=self.less_than_or_equal,
         )
+
+
+@strawberry.input
+class DateTimeFilter:
+    """Filter for datetime fields."""
+
+    before: Optional[datetime] = None
+    after: Optional[datetime] = None
+    equals: Optional[datetime] = None
+    not_equals: Optional[datetime] = None
+
+    def build_query_condition(
+        self,
+        before_factory: Callable[[datetime], QueryCondition],
+        after_factory: Callable[[datetime], QueryCondition],
+        equals_factory: Optional[Callable[[datetime], QueryCondition]] = None,
+    ) -> Optional[QueryCondition]:
+        """Build a query condition from this filter using the provided factory callables.
+
+        Args:
+            before_factory: Factory function that takes datetime and returns QueryCondition for < comparison
+            after_factory: Factory function that takes datetime and returns QueryCondition for > comparison
+            equals_factory: Optional factory function for = comparison
+
+        Returns:
+            QueryCondition if any filter field is set, None otherwise
+        """
+        if self.equals and equals_factory:
+            return equals_factory(self.equals)
+        if self.before:
+            return before_factory(self.before)
+        if self.after:
+            return after_factory(self.after)
+        return None
 
 
 @strawberry.enum
@@ -144,10 +178,9 @@ class JSONString:
     def serialize(value: Any) -> JSONString:
         if isinstance(value, (dict, list)):
             return cast(JSONString, dump_json_str(value))
-        elif isinstance(value, str):
+        if isinstance(value, str):
             return cast(JSONString, value)
-        else:
-            return cast(JSONString, dump_json_str(value))
+        return cast(JSONString, dump_json_str(value))
 
     @staticmethod
     def from_resource_slot(resource_slot: ResourceSlot) -> JSONString:
@@ -155,7 +188,7 @@ class JSONString:
 
 
 def to_global_id(
-    type_: Type[Any], local_id: uuid.UUID | str, is_target_graphene_object: bool = False
+    type_: type[Any], local_id: uuid.UUID | str, is_target_graphene_object: bool = False
 ) -> str:
     if is_target_graphene_object:
         # For compatibility with existing Graphene-based global IDs
@@ -240,7 +273,7 @@ class PageInfo:
     start_cursor: Optional[str] = None
     end_cursor: Optional[str] = None
 
-    def to_strawberry_page_info(self) -> "strawberry.relay.PageInfo":
+    def to_strawberry_page_info(self) -> strawberry.relay.PageInfo:
         return strawberry.relay.PageInfo(
             has_next_page=self.has_next_page,
             has_previous_page=self.has_previous_page,

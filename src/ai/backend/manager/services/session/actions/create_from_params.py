@@ -1,7 +1,8 @@
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Mapping, Optional, override
+from typing import Any, Optional, override
 
 import yarl
 

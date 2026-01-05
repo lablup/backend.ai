@@ -26,13 +26,12 @@ from ai.backend.common.dto.storage.request import (
     UploadObjectReq,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.services.storages.object_storage import ObjectStorageService
 from ai.backend.storage.types import MultipartFileUploadStreamReader
-
-from ....services.storages.object_storage import ObjectStorageService
-from ....utils import log_client_api_entry
+from ai.backend.storage.utils import log_client_api_entry
 
 if TYPE_CHECKING:
-    from ....context import RootContext
+    from ai.backend.storage.context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

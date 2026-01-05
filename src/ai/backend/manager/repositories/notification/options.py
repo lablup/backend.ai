@@ -25,8 +25,7 @@ class NotificationChannelConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return NotificationChannelRow.name.ilike(f"%{name}%")
-            else:
-                return NotificationChannelRow.name.like(f"%{name}%")
+            return NotificationChannelRow.name.like(f"%{name}%")
 
         return inner
 
@@ -35,8 +34,7 @@ class NotificationChannelConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return sa.func.lower(NotificationChannelRow.name) == name.lower()
-            else:
-                return NotificationChannelRow.name == name
+            return NotificationChannelRow.name == name
 
         return inner
 
@@ -98,22 +96,19 @@ class NotificationChannelOrders:
     def name(ascending: bool = True) -> QueryOrder:
         if ascending:
             return NotificationChannelRow.name.asc()
-        else:
-            return NotificationChannelRow.name.desc()
+        return NotificationChannelRow.name.desc()
 
     @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return NotificationChannelRow.created_at.asc()
-        else:
-            return NotificationChannelRow.created_at.desc()
+        return NotificationChannelRow.created_at.desc()
 
     @staticmethod
     def updated_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return NotificationChannelRow.updated_at.asc()
-        else:
-            return NotificationChannelRow.updated_at.desc()
+        return NotificationChannelRow.updated_at.desc()
 
 
 class NotificationRuleConditions:
@@ -131,8 +126,7 @@ class NotificationRuleConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return NotificationRuleRow.name.ilike(f"%{name}%")
-            else:
-                return NotificationRuleRow.name.like(f"%{name}%")
+            return NotificationRuleRow.name.like(f"%{name}%")
 
         return inner
 
@@ -141,8 +135,7 @@ class NotificationRuleConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return sa.func.lower(NotificationRuleRow.name) == name.lower()
-            else:
-                return NotificationRuleRow.name == name
+            return NotificationRuleRow.name == name
 
         return inner
 
@@ -204,19 +197,16 @@ class NotificationRuleOrders:
     def name(ascending: bool = True) -> QueryOrder:
         if ascending:
             return NotificationRuleRow.name.asc()
-        else:
-            return NotificationRuleRow.name.desc()
+        return NotificationRuleRow.name.desc()
 
     @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return NotificationRuleRow.created_at.asc()
-        else:
-            return NotificationRuleRow.created_at.desc()
+        return NotificationRuleRow.created_at.desc()
 
     @staticmethod
     def updated_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return NotificationRuleRow.updated_at.asc()
-        else:
-            return NotificationRuleRow.updated_at.desc()
+        return NotificationRuleRow.updated_at.desc()

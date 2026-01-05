@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import Mapping, Optional, cast
+from collections.abc import Mapping
+from typing import Optional, cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -81,8 +82,7 @@ class ResourcePresetDBSource:
                 raise ResourcePresetConflict(
                     f"Duplicate resource preset name (name:{spec.name}, scaling_group:{spec.scaling_group_name})"
                 )
-            data = result.row.to_dataclass()
-        return data
+            return result.row.to_dataclass()
 
     async def get_preset_by_id(self, preset_id: UUID) -> ResourcePresetData:
         """
@@ -93,8 +93,7 @@ class ResourcePresetDBSource:
             preset_row = await self._get_preset_by_id(session, preset_id)
             if preset_row is None:
                 raise ResourcePresetNotFound()
-            data = preset_row.to_dataclass()
-        return data
+            return preset_row.to_dataclass()
 
     async def get_preset_by_name(self, name: str) -> ResourcePresetData:
         """
@@ -105,8 +104,7 @@ class ResourcePresetDBSource:
             preset_row = await self._get_preset_by_name(session, name)
             if preset_row is None:
                 raise ResourcePresetNotFound()
-            data = preset_row.to_dataclass()
-        return data
+            return preset_row.to_dataclass()
 
     async def get_preset_by_id_or_name(
         self, preset_id: Optional[UUID], name: Optional[str]
@@ -118,8 +116,7 @@ class ResourcePresetDBSource:
         """
         async with self._db.begin_readonly_session() as session:
             preset_row = await self._get_preset_by_id_or_name(session, preset_id, name)
-            data = preset_row.to_dataclass()
-        return data
+            return preset_row.to_dataclass()
 
     async def _get_preset_by_id_or_name(
         self, db_sess: SASession, preset_id: Optional[UUID], name: Optional[str]
@@ -203,7 +200,7 @@ class ResourcePresetDBSource:
         """
         async with self._db.begin_readonly_session() as conn:
             # Fetch all database data at once
-            db_data = await self._fetch_all_check_presets_data(
+            return await self._fetch_all_check_presets_data(
                 conn,
                 access_key,
                 user_id,
@@ -213,8 +210,6 @@ class ResourcePresetDBSource:
                 known_slot_types,
                 scaling_group,
             )
-
-        return db_data
 
     async def _get_group_info(
         self,

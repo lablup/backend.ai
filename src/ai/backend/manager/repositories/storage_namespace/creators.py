@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-
-from typing_extensions import override
+from typing import override
 
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.repositories.base import CreatorSpec

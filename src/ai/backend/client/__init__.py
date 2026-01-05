@@ -11,4 +11,4 @@ __version__ = (Path(__file__).parent / "VERSION").read_text().strip()
 
 
 def get_user_agent():
-    return "Backend.AI Client for Python {0}".format(__version__)
+    return f"Backend.AI Client for Python {__version__}"

@@ -13,6 +13,8 @@ import ssl
 import sys
 import traceback
 from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
     Iterable,
     Mapping,
     MutableMapping,
@@ -20,14 +22,12 @@ from collections.abc import (
 )
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from pprint import pformat
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncGenerator,
-    AsyncIterator,
     Final,
     Optional,
     cast,
@@ -279,6 +279,8 @@ global_subapp_pkgs: Final[list[str]] = [
     ".object_storage",
     ".vfs_storage",
     ".notification",
+    ".deployment",
+    ".rbac",
 ]
 
 global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
@@ -332,8 +334,7 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
             return GenericBadRequest("Unsupported API version.")
     except (ValueError, KeyError):
         return GenericBadRequest("Unsupported API version.")
-    resp = await _handler(request)
-    return resp
+    return await _handler(request)
 
 
 def _debug_error_response(
@@ -390,10 +391,9 @@ async def exception_middleware(
     except InvalidArgument as ex:
         if len(ex.args) > 1:
             raise InvalidAPIParameters(f"{ex.args[0]}: {', '.join(map(str, ex.args[1:]))}")
-        elif len(ex.args) == 1:
+        if len(ex.args) == 1:
             raise InvalidAPIParameters(ex.args[0])
-        else:
-            raise InvalidAPIParameters()
+        raise InvalidAPIParameters()
     except BackendAIError as ex:
         if ex.status_code // 100 == 4:
             log.warning(
@@ -445,8 +445,7 @@ async def exception_middleware(
         )
         if root_ctx.config_provider.config.debug.enabled:
             return _debug_error_response(e)
-        else:
-            raise InternalServerError()
+        raise InternalServerError()
     else:
         await stats_monitor.report_metric(INCREMENT, f"ai.backend.manager.api.status.{resp.status}")
         return resp
@@ -554,7 +553,7 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             mgr_status = ManagerStatus.RUNNING
         log.info("Manager status: {}", mgr_status)
         tz = root_ctx.config_provider.config.system.timezone
-        log.info("Configured timezone: {}", tz.tzname(datetime.now()))
+        log.info("Configured timezone: {}", tz.tzname(datetime.now(UTC)))
     yield
 
 
@@ -1574,7 +1573,7 @@ def build_root_app(
         if pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.api")
-        init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+        init_subapp(pkg_name, app, subapp_mod.create_app)
 
     vendor_path = importlib.resources.files("ai.backend.manager.vendor")
     if not isinstance(vendor_path, Path):
@@ -1636,7 +1635,7 @@ def build_public_app(
         if root_ctx.pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.public_api")
-        init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+        init_subapp(pkg_name, app, subapp_mod.create_app)
     return app
 
 

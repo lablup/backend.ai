@@ -11,23 +11,24 @@ import sys
 import time
 import traceback
 from collections import OrderedDict, defaultdict
-from collections.abc import AsyncIterator
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
+    Callable,
+    Coroutine,
+    Iterable,
+    Mapping,
+    Sequence,
+)
 from contextlib import AsyncExitStack, asynccontextmanager
 from ipaddress import ip_network
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import (
     Any,
-    AsyncGenerator,
-    Callable,
     ClassVar,
-    Coroutine,
-    Iterable,
     Literal,
-    Mapping,
     Optional,
-    Sequence,
-    Set,
     cast,
 )
 from uuid import UUID
@@ -152,7 +153,7 @@ def collect_error(meth: Callable) -> Callable:
         try:
             return await meth(self, *args, **kwargs)
         except Exception:
-            agent_id = kwargs.get("agent_id", None)
+            agent_id = kwargs.get("agent_id")
             agent = self.runtime.get_agent(agent_id)
             await agent.produce_error_event()
             raise
@@ -161,7 +162,7 @@ def collect_error(meth: Callable) -> Callable:
 
 
 class RPCFunctionRegistry:
-    functions: Set[str]
+    functions: set[str]
     _metric_observer: RPCMetricObserver
 
     def __init__(self) -> None:
@@ -178,13 +179,12 @@ class RPCFunctionRegistry:
             try:
                 if request.body is None:
                     return await meth(self_)
-                else:
-                    return await meth(
-                        self_,
-                        *request.body["args"],
-                        **request.body["kwargs"],
-                    )
-            except (asyncio.CancelledError, asyncio.TimeoutError):
+                return await meth(
+                    self_,
+                    *request.body["args"],
+                    **request.body["kwargs"],
+                )
+            except (TimeoutError, asyncio.CancelledError):
                 raise
             except ResourceError:
                 # This is an expected scenario.
@@ -199,7 +199,7 @@ class RPCFunctionRegistry:
 
 
 class RPCFunctionRegistryV2:
-    functions: Set[str]
+    functions: set[str]
     _metric_observer: RPCMetricObserver
 
     def __init__(self) -> None:
@@ -216,14 +216,13 @@ class RPCFunctionRegistryV2:
             try:
                 if request.body is None:
                     return await meth(self_)
-                else:
-                    res = await meth(
-                        self_,
-                        *request.body["args"],
-                        **request.body["kwargs"],
-                    )
-                    return res.as_dict()
-            except (asyncio.CancelledError, asyncio.TimeoutError):
+                res = await meth(
+                    self_,
+                    *request.body["args"],
+                    **request.body["kwargs"],
+                )
+                return res.as_dict()
+            except (TimeoutError, asyncio.CancelledError):
                 raise
             except ResourceError:
                 # This is an expected scenario.
@@ -448,9 +447,9 @@ class AgentRPCServer(aobject):
                 case list():
                     return [_ensure_serializable(e) for e in o]
                 case set():
-                    return set([_ensure_serializable(e) for e in o])
+                    return {_ensure_serializable(e) for e in o}
                 case tuple():
-                    return tuple([_ensure_serializable(e) for e in o])
+                    return tuple(_ensure_serializable(e) for e in o)
                 case _:
                     return str(o)
 
@@ -572,7 +571,7 @@ class AgentRPCServer(aobject):
 
                 self.local_config.update(container_update=container_updates)
         except Exception as e:
-            log.warning("etcd: container-config error: {}".format(e))
+            log.warning(f"etcd: container-config error: {e}")
 
     async def __aenter__(self) -> None:
         await self.rpc_server.__aenter__()
@@ -600,7 +599,7 @@ class AgentRPCServer(aobject):
     @collect_error
     async def update_scaling_group(self, scaling_group: str, agent_id: AgentId | None = None):
         cfg_src_path = config.find_config_file("agent")
-        with open(cfg_src_path, "r") as f:
+        with open(cfg_src_path) as f:
             data = tomlkit.load(f)
         agent = self.runtime.get_agent(agent_id)
         if "agents" in data:
@@ -799,7 +798,7 @@ class AgentRPCServer(aobject):
         coros = []
         agent = self.runtime.get_agent(agent_id)
         throttle_sema = asyncio.Semaphore(agent.local_config.agent.kernel_creation_concurrency)
-        for raw_kernel_id, raw_config in zip(raw_kernel_ids, raw_configs):
+        for raw_kernel_id, raw_config in zip(raw_kernel_ids, raw_configs, strict=True):
             log.info(
                 "rpc::create_kernel(k:{0}, img:{1})",
                 raw_kernel_id,
@@ -989,7 +988,7 @@ class AgentRPCServer(aobject):
                 code[:20] + "..." if len(code) > 20 else code,
             )
         agent = self.runtime.get_agent(agent_id)
-        result = await agent.execute(
+        return await agent.execute(
             SessionId(UUID(session_id)),
             KernelId(UUID(kernel_id)),
             run_id,
@@ -999,7 +998,6 @@ class AgentRPCServer(aobject):
             api_version=api_version,
             flush_timeout=flush_timeout,
         )
-        return result
 
     @rpc_function
     @collect_error
@@ -1065,9 +1063,11 @@ class AgentRPCServer(aobject):
         *,
         canonical: str | None = None,
         filename: str | None = None,
-        extra_labels: dict[str, str] = {},
+        extra_labels: dict[str, str] | None = None,
         agent_id: AgentId | None = None,
     ) -> dict[str, Any]:
+        if extra_labels is None:
+            extra_labels = {}
         log.info("rpc::commit(k:{})", kernel_id)
         agent = self.runtime.get_agent(agent_id)
         bgtask_mgr = agent.background_task_manager

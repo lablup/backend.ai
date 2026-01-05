@@ -7,8 +7,8 @@ import logging
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentPool
+from ai.backend.manager.sokovan.scheduler.types import SessionTransitionData
 
-from ..types import SessionTransitionData
 from .base import AbstractSessionHook
 
 log = BraceStyleAdapter(logging.getLogger(__name__))

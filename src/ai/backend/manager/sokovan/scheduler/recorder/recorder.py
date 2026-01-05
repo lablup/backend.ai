@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import datetime, timezone
-from typing import Generator
+from datetime import UTC, datetime
 
 from ai.backend.common.types import SessionId
 
@@ -83,7 +83,7 @@ class TransitionRecorder:
                 phases=phases,
                 name=name,
                 status=status,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 detail=detail,
             )
         )

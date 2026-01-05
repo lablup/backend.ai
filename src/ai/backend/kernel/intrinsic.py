@@ -64,7 +64,7 @@ async def init_sshd_service(child_env):
                 auth_path.parent.chmod(0o700)
             if (auth_path.stat().st_mode & 0o077) != 0:
                 auth_path.chmod(0o600)
-        except IOError:
+        except OSError:
             log.warning("could not set the permission for /home/work/.ssh")
     proc = await asyncio.create_subprocess_exec(
         *[

@@ -1,13 +1,12 @@
-from typing import Iterable
+from collections.abc import Iterable
 
 import aiohttp_cors
 from aiohttp import web
 
 from ai.backend.appproxy.common.types import CORSOptions, FrontendMode, WebMiddleware
-
-from .. import __version__
-from ..errors import MissingPortProxyConfigError
-from ..types import RootContext
+from ai.backend.appproxy.worker import __version__
+from ai.backend.appproxy.worker.errors import MissingPortProxyConfigError
+from ai.backend.appproxy.worker.types import RootContext
 
 
 async def hello(request: web.Request) -> web.Response:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import socket
@@ -17,16 +16,16 @@ from ai.backend.common import msgpack
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from ..api.context import RootContext
+    from ai.backend.manager.api.context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__: tuple[str, ...] = (
-    "SQLAlchemyConnectionInfo",
     "RedisObjectConnectionInfo",
-    "get_sqlalchemy_connection_info",
-    "get_redis_object_info_list",
+    "SQLAlchemyConnectionInfo",
     "_get_connnection_info",
+    "get_redis_object_info_list",
+    "get_sqlalchemy_connection_info",
     "report_manager_status",
 )
 
@@ -85,13 +84,12 @@ class ConnectionInfoOfProcess(BaseModel):
 
 async def get_sqlalchemy_connection_info(root_ctx: RootContext) -> SQLAlchemyConnectionInfo:
     pool = cast(Pool, root_ctx.db.pool)
-    sqlalchemy_info = SQLAlchemyConnectionInfo(
+    return SQLAlchemyConnectionInfo(
         pool_type=type(pool).__name__,
         status_description=pool.status(),
         num_checkedout_cxn=pool.checkedout(),
         num_checkedin_cxn=pool.checkedin(),
     )
-    return sqlalchemy_info
 
 
 async def get_redis_object_info_list(root_ctx: RootContext) -> list[RedisObjectConnectionInfo]:
@@ -134,7 +132,7 @@ async def get_manager_db_cxn_status(root_ctx: RootContext) -> list[ConnectionInf
                 f"{MANAGER_STATUS_KEY}*",
             ),
         )
-    except (asyncio.TimeoutError, glide.ConnectionError, glide.TimeoutError):
+    except (TimeoutError, glide.ConnectionError, glide.TimeoutError):
         # Cannot get data from redis. Return process's own info.
         cxn_infos = [(await _get_connnection_info(root_ctx))]
     else:

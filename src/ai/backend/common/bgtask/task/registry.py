@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
-from typing import Any, Generic, Mapping, Optional, override
+from collections.abc import Mapping
+from typing import Any, Generic, Optional, override
 
+from ai.backend.common.bgtask.types import BgtaskNameBase
 from ai.backend.common.exception import (
     BgtaskNotRegisteredError,
 )
 
-from ..types import BgtaskNameBase
 from .base import (
     BaseBackgroundTaskHandler,
     BaseBackgroundTaskManifest,

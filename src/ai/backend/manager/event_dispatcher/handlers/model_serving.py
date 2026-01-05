@@ -17,20 +17,19 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.kernel import SessionNotFound
-from ai.backend.manager.registry import AgentRegistry
-
-from ...models.endpoint import EndpointRow
-from ...models.image import ImageIdentifier, ImageRow
-from ...models.keypair import KeyPairRow
-from ...models.routing import RouteStatus, RoutingRow
-from ...models.session import KernelLoadingStrategy, SessionRow
-from ...models.user import UserRow
-from ...models.utils import (
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.image import ImageIdentifier, ImageRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.routing import RouteStatus, RoutingRow
+from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
+from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
 )
-from ...types import UserScope
-from ...utils import query_userinfo
+from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.types import UserScope
+from ai.backend.manager.utils import query_userinfo
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -127,7 +126,7 @@ class ModelServingEventHandler:
                     environ["BACKEND_MODEL_NAME"] = endpoint.model_row.name
 
                 await self._registry.create_session(
-                    f"{endpoint.name}-{str(event.route_id)}",
+                    f"{endpoint.name}-{event.route_id!s}",
                     image_row.image_ref,
                     UserScope(
                         domain_name=endpoint.domain,

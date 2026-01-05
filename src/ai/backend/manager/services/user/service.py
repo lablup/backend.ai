@@ -153,7 +153,7 @@ class UserService:
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            for sess, result in zip(active_sessions, results):
+            for sess, result in zip(active_sessions, results, strict=True):
                 if isinstance(result, Exception):
                     log.warning(f"Session {sess.id} not terminated properly: {result}")
 

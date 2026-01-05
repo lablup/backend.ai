@@ -329,7 +329,9 @@ class ImageService:
                 image_data_list = await self._image_repository.resolve_images_batch(
                     successful_identifiers
                 )
-                for image_data, canonical in zip(image_data_list, successful_canonicals):
+                for image_data, canonical in zip(
+                    image_data_list, successful_canonicals, strict=True
+                ):
                     purged_images_data.purged_images.append(canonical)
                     total_reserved_bytes += image_data.size_bytes
 

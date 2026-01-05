@@ -1,18 +1,14 @@
+from collections.abc import Collection, Sequence
 from pathlib import Path
 from typing import (
-    Collection,
-    List,
     Optional,
-    Sequence,
-    Set,
-    Tuple,
 )
 
 import pyhlml
 
+from ai.backend.accelerator.habana.plugin import AbstractGaudiPlugin
 from ai.backend.common.types import AcceleratorMetadata, DeviceId, DeviceName, SlotName, SlotTypes
 
-from ..plugin import AbstractGaudiPlugin
 from .types import Gaudi3Device
 
 __all__ = (
@@ -25,10 +21,10 @@ PREFIX = "gaudi3"
 
 class Gaudi3Plugin(AbstractGaudiPlugin):
     key = DeviceName("gaudi3")
-    slot_types: Sequence[Tuple[SlotName, SlotTypes]] = (
+    slot_types: Sequence[tuple[SlotName, SlotTypes]] = (
         (SlotName("gaudi3.device"), SlotTypes("count")),
     )
-    exclusive_slot_types: Set[str] = {"gaudi3.device"}
+    exclusive_slot_types: set[str] = {"gaudi3.device"}
 
     async def list_devices(self) -> Collection[Gaudi3Device]:
         if not self.enabled:
@@ -39,7 +35,7 @@ class Gaudi3Plugin(AbstractGaudiPlugin):
 
         num_devices = pyhlml.hlmlDeviceGetCount()
 
-        devices: List[Gaudi3Device] = []
+        devices: list[Gaudi3Device] = []
         for dev_idx in range(num_devices):
             if dev_idx in self.device_mask:
                 continue

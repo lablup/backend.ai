@@ -18,8 +18,9 @@ class Vec2D(tuple):
         return Vec2D(self[0] * other, self[1] * other)
 
     def __rmul__(self, other):
-        if isinstance(other, int) or isinstance(other, float):
+        if isinstance(other, (int, float)):
             return Vec2D(self[0] * other, self[1] * other)
+        return None
 
     def __sub__(self, other):
         return Vec2D(self[0] - other[0], self[1] - other[1])
@@ -40,12 +41,12 @@ class Vec2D(tuple):
     def __getnewargs__(self):
         return (self[0], self[1])
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "(%.2f,%.2f)" % self
 
 
 class Turtle:
-    def __init__(self, canvas):
+    def __init__(self, canvas) -> None:
         self.canvas = canvas
         self.points = []
         self.pen = True

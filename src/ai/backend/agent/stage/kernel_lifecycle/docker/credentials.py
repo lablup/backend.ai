@@ -5,9 +5,10 @@ This stage handles Docker credentials setup for containers.
 """
 
 import asyncio
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, Optional, override
+from typing import Any, Optional, override
 
 from ai.backend.common.json import dump_json
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage

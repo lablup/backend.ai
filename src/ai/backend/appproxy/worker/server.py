@@ -14,10 +14,10 @@ import ssl
 import sys
 import traceback
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
-from typing import Any, AsyncIterator, Final, Iterable, Mapping, Sequence, cast
+from typing import Any, Final, cast
 
 import aiohttp_cors
 import aiohttp_jinja2
@@ -148,8 +148,7 @@ async def request_context_aware_middleware(
     request["request_id"] = request_id
     if _current_task := asyncio.current_task():
         setattr(_current_task, "request_id", request_id)
-    resp = await handler(request)
-    return resp
+    return await handler(request)
 
 
 @web.middleware
@@ -171,8 +170,7 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
     request["request_id"] = request_id
     if _current_task := asyncio.current_task():
         setattr(_current_task, "request_id", request_id)
-    resp = await _handler(request)
-    return resp
+    return await _handler(request)
 
 
 @web.middleware
@@ -192,13 +190,12 @@ async def exception_middleware(
                 status=ex.status_code,
                 headers={"Access-Control-Allow-Origin": "*"},
             )
-        else:
-            return aiohttp_jinja2.render_template(
-                "error.jinja2",
-                request,
-                ex.body_dict,
-                status=ex.status_code,
-            )
+        return aiohttp_jinja2.render_template(
+            "error.jinja2",
+            request,
+            ex.body_dict,
+            status=ex.status_code,
+        )
     except web.HTTPException as ex:
         if ex.status_code == 404:
             raise URLNotFound(extra_data=request.path)
@@ -218,8 +215,7 @@ async def exception_middleware(
         log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
         if root_ctx.local_config.debug.enabled:
             raise InternalServerError(traceback.format_exc())
-        else:
-            raise InternalServerError()
+        raise InternalServerError()
     else:
         return resp
 
@@ -339,11 +335,10 @@ async def _make_message_queue(
             stream_redis_target,
             args,
         )
-    else:
-        return await RedisQueue.create(
-            stream_redis_target,
-            args,
-        )
+    return await RedisQueue.create(
+        stream_redis_target,
+        args,
+    )
 
 
 @asynccontextmanager
@@ -433,7 +428,7 @@ async def proxy_frontend_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         try:
             await root_ctx.proxy_frontend.stop()
         except CleanupError as ee:
-            if all([isinstance(e, asyncio.CancelledError) for e in ee.exceptions]):
+            if all(isinstance(e, asyncio.CancelledError) for e in ee.exceptions):
                 raise asyncio.CancelledError()
             else:
                 raise ee
@@ -589,11 +584,10 @@ async def metrics(request: web.Request) -> web.Response:
     except ValueError:
         raise GenericForbidden
 
-    response = web.Response(
+    return web.Response(
         text=root_ctx.metrics.to_prometheus(),
         content_type="text/plain",
     )
-    return response
 
 
 async def hello(request: web.Request) -> web.Response:
@@ -800,7 +794,7 @@ def build_root_app(
         if pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.appproxy.worker.api")
-        init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+        init_subapp(pkg_name, app, subapp_mod.create_app)
     return app
 
 

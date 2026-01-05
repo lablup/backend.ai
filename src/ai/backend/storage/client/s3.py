@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterable
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional, override
+from typing import Any, Optional, override
 
 import aioboto3
 
@@ -39,7 +39,7 @@ class S3DownloadStreamReader(StreamReader):
         target: _S3Target,
         credentials: _S3Credentials,
         config: _S3DownloadConfig,
-    ):
+    ) -> None:
         self._session = aioboto3.Session()
         self._target = target
         self._credentials = credentials
@@ -86,7 +86,7 @@ class S3Client:
         region_name: Optional[str],
         aws_access_key_id: Optional[str],
         aws_secret_access_key: Optional[str],
-    ):
+    ) -> None:
         self.bucket_name = bucket_name
         self.endpoint_url = endpoint_url
         self.region_name = region_name
@@ -324,13 +324,11 @@ class S3Client:
             if response_content_type:
                 params["ResponseContentType"] = response_content_type
 
-            url = await s3_client.generate_presigned_url(
+            return await s3_client.generate_presigned_url(
                 "get_object",
                 Params=params,
                 ExpiresIn=expiration,
             )
-
-            return url
 
     async def get_object_meta(self, s3_key: str) -> ObjectMetaResponse:
         """

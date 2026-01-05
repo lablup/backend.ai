@@ -1,9 +1,9 @@
 import sys
 
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.types import CLIContext
 
-from ..extensions import pass_ctx_obj
-from ..types import CLIContext
 from . import admin
 
 

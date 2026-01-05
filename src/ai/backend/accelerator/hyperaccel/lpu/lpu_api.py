@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import List
 
 from ai.backend.common.types import DeviceId
 
@@ -7,8 +6,8 @@ from .types import LPUDevice
 from .utils import blocking_job
 
 
-async def list_devices() -> List[LPUDevice]:
-    devices: List[LPUDevice] = []
+async def list_devices() -> list[LPUDevice]:
+    devices: list[LPUDevice] = []
     xclmgmt_path = Path("/sys/bus/pci/drivers/xclmgmt")
     folders = await blocking_job(
         lambda: sorted(
@@ -16,13 +15,13 @@ async def list_devices() -> List[LPUDevice]:
         ),
     )
 
-    for idx, folder in zip(range(len(folders)), folders):
+    for idx, folder in enumerate(folders):
         domain, bus, slot_func = folder.name.split(":")[:3]
         slot, func = slot_func.split(".")[:2]
         display_driver_path = (folder / ".." / f"{domain}:{bus}:{slot}.1").resolve()
         renderD_files = await blocking_job(
-            lambda: [
-                x for x in (display_driver_path / "drm").iterdir() if x.name.startswith("renderD")
+            lambda ddp=display_driver_path: [
+                x for x in (ddp / "drm").iterdir() if x.name.startswith("renderD")
             ],
         )
         assert len(renderD_files) == 1, (

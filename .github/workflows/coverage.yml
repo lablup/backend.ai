@@ -12,7 +12,7 @@ on:
 jobs:
   test-coverage:
     if: ${{ contains(fromJson('["schedule", "workflow_dispatch"]'), github.event_name) || (!contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == true) }}
-    runs-on: [ubuntu-latest-8-cores]
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout the revision
       uses: actions/checkout@v6
@@ -34,7 +34,7 @@ jobs:
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Run the full test suite
-      timeout-minutes: 15
+      timeout-minutes: 60
       run: |
         # configure redis sentinel cluster hostnames for testing
         grep -q "127.0.0.1 node01" /etc/hosts || echo "127.0.0.1 node01" | sudo tee -a /etc/hosts

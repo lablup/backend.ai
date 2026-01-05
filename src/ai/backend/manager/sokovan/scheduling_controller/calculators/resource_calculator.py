@@ -1,8 +1,9 @@
 """Stateless calculator for resource requirements."""
 
 import logging
+from collections.abc import Mapping
 from decimal import Decimal
-from typing import Any, Mapping, Optional
+from typing import Any, Optional
 
 from ai.backend.common.types import (
     BinarySize,
@@ -21,8 +22,10 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionCreationContext,
     SessionCreationSpec,
 )
-
-from ..types import CalculatedResources, KernelResourceInfo
+from ai.backend.manager.sokovan.scheduling_controller.types import (
+    CalculatedResources,
+    KernelResourceInfo,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -30,7 +33,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class ResourceCalculator:
     """Stateless calculator for resource requirements."""
 
-    def __init__(self, config_provider: ManagerConfigProvider):
+    def __init__(self, config_provider: ManagerConfigProvider) -> None:
         self._config_provider = config_provider
 
     async def calculate(
@@ -215,13 +218,12 @@ class ResourceCalculator:
                 image_min_slots,
                 known_slot_types,
             )
-        else:
-            # Legacy client support (prior to v19.03)
-            return await self._calculate_from_legacy(
-                creation_config,
-                image_min_slots,
-                known_slot_types,
-            )
+        # Legacy client support (prior to v19.03)
+        return await self._calculate_from_legacy(
+            creation_config,
+            image_min_slots,
+            known_slot_types,
+        )
 
     async def _calculate_from_resources(
         self,

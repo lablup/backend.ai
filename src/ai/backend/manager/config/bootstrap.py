@@ -72,7 +72,7 @@ class BootstrapConfig(BaseModel):
         """,
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return pformat(self.model_dump())
 
     @classmethod
@@ -103,5 +103,4 @@ class BootstrapConfig(BaseModel):
         ])
         raw_cfg = await cfg_loader.load()
 
-        cfg = cls.model_validate(raw_cfg, by_name=True)
-        return cfg
+        return cls.model_validate(raw_cfg, by_name=True)

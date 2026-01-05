@@ -5,11 +5,17 @@ from typing import Optional
 import click
 
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.pretty import (
+    ProgressBarWithSpinner,
+    print_done,
+    print_error,
+    print_fail,
+    print_warn,
+)
+from ai.backend.client.cli.types import CLIContext
+from ai.backend.client.compat import asyncio_run
 
-from ...compat import asyncio_run
-from ..extensions import pass_ctx_obj
-from ..pretty import ProgressBarWithSpinner, print_done, print_error, print_fail, print_warn
-from ..types import CLIContext
 from . import admin
 
 
@@ -58,9 +64,8 @@ def rescan(registry: str, project: Optional[str] = None) -> None:
     """
     Update the kernel image metadata from the configured registries.
     """
+    from ai.backend.client.session import AsyncSession
     from ai.backend.common.bgtask.types import BgtaskStatus
-
-    from ...session import AsyncSession
 
     async def rescan_images_impl(registry: str, project: Optional[str]) -> None:
         async with AsyncSession() as session:

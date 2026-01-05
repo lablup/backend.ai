@@ -95,15 +95,13 @@ class SessionSchedulingHistoryOrders:
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return SessionSchedulingHistoryRow.created_at.asc()
-        else:
-            return SessionSchedulingHistoryRow.created_at.desc()
+        return SessionSchedulingHistoryRow.created_at.desc()
 
     @staticmethod
     def updated_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return SessionSchedulingHistoryRow.updated_at.asc()
-        else:
-            return SessionSchedulingHistoryRow.updated_at.desc()
+        return SessionSchedulingHistoryRow.updated_at.desc()
 
 
 # ========== Kernel Scheduling History ==========
@@ -192,15 +190,13 @@ class KernelSchedulingHistoryOrders:
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return KernelSchedulingHistoryRow.created_at.asc()
-        else:
-            return KernelSchedulingHistoryRow.created_at.desc()
+        return KernelSchedulingHistoryRow.created_at.desc()
 
     @staticmethod
     def updated_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return KernelSchedulingHistoryRow.updated_at.asc()
-        else:
-            return KernelSchedulingHistoryRow.updated_at.desc()
+        return KernelSchedulingHistoryRow.updated_at.desc()
 
 
 # ========== Deployment History ==========
@@ -268,15 +264,13 @@ class DeploymentHistoryOrders:
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return DeploymentHistoryRow.created_at.asc()
-        else:
-            return DeploymentHistoryRow.created_at.desc()
+        return DeploymentHistoryRow.created_at.desc()
 
     @staticmethod
     def updated_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return DeploymentHistoryRow.updated_at.asc()
-        else:
-            return DeploymentHistoryRow.updated_at.desc()
+        return DeploymentHistoryRow.updated_at.desc()
 
 
 # ========== Route History ==========
@@ -365,12 +359,10 @@ class RouteHistoryOrders:
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return RouteHistoryRow.created_at.asc()
-        else:
-            return RouteHistoryRow.created_at.desc()
+        return RouteHistoryRow.created_at.desc()
 
     @staticmethod
     def updated_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return RouteHistoryRow.updated_at.asc()
-        else:
-            return RouteHistoryRow.updated_at.desc()
+        return RouteHistoryRow.updated_at.desc()

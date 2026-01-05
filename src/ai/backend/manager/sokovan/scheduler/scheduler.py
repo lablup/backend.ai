@@ -212,7 +212,7 @@ class Scheduler:
 
         hook_results = await asyncio.gather(*hook_coroutines, return_exceptions=True)
 
-        for session_data, result in zip(sessions_data, hook_results):
+        for session_data, result in zip(sessions_data, hook_results, strict=True):
             if isinstance(result, BaseException):
                 log.error(
                     "Hook failed with exception for session {}: {}",
@@ -278,7 +278,7 @@ class Scheduler:
 
         hook_results = await asyncio.gather(*hook_coroutines, return_exceptions=True)
 
-        for session_data, result in zip(sessions_data, hook_results):
+        for session_data, result in zip(sessions_data, hook_results, strict=True):
             if isinstance(result, BaseException):
                 log.error(
                     "Termination hook failed with exception for session {} (will still terminate): {}",

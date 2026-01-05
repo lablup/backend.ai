@@ -1,4 +1,3 @@
-import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
@@ -11,12 +10,11 @@ from ai.backend.manager.services.permission_contoller.actions.base import RoleAc
 
 @dataclass
 class UpdateRoleAction(RoleAction):
-    role_id: uuid.UUID
     updater: Updater[RoleRow]
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.role_id)
+        return str(self.updater.pk_value)
 
     @override
     @classmethod
@@ -26,8 +24,7 @@ class UpdateRoleAction(RoleAction):
 
 @dataclass
 class UpdateRoleActionResult(BaseActionResult):
-    data: Optional[RoleData]
-    success: bool
+    data: RoleData
 
     @override
     def entity_id(self) -> Optional[str]:

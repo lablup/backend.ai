@@ -757,9 +757,7 @@ class ArtifactRevisionService:
         """
         if latest_commit_hash is None:
             return False
-        if (
+        return (
             artifact_revision.status == ArtifactStatus.AVAILABLE
             and artifact_revision.digest == latest_commit_hash
-        ):
-            return True
-        return False
+        )

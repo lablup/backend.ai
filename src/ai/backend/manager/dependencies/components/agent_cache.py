@@ -10,9 +10,8 @@ from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
+from ai.backend.manager.dependencies.errors import InvalidManagerKeypairError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-
-from ..errors import InvalidManagerKeypairError
 
 
 @dataclass

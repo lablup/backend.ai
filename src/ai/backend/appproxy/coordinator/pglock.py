@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, AsyncContextManager
+from contextlib import AbstractAsyncContextManager
+from typing import Any
 
 from ai.backend.common.lock import AbstractDistributedLock
 
@@ -10,7 +11,7 @@ from .models.utils import ExtendedAsyncSAEngine
 
 
 class PgAdvisoryLock(AbstractDistributedLock):
-    _lock_ctx: AsyncContextManager | None
+    _lock_ctx: AbstractAsyncContextManager | None
 
     def __init__(self, db: ExtendedAsyncSAEngine, lock_id: LockID) -> None:
         self.db = db

@@ -6,8 +6,8 @@ Interactive sessions don't require special handling during state transitions.
 import logging
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.sokovan.scheduler.types import SessionTransitionData
 
-from ..types import SessionTransitionData
 from .base import AbstractSessionHook
 
 log = BraceStyleAdapter(logging.getLogger(__name__))

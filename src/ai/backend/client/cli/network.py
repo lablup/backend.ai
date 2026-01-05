@@ -1,6 +1,7 @@
 import sys
 import uuid
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 import click
 
@@ -8,9 +9,9 @@ from ai.backend.cli.types import ExitCode
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.exceptions import BackendAPIError
+from ai.backend.client.output.fields import network_fields
 from ai.backend.client.session import Session
 
-from ..output.fields import network_fields
 from .pretty import print_done
 
 _default_list_fields = (
@@ -79,7 +80,7 @@ def list(ctx: CLIContext, format, filter_, order, offset, limit):
         try:
             fields = [network_fields[f.strip()] for f in format.split(",")]
         except KeyError as e:
-            ctx.output.print_fail(f"Field {str(e)} not found")
+            ctx.output.print_fail(f"Field {e!s} not found")
             sys.exit(ExitCode.FAILURE)
     else:
         fields = None
@@ -117,7 +118,7 @@ def get(ctx: CLIContext, network, format):
         try:
             fields = [network_fields[f.strip()] for f in format.split(",")]
         except KeyError as e:
-            ctx.output.print_fail(f"Field {str(e)} not found")
+            ctx.output.print_fail(f"Field {e!s} not found")
             sys.exit(ExitCode.FAILURE)
     else:
         fields = _default_list_fields

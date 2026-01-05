@@ -50,8 +50,7 @@ class HammerspaceAPIClient:
         self._connection_info = connection_info
 
     def _create_session(self, key: ClientKey) -> aiohttp.ClientSession:
-        session = self._client_pool.load_client_session(key)
-        return session
+        return self._client_pool.load_client_session(key)
 
     async def _login(self) -> aiohttp.ClientSession:
         session = self._create_session(
@@ -81,8 +80,7 @@ class HammerspaceAPIClient:
         await self._login()
 
     async def _create_login_session(self) -> aiohttp.ClientSession:
-        session = await self._login()
-        return session
+        return await self._login()
 
     async def _check_nfs_export(self, export_path: str) -> None:
         host = self._connection_info.address.host
@@ -156,8 +154,7 @@ class HammerspaceAPIClient:
             ssl=self._connection_info.ssl_enabled,
         ) as resp:
             resp.raise_for_status()
-            data = await resp.json()
-            return data
+            return await resp.json()
 
     async def get_share(
         self,
@@ -230,5 +227,4 @@ class HammerspaceAPIClient:
         ) as resp:
             resp.raise_for_status()
             data = await resp.json()
-            metric = Metric.model_validate(data)
-            return metric
+            return Metric.model_validate(data)

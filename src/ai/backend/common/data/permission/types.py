@@ -78,6 +78,13 @@ class EntityType(enum.StrEnum):
     IMAGE = "image"
     SESSION = "session"
 
+    ARTIFACT = "artifact"
+    ARTIFACT_REGISTRY = "artifact_registry"
+    APP_CONFIG = "app_config"
+    NOTIFICATION_CHANNEL = "notification_channel"
+    NOTIFICATION_RULE = "notification_rule"
+    MODEL_DEPLOYMENT = "model_deployment"
+
     @classmethod
     def _scope_types(cls) -> set[EntityType]:
         """
@@ -94,6 +101,12 @@ class EntityType(enum.StrEnum):
             cls.VFOLDER,
             cls.IMAGE,
             cls.SESSION,
+            cls.ARTIFACT,
+            cls.ARTIFACT_REGISTRY,
+            cls.APP_CONFIG,
+            cls.NOTIFICATION_CHANNEL,
+            cls.NOTIFICATION_RULE,
+            cls.MODEL_DEPLOYMENT,
         }
 
     @classmethod

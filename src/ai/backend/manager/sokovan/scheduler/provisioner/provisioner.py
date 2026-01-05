@@ -19,9 +19,8 @@ from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
     SchedulingData,
 )
-
-from ..results import ScheduleResult
-from ..types import (
+from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
+from ai.backend.manager.sokovan.scheduler.types import (
     AllocationBatch,
     KeypairOccupancy,
     SchedulingConfig,
@@ -31,6 +30,7 @@ from ..types import (
     SessionWorkload,
     SystemSnapshot,
 )
+
 from .allocators.allocator import SchedulingAllocator
 from .selectors.concentrated import ConcentratedAgentSelector
 from .selectors.dispersed import DispersedAgentSelector
@@ -224,9 +224,7 @@ class SessionProvisioner:
         session_allocations: list[SessionAllocation] = []
         scheduling_failures: list[SchedulingFailure] = []
         # Get agent selection strategy from scheduler opts config
-        agent_selection_strategy = sg_info.scheduler_opts.config.get(
-            "agent_selection_strategy", AgentSelectionStrategy.CONCENTRATED
-        )
+        agent_selection_strategy = sg_info.scheduler_opts.agent_selection_strategy
         agent_selector = self._agent_selector_pool[agent_selection_strategy]
         for session_workload in sequenced_workloads:
             # Track predicates for this session
@@ -320,16 +318,17 @@ class SessionProvisioner:
                     agent_selector,
                 )
                 # Agent selection succeeded - add to passed predicates
-                selector_strategy = agent_selector._strategy
                 passed_phases.append(
                     SchedulingPredicate(
-                        name=selector_strategy.name(), msg=selector_strategy.success_message()
+                        name=agent_selector.strategy_name(),
+                        msg=agent_selector.strategy_success_message(),
                     )
                 )
             except Exception as e:
                 # Add failed predicate for agent selection
-                selector_strategy = agent_selector._strategy
-                failed_phases.append(SchedulingPredicate(name=selector_strategy.name(), msg=str(e)))
+                failed_phases.append(
+                    SchedulingPredicate(name=agent_selector.strategy_name(), msg=str(e))
+                )
                 raise
 
         # Phase 3: Allocation success - add allocator predicate

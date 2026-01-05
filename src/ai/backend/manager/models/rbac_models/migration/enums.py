@@ -112,18 +112,25 @@ class EntityType(enum.StrEnum):
     IMAGE = "image"
     SESSION = "session"
 
+    ARTIFACT = "artifact"
+    ARTIFACT_REGISTRY = "artifact_registry"
+    APP_CONFIG = "app_config"
+    NOTIFICATION_CHANNEL = "notification_channel"
+    NOTIFICATION_RULE = "notification_rule"
+    MODEL_DEPLOYMENT = "model_deployment"
+
     def to_original(self) -> OriginalEntityType:
         return OriginalEntityType(self.value)
 
     @classmethod
-    def _scope_types(cls) -> set["EntityType"]:
+    def _scope_types(cls) -> set[EntityType]:
         """
         Returns a set of entity types that are considered scope types.
         """
         return {cls.USER, cls.PROJECT, cls.DOMAIN}
 
     @classmethod
-    def _resource_types(cls) -> set["EntityType"]:
+    def _resource_types(cls) -> set[EntityType]:
         """
         Returns a set of entity types that are considered resource types.
         """
@@ -131,24 +138,30 @@ class EntityType(enum.StrEnum):
             cls.VFOLDER,
             cls.IMAGE,
             cls.SESSION,
+            cls.ARTIFACT,
+            cls.ARTIFACT_REGISTRY,
+            cls.APP_CONFIG,
+            cls.NOTIFICATION_CHANNEL,
+            cls.NOTIFICATION_RULE,
+            cls.MODEL_DEPLOYMENT,
         }
 
     @classmethod
-    def owner_accessible_entity_types_in_user(cls) -> set["EntityType"]:
+    def owner_accessible_entity_types_in_user(cls) -> set[EntityType]:
         """
         Returns a set of entity types that are accessible by owner roles in user scope.
         """
         return cls._resource_types()
 
     @classmethod
-    def admin_accessible_entity_types_in_project(cls) -> set["EntityType"]:
+    def admin_accessible_entity_types_in_project(cls) -> set[EntityType]:
         """
         Returns a set of entity types that are accessible by admin roles.
         """
         return {*cls._resource_types(), cls.USER}
 
     @classmethod
-    def member_accessible_entity_types_in_project(cls) -> set["EntityType"]:
+    def member_accessible_entity_types_in_project(cls) -> set[EntityType]:
         """
         Returns a set of entity types that are accessible by member roles.
         """
