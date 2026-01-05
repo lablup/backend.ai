@@ -4,8 +4,8 @@ from decimal import Decimal
 from typing import override
 
 from ai.backend.common.types import AccessKey, ResourceSlot
+from ai.backend.manager.sokovan.scheduler.types import SessionWorkload, SystemSnapshot
 
-from ...types import SessionWorkload, SystemSnapshot
 from .sequencer import WorkloadSequencer
 
 
@@ -55,8 +55,7 @@ class DRFSequencer(WorkloadSequencer):
 
         # Sort workloads by dominant share (ascending order - lower share gets higher priority)
         # For users with the same dominant share, maintain original order
-        sorted_workloads = sorted(workloads, key=lambda w: user_dominant_shares[w.access_key])
-        return sorted_workloads
+        return sorted(workloads, key=lambda w: user_dominant_shares[w.access_key])
 
     def _calculate_dominant_share(
         self, resource_slots: ResourceSlot, total_capacity: ResourceSlot

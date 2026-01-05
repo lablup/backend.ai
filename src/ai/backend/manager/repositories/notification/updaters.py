@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
-
-from typing_extensions import override
+from typing import Any, Optional, override
 
 from ai.backend.manager.data.notification.types import WebhookConfig
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow

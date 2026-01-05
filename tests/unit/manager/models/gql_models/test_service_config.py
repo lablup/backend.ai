@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ai.backend.manager.models.gql_models.service_config import ServiceConfigNode
+from ai.backend.manager.api.gql_legacy.service_config import ServiceConfigNode
 
 
 @pytest.mark.asyncio

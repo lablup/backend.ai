@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import textwrap
+from collections.abc import Iterable
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Iterable
+from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
 import aiohttp_cors
@@ -27,12 +28,12 @@ from ai.backend.appproxy.common.utils import (
     pydantic_api_response_handler,
 )
 from ai.backend.appproxy.coordinator.errors import InvalidCircuitStateError, InvalidURLError
+from ai.backend.appproxy.coordinator.models import Circuit, Endpoint, Worker
+from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
 from ai.backend.appproxy.coordinator.models.worker import add_circuit
+from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.common.config import ModelHealthCheck
 
-from ..models import Circuit, Endpoint, Worker
-from ..models.utils import execute_with_txn_retry
-from ..types import RootContext
 from .types import SessionConfig, StubResponseModel
 from .utils import auth_required
 
@@ -144,11 +145,9 @@ async def create_or_update_endpoint(
             domain = "." + ".".join(_url.host.split(".")[1:])
 
             query = sa.select(Worker).where(
-                (
-                    Worker.accepted_traffics.contains([AppMode.INFERENCE])
-                    & (Worker.frontend_mode == FrontendMode.WILDCARD_DOMAIN)
-                    & (Worker.wildcard_domain == domain)
-                )
+                Worker.accepted_traffics.contains([AppMode.INFERENCE])
+                & (Worker.frontend_mode == FrontendMode.WILDCARD_DOMAIN)
+                & (Worker.wildcard_domain == domain)
             )
             result = await sess.execute(query)
             matched_worker = result.scalar()
@@ -158,11 +157,9 @@ async def create_or_update_endpoint(
                 if not _url.port:
                     raise InvalidURLError("URL is missing port component for port-based worker.")
                 query = sa.select(Worker).where(
-                    (
-                        Worker.accepted_traffics.contains([AppMode.INFERENCE])
-                        & (Worker.frontend_mode == FrontendMode.PORT)
-                        & (Worker.hostname == _url.host)
-                    )
+                    Worker.accepted_traffics.contains([AppMode.INFERENCE])
+                    & (Worker.frontend_mode == FrontendMode.PORT)
+                    & (Worker.hostname == _url.host)
                 )
                 result = await sess.execute(query)
                 worker_candidates = result.scalars().all()

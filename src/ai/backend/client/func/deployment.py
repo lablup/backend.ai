@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from ai.backend.client.request import Request
 from ai.backend.common.dto.manager.deployment import (
     ActivateRevisionResponse,
     CreateDeploymentRequest,
@@ -26,7 +27,6 @@ from ai.backend.common.dto.manager.deployment import (
     UpdateRouteTrafficStatusResponse,
 )
 
-from ..request import Request
 from .base import BaseFunction, api_function
 
 __all__ = ("Deployment",)

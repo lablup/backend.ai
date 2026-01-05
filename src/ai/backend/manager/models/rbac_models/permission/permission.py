@@ -11,8 +11,7 @@ from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
 )
-
-from ...base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     IDColumn,

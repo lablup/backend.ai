@@ -3,9 +3,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
-from typing import AsyncIterator, Callable, Optional
+from typing import Optional
 
 import sqlalchemy as sa
 import zmq
@@ -31,28 +32,27 @@ class PeerInvoker(Peer):
         _cached_funcs: dict[str, Callable]
         order_key: ContextVar[Optional[str]]
 
-        def __init__(self, peer: Peer):
+        def __init__(self, peer: Peer) -> None:
             self._cached_funcs = {}
             self.peer = peer
             self.order_key = ContextVar("order_key", default=None)
 
-        def __getattr__(self, name: str):
+        def __getattr__(self, name: str) -> Callable:
             if f := self._cached_funcs.get(name, None):
                 return f
-            else:
 
-                async def _wrapped(*args, **kwargs):
-                    request_body = {
-                        "args": args,
-                        "kwargs": kwargs,
-                    }
-                    self.peer.last_used = time.monotonic()
-                    ret = await self.peer.invoke(name, request_body, order_key=self.order_key.get())
-                    self.peer.last_used = time.monotonic()
-                    return ret
+            async def _wrapped(*args, **kwargs):
+                request_body = {
+                    "args": args,
+                    "kwargs": kwargs,
+                }
+                self.peer.last_used = time.monotonic()
+                ret = await self.peer.invoke(name, request_body, order_key=self.order_key.get())
+                self.peer.last_used = time.monotonic()
+                return ret
 
-                self._cached_funcs[name] = _wrapped
-                return _wrapped
+            self._cached_funcs[name] = _wrapped
+            return _wrapped
 
     call: _CallStub
     last_used: float
@@ -167,7 +167,7 @@ class AgentRPCCache:
             detail = (
                 "Fail to initate RPC connection. "
                 "This could be caused by a connection delay or an attempt to connect to an invalid address. "
-                f"(repr: {repr(orig_exc)})."
+                f"(repr: {orig_exc!r})."
             )
             raise RPCError(
                 agent_id,

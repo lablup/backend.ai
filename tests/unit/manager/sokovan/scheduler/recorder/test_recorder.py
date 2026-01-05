@@ -55,15 +55,17 @@ class TestTransitionRecorder:
         session_id: SessionId,
     ) -> None:
         """Test that step() records started and failed when exception occurs."""
-        with pytest.raises(ValueError, match="Test error"):
-            with recorder.step(
+        with (
+            pytest.raises(ValueError, match="Test error"),
+            recorder.step(
                 StepDescriptor(
                     session_id=session_id,
                     name="check_quota",
                     success_detail="Should not appear",
                 )
-            ):
-                raise ValueError("Test error")
+            ),
+        ):
+            raise ValueError("Test error")
 
         steps = recorder.get_steps(session_id)
         assert len(steps) == 2

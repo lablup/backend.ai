@@ -15,8 +15,7 @@ from ai.backend.manager.services.model_serving.actions.get_model_service_info im
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )
-
-from ...utils import ScenarioBase
+from ai.backend.testutils.scenario import ScenarioBase
 
 
 @pytest.fixture
@@ -32,22 +31,20 @@ def mock_check_requester_access_get_info(mocker, model_serving_service):
 
 @pytest.fixture
 def mock_get_endpoint_by_id_force_get_info(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.admin_repository,
         "get_endpoint_by_id_force",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
 def mock_get_endpoint_by_id_validated_get_info(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.repository,
         "get_endpoint_by_id_validated",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 class TestGetModelServiceInfo:

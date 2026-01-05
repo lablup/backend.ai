@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Final, Optional
 
 import pytest
@@ -70,7 +70,7 @@ class MockActionMonitor:
         # Partially check the result
         assert result.meta.status == self.expected_done_result.meta.status
         assert result.meta.description == self.expected_done_result.meta.description
-        current_time = datetime.now()
+        current_time = datetime.now(tz=UTC)
         assert result.meta.started_at < current_time
         assert result.meta.started_at <= result.meta.ended_at
         assert result.meta.ended_at < current_time

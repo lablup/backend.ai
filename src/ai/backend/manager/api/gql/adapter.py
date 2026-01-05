@@ -105,7 +105,7 @@ class BaseGQLAdapter:
                 cursor_order=spec.forward_order,
                 cursor_condition=cursor_condition,
             )
-        elif options.last is not None:
+        if options.last is not None:
             if options.last <= 0:
                 raise InvalidGraphQLParameters(f"last must be positive, got {options.last}")
             cursor_condition = None
@@ -117,7 +117,7 @@ class BaseGQLAdapter:
                 cursor_order=spec.backward_order,
                 cursor_condition=cursor_condition,
             )
-        elif options.limit is not None:
+        if options.limit is not None:
             if options.limit <= 0:
                 raise InvalidGraphQLParameters(f"limit must be positive, got {options.limit}")
             if options.offset is not None and options.offset < 0:

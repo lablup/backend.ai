@@ -1,6 +1,6 @@
 from ai.backend.appproxy.common.types import RouteInfo
+from ai.backend.appproxy.worker.types import Circuit, RootContext
 
-from ...types import Circuit, RootContext
 from .base import BaseBackend
 
 

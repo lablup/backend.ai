@@ -28,14 +28,16 @@ class libtpu:
                 cls.zone = zone
             else:
                 try:
-                    async with aiohttp.ClientSession() as sess:
-                        async with sess.get(
+                    async with (
+                        aiohttp.ClientSession() as sess,
+                        sess.get(
                             "http://metadata.google.internal/computeMetadata/v1/instance/zone",
                             headers={"Metadata-Flavor": "Google"},
-                        ) as resp:
-                            resp_body = await resp.text()
-                            zone = resp_body.split("/")[-1]
-                            cls.zone = zone
+                        ) as resp,
+                    ):
+                        resp_body = await resp.text()
+                        zone = resp_body.split("/")[-1]
+                        cls.zone = zone
                 except aiohttp.ClientError as e:
                     raise ImportError(
                         "Could not detect Gcloud zone automatically. Please set default gcloud zone."
@@ -52,8 +54,7 @@ class libtpu:
             out, _ = await proc.communicate()
         except FileNotFoundError:
             raise ImportError("Gcloud SDK is not available!")
-        output = out.decode()
-        return output
+        return out.decode()
 
     @classmethod
     async def get_device_count(cls) -> int:
@@ -67,8 +68,7 @@ class libtpu:
         cmd = ["compute", "tpus", "list", "--format", "value(name)", "--filter", "state:READY"]
         ret = await cls._run_ctpu(cmd)
         devices_info = ret.strip().splitlines()
-        dev_name = devices_info[dev_idx].strip()
-        return dev_name
+        return devices_info[dev_idx].strip()
 
     @classmethod
     async def get_device_props(cls, dev_name: str):

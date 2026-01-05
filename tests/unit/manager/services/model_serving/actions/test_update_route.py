@@ -14,8 +14,7 @@ from ai.backend.manager.services.model_serving.actions.update_route import (
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )
-
-from ...utils import ScenarioBase
+from ai.backend.testutils.scenario import ScenarioBase
 
 
 @pytest.fixture
@@ -31,32 +30,29 @@ def mock_check_requester_access_update_route(mocker, model_serving_service):
 
 @pytest.fixture
 def mock_update_route_traffic_force(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.admin_repository,
         "update_route_traffic_force",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
 def mock_update_route_traffic_validated(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.repository,
         "update_route_traffic_validated",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
 def mock_get_endpoint_for_appproxy_update(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.repository,
         "get_endpoint_for_appproxy_update",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture

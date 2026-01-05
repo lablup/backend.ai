@@ -1,6 +1,7 @@
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Optional, override
+from typing import Any, Optional, override
 
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent

@@ -4,9 +4,10 @@ import functools
 import logging
 import secrets
 import uuid
+from collections.abc import Mapping, MutableMapping
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Any, Mapping, MutableMapping, Optional, Union, cast
+from typing import Any, Optional, cast
 from urllib.parse import urlparse
 
 import aiohttp
@@ -863,9 +864,9 @@ class SessionService:
                 raise RuntimeError("should not reach here")
             # handle cases when some params are deliberately set to None
             if code is None:
-                code = ""  # noqa
+                code = ""
             if opts is None:
-                opts = {}  # noqa
+                opts = {}
             if mode == "complete":
                 # For legacy
                 completion_resp = await self._agent_registry.get_completions(session, code, opts)
@@ -1294,7 +1295,7 @@ class SessionService:
             )
         )
 
-        opts: MutableMapping[str, Union[None, str, list[str]]] = {}
+        opts: MutableMapping[str, None | str | list[str]] = {}
         if arguments is not None:
             opts["arguments"] = load_json(arguments)
         if envs is not None:
@@ -1323,19 +1324,21 @@ class SessionService:
             },
         }
 
-        async with aiohttp.ClientSession() as req:
-            async with req.post(
+        async with (
+            aiohttp.ClientSession() as req,
+            req.post(
                 f"{wsproxy_addr}/v2/conf",
                 json=body,
-            ) as resp:
-                token_json = await resp.json()
+            ) as resp,
+        ):
+            token_json = await resp.json()
 
-                return StartServiceActionResult(
-                    result=None,
-                    session_data=session.to_dataclass(),
-                    token=token_json["token"],
-                    wsproxy_addr=wsproxy_advertise_addr,
-                )
+            return StartServiceActionResult(
+                result=None,
+                session_data=session.to_dataclass(),
+                token=token_json["token"],
+                wsproxy_addr=wsproxy_advertise_addr,
+            )
 
     async def upload_files(self, action: UploadFilesAction) -> UploadFilesActionResult:
         session_name = action.session_name

@@ -52,8 +52,8 @@ def show(cli_ctx: CLIContext, alembic_config) -> None:
     from alembic.script import ScriptDirectory
     from sqlalchemy.engine import Connection
 
-    from ..models.alembic import invoked_programmatically
-    from ..models.utils import create_async_engine
+    from ai.backend.manager.models.alembic import invoked_programmatically
+    from ai.backend.manager.models.utils import create_async_engine
 
     def _get_current_rev_sync(connection: Connection) -> str | None:
         context = MigrationContext.configure(connection)
@@ -162,7 +162,7 @@ def apply_missing_revisions(
         importlib.resources.files("ai.backend.manager.models.alembic.revision_history")
     ) as f:
         try:
-            with open(f / f"{previous_version}.json", "r") as fr:
+            with open(f / f"{previous_version}.json") as fr:
                 revision_history: RevisionHistory = load_json(fr.read())
         except FileNotFoundError:
             log.error(
@@ -225,9 +225,11 @@ def oneshot(cli_ctx: CLIContext, alembic_config: str) -> None:
     from alembic.script import ScriptDirectory
     from sqlalchemy.engine import Connection, Engine
 
-    from ..models.alembic import invoked_programmatically
-    from ..models.base import metadata
-    from ..models.utils import create_async_engine
+    from ai.backend.manager.models.alembic import invoked_programmatically
+    from ai.backend.manager.models.base import ensure_all_tables_registered, metadata
+    from ai.backend.manager.models.utils import create_async_engine
+
+    ensure_all_tables_registered()
 
     def _get_current_rev_sync(connection: Connection) -> str | None:
         context = MigrationContext.configure(connection)

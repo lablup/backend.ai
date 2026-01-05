@@ -28,23 +28,23 @@ class StringFilterData:
         """
         if self.equals is not None:
             return column == self.equals
-        elif self.i_equals is not None:
+        if self.i_equals is not None:
             return column.ilike(self.i_equals)
-        elif self.not_equals is not None:
+        if self.not_equals is not None:
             return column != self.not_equals
-        elif self.i_not_equals is not None:
+        if self.i_not_equals is not None:
             return ~column.ilike(self.i_not_equals)
-        elif self.starts_with is not None:
+        if self.starts_with is not None:
             return column.like(f"{self.starts_with}%")
-        elif self.i_starts_with is not None:
+        if self.i_starts_with is not None:
             return column.ilike(f"{self.i_starts_with}%")
-        elif self.ends_with is not None:
+        if self.ends_with is not None:
             return column.like(f"%{self.ends_with}")
-        elif self.i_ends_with is not None:
+        if self.i_ends_with is not None:
             return column.ilike(f"%{self.i_ends_with}")
-        elif self.contains is not None:
+        if self.contains is not None:
             return column.like(f"%{self.contains}%")
-        elif self.i_contains is not None:
+        if self.i_contains is not None:
             return column.ilike(f"%{self.i_contains}%")
 
         return None
@@ -72,15 +72,15 @@ class IntFilterData:
         """
         if self.equals is not None:
             return column == self.equals
-        elif self.not_equals is not None:
+        if self.not_equals is not None:
             return column != self.not_equals
-        elif self.greater_than is not None:
+        if self.greater_than is not None:
             return column > self.greater_than
-        elif self.greater_than_or_equal is not None:
+        if self.greater_than_or_equal is not None:
             return column >= self.greater_than_or_equal
-        elif self.less_than is not None:
+        if self.less_than is not None:
             return column < self.less_than
-        elif self.less_than_or_equal is not None:
+        if self.less_than_or_equal is not None:
             return column <= self.less_than_or_equal
 
         return None

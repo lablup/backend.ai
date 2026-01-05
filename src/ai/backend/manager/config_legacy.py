@@ -7,17 +7,13 @@ import socket
 import sys
 from abc import abstractmethod
 from collections import UserDict
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Awaitable,
-    Callable,
     Final,
-    List,
     Optional,
-    Sequence,
     TypeAlias,
 )
 
@@ -387,7 +383,7 @@ class AbstractConfig(UserDict):
     Deprecated: Use ai.backend.manager.config.unified instead.
     """
 
-    _watch_callbacks: List[ConfigWatchCallback]
+    _watch_callbacks: list[ConfigWatchCallback]
 
     def __init__(self, initial_data: Optional[Mapping[str, Any]] = None) -> None:
         super().__init__(initial_data)

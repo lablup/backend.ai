@@ -19,8 +19,7 @@ class ScalingGroupConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return ScalingGroupRow.name.ilike(f"%{name}%")
-            else:
-                return ScalingGroupRow.name.like(f"%{name}%")
+            return ScalingGroupRow.name.like(f"%{name}%")
 
         return inner
 
@@ -29,8 +28,7 @@ class ScalingGroupConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return sa.func.lower(ScalingGroupRow.name) == name.lower()
-            else:
-                return ScalingGroupRow.name == name
+            return ScalingGroupRow.name == name
 
         return inner
 
@@ -39,8 +37,7 @@ class ScalingGroupConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return ScalingGroupRow.description.ilike(f"%{description}%")
-            else:
-                return ScalingGroupRow.description.like(f"%{description}%")
+            return ScalingGroupRow.description.like(f"%{description}%")
 
         return inner
 
@@ -49,8 +46,7 @@ class ScalingGroupConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return sa.func.lower(ScalingGroupRow.description) == description.lower()
-            else:
-                return ScalingGroupRow.description == description
+            return ScalingGroupRow.description == description
 
         return inner
 
@@ -151,26 +147,22 @@ class ScalingGroupOrders:
     def name(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ScalingGroupRow.name.asc()
-        else:
-            return ScalingGroupRow.name.desc()
+        return ScalingGroupRow.name.desc()
 
     @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ScalingGroupRow.created_at.asc()
-        else:
-            return ScalingGroupRow.created_at.desc()
+        return ScalingGroupRow.created_at.desc()
 
     @staticmethod
     def is_active(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ScalingGroupRow.is_active.asc()
-        else:
-            return ScalingGroupRow.is_active.desc()
+        return ScalingGroupRow.is_active.desc()
 
     @staticmethod
     def is_public(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ScalingGroupRow.is_public.asc()
-        else:
-            return ScalingGroupRow.is_public.desc()
+        return ScalingGroupRow.is_public.desc()

@@ -1,4 +1,5 @@
-from typing import Callable, Iterable, Mapping, Optional, Self
+from collections.abc import Callable, Iterable, Mapping
+from typing import Optional, Self
 
 from aiohttp import web
 from aiohttp.typedefs import Handler

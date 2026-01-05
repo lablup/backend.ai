@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import sys
-from typing import Any, Callable, Iterator, List, Mapping, Optional, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from typing import Any, Optional
 
 from tabulate import tabulate
 
@@ -147,7 +148,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
         page_size: Optional[int] = None,
         plain=False,
     ) -> None:
-        fields: List[FieldSpec] = []
+        fields: list[FieldSpec] = []
 
         def infinite_fetch(_page_size: int) -> Iterator[_Item]:
             nonlocal fields

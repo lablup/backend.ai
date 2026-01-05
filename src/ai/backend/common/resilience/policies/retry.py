@@ -15,9 +15,8 @@ from ai.backend.common.exception import (
     ErrorOperation,
     UnreachableError,
 )
+from ai.backend.common.resilience.policy import Policy
 from ai.backend.logging import BraceStyleAdapter
-
-from ..policy import Policy
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

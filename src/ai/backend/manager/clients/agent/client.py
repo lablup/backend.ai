@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager as actxmgr
-from typing import Any, AsyncIterator, Mapping, Optional
+from typing import Any, Optional
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError

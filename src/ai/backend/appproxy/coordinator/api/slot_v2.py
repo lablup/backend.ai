@@ -1,5 +1,6 @@
 import dataclasses
-from typing import Annotated, Iterable
+from collections.abc import Iterable
+from typing import Annotated
 
 import aiohttp_cors
 from aiohttp import web
@@ -7,9 +8,9 @@ from pydantic import BaseModel, Field
 
 from ai.backend.appproxy.common.types import CORSOptions, PydanticResponse, WebMiddleware
 from ai.backend.appproxy.common.utils import pydantic_api_handler
+from ai.backend.appproxy.coordinator.models.worker import Worker
+from ai.backend.appproxy.coordinator.types import RootContext
 
-from ..models.worker import Worker
-from ..types import RootContext
 from .types import SlotModel
 from .utils import auth_required
 

@@ -3,7 +3,8 @@ from __future__ import annotations
 import copy
 import logging
 import urllib.parse
-from typing import Any, AsyncIterator, Mapping, Optional, cast, override
+from collections.abc import AsyncIterator, Mapping
+from typing import Any, Optional, cast, override
 
 import aiohttp
 import aiohttp.client_exceptions
@@ -14,8 +15,12 @@ from ai.backend.common.docker import ImageRef, arch_name_aliases
 from ai.backend.common.docker import login as registry_login
 from ai.backend.common.json import read_json
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.exceptions import (
+    ContainerRegistryProjectEmpty,
+    ScanImageError,
+    ScanTagError,
+)
 
-from ..exceptions import ContainerRegistryProjectEmpty, ScanImageError, ScanTagError
 from .base import (
     BaseContainerRegistry,
     concurrency_sema,
@@ -459,7 +464,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         if architecture:
             architecture = arch_name_aliases.get(architecture, architecture)
         else:
-            if tag.endswith("-arm64") or tag.endswith("-aarch64"):
+            if tag.endswith(("-arm64", "-aarch64")):
                 architecture = "aarch64"
             else:
                 architecture = "x86_64"
@@ -608,7 +613,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         async with concurrency_sema.get():
             # Harbor does not provide architecture information for a single-arch tag reference.
             # We heuristically detect the architecture using the tag name pattern.
-            if tag.endswith("-arm64") or tag.endswith("-aarch64"):
+            if tag.endswith(("-arm64", "-aarch64")):
                 architecture = "aarch64"
             else:
                 architecture = "x86_64"

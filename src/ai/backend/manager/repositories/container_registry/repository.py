@@ -21,13 +21,13 @@ from ai.backend.manager.models.container_registry import (
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
-from ai.backend.manager.models.gql_models.container_registry import handle_allowed_groups_update
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.purger import Purger, execute_purger
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
+    handle_allowed_groups_update,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

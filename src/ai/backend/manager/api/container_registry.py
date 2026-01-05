@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Iterable
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Iterable, Optional, Tuple
+from typing import TYPE_CHECKING, Optional
 
 import aiohttp_cors
 import sqlalchemy as sa
@@ -21,6 +22,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.errors.image import (
     ContainerRegistryWebhookAuthorizationFailed,
+    HarborWebhookContainerRegistryRowNotFound,
 )
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
@@ -33,8 +35,6 @@ from ai.backend.manager.services.container_registry.actions.modify_container_reg
     ModifyContainerRegistryAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
-
-from ..errors.image import HarborWebhookContainerRegistryRowNotFound
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -208,7 +208,7 @@ async def harbor_webhook_handler(
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["api_versions"] = (1, 2, 3, 4, 5)
     app["prefix"] = "container-registries"

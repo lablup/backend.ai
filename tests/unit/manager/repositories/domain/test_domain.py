@@ -5,7 +5,7 @@ Tests the repository layer with real database operations.
 
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -16,19 +16,28 @@ from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolder
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
 from ai.backend.manager.errors.resource import DomainDeletionFailed, DomainHasUsers
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow, domains, row_to_data
+from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow, groups
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
@@ -50,16 +59,25 @@ class TestDomainRepository:
             [
                 # FK dependency order: parents before children
                 DomainRow,
+                ScalingGroupRow,
                 UserResourcePolicyRow,
-                KeyPairResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
                 UserRow,
                 KeyPairRow,
                 GroupRow,
-                ScalingGroupRow,
-                AgentRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
                 SessionRow,
+                AgentRow,
                 KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
             ],
         ):
             yield database_connection
@@ -164,8 +182,8 @@ class TestDomainRepository:
                 "description": "Model store group for sample-domain",
                 "domain_name": "sample-domain",
                 "is_active": True,
-                "created_at": datetime.now(),
-                "modified_at": datetime.now(),
+                "created_at": datetime.now(tz=UTC),
+                "modified_at": datetime.now(tz=UTC),
                 "type": "GENERAL",
                 "total_resource_slots": {},
                 "allowed_vfolder_hosts": {},
@@ -445,8 +463,8 @@ class TestDomainRepository:
                 "status": UserStatus.ACTIVE,
                 "domain_name": domain_name,
                 "role": UserRole.USER,
-                "created_at": datetime.now(),
-                "modified_at": datetime.now(),
+                "created_at": datetime.now(tz=UTC),
+                "modified_at": datetime.now(tz=UTC),
                 "allowed_client_ip": None,
                 "resource_policy": "default",
                 "totp_activated": False,

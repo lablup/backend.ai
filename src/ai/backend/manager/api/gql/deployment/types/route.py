@@ -19,6 +19,7 @@ from ai.backend.manager.api.gql.base import (
     to_global_id,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.data.deployment.types import (
     RouteInfo,
 )
@@ -29,7 +30,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as RouteTrafficStatusEnum,
 )
 from ai.backend.manager.errors.deployment import EndpointNotFound
-from ai.backend.manager.models.gql_models.session import ComputeSessionNode
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.deployment.options import RouteConditions, RouteOrders
 
@@ -78,7 +78,7 @@ class Route(Node):
     @strawberry.field(description="The deployment this route belongs to.")
     async def deployment(
         self, info: Info[StrawberryGQLContext]
-    ) -> Annotated["ModelDeployment", strawberry.lazy(".deployment")]:
+    ) -> Annotated[ModelDeployment, strawberry.lazy(".deployment")]:
         """Resolve deployment using dataloader."""
         from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
 
@@ -104,7 +104,7 @@ class Route(Node):
     @strawberry.field(description="The revision associated with the route.")
     async def revision(
         self, info: Info[StrawberryGQLContext]
-    ) -> Annotated["ModelRevision", strawberry.lazy(".revision")] | None:
+    ) -> Annotated[ModelRevision, strawberry.lazy(".revision")] | None:
         """Resolve revision using dataloader."""
         from ai.backend.manager.api.gql.deployment.types.revision import ModelRevision
 

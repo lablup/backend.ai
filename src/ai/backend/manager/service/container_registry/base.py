@@ -44,7 +44,7 @@ class AbstractPerProjectRegistryQuotaRepository(abc.ABC):
 
 
 class PerProjectRegistryQuotaRepository(AbstractPerProjectRegistryQuotaRepository):
-    def __init__(self, db: ExtendedAsyncSAEngine):
+    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self.db = db
 
     @classmethod

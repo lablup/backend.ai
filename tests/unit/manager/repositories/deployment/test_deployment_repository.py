@@ -32,7 +32,6 @@ from ai.backend.manager.data.deployment.types import ModelRevisionData
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import AutoScalingPolicyNotFound, DeploymentPolicyNotFound
-from ai.backend.manager.models import KeyPairResourcePolicyRow, KeyPairRow
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyData,
@@ -51,10 +50,14 @@ from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import (
@@ -113,10 +116,12 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             [
                 DomainRow,
                 ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 AgentRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
                 GroupRow,
@@ -214,7 +219,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             policy = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_session_count_per_model_session=5,
                 max_customized_image_count=3,
             )
@@ -827,6 +832,7 @@ class TestGetDefaultArchitectureFromScalingGroup:
             database_connection,
             [
                 ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 AgentRow,
             ],
         ):
@@ -962,13 +968,12 @@ class TestGetDefaultArchitectureFromScalingGroup:
         test_scaling_group_name: str,
     ) -> AgentId:
         """Create a single aarch64 agent."""
-        agent_id = await self._create_agent(
+        return await self._create_agent(
             db_with_cleanup,
             test_scaling_group_name,
             "aarch64",
             suffix="single",
         )
-        return agent_id
 
     @pytest.fixture
     async def alive_x86_and_lost_aarch64_agents(
@@ -1173,8 +1178,10 @@ class TestDeploymentRevisionOperations:
             [
                 DomainRow,
                 ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
                 VFolderRow,
@@ -1242,7 +1249,7 @@ class TestDeploymentRevisionOperations:
             policy = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_session_count_per_model_session=5,
                 max_customized_image_count=3,
             )
@@ -1343,9 +1350,7 @@ class TestDeploymentRevisionOperations:
             )
             db_sess.add(image)
             await db_sess.commit()
-            image_id = image.id
-
-        return image_id
+            return image.id
 
     @pytest.fixture
     async def test_endpoint_id(
@@ -1817,8 +1822,10 @@ class TestDeploymentAutoScalingPolicyOperations:
             [
                 DomainRow,
                 ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
                 VFolderRow,
@@ -1885,7 +1892,7 @@ class TestDeploymentAutoScalingPolicyOperations:
             policy = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_session_count_per_model_session=5,
                 max_customized_image_count=3,
             )
@@ -2200,8 +2207,10 @@ class TestDeploymentPolicyOperations:
             [
                 DomainRow,
                 ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
                 VFolderRow,
@@ -2268,7 +2277,7 @@ class TestDeploymentPolicyOperations:
             policy = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_session_count_per_model_session=5,
                 max_customized_image_count=3,
             )
@@ -2558,8 +2567,10 @@ class TestRouteOperations:
             [
                 DomainRow,
                 ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
                 VFolderRow,
@@ -2626,7 +2637,7 @@ class TestRouteOperations:
             policy = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_session_count_per_model_session=5,
                 max_customized_image_count=3,
             )

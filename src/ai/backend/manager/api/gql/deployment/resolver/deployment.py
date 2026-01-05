@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
+from typing import Optional
 from uuid import UUID
 
 import strawberry

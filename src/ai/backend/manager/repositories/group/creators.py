@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
-
-from typing_extensions import override
+from typing import Optional, override
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.group import GroupRow, ProjectType

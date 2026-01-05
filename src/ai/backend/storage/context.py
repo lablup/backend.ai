@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import MutableMapping
+from collections.abc import AsyncIterator, Mapping, MutableMapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import (
-    AsyncIterator,
     Final,
-    Mapping,
 )
 
 import aiohttp_cors

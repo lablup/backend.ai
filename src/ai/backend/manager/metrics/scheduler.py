@@ -1,8 +1,9 @@
 """Scheduler metrics for monitoring session scheduling performance."""
 
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator, Optional, Self
+from typing import Optional, Self
 
 from prometheus_client import Counter, Histogram
 

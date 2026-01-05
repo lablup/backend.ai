@@ -6,20 +6,20 @@ from dataclasses import dataclass
 from typing import Generic, Optional, TypeVar
 
 from ai.backend.common.bgtask.task.base import BaseBackgroundTaskResult
-
-from ..events.event_types.bgtask.broadcast import (
+from ai.backend.common.events.event_types.bgtask.broadcast import (
     BaseBgtaskDoneEvent,
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskFailedEvent,
 )
-from ..exception import (
+from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
     ErrorDetail,
     ErrorDomain,
     ErrorOperation,
 )
+
 from .types import BgtaskStatus
 
 R = TypeVar("R", bound=Optional[BaseBackgroundTaskResult])
@@ -102,9 +102,8 @@ class TaskFailedResult(TaskResult):
     def error_code(self) -> Optional[ErrorCode]:
         if isinstance(self.exception, BackendAIError):
             return self.exception.error_code()
-        else:
-            return ErrorCode(
-                domain=ErrorDomain.BGTASK,
-                operation=ErrorOperation.EXECUTE,
-                error_detail=ErrorDetail.INTERNAL_ERROR,
-            )
+        return ErrorCode(
+            domain=ErrorDomain.BGTASK,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

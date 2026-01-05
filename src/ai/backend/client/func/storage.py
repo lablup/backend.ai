@@ -1,10 +1,12 @@
-from typing import Optional, Sequence
+from collections.abc import Sequence
+from typing import Optional
 
-from ..output.fields import storage_fields
-from ..output.types import FieldSpec, PaginatedResult
-from ..pagination import fetch_paginated_result
-from ..session import api_session
-from ..utils import dedent as _d
+from ai.backend.client.output.fields import storage_fields
+from ai.backend.client.output.types import FieldSpec, PaginatedResult
+from ai.backend.client.pagination import fetch_paginated_result
+from ai.backend.client.session import api_session
+from ai.backend.client.utils import dedent as _d
+
 from .base import BaseFunction, api_function
 
 __all__ = ("Storage",)

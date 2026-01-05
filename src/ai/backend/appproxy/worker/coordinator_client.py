@@ -58,9 +58,8 @@ async def get_circuit_info(root_ctx: RootContext, request_id: str, circuit_id: s
     except aiohttp.ClientResponseError as e:
         if e.code == 404:
             raise ObjectNotFound(object_name="worker:circuit")
-        else:
-            log.exception("error while communicating with coordinator:")
-            raise InternalServerError from e
+        log.exception("error while communicating with coordinator:")
+        raise InternalServerError from e
 
 
 async def list_worker_circuits(root_ctx: RootContext, request_id: str) -> list[Circuit]:
@@ -76,9 +75,8 @@ async def list_worker_circuits(root_ctx: RootContext, request_id: str) -> list[C
     except aiohttp.ClientResponseError as e:
         if e.code == 404:
             raise ObjectNotFound(object_name="worker:worker")
-        else:
-            log.exception("error while communicating with coordinator:")
-            raise InternalServerError from e
+        log.exception("error while communicating with coordinator:")
+        raise InternalServerError from e
 
 
 async def destroy_circuit(root_ctx: RootContext, request_id: str, circuit_id: str) -> None:
@@ -90,9 +88,8 @@ async def destroy_circuit(root_ctx: RootContext, request_id: str, circuit_id: st
     except aiohttp.ClientResponseError as e:
         if e.code == 404:
             raise ObjectNotFound(object_name="worker:circuit")
-        else:
-            log.exception("error while communicating with coordinator:")
-            raise InternalServerError from e
+        log.exception("error while communicating with coordinator:")
+        raise InternalServerError from e
 
 
 async def register_worker(root_ctx: RootContext, request_id: str) -> list[Slot]:

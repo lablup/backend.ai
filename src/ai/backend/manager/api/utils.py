@@ -13,24 +13,18 @@ import time
 import traceback
 import uuid
 from collections import defaultdict
+from collections.abc import Awaitable, Callable, Hashable, Mapping, MutableMapping
 from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    Awaitable,
-    Callable,
     Concatenate,
     Generic,
-    Hashable,
-    Mapping,
-    MutableMapping,
     Optional,
     ParamSpec,
     Protocol,
-    Tuple,
     TypeAlias,
     TypeVar,
-    Union,
 )
 
 import sqlalchemy as sa
@@ -44,15 +38,14 @@ from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.json import load_json
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
-
-from ..errors.api import (
+from ai.backend.manager.errors.api import (
     DeprecatedAPI,
     InvalidAPIParameters,
     NotImplementedAPI,
 )
-from ..errors.common import GenericForbidden
-from ..models import UserRole, users
-from ..utils import (
+from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.models.user import UserRole, users
+from ai.backend.manager.utils import (
     check_if_requester_is_eligible_to_act_as_target_access_key,
     check_if_requester_is_eligible_to_act_as_target_user_uuid,
 )
@@ -74,7 +67,7 @@ def method_placeholder(orig_method):
 
 async def get_access_key_scopes(
     request: web.Request, params: Optional[Any] = None
-) -> Tuple[AccessKey, AccessKey]:
+) -> tuple[AccessKey, AccessKey]:
     if not request["is_authorized"]:
         raise GenericForbidden("Only authorized requests may have access key scopes.")
     root_ctx: RootContext = request.app["_root.context"]
@@ -98,7 +91,7 @@ async def get_access_key_scopes(
 
 async def get_user_uuid_scopes(
     request: web.Request, params: Optional[Any] = None
-) -> Tuple[uuid.UUID, uuid.UUID]:
+) -> tuple[uuid.UUID, uuid.UUID]:
     if not request["is_authorized"]:
         raise GenericForbidden("Only authorized requests may have access key scopes.")
     root_ctx: RootContext = request.app["_root.context"]
@@ -367,30 +360,29 @@ def mask_sensitive_keys(data: Mapping[str, Any]) -> Mapping[str, Any]:
 def trim_text(value: str, maxlen: int) -> str:
     if len(value) <= maxlen:
         return value
-    value = value[: maxlen - 3] + "..."
-    return value
+    return value[: maxlen - 3] + "..."
 
 
 class _Infinity(numbers.Number):
-    def __lt__(self, o):
+    def __lt__(self, o) -> bool:
         return False
 
-    def __le__(self, o):
+    def __le__(self, o) -> bool:
         return False
 
-    def __gt__(self, o):
+    def __gt__(self, o) -> bool:
         return True
 
-    def __ge__(self, o):
+    def __ge__(self, o) -> bool:
         return False
 
-    def __float__(self):
+    def __float__(self) -> float:
         return float("inf")
 
-    def __int__(self):
+    def __int__(self) -> int:
         return 0xFFFF_FFFF_FFFF_FFFF  # a practical 64-bit maximum
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self)
 
 
@@ -438,7 +430,7 @@ def set_handler_attr(func, key, value):
     if attrs is None:
         attrs = {}
     attrs[key] = value
-    setattr(func, "_backend_attrs", attrs)
+    func._backend_attrs = attrs
 
 
 def get_handler_attr(request, key, default=None):
@@ -482,7 +474,7 @@ async def call_non_bursty(
     coro: Callable[[], Any],
     *,
     max_bursts: int = 64,
-    max_idle: Union[int, float] = 100.0,
+    max_idle: int | float = 100.0,
 ):
     """
     Execute a coroutine once upon max_bursts bursty invocations or max_idle
@@ -523,16 +515,16 @@ async def call_non_bursty(
     if invoke:
         if inspect.iscoroutinefunction(coro):
             return await coro()
-        else:
-            return coro()
+        return coro()
+    return None
 
 
 class Singleton(type):
     _instances: MutableMapping[Any, Any] = {}
 
-    def __call__(cls, *args, **kwargs):
+    def __call__(cls, *args, **kwargs) -> Any:
         if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+            cls._instances[cls] = super().__call__(*args, **kwargs)
         return cls._instances[cls]
 
 

@@ -12,6 +12,7 @@ from ai.backend.common.dto.manager.rbac import (
     PermissionDTO,
 )
 from ai.backend.manager.data.permission.permission import PermissionData
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.repositories.base import Creator, Purger
 from ai.backend.manager.repositories.permission_controller.creators import (
     PermissionCreatorSpec,
@@ -20,8 +21,6 @@ from ai.backend.manager.services.permission_contoller.actions.permission import 
     CreatePermissionAction,
     DeletePermissionAction,
 )
-
-from ...models.rbac_models.permission.permission import PermissionRow
 
 __all__ = ("PermissionAdapter",)
 

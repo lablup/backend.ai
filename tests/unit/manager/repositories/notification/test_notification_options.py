@@ -7,24 +7,38 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.types import BinarySize
 from ai.backend.manager.data.notification import NotificationChannelType, NotificationRuleType
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.notification import (
     NotificationChannelRow,
     NotificationRuleRow,
     WebhookConfig,
 )
+from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import (
     PasswordHashAlgorithm,
     PasswordInfo,
@@ -33,6 +47,7 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     CursorBackwardPagination,
@@ -63,12 +78,28 @@ class TestNotificationOptions:
         async with with_tables(
             database_connection,
             [
-                # FK dependency order: parents before children
+                # Base rows in FK dependency order (parents before children)
                 DomainRow,
+                ScalingGroupRow,
                 UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                UserRoleRow,
                 UserRow,
                 KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+                # Test-specific rows
                 NotificationChannelRow,
                 NotificationRuleRow,
             ],
@@ -109,7 +140,7 @@ class TestNotificationOptions:
             policy = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_session_count_per_model_session=5,
                 max_customized_image_count=3,
             )
@@ -189,8 +220,8 @@ class TestNotificationOptions:
                     config=config.model_dump(),
                     enabled=enabled,
                     created_by=test_user,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
+                    created_at=datetime.now(tz=UTC),
+                    updated_at=datetime.now(tz=UTC),
                 )
                 db_sess.add(channel)
                 channel_ids.append(channel_id)
@@ -206,7 +237,7 @@ class TestNotificationOptions:
     ) -> list[uuid.UUID]:
         """Create sample channels with different timestamps for order testing"""
         channel_ids: list[uuid.UUID] = []
-        base_time = datetime.now()
+        base_time = datetime.now(tz=UTC)
 
         async with db_with_cleanup.begin_session() as db_sess:
             channels_data = [
@@ -253,8 +284,8 @@ class TestNotificationOptions:
                 config=config.model_dump(),
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             db_sess.add(channel)
             await db_sess.commit()
@@ -290,8 +321,8 @@ class TestNotificationOptions:
                     message_template="Test message",
                     enabled=enabled,
                     created_by=test_user,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
+                    created_at=datetime.now(tz=UTC),
+                    updated_at=datetime.now(tz=UTC),
                 )
                 db_sess.add(rule)
                 rule_ids.append(rule_id)
@@ -308,7 +339,7 @@ class TestNotificationOptions:
     ) -> list[uuid.UUID]:
         """Create sample rules with different timestamps for order testing"""
         rule_ids: list[uuid.UUID] = []
-        base_time = datetime.now()
+        base_time = datetime.now(tz=UTC)
 
         async with db_with_cleanup.begin_session() as db_sess:
             rules_data = [
@@ -933,12 +964,28 @@ class TestNotificationCursorPagination:
         async with with_tables(
             database_connection,
             [
-                # FK dependency order: parents before children
+                # Base rows in FK dependency order (parents before children)
                 DomainRow,
+                ScalingGroupRow,
                 UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                UserRoleRow,
                 UserRow,
                 KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+                # Test-specific rows
                 NotificationChannelRow,
                 NotificationRuleRow,
             ],
@@ -979,7 +1026,7 @@ class TestNotificationCursorPagination:
             policy = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_session_count_per_model_session=5,
                 max_customized_image_count=3,
             )
@@ -1042,7 +1089,7 @@ class TestNotificationCursorPagination:
         Created order (oldest to newest): Channel-1, Channel-2, Channel-3, Channel-4, Channel-5
         """
         channel_ids: list[uuid.UUID] = []
-        base_time = datetime.now()
+        base_time = datetime.now(tz=UTC)
 
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(1, 6):

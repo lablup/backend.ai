@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import AsyncIterator, override
+from typing import override
 
 import aiohttp
 import sqlalchemy as sa
@@ -11,9 +12,9 @@ import yarl
 from ai.backend.common.docker import arch_name_aliases, get_docker_connector
 from ai.backend.common.json import pretty_json_str
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.models.image import ImageRow
 
-from ..data.image.types import ImageStatus
-from ..models.image import ImageRow
 from .base import (
     BaseContainerRegistry,
     concurrency_sema,

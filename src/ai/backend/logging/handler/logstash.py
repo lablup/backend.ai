@@ -5,12 +5,12 @@ import logging
 import socket
 import ssl
 from collections import OrderedDict
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import override
 
 import zmq
 
-from ..exceptions import ConfigurationError
+from ai.backend.logging.exceptions import ConfigurationError
 
 
 class LogstashHandler(logging.Handler):
@@ -88,7 +88,7 @@ class LogstashHandler(logging.Handler):
 
         # This log format follows logstash's event format.
         log = OrderedDict([
-            ("@timestamp", datetime.now().isoformat()),
+            ("@timestamp", datetime.now(UTC).isoformat()),
             ("@version", 1),
             ("host", self._myhost),
             ("logger", record.name),

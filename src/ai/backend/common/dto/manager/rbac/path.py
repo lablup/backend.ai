@@ -12,11 +12,11 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 
 __all__ = (
-    "GetRolePathParam",
-    "UpdateRolePathParam",
-    "SearchUsersAssignedToRolePathParam",
-    "DeletePermissionPathParam",
     "DeleteObjectPermissionPathParam",
+    "DeletePermissionPathParam",
+    "GetRolePathParam",
+    "SearchUsersAssignedToRolePathParam",
+    "UpdateRolePathParam",
 )
 
 

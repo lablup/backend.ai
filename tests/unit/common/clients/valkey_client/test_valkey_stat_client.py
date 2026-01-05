@@ -29,7 +29,7 @@ async def test_valkey_stat_multiple_keys(test_valkey_stat: ValkeyStatClient) -> 
     test_values = [f"test-value-{i}".encode() for i in range(3)]
 
     # Set multiple keys
-    key_value_map = dict(zip(test_keys, test_values))
+    key_value_map = dict(zip(test_keys, test_values, strict=True))
     await test_valkey_stat.set_multiple_keys(key_value_map)
 
     # Get multiple keys

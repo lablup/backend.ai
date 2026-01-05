@@ -8,20 +8,14 @@ import shutil
 import signal
 import sys
 import uuid
+from collections.abc import Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from io import StringIO
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    FrozenSet,
-    List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
-    Tuple,
-    Union,
     override,
 )
 
@@ -32,7 +26,30 @@ from kubernetes.client.models import V1Service, V1ServicePort
 from kubernetes_asyncio import client as kube_client
 from kubernetes_asyncio import config as kube_config
 
+from ai.backend.agent.agent import (
+    ACTIVE_STATUS_SET,
+    AbstractAgent,
+    AbstractKernelCreationContext,
+    AgentClass,
+    ScanImagesResult,
+)
+from ai.backend.agent.config.unified import AgentUnifiedConfig, ScratchType
 from ai.backend.agent.etcd import AgentEtcdClientView
+from ai.backend.agent.exception import K8sError, UnsupportedResource
+from ai.backend.agent.kernel import AbstractKernel, KernelRegistry
+from ai.backend.agent.kernel_registry.recovery.kubernetes_recovery import (
+    KubernetesKernelRegistryRecovery,
+    KubernetesKernelRegistryRecoveryArgs,
+)
+from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
+from ai.backend.agent.resources import (
+    AbstractComputePlugin,
+    ComputerContext,
+    KernelResourceSpec,
+    Mount,
+    known_slot_types,
+)
+from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo, Port
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef, KernelFeatures
 from ai.backend.common.dto.agent.response import PurgeImagesResp
@@ -61,29 +78,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from ..agent import (
-    ACTIVE_STATUS_SET,
-    AbstractAgent,
-    AbstractKernelCreationContext,
-    AgentClass,
-    ScanImagesResult,
-)
-from ..config.unified import AgentUnifiedConfig, ScratchType
-from ..exception import K8sError, UnsupportedResource
-from ..kernel import AbstractKernel, KernelRegistry
-from ..kernel_registry.recovery.kubernetes_recovery import (
-    KubernetesKernelRegistryRecovery,
-    KubernetesKernelRegistryRecoveryArgs,
-)
-from ..kernel_registry.writer.types import KernelRegistrySaveMetadata
-from ..resources import (
-    AbstractComputePlugin,
-    ComputerContext,
-    KernelResourceSpec,
-    Mount,
-    known_slot_types,
-)
-from ..types import Container, KernelOwnershipData, MountInfo, Port
 from .kernel import KubernetesKernel
 from .kube_object import (
     ConfigMap,
@@ -110,13 +104,13 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     scratch_dir: Path
     work_dir: Path
     config_dir: Path
-    internal_mounts: List[Mount] = []
+    internal_mounts: list[Mount] = []
     static_pvc_name: str
     workers: Mapping[str, Mapping[str, str]]
-    config_maps: List[ConfigMap]
+    config_maps: list[ConfigMap]
     agent_sockpath: Path
-    volume_mounts: List[KubernetesVolumeMount]
-    volumes: List[KubernetesAbstractVolume]
+    volume_mounts: list[KubernetesVolumeMount]
+    volumes: list[KubernetesAbstractVolume]
 
     def __init__(
         self,
@@ -174,15 +168,14 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         return {}
 
     @override
-    async def prepare_resource_spec(self) -> Tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
+    async def prepare_resource_spec(self) -> tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
         loop = current_loop()
         if self.restarting:
             await kube_config.load_kube_config()
 
             def _kernel_resource_spec_read():
-                with open((self.config_dir / "resource.txt").resolve(), "r") as f:
-                    resource_spec = KernelResourceSpec.read_from_file(f)
-                return resource_spec
+                with open((self.config_dir / "resource.txt").resolve()) as f:
+                    return KernelResourceSpec.read_from_file(f)
 
             resource_spec = await loop.run_in_executor(None, _kernel_resource_spec_read)
             resource_opts = None
@@ -289,7 +282,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
     @override
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
-        mounts: List[Mount] = [
+        mounts: list[Mount] = [
             # Mount scratch directory
             Mount(
                 MountTypes.K8S_GENERIC,
@@ -400,7 +393,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
     @override
     async def process_mounts(self, mounts: Sequence[Mount]):
-        for i, mount in zip(range(len(mounts)), mounts):
+        for i, mount in enumerate(mounts):
             if mount.type == MountTypes.K8S_GENERIC:
                 name = (mount.opts or {})["name"]
                 self.volume_mounts.append(
@@ -437,8 +430,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     def get_runner_mount(
         self,
         type: MountTypes,
-        src: Union[str, Path],
-        target: Union[str, Path],
+        src: str | Path,
+        target: str | Path,
         perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
     ) -> Mount:
@@ -455,7 +448,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
     async def process_volumes(
         self,
-        volumes: List[KubernetesAbstractVolume],
+        volumes: list[KubernetesAbstractVolume],
     ) -> None:
         self.volumes += volumes
 
@@ -506,15 +499,15 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         self,
         computer: AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         return []
 
     async def generate_deployment_object(
         self,
         image: str,
         environ: Mapping[str, Any],
-        ports: List[int],
-        command: List[str],
+        ports: list[int],
+        command: list[str],
         labels: Mapping[str, Any] = {},
     ) -> dict:
         return {
@@ -675,7 +668,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         # TODO: Mark shmem feature as unsupported when advertising agent
 
-        kernel_obj = KubernetesKernel(
+        return KubernetesKernel(
             self.ownership_data,
             self.kernel_config["network_id"],
             self.image_ref,
@@ -686,13 +679,12 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             environ=environ,
             data={},
         )
-        return kernel_obj
 
     @override
     async def start_container(
         self,
         kernel_obj: AbstractKernel,
-        cmdargs: List[str],
+        cmdargs: list[str],
         resource_opts,
         preopen_ports,
         cluster_info: ClusterInfo,
@@ -734,14 +726,14 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             f"kernel-{self.kernel_id}-expose",
             [
                 (port, f"kernel-{self.kernel_id}-svc-{index}")
-                for index, port in zip(range(len(exposed_ports)), exposed_ports)
+                for index, port in enumerate(exposed_ports)
             ],
         )
 
         async def rollup(
-            functions: List[Tuple[Optional[functools.partial], Optional[functools.partial]]],
+            functions: list[tuple[Optional[functools.partial], Optional[functools.partial]]],
         ):
-            rollback_functions: List[Optional[functools.partial]] = []
+            rollback_functions: list[Optional[functools.partial]] = []
 
             for rollup_function, future_rollback_function in functions:
                 try:
@@ -755,7 +747,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     log.exception("Error while rollup: {}", e)
                     raise
 
-        arguments: List[Tuple[Optional[functools.partial], Optional[functools.partial]]] = []
+        arguments: list[tuple[Optional[functools.partial], Optional[functools.partial]]] = []
 
         try:
             expose_service_api_response: V1Service = await core_api.create_namespaced_service(
@@ -767,7 +759,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         if expose_service_api_response.spec is None:
             raise K8sError("expose_service_api_response.spec is None")
-        node_ports: List[V1ServicePort] = expose_service_api_response.spec.ports
+        node_ports: list[V1ServicePort] = expose_service_api_response.spec.ports
         arguments.append((
             None,
             functools.partial(
@@ -1024,8 +1016,8 @@ class KubernetesAgent(
     @override
     async def enumerate_containers(
         self,
-        status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> Sequence[Tuple[KernelId, Container]]:
+        status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
+    ) -> Sequence[tuple[KernelId, Container]]:
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
 
@@ -1035,7 +1027,7 @@ class KubernetesAgent(
             # Additional check to filter out real worker pods only?
 
             async def _fetch_container_info(pod: Any):
-                kernel_id: Union[KernelId, str, None] = "(unknown)"
+                kernel_id: KernelId | str | None = "(unknown)"
                 try:
                     kernel_id = await get_kernel_id_from_deployment(pod)
                     if kernel_id is None or kernel_id not in self.kernel_registry:
@@ -1154,7 +1146,7 @@ class KubernetesAgent(
         except Exception:
             log.warning("_destroy_kernel({0}) kernel missing (already dead?)", kernel_id)
             await asyncio.shield(self.k8s_ptask_group.create_task(force_cleanup()))
-            return None
+            return
         deployment_name = kernel["deployment_name"]
         try:
             await core_api.delete_namespaced_service(f"{deployment_name}-service", "backend-ai")

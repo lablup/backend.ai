@@ -38,7 +38,6 @@ def negate_conditions(conditions: list[QueryCondition]) -> QueryCondition:
         clauses = [cond() for cond in conditions]
         if len(clauses) == 1:
             return sa.not_(clauses[0])
-        else:
-            return sa.not_(sa.and_(*clauses))
+        return sa.not_(sa.and_(*clauses))
 
     return inner

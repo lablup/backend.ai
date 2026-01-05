@@ -2,8 +2,8 @@
 
 import asyncio
 import logging
-from collections.abc import Sequence
-from typing import Any, Coroutine, Optional
+from collections.abc import Coroutine, Sequence
+from typing import Any, Optional
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import (
@@ -89,7 +89,7 @@ class DeploymentExecutor:
     async def check_pending_deployments(
         self, deployments: Sequence[DeploymentInfo]
     ) -> DeploymentExecutionResult:
-        scaling_groups = set(deployment.metadata.resource_group for deployment in deployments)
+        scaling_groups = {deployment.metadata.resource_group for deployment in deployments}
         scaling_group_targets = await self._deployment_repo.fetch_scaling_group_proxy_targets(
             scaling_groups
         )
@@ -121,7 +121,7 @@ class DeploymentExecutor:
 
         if registration_tasks:
             results = await asyncio.gather(*registration_tasks, return_exceptions=True)
-            for deployment, result in zip(deployments, results):
+            for deployment, result in zip(deployments, results, strict=True):
                 if isinstance(result, BaseException):
                     log.error(
                         "Failed to register endpoint for deployment {}: {}",

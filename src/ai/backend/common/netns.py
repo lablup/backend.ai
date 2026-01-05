@@ -13,14 +13,14 @@ def setns(fd: int):
 
 
 class NetworkNamespaceManager:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path) -> None:
         self.self_ns = os.open("/proc/self/ns/net", os.O_RDONLY)
         self.new_ns = os.open(path, os.O_RDONLY)
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         setns(self.new_ns)
 
-    def __exit__(self, *exc_info_args):
+    def __exit__(self, *exc_info_args) -> None:
         setns(self.self_ns)
         os.close(self.new_ns)
         os.close(self.self_ns)

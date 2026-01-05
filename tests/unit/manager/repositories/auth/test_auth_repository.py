@@ -2,10 +2,12 @@
 Tests for AuthRepository functionality.
 """
 
+from __future__ import annotations
+
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
@@ -16,20 +18,30 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.types import UserData
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.errors.auth import GroupMembershipNotFoundError
-from ai.backend.manager.models import (
-    DomainRow,
-    GroupRow,
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow, association_groups_users
+from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
-    KeyPairRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
-    UserRow,
-    association_groups_users,
 )
-from ai.backend.manager.models.group import AssocGroupUserRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.user import UserRole, UserStatus
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.testutils.db import with_tables
 
@@ -67,14 +79,28 @@ class TestAuthRepository:
         async with with_tables(
             database_connection,
             [
+                # FK dependency order: parents before children
                 DomainRow,
+                ScalingGroupRow,
                 UserResourcePolicyRow,
-                KeyPairResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
                 UserRow,
                 KeyPairRow,
                 GroupRow,
                 AssocGroupUserRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
             ],
         ):
             yield database_connection
@@ -499,6 +525,6 @@ class TestAuthRepository:
 
         assert isinstance(result, datetime)
         # Verify it's reasonably close to current time (within 1 second)
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         time_diff = abs((now_utc - result).total_seconds())
         assert time_diff < 1.0

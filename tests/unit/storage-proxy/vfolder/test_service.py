@@ -24,8 +24,7 @@ UUID2 = uuid.UUID("12345678-1234-5678-1234-567812345680")
 
 @pytest.fixture
 def mock_volume_pool():
-    mock_pool = MagicMock(spec=VolumePool)
-    return mock_pool
+    return MagicMock(spec=VolumePool)
 
 
 @pytest.fixture

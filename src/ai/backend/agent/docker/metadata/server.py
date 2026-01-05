@@ -1,7 +1,7 @@
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, MutableMapping, Sequence
 from http import HTTPStatus
-from typing import Any, List, Mapping, MutableMapping, cast
+from typing import Any, cast
 from uuid import UUID
 
 import attr
@@ -91,7 +91,7 @@ class MetadataServer(aobject):
     app: web.Application
     runner: web.AppRunner
     route_structure: MutableMapping[str, Any]
-    loaded_apps: List[str]
+    loaded_apps: list[str]
 
     def __init__(
         self,
@@ -113,12 +113,12 @@ class MetadataServer(aobject):
         self.loaded_apps = []
         self.route_structure = {"latest": {"extension": {}}}
 
-    async def __ainit__(self):
+    async def __ainit__(self) -> None:
         local_config = cast(AgentUnifiedConfig, self.app["_root.context"].local_config)
         await prepare_kernel_metadata_uri_handling(local_config)
         self.app["docker-mode"] = local_config.agent.docker_mode
         log.info("Loading metadata plugin: meta-data")
-        metadata_plugin = ContainerMetadataPlugin({}, local_config)
+        metadata_plugin = ContainerMetadataPlugin({}, local_config.model_dump())
         await metadata_plugin.init(None)
         metadata_app, global_middlewares, route_structures = await metadata_plugin.create_app()
         self._init_subapp(

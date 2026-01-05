@@ -11,8 +11,8 @@ import click
 
 from ai.backend.common.configs.sample_generator import generate_sample_config_file
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 
-from ..config.unified import ManagerUnifiedConfig
 from .context import CLIContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

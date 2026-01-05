@@ -3,18 +3,14 @@ import functools
 import inspect
 import json
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Coroutine, Mapping
 from dataclasses import dataclass, field
 from inspect import Signature
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Coroutine,
     Generic,
     Optional,
     Self,
-    Type,
     TypeAlias,
     TypeVar,
     get_args,
@@ -80,10 +76,10 @@ def convert_validation_error[T](func: Callable[..., T]) -> Callable[..., T]:
 
 
 class BodyParam(Generic[TRequestModel]):
-    _model: Type[TRequestModel]
+    _model: type[TRequestModel]
     _parsed: Optional[TRequestModel]
 
-    def __init__(self, model: Type[TRequestModel]) -> None:
+    def __init__(self, model: type[TRequestModel]) -> None:
         self._model = model
         self._parsed: Optional[TRequestModel] = None
 
@@ -102,10 +98,10 @@ class BodyParam(Generic[TRequestModel]):
 
 
 class QueryParam(Generic[TRequestModel]):
-    _model: Type[TRequestModel]
+    _model: type[TRequestModel]
     _parsed: Optional[TRequestModel]
 
-    def __init__(self, model: Type[TRequestModel]) -> None:
+    def __init__(self, model: type[TRequestModel]) -> None:
         self._model = model
         self._parsed: Optional[TRequestModel] = None
 
@@ -124,10 +120,10 @@ class QueryParam(Generic[TRequestModel]):
 
 
 class HeaderParam(Generic[TRequestModel]):
-    _model: Type[TRequestModel]
+    _model: type[TRequestModel]
     _parsed: Optional[TRequestModel]
 
-    def __init__(self, model: Type[TRequestModel]) -> None:
+    def __init__(self, model: type[TRequestModel]) -> None:
         self._model = model
         self._parsed: Optional[TRequestModel] = None
 
@@ -146,10 +142,10 @@ class HeaderParam(Generic[TRequestModel]):
 
 
 class PathParam(Generic[TRequestModel]):
-    _model: Type[TRequestModel]
+    _model: type[TRequestModel]
     _parsed: Optional[TRequestModel]
 
-    def __init__(self, model: Type[TRequestModel]) -> None:
+    def __init__(self, model: type[TRequestModel]) -> None:
         self._model = model
         self._parsed: Optional[TRequestModel] = None
 
@@ -237,19 +233,18 @@ async def _extract_param_value(request: web.Request, input_param_type: Any) -> _
                 )
             return param_instance.from_body(body)
 
-        elif origin_type is QueryParam:
+        if origin_type is QueryParam:
             return param_instance.from_query(request.query)
 
-        elif origin_type is HeaderParam:
+        if origin_type is HeaderParam:
             return param_instance.from_header(request.headers)
 
-        elif origin_type is PathParam:
+        if origin_type is PathParam:
             return param_instance.from_path(request.match_info)
 
-        else:
-            raise InvalidAPIParameters(
-                f"Parameter '{input_param_type}' must use one of QueryParam, PathParam, HeaderParam, MiddlewareParam, BodyParam"
-            )
+        raise InvalidAPIParameters(
+            f"Parameter '{input_param_type}' must use one of QueryParam, PathParam, HeaderParam, MiddlewareParam, BodyParam"
+        )
 
     except ValidationError as e:
         raise InvalidAPIParameters(str(e))
@@ -362,7 +357,7 @@ async def _serialize_parameter(
                 body = await request.json()
             except json.decoder.JSONDecodeError as e:
                 raise MalformedRequestBody(
-                    f"Malformed body - URL: {request.url}, Method: {request.method}, error: {repr(e)}"
+                    f"Malformed body - URL: {request.url}, Method: {request.method}, error: {e!r}"
                 )
             return param_instance_or_class.from_body(body)
         case QueryParam():
@@ -376,7 +371,7 @@ async def _serialize_parameter(
                 param_instance = await param_instance_or_class.from_request(request)
             except ValidationError as e:
                 raise MiddlewareParamParsingFailed(
-                    f"Failed while parsing {param_instance_or_class}. (error:{repr(e)})"
+                    f"Failed while parsing {param_instance_or_class}. (error:{e!r})"
                 )
     return param_instance
 
@@ -517,7 +512,7 @@ def stream_api_handler(handler: StreamBaseHandler) -> ParsedRequestHandler:
             await resp.write(first_chunk)
         except Exception as e:
             raise web.HTTPInternalServerError(
-                reason=f"Failed to send first chunk from stream: {repr(e)}"
+                reason=f"Failed to send first chunk from stream: {e!r}"
             ) from e
 
         async for chunk in body_iter:

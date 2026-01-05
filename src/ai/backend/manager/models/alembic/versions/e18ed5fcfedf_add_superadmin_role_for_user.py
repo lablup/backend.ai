@@ -11,7 +11,7 @@ import textwrap
 from alembic import op
 from sqlalchemy.sql import text
 
-from ai.backend.manager.models import UserRole
+from ai.backend.manager.models.user import UserRole
 
 # revision identifiers, used by Alembic.
 revision = "e18ed5fcfedf"

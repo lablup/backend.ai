@@ -3,9 +3,10 @@ from __future__ import annotations
 import copy
 import logging
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, Sequence, cast
+from typing import Optional, cast
 from uuid import UUID
 
 import msgpack
@@ -36,8 +37,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
-
-from ..permission_controller.role_manager import RoleManager
+from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -252,7 +252,7 @@ class GroupRepository:
         objs_per_group = {}
         local_tz = self._config_provider.config.system.timezone
 
-        for row, raw_stat in zip(rows, raw_stats):
+        for row, raw_stat in zip(rows, raw_stats, strict=True):
             group_id = str(row["group_id"])
             last_stat = row["last_stat"]
             if not last_stat:
@@ -263,10 +263,10 @@ class GroupRepository:
             nfs = None
             if row["vfolder_mounts"]:
                 # For >=22.03, return used host directories instead of volume host, which is not so useful.
-                nfs = list(set([str(mount.host_path) for mount in row["vfolder_mounts"]]))
+                nfs = list({str(mount.host_path) for mount in row["vfolder_mounts"]})
             elif row["mounts"] and isinstance(row["mounts"][0], list):
                 # For the kernel records that have legacy contents of `mounts`.
-                nfs = list(set([mount[2] for mount in row["mounts"]]))
+                nfs = list({mount[2] for mount in row["mounts"]})
             if row["terminated_at"] is None:
                 used_time = used_days = None
             else:

@@ -3,16 +3,16 @@ from __future__ import annotations
 import asyncio
 import os
 from collections import OrderedDict
-from typing import Any, Dict, FrozenSet, Mapping, Sequence, override
+from collections.abc import Mapping, Sequence
+from typing import Any, override
 
+from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel, NextResult, ResultRecord
+from ai.backend.agent.resources import KernelResourceSpec
+from ai.backend.agent.types import AgentEventData, KernelOwnershipData
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp, CodeCompletionResult
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import CommitStatus
-
-from ..kernel import AbstractCodeRunner, AbstractKernel, NextResult, ResultRecord
-from ..resources import KernelResourceSpec
-from ..types import AgentEventData, KernelOwnershipData
 
 
 class DummyKernel(AbstractKernel):
@@ -29,7 +29,7 @@ class DummyKernel(AbstractKernel):
         resource_spec: KernelResourceSpec,
         service_ports: Any,  # TODO: type-annotation
         environ: Mapping[str, Any],
-        data: Dict[str, Any],
+        data: dict[str, Any],
         dummy_config: Mapping[str, Any],
     ) -> None:
         super().__init__(
@@ -56,9 +56,9 @@ class DummyKernel(AbstractKernel):
         self,
         event_producer: EventProducer,
         *,
-        client_features: FrozenSet[str],
+        client_features: frozenset[str],
         api_version: int,
-    ) -> "AbstractCodeRunner":
+    ) -> AbstractCodeRunner:
         if self.dummy_kernel_cfg["use-fake-code-runner"]:
             return await DummyFakeCodeRunner.new(
                 self.kernel_id,
@@ -70,17 +70,16 @@ class DummyKernel(AbstractKernel):
                 exec_timeout=0,
                 client_features=client_features,
             )
-        else:
-            return await DummyCodeRunner.new(
-                self.kernel_id,
-                self.session_id,
-                event_producer,
-                kernel_host=self.data["kernel_host"],
-                repl_in_port=self.data["repl_in_port"],
-                repl_out_port=self.data["repl_out_port"],
-                exec_timeout=0,
-                client_features=client_features,
-            )
+        return await DummyCodeRunner.new(
+            self.kernel_id,
+            self.session_id,
+            event_producer,
+            kernel_host=self.data["kernel_host"],
+            repl_in_port=self.data["repl_in_port"],
+            repl_out_port=self.data["repl_out_port"],
+            exec_timeout=0,
+            client_features=client_features,
+        )
 
     @override
     async def check_status(self):
@@ -135,8 +134,10 @@ class DummyKernel(AbstractKernel):
         *,
         canonical: str | None = None,
         filename: str | None = None,
-        extra_labels: dict[str, str] = {},
+        extra_labels: dict[str, str] | None = None,
     ) -> None:
+        if extra_labels is None:
+            extra_labels = {}
         self.is_commiting = True
         delay = self.dummy_kernel_cfg["delay"]["commit"]
         await asyncio.sleep(delay)
@@ -263,7 +264,7 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
     async def __ainit__(self) -> None:
         return
 
-    def __setstate__(self, props):
+    def __setstate__(self, props) -> None:
         self.__dict__.update(props)
         self.zctx = None
         self.input_sock = None

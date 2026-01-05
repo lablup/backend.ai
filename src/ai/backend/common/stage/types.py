@@ -93,7 +93,7 @@ class ProvisionStage(Stage[TSpec, TResource]):
     _resource: Optional[TResource]
     _setup_completed: asyncio.Event
 
-    def __init__(self, provisioner: Provisioner):
+    def __init__(self, provisioner: Provisioner) -> None:
         self._provisioner = provisioner
         self._resource = None
         self._setup_completed = asyncio.Event()
@@ -134,7 +134,7 @@ class ArgsSpecGenerator(SpecGenerator[TSpec]):
 
     _args: TSpec
 
-    def __init__(self, args: TSpec):
+    def __init__(self, args: TSpec) -> None:
         self._args = args
 
     @override

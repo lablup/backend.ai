@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import Tuple
 from unittest import mock
 
 import pytest
@@ -14,7 +13,7 @@ from ai.backend.common.types import HostPortPair, RedisConnectionInfo
 
 @pytest.mark.redis
 @pytest.mark.asyncio
-async def test_pipeline_single_instance(redis_container: Tuple[str, HostPortPair]) -> None:
+async def test_pipeline_single_instance(redis_container: tuple[str, HostPortPair]) -> None:
     addr = redis_container[1]
     rconn = RedisConnectionInfo(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.5),
@@ -40,7 +39,7 @@ async def test_pipeline_single_instance(redis_container: Tuple[str, HostPortPair
 
 @pytest.mark.redis
 @pytest.mark.asyncio
-async def test_pipeline_single_instance_retries(redis_container: Tuple[str, HostPortPair]) -> None:
+async def test_pipeline_single_instance_retries(redis_container: tuple[str, HostPortPair]) -> None:
     addr = redis_container[1]
     rconn = RedisConnectionInfo(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.5),

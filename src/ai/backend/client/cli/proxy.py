@@ -3,32 +3,34 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+from collections.abc import AsyncIterator
 from http import HTTPStatus
-from typing import AsyncIterator, Tuple, Union
 
 import aiohttp
 import click
 from aiohttp import web
 
 from ai.backend.cli.main import main
+from ai.backend.client.exceptions import BackendAPIError, BackendClientError
+from ai.backend.client.request import Request
+from ai.backend.client.session import AsyncSession
 
-from ..exceptions import BackendAPIError, BackendClientError
-from ..request import Request
-from ..session import AsyncSession
 from .pretty import print_error, print_fail, print_info
 
 
 class WebSocketProxy:
     __slots__ = (
-        "up_conn",
         "down_conn",
+        "up_conn",
         "upstream_buffer",
         "upstream_buffer_task",
     )
 
-    upstream_buffer: asyncio.Queue[Tuple[Union[str, bytes], aiohttp.WSMsgType]]
+    upstream_buffer: asyncio.Queue[tuple[str | bytes, aiohttp.WSMsgType]]
 
-    def __init__(self, up_conn: aiohttp.ClientWebSocketResponse, down_conn: web.WebSocketResponse):
+    def __init__(
+        self, up_conn: aiohttp.ClientWebSocketResponse, down_conn: web.WebSocketResponse
+    ) -> None:
         self.up_conn = up_conn
         self.down_conn = down_conn
         self.upstream_buffer = asyncio.Queue()
@@ -44,9 +46,7 @@ class WebSocketProxy:
                 if msg.type in (aiohttp.WSMsgType.TEXT, aiohttp.WSMsgType.BINARY):
                     await self.send(msg.data, msg.type)
                 elif msg.type == aiohttp.WSMsgType.ERROR:
-                    print_fail(
-                        "ws connection closed with exception {}".format(self.up_conn.exception())
-                    )
+                    print_fail(f"ws connection closed with exception {self.up_conn.exception()}")
                     break
                 elif msg.type == aiohttp.WSMsgType.CLOSE:
                     break
@@ -66,15 +66,13 @@ class WebSocketProxy:
                     await self.down_conn.send_str(msg.data)
                 elif msg.type == aiohttp.WSMsgType.BINARY:
                     await self.down_conn.send_bytes(msg.data)
-                elif msg.type == aiohttp.WSMsgType.CLOSED:
-                    break
-                elif msg.type == aiohttp.WSMsgType.ERROR:
+                elif msg.type == aiohttp.WSMsgType.CLOSED or msg.type == aiohttp.WSMsgType.ERROR:
                     break
             # here, server gracefully disconnected
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            print_fail("unexpected error: {}".format(e))
+            print_fail(f"unexpected error: {e}")
         finally:
             await self.close_upstream()
             print_info("websocket proxy terminated")

@@ -1,6 +1,6 @@
 import enum
 from dataclasses import dataclass
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from dataclasses_json import DataClassJsonMixin
 
@@ -27,9 +27,9 @@ class GPFSFilesystemMount(DataClassJsonMixin):
     driveLetter: Optional[str]
     remoteDeviceName: Optional[str]
     readOnly: Optional[bool]
-    nodesMountedReadWrite: Optional[List[str]]
-    nodesMountedReadOnly: Optional[List[str]]
-    nodesMountedInternally: Optional[List[str]]
+    nodesMountedReadWrite: Optional[list[str]]
+    nodesMountedReadOnly: Optional[list[str]]
+    nodesMountedInternally: Optional[list[str]]
     status: Optional[str]
 
 
@@ -136,7 +136,7 @@ class GPFSSystemHealthState(DataClassJsonMixin):
     entityName: Optional[str]
     parentName: Optional[str]
     state: Optional[str]
-    reasons: Optional[List[str]]
+    reasons: Optional[list[str]]
 
 
 @dataclass
@@ -159,11 +159,11 @@ class GPFSDisk(DataClassJsonMixin):
 
 @dataclass
 class GPFSJobResult(DataClassJsonMixin):
-    commands: Optional[List[str]] = None
-    progress: Optional[List[str]] = None
+    commands: Optional[list[str]] = None
+    progress: Optional[list[str]] = None
     exitCode: Optional[int] = None
-    stderr: Optional[List[str]] = None
-    stdout: Optional[List[str]] = None
+    stderr: Optional[list[str]] = None
+    stdout: Optional[list[str]] = None
 
 
 @dataclass
@@ -190,7 +190,7 @@ class GPFSJob(DataClassJsonMixin):
     submitted: Optional[str] = None
     completed: Optional[str] = None
     runtime: Optional[int] = None
-    pids: Optional[List[int]] = None
+    pids: Optional[list[int]] = None
 
 
 class GPFSQuotaType(enum.StrEnum):

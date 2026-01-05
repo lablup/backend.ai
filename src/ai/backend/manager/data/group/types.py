@@ -5,9 +5,7 @@ import uuid
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
-
-from typing_extensions import override
+from typing import Any, Optional, override
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.permission.id import ScopeId

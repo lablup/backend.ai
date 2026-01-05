@@ -7,8 +7,9 @@ the row-based implementation details of the legacy selectors.
 
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Mapping, Optional, Sequence
+from typing import Optional
 from uuid import UUID
 
 from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
@@ -176,16 +177,15 @@ class AgentSelectionCriteria:
                     kernel_ids=kernel_ids,
                 )
             ]
-        else:
-            # Return individual kernel resources for multi-node sessions
-            return [
-                ResourceRequirements(
-                    requested_slots=req.requested_slots,
-                    required_architecture=req.required_architecture,
-                    kernel_ids=[kernel_id],
-                )
-                for kernel_id, req in self.kernel_requirements.items()
-            ]
+        # Return individual kernel resources for multi-node sessions
+        return [
+            ResourceRequirements(
+                requested_slots=req.requested_slots,
+                required_architecture=req.required_architecture,
+                kernel_ids=[kernel_id],
+            )
+            for kernel_id, req in self.kernel_requirements.items()
+        ]
 
 
 class AbstractAgentSelector(ABC):

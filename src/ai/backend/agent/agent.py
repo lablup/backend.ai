@@ -27,6 +27,7 @@ from collections.abc import (
 )
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import UTC
 from decimal import Decimal
 from io import SEEK_END, BytesIO
 from itertools import chain
@@ -743,7 +744,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             additional_allowed_syscalls = computer_ctx.instance.get_additional_allowed_syscalls()
             additional_allowed_syscalls_set.update(additional_allowed_syscalls)
 
-        self.additional_allowed_syscalls = sorted(list(additional_allowed_syscalls_set))
+        self.additional_allowed_syscalls = sorted(additional_allowed_syscalls_set)
         update_additional_gids(environ, list(additional_gid_set))
 
     def get_overriding_uid(self) -> Optional[int]:
@@ -1026,7 +1027,7 @@ class AbstractAgent(
             await self.valkey_stat_client.store_computer_metadata(field_value_map)
 
         all_devices = list(
-            chain.from_iterable((computer.devices for computer in self.computers.values()))
+            chain.from_iterable(computer.devices for computer in self.computers.values())
         )
         self.affinity_map = AffinityMap.build(all_devices)
 
@@ -1190,9 +1191,7 @@ class AbstractAgent(
                             await t
                         except asyncio.CancelledError:
                             continue
-        if isinstance(event, KernelStartedAnycastEvent) or isinstance(
-            event, KernelTerminatedAnycastEvent
-        ):
+        if isinstance(event, (KernelStartedAnycastEvent, KernelTerminatedAnycastEvent)):
             await self.save_last_registry()
 
     async def anycast_event(self, event: AbstractAnycastEvent) -> None:
@@ -1293,7 +1292,7 @@ class AbstractAgent(
             await self.valkey_image_client.add_agent_installed_images(
                 agent_id=self.id, installed_image_info=list(self.images.values())
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log.warning("event dispatch timeout: instance_heartbeat")
         except Exception:
             log.exception("instance_heartbeat failure")
@@ -1686,7 +1685,7 @@ class AbstractAgent(
         tasks = [self._clean_kernel_object(kernel_id) for kernel_id in kernel_ids]
         try:
             await asyncio.gather(*tasks, return_exceptions=True)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log.warning(
                 "clean_kernel_objects() timed out, some kernel objects may not be cleaned up"
             )
@@ -1983,9 +1982,7 @@ class AbstractAgent(
                         )
                 finally:
                     # Enqueue the events.
-                    terminated_kernel_ids = ",".join([
-                        str(kid) for kid in terminated_kernels.keys()
-                    ])
+                    terminated_kernel_ids = ",".join([str(kid) for kid in terminated_kernels])
                     if terminated_kernel_ids:
                         log.debug(f"Terminate kernels(ids:[{terminated_kernel_ids}])")
                     for kernel_id, ev in terminated_kernels.items():
@@ -1997,13 +1994,13 @@ class AbstractAgent(
             self._sync_container_lifecycle_observer.observe_container_lifecycle_failure(
                 agent_id=self.id, exception=e
             )
-        except asyncio.TimeoutError as e:
+        except TimeoutError as e:
             log.warning("sync_container_lifecycles() timeout, continuing")
             self._sync_container_lifecycle_observer.observe_container_lifecycle_failure(
                 agent_id=self.id, exception=e
             )
         except Exception as e:
-            log.exception(f"sync_container_lifecycles() failure, continuing (detail: {repr(e)})")
+            log.exception(f"sync_container_lifecycles() failure, continuing (detail: {e!r})")
             self._sync_container_lifecycle_observer.observe_container_lifecycle_failure(
                 agent_id=self.id, exception=e
             )
@@ -2077,7 +2074,7 @@ class AbstractAgent(
         auto_terminate = self.local_config.agent.force_terminate_abusing_containers
 
         def _read(path: Path) -> str:
-            with open(path, "r") as fr:
+            with open(path) as fr:
                 return fr.read()
 
         def _rm(path: Path) -> None:
@@ -2185,7 +2182,7 @@ class AbstractAgent(
         Spawn bgtasks that pull the specified images and return bgtask IDs.
         Tracks pull operations for health monitoring.
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from ai.backend.common.bgtask.bgtask import ProgressReporter
         from ai.backend.common.events.event_types.image.anycast import (
@@ -2223,14 +2220,14 @@ class AbstractAgent(
                 )
 
                 if need_to_pull:
-                    log.info(f"check_and_pull() start pulling {str(img_ref)}")
+                    log.info(f"check_and_pull() start pulling {img_ref!s}")
 
                     await self.anycast_event(
                         ImagePullStartedEvent(
                             image=str(img_ref),
                             image_ref=img_ref,
                             agent_id=self.id,
-                            timestamp=datetime.now(timezone.utc).timestamp(),
+                            timestamp=datetime.now(UTC).timestamp(),
                         )
                     )
 
@@ -2240,9 +2237,9 @@ class AbstractAgent(
                             img_ref, img_conf["registry"], timeout=image_pull_timeout
                         )
 
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         log.exception(
-                            f"Image pull timeout (img:{str(img_ref)}, sec:{image_pull_timeout})"
+                            f"Image pull timeout (img:{img_ref!s}, sec:{image_pull_timeout})"
                         )
 
                         await self.anycast_event(
@@ -2256,7 +2253,7 @@ class AbstractAgent(
                         raise
 
                     except Exception as e:
-                        log.exception(f"Image pull failed (img:{img_ref}, err:{repr(e)})")
+                        log.exception(f"Image pull failed (img:{img_ref}, err:{e!r})")
 
                         await self.anycast_event(
                             ImagePullFailedEvent(
@@ -2275,7 +2272,7 @@ class AbstractAgent(
                                 image=str(img_ref),
                                 image_ref=img_ref,
                                 agent_id=self.id,
-                                timestamp=datetime.now(timezone.utc).timestamp(),
+                                timestamp=datetime.now(UTC).timestamp(),
                             )
                         )
                 else:
@@ -2286,7 +2283,7 @@ class AbstractAgent(
                             image=str(img_ref),
                             image_ref=img_ref,
                             agent_id=self.id,
-                            timestamp=datetime.now(timezone.utc).timestamp(),
+                            timestamp=datetime.now(UTC).timestamp(),
                             msg="Image already exists",
                         )
                     )
@@ -2544,7 +2541,7 @@ class AbstractAgent(
                         "exec": "",
                     }
                     mode = "continue"
-        except asyncio.TimeoutError:
+        except TimeoutError:
             await self.anycast_and_broadcast_event(
                 SessionFailureAnycastEvent(session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2),
                 SessionFailureBroadcastEvent(
@@ -2678,7 +2675,7 @@ class AbstractAgent(
                             timeout=image_pull_timeout,
                         )
 
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         log.exception(
                             f"Image pull timeout after {image_pull_timeout} seconds. Destroying kernel (k:{kernel_id}, img:{ctx.image_ref.canonical})"
                         )
@@ -3071,7 +3068,7 @@ class AbstractAgent(
                             container_id=ContainerId(cid),
                         )
                         raise ContainerCreationFailedError(
-                            f"Kernel failed to create container (k:{str(ctx.kernel_id)}, detail:{msg})"
+                            f"Kernel failed to create container (k:{ctx.kernel_id!s}, detail:{msg})"
                         )
                     except Exception as e:
                         log.warning(
@@ -3085,7 +3082,7 @@ class AbstractAgent(
                             KernelLifecycleEventReason.FAILED_TO_CREATE,
                         )
                         raise ContainerCreationFailedError(
-                            f"Kernel failed to create container (k:{str(kernel_id)}, detail: {str(e)})"
+                            f"Kernel failed to create container (k:{kernel_id!s}, detail: {e!s})"
                         )
                     try:
                         pretty_container_id: str = container_data["container_id"][:12]
@@ -3165,7 +3162,7 @@ class AbstractAgent(
                             pretty_container_id,
                             service_ports,
                         )
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         await self.inject_container_lifecycle_event(
                             kernel_id,
                             session_id,
@@ -3174,7 +3171,7 @@ class AbstractAgent(
                             container_id=ContainerId(container_data["container_id"]),
                         )
                         raise ContainerStartupTimeoutError(
-                            f"Timeout during container startup (k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
+                            f"Timeout during container startup (k:{ctx.kernel_id!s}, container:{container_data['container_id']})"
                         )
                     except asyncio.CancelledError:
                         await self.inject_container_lifecycle_event(
@@ -3185,7 +3182,7 @@ class AbstractAgent(
                             container_id=ContainerId(container_data["container_id"]),
                         )
                         raise ContainerStartupCancelledError(
-                            f"Cancelled waiting of container startup (k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
+                            f"Cancelled waiting of container startup (k:{ctx.kernel_id!s}, container:{container_data['container_id']})"
                         )
                     except RetryError:
                         await self.inject_container_lifecycle_event(
@@ -3197,7 +3194,7 @@ class AbstractAgent(
                         )
                         err_msg = (
                             "Container startup failed, the container might be missing or failed to initialize "
-                            f"(k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
+                            f"(k:{ctx.kernel_id!s}, container:{container_data['container_id']})"
                         )
                         log.exception(err_msg)
                         raise ContainerStartupFailedError(err_msg)
@@ -3624,7 +3621,7 @@ class AbstractAgent(
             try:
                 with timeout(60):
                     await tracker.destroy_event.wait()
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 log.warning("timeout detected while restarting kernel {0}!", kernel_id)
                 self.restarting_kernels.pop(kernel_id, None)
                 await self.inject_container_lifecycle_event(
@@ -3746,8 +3743,10 @@ class AbstractAgent(
         *,
         canonical: str | None = None,
         filename: str | None = None,
-        extra_labels: dict[str, str] = {},
+        extra_labels: dict[str, str] | None = None,
     ):
+        if extra_labels is None:
+            extra_labels = {}
         return await self.kernel_registry[kernel_id].commit(
             kernel_id, subdir, canonical=canonical, filename=filename, extra_labels=extra_labels
         )

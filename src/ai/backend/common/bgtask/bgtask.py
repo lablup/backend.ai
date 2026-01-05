@@ -6,18 +6,15 @@ import logging
 import time
 import uuid
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Mapping, MutableMapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping, MutableMapping, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from typing import (
-    Awaitable,
-    Callable,
     Concatenate,
     Final,
     Optional,
     ParamSpec,
     Self,
-    Sequence,
     TypeAlias,
 )
 
@@ -38,6 +35,17 @@ from ai.backend.common.clients.valkey_client.valkey_bgtask.client import (
     TaskSetKey,
     ValkeyBgtaskClient,
 )
+from ai.backend.common.events.dispatcher import (
+    EventProducer,
+)
+from ai.backend.common.events.event_types.bgtask.broadcast import (
+    BaseBgtaskDoneEvent,
+    BgtaskCancelledEvent,
+    BgtaskDoneEvent,
+    BgtaskFailedEvent,
+    BgtaskPartialSuccessEvent,
+    BgtaskUpdatedEvent,
+)
 from ai.backend.common.events.types import EventCacheDomain
 from ai.backend.common.exception import (
     BackendAIError,
@@ -46,20 +54,9 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.common.types import DispatchResult, Sentinel
 from ai.backend.logging import BraceStyleAdapter
 
-from ..events.dispatcher import (
-    EventProducer,
-)
-from ..events.event_types.bgtask.broadcast import (
-    BaseBgtaskDoneEvent,
-    BgtaskCancelledEvent,
-    BgtaskDoneEvent,
-    BgtaskFailedEvent,
-    BgtaskPartialSuccessEvent,
-    BgtaskUpdatedEvent,
-)
-from ..types import DispatchResult, Sentinel
 from .hooks import (
     BackgroundTaskObserver,
     CompositeTaskHook,
@@ -282,7 +279,7 @@ class BackgroundTaskManager:
         valkey_client: ValkeyBgtaskClient,
         server_id: str,
         tags: Optional[Iterable[str]] = None,
-        bgtask_observer: BackgroundTaskObserver = NopBackgroundTaskObserver(),
+        bgtask_observer: Optional[BackgroundTaskObserver] = None,
         task_registry: Optional[BackgroundTaskHandlerRegistry] = None,
     ) -> None:
         self._event_producer = event_producer
@@ -292,6 +289,8 @@ class BackgroundTaskManager:
         self._task_set_key = TaskSetKey(
             server_id=server_id, tags=set(tags) if tags is not None else set()
         )
+        if bgtask_observer is None:
+            bgtask_observer = NopBackgroundTaskObserver()
         self._metric_observer = bgtask_observer
         self._hook = CompositeTaskHook([
             MetricObserverHook(bgtask_observer),
@@ -360,8 +359,7 @@ class BackgroundTaskManager:
             return BgtaskPartialSuccessEvent(
                 task_id=task_id, message=message, errors=bgtask_result.errors
             )
-        else:
-            return BgtaskDoneEvent(task_id=task_id, message=message)
+        return BgtaskDoneEvent(task_id=task_id, message=message)
 
     async def _run_bgtask(
         self,

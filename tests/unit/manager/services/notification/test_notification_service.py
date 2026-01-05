@@ -4,7 +4,7 @@ Tests the service layer with mocked repository operations.
 """
 
 from collections.abc import AsyncGenerator
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -100,7 +100,7 @@ class TestNotificationService:
     @pytest.fixture
     def sample_webhook_channel(self) -> NotificationChannelData:
         """Create sample webhook notification channel"""
-        now = datetime.now()
+        now = datetime.now(tz=UTC)
         return NotificationChannelData(
             id=uuid4(),
             name="Test Webhook",
@@ -122,7 +122,7 @@ class TestNotificationService:
     @pytest.fixture
     def sample_rule(self, sample_webhook_channel: NotificationChannelData) -> NotificationRuleData:
         """Create sample notification rule"""
-        now = datetime.now()
+        now = datetime.now(tz=UTC)
         return NotificationRuleData(
             id=uuid4(),
             name="Session Started Rule",
@@ -141,7 +141,7 @@ class TestNotificationService:
         """Create sample notification event"""
         return NotificationTriggeredEvent(
             rule_type=NotificationRuleType.SESSION_STARTED,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(tz=UTC),
             notification_data=SessionStartedMessage(
                 session_id="sess-12345",
                 session_name="test-session",
@@ -237,7 +237,7 @@ class TestNotificationService:
         # Mock HTTP session to avoid actual webhook calls
         self._mock_http_session_success(notification_service)
 
-        now = datetime.now()
+        now = datetime.now(tz=UTC)
         rule1 = NotificationRuleData(
             id=uuid4(),
             name="Rule 1",
@@ -286,7 +286,7 @@ class TestNotificationService:
     ) -> None:
         """Test that template rendering errors are handled gracefully"""
         # Create rule with invalid template syntax
-        now = datetime.now()
+        now = datetime.now(tz=UTC)
         invalid_rule = NotificationRuleData(
             id=uuid4(),
             name="Invalid Template Rule",
@@ -325,7 +325,7 @@ class TestNotificationService:
         # Mock HTTP session to avoid actual webhook calls
         self._mock_http_session_success(notification_service)
 
-        now = datetime.now()
+        now = datetime.now(tz=UTC)
         rule = NotificationRuleData(
             id=uuid4(),
             name="Timestamp Rule",
@@ -341,7 +341,7 @@ class TestNotificationService:
 
         event = NotificationTriggeredEvent(
             rule_type=NotificationRuleType.SESSION_STARTED,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(tz=UTC),
             notification_data=SessionStartedMessage(
                 session_id="test-session",
                 session_name="test-session",
@@ -373,7 +373,7 @@ class TestNotificationService:
         # Mock HTTP session to avoid actual webhook calls
         self._mock_http_session_success(notification_service)
 
-        now = datetime.now()
+        now = datetime.now(tz=UTC)
         rule = NotificationRuleData(
             id=uuid4(),
             name="Session Terminated Rule",
@@ -389,7 +389,7 @@ class TestNotificationService:
 
         event = NotificationTriggeredEvent(
             rule_type=NotificationRuleType.SESSION_TERMINATED,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(tz=UTC),
             notification_data=SessionTerminatedMessage(
                 session_id="test-session",
                 session_name="test-session",
@@ -422,7 +422,7 @@ class TestNotificationService:
 
         action = ProcessNotificationAction(
             rule_type=NotificationRuleType.SESSION_TERMINATED,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(tz=UTC),
             notification_data=SessionTerminatedMessage(
                 session_id="test-session",
                 session_name="test-session",
@@ -551,7 +551,7 @@ class TestNotificationService:
             enabled=False,
             created_by=sample_webhook_channel.created_by,
             created_at=sample_webhook_channel.created_at,
-            updated_at=datetime.now(),
+            updated_at=datetime.now(tz=UTC),
         )
         mock_repository.update_channel = AsyncMock(return_value=updated_channel)
 
@@ -587,7 +587,7 @@ class TestNotificationService:
             enabled=False,
             created_by=sample_rule.created_by,
             created_at=sample_rule.created_at,
-            updated_at=datetime.now(),
+            updated_at=datetime.now(tz=UTC),
         )
         mock_repository.update_rule = AsyncMock(return_value=updated_rule)
 
@@ -823,8 +823,8 @@ class TestNotificationService:
             message_template="Invalid {{ unclosed",  # Invalid Jinja2 syntax
             enabled=True,
             created_by=uuid4(),
-            created_at=datetime.now(),
-            updated_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            updated_at=datetime.now(tz=UTC),
         )
         mock_repository.get_rule_by_id = AsyncMock(return_value=invalid_rule)
 

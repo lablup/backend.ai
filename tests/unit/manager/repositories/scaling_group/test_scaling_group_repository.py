@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import AsyncGenerator, Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Optional
 
 import pytest
@@ -11,16 +11,24 @@ from ai.backend.common.types import SessionTypes
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionId, SessionRow
@@ -47,19 +55,27 @@ class TestScalingGroupRepositoryDB:
         async with with_tables(
             database_connection,
             [
-                # FK dependency order: parents first
+                # FK dependency order: parents before children
                 DomainRow,
-                ProjectResourcePolicyRow,
-                UserResourcePolicyRow,
-                KeyPairResourcePolicyRow,
                 ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
                 UserRow,
                 KeyPairRow,
                 GroupRow,
-                SessionRow,
+                ImageRow,
                 VFolderRow,
                 EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
                 RoutingRow,
+                ResourcePresetRow,
             ],
         ):
             yield database_connection
@@ -110,7 +126,7 @@ class TestScalingGroupRepositoryDB:
                     description=f"Test scaling group {i:02d}",
                     is_active=is_active_func(i),
                     is_public=True,
-                    created_at=datetime.now(),
+                    created_at=datetime.now(tz=UTC),
                     wsproxy_addr=None,
                     wsproxy_api_token=None,
                     driver="static",
@@ -171,7 +187,7 @@ class TestScalingGroupRepositoryDB:
                 description="Test scaling group for purge",
                 is_active=True,
                 is_public=True,
-                created_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
                 wsproxy_addr=None,
                 wsproxy_api_token=None,
                 driver="static",
@@ -242,7 +258,7 @@ class TestScalingGroupRepositoryDB:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                created_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
                 domain_name=test_domain,
                 resource_policy=test_resource_policy,
             )
@@ -254,7 +270,7 @@ class TestScalingGroupRepositoryDB:
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 description="Test group for cascade delete",
                 is_active=True,
-                created_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
                 domain_name=test_domain,
                 total_resource_slots={},
                 allowed_vfolder_hosts={},
@@ -287,7 +303,7 @@ class TestScalingGroupRepositoryDB:
                 description="Test scaling group for cascade delete",
                 is_active=True,
                 is_public=True,
-                created_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
                 wsproxy_addr=None,
                 wsproxy_api_token=None,
                 driver="static",

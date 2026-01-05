@@ -1,7 +1,8 @@
 import logging
 from collections import ChainMap
+from collections.abc import Mapping
 from datetime import datetime
-from typing import Mapping, Optional, cast
+from typing import Optional, cast
 
 from aiohttp import web
 
@@ -122,7 +123,7 @@ class AuthService:
         auth_config = self._config_provider.config.auth
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
-        elif hook_result.result:
+        if hook_result.result:
             # Passed one of AUTHORIZED hook
             user = hook_result.result
         else:
@@ -182,9 +183,8 @@ class AuthService:
         )
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
-        else:
-            # Merge the hook results as a single map.
-            user_data_overriden = ChainMap(*cast(Mapping, hook_result.result))
+        # Merge the hook results as a single map.
+        user_data_overriden = ChainMap(*cast(Mapping, hook_result.result))
 
         # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
         # The hook handlers should accept the request and whole ``params` dict.
@@ -243,7 +243,7 @@ class AuthService:
             "user_id": action.email,
             "access_key": ak,
             "secret_key": sk,
-            "is_active": True if data.get("status") == UserStatus.ACTIVE else False,
+            "is_active": data.get("status") == UserStatus.ACTIVE,
             "is_admin": False,
             "resource_policy": resource_policy,
             "rate_limit": 1000,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt as pyjwt
 import pytest
@@ -96,9 +96,9 @@ def test_generate_token_sets_expiration(
     test_secret_key: str,
 ) -> None:
     """Test that generated token has correct expiration time."""
-    before_generation = datetime.now(timezone.utc)
+    before_generation = datetime.now(UTC)
     token = jwt_signer.generate_token(user_context, test_secret_key)
-    after_generation = datetime.now(timezone.utc)
+    after_generation = datetime.now(UTC)
 
     decoded = pyjwt.decode(
         token,
@@ -106,7 +106,7 @@ def test_generate_token_sets_expiration(
         algorithms=[jwt_config.algorithm],
     )
 
-    exp_time = datetime.fromtimestamp(decoded["exp"], tz=timezone.utc)
+    exp_time = datetime.fromtimestamp(decoded["exp"], tz=UTC)
     expected_min = before_generation + jwt_config.token_expiration - timedelta(seconds=2)
     expected_max = after_generation + jwt_config.token_expiration + timedelta(seconds=2)
 
@@ -121,9 +121,9 @@ def test_generate_token_sets_issued_at(
     test_secret_key: str,
 ) -> None:
     """Test that generated token has correct issued-at time."""
-    before_generation = datetime.now(timezone.utc)
+    before_generation = datetime.now(UTC)
     token = jwt_signer.generate_token(user_context, test_secret_key)
-    after_generation = datetime.now(timezone.utc)
+    after_generation = datetime.now(UTC)
 
     decoded = pyjwt.decode(
         token,
@@ -131,7 +131,7 @@ def test_generate_token_sets_issued_at(
         algorithms=[jwt_config.algorithm],
     )
 
-    iat_time = datetime.fromtimestamp(decoded["iat"], tz=timezone.utc)
+    iat_time = datetime.fromtimestamp(decoded["iat"], tz=UTC)
 
     # Add tolerance for timestamp precision (JWT uses seconds, not microseconds)
     before_with_margin = before_generation - timedelta(seconds=1)

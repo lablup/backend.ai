@@ -16,8 +16,7 @@ from ai.backend.manager.data.agent.types import (
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
-from ai.backend.manager.models import agents
-from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.agent import AgentRow, agents
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

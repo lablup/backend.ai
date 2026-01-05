@@ -155,9 +155,7 @@ class ModelServingRepository:
             )
             result = await session.execute(query)
             rows = cast(list[EndpointRow], result.scalars().all())
-            data_list = [row.to_data() for row in rows]
-
-            return data_list
+            return [row.to_data() for row in rows]
 
     @model_serving_repository_resilience.apply()
     async def check_endpoint_name_uniqueness(self, name: str) -> bool:
@@ -196,9 +194,7 @@ class ModelServingRepository:
             endpoint_row.url = await registry.create_appproxy_endpoint(
                 db_sess, endpoint_before_assign_url
             )
-            data = endpoint_row.to_data()
-
-        return data
+            return endpoint_row.to_data()
 
     @model_serving_repository_resilience.apply()
     async def update_endpoint_lifecycle_validated(
@@ -366,14 +362,19 @@ class ModelServingRepository:
 
     @model_serving_repository_resilience.apply()
     async def create_endpoint_token_validated(
-        self, token_row: EndpointTokenRow, user_id: uuid.UUID, user_role: UserRole, domain_name: str
+        self,
+        creator: Creator[EndpointTokenRow],
+        user_id: uuid.UUID,
+        user_role: UserRole,
+        domain_name: str,
     ) -> Optional[EndpointTokenData]:
         """
         Create endpoint token with access validation.
         Returns token data if created, None if no access to endpoint.
         """
         async with self._db.begin_session() as session:
-            endpoint = await self._get_endpoint_by_id(session, token_row.endpoint)
+            endpoint_id = creator.spec.endpoint  # type: ignore[attr-defined]
+            endpoint = await self._get_endpoint_by_id(session, endpoint_id)
             if not endpoint:
                 return None
 
@@ -382,11 +383,8 @@ class ModelServingRepository:
             ):
                 return None
 
-            session.add(token_row)
-            await session.commit()
-            await session.refresh(token_row)
-
-            return token_row.to_dataclass()
+            result = await execute_creator(session, creator)
+            return result.row.to_dataclass()
 
     @model_serving_repository_resilience.apply()
     async def get_scaling_group_info(self, scaling_group_name: str) -> Optional[ScalingGroupData]:
@@ -397,7 +395,7 @@ class ModelServingRepository:
             query = (
                 sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
                 .select_from(scaling_groups)
-                .where((scaling_groups.c.name == scaling_group_name))
+                .where(scaling_groups.c.name == scaling_group_name)
             )
             result = await session.execute(query)
             row = result.first()
@@ -968,7 +966,7 @@ class ModelServingRepository:
         except StatementError as e:
             orig_exc = e.orig
             return MutationResult(success=False, message=str(orig_exc), data=None)
-        except (asyncio.CancelledError, asyncio.TimeoutError):
+        except (TimeoutError, asyncio.CancelledError):
             raise
         except Exception:
             raise

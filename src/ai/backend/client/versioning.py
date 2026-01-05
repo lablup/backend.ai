@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Sequence, Tuple, Union
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .func.session import ComputeSession
@@ -16,27 +17,26 @@ naming_profile = {
 }
 
 
-def get_naming(api_version: Tuple[int, str], key: str) -> str:
+def get_naming(api_version: tuple[int, str], key: str) -> str:
     if api_version[0] <= 4:
         return naming_profile[key][0]
     return naming_profile[key][1]
 
 
-def get_id_or_name(api_version: Tuple[int, str], obj: ComputeSession) -> str:
+def get_id_or_name(api_version: tuple[int, str], obj: ComputeSession) -> str:
     if api_version[0] <= 4:
         assert obj.name is not None
         return obj.name
     if obj.id:
         return str(obj.id)
-    else:
-        assert obj.name is not None
-        return obj.name
+    assert obj.name is not None
+    return obj.name
 
 
 def apply_version_aware_fields(
     api_session,
-    fields: Sequence[Tuple[str, Union[Callable, str]]],
-) -> Sequence[Tuple[str, str]]:
+    fields: Sequence[tuple[str, Callable | str]],
+) -> Sequence[tuple[str, str]]:
     version_aware_fields = []
     for f in fields:
         if callable(f[1]):

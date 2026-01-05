@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from datetime import datetime, tzinfo
 from decimal import Decimal
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
 import attrs
@@ -25,12 +26,12 @@ from .user import UserRow
 from .utils import ExtendedAsyncSAEngine
 
 __all__: Sequence[str] = (
+    "BaseResourceUsageGroup",
     "ResourceGroupUnit",
     "ResourceUsage",
-    "BaseResourceUsageGroup",
+    "fetch_resource_usage",
     "parse_resource_usage",
     "parse_resource_usage_groups",
-    "fetch_resource_usage",
 )
 
 
@@ -450,10 +451,10 @@ def parse_resource_usage(
     nfs = set()
     if kernel.vfolder_mounts:
         # For >=22.03, return used host directories instead of volume host, which is not so useful.
-        nfs = set([str(mount.host_path) for mount in kernel.vfolder_mounts])
+        nfs = {str(mount.host_path) for mount in kernel.vfolder_mounts}
     elif kernel.mounts and isinstance(kernel.mounts[0], list):
         # For the kernel records that have legacy contents of `mounts`.
-        nfs = set([mount[2] for mount in kernel.mounts])
+        nfs = {mount[2] for mount in kernel.mounts}
 
     device_type = set()
     smp = 0
@@ -498,7 +499,7 @@ async def parse_resource_usage_groups(
 
     kernel_ids_str = [str(kern_id) for kern_id in stat_empty_kerns]
     raw_stats = await valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids_str)
-    for kern_id, raw_stat in zip(stat_empty_kerns, raw_stats):
+    for kern_id, raw_stat in zip(stat_empty_kerns, raw_stats, strict=True):
         if raw_stat is None:
             continue
         stat_map[kern_id] = msgpack.unpackb(raw_stat)
@@ -638,6 +639,4 @@ async def fetch_resource_usage(
     )
     async with db_engine.begin_readonly_session() as db_sess:
         result = await db_sess.execute(query)
-        kernels = result.scalars().all()
-
-    return kernels
+        return result.scalars().all()

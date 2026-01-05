@@ -7,7 +7,7 @@ Tests verify service layer business logic using mocked repositories.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
@@ -127,7 +127,7 @@ def image_data(image_id: uuid.UUID, container_registry_id: uuid.UUID) -> ImageDa
         labels=ImageLabelsData(label_data={}),
         resources=ImageResourcesData(resources_data=RESOURCE_LIMITS),
         status=ImageStatus.ALIVE,
-        created_at=datetime(2023, 9, 30, 15, 0, 0, tzinfo=timezone.utc),
+        created_at=datetime(2023, 9, 30, 15, 0, 0, tzinfo=UTC),
     )
 
 

@@ -14,20 +14,14 @@ import urllib.error
 import urllib.request
 import uuid
 from abc import ABCMeta, abstractmethod
+from collections.abc import Awaitable, Mapping, MutableMapping, Sequence
 from functools import partial
 from pathlib import Path
 from typing import (
     Any,
-    Awaitable,
     ClassVar,
-    Dict,
-    List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
     TypeVar,
-    Union,
 )
 
 import janus
@@ -95,7 +89,7 @@ async def terminate_and_wait(proc: asyncio.subprocess.Process, timeout: float = 
         proc.terminate()
         try:
             await asyncio.wait_for(proc.wait(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             proc.kill()
             await proc.wait()
     except ProcessLookupError:
@@ -151,7 +145,7 @@ class BaseRunner(metaclass=ABCMeta):
     service_parser: Optional[ServiceParser]
     runtime_path: Path
 
-    services_running: Dict[str, asyncio.subprocess.Process]
+    services_running: dict[str, asyncio.subprocess.Process]
 
     intrinsic_host_ports_mapping: Mapping[str, int]
 
@@ -408,7 +402,7 @@ class BaseRunner(metaclass=ABCMeta):
             if clean_cmd is None or clean_cmd == "":
                 # skipped
                 return
-            elif clean_cmd == "*":
+            if clean_cmd == "*":
                 ret = await self.clean_heuristic()
             else:
                 ret = await self.run_subproc(clean_cmd)
@@ -444,7 +438,7 @@ class BaseRunner(metaclass=ABCMeta):
             if build_cmd is None or build_cmd == "":
                 # skipped
                 return
-            elif build_cmd == "*":
+            if build_cmd == "*":
                 if Path("Makefile").is_file():
                     ret = await self.run_subproc("make")
                 else:
@@ -472,7 +466,7 @@ class BaseRunner(metaclass=ABCMeta):
             if exec_cmd is None or exec_cmd == "":
                 # skipped
                 return
-            elif exec_cmd == "*":
+            if exec_cmd == "*":
                 ret = await self.execute_heuristic()
             else:
                 ret = await self.run_subproc(exec_cmd, batch=True)
@@ -587,7 +581,7 @@ class BaseRunner(metaclass=ABCMeta):
                 self.kernel_client.input(user_input)
 
         # Run jupyter kernel's blocking execution method in an executor pool.
-        allow_stdin = False if self.user_input_queue is None else True
+        allow_stdin = self.user_input_queue is not None
         stdin_hook = None if self.user_input_queue is None else stdin_hook  # type: ignore
         try:
             await aexecute_interactive(
@@ -789,7 +783,7 @@ class BaseRunner(metaclass=ABCMeta):
                             new_health_status = HealthStatus.HEALTHY
                     except urllib.error.URLError:
                         pass
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 elapsed_time = health_check_info["max_wait_time"]
                 pass
             finally:
@@ -860,7 +854,7 @@ class BaseRunner(metaclass=ABCMeta):
                             "error": error_reason,
                         }
 
-                    cmdargs: Optional[Sequence[Union[str, os.PathLike]]]
+                    cmdargs: Optional[Sequence[str | os.PathLike]]
                     env: Mapping[str, str]
                     cmdargs, env = None, {}
                     if service_info["name"] == "ttyd":
@@ -924,7 +918,7 @@ class BaseRunner(metaclass=ABCMeta):
                             "status": "failed",
                             "error": error_reason,
                         }
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         # Takes too much time to open a local port.
                         if service_info["name"] in self.services_running:
                             await terminate_and_wait(proc, timeout=10.0)
@@ -972,7 +966,7 @@ class BaseRunner(metaclass=ABCMeta):
         )
         self.services_running.pop(service_name, None)
 
-    async def run_subproc(self, cmd: Union[str, List[str]], batch: bool = False):
+    async def run_subproc(self, cmd: str | list[str], batch: bool = False):
         """A thin wrapper for an external command."""
         loop = current_loop()
         if Path("/home/work/.logs").is_dir():

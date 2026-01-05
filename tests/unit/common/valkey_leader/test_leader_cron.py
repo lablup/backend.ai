@@ -66,8 +66,7 @@ async def mock_event_producer():
 @pytest.fixture
 async def mock_event():
     """Create a mock event."""
-    event = create_autospec(AbstractAnycastEvent, instance=True)
-    return event
+    return create_autospec(AbstractAnycastEvent, instance=True)
 
 
 @pytest.fixture

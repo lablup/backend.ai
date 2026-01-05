@@ -79,13 +79,11 @@ class PermissionUpdateUtil:
         role_row = result.fetchone()
         if role_row is not None:
             return role_row.id
-        else:
-            role_id = insert_and_returning_id(
-                db_conn,
-                roles_table,
-                role_input.to_dict(),
-            )
-            return role_id
+        return insert_and_returning_id(
+            db_conn,
+            roles_table,
+            role_input.to_dict(),
+        )
 
     @staticmethod
     def get_or_create_global_permission_group(
@@ -107,20 +105,19 @@ class PermissionUpdateUtil:
         permission_group_row = result.fetchone()
         if permission_group_row is not None:
             return permission_group_row.id, True
-        else:
-            input = (
-                PermissionGroupCreateInput(
-                    role_id=role_id,
-                    scope_type=ScopeType.GLOBAL,
-                    scope_id=GLOBAL_SCOPE_ID,
-                )
-            ).to_dict()
-            permission_group_id = insert_and_returning_id(
-                db_conn,
-                permission_groups_table,
-                input,
+        input = (
+            PermissionGroupCreateInput(
+                role_id=role_id,
+                scope_type=ScopeType.GLOBAL,
+                scope_id=GLOBAL_SCOPE_ID,
             )
-            return permission_group_id, False
+        ).to_dict()
+        permission_group_id = insert_and_returning_id(
+            db_conn,
+            permission_groups_table,
+            input,
+        )
+        return permission_group_id, False
 
     @staticmethod
     def create_permissions(

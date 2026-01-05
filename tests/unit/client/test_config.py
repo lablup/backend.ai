@@ -23,9 +23,8 @@ def cfg_params():
 def test_get_env():
     with pytest.raises(KeyError):
         get_env("TESTKEY")
-    with pytest.raises(KeyError):
-        with mock.patch.dict(os.environ, {"TESTKEY": "testkey"}):
-            get_env("TESTKEY")
+    with pytest.raises(KeyError), mock.patch.dict(os.environ, {"TESTKEY": "testkey"}):
+        get_env("TESTKEY")
     with mock.patch.dict(os.environ, {"BACKEND_TESTKEY": "testkey"}):
         r = get_env("TESTKEY")
         assert r == "testkey"
@@ -90,7 +89,7 @@ def test_validation():
     cfg = APIConfig(vfolder_mounts="", **mandatory_args)
     assert cfg.vfolder_mounts == []
     cfg = APIConfig(vfolder_mounts=["abc", "def"], **mandatory_args)
-    assert set(cfg.vfolder_mounts) == set(["abc", "def"])
+    assert set(cfg.vfolder_mounts) == {"abc", "def"}
 
 
 def test_set_and_get_config(mocker, cfg_params):

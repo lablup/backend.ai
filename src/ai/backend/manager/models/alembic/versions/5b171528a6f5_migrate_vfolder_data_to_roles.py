@@ -48,7 +48,7 @@ mapper_registry = registry(metadata=metadata)
 class Tables:
     @staticmethod
     def get_vfolder_table() -> sa.Table:
-        vfolder_table = sa.Table(
+        return sa.Table(
             "vfolders",
             mapper_registry.metadata,
             IDColumn("id"),
@@ -62,11 +62,10 @@ class Tables:
             sa.Column("domain_name", sa.String(255), nullable=False),
             extend_existing=True,
         )
-        return vfolder_table
 
     @staticmethod
     def get_vfolder_permissions_table() -> sa.Table:
-        vfolder_permissions_table = sa.Table(
+        return sa.Table(
             "vfolder_permissions",
             mapper_registry.metadata,
             IDColumn("id"),
@@ -85,7 +84,6 @@ class Tables:
             sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=False),
             extend_existing=True,
         )
-        return vfolder_permissions_table
 
 
 class PermissionCreator:

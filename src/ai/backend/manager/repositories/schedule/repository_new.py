@@ -1,7 +1,8 @@
 """Repository pattern implementation for schedule operations."""
 
 import logging
-from typing import Mapping, Optional
+from collections.abc import Mapping
+from typing import Optional
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
@@ -57,7 +58,7 @@ class ScheduleRepository:
         db: ExtendedAsyncSAEngine,
         valkey_stat: ValkeyStatClient,
         config_provider: ManagerConfigProvider,
-    ):
+    ) -> None:
         self._db_source = ScheduleDBSource(db)
         self._cache_source = ScheduleCacheSource(valkey_stat)
         self._config_provider = config_provider

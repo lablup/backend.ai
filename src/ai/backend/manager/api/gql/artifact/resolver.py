@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import uuid
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
+from typing import Optional
 
 import strawberry
 from strawberry import ID, Info
 
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.manager.api.gql.base import (
-    to_global_id,
+    encode_cursor,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
@@ -109,7 +110,7 @@ from .types import (
 )
 async def artifacts(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ArtifactFilter] = ArtifactFilter(availability=[ArtifactAvailability.ALIVE]),
+    filter: Optional[ArtifactFilter] = None,
     order_by: Optional[list[ArtifactOrderBy]] = None,
     before: Optional[str] = None,
     after: Optional[str] = None,
@@ -118,6 +119,8 @@ async def artifacts(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ArtifactConnection:
+    if filter is None:
+        filter = ArtifactFilter(availability=[ArtifactAvailability.ALIVE])
     return await fetch_artifacts(
         info,
         filter,
@@ -275,7 +278,7 @@ async def import_artifacts(
         )
 
     edges = [
-        ArtifactRevisionEdge(node=artifact, cursor=to_global_id(ArtifactRevisionEdge, artifact.id))
+        ArtifactRevisionEdge(node=artifact, cursor=encode_cursor(artifact.id))
         for artifact in imported_artifacts
     ]
 
@@ -401,7 +404,7 @@ async def delegate_import_artifacts(
         )
 
     edges = [
-        ArtifactRevisionEdge(node=artifact, cursor=to_global_id(ArtifactRevisionEdge, artifact.id))
+        ArtifactRevisionEdge(node=artifact, cursor=encode_cursor(artifact.id))
         for artifact in imported_artifacts
     ]
 
@@ -486,7 +489,7 @@ async def cleanup_artifact_revisions(
         cleaned_artifact_revisions.append(ArtifactRevision.from_dataclass(action_result.result))
 
     edges = [
-        ArtifactRevisionEdge(node=revision, cursor=to_global_id(ArtifactRevisionEdge, revision.id))
+        ArtifactRevisionEdge(node=revision, cursor=encode_cursor(revision.id))
         for revision in cleaned_artifact_revisions
     ]
 
@@ -666,7 +669,7 @@ async def scan_artifact_models(
         edges.extend([
             ArtifactRevisionEdge(
                 node=ArtifactRevision.from_dataclass(revision),
-                cursor=to_global_id(ArtifactRevision, revision.id),
+                cursor=encode_cursor(revision.id),
             )
             for revision in data.revisions
         ])

@@ -84,7 +84,7 @@ def test_host_port_pair_direct_creation():
     pair = HostPortPair(ip, 8000)
 
     assert pair.as_sockaddr() == ("1.2.3.4", 8000)
-    assert "{}".format(pair) == "1.2.3.4:8000"
+    assert f"{pair}" == "1.2.3.4:8000"
     assert str(pair) == "1.2.3.4:8000"
 
 

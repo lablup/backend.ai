@@ -1,20 +1,13 @@
 import logging
 import re
 import uuid
+from collections.abc import Collection, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Collection,
-    Dict,
-    List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
-    Set,
-    Tuple,
 )
 
 import aiodocker
@@ -96,11 +89,11 @@ class CUDAPlugin(AbstractComputePlugin):
     config_watch_enabled = False
 
     key = DeviceName("cuda")
-    slot_types: Sequence[Tuple[SlotName, SlotTypes]] = (
+    slot_types: Sequence[tuple[SlotName, SlotTypes]] = (
         (SlotName("cuda.device"), SlotTypes("count")),
     )
 
-    docker_version: Tuple[int, ...] = (0, 0, 0)
+    docker_version: tuple[int, ...] = (0, 0, 0)
 
     device_mask: Sequence[str] = []
     enabled: bool = True
@@ -298,7 +291,7 @@ class CUDAPlugin(AbstractComputePlugin):
             for device_id, alloc in per_device_alloc.items():
                 if alloc > 0:
                     assigned_device_ids.append(device_id)
-        docker_config: Dict[str, Any] = {}
+        docker_config: dict[str, Any] = {}
         if self.docker_version >= (19, 3, 0):
             # NOTE: You may put additional Docker container creation API params here.
             if assigned_device_ids:
@@ -344,11 +337,11 @@ class CUDAPlugin(AbstractComputePlugin):
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Sequence[DeviceModelInfo]:
-        device_ids: List[DeviceId] = []
+        device_ids: list[DeviceId] = []
         if SlotName("cuda.devices") in device_alloc:
             device_ids.extend(device_alloc[SlotName("cuda.devices")].keys())
         available_devices = await self.list_devices()
-        attached_devices: List[DeviceModelInfo] = []
+        attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
                 proc = device.processing_units
@@ -402,7 +395,7 @@ class CUDAPlugin(AbstractComputePlugin):
         if not self.enabled:
             return data
 
-        active_device_id_set: Set[DeviceId] = set()
+        active_device_id_set: set[DeviceId] = set()
         for slot_type, per_device_alloc in device_alloc.items():
             for dev_id, alloc in per_device_alloc.items():
                 if alloc > 0:
@@ -416,12 +409,12 @@ class CUDAPlugin(AbstractComputePlugin):
 
     async def get_docker_networks(
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[str]:
+    ) -> list[str]:
         return []
 
     async def generate_mounts(
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         return []
 
     def get_metadata(self) -> AcceleratorMetadata:

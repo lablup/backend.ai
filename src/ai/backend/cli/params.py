@@ -38,7 +38,7 @@ class BoolExprType(click.ParamType):
 class ByteSizeParamType(click.ParamType):
     name = "byte"
 
-    _rx_digits = re.compile(r"^(\d+(?:\.\d*)?)([kmgtpe]?)$", re.I)
+    _rx_digits = re.compile(r"^(\d+(?:\.\d*)?)([kmgtpe]?)$", re.IGNORECASE)
     _scales = {
         "k": 2**10,
         "m": 2**20,
@@ -169,7 +169,7 @@ def drange(start: Decimal, stop: Decimal, num: int):
     """
     delta = stop - start
     step = delta / (num - 1)
-    yield from (start + step * Decimal(tick) for tick in range(0, num))
+    yield from (start + step * Decimal(tick) for tick in range(num))
 
 
 class RangeExprOptionType(click.ParamType):
@@ -196,14 +196,13 @@ class RangeExprOptionType(click.ParamType):
         try:
             if value.startswith("case:"):
                 return key, value[5:].split(",")
-            elif value.startswith("linspace:"):
+            if value.startswith("linspace:"):
                 start, stop, num = value[9:].split(",")
                 return key, tuple(drange(Decimal(start), Decimal(stop), int(num)))
-            elif value.startswith("range:"):
+            if value.startswith("range:"):
                 range_args = map(int, value[6:].split(","))
                 return key, tuple(range(*range_args))
-            else:
-                self.fail("Unrecognized range expression type", param, ctx)
+            self.fail("Unrecognized range expression type", param, ctx)
         except ValueError as e:
             self.fail(str(e), param, ctx)
 

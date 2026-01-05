@@ -34,8 +34,7 @@ class TestValkeyDependency:
         redis_config = redis_config_iv.check(redis_config_data)
 
         # Create minimal ManagerUnifiedConfig with just redis settings
-        config = ManagerUnifiedConfig(redis=redis_config)  # type: ignore[call-arg]
-        return config
+        return ManagerUnifiedConfig(redis=redis_config)  # type: ignore[call-arg]
 
     @pytest.mark.asyncio
     async def test_provide_valkey_clients(

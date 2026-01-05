@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Optional
 from unittest.mock import AsyncMock
@@ -35,8 +35,8 @@ class _RemainingTimeCalculationTestConfig:
         # remaining = (idle_baseline - now) + timeout_period
         # = (12:30:00 - 12:30:20) + 30s = -20s + 30s = 10s
         _RemainingTimeCalculationTestConfig(
-            now=datetime(2020, 3, 1, 12, 30, second=20),
-            idle_baseline=datetime(2020, 3, 1, 12, 30, second=0),
+            now=datetime(2020, 3, 1, 12, 30, second=20, tzinfo=UTC),
+            idle_baseline=datetime(2020, 3, 1, 12, 30, second=0, tzinfo=UTC),
             timeout_period=timedelta(seconds=30),
             grace_period_end=None,
             expected_remaining=10.0,
@@ -46,10 +46,10 @@ class _RemainingTimeCalculationTestConfig:
         # remaining = (baseline - now) + timeout_period
         # = (12:30:30 - 12:30:20) + 30s = 10s + 30s = 40s
         _RemainingTimeCalculationTestConfig(
-            now=datetime(2020, 3, 1, 12, 30, second=20),
-            idle_baseline=datetime(2020, 3, 1, 12, 30, second=0),
+            now=datetime(2020, 3, 1, 12, 30, second=20, tzinfo=UTC),
+            idle_baseline=datetime(2020, 3, 1, 12, 30, second=0, tzinfo=UTC),
             timeout_period=timedelta(seconds=30),
-            grace_period_end=datetime(2020, 3, 1, 12, 30, second=30),
+            grace_period_end=datetime(2020, 3, 1, 12, 30, second=30, tzinfo=UTC),
             expected_remaining=40.0,
         ),
         # Test 3: idle_baseline takes precedence (idle_baseline > grace_period_end)
@@ -57,10 +57,10 @@ class _RemainingTimeCalculationTestConfig:
         # remaining = (baseline - now) + timeout_period
         # = (12:30:30 - 12:30:20) + 30s = 10s + 30s = 40s
         _RemainingTimeCalculationTestConfig(
-            now=datetime(2020, 3, 1, 12, 30, second=20),
-            idle_baseline=datetime(2020, 3, 1, 12, 30, second=30),
+            now=datetime(2020, 3, 1, 12, 30, second=20, tzinfo=UTC),
+            idle_baseline=datetime(2020, 3, 1, 12, 30, second=30, tzinfo=UTC),
             timeout_period=timedelta(seconds=30),
-            grace_period_end=datetime(2020, 3, 1, 12, 30, second=20),
+            grace_period_end=datetime(2020, 3, 1, 12, 30, second=20, tzinfo=UTC),
             expected_remaining=40.0,
         ),
         # Test 4: Timeout exceeded (negative remaining time)
@@ -68,10 +68,10 @@ class _RemainingTimeCalculationTestConfig:
         # remaining = (baseline - now) + timeout_period
         # = (12:30:10 - 12:30:50) + 10s = -40s + 10s = -30s
         _RemainingTimeCalculationTestConfig(
-            now=datetime(2020, 3, 1, 12, 30, second=50),
-            idle_baseline=datetime(2020, 3, 1, 12, 30, second=0),
+            now=datetime(2020, 3, 1, 12, 30, second=50, tzinfo=UTC),
+            idle_baseline=datetime(2020, 3, 1, 12, 30, second=0, tzinfo=UTC),
             timeout_period=timedelta(seconds=10),
-            grace_period_end=datetime(2020, 3, 1, 12, 30, second=10),
+            grace_period_end=datetime(2020, 3, 1, 12, 30, second=10, tzinfo=UTC),
             expected_remaining=-30.0,
         ),
     ],
@@ -94,7 +94,7 @@ class TestNewUserGracePeriodChecker:
     @pytest.fixture
     def base_time(self) -> datetime:
         """Reference time for all tests. All other times are calculated as offsets from this."""
-        return datetime.now(timezone.utc).replace(microsecond=0)
+        return datetime.now(UTC).replace(microsecond=0)
 
     @pytest.fixture
     async def valkey_live(self) -> AsyncMock:
@@ -172,7 +172,7 @@ class TestNetworkTimeoutIdleChecker:
     @pytest.fixture
     def base_time(self) -> datetime:
         """Reference time for all tests. All other times are calculated as offsets from this."""
-        return datetime.now(timezone.utc).replace(microsecond=0)
+        return datetime.now(UTC).replace(microsecond=0)
 
     @pytest.fixture
     async def test_valkey_live(self) -> AsyncMock:
@@ -404,7 +404,7 @@ class TestSessionLifetimeChecker:
     @pytest.fixture
     def base_time(self) -> datetime:
         """Reference time: All sessions and users created at this time"""
-        return datetime.now(timezone.utc).replace(microsecond=0)
+        return datetime.now(UTC).replace(microsecond=0)
 
     @pytest.fixture
     async def valkey_live(self) -> AsyncMock:
@@ -678,7 +678,7 @@ class TestUtilizationIdleChecker:
     @pytest.fixture
     def base_time(self) -> datetime:
         """Reference time for all tests. All other times are calculated as offsets from this."""
-        return datetime.now(timezone.utc).replace(microsecond=0)
+        return datetime.now(UTC).replace(microsecond=0)
 
     @pytest.fixture
     async def valkey_live(self) -> AsyncMock:
@@ -1208,11 +1208,11 @@ class TestUtilizationIdleChecker:
         def mock_get_live_data_side_effect(key: str) -> Optional[bytes]:
             if ".util_first_collected" in key:
                 return f"{util_first_collected_time:.06f}".encode()
-            elif ".util_series" in key:
+            if ".util_series" in key:
                 return msgpack.packb({"cpu_util": [], "mem": [], "cuda_util": [], "cuda_mem": []})
-            elif ".utilization_extra" in key:
+            if ".utilization_extra" in key:
                 return msgpack.packb({"resources": {}})
-            elif ".utilization" in key:
+            if ".utilization" in key:
                 return msgpack.packb(insufficient_test_config.expected_remaining)
             return None
 

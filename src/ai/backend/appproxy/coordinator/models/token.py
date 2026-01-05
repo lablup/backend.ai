@@ -31,7 +31,7 @@ class Token(Base, BaseMixin):
         session: AsyncSession,
         token_id: UUID,
     ) -> "Token":
-        query = sa.select(Token).where((Token.id == token_id))
+        query = sa.select(Token).where(Token.id == token_id)
         token = await session.scalar(query)
         if not token:
             raise ObjectNotFound(object_name="token")

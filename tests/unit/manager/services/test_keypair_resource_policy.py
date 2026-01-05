@@ -7,7 +7,7 @@ Repository tests verify actual DB operations separately.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -56,7 +56,7 @@ class TestCreateKeypairResourcePolicy:
     def sample_policy_data(self) -> KeyPairResourcePolicyData:
         return KeyPairResourcePolicyData(
             name="test-policy",
-            created_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
             default_for_unspecified=DefaultForUnspecified.LIMITED,
             total_resource_slots=ResourceSlot.from_user_input({"cpu": "2", "mem": "4g"}, None),
             max_session_lifetime=1800,
@@ -75,7 +75,7 @@ class TestCreateKeypairResourcePolicy:
     def minimal_policy_data(self) -> KeyPairResourcePolicyData:
         return KeyPairResourcePolicyData(
             name="minimal-policy",
-            created_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
             default_for_unspecified=DefaultForUnspecified.LIMITED,
             total_resource_slots=ResourceSlot.from_user_input({"cpu": "1", "mem": "1g"}, None),
             max_session_lifetime=0,
@@ -212,7 +212,7 @@ class TestModifyKeypairResourcePolicy:
     def modified_policy_data(self) -> KeyPairResourcePolicyData:
         return KeyPairResourcePolicyData(
             name="test-policy",
-            created_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
             default_for_unspecified=DefaultForUnspecified.LIMITED,
             total_resource_slots=ResourceSlot.from_user_input({"cpu": "4", "mem": "8g"}, None),
             max_session_lifetime=0,
@@ -229,7 +229,7 @@ class TestModifyKeypairResourcePolicy:
     def nullified_policy_data(self) -> KeyPairResourcePolicyData:
         return KeyPairResourcePolicyData(
             name="test-policy",
-            created_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
             default_for_unspecified=DefaultForUnspecified.LIMITED,
             total_resource_slots=ResourceSlot.from_user_input({"cpu": "4", "mem": "8g"}, None),
             max_session_lifetime=0,
@@ -312,7 +312,7 @@ class TestModifyKeypairResourcePolicy:
         new_slots = ResourceSlot.from_user_input({"cpu": "100", "mem": "512g", "gpu": "8"}, None)
         expected_policy = KeyPairResourcePolicyData(
             name="test-policy",
-            created_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
             default_for_unspecified=DefaultForUnspecified.LIMITED,
             total_resource_slots=new_slots,
             max_session_lifetime=0,
@@ -379,7 +379,7 @@ class TestDeleteKeypairResourcePolicy:
     def sample_policy_data(self) -> KeyPairResourcePolicyData:
         return KeyPairResourcePolicyData(
             name="test-policy",
-            created_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
             default_for_unspecified=DefaultForUnspecified.LIMITED,
             total_resource_slots=ResourceSlot.from_user_input({"cpu": "4", "mem": "8g"}, None),
             max_session_lifetime=0,

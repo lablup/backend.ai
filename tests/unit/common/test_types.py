@@ -84,19 +84,19 @@ def test_check_typed_dict():
 
 
 def test_binary_size_str_conversion():
-    assert 1 == BinarySize.from_str("1 byte")
-    assert 19291991 == BinarySize.from_str(19291991)
+    assert BinarySize.from_str("1 byte") == 1
+    assert BinarySize.from_str(19291991) == 19291991
     with pytest.raises(ValueError):
         BinarySize.from_str("1.1")
-    assert 1126 == BinarySize.from_str("1.1k")
-    assert 11021204 == BinarySize.from_str("11_021_204")
-    assert 12345 == BinarySize.from_str("12345 bytes")
-    assert 12345 == BinarySize.from_str("12345 B")
-    assert 12345 == BinarySize.from_str("12_345 bytes")
-    assert 99 == BinarySize.from_str("99 bytes")
-    assert 1024 == BinarySize.from_str("1 KiB")
-    assert 2048 == BinarySize.from_str("2 KiBytes")
-    assert 127303 == BinarySize.from_str("124.32 KiB")
+    assert BinarySize.from_str("1.1k") == 1126
+    assert BinarySize.from_str("11_021_204") == 11021204
+    assert BinarySize.from_str("12345 bytes") == 12345
+    assert BinarySize.from_str("12345 B") == 12345
+    assert BinarySize.from_str("12_345 bytes") == 12345
+    assert BinarySize.from_str("99 bytes") == 99
+    assert BinarySize.from_str("1 KiB") == 1024
+    assert BinarySize.from_str("2 KiBytes") == 2048
+    assert BinarySize.from_str("124.32 KiB") == 127303
     assert str(BinarySize(1)) == "1 byte"
     assert str(BinarySize(2)) == "2 bytes"
     assert str(BinarySize(1024)) == "1 KiB"
@@ -114,29 +114,29 @@ def test_binary_size_str_conversion():
         BinarySize.finite_from_str("inf")
 
     # short-hand formats
-    assert 2**30 == BinarySize.from_str("1g")
-    assert 1048576 == BinarySize.from_str("1m")
-    assert 524288 == BinarySize.from_str("0.5m")
-    assert 524288 == BinarySize.from_str("512k")
-    assert "{: }".format(BinarySize(930)) == "930"
-    assert "{:k}".format(BinarySize(1024)) == "1k"  # type: ignore
-    assert "{:k}".format(BinarySize(524288)) == "512k"  # type: ignore
-    assert "{:k}".format(BinarySize(1048576)) == "1024k"  # type: ignore
-    assert "{:m}".format(BinarySize(524288)) == "0.5m"  # type: ignore
-    assert "{:m}".format(BinarySize(1048576)) == "1m"  # type: ignore
-    assert "{:m}".format(BinarySize(1048576123)) == "1000m"  # type: ignore
-    assert "{:g}".format(BinarySize(2**30)) == "1g"
+    assert BinarySize.from_str("1g") == 2**30
+    assert BinarySize.from_str("1m") == 1048576
+    assert BinarySize.from_str("0.5m") == 524288
+    assert BinarySize.from_str("512k") == 524288
+    assert f"{BinarySize(930): }" == "930"
+    assert f"{BinarySize(1024):k}" == "1k"  # type: ignore
+    assert f"{BinarySize(524288):k}" == "512k"  # type: ignore
+    assert f"{BinarySize(1048576):k}" == "1024k"  # type: ignore
+    assert f"{BinarySize(524288):m}" == "0.5m"  # type: ignore
+    assert f"{BinarySize(1048576):m}" == "1m"  # type: ignore
+    assert f"{BinarySize(1048576123):m}" == "1000m"  # type: ignore
+    assert f"{BinarySize(2**30):g}" == "1g"
     with pytest.raises(ValueError):
-        "{:x}".format(BinarySize(1))
+        f"{BinarySize(1):x}"
     with pytest.raises(ValueError):
-        "{:qqqq}".format(BinarySize(1))
+        f"{BinarySize(1):qqqq}"
     with pytest.raises(ValueError):
-        "{:}".format(BinarySize(1))
-    assert "{:s}".format(BinarySize(930)) == "930"
-    assert "{:s}".format(BinarySize(1024)) == "1k"
-    assert "{:s}".format(BinarySize(524288)) == "512k"
-    assert "{:s}".format(BinarySize(1048576)) == "1m"
-    assert "{:s}".format(BinarySize(2**30)) == "1g"
+        f"{BinarySize(1)}"
+    assert f"{BinarySize(930):s}" == "930"
+    assert f"{BinarySize(1024):s}" == "1k"
+    assert f"{BinarySize(524288):s}" == "512k"
+    assert f"{BinarySize(1048576):s}" == "1m"
+    assert f"{BinarySize(2**30):s}" == "1g"
 
 
 def test_binary_size_decimal_conversion():

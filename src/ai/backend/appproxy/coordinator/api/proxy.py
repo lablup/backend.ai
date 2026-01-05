@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 import urllib.parse
-from typing import TYPE_CHECKING, Annotated, Iterable, Optional
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Annotated, Optional
 from uuid import UUID
 
 import jwt
@@ -25,11 +26,10 @@ from ai.backend.appproxy.common.types import (
 from ai.backend.appproxy.common.utils import mime_match, pydantic_api_handler
 from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
 from ai.backend.appproxy.coordinator.errors import CircuitCreationError
+from ai.backend.appproxy.coordinator.models import Circuit, Token, Worker, add_circuit
+from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
+from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.logging import BraceStyleAdapter
-
-from ..models import Circuit, Token, Worker, add_circuit
-from ..models.utils import execute_with_txn_retry
-from ..types import RootContext
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -221,8 +221,7 @@ async def proxy(
             ),
             headers={"Access-Control-Allow-Origin": "*", "Access-Control-Expose-Headers": "*"},
         )
-    else:
-        return web.HTTPPermanentRedirect(app_url)
+    return web.HTTPPermanentRedirect(app_url)
 
 
 async def init(app: web.Application) -> None:

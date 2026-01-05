@@ -1,7 +1,8 @@
 import logging
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any, Mapping, Optional, cast
+from typing import Any, Optional, cast
 from uuid import UUID
 
 import msgpack
@@ -34,10 +35,9 @@ from ai.backend.manager.errors.user import (
     UserModificationFailure,
     UserNotFound,
 )
-from ai.backend.manager.models import kernels
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
-from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
+from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES, kernels
 from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair_data, keypairs
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
@@ -48,10 +48,9 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     AssociationScopesEntitiesCreatorSpec,
     UserRoleCreatorSpec,
 )
+from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
-
-from ..permission_controller.role_manager import RoleManager
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -258,8 +257,7 @@ class UserRepository:
                 await self._update_user_groups(
                     conn, updated_user.uuid, updated_user.domain_name, group_ids
                 )
-            res = UserData.from_row(updated_user)
-        return res
+            return UserData.from_row(updated_user)
 
     @user_repository_resilience.apply()
     async def soft_delete_user_validated(self, email: str, requester_uuid: Optional[UUID]) -> None:
@@ -565,7 +563,7 @@ class UserRepository:
         kernel_ids = [str(row["id"]) for row in rows]
         raw_stats = await valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids)
 
-        for row, raw_stat in zip(rows, raw_stats):
+        for row, raw_stat in zip(rows, raw_stats, strict=True):
             if raw_stat is not None:
                 last_stat = msgpack.unpackb(raw_stat)
                 io_read_byte = int(nmget(last_stat, "io_read.current", 0))

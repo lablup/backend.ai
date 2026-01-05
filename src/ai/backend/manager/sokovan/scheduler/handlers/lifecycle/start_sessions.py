@@ -11,10 +11,9 @@ from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import LockID
+from ai.backend.manager.sokovan.scheduler.handlers.base import SchedulerHandler
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
-
-from ..base import SchedulerHandler
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -26,7 +25,7 @@ class StartSessionsHandler(SchedulerHandler):
         self,
         scheduler: Scheduler,
         event_producer: EventProducer,
-    ):
+    ) -> None:
         self._scheduler = scheduler
         self._event_producer = event_producer
 

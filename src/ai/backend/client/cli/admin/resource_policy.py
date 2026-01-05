@@ -5,10 +5,9 @@ import click
 from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.params import OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
-
-from ..extensions import pass_ctx_obj
-from ..pretty import print_info
-from ..types import CLIContext
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.pretty import print_info
+from ai.backend.client.cli.types import CLIContext
 
 # from ai.backend.client.output.fields import keypair_resource_policy_fields
 from . import admin
@@ -29,8 +28,8 @@ def info(ctx: CLIContext, name: str) -> None:
     Show details about a keypair resource policy. When `name` option is omitted, the
     resource policy for the current access_key will be returned.
     """
-    from ...func.keypair_resource_policy import _default_detail_fields
-    from ...session import Session
+    from ai.backend.client.func.keypair_resource_policy import _default_detail_fields
+    from ai.backend.client.session import Session
 
     with Session() as session:
         try:
@@ -49,8 +48,8 @@ def list(ctx: CLIContext) -> None:
     List and manage keypair resource policies.
     (admin privilege required)
     """
-    from ...func.keypair_resource_policy import _default_list_fields
-    from ...session import Session
+    from ai.backend.client.func.keypair_resource_policy import _default_list_fields
+    from ai.backend.client.session import Session
 
     with Session() as session:
         try:
@@ -149,7 +148,7 @@ def add(
 
     NAME: NAME of a new keypair resource policy.
     """
-    from ...session import Session
+    from ai.backend.client.session import Session
 
     with Session() as session:
         try:
@@ -274,7 +273,7 @@ def update(
 
     NAME: NAME of a keypair resource policy to update.
     """
-    from ...session import Session
+    from ai.backend.client.session import Session
 
     with Session() as session:
         try:
@@ -322,7 +321,7 @@ def delete(ctx: CLIContext, name: str) -> None:
 
     NAME: NAME of a keypair resource policy to delete.
     """
-    from ...session import Session
+    from ai.backend.client.session import Session
 
     with Session() as session:
         if not ask_yn():

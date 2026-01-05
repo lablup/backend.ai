@@ -1,16 +1,15 @@
 import logging
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, FrozenSet, Literal, Mapping, Optional
+from typing import Any, Literal, Optional
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-
-from ...types import CapacityUsage, FSPerfMetric
-from ...watcher import WatcherClient
-from ..abc import (
+from ai.backend.storage.types import CapacityUsage, FSPerfMetric
+from ai.backend.storage.volumes.abc import (
     CAP_FAST_FS_SIZE,
     CAP_METRIC,
     CAP_QUOTA,
@@ -20,7 +19,9 @@ from ..abc import (
     QuotaConfig,
     QuotaUsage,
 )
-from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
+from ai.backend.storage.volumes.vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
+from ai.backend.storage.watcher import WatcherClient
+
 from .exceptions import GPFSNoMetricError
 from .gpfs_client import GPFSAPIClient
 
@@ -189,7 +190,7 @@ class GPFSVolume(BaseVolume):
             self.fs,
         )
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_FAST_FS_SIZE, CAP_VFOLDER, CAP_QUOTA, CAP_METRIC])
 
     async def get_hwinfo(self) -> HardwareMetadata:

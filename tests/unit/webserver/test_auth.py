@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -25,7 +25,7 @@ class DummyConfig:
 
 
 class DummyRequest:
-    def __init__(self, app_data: Dict[str, Any]) -> None:
+    def __init__(self, app_data: dict[str, Any]) -> None:
         self.app = app_data
 
 

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Annotated, Iterable, Sequence
+from collections.abc import Iterable, Sequence
+from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
 import aiohttp_cors
@@ -18,10 +19,10 @@ from ai.backend.appproxy.common.types import (
     WebMiddleware,
 )
 from ai.backend.appproxy.common.utils import pydantic_api_handler, pydantic_api_response_handler
+from ai.backend.appproxy.coordinator.models import Circuit
+from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
+from ai.backend.appproxy.coordinator.types import RootContext
 
-from ..models import Circuit
-from ..models.utils import execute_with_txn_retry
-from ..types import RootContext
 from .types import StubResponseModel
 from .utils import auth_required
 

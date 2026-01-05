@@ -14,18 +14,16 @@ from ai.backend.manager.services.model_serving.actions.list_model_service import
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )
-
-from ...utils import ScenarioBase
+from ai.backend.testutils.scenario import ScenarioBase
 
 
 @pytest.fixture
 def mock_list_endpoints_by_owner_validated(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.repository,
         "list_endpoints_by_owner_validated",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 class TestListModelService:

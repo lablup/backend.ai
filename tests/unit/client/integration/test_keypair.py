@@ -58,15 +58,14 @@ async def test_keypair_manipulation_operations():
 @pytest.mark.asyncio
 async def test_user_cannot_create_keypair(userconfig):
     email = "testion" + uuid.uuid4().hex + "@test.mars"
-    with Session() as sess:
-        with pytest.raises(BackendAPIError):
-            sess.KeyPair.create(
-                user_id=email,
-                is_active=True,
-                is_admin=False,
-                resource_policy="default",
-                rate_limit=1,
-            )
+    with Session() as sess, pytest.raises(BackendAPIError):
+        sess.KeyPair.create(
+            user_id=email,
+            is_active=True,
+            is_admin=False,
+            resource_policy="default",
+            rate_limit=1,
+        )
 
 
 @pytest.mark.asyncio

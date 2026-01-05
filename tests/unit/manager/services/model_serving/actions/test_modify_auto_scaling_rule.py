@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
@@ -27,8 +27,7 @@ from ai.backend.manager.services.model_serving.processors.auto_scaling import (
     ModelServingAutoScalingProcessors,
 )
 from ai.backend.manager.types import OptionalState, TriState
-
-from ...utils import ScenarioBase
+from ai.backend.testutils.scenario import ScenarioBase
 
 
 @pytest.fixture
@@ -44,32 +43,29 @@ def mock_check_requester_access_modify(mocker, auto_scaling_service):
 
 @pytest.fixture
 def mock_get_auto_scaling_rule_by_id(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.repository,
         "get_auto_scaling_rule_by_id_validated",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
 def mock_modify_auto_scaling_rule(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.repository,
         "update_auto_scaling_rule_validated",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
 def mock_update_auto_scaling_rule_force(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.admin_repository,
         "update_auto_scaling_rule_force",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 class TestModifyAutoScalingRule:
@@ -218,7 +214,7 @@ class TestModifyAutoScalingRule:
                 cooldown_seconds=300,
                 min_replicas=2,
                 max_replicas=10,
-                created_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
                 last_triggered_at=None,
                 endpoint=uuid.UUID("11111111-1111-1111-1111-111111111111"),
             )

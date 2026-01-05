@@ -5,9 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Optional
-
-from typing_extensions import override
+from typing import Any, Optional, override
 
 from ai.backend.common.types import (
     ResourceSlot,

@@ -1,6 +1,7 @@
 import logging
+from collections.abc import AsyncIterator
 from http import HTTPStatus
-from typing import AsyncIterator, Optional, cast, override
+from typing import Optional, cast, override
 
 import aiohttp
 import yarl

@@ -246,7 +246,7 @@ async def test_fetch_cancellation_async(dummy_endpoint):
 async def test_fetch_timeout_async(dummy_endpoint):
     with aioresponses() as m:
         async with AsyncSession():
-            m.post(dummy_endpoint, exception=asyncio.TimeoutError())
+            m.post(dummy_endpoint, exception=TimeoutError())
             rqst = Request("POST", "/")
             with pytest.raises(asyncio.TimeoutError):
                 async with rqst.fetch():

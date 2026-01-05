@@ -11,16 +11,31 @@ import pytest
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.types import BinarySize, ValkeyTarget
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.app_config import AppConfigRow, AppConfigScopeType
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.app_config import AppConfigRepository
 from ai.backend.manager.repositories.app_config.creators import AppConfigCreatorSpec
 from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
@@ -51,11 +66,27 @@ class TestAppConfigRepository:
         async with with_tables(
             database_connection,
             [
+                # FK dependency order: parents before children
                 DomainRow,
+                ScalingGroupRow,
                 UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                UserRoleRow,
                 UserRow,
                 KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
                 AppConfigRow,
             ],
         ):
@@ -95,7 +126,7 @@ class TestAppConfigRepository:
             policy = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_session_count_per_model_session=5,
                 max_customized_image_count=3,
             )

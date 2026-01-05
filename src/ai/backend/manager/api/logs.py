@@ -3,9 +3,10 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import uuid
-from datetime import datetime
+from collections.abc import MutableMapping
+from datetime import UTC, datetime
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, MutableMapping, Tuple
+from typing import TYPE_CHECKING, Any
 
 import aiohttp_cors
 import attrs
@@ -20,11 +21,13 @@ from ai.backend.common.events.dispatcher import EventHandler
 from ai.backend.common.events.event_types.log.anycast import DoLogCleanupEvent
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter, LogLevel
+from ai.backend.manager.defs import LockID
+from ai.backend.manager.errors.resource import DBOperationFailed
+from ai.backend.manager.models.error_logs import error_logs
+from ai.backend.manager.models.group import association_groups_users as agus
+from ai.backend.manager.models.group import groups
+from ai.backend.manager.models.user import UserRole
 
-from ..defs import LockID
-from ..errors.resource import DBOperationFailed
-from ..models import UserRole, error_logs, groups
-from ..models import association_groups_users as agus
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware
@@ -224,7 +227,7 @@ async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogClean
             "falling back to 90 days",
             raw_lifetime,
         )
-    boundary = datetime.now() - lifetime
+    boundary = datetime.now(UTC) - lifetime
     async with root_ctx.db.begin() as conn:
         query = sa.delete(error_logs).where(error_logs.c.created_at < boundary)
         result = await conn.execute(query)
@@ -266,7 +269,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)

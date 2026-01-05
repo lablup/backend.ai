@@ -6,7 +6,7 @@ Only artifact-related tests. Revision tests are in artifact_revision/test_artifa
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -120,7 +120,7 @@ class TestArtifactService:
     @pytest.fixture
     def sample_artifact_data(self) -> ArtifactData:
         """Create sample artifact data"""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         registry_id = uuid4()
         return ArtifactData(
             id=uuid4(),
@@ -262,7 +262,7 @@ class TestArtifactService:
             source_registry_type=sample_artifact_data.source_registry_type,
             availability=sample_artifact_data.availability,
             scanned_at=sample_artifact_data.scanned_at,
-            updated_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(UTC),
             readonly=sample_artifact_data.readonly,
             extra=sample_artifact_data.extra,
         )
@@ -292,7 +292,7 @@ class TestArtifactService:
             source_registry_type=sample_artifact_data.source_registry_type,
             availability=ArtifactAvailability.DELETED,
             scanned_at=sample_artifact_data.scanned_at,
-            updated_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(UTC),
             readonly=sample_artifact_data.readonly,
             extra=sample_artifact_data.extra,
         )

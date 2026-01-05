@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Callable, Final
+from collections.abc import Callable
+from typing import Final
 
 from aiomonitor.task import preserve_termination_log
 

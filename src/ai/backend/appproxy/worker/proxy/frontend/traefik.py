@@ -5,7 +5,8 @@ import logging
 import os
 import time
 import uuid
-from typing import TYPE_CHECKING, Generic, Mapping, TypeAlias, Union
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Generic, TypeAlias
 
 import aiotools
 from aiohttp import web
@@ -13,11 +14,9 @@ from aiohttp import web
 from ai.backend.appproxy.common.config import get_default_redis_key_ttl
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.common.types import RouteInfo
+from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError, MissingTraefikConfigError
 from ai.backend.appproxy.worker.proxy.backend.traefik import TraefikBackend
-from ai.backend.logging import BraceStyleAdapter
-
-from ...errors import InvalidFrontendTypeError, MissingTraefikConfigError
-from ...types import (
+from ai.backend.appproxy.worker.types import (
     LAST_USED_MARKER_SOCKET_NAME,
     Circuit,
     PortFrontendInfo,
@@ -25,13 +24,15 @@ from ...types import (
     SubdomainFrontendInfo,
     TCircuitKey,
 )
+from ai.backend.logging import BraceStyleAdapter
+
 from .base import BaseFrontend
 
 if TYPE_CHECKING:
     pass
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
-MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
+MSetType: TypeAlias = Mapping[str | bytes, bytes | float | int | str]
 
 
 class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend, TCircuitKey]):

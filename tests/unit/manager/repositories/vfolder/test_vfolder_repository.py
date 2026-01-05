@@ -20,15 +20,27 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import (
     UserRole,
     UserRow,
@@ -82,13 +94,25 @@ class TestVfolderRepository:
             database_connection,
             [
                 DomainRow,
+                ScalingGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                UserRoleRow,
                 UserRow,
                 KeyPairRow,
                 GroupRow,
+                ImageRow,
                 VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
                 VFolderPermissionRow,
             ],
         ):
@@ -128,7 +152,7 @@ class TestVfolderRepository:
             user_policy = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_session_count_per_model_session=5,
                 max_customized_image_count=3,
             )
@@ -149,7 +173,7 @@ class TestVfolderRepository:
             project_policy = ProjectResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_network_count=3,
             )
             db_sess.add(project_policy)

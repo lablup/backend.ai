@@ -73,10 +73,10 @@ class AliasGroupMixin(click.Group):
     ref) https://github.com/click-contrib/click-aliases
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._commands = {}
-        self._aliases = {}
+        self._commands: dict[str, click.Command] = {}
+        self._aliases: dict[str, str] = {}
 
     def command(self, *args, **kwargs):
         aliases = kwargs.pop("aliases", [])
@@ -119,6 +119,7 @@ class AliasGroupMixin(click.Group):
         command = super().get_command(ctx, cmd_name)
         if command:
             return command
+        return None
 
     def format_commands(self, ctx, formatter):
         commands = []
@@ -131,7 +132,7 @@ class AliasGroupMixin(click.Group):
                 continue
             if subcommand in self._commands:
                 aliases = ",".join(sorted(self._commands[subcommand]))
-                subcommand = "{0} ({1})".format(subcommand, aliases)
+                subcommand = f"{subcommand} ({aliases})"
             commands.append((subcommand, cmd))
 
         # allow for 3 times the default spacing

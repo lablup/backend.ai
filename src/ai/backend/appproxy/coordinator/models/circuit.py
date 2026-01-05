@@ -1,5 +1,6 @@
-from datetime import datetime
-from typing import TYPE_CHECKING, Any, Optional, Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -108,7 +109,7 @@ class Circuit(Base, BaseMixin):
         load_worker=True,
         load_endpoint=True,
     ) -> "Circuit":
-        query = sa.select(Circuit).where((Circuit.id == circuit_id))
+        query = sa.select(Circuit).where(Circuit.id == circuit_id)
         if load_worker:
             query = query.options(selectinload(Circuit.worker_row))
         if load_endpoint:
@@ -126,7 +127,7 @@ class Circuit(Base, BaseMixin):
         load_worker=True,
         load_endpoint=True,
     ) -> "Circuit":
-        query = sa.select(Circuit).where((Circuit.endpoint_id == endpoint_id))
+        query = sa.select(Circuit).where(Circuit.endpoint_id == endpoint_id)
         if load_worker:
             query = query.options(selectinload(Circuit.worker_row))
         if load_endpoint:
@@ -183,7 +184,7 @@ class Circuit(Base, BaseMixin):
         load_worker=True,
         load_endpoint=True,
     ) -> "Circuit":
-        query = sa.select(Circuit).where((Circuit.endpoint_id == endpoint_id))
+        query = sa.select(Circuit).where(Circuit.endpoint_id == endpoint_id)
         if load_worker:
             query = query.options(selectinload(Circuit.worker_row))
         if load_endpoint:
@@ -233,8 +234,8 @@ class Circuit(Base, BaseMixin):
         c.session_ids = [r.session_id for r in route_info]
         c.runtime_variant = runtime_variant
 
-        c.created_at = datetime.now()
-        c.updated_at = datetime.now()
+        c.created_at = datetime.now(UTC)
+        c.updated_at = datetime.now(UTC)
 
         return c
 

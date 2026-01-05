@@ -1,23 +1,24 @@
 import asyncio
+from collections.abc import Mapping
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Any, Mapping, Optional, Type, cast
+from typing import Any, Optional, cast
 
 import aiofiles
 import aiotools
 import tomli
 
 from ai.backend.test.contexts.context import BaseTestContext, ContextName
+from ai.backend.test.testcases.spec_manager import TestSpec, TestSpecManager, TestTag
 from ai.backend.test.tester.config import TesterConfig
 
-from ..testcases.spec_manager import TestSpec, TestSpecManager, TestTag
 from .exporter import TestExporter
 from .runner import TestRunner
 
 
 class Tester:
     _spec_manager: TestSpecManager
-    _exporter_type: Type[TestExporter]
+    _exporter_type: type[TestExporter]
     _config_file_path: Path
     _config: Optional[TesterConfig]
     _semaphore_instance: Optional[asyncio.Semaphore]
@@ -25,7 +26,7 @@ class Tester:
     def __init__(
         self,
         spec_manager: TestSpecManager,
-        exporter_type: Type[TestExporter],
+        exporter_type: type[TestExporter],
         config_file_path: Path,
     ) -> None:
         self._spec_manager = spec_manager
@@ -45,11 +46,10 @@ class Tester:
 
     @aiotools.lru_cache(maxsize=1)
     async def _load_tester_config(self, config_path: Path) -> TesterConfig:
-        async with aiofiles.open(config_path, mode="r") as fp:
+        async with aiofiles.open(config_path) as fp:
             raw_content = await fp.read()
             content = tomli.loads(raw_content)
-            config = TesterConfig.model_validate(content, by_alias=True, by_name=True)
-            return config
+            return TesterConfig.model_validate(content, by_alias=True, by_name=True)
 
     async def _run_single_spec(self, spec: TestSpec, sub_name: Optional[str] = None) -> None:
         async with self._semaphore:

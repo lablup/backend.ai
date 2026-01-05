@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import contextlib
 import sys
+from collections.abc import AsyncIterator
 from pathlib import Path
 from pprint import pformat
-from typing import TYPE_CHECKING, Any, AsyncIterator, Optional, Self
+from typing import TYPE_CHECKING, Any, Optional, Self
 
 import click
 

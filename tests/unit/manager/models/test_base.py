@@ -4,7 +4,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.manager.models.base import DecimalType, batch_result_in_scalar_stream
+from ai.backend.manager.api.gql_legacy.base import batch_result_in_scalar_stream
+from ai.backend.manager.models.base import DecimalType
 
 
 @pytest.mark.asyncio

@@ -13,8 +13,8 @@ from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 __all__ = [
     "GroupData",
     "GroupModifier",
-    "ProjectType",
     "OptionalState",
     "PartialModifier",
+    "ProjectType",
     "TriState",
 ]

@@ -1,13 +1,12 @@
 import json
 from contextlib import closing
-from typing import Tuple
 
-from ...utils.cli import EOF, ClientRunnerFunc, decode
-from ..conftest import KeypairOption, User
+from ai.backend.test.cli_integration.conftest import KeypairOption, User
+from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
 def test_add_keypair(
-    run_admin: ClientRunnerFunc, users: Tuple[User], keypair_options: Tuple[KeypairOption]
+    run_admin: ClientRunnerFunc, users: tuple[User], keypair_options: tuple[KeypairOption]
 ):
     """
     Test add keypair.
@@ -69,7 +68,7 @@ def test_add_keypair(
         assert response.get("ok") is True, "cannot add users to group"
 
     # Create keypair
-    for i, (user, keypair_option) in enumerate(zip(users, keypair_options)):
+    for i, (user, keypair_option) in enumerate(zip(users, keypair_options, strict=True)):
         keypair_add_arguments = [
             "--output=json",
             "admin",
@@ -96,7 +95,7 @@ def test_add_keypair(
         keypair_list = loaded.get("items")
         assert isinstance(keypair_list, list), "List not printed properly!"
 
-    for i, (user, keypair_option) in enumerate(zip(users, keypair_options)):
+    for i, (user, keypair_option) in enumerate(zip(users, keypair_options, strict=True)):
         keypair = get_keypair_from_list(keypair_list, user.email)
         assert "access_key" in keypair, f"Keypair#{i + 1} doesn't exist"
         assert keypair.get("is_active") is keypair_option.is_active, (
@@ -113,7 +112,7 @@ def test_add_keypair(
 
 
 def test_update_keypair(
-    run_admin: ClientRunnerFunc, users: Tuple[User], new_keypair_options: Tuple[KeypairOption]
+    run_admin: ClientRunnerFunc, users: tuple[User], new_keypair_options: tuple[KeypairOption]
 ):
     """
     Test update keypair.
@@ -129,7 +128,7 @@ def test_update_keypair(
         keypair_list = loaded.get("items")
         assert isinstance(keypair_list, list), "List not printed properly!"
 
-    for i, (user, new_keypair_option) in enumerate(zip(users, new_keypair_options)):
+    for i, (user, new_keypair_option) in enumerate(zip(users, new_keypair_options, strict=True)):
         keypair = get_keypair_from_list(keypair_list, user.email)
         assert "access_key" in keypair, f"Keypair#{i + 1} info doesn't exist"
 
@@ -160,7 +159,7 @@ def test_update_keypair(
         updated_keypair_list = loaded.get("items")
         assert isinstance(updated_keypair_list, list), "List not printed properly!"
 
-    for i, (user, new_keypair_option) in enumerate(zip(users, new_keypair_options)):
+    for i, (user, new_keypair_option) in enumerate(zip(users, new_keypair_options, strict=True)):
         updated_keypair = get_keypair_from_list(updated_keypair_list, user.email)
         assert "access_key" in updated_keypair, f"Keypair#{i + 1} doesn't exist"
         assert updated_keypair.get("is_active") is new_keypair_option.is_active, (
@@ -177,7 +176,7 @@ def test_update_keypair(
         )
 
 
-def test_delete_keypair(run_admin: ClientRunnerFunc, users: Tuple[User]):
+def test_delete_keypair(run_admin: ClientRunnerFunc, users: tuple[User]):
     """
     Test delete keypair.
     This test must be executed after test_add_keypair.

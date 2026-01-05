@@ -2,18 +2,15 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Mapping, MutableMapping, Sequence
 from enum import StrEnum
 from typing import (
     TYPE_CHECKING,
     Any,
     Final,
     Generic,
-    Mapping,
-    MutableMapping,
     Optional,
     Self,
-    Sequence,
-    Set,
     TypeVar,
     override,
 )
@@ -35,12 +32,13 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.errors.resource import InvalidSchedulerState
-
-from ..models import AgentRow, KernelRow, SessionRow
-from ..models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.models.session import SessionRow
 
 if TYPE_CHECKING:
-    from ..registry import AgentRegistry
+    from ai.backend.manager.registry import AgentRegistry
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
@@ -101,7 +99,7 @@ class SchedulingContext:
     Context for each scheduling decision.
     """
 
-    registry: "AgentRegistry"
+    registry: AgentRegistry
     known_slot_types: Mapping[SlotName, SlotTypes]
 
 
@@ -109,7 +107,7 @@ class SchedulingContext:
 class KernelAgentBinding:
     kernel: KernelRow
     agent_alloc_ctx: AgentAllocationContext
-    allocated_host_ports: Set[int]
+    allocated_host_ports: set[int]
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -251,7 +249,7 @@ class AbstractAgentSelector(Generic[T_ResourceGroupState], ABC):
     @classmethod
     @abstractmethod
     def get_state_cls(cls) -> type[T_ResourceGroupState]:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     async def assign_agent_for_session(
         self,

@@ -27,6 +27,9 @@ from ai.backend.manager.api.gql.image import Image
 from ai.backend.manager.api.gql.resource_group import ResourceGroup
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder import ExtraVFolderMountConnection, VFolder
+from ai.backend.manager.api.gql_legacy.image import ImageNode
+from ai.backend.manager.api.gql_legacy.scaling_group import ScalingGroupNode
+from ai.backend.manager.api.gql_legacy.vfolder import VirtualFolderNode
 from ai.backend.manager.data.deployment.creator import ModelRevisionCreator, VFolderMountsCreator
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
@@ -39,9 +42,6 @@ from ai.backend.manager.data.deployment.types import (
     ResourceConfigData,
     ResourceSpec,
 )
-from ai.backend.manager.models.gql_models.image import ImageNode
-from ai.backend.manager.models.gql_models.scaling_group import ScalingGroupNode
-from ai.backend.manager.models.gql_models.vfolder import VirtualFolderNode
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
@@ -338,7 +338,7 @@ class ActivateRevisionInputGQL:
     description="Added in 25.19.0. Result of activating a revision.",
 )
 class ActivateRevisionPayloadGQL:
-    deployment: Annotated["ModelDeployment", strawberry.lazy(".deployment")]
+    deployment: Annotated[ModelDeployment, strawberry.lazy(".deployment")]
     previous_revision_id: Optional[ID]
     activated_revision_id: ID
 

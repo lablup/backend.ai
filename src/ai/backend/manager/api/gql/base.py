@@ -5,7 +5,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Optional, Protocol, Type, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Optional, Protocol, TypeVar, cast
 
 import graphene
 import strawberry
@@ -38,8 +38,7 @@ class ByteSize(str):
     def parse_literal(ast) -> str:
         if not isinstance(ast, StringValueNode):
             raise ValueError("ByteSize must be provided as a string literal")
-        value = ast.value
-        return value
+        return ast.value
 
 
 @strawberry.input
@@ -86,11 +85,11 @@ class StringFilter:
         """
         if self.equals:
             return equals_factory(self.equals, False)
-        elif self.i_equals:
+        if self.i_equals:
             return equals_factory(self.i_equals, True)
-        elif self.contains:
+        if self.contains:
             return contains_factory(self.contains, False)
-        elif self.i_contains:
+        if self.i_contains:
             return contains_factory(self.i_contains, True)
         return None
 
@@ -142,9 +141,9 @@ class DateTimeFilter:
         """
         if self.equals and equals_factory:
             return equals_factory(self.equals)
-        elif self.before:
+        if self.before:
             return before_factory(self.before)
-        elif self.after:
+        if self.after:
             return after_factory(self.after)
         return None
 
@@ -179,10 +178,9 @@ class JSONString:
     def serialize(value: Any) -> JSONString:
         if isinstance(value, (dict, list)):
             return cast(JSONString, dump_json_str(value))
-        elif isinstance(value, str):
+        if isinstance(value, str):
             return cast(JSONString, value)
-        else:
-            return cast(JSONString, dump_json_str(value))
+        return cast(JSONString, dump_json_str(value))
 
     @staticmethod
     def from_resource_slot(resource_slot: ResourceSlot) -> JSONString:
@@ -190,7 +188,7 @@ class JSONString:
 
 
 def to_global_id(
-    type_: Type[Any], local_id: uuid.UUID | str, is_target_graphene_object: bool = False
+    type_: type[Any], local_id: uuid.UUID | str, is_target_graphene_object: bool = False
 ) -> str:
     if is_target_graphene_object:
         # For compatibility with existing Graphene-based global IDs
@@ -275,7 +273,7 @@ class PageInfo:
     start_cursor: Optional[str] = None
     end_cursor: Optional[str] = None
 
-    def to_strawberry_page_info(self) -> "strawberry.relay.PageInfo":
+    def to_strawberry_page_info(self) -> strawberry.relay.PageInfo:
         return strawberry.relay.PageInfo(
             has_next_page=self.has_next_page,
             has_previous_page=self.has_previous_page,

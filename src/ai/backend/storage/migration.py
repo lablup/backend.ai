@@ -4,11 +4,12 @@ import enum
 import logging
 import os
 import re
+from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import AsyncIterator, Iterator, Optional, TypedDict
+from typing import Optional, TypedDict
 from uuid import UUID
 
 import aiofiles
@@ -156,11 +157,7 @@ async def upgrade_2_to_3(
                     quota_scope_id = quota_scope_map[folder_id]
                 except KeyError:
                     continue
-                progbar.set_description(
-                    "inspecting contents of vfolder {}".format(
-                        folder_id,
-                    )
-                )
+                progbar.set_description(f"inspecting contents of vfolder {folder_id}")
                 orig_vfid = VFolderID(None, folder_id)
                 dst_vfid = VFolderID(quota_scope_id, folder_id)
                 try:

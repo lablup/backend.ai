@@ -1,7 +1,6 @@
+from ai.backend.accelerator.rebellions.common.atom_api import ATOMDeviceStat
+from ai.backend.accelerator.rebellions.common.types import AbstractATOMDevice
 from ai.backend.common.types import DeviceId
-
-from ..common.atom_api import ATOMDeviceStat
-from ..common.types import AbstractATOMDevice
 
 __all__ = ("ATOMPlusDevice",)
 

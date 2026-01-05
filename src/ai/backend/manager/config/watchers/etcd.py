@@ -23,7 +23,5 @@ class EtcdConfigWatcher(AbstractConfigWatcher):
                     case QueueSentinel.CLOSED | QueueSentinel.TIMEOUT:
                         break
                     case _:
-                        if ev.event == WatchEventType.PUT:
-                            yield ev
-                        elif ev.event == WatchEventType.DELETE:
+                        if ev.event == WatchEventType.PUT or ev.event == WatchEventType.DELETE:
                             yield ev

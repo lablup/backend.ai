@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
@@ -77,7 +77,7 @@ async def test_update_password_no_auth_successful(
         "status": UserStatus.ACTIVE,
     }
 
-    new_timestamp = datetime(2024, 1, 1, 12, 0, 0)  # Fixed timestamp for comparison
+    new_timestamp = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)  # Fixed timestamp for comparison
     mock_auth_repository.update_user_password_by_uuid.return_value = new_timestamp
 
     mocker.patch(
@@ -86,7 +86,7 @@ async def test_update_password_no_auth_successful(
     result = await auth_service.update_password_no_auth(action)
 
     assert result.user_id == UUID("12345678-1234-5678-1234-567812345678")
-    assert result.password_changed_at == datetime(2024, 1, 1, 12, 0, 0)
+    assert result.password_changed_at == datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
 
 
 @pytest.mark.asyncio
@@ -212,7 +212,7 @@ async def test_update_password_no_auth_with_retry(
         "status": UserStatus.ACTIVE,
     }
 
-    changed_at = datetime.now()
+    changed_at = datetime.now(tz=UTC)
     mock_auth_repository.update_user_password_by_uuid.return_value = changed_at
 
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(

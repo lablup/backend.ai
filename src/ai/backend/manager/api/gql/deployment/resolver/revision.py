@@ -107,14 +107,12 @@ async def inference_runtime_config(name: str) -> JSON:
     description="Added in 25.16.0 Get configuration JSON Schemas for all inference runtimes"
 )
 async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
-    all_configs = {
+    return {
         "vllm": VLLMRuntimeConfig.to_json_schema(),
         "sglang": SGLangRuntimeConfig.to_json_schema(),
         "nvdianim": NVDIANIMRuntimeConfig.to_json_schema(),
         "mojo": MOJORuntimeConfig.to_json_schema(),
     }
-
-    return all_configs
 
 
 # Mutation resolvers

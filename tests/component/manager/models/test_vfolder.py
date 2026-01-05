@@ -5,12 +5,12 @@ import pytest
 
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.common.types import VFolderMount
-from ai.backend.manager.models.gql import GraphQueryContext
+from ai.backend.manager.api.gql_legacy.schema import GraphQueryContext
+from ai.backend.manager.api.gql_legacy.vfolder import VirtualFolder
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
     MountPermission,
     VFolderID,
-    VirtualFolder,
     is_mount_duplicate,
 )
 from ai.backend.manager.server import (
@@ -232,7 +232,7 @@ async def test_batch_load_by_id(
     )
 
     assert len(result) == len(expected_result)
-    for res, expected_id in zip(result, expected_result):
+    for res, expected_id in zip(result, expected_result, strict=True):
         if expected_id is None:
             assert res is None
         else:

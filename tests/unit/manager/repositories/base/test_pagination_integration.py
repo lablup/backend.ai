@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import pytest
@@ -48,7 +48,7 @@ async def pagination_test_db(
                 {
                     "id": i,
                     "name": f"item-{i:03d}",
-                    "created_at": datetime.now(timezone.utc),
+                    "created_at": datetime.now(UTC),
                 }
                 for i in range(1, 101)
             ],

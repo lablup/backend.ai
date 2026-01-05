@@ -3,7 +3,7 @@ Tests for ScalingGroupService functionality.
 Tests the service layer with mocked repository operations.
 """
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -64,7 +64,7 @@ class TestScalingGroupService:
             ),
             metadata=ScalingGroupMetadata(
                 description="Default scaling group",
-                created_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
             ),
             network=ScalingGroupNetworkConfig(
                 wsproxy_addr="",
@@ -191,7 +191,7 @@ class TestScalingGroupService:
                 ),
                 metadata=ScalingGroupMetadata(
                     description=f"Scaling group {i}",
-                    created_at=datetime.now(),
+                    created_at=datetime.now(tz=UTC),
                 ),
                 network=ScalingGroupNetworkConfig(
                     wsproxy_addr="",

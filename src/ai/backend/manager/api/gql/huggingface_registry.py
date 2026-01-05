@@ -8,7 +8,7 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.api.gql.base import to_global_id
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
@@ -39,8 +39,8 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.list impo
 from ai.backend.manager.services.artifact_registry.actions.huggingface.update import (
     UpdateHuggingFaceRegistryAction,
 )
+from ai.backend.manager.types import OptionalState
 
-from ...types import OptionalState
 from .types import StrawberryGQLContext
 
 
@@ -63,7 +63,7 @@ class HuggingFaceRegistry(Node):
     @classmethod
     async def load_by_id(
         cls, ctx: StrawberryGQLContext, registry_ids: Sequence[uuid.UUID]
-    ) -> list["HuggingFaceRegistry"]:
+    ) -> list[HuggingFaceRegistry]:
         action_result = (
             await ctx.processors.artifact_registry.get_huggingface_registries.wait_for_complete(
                 GetHuggingFaceRegistriesAction(registry_ids=list(registry_ids))
@@ -119,10 +119,7 @@ async def huggingface_registries(
     )
 
     nodes = [HuggingFaceRegistry.from_dataclass(data) for data in action_result.data]
-    edges = [
-        HuggingFaceRegistryEdge(node=node, cursor=to_global_id(HuggingFaceRegistry, node.id))
-        for node in nodes
-    ]
+    edges = [HuggingFaceRegistryEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
     return HuggingFaceRegistryConnection(
         edges=edges,

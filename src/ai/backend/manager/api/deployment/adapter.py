@@ -87,11 +87,11 @@ from ai.backend.manager.repositories.deployment.options import (
 )
 
 __all__ = (
+    "CreateDeploymentAdapter",
+    "CreateRevisionAdapter",
     "DeploymentAdapter",
     "RevisionAdapter",
     "RouteAdapter",
-    "CreateDeploymentAdapter",
-    "CreateRevisionAdapter",
 )
 
 
@@ -180,10 +180,9 @@ class DeploymentAdapter(BaseFilterAdapter):
 
         if order.field == DeploymentOrderField.NAME:
             return DeploymentOrders.name(ascending=ascending)
-        elif order.field == DeploymentOrderField.CREATED_AT:
+        if order.field == DeploymentOrderField.CREATED_AT:
             return DeploymentOrders.created_at(ascending=ascending)
-        else:
-            raise ValueError(f"Unknown order field: {order.field}")
+        raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""
@@ -260,10 +259,9 @@ class RevisionAdapter(BaseFilterAdapter):
 
         if order.field == RevisionOrderField.NAME:
             return RevisionOrders.name(ascending=ascending)
-        elif order.field == RevisionOrderField.CREATED_AT:
+        if order.field == RevisionOrderField.CREATED_AT:
             return RevisionOrders.created_at(ascending=ascending)
-        else:
-            raise ValueError(f"Unknown order field: {order.field}")
+        raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""
@@ -339,12 +337,11 @@ class RouteAdapter(BaseFilterAdapter):
 
         if order.field == RouteOrderField.CREATED_AT:
             return RouteOrders.created_at(ascending=ascending)
-        elif order.field == RouteOrderField.STATUS:
+        if order.field == RouteOrderField.STATUS:
             return RouteOrders.status(ascending=ascending)
-        elif order.field == RouteOrderField.TRAFFIC_RATIO:
+        if order.field == RouteOrderField.TRAFFIC_RATIO:
             return RouteOrders.traffic_ratio(ascending=ascending)
-        else:
-            raise ValueError(f"Unknown order field: {order.field}")
+        raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""

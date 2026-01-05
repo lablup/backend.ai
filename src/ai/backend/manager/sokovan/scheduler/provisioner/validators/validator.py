@@ -89,5 +89,4 @@ class SchedulingValidator:
         if errors:
             if len(errors) == 1:
                 raise errors[0]
-            else:
-                raise MultipleValidationErrors(errors)
+            raise MultipleValidationErrors(errors)

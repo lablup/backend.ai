@@ -5,10 +5,11 @@ import enum
 import importlib
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence, Type, TypeAlias
+from typing import TYPE_CHECKING, Any, Optional, TypeAlias
 
 import attrs
 from aiohttp.typedefs import Middleware
@@ -41,11 +42,11 @@ class AgentBackend(enum.StrEnum):
 
 class AbstractAgentDiscovery(ABC):
     @abstractmethod
-    def get_agent_cls(self) -> Type[AbstractAgent]:
+    def get_agent_cls(self) -> type[AbstractAgent]:
         """
         Return the concrete implementation class of AbstactAgent for the backend.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @abstractmethod
     async def load_resources(
@@ -58,7 +59,7 @@ class AbstractAgentDiscovery(ABC):
 
         limit_cpus, limit_gpus are deprecated.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @abstractmethod
     async def scan_available_resources(
@@ -68,7 +69,7 @@ class AbstractAgentDiscovery(ABC):
         """
         Detect available computing resource of the system.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @abstractmethod
     async def prepare_krunner_env(self, local_config: Mapping[str, Any]) -> Mapping[str, str]:
@@ -77,7 +78,7 @@ class AbstractAgentDiscovery(ABC):
         If not, automatically create it and update its content from the packaged pre-built krunner
         tar archives.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 def get_agent_discovery(backend: AgentBackend) -> AbstractAgentDiscovery:
@@ -176,7 +177,7 @@ class ContainerLifecycleEvent:
     exit_code: Optional[int] = None
     suppress_events: bool = False
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.container_id:
             cid = self.container_id[:13]
         else:
@@ -214,11 +215,11 @@ class KernelOwnershipData:
     owner_user_id: Optional[uuid.UUID] = None
     owner_project_id: Optional[uuid.UUID] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         def to_uuid(value: Optional[str | uuid.UUID]) -> Optional[uuid.UUID]:
             if value is None:
                 return None
-            elif isinstance(value, uuid.UUID):
+            if isinstance(value, uuid.UUID):
                 return value
             return uuid.UUID(value)
 

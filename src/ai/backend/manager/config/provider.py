@@ -1,6 +1,7 @@
 import asyncio
 import logging
-from typing import Awaitable, Callable, Self
+from collections.abc import Awaitable, Callable
+from typing import Self
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.loader.loader_chain import LoaderChain
