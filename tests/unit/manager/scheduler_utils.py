@@ -8,6 +8,7 @@ from collections.abc import (
 )
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from itertools import islice
 from typing import (
     Any,
     Final,
@@ -176,7 +177,7 @@ def create_mock_session(
                 local_rank=local_rank,
             )
             for kopt, (role_name, role_idx, local_rank) in zip(
-                kernel_opts, generate_role(), strict=True
+                kernel_opts, islice(generate_role(), len(kernel_opts)), strict=True
             )
         ],
         priority=priority,
