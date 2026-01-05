@@ -141,5 +141,5 @@ class ScalingGroupDBSource:
         async with self._db.begin_session() as session:
             result = await execute_updater(session, updater)
             if result is None:
-                raise ScalingGroupNotFound(f"Scaling group not found: {updater.pk_value}")
+                raise ScalingGroupNotFound(f"Scaling group not found (name:{updater.pk_value})")
             return result.row.to_dataclass()
