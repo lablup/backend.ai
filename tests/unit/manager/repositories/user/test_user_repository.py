@@ -7,11 +7,9 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.types import BinarySize
@@ -24,23 +22,43 @@ from ai.backend.manager.errors.user import (
     UserModificationBadRequest,
     UserNotFound,
 )
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import (
+    AssociationScopesEntitiesRow,
+    PermissionGroupRow,
+    PermissionRow,
+    RoleRow,
+    UserRoleRow,
+)
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.types import OptionalState
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.db import with_tables
 
 
 def create_test_password_info(password: str = "test_password") -> PasswordInfo:
@@ -59,19 +77,40 @@ class TestUserRepository:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         """Database engine that auto-cleans test data after each test"""
-        try:
-            yield database_engine
-        finally:
-            # Cleanup in FK-safe order
-            async with database_engine.begin_session() as db_sess:
-                await db_sess.execute(sa.delete(KeyPairRow))
-                await db_sess.execute(sa.delete(UserRow))
-                await db_sess.execute(sa.delete(UserResourcePolicyRow))
-                await db_sess.execute(sa.delete(DomainRow))
-                await db_sess.execute(sa.delete(KeyPairResourcePolicyRow))
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents before children
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                RoleRow,
+                PermissionGroupRow,
+                PermissionRow,
+                UserRoleRow,
+                AssociationScopesEntitiesRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def default_keypair_resource_policy(
@@ -398,7 +437,7 @@ class TestUserRepository:
             )
         )
 
-        with pytest.raises(UserCreationBadRequest, match="Domain.*does not exist"):
+        with pytest.raises(UserCreationBadRequest, match=r"Domain.*does not exist"):
             await user_repository.create_user_validated(creator_bad_domain, group_ids=[])
 
         # Test 2: User with same email already exists
@@ -423,7 +462,7 @@ class TestUserRepository:
             )
         )
 
-        with pytest.raises(UserConflict, match="User with email.*or username.*already exists"):
+        with pytest.raises(UserConflict, match=r"User with email.*or username.*already exists"):
             await user_repository.create_user_validated(creator_dup_email, group_ids=[])
 
         # Test 3: User with same username already exists
@@ -448,7 +487,7 @@ class TestUserRepository:
             )
         )
 
-        with pytest.raises(UserConflict, match="User with email.*or username.*already exists"):
+        with pytest.raises(UserConflict, match=r"User with email.*or username.*already exists"):
             await user_repository.create_user_validated(creator_dup_username, group_ids=[])
 
     # ============ Update User Tests ============
@@ -517,7 +556,7 @@ class TestUserRepository:
         updater = Updater(spec=updater_spec, pk_value=sample_user_row.email)
 
         with pytest.raises(
-            UserModificationBadRequest, match="Username.*is already taken by another user"
+            UserModificationBadRequest, match=r"Username.*is already taken by another user"
         ):
             await user_repository.update_user_validated(
                 email=sample_user_row.email,
@@ -536,7 +575,7 @@ class TestUserRepository:
         )
         updater = Updater(spec=updater_spec, pk_value=sample_user_row.email)
 
-        with pytest.raises(UserModificationBadRequest, match="Domain.*does not exist"):
+        with pytest.raises(UserModificationBadRequest, match=r"Domain.*does not exist"):
             await user_repository.update_user_validated(
                 email=sample_user_row.email,
                 updater=updater,
@@ -554,7 +593,7 @@ class TestUserRepository:
         )
         updater = Updater(spec=updater_spec, pk_value=sample_user_row.email)
 
-        with pytest.raises(UserModificationBadRequest, match="Resource policy.*does not exist"):
+        with pytest.raises(UserModificationBadRequest, match=r"Resource policy.*does not exist"):
             await user_repository.update_user_validated(
                 email=sample_user_row.email,
                 updater=updater,
