@@ -4,9 +4,12 @@ Re-exports all public APIs for backward compatibility.
 """
 
 from .creator import (
+    BulkCreator,
+    BulkCreatorResult,
     Creator,
     CreatorResult,
     CreatorSpec,
+    execute_bulk_creator,
     execute_creator,
 )
 from .pagination import (
@@ -83,6 +86,10 @@ __all__ = [
     "Creator",
     "CreatorResult",
     "execute_creator",
+    # BulkCreator
+    "BulkCreator",
+    "BulkCreatorResult",
+    "execute_bulk_creator",
     # Updater
     "UpdaterSpec",
     "Updater",
