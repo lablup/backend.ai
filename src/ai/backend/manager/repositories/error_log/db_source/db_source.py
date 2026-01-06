@@ -8,7 +8,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.error_log.types import ErrorLogData
-from ai.backend.manager.models.error_log import ErrorLogRow
+from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.repositories.base import (
     Creator,
     execute_creator,

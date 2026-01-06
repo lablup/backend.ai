@@ -10,7 +10,7 @@ from ai.backend.manager.repositories.base import Creator
 from .base import ErrorLogAction
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.error_log import ErrorLogRow
+    from ai.backend.manager.models.error_logs import ErrorLogRow
 
 
 @dataclass

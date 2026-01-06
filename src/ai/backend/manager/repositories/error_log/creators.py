@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, override
 
-from ai.backend.manager.models.error_log import ErrorLogRow
+from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.repositories.base import CreatorSpec
 
 if TYPE_CHECKING:
