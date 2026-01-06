@@ -18,8 +18,5 @@ WORKDIR /app
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Expose the manager service port
-EXPOSE 8091
-
 # Set the default command to run the entrypoint script
 CMD ["/app/entrypoint.sh"]
