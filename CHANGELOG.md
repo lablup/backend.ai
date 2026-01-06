@@ -95,6 +95,7 @@ Implemented Scaling Group creation action with the Creator pattern.
 ### Security Fixes
 Security vulnerability fixes and hardening were applied.
 
+* **CVE-2025-49651**: Clarified that direct access to compute nodes via port scanning is not a software vulnerability but requires proper network isolation as part of deployment architecture. Backend.AI is designed to operate with compute nodes in network-isolated environments where inbound access is restricted to App Proxy components only. Added comprehensive documentation on required network security configuration ([#7587](https://github.com/lablup/backend.ai/issues/7587))
 * **CVE-2025-49652**: Change default signup status to inactive, preventing newly registered accounts from accessing system resources until an administrator explicitly activates them ([#7520](https://github.com/lablup/backend.ai/issues/7520))
 
 ### Improvements
