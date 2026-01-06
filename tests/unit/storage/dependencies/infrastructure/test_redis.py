@@ -32,6 +32,8 @@ class TestRedisProvider:
         config.etcd = EtcdConfig(
             addr=HostPortPair(host=etcd_addr.host, port=etcd_addr.port),
             namespace=test_ns,
+            user=None,
+            password=None,
         )
         return config
 

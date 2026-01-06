@@ -5,7 +5,7 @@ from typing import Annotated
 import pytest
 from pydantic import BaseModel, Field
 
-from ai.backend.common.configs.meta import (
+from ai.backend.common.meta import (
     BackendAIAPIMeta,
     BackendAIConfigMeta,
     BackendAIFieldMeta,
