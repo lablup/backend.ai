@@ -10,6 +10,63 @@ Created: 2026-01-06
 
 Currently, when users import artifacts via the `import_artifacts` GraphQL mutation, the download destination is determined by the pre-configured `artifact_storage` in the system settings. This limits flexibility as users cannot choose where to store their imported models.
 
+### Current Structure
+
+The current artifact import flow works as follows:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              Client (WebUI)                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │ import_artifacts(artifactRevisionIds)
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                 Manager                                     │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  ArtifactRevisionService.import_revision()                            │  │
+│  │    1. Load artifact & revision data from DB                           │  │
+│  │    2. Read reservoir_config from settings                             │  │
+│  │    3. Resolve storage_host from artifact_storage config               │  │
+│  │    4. Build storage_step_mappings (DOWNLOAD, VERIFY, ARCHIVE)         │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │ POST /import (with storage_step_mappings)
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                             Storage Proxy                                   │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  Import Pipeline                                                      │  │
+│  │    1. DOWNLOAD: Fetch model from external registry (HuggingFace/etc)  │  │
+│  │    2. VERIFY: Run verification (malware scan, etc.)                   │  │
+│  │    3. ARCHIVE: Store to final destination                             │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                      │                                      │
+│                                      ▼                                      │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  StoragePool                                                          │  │
+│  │    ├── VFSStorage (pre-configured from config file)                   │  │
+│  │    └── ObjectStorage (pre-configured from config file)                │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         artifact_storage (destination)                      │
+│                                                                             │
+│   Pre-configured in storage-proxy.toml:                                     │
+│   ┌─────────────────────┐    or    ┌─────────────────────┐                  │
+│   │  VFS Storage        │          │  Object Storage     │                  │
+│   │  /path/to/artifacts │          │  s3://bucket/...    │                  │
+│   └─────────────────────┘          └─────────────────────┘                  │
+│                                                                             │
+│   ⚠️  Cannot download directly to user's VFolder                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Limitation**: Models cannot be downloaded directly to user VFolders, which limits direct integration with Backend.AI's compute sessions and model serving features.
+
 ### Use Case: Model Store Integration
 
 On the Model Store page, users need the ability to download models directly to their own vfolders:
