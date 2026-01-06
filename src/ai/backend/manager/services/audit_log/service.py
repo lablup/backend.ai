@@ -22,6 +22,5 @@ class AuditLogService:
         self._audit_log_repository = audit_log_repository
 
     async def create(self, action: CreateAuditLogAction) -> CreateAuditLogActionResult:
-        log.info("Creating audit log entry")
         data = await self._audit_log_repository.create(action.creator)
         return CreateAuditLogActionResult(audit_log_id=data.id)
