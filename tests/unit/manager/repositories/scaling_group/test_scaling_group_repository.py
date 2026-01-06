@@ -786,46 +786,44 @@ class TestScalingGroupRepositoryDB:
         )
         assert association_exists is True
 
+    @pytest.fixture
+    async def sample_scaling_group_with_domain_association(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_scaling_group_for_association: str,
+        sample_domain: str,
+    ) -> AsyncGenerator[tuple[str, str], None]:
+        """Create a scaling group with a single domain association for testing"""
+        async with db_with_cleanup.begin_session() as db_sess:
+            association = ScalingGroupForDomainRow(
+                scaling_group=sample_scaling_group_for_association,
+                domain=sample_domain,
+            )
+            db_sess.add(association)
+
+        yield sample_scaling_group_for_association, sample_domain
+
     # Disassociate Tests
     async def test_disassociate_scaling_group_with_domains_success(
         self,
         scaling_group_repository: ScalingGroupRepository,
-        sample_scaling_group_for_association: str,
-        sample_domain: str,
+        sample_scaling_group_with_domain_association: tuple[str, str],
     ) -> None:
-        """Test disassociating a scaling group from domains"""
-        # First, associate the scaling group with the domain
-        bulk_creator = BulkCreator(
-            specs=[
-                ScalingGroupForDomainCreatorSpec(
-                    scaling_group=sample_scaling_group_for_association,
-                    domain=sample_domain,
-                )
-            ]
-        )
-        await scaling_group_repository.associate_scaling_group_with_domains(bulk_creator)
-
-        # Verify association exists using repository method
-        association_exists = (
-            await scaling_group_repository.check_scaling_group_domain_association_exists(
-                scaling_group=sample_scaling_group_for_association,
-                domain=sample_domain,
-            )
-        )
-        assert association_exists is True
+        """Test disassociating a scaling group from a domain"""
+        scaling_group, domain = sample_scaling_group_with_domain_association
 
         # Disassociate the scaling group from the domain
         purger = create_scaling_group_for_domain_purger(
-            scaling_group=sample_scaling_group_for_association,
-            domain=sample_domain,
+            scaling_group=scaling_group,
+            domain=domain,
         )
         await scaling_group_repository.disassociate_scaling_group_with_domains(purger)
 
-        # Verify association is removed using repository method
+        # Verify association is removed
         association_exists = (
             await scaling_group_repository.check_scaling_group_domain_association_exists(
-                scaling_group=sample_scaling_group_for_association,
-                domain=sample_domain,
+                scaling_group=scaling_group,
+                domain=domain,
             )
         )
         assert association_exists is False
