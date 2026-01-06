@@ -938,19 +938,17 @@ class _StmtWithConditions:
 def _apply_filter_conditions(
     stmt: sa.sql.Select,
     orm_class,
-    filter_expr: FilterExprArg | None,
+    filter_expr: FilterExprArg,
 ) -> _StmtWithConditions:
     """
     Filter conditions should be applied to both the main query statement and the count statement,
     as they define which items are included in the result set regardless of pagination.
     """
     filter_conditions: list[WhereClauseType] = []
-
-    if filter_expr is not None:
-        condition_parser = filter_expr.parser
-        filter_cond = condition_parser.parse_filter(orm_class, filter_expr.expr)
-        filter_conditions.append(filter_cond)
-        stmt = stmt.where(filter_cond)
+    condition_parser = filter_expr.parser
+    filter_cond = condition_parser.parse_filter(orm_class, filter_expr.expr)
+    filter_conditions.append(filter_cond)
+    stmt = stmt.where(filter_cond)
 
     return _StmtWithConditions(stmt, filter_conditions)
 
@@ -1053,7 +1051,7 @@ def _build_sql_stmt_from_connection_args(
         parser = order_expr.parser
         ordering_item_list = parser.parse_order(orm_class, order_expr.expr)
 
-    # ===== Apply ORDER BY for cursor-based pagination =====
+    # Apply ORDER BY for cursor-based pagination
     match pagination_order:
         case ConnectionPaginationOrder.FORWARD | None:
             # Default ordering by id column (ascending for forward pagination)
@@ -1073,11 +1071,14 @@ def _build_sql_stmt_from_connection_args(
     for col, direction in [*ordering_item_list, id_ordering_item]:
         stmt = stmt.order_by(set_ordering(col, direction))
 
-    # Apply filter conditions (to both stmt and count_stmt)
-    filter_result = _apply_filter_conditions(stmt, orm_class, filter_expr)
-    stmt = filter_result.stmt
-    for cond in filter_result.conditions:
-        count_stmt = count_stmt.where(cond)
+    # Apply filter conditions
+    filter_conditions = []
+    if filter_expr is not None:
+        filter_result = _apply_filter_conditions(stmt, orm_class, filter_expr)
+        stmt = filter_result.stmt
+        for cond in filter_result.conditions:
+            count_stmt = count_stmt.where(cond)
+        filter_conditions = filter_result.conditions
 
     # Apply cursor pagination WHERE conditions (to stmt only)
     cursor_result = _apply_cursor_pagination(
@@ -1089,7 +1090,7 @@ def _build_sql_stmt_from_connection_args(
     if requested_page_size is not None:
         stmt = stmt.limit(requested_page_size + 1)
 
-    return stmt, count_stmt, [*filter_result.conditions, *cursor_result.conditions]
+    return stmt, count_stmt, [*filter_conditions, *cursor_result.conditions]
 
 
 def _build_sql_stmt_from_sql_arg(
