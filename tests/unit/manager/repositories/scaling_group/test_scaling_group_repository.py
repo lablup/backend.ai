@@ -41,7 +41,14 @@ from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
-from ai.backend.manager.repositories.scaling_group.updaters import ScalingGroupUpdaterSpec
+from ai.backend.manager.repositories.scaling_group.updaters import (
+    ScalingGroupDriverConfigUpdaterSpec,
+    ScalingGroupMetadataUpdaterSpec,
+    ScalingGroupNetworkConfigUpdaterSpec,
+    ScalingGroupSchedulerConfigUpdaterSpec,
+    ScalingGroupStatusUpdaterSpec,
+    ScalingGroupUpdaterSpec,
+)
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 
@@ -128,21 +135,58 @@ class TestScalingGroupRepositoryDB:
         use_host_network: Optional[OptionalState[bool]] = None,
     ) -> Updater[ScalingGroupRow]:
         """Create a ScalingGroupUpdaterSpec with the given parameters."""
+        # Build sub-specs only if any of their fields are provided
+        status_spec: ScalingGroupStatusUpdaterSpec | None = None
+        if is_active is not None or is_public is not None:
+            status_spec = ScalingGroupStatusUpdaterSpec(
+                is_active=is_active if is_active is not None else OptionalState.nop(),
+                is_public=is_public if is_public is not None else OptionalState.nop(),
+            )
+
+        metadata_spec: ScalingGroupMetadataUpdaterSpec | None = None
+        if description is not None:
+            metadata_spec = ScalingGroupMetadataUpdaterSpec(
+                description=description,
+            )
+
+        network_spec: ScalingGroupNetworkConfigUpdaterSpec | None = None
+        if (
+            wsproxy_addr is not None
+            or wsproxy_api_token is not None
+            or use_host_network is not None
+        ):
+            network_spec = ScalingGroupNetworkConfigUpdaterSpec(
+                wsproxy_addr=wsproxy_addr if wsproxy_addr is not None else TriState.nop(),
+                wsproxy_api_token=(
+                    wsproxy_api_token if wsproxy_api_token is not None else TriState.nop()
+                ),
+                use_host_network=(
+                    use_host_network if use_host_network is not None else OptionalState.nop()
+                ),
+            )
+
+        driver_spec: ScalingGroupDriverConfigUpdaterSpec | None = None
+        if driver is not None or driver_opts is not None:
+            driver_spec = ScalingGroupDriverConfigUpdaterSpec(
+                driver=driver if driver is not None else OptionalState.nop(),
+                driver_opts=driver_opts if driver_opts is not None else OptionalState.nop(),
+            )
+
+        scheduler_spec: ScalingGroupSchedulerConfigUpdaterSpec | None = None
+        if scheduler is not None or scheduler_opts is not None:
+            scheduler_spec = ScalingGroupSchedulerConfigUpdaterSpec(
+                scheduler=scheduler if scheduler is not None else OptionalState.nop(),
+                scheduler_opts=scheduler_opts
+                if scheduler_opts is not None
+                else OptionalState.nop(),
+            )
+
         spec = ScalingGroupUpdaterSpec(
-            description=description if description is not None else TriState.nop(),
-            is_active=is_active if is_active is not None else OptionalState.nop(),
-            is_public=is_public if is_public is not None else OptionalState.nop(),
-            wsproxy_addr=wsproxy_addr if wsproxy_addr is not None else TriState.nop(),
-            wsproxy_api_token=(
-                wsproxy_api_token if wsproxy_api_token is not None else TriState.nop()
-            ),
-            driver=driver if driver is not None else OptionalState.nop(),
-            driver_opts=driver_opts if driver_opts is not None else OptionalState.nop(),
-            scheduler=scheduler if scheduler is not None else OptionalState.nop(),
-            scheduler_opts=scheduler_opts if scheduler_opts is not None else OptionalState.nop(),
-            use_host_network=(
-                use_host_network if use_host_network is not None else OptionalState.nop()
-            ),
+            status=status_spec,
+            metadata=metadata_spec,
+            network=network_spec,
+            driver=driver_spec,
+            scheduler=scheduler_spec,
         )
         return Updater(spec=spec, pk_value=name)
 
