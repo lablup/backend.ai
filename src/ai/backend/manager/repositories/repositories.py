@@ -7,6 +7,7 @@ from ai.backend.manager.repositories.artifact.repositories import ArtifactReposi
 from ai.backend.manager.repositories.artifact_registry.repositories import (
     ArtifactRegistryRepositories,
 )
+from ai.backend.manager.repositories.audit_log.repositories import AuditLogRepositories
 from ai.backend.manager.repositories.auth.repositories import AuthRepositories
 from ai.backend.manager.repositories.container_registry.repositories import (
     ContainerRegistryRepositories,
@@ -86,6 +87,7 @@ class Repositories:
     artifact: ArtifactRepositories
     artifact_registry: ArtifactRegistryRepositories
     storage_namespace: StorageNamespaceRepositories
+    audit_log: AuditLogRepositories
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
@@ -119,6 +121,7 @@ class Repositories:
         huggingface_registry_repositories = HuggingFaceRegistryRepositories.create(args)
         artifact_registries = ArtifactRegistryRepositories.create(args)
         storage_namespace_repositories = StorageNamespaceRepositories.create(args)
+        audit_log_repositories = AuditLogRepositories.create(args)
 
         return cls(
             agent=agent_repositories,
@@ -151,4 +154,5 @@ class Repositories:
             artifact=artifact_repositories,
             artifact_registry=artifact_registries,
             storage_namespace=storage_namespace_repositories,
+            audit_log=audit_log_repositories,
         )

@@ -9,6 +9,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.audit_log import AuditLogRow
 from ai.backend.manager.repositories.audit_log import AuditLogCreatorSpec, AuditLogRepository
 from ai.backend.manager.repositories.base import Creator
@@ -43,18 +44,22 @@ class TestAuditLogRepository:
         statuses = [OperationStatus.SUCCESS, OperationStatus.ERROR, OperationStatus.RUNNING]
 
         for i, status in enumerate(statuses):
-            creator = Creator(
-                spec=AuditLogCreatorSpec(
-                    action_id=uuid.uuid4(),
-                    entity_type="agent",
-                    operation=f"operation_{i}",
-                    created_at=now,
-                    description=f"Operation {i}",
-                    status=status,
-                )
+            data = AuditLogData(
+                id=uuid.uuid4(),
+                action_id=uuid.uuid4(),
+                entity_type="agent",
+                operation=f"operation_{i}",
+                created_at=now,
+                description=f"Operation {i}",
+                status=status,
+                entity_id=None,
+                request_id=None,
+                triggered_by=None,
+                duration=None,
             )
-            row = await audit_log_repository.create(creator)
-            assert row.status == status
+            creator = Creator(spec=AuditLogCreatorSpec(data))
+            result = await audit_log_repository.create(creator)
+            assert result.status == status
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             result = await db_sess.execute(sa.select(sa.func.count()).select_from(AuditLogRow))
