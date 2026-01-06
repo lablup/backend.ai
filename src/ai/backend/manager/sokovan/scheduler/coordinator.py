@@ -32,21 +32,25 @@ from ai.backend.manager.types import DistributedLockFactory
 
 from .handlers import (
     CheckCreatingProgressHandler,
+    CheckCreatingProgressLifecycleHandler,
     CheckPreconditionHandler,
     CheckPullingProgressHandler,
+    CheckPullingProgressLifecycleHandler,
     CheckRunningSessionTerminationHandler,
+    CheckRunningSessionTerminationLifecycleHandler,
     CheckTerminatingProgressHandler,
+    CheckTerminatingProgressLifecycleHandler,
     RetryCreatingHandler,
     RetryPreparingHandler,
     SchedulerHandler,
     ScheduleSessionsHandler,
+    SessionLifecycleHandler,
     StartSessionsHandler,
     SweepLostAgentKernelsHandler,
     SweepSessionsHandler,
     SweepStaleKernelsHandler,
     TerminateSessionsHandler,
 )
-from .handlers.base import SessionLifecycleHandler
 from .kernel import KernelStateEngine
 from .recorder import RecorderContext
 from .results import SessionExecutionResult
@@ -186,8 +190,32 @@ class ScheduleCoordinator:
         - Handler executes business logic and returns successes/failures/stales
         - Coordinator applies status transitions based on handler's declared statuses
         """
-        # Currently empty - handlers will be migrated from _schedule_handlers progressively
-        return {}
+        # Get hook registry from scheduler for handlers that need it
+        hook_registry = self._scheduler._hook_registry
+
+        return {
+            ScheduleType.CHECK_PULLING_PROGRESS: CheckPullingProgressLifecycleHandler(
+                self._event_producer,
+            ),
+            ScheduleType.CHECK_CREATING_PROGRESS: CheckCreatingProgressLifecycleHandler(
+                self._scheduling_controller,
+                self._event_producer,
+                self._repository,
+                hook_registry,
+            ),
+            ScheduleType.CHECK_TERMINATING_PROGRESS: CheckTerminatingProgressLifecycleHandler(
+                self._scheduling_controller,
+                self._event_producer,
+                self._repository,
+                hook_registry,
+            ),
+            ScheduleType.CHECK_RUNNING_SESSION_TERMINATION: (
+                CheckRunningSessionTerminationLifecycleHandler(
+                    self._valkey_schedule,
+                    self._repository,
+                )
+            ),
+        }
 
     async def process_lifecycle_schedule(
         self,
