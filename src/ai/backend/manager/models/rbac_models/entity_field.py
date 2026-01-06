@@ -14,12 +14,12 @@ class EntityFieldRow(Base):
         sa.UniqueConstraint(
             "entity_type",
             "entity_id",
-            "ref_entity_type",
-            "ref_entity_id",
+            "field_type",
+            "field_id",
             name="uq_entity_fields_mapping",
         ),
         sa.Index("ix_entity_fields_entity_lookup", "entity_type", "entity_id"),
-        sa.Index("ix_entity_fields_ref_lookup", "ref_entity_type", "ref_entity_id"),
+        sa.Index("ix_entity_fields_field_lookup", "field_type", "field_id"),
     )
 
     id = IDColumn()
@@ -34,13 +34,13 @@ class EntityFieldRow(Base):
         sa.String(64),
         nullable=False,
     )
-    ref_entity_type = sa.Column(
-        "ref_entity_type",
+    field_type = sa.Column(
+        "field_type",
         sa.String(64),
         nullable=False,
     )
-    ref_entity_id = sa.Column(
-        "ref_entity_id",
+    field_id = sa.Column(
+        "field_id",
         sa.String(64),
         nullable=False,
     )

@@ -1,4 +1,4 @@
-"""add-entity_fields table
+"""add entity_fields table
 
 Revision ID: d86417a6bf7b
 Revises: d0a3c0716970
@@ -24,8 +24,8 @@ def upgrade() -> None:
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
         sa.Column("entity_type", sa.String(length=64), nullable=False),
         sa.Column("entity_id", sa.String(length=64), nullable=False),
-        sa.Column("ref_entity_type", sa.String(length=64), nullable=False),
-        sa.Column("ref_entity_id", sa.String(length=64), nullable=False),
+        sa.Column("field_type", sa.String(length=64), nullable=False),
+        sa.Column("field_id", sa.String(length=64), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -36,8 +36,8 @@ def upgrade() -> None:
         sa.UniqueConstraint(
             "entity_type",
             "entity_id",
-            "ref_entity_type",
-            "ref_entity_id",
+            "field_type",
+            "field_id",
             name="uq_entity_fields_mapping",
         ),
     )
@@ -47,13 +47,13 @@ def upgrade() -> None:
         ["entity_type", "entity_id"],
     )
     op.create_index(
-        "ix_entity_fields_ref_lookup",
+        "ix_entity_fields_field_lookup",
         "entity_fields",
-        ["ref_entity_type", "ref_entity_id"],
+        ["field_type", "field_id"],
     )
 
 
 def downgrade() -> None:
-    op.drop_index("ix_entity_fields_ref_lookup", table_name="entity_fields")
+    op.drop_index("ix_entity_fields_field_lookup", table_name="entity_fields")
     op.drop_index("ix_entity_fields_entity_lookup", table_name="entity_fields")
     op.drop_table("entity_fields")
