@@ -43,7 +43,6 @@ class EtcdConfig(BaseConfigSchema):
             ),
             added_version="22.03.0",
             example=ConfigExample(local="127.0.0.1:2379", prod="etcd-cluster:2379"),
-            composite=True,
         ),
     ]
     user: Annotated[
