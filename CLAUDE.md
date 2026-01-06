@@ -27,6 +27,42 @@ Update README when:
 Example: Adding a new service → Read `services/README.md` → Follow patterns → Update service index
 
 
+## BEP-First Development
+
+**For significant new features, check BEP (Backend.AI Enhancement Proposals) first.**
+
+BEP documents define architectural decisions, API designs, and implementation strategies for major features.
+
+### Before Starting Development
+
+1. Read `proposals/README.md` for the BEP process overview
+2. Check the BEP Number Registry table for existing proposals related to your work
+3. If a relevant BEP exists:
+   - Read the BEP document in `proposals/BEP-XXXX-*.md`
+   - Follow the design decisions and implementation plans documented
+4. If no BEP exists for a significant feature:
+   - **Do not start implementation** until the BEP is created and discussed
+   - Reserve a BEP number in the registry
+   - Create the BEP document using the template at `proposals/BEP-0000-template.md`
+   - Submit a PR and discuss with maintainers
+
+### When BEP is Required
+
+- New subsystems or major components
+- Significant API changes or additions
+- Architectural changes affecting multiple packages
+- New integrations with external systems
+- Changes to core workflows (scheduling, storage, etc.)
+
+### When BEP is NOT Required
+
+- Bug fixes
+- Minor enhancements to existing features
+- Refactoring without behavioral changes
+- Documentation updates
+- Test additions
+
+
 ## General
 
 ### Tidy First Approach
