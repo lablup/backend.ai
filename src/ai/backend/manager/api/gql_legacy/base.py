@@ -958,76 +958,74 @@ def _apply_cursor_pagination(
     stmt: sa.sql.Select,
     id_column: sa.Column,
     ordering_item_list: list[OrderingItem],
-    connection_args: ConnectionArgs,
+    cursor_id: str,
+    pagination_order: ConnectionPaginationOrder | None,
 ) -> _StmtWithConditions:
     """
     Apply cursor-based pagination WHERE conditions to the statement.
     """
     cursor_conditions: list[WhereClauseType] = []
-    cursor_id, pagination_order, _ = connection_args
+    _, cursor_row_id_str = AsyncNode.resolve_global_id(info, cursor_id)
 
-    if cursor_id is not None:
-        _, cursor_row_id_str = AsyncNode.resolve_global_id(info, cursor_id)
+    cursor_row_id: UUID | str
+    try:
+        cursor_row_id = uuid.UUID(cursor_row_id_str)
+    except (ValueError, AttributeError):
+        # Fall back to string if not a valid UUID (for other ID types)
+        cursor_row_id = cursor_row_id_str
 
-        cursor_row_id: UUID | str
-        try:
-            cursor_row_id = uuid.UUID(cursor_row_id_str)
-        except (ValueError, AttributeError):
-            # Fall back to string if not a valid UUID (for other ID types)
-            cursor_row_id = cursor_row_id_str
+    def subq_to_condition(
+        column_to_be_compared: InstrumentedAttribute,
+        subquery: ScalarSelect,
+        direction: OrderDirection,
+    ) -> WhereClauseType:
+        """Generate cursor condition for a specific ordering column.
 
-        def subq_to_condition(
-            column_to_be_compared: InstrumentedAttribute,
-            subquery: ScalarSelect,
-            direction: OrderDirection,
-        ) -> WhereClauseType:
-            """Generate cursor condition for a specific ordering column.
+        This handles cursor conditions when explicit order_expr is provided.
+        For example, if ordering by "created_at DESC", this ensures we only get items
+        where created_at < cursor_created_at, or where created_at = cursor_created_at but id < cursor_id.
+        """
+        match pagination_order:
+            case ConnectionPaginationOrder.FORWARD | None:
+                if direction == OrderDirection.ASC:
+                    cond = column_to_be_compared > subquery
+                else:
+                    cond = column_to_be_compared < subquery
 
-            This handles cursor conditions when explicit order_expr is provided.
-            For example, if ordering by "created_at DESC", this ensures we only get items
-            where created_at < cursor_created_at, or where created_at = cursor_created_at but id < cursor_id.
-            """
-            match pagination_order:
-                case ConnectionPaginationOrder.FORWARD | None:
-                    if direction == OrderDirection.ASC:
-                        cond = column_to_be_compared > subquery
-                    else:
-                        cond = column_to_be_compared < subquery
+                # Comparing ID field - The direction of inequality sign is not affected by `direction` argument here
+                # because the ordering direction of ID field is always determined by `pagination_order` only.
+                condition_when_same_with_subq = (column_to_be_compared == subquery) & (
+                    id_column > cursor_row_id
+                )
+            case ConnectionPaginationOrder.BACKWARD:
+                if direction == OrderDirection.ASC:
+                    cond = column_to_be_compared < subquery
+                else:
+                    cond = column_to_be_compared > subquery
+                condition_when_same_with_subq = (column_to_be_compared == subquery) & (
+                    id_column < cursor_row_id
+                )
 
-                    # Comparing ID field - The direction of inequality sign is not affected by `direction` argument here
-                    # because the ordering direction of ID field is always determined by `pagination_order` only.
-                    condition_when_same_with_subq = (column_to_be_compared == subquery) & (
-                        id_column > cursor_row_id
-                    )
-                case ConnectionPaginationOrder.BACKWARD:
-                    if direction == OrderDirection.ASC:
-                        cond = column_to_be_compared < subquery
-                    else:
-                        cond = column_to_be_compared > subquery
-                    condition_when_same_with_subq = (column_to_be_compared == subquery) & (
-                        id_column < cursor_row_id
-                    )
+        return cond | condition_when_same_with_subq
 
-            return cond | condition_when_same_with_subq
+    # Add cursor conditions for explicit ordering columns (if any)
+    for col, direction in ordering_item_list:
+        subq = sa.select(col).where(id_column == cursor_row_id).scalar_subquery()
+        cursor_conditions.append(subq_to_condition(col, subq, direction))
 
-        # Add cursor conditions for explicit ordering columns (if any)
-        for col, direction in ordering_item_list:
-            subq = sa.select(col).where(id_column == cursor_row_id).scalar_subquery()
-            cursor_conditions.append(subq_to_condition(col, subq, direction))
+    # Add id-based cursor WHERE condition ONLY when no explicit ordering is provided.
+    # This is CRITICAL for pagination to work when no explicit order_expr is provided.
+    # When ordering_item_list is not empty, the id condition is already embedded
+    # in the ordering cursor conditions above (via condition_when_same_with_subq).
+    if not ordering_item_list:
+        match pagination_order:
+            case ConnectionPaginationOrder.FORWARD | None:
+                cursor_conditions.append(id_column > cursor_row_id)
+            case ConnectionPaginationOrder.BACKWARD:
+                cursor_conditions.append(id_column < cursor_row_id)
 
-        # Add id-based cursor WHERE condition ONLY when no explicit ordering is provided.
-        # This is CRITICAL for pagination to work when no explicit order_expr is provided.
-        # When ordering_item_list is not empty, the id condition is already embedded
-        # in the ordering cursor conditions above (via condition_when_same_with_subq).
-        if not ordering_item_list:
-            match pagination_order:
-                case ConnectionPaginationOrder.FORWARD | None:
-                    cursor_conditions.append(id_column > cursor_row_id)
-                case ConnectionPaginationOrder.BACKWARD:
-                    cursor_conditions.append(id_column < cursor_row_id)
-
-        for cond in cursor_conditions:
-            stmt = stmt.where(cond)
+    for cond in cursor_conditions:
+        stmt = stmt.where(cond)
 
     return _StmtWithConditions(stmt, cursor_conditions)
 
@@ -1082,16 +1080,20 @@ def _build_sql_stmt_from_connection_args(
         filter_conditions = filter_result.conditions
 
     # Apply cursor pagination WHERE conditions (to stmt only)
-    cursor_result = _apply_cursor_pagination(
-        info, stmt, id_column, ordering_item_list, connection_args
-    )
-    stmt = cursor_result.stmt
+    cursor_conditions = []
+    cursor_id, pagination_order, _ = connection_args
+    if cursor_id is not None:
+        cursor_result = _apply_cursor_pagination(
+            info, stmt, id_column, ordering_item_list, cursor_id, pagination_order
+        )
+        stmt = cursor_result.stmt
+        cursor_conditions = cursor_result.conditions
 
     # Apply LIMIT (to stmt only)
     if requested_page_size is not None:
         stmt = stmt.limit(requested_page_size + 1)
 
-    return stmt, count_stmt, [*filter_conditions, *cursor_result.conditions]
+    return stmt, count_stmt, [*filter_conditions, *cursor_conditions]
 
 
 def _build_sql_stmt_from_sql_arg(
