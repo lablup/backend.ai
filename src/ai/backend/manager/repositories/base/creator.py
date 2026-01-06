@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generic, TypeVar
 
@@ -83,3 +84,54 @@ async def execute_creator(
     await db_sess.flush()
     await db_sess.refresh(row)
     return CreatorResult(row=row)
+
+
+@dataclass
+class BulkCreator(Generic[TRow]):
+    """Bundles multiple creator specs for bulk insert operations.
+
+    Attributes:
+        specs: Sequence of CreatorSpec implementations defining what to create.
+
+    Note:
+        Additional fields (e.g., RBAC context) may be added later.
+    """
+
+    specs: Sequence[CreatorSpec[TRow]]
+
+
+@dataclass
+class BulkCreatorResult(Generic[TRow]):
+    """Result of executing a bulk create operation."""
+
+    rows: list[TRow]
+
+
+async def execute_bulk_creator(
+    db_sess: SASession,
+    bulk_creator: BulkCreator[TRow],
+) -> BulkCreatorResult[TRow]:
+    """Execute bulk INSERT with multiple creator specs.
+
+    Args:
+        db_sess: Database session (must be writable)
+        bulk_creator: BulkCreator containing specs for rows to insert
+
+    Returns:
+        BulkCreatorResult containing all created rows with generated values
+
+    Note:
+        All rows are inserted in a single flush operation for efficiency.
+        The caller controls the transaction boundary (commit/rollback).
+    """
+    if not bulk_creator.specs:
+        return BulkCreatorResult(rows=[])
+
+    rows = [spec.build_row() for spec in bulk_creator.specs]
+    db_sess.add_all(rows)
+    await db_sess.flush()
+
+    for row in rows:
+        await db_sess.refresh(row)
+
+    return BulkCreatorResult(rows=rows)
