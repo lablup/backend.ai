@@ -16,6 +16,7 @@ from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.repositories.base.updater import Updater
 
 from .db_source import ScalingGroupDBSource
 
@@ -78,3 +79,13 @@ class ScalingGroupRepository:
         Raises ScalingGroupNotFound if scaling group doesn't exist.
         """
         return await self._db_source.purge_scaling_group(purger)
+
+    async def update_scaling_group(
+        self,
+        updater: Updater[ScalingGroupRow],
+    ) -> ScalingGroupData:
+        """Updates an existing scaling group.
+
+        Raises ScalingGroupNotFound if the scaling group does not exist.
+        """
+        return await self._db_source.update_scaling_group(updater)

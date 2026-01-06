@@ -378,6 +378,8 @@ class ScalingGroupFilterGQL(GQLFilter):
             name_condition = self.name.build_query_condition(
                 contains_factory=ScalingGroupConditions.by_name_contains,
                 equals_factory=ScalingGroupConditions.by_name_equals,
+                starts_with_factory=ScalingGroupConditions.by_name_starts_with,
+                ends_with_factory=ScalingGroupConditions.by_name_ends_with,
             )
             if name_condition:
                 field_conditions.append(name_condition)
@@ -387,6 +389,8 @@ class ScalingGroupFilterGQL(GQLFilter):
             description_condition = self.description.build_query_condition(
                 contains_factory=ScalingGroupConditions.by_description_contains,
                 equals_factory=ScalingGroupConditions.by_description_equals,
+                starts_with_factory=ScalingGroupConditions.by_description_starts_with,
+                ends_with_factory=ScalingGroupConditions.by_description_ends_with,
             )
             if description_condition:
                 field_conditions.append(description_condition)

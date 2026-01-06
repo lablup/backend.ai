@@ -2874,11 +2874,17 @@ input StringFilter {
   startsWith: String = null
   endsWith: String = null
   equals: String = null
+  notContains: String = null
+  notStartsWith: String = null
+  notEndsWith: String = null
   notEquals: String = null
   iContains: String = null
   iStartsWith: String = null
   iEndsWith: String = null
   iEquals: String = null
+  iNotContains: String = null
+  iNotStartsWith: String = null
+  iNotEndsWith: String = null
   iNotEquals: String = null
 }
 

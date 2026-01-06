@@ -8,6 +8,7 @@ from collections.abc import Collection
 import sqlalchemy as sa
 
 from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
+from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
@@ -23,20 +24,54 @@ class DeploymentConditions:
         return inner
 
     @staticmethod
-    def by_name_equals(value: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(EndpointRow.name) == value.lower()
-            return EndpointRow.name == value
+            if spec.case_insensitive:
+                condition = sa.func.lower(EndpointRow.name) == spec.value.lower()
+            else:
+                condition = EndpointRow.name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_name_contains(value: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(EndpointRow.name).contains(value.lower())
-            return EndpointRow.name.contains(value)
+            if spec.case_insensitive:
+                condition = EndpointRow.name.ilike(f"%{spec.value}%")
+            else:
+                condition = EndpointRow.name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = EndpointRow.name.ilike(f"{spec.value}%")
+            else:
+                condition = EndpointRow.name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = EndpointRow.name.ilike(f"%{spec.value}")
+            else:
+                condition = EndpointRow.name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -48,20 +83,54 @@ class DeploymentConditions:
         return inner
 
     @staticmethod
-    def by_domain_name_equals(value: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_domain_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(EndpointRow.domain) == value.lower()
-            return EndpointRow.domain == value
+            if spec.case_insensitive:
+                condition = sa.func.lower(EndpointRow.domain) == spec.value.lower()
+            else:
+                condition = EndpointRow.domain == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_contains(value: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_domain_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(EndpointRow.domain).contains(value.lower())
-            return EndpointRow.domain.contains(value)
+            if spec.case_insensitive:
+                condition = EndpointRow.domain.ilike(f"%{spec.value}%")
+            else:
+                condition = EndpointRow.domain.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = EndpointRow.domain.ilike(f"{spec.value}%")
+            else:
+                condition = EndpointRow.domain.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = EndpointRow.domain.ilike(f"%{spec.value}")
+            else:
+                condition = EndpointRow.domain.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -87,38 +156,106 @@ class DeploymentConditions:
         return inner
 
     @staticmethod
-    def by_tag_contains(value: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_tag_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(EndpointRow.tag).contains(value.lower())
-            return EndpointRow.tag.contains(value)
+            if spec.case_insensitive:
+                condition = EndpointRow.tag.ilike(f"%{spec.value}%")
+            else:
+                condition = EndpointRow.tag.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_tag_equals(value: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_tag_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(EndpointRow.tag) == value.lower()
-            return EndpointRow.tag == value
+            if spec.case_insensitive:
+                condition = sa.func.lower(EndpointRow.tag) == spec.value.lower()
+            else:
+                condition = EndpointRow.tag == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_url_contains(value: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_tag_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(EndpointRow.url).contains(value.lower())
-            return EndpointRow.url.contains(value)
+            if spec.case_insensitive:
+                condition = EndpointRow.tag.ilike(f"{spec.value}%")
+            else:
+                condition = EndpointRow.tag.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_url_equals(value: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_tag_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(EndpointRow.url) == value.lower()
-            return EndpointRow.url == value
+            if spec.case_insensitive:
+                condition = EndpointRow.tag.ilike(f"%{spec.value}")
+            else:
+                condition = EndpointRow.tag.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_url_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = EndpointRow.url.ilike(f"%{spec.value}%")
+            else:
+                condition = EndpointRow.url.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_url_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(EndpointRow.url) == spec.value.lower()
+            else:
+                condition = EndpointRow.url == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_url_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = EndpointRow.url.ilike(f"{spec.value}%")
+            else:
+                condition = EndpointRow.url.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_url_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = EndpointRow.url.ilike(f"%{spec.value}")
+            else:
+                condition = EndpointRow.url.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 

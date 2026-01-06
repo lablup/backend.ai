@@ -11,6 +11,10 @@ from ai.backend.manager.services.scaling_group.actions.list_scaling_groups impor
     SearchScalingGroupsAction,
     SearchScalingGroupsActionResult,
 )
+from ai.backend.manager.services.scaling_group.actions.modify import (
+    ModifyScalingGroupAction,
+    ModifyScalingGroupActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.purge_scaling_group import (
     PurgeScalingGroupAction,
     PurgeScalingGroupActionResult,
@@ -21,6 +25,7 @@ from ai.backend.manager.services.scaling_group.service import ScalingGroupServic
 class ScalingGroupProcessors(AbstractProcessorPackage):
     create_scaling_group: ActionProcessor[CreateScalingGroupAction, CreateScalingGroupActionResult]
     purge_scaling_group: ActionProcessor[PurgeScalingGroupAction, PurgeScalingGroupActionResult]
+    modify_scaling_group: ActionProcessor[ModifyScalingGroupAction, ModifyScalingGroupActionResult]
     search_scaling_groups: ActionProcessor[
         SearchScalingGroupsAction, SearchScalingGroupsActionResult
     ]
@@ -28,6 +33,7 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
     def __init__(self, service: ScalingGroupService, action_monitors: list[ActionMonitor]) -> None:
         self.create_scaling_group = ActionProcessor(service.create_scaling_group, action_monitors)
         self.purge_scaling_group = ActionProcessor(service.purge_scaling_group, action_monitors)
+        self.modify_scaling_group = ActionProcessor(service.modify_scaling_group, action_monitors)
         self.search_scaling_groups = ActionProcessor(service.search_scaling_groups, action_monitors)
 
     @override
@@ -35,5 +41,6 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         return [
             CreateScalingGroupAction.spec(),
             PurgeScalingGroupAction.spec(),
+            ModifyScalingGroupAction.spec(),
             SearchScalingGroupsAction.spec(),
         ]
