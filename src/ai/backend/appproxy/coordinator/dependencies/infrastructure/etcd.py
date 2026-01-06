@@ -34,8 +34,16 @@ class EtcdProvider(DependencyProvider[ServerConfig, TraefikEtcd | None]):
             if traefik_config.etcd.password:
                 creds = {"password": traefik_config.etcd.password}
 
+            # Handle addr as either single HostPortPair or list
+            addr = traefik_config.etcd.addr
+            if isinstance(addr, list):
+                # Use first address from the list
+                host_port = addr[0]
+            else:
+                host_port = addr
+
             traefik_etcd = TraefikEtcd(
-                HostPortPair(traefik_config.etcd.addr.host, traefik_config.etcd.addr.port),
+                HostPortPair(host_port.host, host_port.port),
                 traefik_config.etcd.namespace,
                 {ConfigScopes.GLOBAL: ""},
                 credentials=creds,

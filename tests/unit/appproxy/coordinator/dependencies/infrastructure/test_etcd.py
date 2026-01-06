@@ -28,12 +28,12 @@ class TestEtcdProvider:
         test_ns: str,
     ) -> ServerConfig:
         """Create a coordinator config with Traefik enabled."""
-        from ai.backend.appproxy.common.config import HostPortPair
         from ai.backend.appproxy.coordinator.config import (
             EtcdConfig,
             ProxyCoordinatorConfig,
             TraefikConfig,
         )
+        from ai.backend.common.typed_validators import HostPortPair
 
         container_id, etcd_addr = etcd_container
 
@@ -41,6 +41,7 @@ class TestEtcdProvider:
         etcd_config = EtcdConfig(
             addr=HostPortPair(host=etcd_addr.host, port=etcd_addr.port),
             namespace=test_ns,
+            user=None,
             password=None,
         )
 
