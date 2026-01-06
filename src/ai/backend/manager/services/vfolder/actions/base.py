@@ -15,7 +15,8 @@ from ai.backend.manager.actions.action.single_entity import (
     BaseSingleEntityAction,
     BaseSingleEntityActionResult,
 )
-from ai.backend.manager.data.permission.types import EntityType, OperationType
+from ai.backend.manager.actions.action.types import FieldData
+from ai.backend.manager.data.permission.types import OperationType
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import (
@@ -57,12 +58,7 @@ class VFolderSingleEntityAction(BaseSingleEntityAction):
         return "vfolder"
 
     @override
-    @classmethod
-    def field_type(cls) -> EntityType | None:
-        return None
-
-    @override
-    def field_id(self) -> str | None:
+    def field_data(self) -> FieldData | None:
         return None
 
 

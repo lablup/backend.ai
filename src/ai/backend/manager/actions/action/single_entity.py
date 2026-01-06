@@ -1,9 +1,10 @@
 from abc import abstractmethod
 from typing import TypeVar, override
 
-from ai.backend.common.data.permission.types import EntityType, OperationType
+from ai.backend.common.data.permission.types import OperationType
 
 from .base import BaseAction, BaseActionResult
+from .types import FieldData
 
 
 class BaseSingleEntityAction(BaseAction):
@@ -15,20 +16,12 @@ class BaseSingleEntityAction(BaseAction):
     def target_entity_id(self) -> str:
         raise NotImplementedError
 
-    @classmethod
     @abstractmethod
-    def field_type(cls) -> EntityType | None:
+    def field_data(self) -> FieldData | None:
         """
-        Returns the entity type of this action's target when it exists as a field
-        of another entity. Returns None if this entity is not a field.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def field_id(self) -> str | None:
-        """
-        Returns the entity ID of this action's target when it exists as a field
-        of another entity. Returns None if this entity is not a field.
+        Returns field data containing the field type and ID when the action's
+        target exists as a field of another entity.
+        Returns None if this entity is not a field.
         """
         raise NotImplementedError
 
