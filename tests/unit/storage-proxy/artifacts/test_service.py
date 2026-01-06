@@ -89,7 +89,7 @@ def create_mock_aiohttp_session() -> tuple[Mock, Mock]:
 @pytest.fixture
 def mock_huggingface_config() -> HuggingfaceConfig:
     """Mock HuggingfaceConfig object."""
-    return HuggingfaceConfig(
+    return HuggingfaceConfig(  # type: ignore[call-arg]
         token="test_token",
         endpoint="https://huggingface.co",
     )
@@ -210,7 +210,7 @@ def mock_progress_reporter() -> MagicMock:
 @pytest.fixture
 def mock_reservoir_config() -> ReservoirConfig:
     """Mock ReservoirConfig object."""
-    return ReservoirConfig(
+    return ReservoirConfig(  # type: ignore[call-arg]
         endpoint="https://s3.amazonaws.com",
         object_storage_region="us-west-2",
         object_storage_access_key="test_access_key",
@@ -221,7 +221,7 @@ def mock_reservoir_config() -> ReservoirConfig:
 @pytest.fixture
 def mock_object_storage_config() -> ObjectStorageConfig:
     """Mock ObjectStorageConfig object."""
-    return ObjectStorageConfig(
+    return ObjectStorageConfig(  # type: ignore[call-arg]
         endpoint="https://s3.amazonaws.com",
         region="us-west-2",
         access_key="test_access_key",
@@ -256,7 +256,7 @@ def mock_import_step_context(
 def mock_reservoir_registry_configs() -> dict[str, ReservoirConfig]:
     """Mock Reservoir registry configurations."""
     return {
-        "test_registry": ReservoirConfig(
+        "test_registry": ReservoirConfig(  # type: ignore[call-arg]
             endpoint="https://s3.amazonaws.com",
             object_storage_region="us-west-2",
             object_storage_access_key="test_access_key",
@@ -294,7 +294,7 @@ def reservoir_download_step(
     # Create ManagerHTTPClientPool
     manager_client_pool = ManagerHTTPClientPool(
         registry_configs=mock_reservoir_registry_configs,
-        client_config=ReservoirClientConfig(),
+        client_config=ReservoirClientConfig(),  # type: ignore[call-arg]
     )
     return ReservoirDownloadStep(
         registry_configs=mock_reservoir_registry_configs,
@@ -1053,7 +1053,7 @@ class TestReservoirDownloadStep:
         # Create ManagerHTTPClientPool with empty configs
         manager_client_pool = ManagerHTTPClientPool(
             registry_configs={},
-            client_config=ReservoirClientConfig(),
+            client_config=ReservoirClientConfig(),  # type: ignore[call-arg]
         )
         step = ReservoirDownloadStep(
             registry_configs={},

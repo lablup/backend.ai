@@ -34,7 +34,7 @@ class TestStreamReader(StreamReader):
 @pytest.fixture
 def storage_config(minio_container) -> ObjectStorageConfig:
     container_id, host_port = minio_container
-    return ObjectStorageConfig(
+    return ObjectStorageConfig(  # type: ignore[call-arg]
         buckets=[_BUCKET_FIXTURE_NAME],
         endpoint=f"http://{host_port.host}:{host_port.port}",
         region="us-east-1",
@@ -56,7 +56,7 @@ def storages_service(storage_config) -> ObjectStorageService:
 @pytest.fixture
 def reservoir_config(minio_container) -> ReservoirConfig:
     container_id, host_port = minio_container
-    return ReservoirConfig(
+    return ReservoirConfig(  # type: ignore[call-arg]
         endpoint=f"http://{host_port.host}:{host_port.port}",
         object_storage_access_key="minioadmin",
         object_storage_secret_key="minioadmin",
