@@ -532,8 +532,9 @@ async def database_engine(bootstrap_config, database):
 
 
 @pytest.fixture()
-def extra_fixtures():
-    return {}
+def extra_fixtures(request: pytest.FixtureRequest) -> dict[str, Any]:
+    """Allow parameterized extra fixtures via indirect parametrization."""
+    return getattr(request, "param", {})
 
 
 @pytest.fixture()
