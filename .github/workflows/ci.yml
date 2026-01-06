@@ -127,7 +127,7 @@ jobs:
       # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
       with:
         gha-cache-key: v0
-        named-caches-hash: ${{ hashFiles('python.lock', 'tools/*.lock') }}
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Check BUILD files
       run: pants tailor --check update-build-files --check '::'
@@ -195,7 +195,7 @@ jobs:
       uses: pantsbuild/actions/init-pants@v10
       with:
         gha-cache-key: v0
-        named-caches-hash: ${{ hashFiles('python.lock', 'tools/*.lock') }}
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Prepare DB
       run: docker compose -f docker-compose.halfstack-main.yml up -d backendai-half-db --wait
@@ -255,7 +255,7 @@ jobs:
       uses: pantsbuild/actions/init-pants@v10
       with:
         gha-cache-key: v0
-        named-caches-hash: ${{ hashFiles('python.lock', 'tools/*.lock') }}
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Typecheck
       run: |
@@ -323,7 +323,7 @@ jobs:
       uses: pantsbuild/actions/init-pants@v10
       with:
         gha-cache-key: v0
-        named-caches-hash: ${{ hashFiles('python.lock', 'tools/*.lock') }}
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Test
       timeout-minutes: 60
@@ -401,7 +401,7 @@ jobs:
       uses: pantsbuild/actions/init-pants@v10
       with:
         gha-cache-key: v0
-        named-caches-hash: ${{ hashFiles('python.lock', 'tools/*.lock') }}
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'false'
     - name: Build both lazy and fat packages
       run: |
@@ -458,7 +458,7 @@ jobs:
       uses: pantsbuild/actions/init-pants@v10
       with:
         gha-cache-key: v0
-        named-caches-hash: ${{ hashFiles('python.lock', 'tools/*.lock') }}
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'false'
     - name: Build wheel packages
       run: |
