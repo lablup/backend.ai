@@ -1,8 +1,7 @@
 """Tests for DownloadStep implementations."""
 
 import uuid
-from datetime import datetime
-from typing import Tuple
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
@@ -55,7 +54,7 @@ from ai.backend.storage.types import BucketCopyOptions
 _DEFAULT_CHUNK_SIZE = 8192
 
 
-def create_mock_aiohttp_session() -> Tuple[Mock, Mock]:
+def create_mock_aiohttp_session() -> tuple[Mock, Mock]:
     """Create a properly configured mock session that supports async context manager protocol."""
     mock_session = Mock()
 
@@ -182,8 +181,8 @@ def mock_model_info() -> ModelData:
         name="DialoGPT-medium",
         author="microsoft",
         tags=["pytorch", "text-generation"],
-        created_at=datetime(2021, 1, 1),
-        modified_at=datetime(2023, 6, 15),
+        created_at=datetime(2021, 1, 1, tzinfo=UTC),
+        modified_at=datetime(2023, 6, 15, tzinfo=UTC),
         size=2048000,
     )
 
@@ -329,8 +328,8 @@ class TestHuggingFaceDownloadStep:
         mock_hf_model.id = "microsoft/DialoGPT-medium"
         mock_hf_model.author = "microsoft"
         mock_hf_model.tags = ["pytorch", "text-generation"]
-        mock_hf_model.created_at = datetime(2021, 1, 1)
-        mock_hf_model.last_modified = datetime(2023, 6, 15)
+        mock_hf_model.created_at = datetime(2021, 1, 1, tzinfo=UTC)
+        mock_hf_model.last_modified = datetime(2023, 6, 15, tzinfo=UTC)
         mock_list_models.return_value = [mock_hf_model]
 
         scanner = hf_download_step._make_scanner("test_registry")
@@ -374,8 +373,8 @@ class TestHuggingFaceDownloadStep:
         mock_hf_model.id = "microsoft/DialoGPT-medium"
         mock_hf_model.author = "microsoft"
         mock_hf_model.tags = ["pytorch", "text-generation"]
-        mock_hf_model.created_at = datetime(2021, 1, 1)
-        mock_hf_model.last_modified = datetime(2023, 6, 15)
+        mock_hf_model.created_at = datetime(2021, 1, 1, tzinfo=UTC)
+        mock_hf_model.last_modified = datetime(2023, 6, 15, tzinfo=UTC)
         mock_model_info.return_value = mock_hf_model
 
         scanner = hf_download_step._make_scanner("test_registry")
@@ -547,12 +546,9 @@ class TestHuggingFaceDownloadStep:
         def mock_headers_get(key, default=None):
             if key == "Content-Length":
                 return "12"  # Total size matches our chunks
-            elif key == "ETag":
+            if key == "ETag" or key == "Accept-Ranges":
                 return default
-            elif key == "Accept-Ranges":
-                return default
-            else:
-                return default
+            return default
 
         mock_response.headers.get.side_effect = mock_headers_get
 
@@ -622,8 +618,7 @@ class TestHuggingFaceDownloadStep:
         def mock_headers_get(key, default=None):
             if key == "Content-Length":
                 return "100"  # Valid content length for HEAD probe
-            else:
-                return default
+            return default
 
         mock_response.headers.get.side_effect = mock_headers_get
 
@@ -848,8 +843,7 @@ class TestReservoirDownloadStep:
         def mock_get_storage(name: str):
             if name == "test_storage":
                 return mock_storage_pool.get_storage("test_storage")
-            else:
-                raise KeyError(name)
+            raise KeyError(name)
 
         mock_storage_pool_with_error = Mock(spec=StoragePool)
         mock_storage_pool_with_error.get_storage = Mock(side_effect=mock_get_storage)

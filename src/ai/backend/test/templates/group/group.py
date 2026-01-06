@@ -1,6 +1,7 @@
 import asyncio
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import AsyncIterator, override
+from typing import override
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.test.contexts.client_session import ClientSessionContext
@@ -21,7 +22,7 @@ class GroupTemplate(WrapperTestTemplate):
     async def _context(self) -> AsyncIterator[None]:
         spec_meta = TestSpecMetaContext.current()
         test_id = spec_meta.test_id
-        group_name = f"test-group-{str(test_id)}"
+        group_name = f"test-group-{test_id!s}"
         client_session = ClientSessionContext.current()
         domain_ctx = DomainContext.current()
 

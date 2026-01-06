@@ -3,22 +3,43 @@ Tests for NotificationRepository query options (conditions and orders).
 Tests the filter and ordering functionality with real database operations.
 """
 
+from __future__ import annotations
+
 import uuid
-from datetime import datetime, timedelta
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.types import BinarySize
+from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.data.notification import NotificationChannelType, NotificationRuleType
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.notification import (
     NotificationChannelRow,
     NotificationRuleRow,
     WebhookConfig,
 )
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import (
     PasswordHashAlgorithm,
     PasswordInfo,
@@ -27,6 +48,7 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     CursorBackwardPagination,
@@ -40,6 +62,7 @@ from ai.backend.manager.repositories.notification.options import (
     NotificationRuleConditions,
     NotificationRuleOrders,
 )
+from ai.backend.testutils.db import with_tables
 
 
 class TestNotificationOptions:
@@ -50,21 +73,45 @@ class TestNotificationOptions:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans notification data after each test"""
-        yield database_engine
-
-        # Cleanup all notification data after test
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(NotificationRuleRow))
-            await db_sess.execute(sa.delete(NotificationChannelRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # Base rows in FK dependency order (parents before children)
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+                # Test-specific rows
+                NotificationChannelRow,
+                NotificationRuleRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -78,20 +125,15 @@ class TestNotificationOptions:
                 allowed_docker_registries=[],
             )
             db_sess.add(domain)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        try:
-            yield domain_name
-        finally:
-            # Cleanup
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
+        return domain_name
 
     @pytest.fixture
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test resource policy and return policy name"""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
@@ -99,23 +141,14 @@ class TestNotificationOptions:
             policy = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_session_count_per_model_session=5,
                 max_customized_image_count=3,
             )
             db_sess.add(policy)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        try:
-            yield policy_name
-        finally:
-            # Cleanup
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_sess.execute(
-                    sa.delete(UserResourcePolicyRow).where(
-                        UserResourcePolicyRow.name == policy_name
-                    )
-                )
+        return policy_name
 
     @pytest.fixture
     async def test_user(
@@ -123,7 +156,7 @@ class TestNotificationOptions:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test user and return user UUID"""
         user_uuid = uuid.uuid4()
 
@@ -148,32 +181,26 @@ class TestNotificationOptions:
                 resource_policy=test_resource_policy_name,
             )
             db_sess.add(user)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        try:
-            yield user_uuid
-        finally:
-            # Cleanup
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
+        return user_uuid
 
     @pytest.fixture
-    async def notification_repository(
+    def notification_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[NotificationRepository, None]:
+    ) -> NotificationRepository:
         """Create NotificationRepository instance with database"""
-        repo = NotificationRepository(db=db_with_cleanup)
-        yield repo
+        return NotificationRepository(db=db_with_cleanup)
 
     @pytest.fixture
     async def sample_channels_for_filter(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> list[uuid.UUID]:
         """Create sample channels with various names and types for filter testing"""
-        channel_ids = []
+        channel_ids: list[uuid.UUID] = []
         async with db_with_cleanup.begin_session() as db_sess:
             channels_data = [
                 ("Test Channel", NotificationChannelType.WEBHOOK, True),
@@ -194,24 +221,24 @@ class TestNotificationOptions:
                     config=config.model_dump(),
                     enabled=enabled,
                     created_by=test_user,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
+                    created_at=datetime.now(tz=UTC),
+                    updated_at=datetime.now(tz=UTC),
                 )
                 db_sess.add(channel)
                 channel_ids.append(channel_id)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield channel_ids
+        return channel_ids
 
     @pytest.fixture
     async def sample_channels_for_order(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> list[uuid.UUID]:
         """Create sample channels with different timestamps for order testing"""
-        channel_ids = []
-        base_time = datetime.now()
+        channel_ids: list[uuid.UUID] = []
+        base_time = datetime.now(tz=UTC)
 
         async with db_with_cleanup.begin_session() as db_sess:
             channels_data = [
@@ -236,16 +263,16 @@ class TestNotificationOptions:
                 )
                 db_sess.add(channel)
                 channel_ids.append(channel_id)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield channel_ids
+        return channel_ids
 
     @pytest.fixture
     async def sample_channel_for_rules(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create a single channel for rule testing"""
         channel_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
@@ -258,13 +285,13 @@ class TestNotificationOptions:
                 config=config.model_dump(),
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             db_sess.add(channel)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield channel_id
+        return channel_id
 
     @pytest.fixture
     async def sample_rules_for_filter(
@@ -272,9 +299,9 @@ class TestNotificationOptions:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user: uuid.UUID,
         sample_channel_for_rules: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> list[uuid.UUID]:
         """Create sample rules with various names and types for filter testing"""
-        rule_ids = []
+        rule_ids: list[uuid.UUID] = []
         async with db_with_cleanup.begin_session() as db_sess:
             rules_data = [
                 ("Test Rule", NotificationRuleType.SESSION_STARTED, True),
@@ -295,14 +322,14 @@ class TestNotificationOptions:
                     message_template="Test message",
                     enabled=enabled,
                     created_by=test_user,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
+                    created_at=datetime.now(tz=UTC),
+                    updated_at=datetime.now(tz=UTC),
                 )
                 db_sess.add(rule)
                 rule_ids.append(rule_id)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield rule_ids
+        return rule_ids
 
     @pytest.fixture
     async def sample_rules_for_order(
@@ -310,10 +337,10 @@ class TestNotificationOptions:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user: uuid.UUID,
         sample_channel_for_rules: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> list[uuid.UUID]:
         """Create sample rules with different timestamps for order testing"""
-        rule_ids = []
-        base_time = datetime.now()
+        rule_ids: list[uuid.UUID] = []
+        base_time = datetime.now(tz=UTC)
 
         async with db_with_cleanup.begin_session() as db_sess:
             rules_data = [
@@ -338,9 +365,9 @@ class TestNotificationOptions:
                 )
                 db_sess.add(rule)
                 rule_ids.append(rule_id)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield rule_ids
+        return rule_ids
 
     # NotificationChannelConditions Tests
 
@@ -355,7 +382,9 @@ class TestNotificationOptions:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationChannelConditions.by_name_contains("Test", case_insensitive=False)
+                NotificationChannelConditions.by_name_contains(
+                    StringMatchSpec("Test", case_insensitive=False, negated=False)
+                )
             ],
             orders=[],
         )
@@ -376,7 +405,9 @@ class TestNotificationOptions:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationChannelConditions.by_name_contains("test", case_insensitive=True)
+                NotificationChannelConditions.by_name_contains(
+                    StringMatchSpec("test", case_insensitive=True, negated=False)
+                )
             ],
             orders=[],
         )
@@ -398,7 +429,9 @@ class TestNotificationOptions:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationChannelConditions.by_name_equals("Test Channel", case_insensitive=False)
+                NotificationChannelConditions.by_name_equals(
+                    StringMatchSpec("Test Channel", case_insensitive=False, negated=False)
+                )
             ],
             orders=[],
         )
@@ -419,7 +452,9 @@ class TestNotificationOptions:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationChannelConditions.by_name_equals("test channel", case_insensitive=True)
+                NotificationChannelConditions.by_name_equals(
+                    StringMatchSpec("test channel", case_insensitive=True, negated=False)
+                )
             ],
             orders=[],
         )
@@ -627,7 +662,9 @@ class TestNotificationOptions:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationRuleConditions.by_name_contains("Test", case_insensitive=False)
+                NotificationRuleConditions.by_name_contains(
+                    StringMatchSpec("Test", case_insensitive=False, negated=False)
+                )
             ],
             orders=[],
         )
@@ -647,7 +684,11 @@ class TestNotificationOptions:
         # sample_rules_for_filter creates rules with various names
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[NotificationRuleConditions.by_name_contains("test", case_insensitive=True)],
+            conditions=[
+                NotificationRuleConditions.by_name_contains(
+                    StringMatchSpec("test", case_insensitive=True, negated=False)
+                )
+            ],
             orders=[],
         )
         rules = await notification_repository.search_rules(querier=querier)
@@ -668,7 +709,9 @@ class TestNotificationOptions:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationRuleConditions.by_name_equals("Test Rule", case_insensitive=False)
+                NotificationRuleConditions.by_name_equals(
+                    StringMatchSpec("Test Rule", case_insensitive=False, negated=False)
+                )
             ],
             orders=[],
         )
@@ -689,7 +732,9 @@ class TestNotificationOptions:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationRuleConditions.by_name_equals("test rule", case_insensitive=True)
+                NotificationRuleConditions.by_name_equals(
+                    StringMatchSpec("test rule", case_insensitive=True, negated=False)
+                )
             ],
             orders=[],
         )
@@ -893,7 +938,11 @@ class TestNotificationOptions:
         """Test that searching for non-existent channel returns empty with total_count=0"""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[NotificationChannelConditions.by_name_equals("NonexistentChannelName")],
+            conditions=[
+                NotificationChannelConditions.by_name_equals(
+                    StringMatchSpec("NonexistentChannelName", case_insensitive=False, negated=False)
+                )
+            ],
             orders=[],
         )
         channels = await notification_repository.search_channels(querier=querier)
@@ -911,7 +960,11 @@ class TestNotificationOptions:
         """Test that searching for non-existent rule returns empty with total_count=0"""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[NotificationRuleConditions.by_name_equals("NonexistentRuleName")],
+            conditions=[
+                NotificationRuleConditions.by_name_equals(
+                    StringMatchSpec("NonexistentRuleName", case_insensitive=False, negated=False)
+                )
+            ],
             orders=[],
         )
         rules = await notification_repository.search_rules(querier=querier)
@@ -932,20 +985,45 @@ class TestNotificationCursorPagination:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans notification data after each test"""
-        yield database_engine
-
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(NotificationRuleRow))
-            await db_sess.execute(sa.delete(NotificationChannelRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # Base rows in FK dependency order (parents before children)
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+                # Test-specific rows
+                NotificationChannelRow,
+                NotificationRuleRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -959,19 +1037,15 @@ class TestNotificationCursorPagination:
                 allowed_docker_registries=[],
             )
             db_sess.add(domain)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        try:
-            yield domain_name
-        finally:
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
+        return domain_name
 
     @pytest.fixture
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test resource policy and return policy name"""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
@@ -979,22 +1053,14 @@ class TestNotificationCursorPagination:
             policy = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_session_count_per_model_session=5,
                 max_customized_image_count=3,
             )
             db_sess.add(policy)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        try:
-            yield policy_name
-        finally:
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_sess.execute(
-                    sa.delete(UserResourcePolicyRow).where(
-                        UserResourcePolicyRow.name == policy_name
-                    )
-                )
+        return policy_name
 
     @pytest.fixture
     async def test_user(
@@ -1002,7 +1068,7 @@ class TestNotificationCursorPagination:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test user and return user UUID"""
         user_uuid = uuid.uuid4()
 
@@ -1027,35 +1093,30 @@ class TestNotificationCursorPagination:
                 resource_policy=test_resource_policy_name,
             )
             db_sess.add(user)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        try:
-            yield user_uuid
-        finally:
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
+        return user_uuid
 
     @pytest.fixture
-    async def notification_repository(
+    def notification_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[NotificationRepository, None]:
+    ) -> NotificationRepository:
         """Create NotificationRepository instance with database"""
-        repo = NotificationRepository(db=db_with_cleanup)
-        yield repo
+        return NotificationRepository(db=db_with_cleanup)
 
     @pytest.fixture
     async def channels_for_cursor_pagination(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> list[uuid.UUID]:
         """Create 5 channels with distinct created_at times for cursor pagination testing.
 
         Created order (oldest to newest): Channel-1, Channel-2, Channel-3, Channel-4, Channel-5
         """
-        channel_ids = []
-        base_time = datetime.now()
+        channel_ids: list[uuid.UUID] = []
+        base_time = datetime.now(tz=UTC)
 
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(1, 6):
@@ -1075,9 +1136,9 @@ class TestNotificationCursorPagination:
                 )
                 db_sess.add(channel)
                 channel_ids.append(channel_id)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield channel_ids
+        return channel_ids
 
     @pytest.mark.asyncio
     async def test_forward_pagination_first_page_shows_newest_first(

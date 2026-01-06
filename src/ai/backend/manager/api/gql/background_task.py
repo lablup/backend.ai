@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import AsyncGenerator
 from enum import StrEnum
-from typing import TYPE_CHECKING, AsyncGenerator, Optional
+from typing import TYPE_CHECKING, Optional
 
 import strawberry
 from strawberry import Info

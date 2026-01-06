@@ -13,19 +13,13 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.errors.auth import UserNotFound
 from ai.backend.manager.errors.storage import VFolderOperationFailed
-from ai.backend.manager.models import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    VFolderDeletionInfo,
-    VFolderRow,
-    VFolderStatusSet,
-    initiate_vfolder_deletion,
-    kernels,
-    vfolder_invitations,
-    vfolder_status_map,
-)
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.error_logs import error_logs
 from ai.backend.manager.models.group import association_groups_users
+from ai.backend.manager.models.kernel import (
+    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    kernels,
+)
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.session import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
@@ -39,7 +33,16 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.types import join_by_related_field
 from ai.backend.manager.models.user import UserRow, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SAConnection
-from ai.backend.manager.models.vfolder import vfolder_permissions, vfolders
+from ai.backend.manager.models.vfolder import (
+    VFolderDeletionInfo,
+    VFolderRow,
+    VFolderStatusSet,
+    initiate_vfolder_deletion,
+    vfolder_invitations,
+    vfolder_permissions,
+    vfolder_status_map,
+    vfolders,
+)
 
 user_repository_resilience = Resilience(
     policies=[
@@ -335,8 +338,7 @@ class AdminUserRepository:
                 result = await conn.execute(update_query)
                 rowcount += result.rowcount
             return rowcount
-        else:
-            return 0
+        return 0
 
     async def _delete_vfolders(
         self,
@@ -380,8 +382,7 @@ class AdminUserRepository:
         except VFolderOperationFailed:
             raise
 
-        deleted_count = len(target_vfs)
-        return deleted_count
+        return len(target_vfs)
 
     async def _delete_keypairs_with_valkey(
         self,

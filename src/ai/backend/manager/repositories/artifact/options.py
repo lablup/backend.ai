@@ -7,6 +7,7 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
+from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactRemoteStatus,
@@ -29,62 +30,158 @@ class ArtifactConditions:
         return inner
 
     @staticmethod
-    def by_name_contains(name: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return ArtifactRow.name.ilike(f"%{name}%")
+            if spec.case_insensitive:
+                condition = ArtifactRow.name.ilike(f"%{spec.value}%")
             else:
-                return ArtifactRow.name.like(f"%{name}%")
+                condition = ArtifactRow.name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_name_equals(name: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(ArtifactRow.name) == name.lower()
+            if spec.case_insensitive:
+                condition = sa.func.lower(ArtifactRow.name) == spec.value.lower()
             else:
-                return ArtifactRow.name == name
+                condition = ArtifactRow.name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_registry_contains(registry: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return ArtifactRow.registry_type.ilike(f"%{registry}%")
+            if spec.case_insensitive:
+                condition = ArtifactRow.name.ilike(f"{spec.value}%")
             else:
-                return ArtifactRow.registry_type.like(f"%{registry}%")
+                condition = ArtifactRow.name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_registry_equals(registry: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(ArtifactRow.registry_type) == registry.lower()
+            if spec.case_insensitive:
+                condition = ArtifactRow.name.ilike(f"%{spec.value}")
             else:
-                return ArtifactRow.registry_type == registry
+                condition = ArtifactRow.name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_source_contains(source: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_registry_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return ArtifactRow.source_registry_type.ilike(f"%{source}%")
+            if spec.case_insensitive:
+                condition = ArtifactRow.registry_type.ilike(f"%{spec.value}%")
             else:
-                return ArtifactRow.source_registry_type.like(f"%{source}%")
+                condition = ArtifactRow.registry_type.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_source_equals(source: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_registry_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(ArtifactRow.source_registry_type) == source.lower()
+            if spec.case_insensitive:
+                condition = sa.func.lower(ArtifactRow.registry_type) == spec.value.lower()
             else:
-                return ArtifactRow.source_registry_type == source
+                condition = ArtifactRow.registry_type == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_registry_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ArtifactRow.registry_type.ilike(f"{spec.value}%")
+            else:
+                condition = ArtifactRow.registry_type.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_registry_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ArtifactRow.registry_type.ilike(f"%{spec.value}")
+            else:
+                condition = ArtifactRow.registry_type.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_source_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ArtifactRow.source_registry_type.ilike(f"%{spec.value}%")
+            else:
+                condition = ArtifactRow.source_registry_type.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_source_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(ArtifactRow.source_registry_type) == spec.value.lower()
+            else:
+                condition = ArtifactRow.source_registry_type == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_source_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ArtifactRow.source_registry_type.ilike(f"{spec.value}%")
+            else:
+                condition = ArtifactRow.source_registry_type.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_source_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ArtifactRow.source_registry_type.ilike(f"%{spec.value}")
+            else:
+                condition = ArtifactRow.source_registry_type.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -110,29 +207,25 @@ class ArtifactOrders:
     def name(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ArtifactRow.name.asc()
-        else:
-            return ArtifactRow.name.desc()
+        return ArtifactRow.name.desc()
 
     @staticmethod
     def type(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ArtifactRow.type.asc()
-        else:
-            return ArtifactRow.type.desc()
+        return ArtifactRow.type.desc()
 
     @staticmethod
     def scanned_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ArtifactRow.scanned_at.asc()
-        else:
-            return ArtifactRow.scanned_at.desc()
+        return ArtifactRow.scanned_at.desc()
 
     @staticmethod
     def updated_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ArtifactRow.updated_at.asc()
-        else:
-            return ArtifactRow.updated_at.desc()
+        return ArtifactRow.updated_at.desc()
 
 
 class ArtifactRevisionConditions:
@@ -146,22 +239,54 @@ class ArtifactRevisionConditions:
         return inner
 
     @staticmethod
-    def by_version_contains(version: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_version_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return ArtifactRevisionRow.version.ilike(f"%{version}%")
+            if spec.case_insensitive:
+                condition = ArtifactRevisionRow.version.ilike(f"%{spec.value}%")
             else:
-                return ArtifactRevisionRow.version.like(f"%{version}%")
+                condition = ArtifactRevisionRow.version.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_version_equals(version: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_version_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(ArtifactRevisionRow.version) == version.lower()
+            if spec.case_insensitive:
+                condition = sa.func.lower(ArtifactRevisionRow.version) == spec.value.lower()
             else:
-                return ArtifactRevisionRow.version == version
+                condition = ArtifactRevisionRow.version == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_version_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ArtifactRevisionRow.version.ilike(f"{spec.value}%")
+            else:
+                condition = ArtifactRevisionRow.version.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_version_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ArtifactRevisionRow.version.ilike(f"%{spec.value}")
+            else:
+                condition = ArtifactRevisionRow.version.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -229,33 +354,28 @@ class ArtifactRevisionOrders:
     def version(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ArtifactRevisionRow.version.asc()
-        else:
-            return ArtifactRevisionRow.version.desc()
+        return ArtifactRevisionRow.version.desc()
 
     @staticmethod
     def status(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ArtifactRevisionRow.status.asc()
-        else:
-            return ArtifactRevisionRow.status.desc()
+        return ArtifactRevisionRow.status.desc()
 
     @staticmethod
     def size(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ArtifactRevisionRow.size.asc()
-        else:
-            return ArtifactRevisionRow.size.desc()
+        return ArtifactRevisionRow.size.desc()
 
     @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ArtifactRevisionRow.created_at.asc()
-        else:
-            return ArtifactRevisionRow.created_at.desc()
+        return ArtifactRevisionRow.created_at.desc()
 
     @staticmethod
     def updated_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ArtifactRevisionRow.updated_at.asc()
-        else:
-            return ArtifactRevisionRow.updated_at.desc()
+        return ArtifactRevisionRow.updated_at.desc()

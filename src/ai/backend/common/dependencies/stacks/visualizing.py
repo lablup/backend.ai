@@ -3,11 +3,11 @@ from __future__ import annotations
 import sys
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import TextIO
 
-from ..base import (
+from ai.backend.common.dependencies.base import (
     DependencyComposer,
     DependencyProvider,
     DependencyStack,
@@ -122,7 +122,7 @@ class VisualizingDependencyStack(DependencyStack):
         event = DependencyEvent(
             stage_name=stage_name,
             status=status,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(UTC),
             error=error,
             depth=self._depth,
         )
@@ -171,12 +171,11 @@ class VisualizingDependencyStack(DependencyStack):
             nested_stack._events = self._events  # Share event list
 
             await self._stack.enter_async_context(nested_stack)
-            resources = await nested_stack._stack.enter_async_context(
+            return await nested_stack._stack.enter_async_context(
                 composer.compose(nested_stack, setup_input)
             )
 
             # Don't record completion for composers - only show starting
-            return resources
         except Exception as e:
             self._record_event(stage_name, DependencyStatus.FAILED, error=e)
             raise

@@ -23,7 +23,7 @@ def _filtered_writestr(self, zinfo_or_arcname, bytes, compress_type=None):
         else:
             fn = zinfo_or_arcname.filename
         if fn.startswith("ai/backend/accelerator/ipu/"):
-            if (fn.endswith(".py") and Path(fn).name not in pure_python_mods) or fn.endswith(".c"):  # noqa: W503
+            if (fn.endswith(".py") and Path(fn).name not in pure_python_mods) or fn.endswith(".c"):
                 return
     self._orig_writestr(zinfo_or_arcname, bytes, compress_type)
 

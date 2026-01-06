@@ -5,9 +5,9 @@ Tests the client with real Redis operations for route health monitoring.
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from time import time
-from typing import AsyncGenerator
 from uuid import uuid4
 
 import pytest

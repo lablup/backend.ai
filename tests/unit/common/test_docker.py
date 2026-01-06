@@ -464,9 +464,9 @@ def test_image_ref_ordering():
     # only the image-refs with same names can be compared.
     rx = ImageRef.from_image_str("lablup/python:3.6-ubuntu", default_repository, default_registry)
     with pytest.raises(ValueError):
-        rx < r1
+        _ = rx < r1
     with pytest.raises(ValueError):
-        r1 < rx
+        _ = r1 < rx
 
     # test case added for explicit behavior documentation
     # ImageRef.from_image_str(...:ubuntu16.04) > ImageRef.from_image_str(...:ubuntu) == False

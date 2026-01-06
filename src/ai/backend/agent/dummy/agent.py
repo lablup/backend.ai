@@ -1,18 +1,32 @@
 import asyncio
+from collections.abc import Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import (
     Any,
-    FrozenSet,
     Literal,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
-    Tuple,
     override,
 )
 
+from ai.backend.agent.agent import (
+    ACTIVE_STATUS_SET,
+    AbstractAgent,
+    AbstractKernelCreationContext,
+    ScanImagesResult,
+)
+from ai.backend.agent.config.unified import AgentUnifiedConfig
+from ai.backend.agent.exception import UnsupportedResource
+from ai.backend.agent.kernel import AbstractKernel
+from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
+from ai.backend.agent.resources import (
+    AbstractComputePlugin,
+    ComputerContext,
+    KernelResourceSpec,
+    Mount,
+    known_slot_types,
+)
+from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
@@ -39,24 +53,6 @@ from ai.backend.common.types import (
     current_resource_slots,
 )
 
-from ..agent import (
-    ACTIVE_STATUS_SET,
-    AbstractAgent,
-    AbstractKernelCreationContext,
-    ScanImagesResult,
-)
-from ..config.unified import AgentUnifiedConfig
-from ..exception import UnsupportedResource
-from ..kernel import AbstractKernel
-from ..kernel_registry.writer.types import KernelRegistrySaveMetadata
-from ..resources import (
-    AbstractComputePlugin,
-    ComputerContext,
-    KernelResourceSpec,
-    Mount,
-    known_slot_types,
-)
-from ..types import Container, KernelOwnershipData, MountInfo
 from .config import read_dummy_config
 from .kernel import DummyKernel
 
@@ -97,7 +93,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
     @override
     async def prepare_resource_spec(
         self,
-    ) -> Tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
+    ) -> tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
         slots = ResourceSlot.from_json(self.kernel_config["resource_slots"])
         # Ensure that we have intrinsic slots.
         if SlotName("cpu") not in slots:
@@ -294,8 +290,8 @@ class DummyAgent(
     @override
     async def enumerate_containers(
         self,
-        status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> Sequence[Tuple[KernelId, Container]]:
+        status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
+    ) -> Sequence[tuple[KernelId, Container]]:
         return []
 
     @override
@@ -356,11 +352,9 @@ class DummyAgent(
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
     ) -> bool:
-        if (
+        return (
             existing_imgs := self.dummy_agent_cfg["image"]["already-have"]
-        ) is not None and image_ref in existing_imgs:
-            return True
-        return False
+        ) is not None and image_ref in existing_imgs
 
     @override
     async def init_kernel_context(

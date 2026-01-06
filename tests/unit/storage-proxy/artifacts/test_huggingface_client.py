@@ -1,6 +1,6 @@
 """Tests for HuggingFace Client and Scanner implementation."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
@@ -23,8 +23,8 @@ def mock_hf_model_info() -> MagicMock:
     mock_model.id = "microsoft/DialoGPT-medium"
     mock_model.author = "microsoft"
     mock_model.tags = ["pytorch", "text-generation"]
-    mock_model.created_at = datetime(2021, 1, 1)
-    mock_model.last_modified = datetime(2023, 6, 15)
+    mock_model.created_at = datetime(2021, 1, 1, tzinfo=UTC)
+    mock_model.last_modified = datetime(2023, 6, 15, tzinfo=UTC)
     mock_model.gated = None
     return mock_model
 
@@ -304,8 +304,8 @@ class TestHuggingFaceScanner:
         mock_good_model.id = "microsoft/DialoGPT-medium"
         mock_good_model.author = "microsoft"
         mock_good_model.tags = ["pytorch"]
-        mock_good_model.created_at = datetime(2021, 1, 1)
-        mock_good_model.last_modified = datetime(2023, 6, 15)
+        mock_good_model.created_at = datetime(2021, 1, 1, tzinfo=UTC)
+        mock_good_model.last_modified = datetime(2023, 6, 15, tzinfo=UTC)
         mock_good_model.gated = False
 
         mock_bad_model = MagicMock(spec=HfModelInfo)

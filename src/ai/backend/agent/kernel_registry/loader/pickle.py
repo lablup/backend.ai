@@ -8,10 +8,13 @@ from collections.abc import MutableMapping
 from pathlib import Path
 from typing import TYPE_CHECKING, override
 
+from ai.backend.agent.kernel_registry.exception import (
+    KernelRegistryLoadError,
+    KernelRegistryNotFound,
+)
 from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
 
-from ..exception import KernelRegistryLoadError, KernelRegistryNotFound
 from .abc import AbstractKernelRegistryLoader
 
 if TYPE_CHECKING:
@@ -45,8 +48,7 @@ class PickleBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
             )
         try:
             with open(final_file_path, "rb") as f:
-                result = pickle.load(f)
-                return result
+                return pickle.load(f)
         except EOFError as e:
             log.warning("Failed to load the last kernel registry: {}", str(final_file_path))
             raise KernelRegistryLoadError from e

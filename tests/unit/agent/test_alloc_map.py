@@ -605,8 +605,8 @@ def test_fraction_alloc_map_even_allocation_many_devices_2() -> None:
 def test_quantum_size(alloc_strategy: AllocationStrategy) -> None:
     alloc_map = FractionAllocMap(
         device_slots={
-            DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1)),  # noqa
-            DeviceId("a1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1)),  # noqa
+            DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1)),
+            DeviceId("a1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1)),
         },
         quantum_size=Decimal("0.25"),
         allocation_strategy=alloc_strategy,
@@ -695,8 +695,8 @@ def test_quantum_size(alloc_strategy: AllocationStrategy) -> None:
         # So let's change the situation.
         alloc_map = FractionAllocMap(
             device_slots={
-                DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1)),  # noqa
-                DeviceId("a1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1)),  # noqa
+                DeviceId("a0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1)),
+                DeviceId("a1"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("x"), Decimal(1)),
             },
             quantum_size=Decimal("0.3"),
             allocation_strategy=alloc_strategy,
@@ -714,15 +714,15 @@ def test_exclusive_resource_slots() -> None:
         device_slots={
             DeviceId("a0"): DeviceSlotInfo(
                 SlotTypes.UNIQUE, SlotName("cuda.device:1g.5gb-mig"), Decimal(1)
-            ),  # noqa
+            ),
             DeviceId("a1"): DeviceSlotInfo(
                 SlotTypes.UNIQUE, SlotName("cuda.device:1g.5gb-mig"), Decimal(1)
-            ),  # noqa
+            ),
             DeviceId("a2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda.device"), Decimal(1)),
             DeviceId("a3"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda.device"), Decimal(1)),
             DeviceId("a4"): DeviceSlotInfo(
                 SlotTypes.UNIQUE, SlotName("cuda.device:3g.20gb-mig"), Decimal(1)
-            ),  # noqa
+            ),
         },
         exclusive_slot_types={"cuda.device:*-mig", "cuda.device", "cuda.shares"},
     )
@@ -753,15 +753,15 @@ def test_heterogeneous_resource_slots_with_discrete_alloc_map() -> None:
         device_slots={
             DeviceId("a0"): DeviceSlotInfo(
                 SlotTypes.UNIQUE, SlotName("cuda.device:1g.5gb-mig"), Decimal(1)
-            ),  # noqa
+            ),
             DeviceId("a1"): DeviceSlotInfo(
                 SlotTypes.UNIQUE, SlotName("cuda.device:1g.5gb-mig"), Decimal(1)
-            ),  # noqa
+            ),
             DeviceId("a2"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda.device"), Decimal(1)),
             DeviceId("a3"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda.device"), Decimal(1)),
             DeviceId("a4"): DeviceSlotInfo(
                 SlotTypes.UNIQUE, SlotName("cuda.device:3g.20gb-mig"), Decimal(1)
-            ),  # noqa
+            ),
         },
         exclusive_slot_types={"cuda.device:*-mig", "cuda.device", "cuda.shares"},
     )
@@ -843,10 +843,10 @@ def test_heterogeneous_resource_slots_with_fractional_alloc_map() -> None:
         device_slots={
             DeviceId("a0"): DeviceSlotInfo(
                 SlotTypes.UNIQUE, SlotName("cuda.device:1g.5gb-mig"), Decimal(1)
-            ),  # noqa
+            ),
             DeviceId("a1"): DeviceSlotInfo(
                 SlotTypes.UNIQUE, SlotName("cuda.device:1g.5gb-mig"), Decimal(1)
-            ),  # noqa
+            ),
             DeviceId("a2"): DeviceSlotInfo(
                 SlotTypes.COUNT, SlotName("cuda.shares"), Decimal("1.0")
             ),
@@ -855,7 +855,7 @@ def test_heterogeneous_resource_slots_with_fractional_alloc_map() -> None:
             ),
             DeviceId("a4"): DeviceSlotInfo(
                 SlotTypes.UNIQUE, SlotName("cuda.device:3g.20gb-mig"), Decimal(1)
-            ),  # noqa
+            ),
         },
         exclusive_slot_types={"cuda.device:*-mig", "cuda.device", "cuda.shares"},
         allocation_strategy=AllocationStrategy.FILL,

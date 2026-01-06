@@ -3,7 +3,6 @@ Simple tests for Container Metric Service functionality.
 Tests the core container metric service actions to verify metric collection and querying capabilities.
 """
 
-from typing import Tuple
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import UUID
 
@@ -29,7 +28,7 @@ from ai.backend.manager.services.metric.types import (
 )
 
 
-def create_mock_aiohttp_session() -> Tuple[Mock, AsyncMock]:
+def create_mock_aiohttp_session() -> tuple[Mock, AsyncMock]:
     """Create a properly configured mock session that supports async context manager protocol."""
     mock_session = Mock()
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import pytest
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 @pytest.fixture
 async def pagination_test_db(
-    database_engine: ExtendedAsyncSAEngine,
+    database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[tuple[AsyncConnection, sa.Table], None]:
     """Create test table with 100 items for pagination testing."""
     metadata = sa.MetaData()
@@ -38,7 +38,7 @@ async def pagination_test_db(
         sa.Column("created_at", sa.DateTime(timezone=True)),
     )
 
-    async with database_engine.begin() as conn:
+    async with database_connection.begin() as conn:
         await conn.run_sync(lambda c: metadata.create_all(c, [test_items]))
 
         # Insert 100 items with sequential IDs (1-100)
@@ -48,7 +48,7 @@ async def pagination_test_db(
                 {
                     "id": i,
                     "name": f"item-{i:03d}",
-                    "created_at": datetime.now(timezone.utc),
+                    "created_at": datetime.now(UTC),
                 }
                 for i in range(1, 101)
             ],
@@ -295,7 +295,7 @@ class TestEdgeCases:
 
     async def test_empty_table(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> None:
         """Test pagination on empty table."""
         metadata = sa.MetaData()
@@ -306,7 +306,7 @@ class TestEdgeCases:
             sa.Column("name", sa.String(50)),
         )
 
-        async with database_engine.begin() as conn:
+        async with database_connection.begin() as conn:
             await conn.run_sync(lambda c: metadata.create_all(c, [empty_table]))
 
             try:
@@ -344,7 +344,7 @@ class TestEdgeCases:
 
     async def test_single_item(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> None:
         """Test pagination with single item."""
         metadata = sa.MetaData()
@@ -355,7 +355,7 @@ class TestEdgeCases:
             sa.Column("name", sa.String(50)),
         )
 
-        async with database_engine.begin() as conn:
+        async with database_connection.begin() as conn:
             await conn.run_sync(lambda c: metadata.create_all(c, [single_table]))
             await conn.execute(single_table.insert(), [{"id": 1, "name": "only-one"}])
 

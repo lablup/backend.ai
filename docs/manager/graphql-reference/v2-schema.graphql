@@ -2060,7 +2060,7 @@ type Query {
   Use filters to narrow down results by type, name, registry, or availability.
   Supports cursor-based pagination for efficient browsing of large datasets.
   """
-  artifacts(filter: ArtifactFilter = {type: null, name: null, registry: null, source: null, availability: [ALIVE], AND: null, OR: null, NOT: null}, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactConnection!
+  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactConnection!
 
   """
   Added in 25.14.0.
@@ -2874,11 +2874,17 @@ input StringFilter {
   startsWith: String = null
   endsWith: String = null
   equals: String = null
+  notContains: String = null
+  notStartsWith: String = null
+  notEndsWith: String = null
   notEquals: String = null
   iContains: String = null
   iStartsWith: String = null
   iEndsWith: String = null
   iEquals: String = null
+  iNotContains: String = null
+  iNotStartsWith: String = null
+  iNotEndsWith: String = null
   iNotEquals: String = null
 }
 

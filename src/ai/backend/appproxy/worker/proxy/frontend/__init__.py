@@ -1,12 +1,12 @@
 __all__ = [
+    "H2PortFrontend",
+    "H2SubdomainFrontend",
+    "HTTPPortFrontend",
+    "HTTPSubdomainFrontend",
+    "TCPFrontend",
     "TraefikPortFrontend",
     "TraefikSubdomainFrontend",
     "TraefikTCPFrontend",
-    "HTTPPortFrontend",
-    "HTTPSubdomainFrontend",
-    "H2PortFrontend",
-    "H2SubdomainFrontend",
-    "TCPFrontend",
 ]
 
 from .h2.port import PortFrontend as H2PortFrontend

@@ -14,17 +14,17 @@ from typing import Optional, Self
 from click import echo, style
 from tqdm import tqdm
 
-from ..exceptions import BackendAPIError
+from ai.backend.client.exceptions import BackendAPIError
 
 __all__ = (
     "PrintStatus",
-    "print_pretty",
-    "print_info",
-    "print_wait",
     "print_done",
-    "print_warn",
-    "print_fail",
     "print_error",
+    "print_fail",
+    "print_info",
+    "print_pretty",
+    "print_wait",
+    "print_warn",
     "show_warning",
 )
 
@@ -98,7 +98,7 @@ def print_pretty(msg, *, status=PrintStatus.NONE, file=None):
     echo("\x1b[2K", nl=False, file=file)
     text = textwrap.indent(msg, "  ")
     text = style(indicator + text[1:], reset=True)
-    echo("{0}\r".format(text), nl=False, file=file)
+    echo(f"{text}\r", nl=False, file=file)
     file.flush()
     if status != PrintStatus.WAITING:
         echo("", file=file)
@@ -118,14 +118,14 @@ def _format_gql_path(items: Sequence[str | int]) -> str:
             case int():
                 pieces.append(f"[{item}]")
             case _:
-                pieces.append(f".{str(item)}")
+                pieces.append(f".{item!s}")
     return "".join(pieces)[1:]  # strip first dot
 
 
 def format_error(exc: Exception):
     if isinstance(exc, BackendAPIError):
-        yield "{0}: {1} {2}\n".format(exc.__class__.__name__, exc.status, exc.reason)
-        yield "{0[title]}".format(exc.data)
+        yield f"{exc.__class__.__name__}: {exc.status} {exc.reason}\n"
+        yield f"{exc.data['title']}"
         if exc.data["type"].endswith("/too-many-sessions-matched"):
             matches = exc.data["data"].get("matches", [])
             if matches:
@@ -190,7 +190,7 @@ def print_error(exc: Exception, *, file=None):
     text = "".join(format_error(exc))
     text = textwrap.indent(text, "  ")
     text = style(indicator + text[1:], reset=True)
-    echo("{0}\r".format(text), nl=False, file=file)
+    echo(f"{text}\r", nl=False, file=file)
     echo("", file=file)
     file.flush()
 

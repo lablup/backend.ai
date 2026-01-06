@@ -56,24 +56,24 @@ class TestUpserterBasic:
     @pytest.fixture
     async def upserter_row_class(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[type[UpserterTestRow], None]:
         """Create ORM test table with unique constraint on name and return row class."""
-        async with database_engine.begin() as conn:
+        async with database_connection.begin() as conn:
             await conn.run_sync(lambda c: Base.metadata.create_all(c, [UpserterTestRow.__table__]))
 
         yield UpserterTestRow
 
-        async with database_engine.begin() as conn:
+        async with database_connection.begin() as conn:
             await conn.execute(sa.text("DROP TABLE IF EXISTS test_upserter_orm CASCADE"))
 
     async def test_upsert_insert_new_row(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         upserter_row_class: type[UpserterTestRow],
     ) -> None:
         """Test upserting a new row (insert case)."""
-        async with database_engine.begin_session() as db_sess:
+        async with database_connection.begin_session() as db_sess:
             spec = SimpleUpserterSpec(name="new-item", value="initial-value")
             upserter: Upserter[UpserterTestRow] = Upserter(spec=spec)
 
@@ -93,12 +93,12 @@ class TestUpserterBasic:
 
     async def test_upsert_update_existing_row(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
         upserter_row_class: type[UpserterTestRow],
     ) -> None:
         """Test upserting an existing row (update case)."""
         table = upserter_row_class.__table__
-        async with database_engine.begin_session() as db_sess:
+        async with database_connection.begin_session() as db_sess:
             # First insert
             await db_sess.execute(table.insert().values(name="existing-item", value="old-value"))
             count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(table))

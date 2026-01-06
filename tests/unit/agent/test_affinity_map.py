@@ -550,7 +550,7 @@ def test_affinity_map_secondary_allocation_with_existing_alloc(
     print()
 
     # Simulate a prior session already allocated.
-    for core_idx in range(0, 24):
+    for core_idx in range(24):
         alloc_map.allocations[SlotName("cpu")][DeviceId(str(core_idx))] = Decimal(1)
     for npu_id in ("npu0", "npu1", "npu2"):
         alloc_map.allocations[SlotName("npu")][DeviceId(npu_id)] = Decimal(1)

@@ -1,5 +1,6 @@
 import uuid
-from typing import Any, Mapping, Optional, Sequence, Union
+from collections.abc import Mapping, Sequence
+from typing import Any, Optional
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -53,11 +54,12 @@ from ai.backend.manager.models.vfolder import (
     query_accessible_vfolders,
     vfolders,
 )
-
-from ..base.creator import Creator
-from ..base.updater import Updater, execute_updater
-from ..permission_controller.creators import AssociationScopesEntitiesCreatorSpec
-from ..permission_controller.role_manager import RoleManager
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.permission_controller.creators import (
+    AssociationScopesEntitiesCreatorSpec,
+)
+from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 
 vfolder_repository_resilience = Resilience(
     policies=[
@@ -638,7 +640,7 @@ class VfolderRepository:
 
     @vfolder_repository_resilience.apply()
     async def get_group_resource_info(
-        self, group_id_or_name: Union[str, uuid.UUID], domain_name: str
+        self, group_id_or_name: str | uuid.UUID, domain_name: str
     ) -> Optional[tuple[uuid.UUID, int, int, ProjectType]]:
         """
         Get group resource information by group ID or name.

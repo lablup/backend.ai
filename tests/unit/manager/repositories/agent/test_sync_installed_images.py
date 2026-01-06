@@ -17,10 +17,32 @@ from ai.backend.common.data.image.types import InstalledImageInfo
 from ai.backend.common.types import AgentId, ImageID, ValkeyTarget
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageType
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import ImageAliasRow, ImageRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.agent.repository import AgentRepository
+from ai.backend.testutils.db import with_tables
 
 
 @dataclass
@@ -125,9 +147,45 @@ class TestSyncInstalledImagesIntegration:
         return mock
 
     @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents before children
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ContainerRegistryRow,
+                ImageRow,
+                ImageAliasRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
     async def agent_repository(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         valkey_image_client: ValkeyImageClient,
         valkey_live_client: ValkeyLiveClient,
         valkey_stat_client: ValkeyStatClient,
@@ -135,7 +193,7 @@ class TestSyncInstalledImagesIntegration:
     ) -> AgentRepository:
         """Create AgentRepository with all dependencies."""
         return AgentRepository(
-            db=database_engine,
+            db=db_with_cleanup,
             valkey_image=valkey_image_client,
             valkey_live=valkey_live_client,
             valkey_stat=valkey_stat_client,
@@ -145,16 +203,17 @@ class TestSyncInstalledImagesIntegration:
     @asynccontextmanager
     async def create_test_images(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         images_data: list[_TestImageInput],
     ) -> AsyncIterator[list[_TestImageData]]:
-        """Create test images in DB and clean up after use."""
+        """Create test images in DB. TRUNCATE CASCADE handles cleanup."""
         test_images: list[_TestImageData] = []
         registry_id = uuid.uuid4()
 
-        async with database_engine.begin_session() as db_session:
+        async with db_with_cleanup.begin_session() as db_session:
             # Create container registry first
             registry = ContainerRegistryRow(
+                id=registry_id,
                 url="https://cr.backend.ai",
                 registry_name="test-registry",
                 type=ContainerRegistryType.HARBOR2,
@@ -164,7 +223,6 @@ class TestSyncInstalledImagesIntegration:
             )
             db_session.add(registry)
             await db_session.flush()
-            registry_id = registry.id
 
             # Create images
             for img_data in images_data:
@@ -195,26 +253,12 @@ class TestSyncInstalledImagesIntegration:
 
             await db_session.commit()
 
-        try:
-            yield test_images
-        finally:
-            # Cleanup
-            async with database_engine.begin_session() as db_session:
-                for test_image in test_images:
-                    await db_session.execute(
-                        ImageRow.__table__.delete().where(ImageRow.id == test_image.id)
-                    )
-                await db_session.execute(
-                    ContainerRegistryRow.__table__.delete().where(
-                        ContainerRegistryRow.id == registry_id
-                    )
-                )
-                await db_session.commit()
+        yield test_images
 
     @pytest.mark.asyncio
     async def test_sync_installed_images_with_digest_mismatch(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         valkey_image_client: ValkeyImageClient,
         agent_repository: AgentRepository,
     ) -> None:
@@ -222,7 +266,7 @@ class TestSyncInstalledImagesIntegration:
         Verify that sync works when agent digest differs from DB digest.
         """
         async with self.create_test_images(
-            database_engine,
+            db_with_cleanup,
             [
                 _TestImageInput(
                     name="cr.backend.ai/stable/python:3.11-ubuntu20.04",
@@ -277,13 +321,13 @@ class TestSyncInstalledImagesIntegration:
     @pytest.mark.asyncio
     async def test_sync_installed_images_empty_redis(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         valkey_image_client: ValkeyImageClient,
         agent_repository: AgentRepository,
     ) -> None:
         """Test sync when Redis has no installed images for the agent."""
         async with self.create_test_images(
-            database_engine,
+            db_with_cleanup,
             [
                 _TestImageInput(
                     name="cr.backend.ai/stable/python:3.11-ubuntu20.04",
@@ -309,13 +353,13 @@ class TestSyncInstalledImagesIntegration:
     @pytest.mark.asyncio
     async def test_sync_installed_images_multiple_architectures(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         valkey_image_client: ValkeyImageClient,
         agent_repository: AgentRepository,
     ) -> None:
         """Test sync with same image name but different architectures."""
         async with self.create_test_images(
-            database_engine,
+            db_with_cleanup,
             [
                 _TestImageInput(
                     name="cr.backend.ai/stable/python:3.11",
@@ -376,13 +420,13 @@ class TestSyncInstalledImagesIntegration:
     async def test_sync_installed_images_different_architectures(
         self,
         architecture: str,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         valkey_image_client: ValkeyImageClient,
         agent_repository: AgentRepository,
     ) -> None:
         """Test sync works correctly for x86_64 and aarch64 separately."""
         async with self.create_test_images(
-            database_engine,
+            db_with_cleanup,
             [
                 _TestImageInput(
                     name="cr.backend.ai/stable/python:3.11",
@@ -421,13 +465,13 @@ class TestSyncInstalledImagesIntegration:
     @pytest.mark.asyncio
     async def test_sync_installed_images_partial_match(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         valkey_image_client: ValkeyImageClient,
         agent_repository: AgentRepository,
     ) -> None:
         """Test when some agent-reported images don't exist in DB."""
         async with self.create_test_images(
-            database_engine,
+            db_with_cleanup,
             [
                 _TestImageInput(
                     name="cr.backend.ai/stable/python:3.11-ubuntu20.04",

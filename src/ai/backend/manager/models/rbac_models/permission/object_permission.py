@@ -12,8 +12,7 @@ from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
 )
-
-from ...base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     IDColumn,
@@ -21,7 +20,7 @@ from ...base import (
 )
 
 if TYPE_CHECKING:
-    from ..role import RoleRow
+    from ai.backend.manager.models.rbac_models.role import RoleRow
 
 
 class ObjectPermissionRow(Base):

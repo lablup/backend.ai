@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import AsyncGenerator
 from decimal import Decimal
-from typing import TYPE_CHECKING, AsyncGenerator
+from typing import TYPE_CHECKING
 
 import pytest
 import sqlalchemy as sa
@@ -20,21 +21,33 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.image.types import ImageType
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyData,
     DeploymentAutoScalingPolicyRow,
 )
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.testutils.db import with_tables
 
 
 def create_test_password_info(password: str) -> PasswordInfo:
@@ -57,21 +70,36 @@ class TestDeploymentAutoScalingPolicyRow:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans data after each test."""
-        yield database_engine
-
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(DeploymentAutoScalingPolicyRow))
-            await db_sess.execute(sa.delete(EndpointRow))
-            await db_sess.execute(sa.delete(ImageRow))
-            await db_sess.execute(sa.delete(GroupRow))
-            await db_sess.execute(sa.delete(UserRow))
-            await db_sess.execute(sa.delete(UserResourcePolicyRow))
-            await db_sess.execute(sa.delete(ProjectResourcePolicyRow))
-            await db_sess.execute(sa.delete(ScalingGroupRow))
-            await db_sess.execute(sa.delete(DomainRow))
+        """Database connection with tables. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents before children
+                DomainRow,
+                ScalingGroupRow,
+                AgentRow,
+                ResourcePresetRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                VFolderRow,
+                ImageRow,
+                SessionRow,
+                KernelRow,
+                RoutingRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentRevisionRow,
+                DeploymentAutoScalingPolicyRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def test_domain(

@@ -16,7 +16,7 @@ class BatchSessionCreationFailureTimeout(TestCode):
         client_session = ClientSessionContext.current()
         spec_meta = TestSpecMetaContext.current()
         test_id = spec_meta.test_id
-        session_name = f"test_failure_{str(test_id)}"
+        session_name = f"test_failure_{test_id!s}"
 
         image_dep = ImageContext.current()
         session_dep = SessionContext.current()

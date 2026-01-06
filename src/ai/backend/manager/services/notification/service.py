@@ -4,7 +4,7 @@ import asyncio
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, cast
 
 from ai.backend.common.data.notification import NotifiableMessage
@@ -47,8 +47,7 @@ from .actions import (
 if TYPE_CHECKING:
     from ai.backend.manager.data.notification.types import NotificationRuleData
     from ai.backend.manager.notification import NotificationCenter
-
-    from ...repositories.notification import NotificationRepository
+    from ai.backend.manager.repositories.notification import NotificationRepository
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -225,7 +224,7 @@ class NotificationService:
                 message_template=rule.message_template,
                 rule_type=rule.rule_type,
                 channel=rule.channel,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(UTC),
                 notification_data=validated_data,
             )
         )
@@ -379,7 +378,7 @@ class NotificationService:
         successes: list[ProcessedRuleSuccess] = []
         errors: list[BaseException] = []
 
-        for rule, result in zip(rules, results):
+        for rule, result in zip(rules, results, strict=True):
             if isinstance(result, BaseException):
                 errors.append(result)
                 log.error(

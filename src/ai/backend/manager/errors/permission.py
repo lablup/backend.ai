@@ -11,12 +11,12 @@ from ai.backend.common.exception import (
 )
 
 __all__ = (
-    "RoleNotFound",
+    "NotEnoughPermission",
+    "ObjectPermissionNotFound",
+    "PermissionNotFound",
     "RoleAlreadyAssigned",
     "RoleNotAssigned",
-    "NotEnoughPermission",
-    "PermissionNotFound",
-    "ObjectPermissionNotFound",
+    "RoleNotFound",
 )
 
 

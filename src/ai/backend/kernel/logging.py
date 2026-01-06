@@ -17,7 +17,7 @@ class RelativeCreatedFormatter(logging.Formatter):
 
 
 class BraceMessage:
-    __slots__ = ("fmt", "args")
+    __slots__ = ("args", "fmt")
 
     def __init__(self, fmt, args) -> None:
         self.fmt = fmt

@@ -5,8 +5,8 @@ Tests for agent configuration and RPC server functionality.
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest

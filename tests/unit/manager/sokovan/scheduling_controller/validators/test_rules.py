@@ -3,7 +3,6 @@
 import uuid
 from collections.abc import Callable
 from datetime import datetime, timedelta
-from typing import Optional
 from unittest.mock import MagicMock
 
 import pytest
@@ -18,7 +17,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.kernel import QuotaExceeded
-from ai.backend.manager.models import NetworkRow
+from ai.backend.manager.models.network import NetworkRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     AllowedScalingGroup,
@@ -68,18 +67,22 @@ def basic_context() -> SessionCreationContext:
     )
 
 
+_DEFAULT_ACCESS_KEY = AccessKey("test-key")
+_DEFAULT_USER_SCOPE = UserScope(
+    domain_name="default",
+    group_id=uuid.uuid4(),
+    user_uuid=uuid.uuid4(),
+    user_role="user",
+)
+
+
 @pytest.fixture
 def session_spec_factory() -> Callable[..., SessionCreationSpec]:
     def create_spec(
         session_creation_id: str = "test-001",
         session_name: str = "test-session",
-        access_key: AccessKey = AccessKey("test-key"),
-        user_scope: UserScope = UserScope(
-            domain_name="default",
-            group_id=uuid.uuid4(),
-            user_uuid=uuid.uuid4(),
-            user_role="user",
-        ),
+        access_key: AccessKey = _DEFAULT_ACCESS_KEY,
+        user_scope: UserScope = _DEFAULT_USER_SCOPE,
         session_type: SessionTypes = SessionTypes.INTERACTIVE,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
         cluster_size: int = 1,
@@ -87,17 +90,17 @@ def session_spec_factory() -> Callable[..., SessionCreationSpec]:
         resource_policy: dict | None = None,
         kernel_specs: list[KernelEnqueueingConfig] | None = None,
         creation_spec: dict | None = None,
-        scaling_group: Optional[str] = None,
-        session_tag: Optional[str] = None,
-        starts_at: Optional[datetime] = None,
-        batch_timeout: Optional[timedelta] = None,
-        dependency_sessions: Optional[list[SessionId]] = None,
-        callback_url: Optional[yarl.URL] = None,
-        route_id: Optional[uuid.UUID] = None,
+        scaling_group: str | None = None,
+        session_tag: str | None = None,
+        starts_at: datetime | None = None,
+        batch_timeout: timedelta | None = None,
+        dependency_sessions: list[SessionId] | None = None,
+        callback_url: yarl.URL | None = None,
+        route_id: uuid.UUID | None = None,
         sudo_session_enabled: bool = False,
-        network: Optional[NetworkRow] = None,
-        designated_agent_list: Optional[list[str]] = None,
-        internal_data: Optional[dict] = None,
+        network: NetworkRow | None = None,
+        designated_agent_list: list[str] | None = None,
+        internal_data: dict | None = None,
         public_sgroup_only: bool = True,
     ) -> SessionCreationSpec:
         return SessionCreationSpec(

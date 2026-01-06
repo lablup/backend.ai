@@ -1,16 +1,31 @@
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
 
 from ai.backend.common.types import BinarySize, QuotaScopeID
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import (
     PasswordHashAlgorithm,
     PasswordInfo,
@@ -19,21 +34,56 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import ensure_quota_scope_accessible_by_user
+from ai.backend.manager.models.vfolder import VFolderRow, ensure_quota_scope_accessible_by_user
+from ai.backend.testutils.db import with_tables
 
 
 class TestEnsureQuotaScopeAccessibleByUser:
     """Test cases for ensure_quota_scope_accessible_by_user function"""
 
     @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with tables. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents before children
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                AgentRow,
+                VFolderRow,
+                ImageRow,
+                ResourcePresetRow,
+                EndpointRow,
+                DeploymentRevisionRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentPolicyRow,
+                SessionRow,
+                KernelRow,
+                RoutingRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
     async def test_domain_name(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[str, None]:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid4().hex[:8]}"
 
-        async with database_engine.begin_session() as db_sess:
+        async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
                 name=domain_name,
                 description="Test domain for quota scope",
@@ -50,12 +100,12 @@ class TestEnsureQuotaScopeAccessibleByUser:
     @pytest.fixture
     async def other_domain_name(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[str, None]:
         """Create other test domain and return domain name"""
         domain_name = f"test-domain-{uuid4().hex[:8]}"
 
-        async with database_engine.begin_session() as db_sess:
+        async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
                 name=domain_name,
                 description="Other test domain",
@@ -72,16 +122,16 @@ class TestEnsureQuotaScopeAccessibleByUser:
     @pytest.fixture
     async def test_resource_policy_name(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[str, None]:
         """Create test resource policy and return policy name"""
         policy_name = f"test-policy-{uuid4().hex[:8]}"
 
-        async with database_engine.begin_session() as db_sess:
+        async with db_with_cleanup.begin_session() as db_sess:
             policy = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_session_count_per_model_session=5,
                 max_customized_image_count=3,
             )
@@ -93,7 +143,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
     @pytest.fixture
     async def domain_admin_user(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[UUID, None]:
@@ -106,7 +156,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
             salt_size=32,
         )
 
-        async with database_engine.begin_session() as db_sess:
+        async with db_with_cleanup.begin_session() as db_sess:
             user = UserRow(
                 uuid=user_uuid,
                 username=f"test_admin_{user_uuid.hex[:8]}",
@@ -127,7 +177,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
     @pytest.fixture
     async def regular_user(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[UUID, None]:
@@ -140,7 +190,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
             salt_size=32,
         )
 
-        async with database_engine.begin_session() as db_sess:
+        async with db_with_cleanup.begin_session() as db_sess:
             user = UserRow(
                 uuid=user_uuid,
                 username=f"test_user_{user_uuid.hex[:8]}",
@@ -161,7 +211,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
     @pytest.fixture
     async def other_domain_user(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         other_domain_name: str,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[UUID, None]:
@@ -174,7 +224,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
             salt_size=32,
         )
 
-        async with database_engine.begin_session() as db_sess:
+        async with db_with_cleanup.begin_session() as db_sess:
             user = UserRow(
                 uuid=user_uuid,
                 username=f"test_other_{user_uuid.hex[:8]}",
@@ -208,16 +258,16 @@ class TestEnsureQuotaScopeAccessibleByUser:
     @pytest.fixture
     async def test_project_resource_policy_name(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[str, None]:
         """Create test project resource policy and return policy name"""
         policy_name = f"test-group-policy-{uuid4().hex[:8]}"
 
-        async with database_engine.begin_session() as db_sess:
+        async with db_with_cleanup.begin_session() as db_sess:
             policy = ProjectResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_network_count=5,
             )
             db_sess.add(policy)
@@ -228,14 +278,14 @@ class TestEnsureQuotaScopeAccessibleByUser:
     @pytest.fixture
     async def test_group(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_project_resource_policy_name: str,
     ) -> AsyncGenerator[UUID, None]:
         """Create test group and return group UUID"""
         group_uuid = uuid4()
 
-        async with database_engine.begin_session() as db_sess:
+        async with db_with_cleanup.begin_session() as db_sess:
             group = GroupRow(
                 id=group_uuid,
                 name=f"test_group_{group_uuid.hex[:8]}",
@@ -255,14 +305,14 @@ class TestEnsureQuotaScopeAccessibleByUser:
     @pytest.mark.asyncio
     async def test_ensure_quota_scope_accessible_by_domain_admin_with_user_dict(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         regular_user: UUID,
         domain_user_data_dict: dict[str, Any],
     ) -> None:
         """Test admin accessing user quota scope within same domain with user dict"""
         quota_scope = QuotaScopeID.parse(f"user:{regular_user}")
 
-        async with database_engine.begin_session() as session:
+        async with db_with_cleanup.begin_session() as session:
             # Should not raise any exception
             await ensure_quota_scope_accessible_by_user(
                 session,
@@ -273,14 +323,14 @@ class TestEnsureQuotaScopeAccessibleByUser:
     @pytest.mark.asyncio
     async def test_ensure_quota_scope_not_accessible_by_admin_from_other_domain(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         other_domain_user: UUID,
         domain_user_data_dict: dict[str, Any],
     ) -> None:
         """Test admin cannot access user quota scope from different domain"""
         quota_scope = QuotaScopeID.parse(f"user:{other_domain_user}")
 
-        async with database_engine.begin_session() as session:
+        async with db_with_cleanup.begin_session() as session:
             with pytest.raises(InvalidAPIParameters):
                 await ensure_quota_scope_accessible_by_user(
                     session,
@@ -291,14 +341,14 @@ class TestEnsureQuotaScopeAccessibleByUser:
     @pytest.mark.asyncio
     async def test_ensure_group_quota_scope_accessible_by_admin(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_group: UUID,
         domain_user_data_dict: dict[str, Any],
     ) -> None:
         """Test admin accessing project quota scope within same domain"""
         quota_scope = QuotaScopeID.parse(f"project:{test_group}")
 
-        async with database_engine.begin_session() as session:
+        async with db_with_cleanup.begin_session() as session:
             # Should not raise any exception
             await ensure_quota_scope_accessible_by_user(
                 session,

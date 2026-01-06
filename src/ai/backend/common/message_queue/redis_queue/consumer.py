@@ -4,20 +4,20 @@ import asyncio
 import hashlib
 import logging
 import socket
-from collections.abc import Iterable
+from collections.abc import AsyncGenerator, Iterable
 from dataclasses import dataclass
-from typing import AsyncGenerator, Optional, Self, override
+from typing import Optional, Self, override
 
 import glide
 from aiotools.server import process_index
 
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.message_queue.abc import AbstractConsumer
+from ai.backend.common.message_queue.types import MessageId, MQMessage
 from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
-from ..abc import AbstractConsumer
-from ..types import MessageId, MQMessage
 from .exceptions import MessageQueueClosedError
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

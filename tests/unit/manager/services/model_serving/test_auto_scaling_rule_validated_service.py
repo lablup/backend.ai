@@ -6,7 +6,7 @@ Tests the service layer with mocked repository operations.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -41,8 +41,8 @@ class TestAutoScalingServiceSearch:
             cooldown_seconds=300,
             min_replicas=1,
             max_replicas=10,
-            created_at=datetime.now(timezone.utc),
-            last_triggered_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            last_triggered_at=datetime.now(UTC),
             endpoint=uuid.uuid4(),
         )
 

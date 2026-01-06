@@ -1,7 +1,8 @@
 import enum
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from itertools import product
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any, Optional
 
 from ai.backend.test.contexts.context import ContextName
 from ai.backend.test.templates.template import (
@@ -63,7 +64,7 @@ class TestSpec:
             return None
         keys = list(self.parametrizes.keys())
         values_product = product(*(self.parametrizes[key] for key in keys))
-        return [dict(zip(keys, combination)) for combination in values_product]
+        return [dict(zip(keys, combination, strict=True)) for combination in values_product]
 
 
 class TestSpecManager:

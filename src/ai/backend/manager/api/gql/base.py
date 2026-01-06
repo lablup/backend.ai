@@ -5,7 +5,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Optional, Protocol, Type, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Optional, Protocol, TypeVar, cast
 
 import graphene
 import strawberry
@@ -24,6 +24,15 @@ if TYPE_CHECKING:
     )
 
 
+@dataclass(frozen=True)
+class StringMatchSpec:
+    """Specification for string matching operations in query conditions."""
+
+    value: str
+    case_insensitive: bool
+    negated: bool
+
+
 @strawberry.scalar
 class ByteSize(str):
     """
@@ -38,22 +47,33 @@ class ByteSize(str):
     def parse_literal(ast) -> str:
         if not isinstance(ast, StringValueNode):
             raise ValueError("ByteSize must be provided as a string literal")
-        value = ast.value
-        return value
+        return ast.value
 
 
 @strawberry.input
 class StringFilter:
+    # Basic operations
     contains: Optional[str] = None
     starts_with: Optional[str] = None
     ends_with: Optional[str] = None
     equals: Optional[str] = None
+
+    # NOT operations
+    not_contains: Optional[str] = None
+    not_starts_with: Optional[str] = None
+    not_ends_with: Optional[str] = None
     not_equals: Optional[str] = None
 
+    # Case-insensitive operations
     i_contains: Optional[str] = strawberry.field(name="iContains", default=None)
     i_starts_with: Optional[str] = strawberry.field(name="iStartsWith", default=None)
     i_ends_with: Optional[str] = strawberry.field(name="iEndsWith", default=None)
     i_equals: Optional[str] = strawberry.field(name="iEquals", default=None)
+
+    # Case-insensitive NOT operations
+    i_not_contains: Optional[str] = strawberry.field(name="iNotContains", default=None)
+    i_not_starts_with: Optional[str] = strawberry.field(name="iNotStartsWith", default=None)
+    i_not_ends_with: Optional[str] = strawberry.field(name="iNotEndsWith", default=None)
     i_not_equals: Optional[str] = strawberry.field(name="iNotEquals", default=None)
 
     def to_dataclass(self) -> StringFilterData:
@@ -72,26 +92,94 @@ class StringFilter:
 
     def build_query_condition(
         self,
-        contains_factory: Callable[[str, bool], QueryCondition],
-        equals_factory: Callable[[str, bool], QueryCondition],
+        contains_factory: Callable[[StringMatchSpec], QueryCondition],
+        equals_factory: Callable[[StringMatchSpec], QueryCondition],
+        starts_with_factory: Callable[[StringMatchSpec], QueryCondition],
+        ends_with_factory: Callable[[StringMatchSpec], QueryCondition],
     ) -> Optional[QueryCondition]:
         """Build a query condition from this filter using the provided factory callables.
 
         Args:
-            contains_factory: Factory function that takes (value, case_insensitive) and returns QueryCondition
-            equals_factory: Factory function that takes (value, case_insensitive) and returns QueryCondition
+            contains_factory: Factory for LIKE '%value%' operations
+            equals_factory: Factory for exact match (=) operations
+            starts_with_factory: Factory for LIKE 'value%' operations
+            ends_with_factory: Factory for LIKE '%value' operations
 
         Returns:
             QueryCondition if any filter field is set, None otherwise
         """
+        # equals operations
         if self.equals:
-            return equals_factory(self.equals, False)
-        elif self.i_equals:
-            return equals_factory(self.i_equals, True)
-        elif self.contains:
-            return contains_factory(self.contains, False)
-        elif self.i_contains:
-            return contains_factory(self.i_contains, True)
+            return equals_factory(
+                StringMatchSpec(self.equals, case_insensitive=False, negated=False)
+            )
+        if self.i_equals:
+            return equals_factory(
+                StringMatchSpec(self.i_equals, case_insensitive=True, negated=False)
+            )
+        if self.not_equals:
+            return equals_factory(
+                StringMatchSpec(self.not_equals, case_insensitive=False, negated=True)
+            )
+        if self.i_not_equals:
+            return equals_factory(
+                StringMatchSpec(self.i_not_equals, case_insensitive=True, negated=True)
+            )
+
+        # contains operations
+        if self.contains:
+            return contains_factory(
+                StringMatchSpec(self.contains, case_insensitive=False, negated=False)
+            )
+        if self.i_contains:
+            return contains_factory(
+                StringMatchSpec(self.i_contains, case_insensitive=True, negated=False)
+            )
+        if self.not_contains:
+            return contains_factory(
+                StringMatchSpec(self.not_contains, case_insensitive=False, negated=True)
+            )
+        if self.i_not_contains:
+            return contains_factory(
+                StringMatchSpec(self.i_not_contains, case_insensitive=True, negated=True)
+            )
+
+        # starts_with operations
+        if self.starts_with:
+            return starts_with_factory(
+                StringMatchSpec(self.starts_with, case_insensitive=False, negated=False)
+            )
+        if self.i_starts_with:
+            return starts_with_factory(
+                StringMatchSpec(self.i_starts_with, case_insensitive=True, negated=False)
+            )
+        if self.not_starts_with:
+            return starts_with_factory(
+                StringMatchSpec(self.not_starts_with, case_insensitive=False, negated=True)
+            )
+        if self.i_not_starts_with:
+            return starts_with_factory(
+                StringMatchSpec(self.i_not_starts_with, case_insensitive=True, negated=True)
+            )
+
+        # ends_with operations
+        if self.ends_with:
+            return ends_with_factory(
+                StringMatchSpec(self.ends_with, case_insensitive=False, negated=False)
+            )
+        if self.i_ends_with:
+            return ends_with_factory(
+                StringMatchSpec(self.i_ends_with, case_insensitive=True, negated=False)
+            )
+        if self.not_ends_with:
+            return ends_with_factory(
+                StringMatchSpec(self.not_ends_with, case_insensitive=False, negated=True)
+            )
+        if self.i_not_ends_with:
+            return ends_with_factory(
+                StringMatchSpec(self.i_not_ends_with, case_insensitive=True, negated=True)
+            )
+
         return None
 
 
@@ -142,9 +230,9 @@ class DateTimeFilter:
         """
         if self.equals and equals_factory:
             return equals_factory(self.equals)
-        elif self.before:
+        if self.before:
             return before_factory(self.before)
-        elif self.after:
+        if self.after:
             return after_factory(self.after)
         return None
 
@@ -179,10 +267,9 @@ class JSONString:
     def serialize(value: Any) -> JSONString:
         if isinstance(value, (dict, list)):
             return cast(JSONString, dump_json_str(value))
-        elif isinstance(value, str):
+        if isinstance(value, str):
             return cast(JSONString, value)
-        else:
-            return cast(JSONString, dump_json_str(value))
+        return cast(JSONString, dump_json_str(value))
 
     @staticmethod
     def from_resource_slot(resource_slot: ResourceSlot) -> JSONString:
@@ -190,7 +277,7 @@ class JSONString:
 
 
 def to_global_id(
-    type_: Type[Any], local_id: uuid.UUID | str, is_target_graphene_object: bool = False
+    type_: type[Any], local_id: uuid.UUID | str, is_target_graphene_object: bool = False
 ) -> str:
     if is_target_graphene_object:
         # For compatibility with existing Graphene-based global IDs
@@ -275,7 +362,7 @@ class PageInfo:
     start_cursor: Optional[str] = None
     end_cursor: Optional[str] = None
 
-    def to_strawberry_page_info(self) -> "strawberry.relay.PageInfo":
+    def to_strawberry_page_info(self) -> strawberry.relay.PageInfo:
         return strawberry.relay.PageInfo(
             has_next_page=self.has_next_page,
             has_previous_page=self.has_previous_page,

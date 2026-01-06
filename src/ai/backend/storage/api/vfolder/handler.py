@@ -14,8 +14,7 @@ from ai.backend.common.dto.storage.response import (
     VFolderMetadataResponse,
 )
 from ai.backend.common.types import QuotaConfig, VFolderID, VolumeID
-
-from ...volumes.types import (
+from ai.backend.storage.volumes.types import (
     QuotaScopeKey,
     QuotaScopeMeta,
     VFolderKey,

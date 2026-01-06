@@ -9,8 +9,7 @@ from typing import (
 
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountPermission
-
-from ..types import VFolderInvitationInfo
+from ai.backend.manager.services.vfolder.types import VFolderInvitationInfo
 
 
 @dataclass

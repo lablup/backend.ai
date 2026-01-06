@@ -4,8 +4,8 @@ import secrets
 import shutil
 import subprocess
 from collections import defaultdict
+from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import AsyncIterator
 from unittest.mock import AsyncMock, Mock
 
 import aiodocker

@@ -13,12 +13,13 @@ import logging
 import os
 import sys
 import warnings
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from itertools import groupby
 from pathlib import Path
 from queue import Queue
-from typing import Any, Final, Mapping, cast
+from typing import Any, Final, cast
 
 import sqlalchemy as sa
 import trafaret as t
@@ -173,7 +174,7 @@ def migrate_data_etcd_to_psql() -> None:
 
         def backup(etcd_container_registries: Mapping[str, Any]):
             backup_path = Path(os.getenv("BACKEND_ETCD_BACKUP_PATH", "."))
-            backup_path /= ETCD_BACKUP_FILENAME_PATTERN.format(timestamp=datetime.now().isoformat())
+            backup_path /= ETCD_BACKUP_FILENAME_PATTERN.format(timestamp=datetime.now().isoformat())  # noqa: DTZ005
             with open(backup_path, "w") as f:
                 json.dump(dict(etcd_container_registries), f, indent=4)
 
@@ -204,8 +205,7 @@ def migrate_data_etcd_to_psql() -> None:
             file=sys.stderr,
         )
         raise RuntimeError(err_msg) from maybe_registries
-    else:
-        registries = cast(Mapping[str, Any], maybe_registries)
+    registries = cast(Mapping[str, Any], maybe_registries)
 
     old_format_container_registries = {
         hostname: etcd_container_registry_iv.check(item)
@@ -421,10 +421,8 @@ def insert_registry_id_to_images_with_missing_registry_id() -> None:
             sa.update(images_table)
             .values(registry_id=registry_id)
             .where(
-                (
-                    images_table.c.name.startswith(f"{registry_name}/{project}")
-                    & (images_table.c.registry_id.is_(None))
-                )
+                images_table.c.name.startswith(f"{registry_name}/{project}")
+                & (images_table.c.registry_id.is_(None))
             )
         )
 
@@ -485,7 +483,7 @@ def mark_local_images_with_missing_registry_id() -> None:
             registry_id=local_registry_id,
             is_local=True,
         )
-        .where((images_table.c.registry_id.is_(None)))
+        .where(images_table.c.registry_id.is_(None))
     )
 
 

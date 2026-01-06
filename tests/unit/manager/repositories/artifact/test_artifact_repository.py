@@ -7,11 +7,10 @@ Only artifact-related tests. Revision tests are in artifact_revision/test_artifa
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.data.artifact.types import (
@@ -21,14 +20,37 @@ from ai.backend.manager.data.artifact.types import (
 from ai.backend.manager.errors.artifact import (
     ArtifactNotFoundError,
 )
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact.updaters import ArtifactUpdaterSpec
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.types import TriState
+from ai.backend.testutils.db import with_tables
 
 
 class TestArtifactRepository:
@@ -41,15 +63,39 @@ class TestArtifactRepository:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans artifact data after each test"""
-        yield database_engine
-
-        # Cleanup all artifact data after test
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(ArtifactRevisionRow))
-            await db_sess.execute(sa.delete(ArtifactRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # Base rows in FK dependency order (parents before children)
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+                # Test-specific rows
+                ArtifactRow,
+                ArtifactRevisionRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     def test_registry_id(self) -> uuid.UUID:
@@ -153,7 +199,7 @@ class TestArtifactRepository:
     ) -> AsyncGenerator[list[uuid.UUID], None]:
         """Create 25 sample artifacts for pagination testing"""
         artifact_ids = []
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(25):

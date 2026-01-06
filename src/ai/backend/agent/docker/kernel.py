@@ -13,7 +13,7 @@ import subprocess
 import textwrap
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, Final, FrozenSet, Optional, Tuple, cast, override
+from typing import Any, Final, Optional, cast, override
 
 import aiohttp
 import janus
@@ -24,6 +24,11 @@ from aiotools import TaskGroup
 
 from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.docker.utils import PersistentServiceContainer
+from ai.backend.agent.errors import KernelRunnerNotInitializedError, SubprocessStreamError
+from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
+from ai.backend.agent.resources import KernelResourceSpec
+from ai.backend.agent.types import AgentEventData, KernelOwnershipData
+from ai.backend.agent.utils import closing_async, get_arch_name
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
@@ -32,12 +37,6 @@ from ai.backend.common.types import CommitStatus, KernelId, Sentinel
 from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
-
-from ..errors import KernelRunnerNotInitializedError, SubprocessStreamError
-from ..kernel import AbstractCodeRunner, AbstractKernel
-from ..resources import KernelResourceSpec
-from ..types import AgentEventData, KernelOwnershipData
-from ..utils import closing_async, get_arch_name
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -60,7 +59,7 @@ class DockerKernel(AbstractKernel):
         resource_spec: KernelResourceSpec,
         service_ports: Any,  # TODO: type-annotation
         environ: Mapping[str, Any],
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> None:
         super().__init__(
             ownership_data,
@@ -80,18 +79,17 @@ class DockerKernel(AbstractKernel):
     async def close(self) -> None:
         pass
 
-    def __getstate__(self):
-        props = super().__getstate__()
-        return props
+    def __getstate__(self) -> Mapping[str, Any]:
+        return super().__getstate__()
 
-    def __setstate__(self, props):
+    def __setstate__(self, props) -> None:
         if "network_driver" not in props:
             props["network_driver"] = "bridge"
         super().__setstate__(props)
 
     @override
     async def create_code_runner(
-        self, event_producer: EventProducer, *, client_features: FrozenSet[str], api_version: int
+        self, event_producer: EventProducer, *, client_features: frozenset[str], api_version: int
     ) -> AbstractCodeRunner:
         return await DockerCodeRunner.new(
             self.kernel_id,
@@ -115,8 +113,7 @@ class DockerKernel(AbstractKernel):
     async def check_status(self):
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
-        result = await self.runner.feed_and_get_status()
-        return result
+        return await self.runner.feed_and_get_status()
 
     @override
     async def get_logs(self):
@@ -147,21 +144,19 @@ class DockerKernel(AbstractKernel):
                 break
         else:
             return {"status": "failed", "error": "invalid service name"}
-        result = await self.runner.feed_start_service({
+        return await self.runner.feed_start_service({
             "name": service,
             "port": sport["container_ports"][0],  # primary port
             "ports": sport["container_ports"],
             "protocol": sport["protocol"],
             "options": opts,
         })
-        return result
 
     @override
     async def start_model_service(self, model_service: Mapping[str, Any]):
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
-        result = await self.runner.feed_start_model_service(model_service)
-        return result
+        return await self.runner.feed_start_model_service(model_service)
 
     @override
     async def shutdown_service(self, service: str):
@@ -173,10 +168,9 @@ class DockerKernel(AbstractKernel):
     async def get_service_apps(self):
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
-        result = await self.runner.feed_service_apps()
-        return result
+        return await self.runner.feed_service_apps()
 
-    def _get_commit_path(self, kernel_id: KernelId, subdir: str) -> Tuple[Path, Path]:
+    def _get_commit_path(self, kernel_id: KernelId, subdir: str) -> tuple[Path, Path]:
         base_commit_path: Path = self.agent_config["agent"]["image-commit-path"]
         commit_path = base_commit_path / subdir
         lock_path = commit_path / "lock" / str(kernel_id)
@@ -197,8 +191,10 @@ class DockerKernel(AbstractKernel):
         *,
         canonical: str | None = None,
         filename: str | None = None,
-        extra_labels: dict[str, str] = {},
+        extra_labels: dict[str, str] | None = None,
     ) -> None:
+        if extra_labels is None:
+            extra_labels = {}
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
 
@@ -295,7 +291,7 @@ class DockerKernel(AbstractKernel):
                             await docker.images.delete(image_id)
                 finally:
                     await docker.close()
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log.warning("Session is already being committed.")
 
     @override
@@ -316,12 +312,7 @@ class DockerKernel(AbstractKernel):
             await loop.run_in_executor(None, _write_to_disk)
         except OSError as e:
             raise RuntimeError(
-                "{0}: writing uploaded file failed: {1} -> {2} ({3})".format(
-                    self.kernel_id,
-                    container_path,
-                    host_abspath,
-                    repr(e),
-                )
+                f"{self.kernel_id}: writing uploaded file failed: {container_path} -> {host_abspath} ({e!r})"
             )
 
     @override
@@ -489,7 +480,7 @@ class DockerCodeRunner(AbstractCodeRunner):
         return f"tcp://{self.kernel_host}:{self.repl_out_port}"
 
 
-async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> Tuple[str, Optional[str]]:
+async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[str, Optional[str]]:
     docker = Docker()
     arch = get_arch_name()
     current_version = int(

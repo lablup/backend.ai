@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, AsyncContextManager
+from contextlib import AbstractAsyncContextManager
+from typing import TYPE_CHECKING, Any
 
 from ai.backend.common.lock import AbstractDistributedLock
 
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class PgAdvisoryLock(AbstractDistributedLock):
-    _lock_ctx: AsyncContextManager | None
+    _lock_ctx: AbstractAsyncContextManager | None
 
     def __init__(self, db: ExtendedAsyncSAEngine, lock_id: LockID) -> None:
         self.db = db

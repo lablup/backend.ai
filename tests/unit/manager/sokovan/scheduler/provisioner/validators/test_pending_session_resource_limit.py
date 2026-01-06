@@ -1,7 +1,7 @@
 """Tests for pending session resource limit validator."""
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -67,7 +67,7 @@ class TestPendingSessionResourceLimitValidator:
                         PendingSessionInfo(
                             session_id=SessionId(uuid.uuid4()),
                             requested_slots=ResourceSlot(cpu=Decimal("3"), mem=Decimal("3")),
-                            creation_time=datetime.now(),
+                            creation_time=datetime.now(tz=UTC),
                         ),
                     ]
                 }
@@ -116,7 +116,7 @@ class TestPendingSessionResourceLimitValidator:
                         PendingSessionInfo(
                             session_id=SessionId(uuid.uuid4()),
                             requested_slots=ResourceSlot(cpu=Decimal("50"), mem=Decimal("50")),
-                            creation_time=datetime.now(),
+                            creation_time=datetime.now(tz=UTC),
                         ),
                     ]
                 }
@@ -156,7 +156,7 @@ class TestPendingSessionResourceLimitValidator:
                         PendingSessionInfo(
                             session_id=SessionId(uuid.uuid4()),
                             requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                            creation_time=datetime.now(),
+                            creation_time=datetime.now(tz=UTC),
                         ),
                     ]
                 }
@@ -209,17 +209,17 @@ class TestPendingSessionResourceLimitValidator:
                         PendingSessionInfo(
                             session_id=SessionId(uuid.uuid4()),
                             requested_slots=ResourceSlot(cpu=Decimal("3"), mem=Decimal("3")),
-                            creation_time=datetime.now(),
+                            creation_time=datetime.now(tz=UTC),
                         ),
                         PendingSessionInfo(
                             session_id=SessionId(uuid.uuid4()),
                             requested_slots=ResourceSlot(cpu=Decimal("3"), mem=Decimal("3")),
-                            creation_time=datetime.now(),
+                            creation_time=datetime.now(tz=UTC),
                         ),
                         PendingSessionInfo(
                             session_id=SessionId(uuid.uuid4()),
                             requested_slots=ResourceSlot(cpu=Decimal("3"), mem=Decimal("3")),
-                            creation_time=datetime.now(),
+                            creation_time=datetime.now(tz=UTC),
                         ),
                     ]
                 }

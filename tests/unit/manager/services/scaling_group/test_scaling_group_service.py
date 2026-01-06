@@ -3,14 +3,13 @@ Tests for ScalingGroupService functionality.
 Tests the service layer with mocked repository operations.
 """
 
-from datetime import datetime, timedelta
-from typing import Optional
-from unittest.mock import AsyncMock, MagicMock
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from ai.backend.common.exception import ScalingGroupConflict
-from ai.backend.common.types import AgentSelectionStrategy, SessionTypes
+from ai.backend.common.types import AccessKey, AgentSelectionStrategy, SessionTypes
 from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupData,
     ScalingGroupDriverConfig,
@@ -22,7 +21,12 @@ from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupStatus,
     SchedulerType,
 )
+from ai.backend.manager.errors.resource import (
+    ScalingGroupNotFound,
+    ScalingGroupSessionTypeNotAllowed,
+)
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.registry import check_scaling_group
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
@@ -38,36 +42,6 @@ from ai.backend.manager.services.scaling_group.service import ScalingGroupServic
 
 class TestScalingGroupService:
     """Test cases for ScalingGroupService"""
-
-    def _create_scaling_group_creator(
-        self,
-        name: str,
-        driver: str = "static",
-        scheduler: str = "fifo",
-        description: Optional[str] = None,
-        is_active: bool = True,
-        is_public: bool = True,
-        wsproxy_addr: Optional[str] = None,
-        wsproxy_api_token: Optional[str] = None,
-        driver_opts: Optional[dict] = None,
-        scheduler_opts: Optional[ScalingGroupOpts] = None,
-        use_host_network: bool = False,
-    ) -> Creator[ScalingGroupRow]:
-        """Create a ScalingGroupCreatorSpec with the given parameters."""
-        spec = ScalingGroupCreatorSpec(
-            name=name,
-            driver=driver,
-            scheduler=scheduler,
-            description=description,
-            is_active=is_active,
-            is_public=is_public,
-            wsproxy_addr=wsproxy_addr,
-            wsproxy_api_token=wsproxy_api_token,
-            driver_opts=driver_opts if driver_opts is not None else {},
-            scheduler_opts=scheduler_opts,
-            use_host_network=use_host_network,
-        )
-        return Creator(spec=spec)
 
     @pytest.fixture
     def mock_repository(self) -> MagicMock:
@@ -90,7 +64,7 @@ class TestScalingGroupService:
             ),
             metadata=ScalingGroupMetadata(
                 description="Default scaling group",
-                created_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
             ),
             network=ScalingGroupNetworkConfig(
                 wsproxy_addr="",
@@ -119,6 +93,30 @@ class TestScalingGroupService:
                 ),
             ),
         )
+
+    @pytest.fixture
+    def scaling_group_creator_full(self) -> Creator[ScalingGroupRow]:
+        """Creator with full configuration for testing create_scaling_group success"""
+        scheduler_opts = ScalingGroupOpts(
+            allowed_session_types=[SessionTypes.INTERACTIVE, SessionTypes.BATCH],
+            pending_timeout=timedelta(seconds=300),
+            config={"max_sessions": 10},
+            agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
+        )
+        spec = ScalingGroupCreatorSpec(
+            name="test-sgroup-full",
+            driver="docker",
+            scheduler="fifo",
+            description="Full test scaling group",
+            is_active=True,
+            is_public=False,
+            wsproxy_addr="http://wsproxy:5000",
+            wsproxy_api_token="test-token",
+            driver_opts={"docker_host": "unix:///var/run/docker.sock"},
+            scheduler_opts=scheduler_opts,
+            use_host_network=True,
+        )
+        return Creator(spec=spec)
 
     async def test_search_scaling_groups_with_default_querier(
         self,
@@ -193,7 +191,7 @@ class TestScalingGroupService:
                 ),
                 metadata=ScalingGroupMetadata(
                     description=f"Scaling group {i}",
-                    created_at=datetime.now(),
+                    created_at=datetime.now(tz=UTC),
                 ),
                 network=ScalingGroupNetworkConfig(
                     wsproxy_addr="",
@@ -277,34 +275,16 @@ class TestScalingGroupService:
         scaling_group_service: ScalingGroupService,
         mock_repository: MagicMock,
         sample_scaling_group: ScalingGroupData,
+        scaling_group_creator_full: Creator[ScalingGroupRow],
     ) -> None:
         """Test creating a scaling group with all fields specified"""
         mock_repository.create_scaling_group = AsyncMock(return_value=sample_scaling_group)
 
-        scheduler_opts = ScalingGroupOpts(
-            allowed_session_types=[SessionTypes.INTERACTIVE, SessionTypes.BATCH],
-            pending_timeout=timedelta(seconds=300),
-            config={"max_sessions": 10},
-            agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
-        )
-        creator = self._create_scaling_group_creator(
-            name="test-sgroup-full",
-            driver="docker",
-            scheduler="fifo",
-            description="Full test scaling group",
-            is_active=True,
-            is_public=False,
-            wsproxy_addr="http://wsproxy:5000",
-            wsproxy_api_token="test-token",
-            driver_opts={"docker_host": "unix:///var/run/docker.sock"},
-            scheduler_opts=scheduler_opts,
-            use_host_network=True,
-        )
-        action = CreateScalingGroupAction(creator=creator)
+        action = CreateScalingGroupAction(creator=scaling_group_creator_full)
         result = await scaling_group_service.create_scaling_group(action)
 
         assert result.scaling_group == sample_scaling_group
-        mock_repository.create_scaling_group.assert_called_once_with(creator)
+        mock_repository.create_scaling_group.assert_called_once_with(scaling_group_creator_full)
 
     async def test_create_scaling_group_repository_error_propagates(
         self,
@@ -326,3 +306,90 @@ class TestScalingGroupService:
 
         with pytest.raises(ScalingGroupConflict):
             await scaling_group_service.create_scaling_group(action)
+
+
+class TestCheckScalingGroup:
+    """Test cases for check_scaling_group function"""
+
+    @pytest.fixture
+    def mock_conn(self) -> MagicMock:
+        """Create mocked database connection"""
+        return MagicMock()
+
+    async def test_check_scaling_group_raises_session_type_not_allowed(
+        self,
+        mock_conn: MagicMock,
+    ) -> None:
+        """Test that check_scaling_group raises ScalingGroupSessionTypeNotAllowed (422)
+        when requesting BATCH session on INTERACTIVE-only scaling group"""
+        mock_sgroup = {
+            "name": "test-sgroup",
+            "scheduler_opts": ScalingGroupOpts(
+                allowed_session_types=[SessionTypes.INTERACTIVE],
+            ),
+        }
+
+        with patch(
+            "ai.backend.manager.registry.query_allowed_sgroups",
+            new_callable=AsyncMock,
+            return_value=[mock_sgroup],
+        ):
+            with pytest.raises(ScalingGroupSessionTypeNotAllowed) as exc_info:
+                await check_scaling_group(
+                    mock_conn,
+                    scaling_group="test-sgroup",
+                    session_type=SessionTypes.BATCH,
+                    access_key=AccessKey("test-ak"),
+                    domain_name="test-domain",
+                    group_id="test-group-id",
+                )
+            assert exc_info.value.status_code == 422
+
+    async def test_check_scaling_group_succeeds_with_allowed_session_type(
+        self,
+        mock_conn: MagicMock,
+    ) -> None:
+        """Test that check_scaling_group succeeds when session type is allowed"""
+        mock_sgroup = {
+            "name": "test-sgroup",
+            "scheduler_opts": ScalingGroupOpts(
+                allowed_session_types=[SessionTypes.INTERACTIVE],
+            ),
+        }
+
+        with patch(
+            "ai.backend.manager.registry.query_allowed_sgroups",
+            new_callable=AsyncMock,
+            return_value=[mock_sgroup],
+        ):
+            result = await check_scaling_group(
+                mock_conn,
+                scaling_group="test-sgroup",
+                session_type=SessionTypes.INTERACTIVE,
+                access_key=AccessKey("test-ak"),
+                domain_name="test-domain",
+                group_id="test-group-id",
+            )
+            assert result == "test-sgroup"
+
+    async def test_check_scaling_group_raises_not_found(
+        self,
+        mock_conn: MagicMock,
+    ) -> None:
+        """Test that check_scaling_group raises ScalingGroupNotFound (404)
+        when the scaling group does not exist"""
+        with patch(
+            "ai.backend.manager.registry.query_allowed_sgroups",
+            new_callable=AsyncMock,
+            return_value=[],
+        ):
+            with pytest.raises(ScalingGroupNotFound) as exc_info:
+                await check_scaling_group(
+                    mock_conn,
+                    scaling_group="nonexistent-sgroup",
+                    session_type=SessionTypes.INTERACTIVE,
+                    access_key=AccessKey("test-ak"),
+                    domain_name="test-domain",
+                    group_id="test-group-id",
+                )
+            assert exc_info.value.status_code == 404

@@ -172,8 +172,8 @@ def test_string_set_flag() -> None:
     assert MyFlags.A != MyFlags.B
     assert MyFlags.A == "a"
     assert MyFlags.A != "b"
-    assert "a" == MyFlags.A
-    assert "b" != MyFlags.A
+    assert MyFlags.A == "a"
+    assert MyFlags.A != "b"
 
     assert {"a", "b"} == MyFlags.A | MyFlags.B
     assert {"a", "b"} == MyFlags.A | "b"
@@ -296,7 +296,7 @@ async def test_async_file_writer_str() -> None:
             await file_writer.write(init_str[i : i + 20])
 
     # 4. Read string from the file and close it
-    with open(file_name, "r") as f:
+    with open(file_name) as f:
         final_str = f.read()
     Path(file_name).unlink()
 
@@ -314,7 +314,7 @@ async def test_async_file_writer_bytes() -> None:
     init_data = b"".join(randint(0, 255).to_bytes(1, sys.byteorder) for i in range(100))
 
     def dummy_encode(v: str) -> bytes:
-        assert False, "should not be called"
+        pytest.fail("should not be called")
 
     # 3. Write chuncked decoded string into file
     async with AsyncFileWriter(

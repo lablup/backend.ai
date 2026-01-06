@@ -15,9 +15,9 @@ __all__ = (
 
 
 if hasattr(asyncio, "get_running_loop"):
-    current_loop = asyncio.get_running_loop  # type: ignore  # noqa
+    current_loop = asyncio.get_running_loop  # type: ignore
 else:
-    current_loop = asyncio.get_event_loop  # type: ignore  # noqa
+    current_loop = asyncio.get_event_loop  # type: ignore
 
 CLOCK_TICK: Final = os.sysconf("SC_CLK_TCK")
 
@@ -72,7 +72,7 @@ async def wait_local_port_open(port):
         except ConnectionRefusedError:
             await asyncio.sleep(0.1)
             continue
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise
         except Exception:
             raise
@@ -91,7 +91,7 @@ def scan_proc_stats() -> dict[int, dict]:
             try:
                 stat = parse_proc_stat(pid)
                 pid_set[pid] = stat
-            except IOError:
+            except OSError:
                 pass
     return pid_set
 
@@ -110,7 +110,7 @@ def parse_proc_stat(pid):
     #  T  Stopped (on a signal) or (before Linux 2.6.33) trace stopped
     #  t  Tracing stop (Linux 2.6.33 onward)
     #  X  Dead (from Linux 2.6.0 onward)
-    stat = {
+    return {
         "name": name,
         "cmdline": Path(f"/proc/{pid}/cmdline").read_bytes(),
         "status": fields[0],
@@ -122,4 +122,3 @@ def parse_proc_stat(pid):
         "vsize": int(fields[20]),  # bytes
         "rss": int(fields[21]),  # num pages
     }
-    return stat

@@ -27,8 +27,8 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionCreationSpec,
     SessionEnqueueData,
 )
+from ai.backend.manager.sokovan.scheduling_controller.types import CalculatedResources
 
-from ..types import CalculatedResources
 from .base import SessionPreparerRule
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -121,7 +121,7 @@ class SessionPreparer:
         total_requested = calculated_resources.session_requested_slots
 
         # Build complete session data with all information
-        session_data = SessionEnqueueData(
+        return SessionEnqueueData(
             id=session_id,
             creation_id=spec.session_creation_id,
             name=spec.session_name,
@@ -159,8 +159,6 @@ class SessionPreparer:
             dependencies=spec.dependency_sessions or [],
         )
 
-        return session_data
-
     def _determine_network_config(
         self,
         spec: SessionCreationSpec,
@@ -169,11 +167,10 @@ class SessionPreparer:
         """Determine network type and ID from spec."""
         if spec.network:
             return NetworkType.PERSISTENT, str(spec.network.id)
-        elif context.scaling_group_network.use_host_network:
+        if context.scaling_group_network.use_host_network:
             return NetworkType.HOST, None
-        else:
-            # Default to VOLATILE for multi-container or single-container sessions
-            return NetworkType.VOLATILE, None
+        # Default to VOLATILE for multi-container or single-container sessions
+        return NetworkType.VOLATILE, None
 
     async def _prepare_kernels(
         self,

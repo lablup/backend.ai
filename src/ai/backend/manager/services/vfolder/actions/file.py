@@ -10,8 +10,8 @@ from typing import (
 from ai.backend.common.bgtask.types import TaskID
 from ai.backend.common.types import ResultSet
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.services.vfolder.types import FileInfo
 
-from ..types import FileInfo
 from .base import VFolderAction
 
 

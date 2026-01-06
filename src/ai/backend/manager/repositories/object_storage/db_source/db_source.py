@@ -100,8 +100,7 @@ class ObjectStorageDBSource:
                 .returning(ObjectStorageRow.id)
             )
             result = await db_session.execute(delete_query)
-            deleted_id = result.scalar()
-            return deleted_id
+            return result.scalar()
 
     async def list_object_storages(self) -> list[ObjectStorageData]:
         """

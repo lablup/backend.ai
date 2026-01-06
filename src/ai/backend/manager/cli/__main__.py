@@ -176,7 +176,7 @@ def generate_api_keypair(cli_ctx: CLIContext) -> None:
     """
     Generate a manager API keypair and print it out to stdout.
     """
-    from ..models.keypair import generate_keypair as _gen_keypair
+    from ai.backend.manager.models.keypair import generate_keypair as _gen_keypair
 
     _get_logger().info("Generating a manager API keypair...")
     ak, sk = _gen_keypair()
@@ -210,7 +210,7 @@ def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) 
     """
     from zmq.auth.certs import create_certificates, load_certificate
 
-    from ..errors.resource import ConfigurationLoadFailed
+    from ai.backend.manager.errors.resource import ConfigurationLoadFailed
 
     _get_logger().info("Generating a RPC keypair...")
     public_key_path, secret_key_path = create_certificates(dst_dir, name)
@@ -250,20 +250,22 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     """
     import asyncio
     import uuid
-    from datetime import datetime
+    from datetime import UTC, datetime
     from typing import cast
 
     import sqlalchemy as sa
     from more_itertools import chunked
 
     from ai.backend.common.validators import TimeDuration
-    from ai.backend.manager.models import SessionRow, error_logs, kernels
+    from ai.backend.manager.models.error_logs import error_logs
+    from ai.backend.manager.models.kernel import kernels
+    from ai.backend.manager.models.session import SessionRow
     from ai.backend.manager.models.utils import connect_database, vacuum_db
 
     from .context import redis_ctx
 
     log = _get_logger()
-    today = datetime.now()
+    today = datetime.now(UTC)
     duration = TimeDuration()
     expiration_date = today - duration.check_and_return(retention)
     bootstrap_config = asyncio.run(cli_ctx.get_bootstrap_config())

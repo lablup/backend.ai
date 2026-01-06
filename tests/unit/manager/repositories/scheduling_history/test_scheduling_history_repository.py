@@ -4,10 +4,9 @@ Tests the repository layer with real database operations.
 """
 
 import uuid
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import RouteStatus
@@ -17,13 +16,37 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
     SubStepResult,
 )
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
+    DeploymentAutoScalingPolicyRow,
+)
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.scheduling_history import (
     DeploymentHistoryRow,
     KernelSchedulingHistoryRow,
     RouteHistoryRow,
     SessionSchedulingHistoryRow,
 )
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
 from ai.backend.manager.repositories.scheduling_history import (
     DeploymentHistoryCreatorSpec,
@@ -38,6 +61,7 @@ from ai.backend.manager.repositories.scheduling_history.options import (
     RouteHistoryConditions,
     SessionSchedulingHistoryConditions,
 )
+from ai.backend.testutils.db import with_tables
 
 
 class TestSchedulingHistoryRepository:
@@ -46,16 +70,41 @@ class TestSchedulingHistoryRepository:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans scheduling history data after each test"""
-        yield database_engine
-
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(RouteHistoryRow))
-            await db_sess.execute(sa.delete(DeploymentHistoryRow))
-            await db_sess.execute(sa.delete(KernelSchedulingHistoryRow))
-            await db_sess.execute(sa.delete(SessionSchedulingHistoryRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents first
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+                # Scheduling history tables (no FK dependencies on base rows)
+                SessionSchedulingHistoryRow,
+                KernelSchedulingHistoryRow,
+                DeploymentHistoryRow,
+                RouteHistoryRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def scheduling_history_repository(

@@ -7,11 +7,10 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
@@ -21,28 +20,41 @@ from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleListResult,
     EndpointLifecycle,
 )
-from ai.backend.manager.models import (
-    DomainRow,
-    GroupRow,
-    ImageRow,
-    ProjectResourcePolicyRow,
-    ScalingGroupRow,
-    UserResourcePolicyRow,
-    UserRow,
-)
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import (
+    DeploymentAutoScalingPolicyRow,
+)
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     EndpointAutoScalingRuleRow,
     EndpointRow,
 )
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts
-from ai.backend.manager.models.user import UserRole, UserStatus
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
+from ai.backend.testutils.db import with_tables
 
 
 class TestSearchAutoScalingRulesValidated:
@@ -55,23 +67,38 @@ class TestSearchAutoScalingRulesValidated:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans all test data after each test"""
-        yield database_engine
-
-        # Cleanup in FK dependency order
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(EndpointAutoScalingRuleRow))
-            await db_sess.execute(sa.delete(EndpointRow))
-            await db_sess.execute(sa.delete(ImageRow))
-            await db_sess.execute(sa.delete(UserRow))
-            await db_sess.execute(sa.delete(GroupRow))
-            await db_sess.execute(sa.delete(ContainerRegistryRow))
-            await db_sess.execute(sa.delete(ScalingGroupRow))
-            await db_sess.execute(sa.delete(UserResourcePolicyRow))
-            await db_sess.execute(sa.delete(ProjectResourcePolicyRow))
-            await db_sess.execute(sa.delete(DomainRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents first
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ContainerRegistryRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+                EndpointAutoScalingRuleRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def test_scaling_group(
@@ -213,11 +240,11 @@ class TestSearchAutoScalingRulesValidated:
 
         async with db_with_cleanup.begin_session() as db_sess:
             registry = ContainerRegistryRow(
+                id=registry_id,
                 url="http://test-registry.local",
                 registry_name=f"test-registry-{uuid.uuid4().hex[:8]}",
                 type=ContainerRegistryType.DOCKER,
             )
-            registry.id = registry_id
             db_sess.add(registry)
             await db_sess.flush()
 
@@ -314,7 +341,7 @@ class TestSearchAutoScalingRulesValidated:
                     cooldown_seconds=300 + i * 60,
                     min_replicas=1,
                     max_replicas=10 + i,
-                    created_at=datetime.now(timezone.utc),
+                    created_at=datetime.now(UTC),
                 )
                 db_sess.add(rule)
                 rule_ids.append(rule_id)
@@ -345,7 +372,7 @@ class TestSearchAutoScalingRulesValidated:
                     cooldown_seconds=300,
                     min_replicas=1,
                     max_replicas=10,
-                    created_at=datetime.now(timezone.utc),
+                    created_at=datetime.now(UTC),
                 )
                 db_sess.add(rule)
                 rule_ids.append(rule_id)
@@ -356,10 +383,10 @@ class TestSearchAutoScalingRulesValidated:
     @pytest.fixture
     async def model_serving_repository(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ModelServingRepository:
         """Create ModelServingRepository instance with real database"""
-        return ModelServingRepository(db=database_engine)
+        return ModelServingRepository(db=db_with_cleanup)
 
     # =========================================================================
     # Tests - Basic Search

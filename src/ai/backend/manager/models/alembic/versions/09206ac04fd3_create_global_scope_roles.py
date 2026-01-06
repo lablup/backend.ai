@@ -64,7 +64,7 @@ ENTITY_TYPES = {
 class Tables:
     @staticmethod
     def get_users_table() -> sa.Table:
-        users_table = sa.Table(
+        return sa.Table(
             "users",
             mapper_registry.metadata,
             IDColumn("uuid"),
@@ -72,7 +72,6 @@ class Tables:
             sa.Column("role", EnumValueType(UserRole), default=UserRole.USER),
             extend_existing=True,
         )
-        return users_table
 
 
 class RoleCreator:

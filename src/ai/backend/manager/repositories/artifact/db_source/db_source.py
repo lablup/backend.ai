@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Optional
 
 import sqlalchemy as sa
@@ -331,7 +331,7 @@ class ArtifactDBSource:
                     if has_changes:
                         existing_artifact.extra = artifact_data.extra
                         existing_artifact.description = artifact_data.description
-                        existing_artifact.updated_at = datetime.now(timezone.utc)
+                        existing_artifact.updated_at = datetime.now(UTC)
 
                     await db_sess.flush()
                     await db_sess.refresh(
@@ -815,8 +815,7 @@ class ArtifactDBSource:
                     ArtifactRevisionRow.id == artifact_revision_id
                 )
             )
-            readme = result.scalar_one_or_none()
-            return readme
+            return result.scalar_one_or_none()
 
     async def list_artifacts_with_revisions_paginated(
         self,

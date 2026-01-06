@@ -131,8 +131,7 @@ class ValkeyRateLimitClient:
         )
 
         # The last result is the count
-        count = cast(int, result)
-        return count
+        return cast(int, result)
 
     @valkey_rate_limit_resilience.apply()
     async def get_rolling_count(self, access_key: str) -> int:

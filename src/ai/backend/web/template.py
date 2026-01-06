@@ -1,5 +1,5 @@
 import json
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from jinja2 import nodes
 from jinja2.ext import Extension
@@ -11,7 +11,7 @@ from .errors import InvalidTemplateValueError
 class TOMLField(Extension):
     tags = {"toml_field"}
 
-    def parse(self, parser: Parser) -> nodes.Node | List[nodes.Node]:
+    def parse(self, parser: Parser) -> nodes.Node | list[nodes.Node]:
         tag_name = list(self.tags)[0]
         lineno = parser.stream.expect(f"name:{tag_name}").lineno
         field_name: nodes.Expr = parser.parse_expression()
@@ -47,16 +47,14 @@ class TOMLField(Extension):
         )
 
     def _transform(self, field_value: nodes.Expr, lineno: Optional[int] = None) -> nodes.Expr:
-        field_value = nodes.Filter(field_value, "toml_scalar", [], [], None, None, lineno=lineno)
-        return field_value
+        return nodes.Filter(field_value, "toml_scalar", [], [], None, None, lineno=lineno)
 
 
 class TOMLStringListField(TOMLField):
     tags = {"toml_strlist_field"}
 
     def _transform(self, field_value: nodes.Expr, lineno: Optional[int] = None) -> nodes.Expr:
-        field_value = nodes.Filter(field_value, "toml_scalar", [], [], None, None, lineno=lineno)
-        return field_value
+        return nodes.Filter(field_value, "toml_scalar", [], [], None, None, lineno=lineno)
 
 
 def toml_scalar(s: Any) -> str:

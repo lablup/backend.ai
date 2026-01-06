@@ -2,8 +2,8 @@ from uuid import UUID
 
 from pydantic import Field
 
-from ...api_handlers import BaseRequestModel
-from ...types import QuotaScopeType, VolumeID
+from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.types import QuotaScopeType, VolumeID
 
 
 class VolumeIDPath(BaseRequestModel):

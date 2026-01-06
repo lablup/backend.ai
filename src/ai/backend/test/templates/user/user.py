@@ -78,13 +78,12 @@ class UserTemplate(WrapperTestTemplate):
         assert len(keypair_info) > 0, "Keypair list should not be empty"
         keypair_info = keypair_info[0]
 
-        user_meta = CreatedUserMeta(
+        return CreatedUserMeta(
             email=user_info["email"],
             password=password,
             access_key=keypair_info["access_key"],
             secret_key=keypair_info["secret_key"],
         )
-        return user_meta
 
     @override
     @actxmgr

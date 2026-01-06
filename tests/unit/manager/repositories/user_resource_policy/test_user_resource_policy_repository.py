@@ -1,14 +1,34 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.common.exception import UserResourcePolicyNotFound
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user_resource_policy.creators import (
@@ -21,28 +41,60 @@ from ai.backend.manager.repositories.user_resource_policy.updaters import (
     UserResourcePolicyUpdaterSpec,
 )
 from ai.backend.manager.types import OptionalState
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.db import with_tables
 
 
 class TestUserResourcePolicyRepository:
     """Test suite for UserResourcePolicyRepository"""
 
     @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents before children
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
     async def repository(
-        self, database_engine: ExtendedAsyncSAEngine
+        self, db_with_cleanup: ExtendedAsyncSAEngine
     ) -> UserResourcePolicyRepository:
         """Repository instance with real database"""
-        return UserResourcePolicyRepository(db=database_engine)
+        return UserResourcePolicyRepository(db=db_with_cleanup)
 
     @pytest.fixture
     async def sample_policy(
-        self, database_engine: ExtendedAsyncSAEngine
+        self, db_with_cleanup: ExtendedAsyncSAEngine
     ) -> AsyncGenerator[UserResourcePolicyData, None]:
         """Create a sample policy in the database for testing"""
         policy_name = "test-policy-sample"
-        async with database_engine.begin_session() as db_sess:
+        async with db_with_cleanup.begin_session() as db_sess:
             policy_row = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
@@ -54,12 +106,6 @@ class TestUserResourcePolicyRepository:
             await db_sess.flush()
 
         yield policy_row.to_dataclass()
-
-        # Cleanup
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(
-                sa.delete(UserResourcePolicyRow).where(UserResourcePolicyRow.name == policy_name)
-            )
 
     @pytest.mark.asyncio
     async def test_create_policy(self, repository: UserResourcePolicyRepository) -> None:
@@ -78,17 +124,13 @@ class TestUserResourcePolicyRepository:
             max_customized_image_count=max_customized_image_count,
         )
 
-        try:
-            result = await repository.create(Creator(spec=spec))
-            assert isinstance(result, UserResourcePolicyData)
-            assert result.name == "test-policy-create"
-            assert result.max_vfolder_count == max_vfolder_count
-            assert result.max_quota_scope_size == max_quota_scope_size
-            assert result.max_session_count_per_model_session == max_session_count_per_model_session
-            assert result.max_customized_image_count == max_customized_image_count
-        finally:
-            # Cleanup
-            await repository.delete(policy_name)
+        result = await repository.create(Creator(spec=spec))
+        assert isinstance(result, UserResourcePolicyData)
+        assert result.name == "test-policy-create"
+        assert result.max_vfolder_count == max_vfolder_count
+        assert result.max_quota_scope_size == max_quota_scope_size
+        assert result.max_session_count_per_model_session == max_session_count_per_model_session
+        assert result.max_customized_image_count == max_customized_image_count
 
     @pytest.mark.asyncio
     async def test_get_by_name_success(
@@ -234,31 +276,24 @@ class TestUserResourcePolicyRepository:
         max_session_count_per_model_session = 10
         max_customized_image_count = 5
 
-        try:
-            created = await repository.create(
-                Creator(
-                    spec=UserResourcePolicyCreatorSpec(
-                        name=policy_name,
-                        max_vfolder_count=max_vfolder_count,
-                        max_quota_scope_size=max_quota_scope_size,
-                        max_session_count_per_model_session=max_session_count_per_model_session,
-                        max_customized_image_count=max_customized_image_count,
-                    )
+        created = await repository.create(
+            Creator(
+                spec=UserResourcePolicyCreatorSpec(
+                    name=policy_name,
+                    max_vfolder_count=max_vfolder_count,
+                    max_quota_scope_size=max_quota_scope_size,
+                    max_session_count_per_model_session=max_session_count_per_model_session,
+                    max_customized_image_count=max_customized_image_count,
                 )
             )
-            retrieved = await repository.get_by_name(created.name)
+        )
+        retrieved = await repository.get_by_name(created.name)
 
-            assert created.name == retrieved.name
-            assert created.max_vfolder_count == retrieved.max_vfolder_count
-            assert created.max_quota_scope_size == retrieved.max_quota_scope_size
-            assert (
-                created.max_session_count_per_model_session
-                == retrieved.max_session_count_per_model_session
-            )
-            assert created.max_customized_image_count == retrieved.max_customized_image_count
-        finally:
-            # Cleanup
-            try:
-                await repository.delete("test-policy-roundtrip")
-            except UserResourcePolicyNotFound:
-                pass
+        assert created.name == retrieved.name
+        assert created.max_vfolder_count == retrieved.max_vfolder_count
+        assert created.max_quota_scope_size == retrieved.max_quota_scope_size
+        assert (
+            created.max_session_count_per_model_session
+            == retrieved.max_session_count_per_model_session
+        )
+        assert created.max_customized_image_count == retrieved.max_customized_image_count

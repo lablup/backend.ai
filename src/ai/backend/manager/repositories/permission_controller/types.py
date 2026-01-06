@@ -1,6 +1,6 @@
-from ...models.rbac_models.role import RoleRow
-from ...models.user import UserRow
-from ...repositories.base import BatchQuerierResult
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.repositories.base import BatchQuerierResult
 
 
 class RoleBatchQuerierResult(BatchQuerierResult[RoleRow]):

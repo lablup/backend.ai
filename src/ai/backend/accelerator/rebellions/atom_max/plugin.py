@@ -1,8 +1,11 @@
 import logging
 from collections import defaultdict
+from collections.abc import Iterable, Sequence
 from decimal import Decimal
-from typing import DefaultDict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Optional
 
+from ai.backend.accelerator.rebellions.common.atom_api import ATOMAPI
+from ai.backend.accelerator.rebellions.common.plugin import AbstractATOMPlugin
 from ai.backend.agent.stats import (
     Measurement,
     MetricTypes,
@@ -19,8 +22,6 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 
-from ..common.atom_api import ATOMAPI
-from ..common.plugin import AbstractATOMPlugin
 from .types import ATOMMaxChildDevice, ATOMMaxDevice
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
@@ -30,17 +31,17 @@ VALID_DEVICE_NAME = ("RBLN-CA25",)
 
 class ATOMMaxPlugin(AbstractATOMPlugin[ATOMMaxDevice]):
     key = DeviceName("atom-max")
-    slot_types: Sequence[Tuple[SlotName, SlotTypes]] = (
+    slot_types: Sequence[tuple[SlotName, SlotTypes]] = (
         (SlotName("atom-max.device"), SlotTypes("count")),
     )
-    exclusive_slot_types: Set[str] = {"atom-max.device"}
+    exclusive_slot_types: set[str] = {"atom-max.device"}
 
-    _all_devices: Optional[List[ATOMMaxDevice]]
+    _all_devices: Optional[list[ATOMMaxDevice]]
 
-    async def _list_devices(self) -> List[ATOMMaxDevice]:
+    async def _list_devices(self) -> list[ATOMMaxDevice]:
         stats = await ATOMAPI.get_stats(self._rbln_stat_path)
-        devices: List[ATOMMaxDevice] = []
-        devices_by_sid: DefaultDict[DeviceId, List[ATOMMaxChildDevice]] = defaultdict(list)
+        devices: list[ATOMMaxDevice] = []
+        devices_by_sid: defaultdict[DeviceId, list[ATOMMaxChildDevice]] = defaultdict(list)
         for device_info in stats.devices:
             if device_info.name not in VALID_DEVICE_NAME:
                 continue
@@ -132,11 +133,11 @@ class ATOMMaxPlugin(AbstractATOMPlugin[ATOMMaxDevice]):
         self,
         devices: Iterable[ATOMMaxDevice],
     ) -> int:
-        groups: Set[int] = set()
+        groups: set[int] = set()
         device_indexes = []
         for d in devices:
-            groups |= set([int(dd.rbln_stat_info.group_id) for dd in d.children])
-        non_zero_groups: Set[int] = groups - set([0])
+            groups |= {int(dd.rbln_stat_info.group_id) for dd in d.children}
+        non_zero_groups: set[int] = groups - {0}
         if len(non_zero_groups) > 0:
             await ATOMAPI.destroy_groups(self._rbln_stat_path, list(non_zero_groups))
 
@@ -146,8 +147,7 @@ class ATOMMaxPlugin(AbstractATOMPlugin[ATOMMaxDevice]):
         for d in live_devices:
             if d.device_id in unique_ids:
                 device_indexes.extend([dd.rbln_stat_info.npu for dd in d.children])
-        group_idx = await ATOMAPI.create_group(self._rbln_stat_path, device_indexes)
-        return group_idx
+        return await ATOMAPI.create_group(self._rbln_stat_path, device_indexes)
 
     async def list_device_files(self, device: ATOMMaxDevice) -> Iterable[str]:
         return [f"/dev/{c.rbln_stat_info.device}" for c in device.children]

@@ -7,6 +7,7 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
+from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
@@ -29,20 +30,54 @@ class RevisionConditions:
         return inner
 
     @staticmethod
-    def by_name_equals(value: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(DeploymentRevisionRow.name) == value.lower()
-            return DeploymentRevisionRow.name == value
+            if spec.case_insensitive:
+                condition = sa.func.lower(DeploymentRevisionRow.name) == spec.value.lower()
+            else:
+                condition = DeploymentRevisionRow.name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_name_contains(value: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(DeploymentRevisionRow.name).contains(value.lower())
-            return DeploymentRevisionRow.name.contains(value)
+            if spec.case_insensitive:
+                condition = DeploymentRevisionRow.name.ilike(f"%{spec.value}%")
+            else:
+                condition = DeploymentRevisionRow.name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = DeploymentRevisionRow.name.ilike(f"{spec.value}%")
+            else:
+                condition = DeploymentRevisionRow.name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = DeploymentRevisionRow.name.ilike(f"%{spec.value}")
+            else:
+                condition = DeploymentRevisionRow.name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -90,12 +125,10 @@ class RevisionOrders:
     def name(ascending: bool = True) -> QueryOrder:
         if ascending:
             return DeploymentRevisionRow.name.asc()
-        else:
-            return DeploymentRevisionRow.name.desc()
+        return DeploymentRevisionRow.name.desc()
 
     @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return DeploymentRevisionRow.created_at.asc()
-        else:
-            return DeploymentRevisionRow.created_at.desc()
+        return DeploymentRevisionRow.created_at.desc()

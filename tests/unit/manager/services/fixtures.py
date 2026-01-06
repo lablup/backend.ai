@@ -1,6 +1,6 @@
 import dataclasses
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -10,6 +10,7 @@ from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads
 RESOURCE_LIMITS = {"cuda.device": {"min": "1", "max": None}}
 
 CONTAINER_REGISTRY_ROW_FIXTURE = ContainerRegistryRow(
+    id=uuid.uuid4(),
     url="https://registry.example.com",
     registry_name="registry.example.com",
     type=ContainerRegistryType.DOCKER,
@@ -21,7 +22,6 @@ CONTAINER_REGISTRY_ROW_FIXTURE = ContainerRegistryRow(
     extra=None,
 )
 
-CONTAINER_REGISTRY_ROW_FIXTURE.id = uuid.uuid4()
 CONTAINER_REGISTRY_FIXTURE_DATA = CONTAINER_REGISTRY_ROW_FIXTURE.to_dataclass()
 CONTAINER_REGISTRY_FIXTURE_DICT = dataclasses.asdict(
     dataclasses.replace(CONTAINER_REGISTRY_FIXTURE_DATA, type=ContainerRegistryType.DOCKER.value)  # type: ignore
@@ -47,7 +47,7 @@ IMAGE_ROW_FIXTURE = ImageRow(
     status=ImageStatus.ALIVE,
 )
 IMAGE_ROW_FIXTURE.id = uuid.uuid4()
-IMAGE_ROW_FIXTURE.created_at = datetime(2023, 9, 30, 15, 0, 0, tzinfo=timezone.utc)
+IMAGE_ROW_FIXTURE.created_at = datetime(2023, 9, 30, 15, 0, 0, tzinfo=UTC)
 
 IMAGE_FIXTURE_DATA = IMAGE_ROW_FIXTURE.to_dataclass()
 

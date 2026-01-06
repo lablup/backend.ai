@@ -559,7 +559,7 @@ class InstallerApp(App):
             try:
                 install_info = InstallInfo(**json.loads((Path.cwd() / "INSTALL-INFO").read_bytes()))
                 yield InstallReport(install_info)
-            except IOError as e:
+            except OSError as e:
                 log = SetupLog()
                 log.write("Failed to read INSTALL-INFO!")
                 log.write(e)

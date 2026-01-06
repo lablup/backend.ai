@@ -9,13 +9,13 @@ import ssl
 import sys
 import time
 import traceback
-from collections.abc import MutableMapping, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Mapping, MutableMapping, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 from pprint import pprint
-from typing import Any, AsyncGenerator, AsyncIterator, Mapping, Optional, cast
+from typing import Any, Optional, cast
 from uuid import uuid4
 
 import aiohttp
@@ -502,7 +502,7 @@ async def extend_login_session(request: web.Request) -> web.Response:
     session = await get_session(request)
 
     session.expiration_dt = current + login_session_extension_sec
-    expires = datetime.fromtimestamp(session.expiration_dt, tz=timezone.utc).isoformat()
+    expires = datetime.fromtimestamp(session.expiration_dt, tz=UTC).isoformat()
 
     result = {"status": 201, "expires": expires}
     return web.json_response(result)

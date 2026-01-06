@@ -3,7 +3,8 @@ from __future__ import annotations
 import enum
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import Any, Final, List, Optional, Protocol, Sequence, Tuple, Union
+from collections.abc import Sequence
+from typing import Any, Final, Optional, Protocol
 
 import attrs
 
@@ -14,18 +15,18 @@ from . import AbstractPlugin, BasePluginContext
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
+    "ALL_COMPLETED",
+    "ERROR",
+    "FIRST_COMPLETED",
+    "PASSED",
+    "REJECTED",
     "HookHandler",
     "HookPlugin",
     "HookPluginContext",
-    "Reject",
-    "HookResults",
     "HookResult",
+    "HookResults",
     "HookReturnTiming",
-    "PASSED",
-    "REJECTED",
-    "ERROR",
-    "ALL_COMPLETED",
-    "FIRST_COMPLETED",
+    "Reject",
 )
 
 
@@ -50,7 +51,7 @@ class HookPlugin(AbstractPlugin, metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def get_handlers(self) -> Sequence[Tuple[str, HookHandler]]:
+    def get_handlers(self) -> Sequence[tuple[str, HookHandler]]:
         """
         Returns a sequence of pairs of the event name
         and its corresponding handler function.
@@ -59,7 +60,7 @@ class HookPlugin(AbstractPlugin, metaclass=ABCMeta):
 
 
 class Reject(Exception):
-    def __init__(self, reason: str):
+    def __init__(self, reason: str) -> None:
         super().__init__(reason)
         self.reason = reason
 
@@ -85,7 +86,7 @@ FIRST_COMPLETED: Final = HookReturnTiming.FIRST_COMPLETED
 @attrs.define(auto_attribs=True, slots=True)
 class HookResult:
     status: HookResults
-    src_plugin: Optional[Union[str, Sequence[str]]] = None
+    src_plugin: Optional[str | Sequence[str]] = None
     reason: Optional[str] = None
     result: Optional[Any] = None
 
@@ -101,7 +102,7 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
         self,
         event_name: str,
         order: Optional[Sequence[str]] = None,
-    ) -> Sequence[Tuple[str, HookHandler]]:
+    ) -> Sequence[tuple[str, HookHandler]]:
         handlers = []
         for plugin_name, plugin_instance in self.plugins.items():
             for hooked_event_name, hook_handler in plugin_instance.get_handlers():
@@ -119,7 +120,7 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
     async def dispatch(
         self,
         event_name: str,
-        args: Tuple[Any, ...],
+        args: tuple[Any, ...],
         *,
         return_when: HookReturnTiming = ALL_COMPLETED,
         success_if_no_hook: bool = True,
@@ -131,7 +132,7 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
         the event caller should seize the processing.
         """
         executed_plugin_names = []
-        results: List[Any] = []
+        results: list[Any] = []
         for plugin_name, hook_handler in self._get_handlers(event_name, order=order):
             try:
                 executed_plugin_names.append(plugin_name)
@@ -155,8 +156,7 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
                         src_plugin=plugin_name,
                         result=result,
                     )
-                else:
-                    results.append(result)
+                results.append(result)
         if not success_if_no_hook and not executed_plugin_names:
             return HookResult(
                 status=REJECTED,
@@ -172,7 +172,7 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
     async def notify(
         self,
         event_name: str,
-        args: Tuple[Any, ...],
+        args: tuple[Any, ...],
     ) -> None:
         """
         Invoke the handlers that matches with the given ``event_name``.

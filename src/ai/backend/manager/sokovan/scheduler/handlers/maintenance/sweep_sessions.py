@@ -7,10 +7,9 @@ from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.sokovan.scheduler.handlers.base import SchedulerHandler
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
-
-from ..base import SchedulerHandler
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -22,7 +21,7 @@ class SweepSessionsHandler(SchedulerHandler):
         self,
         scheduler: Scheduler,
         repository: SchedulerRepository,
-    ):
+    ) -> None:
         self._scheduler = scheduler
         self._repository = repository
 

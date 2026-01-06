@@ -6,10 +6,9 @@ Tests the repository layer with real database operations.
 from __future__ import annotations
 
 import uuid
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
@@ -20,6 +19,7 @@ from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
+from ai.backend.testutils.db import with_tables
 
 
 class TestReservoirRegistryRepository:
@@ -32,15 +32,17 @@ class TestReservoirRegistryRepository:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans Reservoir registry data after each test"""
-        yield database_engine
-
-        # Cleanup all Reservoir registry data after test
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(ArtifactRegistryRow))
-            await db_sess.execute(sa.delete(ReservoirRegistryRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                ReservoirRegistryRow,
+                ArtifactRegistryRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def sample_registry_id(

@@ -1,622 +1,643 @@
+"""
+Mock-based unit tests for UserService.
+
+Tests verify service layer business logic using mocked repositories.
+Repository tests verify actual DB operations separately.
+"""
+
+from __future__ import annotations
+
 import uuid
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import sqlalchemy as sa
 
-from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.types import AccessKey
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.user.types import UserInfoContext
-from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
-from ai.backend.manager.errors.user import UserConflict, UserCreationBadRequest
-from ai.backend.manager.models.group import (
-    AssocGroupUserRow,
-    GroupRow,
-    ProjectType,
+from ai.backend.manager.data.keypair.types import KeyPairData
+from ai.backend.manager.data.user.types import (
+    UserCreateResultData,
+    UserData,
+    UserInfoContext,
+    UserRole,
+    UserStatus,
 )
+from ai.backend.manager.errors.user import UserNotFound, UserPurgeFailure
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair import (
-    KeyPairRow,
-    generate_keypair,
-    generate_ssh_keypair,
-    keypairs,
-)
-from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.admin_repository import AdminUserRepository
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
-from ai.backend.manager.services.user.actions.create_user import CreateUserAction
-from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
-from ai.backend.manager.services.user.actions.modify_user import ModifyUserAction
-from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
-from ai.backend.manager.services.user.processors import UserProcessors
+from ai.backend.manager.services.user.actions.create_user import (
+    CreateUserAction,
+)
+from ai.backend.manager.services.user.actions.delete_user import (
+    DeleteUserAction,
+)
+from ai.backend.manager.services.user.actions.modify_user import (
+    ModifyUserAction,
+)
+from ai.backend.manager.services.user.actions.purge_user import (
+    PurgeUserAction,
+)
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.types import OptionalState
 
 
-@pytest.fixture
-def mock_redis_connection():
-    mock_redis_connection = MagicMock(spec=ValkeyStatClient)
-    return mock_redis_connection
+class TestCreateUser:
+    """Tests for UserService.create_user"""
 
+    @pytest.fixture
+    def mock_user_repository(self) -> MagicMock:
+        return MagicMock(spec=UserRepository)
 
-@pytest.fixture
-def mock_storage_manager():
-    mock_storage_manager = MagicMock(spec=StorageSessionManager)
-    return mock_storage_manager
+    @pytest.fixture
+    def mock_admin_user_repository(self) -> MagicMock:
+        return MagicMock(spec=AdminUserRepository)
 
-
-@pytest.fixture
-def mock_action_monitor():
-    mock_action_monitor = MagicMock(spec=ActionMonitor)
-    return mock_action_monitor
-
-
-@pytest.fixture
-def processors(
-    database_fixture,
-    database_engine,
-    mock_storage_manager,
-    mock_redis_connection,
-    mock_action_monitor,
-) -> UserProcessors:
-    agent_registry_mock = MagicMock()
-    user_repository = UserRepository(db=database_engine)
-
-    # Mock the _role_manager with all required methods
-    mock_role_manager = MagicMock()
-    mock_role = MagicMock()
-    mock_role.id = uuid.uuid4()
-    mock_role_manager.create_system_role = AsyncMock(return_value=mock_role)
-    mock_role_manager.map_user_to_role = AsyncMock(return_value=None)
-    mock_role_manager.map_entity_to_scope = AsyncMock(return_value=None)
-    user_repository._role_manager = mock_role_manager
-
-    admin_user_repository = AdminUserRepository(db=database_engine)
-    user_service = UserService(
-        storage_manager=mock_storage_manager,
-        valkey_stat_client=mock_redis_connection,
-        agent_registry=agent_registry_mock,
-        user_repository=user_repository,
-        admin_user_repository=admin_user_repository,
-    )
-    return UserProcessors(user_service=user_service, action_monitors=[mock_action_monitor])
-
-
-@pytest.fixture
-def create_user(
-    database_engine: ExtendedAsyncSAEngine,
-    processors: UserProcessors,
-):
-    # NOTICE: To use 'default' resource policy, you must use `database_fixture` concurrently in test function
-    @asynccontextmanager
-    async def _create_user(
-        email: str,
-        name: str,
-        domain_name: str,
-        *,
-        need_password_change: bool = False,
-        role: UserRole = UserRole.USER,
-        full_name: str = "Sample User",
-        password: str = "sample_password",
-        resource_policy_name: str = "default",
-        description: str = "",
-        totp_activated: bool = False,
-        sudo_session_enabled: bool = False,
-        is_active: bool = True,
-    ) -> AsyncGenerator[uuid.UUID, None]:
-        password_info = PasswordInfo(
-            password=password,
-            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
-            rounds=100_000,
-            salt_size=32,
+    @pytest.fixture
+    def service(
+        self,
+        mock_user_repository: MagicMock,
+        mock_admin_user_repository: MagicMock,
+    ) -> UserService:
+        return UserService(
+            storage_manager=MagicMock(),
+            valkey_stat_client=MagicMock(),
+            agent_registry=MagicMock(),
+            user_repository=mock_user_repository,
+            admin_user_repository=mock_admin_user_repository,
         )
-        user_data = {
-            "username": name,
-            "password": password_info,
-            "email": email,
-            "need_password_change": need_password_change,
-            "full_name": full_name,
-            "domain_name": domain_name,
-            "role": role,
-            "status": UserStatus.ACTIVE,
-            "allowed_client_ip": None,
-            "resource_policy": resource_policy_name,
-            "description": description,
-            "totp_activated": totp_activated,
-            "sudo_session_enabled": sudo_session_enabled,
-            "container_uid": None,
-            "container_main_gid": None,
-            "container_gids": None,
-        }
-        async with database_engine.begin_session() as session:
-            await session.execute(sa.insert(UserRow).values(user_data))
-            user_id = await session.scalar(sa.select(UserRow.uuid).where(UserRow.email == email))
 
-            ak, sk = generate_keypair()
-            pubkey, privkey = generate_ssh_keypair()
-            kp_data = {
-                "user_id": email,
-                "access_key": ak,
-                "secret_key": sk,
-                "is_active": is_active,
-                "is_admin": role == UserRole.SUPERADMIN or role == UserRole.ADMIN,
-                "resource_policy": DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
-                "rate_limit": DEFAULT_KEYPAIR_RATE_LIMIT,
-                "num_queries": 0,
-                "ssh_public_key": pubkey,
-                "ssh_private_key": privkey,
-            }
-            await session.execute(
-                sa.insert(keypairs).values(
-                    **kp_data,
-                    user=user_id,
-                )
-            )
-            await session.execute(
-                sa.update(UserRow).where(UserRow.uuid == user_id).values(main_access_key=ak)
-            )
+    @pytest.fixture
+    def sample_user_uuid(self) -> uuid.UUID:
+        return uuid.uuid4()
 
-            model_store_project = await session.scalar(
-                sa.select(GroupRow).where(GroupRow.type == ProjectType.MODEL_STORE)
-            )
-            gids_to_join = [model_store_project.id] if model_store_project is not None else []
+    @pytest.fixture
+    def sample_user_data(self, sample_user_uuid: uuid.UUID) -> UserData:
+        return UserData(
+            id=sample_user_uuid,
+            uuid=sample_user_uuid,
+            username="newuser",
+            email="new@example.com",
+            need_password_change=False,
+            full_name="Test User",
+            description="Test user description",
+            is_active=True,
+            status=UserStatus.ACTIVE,
+            status_info=None,
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
+            domain_name="default",
+            role=UserRole.USER,
+            resource_policy="default",
+            allowed_client_ip=None,
+            totp_activated=False,
+            totp_activated_at=None,
+            sudo_session_enabled=False,
+            main_access_key="TESTKEY1234567890",
+            container_uid=None,
+            container_main_gid=None,
+            container_gids=None,
+        )
 
-            # Add user to groups if group_ids parameter is provided.
-            if len(gids_to_join) > 0:
-                query = (
-                    sa.select(GroupRow.id)
-                    .where(GroupRow.domain_name == domain_name)
-                    .where(GroupRow.id.in_(gids_to_join))
-                )
-                grps = (await session.execute(query)).all()
-                if grps:
-                    group_data = [{"user_id": user_id, "group_id": grp.id} for grp in grps]
-                    group_insert_query = sa.insert(AssocGroupUserRow).values(group_data)
-                    await session.execute(group_insert_query)
+    @pytest.fixture
+    def sample_keypair_data(self, sample_user_uuid: uuid.UUID) -> KeyPairData:
+        return KeyPairData(
+            user_id=sample_user_uuid,
+            access_key=AccessKey("TESTKEY1234567890"),
+            secret_key=SecretKey("test-secret-key"),
+            is_active=True,
+            is_admin=False,
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
+            resource_policy_name="default",
+            rate_limit=60000,
+            ssh_public_key=None,
+            ssh_private_key=None,
+            dotfiles="",
+            bootstrap_script="",
+        )
 
-        try:
-            yield user_id
-
-        finally:
-            async with database_engine.begin_session() as session:
-                await session.execute(
-                    sa.delete(AssocGroupUserRow).where(AssocGroupUserRow.user_id == user_id)
-                )
-                await session.execute(sa.delete(keypairs).where(keypairs.c.user_id == email))
-                await session.execute(sa.delete(UserRow).where(UserRow.uuid == user_id))
-
-    return _create_user
-
-
-async def test_create_user(
-    processors: UserProcessors,
-    database_fixture,
-) -> None:
-    """Test successful user creation with valid data"""
-    password_info = PasswordInfo(
-        password="password123",
-        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
-        rounds=100_000,
-        salt_size=32,
-    )
-    action = CreateUserAction(
-        creator=Creator(
-            spec=UserCreatorSpec(
-                username="testuser",
-                password=password_info,
-                email="test_user@test.com",
-                need_password_change=False,
-                domain_name="default",
-                full_name="Test User",
-                description="Test user description",
-                is_active=True,
-                status=UserStatus.ACTIVE,
-                role=UserRole.USER,
-                allowed_client_ip=None,
-                totp_activated=False,
-                resource_policy="default",
-                sudo_session_enabled=False,
-                container_uid=None,
-                container_main_gid=None,
-                container_gids=None,
-            )
-        ),
-        group_ids=None,
-    )
-
-    result = await processors.create_user.wait_for_complete(action)
-
-    assert result.data.user.username == "testuser"
-    assert result.data.user.email == "test_user@test.com"
-    assert result.data.user.need_password_change is False
-    assert result.data.user.full_name == "Test User"
-    assert result.data.user.description == "Test user description"
-    assert result.data.user.is_active is True
-    assert result.data.user.status == UserStatus.ACTIVE
-    # status_info is None for newly created users
-    assert result.data.user.domain_name == "default"
-    assert result.data.user.role == UserRole.USER
-    assert result.data.user.resource_policy == "default"
-    assert result.data.user.allowed_client_ip is None
-    assert result.data.user.totp_activated is False
-    assert result.data.user.sudo_session_enabled is False
-    assert result.data.user.container_uid is None
-    assert result.data.user.container_main_gid is None
-    assert result.data.user.container_gids is None
-
-
-async def test_create_user_non_existing_domain(
-    processors: UserProcessors,
-) -> None:
-    """Test user creation with non-existing domain"""
-    password_info = PasswordInfo(
-        password="password123",
-        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
-        rounds=100_000,
-        salt_size=32,
-    )
-    action = CreateUserAction(
-        creator=Creator(
-            spec=UserCreatorSpec(
-                username="test_user_not_existing_domain",
-                password=password_info,
-                email="test@test.com",
-                need_password_change=False,
-                domain_name="non_existing_domain",
-                full_name="Test User",
-                description="Test user description",
-                is_active=True,
-                status=UserStatus.ACTIVE,
-                role=UserRole.USER,
-                allowed_client_ip=None,
-                totp_activated=False,
-                resource_policy="default",
-                sudo_session_enabled=False,
-                container_uid=None,
-                container_main_gid=None,
-                container_gids=None,
-            )
-        ),
-        group_ids=None,
-    )
-
-    with pytest.raises(UserCreationBadRequest):
-        await processors.create_user.wait_for_complete(action)
-
-
-async def test_create_user_duplicate_email(
-    processors: UserProcessors,
-    database_fixture,
-    create_user,
-) -> None:
-    """Test user creation with duplicate email"""
-    user_email = "duplicate@test.com"
-    async with create_user(email=user_email, name="existing_user", domain_name="default"):
-        # Try to create another user with the same email
-        password_info = PasswordInfo(
+    @pytest.fixture
+    def sample_password_info(self) -> PasswordInfo:
+        return PasswordInfo(
             password="password123",
             algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
-            rounds=100_000,
+            rounds=600_000,
             salt_size=32,
         )
+
+    @pytest.fixture
+    def sample_create_result(
+        self,
+        sample_user_data: UserData,
+        sample_keypair_data: KeyPairData,
+    ) -> UserCreateResultData:
+        return UserCreateResultData(user=sample_user_data, keypair=sample_keypair_data)
+
+    async def test_create_with_valid_data_returns_user(
+        self,
+        service: UserService,
+        mock_user_repository: MagicMock,
+        sample_user_data: UserData,
+        sample_create_result: UserCreateResultData,
+        sample_password_info: PasswordInfo,
+    ) -> None:
+        """Create user with valid data should return created user."""
+        mock_user_repository.create_user_validated = AsyncMock(return_value=sample_create_result)
+
         action = CreateUserAction(
             creator=Creator(
                 spec=UserCreatorSpec(
-                    username="new_user",
-                    password=password_info,
-                    email=user_email,  # Same email as existing user
-                    need_password_change=False,
-                    domain_name="default",
-                    full_name="New User",
-                    description="Test user description",
-                    is_active=True,
-                    status=UserStatus.ACTIVE,
-                    role=UserRole.USER,
-                    allowed_client_ip=None,
-                    totp_activated=False,
-                    resource_policy="default",
-                    sudo_session_enabled=False,
-                    container_uid=None,
-                    container_main_gid=None,
-                    container_gids=None,
+                    email=sample_user_data.email,
+                    username=sample_user_data.username,
+                    password=sample_password_info,
+                    need_password_change=sample_user_data.need_password_change,
+                    domain_name=sample_user_data.domain_name,
                 )
             ),
             group_ids=None,
         )
 
-        with pytest.raises(UserConflict):
-            await processors.create_user.wait_for_complete(action)
+        result = await service.create_user(action)
 
-
-async def test_create_user_duplicate_username(
-    processors: UserProcessors,
-    database_fixture,
-    create_user,
-) -> None:
-    """Test user creation with duplicate username"""
-    username = "duplicate_username"
-    async with create_user(email="existing@test.com", name=username, domain_name="default"):
-        # Try to create another user with the same username
-        password_info = PasswordInfo(
-            password="password123",
-            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
-            rounds=100_000,
-            salt_size=32,
+        assert result.data.user.email == sample_user_data.email
+        mock_user_repository.create_user_validated.assert_called_once_with(
+            action.creator, action.group_ids
         )
+
+    async def test_create_with_group_ids_passes_to_repository(
+        self,
+        service: UserService,
+        mock_user_repository: MagicMock,
+        sample_user_data: UserData,
+        sample_create_result: UserCreateResultData,
+        sample_password_info: PasswordInfo,
+    ) -> None:
+        """Create user with group_ids should pass them to repository."""
+        mock_user_repository.create_user_validated = AsyncMock(return_value=sample_create_result)
+
+        group_ids = ["group1", "group2"]
         action = CreateUserAction(
             creator=Creator(
                 spec=UserCreatorSpec(
-                    username=username,  # Same username as existing user
-                    password=password_info,
-                    email="new_user@test.com",
+                    email=sample_user_data.email,
+                    username=sample_user_data.username,
+                    password=sample_password_info,
+                    need_password_change=sample_user_data.need_password_change,
+                    domain_name=sample_user_data.domain_name,
+                )
+            ),
+            group_ids=group_ids,
+        )
+
+        result = await service.create_user(action)
+
+        assert result.data is not None
+        mock_user_repository.create_user_validated.assert_called_once_with(
+            action.creator, group_ids
+        )
+
+    async def test_create_with_duplicate_email_raises_error(
+        self,
+        service: UserService,
+        mock_user_repository: MagicMock,
+        sample_password_info: PasswordInfo,
+    ) -> None:
+        """Create user with duplicate email should raise InvalidAPIParameters."""
+        mock_user_repository.create_user_validated = AsyncMock(
+            side_effect=InvalidAPIParameters("User with this email already exists")
+        )
+
+        action = CreateUserAction(
+            creator=Creator(
+                spec=UserCreatorSpec(
+                    email="existing@example.com",
+                    username="existinguser",
+                    password=sample_password_info,
                     need_password_change=False,
                     domain_name="default",
-                    full_name="New User",
-                    description="Test user description",
-                    is_active=True,
-                    status=UserStatus.ACTIVE,
-                    role=UserRole.USER,
-                    allowed_client_ip=None,
-                    totp_activated=False,
-                    resource_policy="default",
-                    sudo_session_enabled=False,
-                    container_uid=None,
-                    container_main_gid=None,
-                    container_gids=None,
                 )
             ),
-            group_ids=None,
         )
 
-        with pytest.raises(UserConflict):
-            await processors.create_user.wait_for_complete(action)
+        with pytest.raises(InvalidAPIParameters):
+            await service.create_user(action)
 
 
-async def test_create_default_keypair_after_create_user(
-    processors: UserProcessors,
-    database_engine: ExtendedAsyncSAEngine,
-    create_user,
-) -> None:
-    user_email = "test-keypair-create-user@email.com"
-    async with create_user(email=user_email, name="test-user", domain_name="default") as user_id:
-        async with database_engine.begin_session() as session:
-            keypair = await session.scalar(
-                sa.select(KeyPairRow).where((KeyPairRow.user == user_id))
-            )
+class TestModifyUser:
+    """Tests for UserService.modify_user"""
 
-            assert keypair is not None
-            assert keypair.is_active is True
-            assert keypair.resource_policy == DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
-            assert keypair.rate_limit == DEFAULT_KEYPAIR_RATE_LIMIT
+    @pytest.fixture
+    def mock_user_repository(self) -> MagicMock:
+        return MagicMock(spec=UserRepository)
 
-            user_main_access_key = await session.scalar(
-                sa.select(UserRow.main_access_key).where(UserRow.uuid == user_id)
-            )
+    @pytest.fixture
+    def mock_admin_user_repository(self) -> MagicMock:
+        return MagicMock(spec=AdminUserRepository)
 
-            assert user_main_access_key == keypair.access_key
-
-
-async def test_create_user_join_model_store_project(
-    processors: UserProcessors,
-    database_engine: ExtendedAsyncSAEngine,
-    create_user,
-) -> None:
-    user_email = "test-join-model-store@email.com"
-    async with create_user(email=user_email, name="test-user", domain_name="default") as user_id:
-        async with database_engine.begin_session() as session:
-            user_group_assoc = await session.scalar(
-                sa.select(AssocGroupUserRow).where(AssocGroupUserRow.user_id == user_id)
-            )
-
-            assert user_group_assoc is not None
-            assert user_group_assoc.group_id == uuid.UUID(
-                "8e32dd28-d319-4e3b-8851-ea37837699a5"
-            )  # fixture injected in root conftest
-
-
-async def test_modify_user(
-    processors: UserProcessors,
-    database_engine: ExtendedAsyncSAEngine,
-    create_user,
-) -> None:
-    user_email = "modify-user@test.com"
-    async with create_user(
-        email=user_email,
-        name="test",
-        domain_name="default",
-        role=UserRole.USER,
-        full_name="Modify User",
-        password="password123",
-    ) as _:
-        spec = UserUpdaterSpec(
-            username=OptionalState.update("modify_user"),
-            full_name=OptionalState.update("Modified User"),
-            totp_activated=OptionalState.update(True),
-            status=OptionalState.update(UserStatus.INACTIVE),
+    @pytest.fixture
+    def service(
+        self,
+        mock_user_repository: MagicMock,
+        mock_admin_user_repository: MagicMock,
+    ) -> UserService:
+        return UserService(
+            storage_manager=MagicMock(),
+            valkey_stat_client=MagicMock(),
+            agent_registry=MagicMock(),
+            user_repository=mock_user_repository,
+            admin_user_repository=mock_admin_user_repository,
         )
+
+    @pytest.fixture
+    def modified_user_data(self) -> UserData:
+        user_uuid = uuid.uuid4()
+        return UserData(
+            id=user_uuid,
+            uuid=user_uuid,
+            username="modified_username",
+            email="test@example.com",
+            need_password_change=False,
+            full_name="Test User",
+            description="Test user description",
+            is_active=True,
+            status=UserStatus.ACTIVE,
+            status_info=None,
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
+            domain_name="default",
+            role=UserRole.USER,
+            resource_policy="default",
+            allowed_client_ip=None,
+            totp_activated=False,
+            totp_activated_at=None,
+            sudo_session_enabled=False,
+            main_access_key="TESTKEY1234567890",
+            container_uid=None,
+            container_main_gid=None,
+            container_gids=None,
+        )
+
+    async def test_modify_with_valid_data_returns_updated_user(
+        self,
+        service: UserService,
+        mock_user_repository: MagicMock,
+        modified_user_data: UserData,
+    ) -> None:
+        """Modify user with valid data should return updated user."""
+        mock_user_repository.update_user_validated = AsyncMock(return_value=modified_user_data)
+
         action = ModifyUserAction(
-            email=user_email,
-            updater=Updater(spec=spec, pk_value=user_email),
-        )
-
-        result = await processors.modify_user.wait_for_complete(action)
-
-        # Check if the user data is modified correctly
-        assert result.data.full_name == "Modified User"
-        assert result.data.totp_activated is True
-        assert result.data.status == UserStatus.INACTIVE
-
-        # Check if data not modified
-        assert result.data.role == UserRole.USER
-        assert result.data.status_info == "admin-requested"
-        assert result.data.modified_at is not None
-        assert result.data.resource_policy == "default"
-
-
-async def test_modify_user_role_to_admin(
-    processors: UserProcessors,
-    database_engine: ExtendedAsyncSAEngine,
-    create_user,
-) -> None:
-    user_email = "modify-user-role@test.com"
-    async with create_user(
-        email=user_email,
-        name="test",
-        domain_name="default",
-        role=UserRole.USER,
-    ) as user_id:
-        spec = UserUpdaterSpec(
-            role=OptionalState.update(UserRole.ADMIN),
-        )
-        action = ModifyUserAction(
-            email=user_email,
-            updater=Updater(spec=spec, pk_value=user_email),
-        )
-        result = await processors.modify_user.wait_for_complete(action)
-
-        # Check if the user data is modified correctly
-        assert result.data.role == UserRole.ADMIN
-
-        # Check if keypair updated as active admin
-        async with database_engine.begin_session() as session:
-            keypair = await session.scalar(
-                sa.select(KeyPairRow).where((KeyPairRow.user == user_id))
-            )
-
-            assert keypair is not None
-            assert keypair.is_active is True
-            assert keypair.is_admin is True
-
-
-async def test_modify_admin_user_to_normal_user(
-    processors: UserProcessors,
-    database_engine: ExtendedAsyncSAEngine,
-    create_user,
-) -> None:
-    user_email = "modify-user-role@test.com"
-    async with create_user(
-        email=user_email,
-        name="test",
-        domain_name="default",
-        role=UserRole.SUPERADMIN,
-    ) as user_id:
-        spec = UserUpdaterSpec(
-            role=OptionalState.update(UserRole.USER),
-        )
-        action = ModifyUserAction(
-            email=user_email,
-            updater=Updater(spec=spec, pk_value=user_email),
-        )
-        result = await processors.modify_user.wait_for_complete(action)
-
-        # Check if the user data is modified correctly
-        assert result.data.role == UserRole.USER
-
-        # Check if keypair updated as active but not admin
-        async with database_engine.begin_session() as session:
-            keypair = await session.scalar(
-                sa.select(KeyPairRow).where((KeyPairRow.user == user_id))
-            )
-
-            assert keypair is not None
-            assert keypair.is_active is True
-            assert keypair.is_admin is False
-
-
-@pytest.mark.asyncio
-async def test_delete_user_success(
-    processors: UserProcessors, database_engine: ExtendedAsyncSAEngine, create_user
-) -> None:
-    delete_user_email = "test-delete-user@email.com"
-    async with create_user(
-        email=delete_user_email, name="test-delete-user", domain_name="default"
-    ) as user_id:
-        delete_action = DeleteUserAction(email=delete_user_email)
-        result = await processors.delete_user.wait_for_complete(delete_action)
-
-        # Check if the user and user keypair both deleted
-        async with database_engine.begin_session() as session:
-            result = await session.scalar(
-                sa.select(KeyPairRow.is_active).where(KeyPairRow.user_id == delete_user_email)
-            )
-            assert result is False
-
-            result = await session.scalar(
-                sa.select(UserRow).where(
-                    (UserRow.uuid == user_id) & (UserRow.status == UserStatus.ACTIVE)
-                )
-            )
-            assert result is None
-
-            result = await session.scalar(
-                sa.select(UserRow).where(
-                    (UserRow.uuid == user_id) & (UserRow.status == UserStatus.DELETED)
-                )
-            )
-            assert result is not None
-
-
-@pytest.mark.asyncio
-async def test_purge_user(
-    processors: UserProcessors, database_engine: ExtendedAsyncSAEngine, create_user, mocker
-) -> None:
-    delete_user_email = "test-delete-user@email.com"
-
-    # No need to patch since mock_redis_connection now has the correct spec
-
-    async with create_user(
-        email=delete_user_email, name="test-delete-user", domain_name="default"
-    ) as user_id:
-        delete_action = DeleteUserAction(email=delete_user_email)
-        result = await processors.delete_user.wait_for_complete(delete_action)
-
-        async with database_engine.begin() as conn:
-            main_access_key = await conn.scalar(
-                sa.select(UserRow.main_access_key).where(UserRow.uuid == user_id)
-            )
-
-        purge_action = PurgeUserAction(
-            email=delete_user_email,
-            user_info_ctx=UserInfoContext(
-                uuid=user_id,
-                email=delete_user_email,
-                main_access_key=main_access_key,
+            email=modified_user_data.email,
+            updater=Updater(
+                spec=UserUpdaterSpec(
+                    username=OptionalState.update(modified_user_data.username),
+                ),
+                pk_value=modified_user_data.email,
             ),
         )
 
-        await processors.purge_user.wait_for_complete(purge_action)
+        result = await service.modify_user(action)
 
-        # Check if the user is purged
-        async with database_engine.begin() as conn:
-            result = await conn.scalar(sa.select(UserRow).where((UserRow.uuid == user_id)))
-            assert result is None
+        assert result.data is not None
+        assert result.data.username == modified_user_data.username
+        mock_user_repository.update_user_validated.assert_called_once_with(
+            email=modified_user_data.email,
+            updater=action.updater,
+            requester_uuid=None,
+        )
+
+    async def test_modify_nonexistent_user_raises_error(
+        self,
+        service: UserService,
+        mock_user_repository: MagicMock,
+    ) -> None:
+        """Modify non-existent user should raise UserNotFound."""
+        mock_user_repository.update_user_validated = AsyncMock(
+            side_effect=UserNotFound("User not found")
+        )
+
+        action = ModifyUserAction(
+            email="nonexistent@example.com",
+            updater=Updater(
+                spec=UserUpdaterSpec(
+                    username=OptionalState.update("new_username"),
+                ),
+                pk_value="nonexistent@example.com",
+            ),
+        )
+
+        with pytest.raises(UserNotFound):
+            await service.modify_user(action)
 
 
-@pytest.mark.asyncio
-async def test_purge_user_fail(
-    processors: UserProcessors,
-) -> None:
-    """Test that purging a non-existing user raises UserNotFound error"""
-    from ai.backend.manager.errors.user import UserNotFound
+class TestDeleteUser:
+    """Tests for UserService.delete_user"""
 
-    action = PurgeUserAction(
-        email="non-exisiting-user@email.com",
-        user_info_ctx=UserInfoContext(
-            uuid=uuid.UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
-            email="non-exisiting-user@email.com",
-            main_access_key=AccessKey("sample_access_key"),
-        ),
-    )
+    @pytest.fixture
+    def mock_user_repository(self) -> MagicMock:
+        return MagicMock(spec=UserRepository)
 
-    with pytest.raises(UserNotFound):
-        await processors.purge_user.wait_for_complete(action)
+    @pytest.fixture
+    def mock_admin_user_repository(self) -> MagicMock:
+        return MagicMock(spec=AdminUserRepository)
+
+    @pytest.fixture
+    def service(
+        self,
+        mock_user_repository: MagicMock,
+        mock_admin_user_repository: MagicMock,
+    ) -> UserService:
+        return UserService(
+            storage_manager=MagicMock(),
+            valkey_stat_client=MagicMock(),
+            agent_registry=MagicMock(),
+            user_repository=mock_user_repository,
+            admin_user_repository=mock_admin_user_repository,
+        )
+
+    async def test_delete_existing_user_returns_success(
+        self,
+        service: UserService,
+        mock_user_repository: MagicMock,
+    ) -> None:
+        """Delete existing user should return success result."""
+        mock_user_repository.soft_delete_user_validated = AsyncMock(return_value=None)
+
+        action = DeleteUserAction(email="test@example.com")
+
+        result = await service.delete_user(action)
+
+        assert result is not None
+        mock_user_repository.soft_delete_user_validated.assert_called_once_with(
+            email="test@example.com",
+            requester_uuid=None,
+        )
+
+    async def test_delete_nonexistent_user_raises_error(
+        self,
+        service: UserService,
+        mock_user_repository: MagicMock,
+    ) -> None:
+        """Delete non-existent user should raise UserNotFound."""
+        mock_user_repository.soft_delete_user_validated = AsyncMock(
+            side_effect=UserNotFound("User not found")
+        )
+
+        action = DeleteUserAction(email="nonexistent@example.com")
+
+        with pytest.raises(UserNotFound):
+            await service.delete_user(action)
+
+
+class TestPurgeUser:
+    """Tests for UserService.purge_user"""
+
+    @pytest.fixture
+    def mock_user_repository(self) -> MagicMock:
+        return MagicMock(spec=UserRepository)
+
+    @pytest.fixture
+    def mock_admin_user_repository(self) -> MagicMock:
+        return MagicMock(spec=AdminUserRepository)
+
+    @pytest.fixture
+    def mock_agent_registry(self) -> MagicMock:
+        return MagicMock()
+
+    @pytest.fixture
+    def service(
+        self,
+        mock_user_repository: MagicMock,
+        mock_admin_user_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+    ) -> UserService:
+        return UserService(
+            storage_manager=MagicMock(),
+            valkey_stat_client=MagicMock(),
+            agent_registry=mock_agent_registry,
+            user_repository=mock_user_repository,
+            admin_user_repository=mock_admin_user_repository,
+        )
+
+    @pytest.fixture
+    def purge_user_uuid(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def purge_user_data(self, purge_user_uuid: uuid.UUID) -> UserData:
+        return UserData(
+            id=purge_user_uuid,
+            uuid=purge_user_uuid,
+            username="purgeuser",
+            email="purge@example.com",
+            need_password_change=False,
+            full_name="Purge User",
+            description="User to be purged",
+            is_active=True,
+            status=UserStatus.ACTIVE,
+            status_info=None,
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
+            domain_name="default",
+            role=UserRole.USER,
+            resource_policy="default",
+            allowed_client_ip=None,
+            totp_activated=False,
+            totp_activated_at=None,
+            sudo_session_enabled=False,
+            main_access_key="TESTKEY1234567890",
+            container_uid=None,
+            container_main_gid=None,
+            container_gids=None,
+        )
+
+    @pytest.fixture
+    def admin_user_info_ctx(self) -> UserInfoContext:
+        return UserInfoContext(
+            uuid=uuid.uuid4(),
+            email="admin@example.com",
+            main_access_key=AccessKey("ADMINKEY123456789"),
+        )
+
+    async def test_purge_user_succeeds_without_active_vfolders(
+        self,
+        service: UserService,
+        mock_user_repository: MagicMock,
+        mock_admin_user_repository: MagicMock,
+        purge_user_data: UserData,
+        admin_user_info_ctx: UserInfoContext,
+    ) -> None:
+        """Purge user without active vfolder mounts should succeed."""
+        mock_user_repository.get_by_email_validated = AsyncMock(return_value=purge_user_data)
+        mock_admin_user_repository.check_user_vfolder_mounted_to_active_kernels_force = AsyncMock(
+            return_value=False
+        )
+        mock_admin_user_repository.retrieve_active_sessions_force = AsyncMock(return_value=[])
+        mock_admin_user_repository.delete_endpoints_force = AsyncMock(return_value=None)
+        mock_admin_user_repository.delete_user_vfolders_force = AsyncMock(return_value=None)
+        mock_admin_user_repository.purge_user_force = AsyncMock(return_value=None)
+
+        action = PurgeUserAction(
+            user_info_ctx=admin_user_info_ctx,
+            email=purge_user_data.email,
+        )
+
+        result = await service.purge_user(action)
+
+        assert result is not None
+        mock_admin_user_repository.purge_user_force.assert_called_once_with(purge_user_data.email)
+
+    async def test_purge_user_fails_with_active_vfolder_mounts(
+        self,
+        service: UserService,
+        mock_user_repository: MagicMock,
+        mock_admin_user_repository: MagicMock,
+        purge_user_data: UserData,
+        admin_user_info_ctx: UserInfoContext,
+    ) -> None:
+        """Purge user with active vfolder mounts should raise UserPurgeFailure."""
+        mock_user_repository.get_by_email_validated = AsyncMock(return_value=purge_user_data)
+        mock_admin_user_repository.check_user_vfolder_mounted_to_active_kernels_force = AsyncMock(
+            return_value=True
+        )
+
+        action = PurgeUserAction(
+            user_info_ctx=admin_user_info_ctx,
+            email=purge_user_data.email,
+        )
+
+        with pytest.raises(UserPurgeFailure):
+            await service.purge_user(action)
+
+    async def test_purge_user_with_shared_vfolders_migration(
+        self,
+        service: UserService,
+        mock_user_repository: MagicMock,
+        mock_admin_user_repository: MagicMock,
+        purge_user_uuid: uuid.UUID,
+        purge_user_data: UserData,
+        admin_user_info_ctx: UserInfoContext,
+    ) -> None:
+        """Purge user with shared vfolders migration enabled should migrate vfolders."""
+        mock_user_repository.get_by_email_validated = AsyncMock(return_value=purge_user_data)
+        mock_admin_user_repository.check_user_vfolder_mounted_to_active_kernels_force = AsyncMock(
+            return_value=False
+        )
+        mock_admin_user_repository.migrate_shared_vfolders_force = AsyncMock(return_value=None)
+        mock_admin_user_repository.retrieve_active_sessions_force = AsyncMock(return_value=[])
+        mock_admin_user_repository.delete_endpoints_force = AsyncMock(return_value=None)
+        mock_admin_user_repository.delete_user_vfolders_force = AsyncMock(return_value=None)
+        mock_admin_user_repository.purge_user_force = AsyncMock(return_value=None)
+
+        action = PurgeUserAction(
+            user_info_ctx=admin_user_info_ctx,
+            email=purge_user_data.email,
+            purge_shared_vfolders=OptionalState.update(True),
+        )
+
+        result = await service.purge_user(action)
+
+        assert result is not None
+        mock_admin_user_repository.migrate_shared_vfolders_force.assert_called_once_with(
+            deleted_user_uuid=purge_user_uuid,
+            target_user_uuid=admin_user_info_ctx.uuid,
+            target_user_email=admin_user_info_ctx.email,
+        )
+
+    async def test_purge_user_with_endpoint_delegation(
+        self,
+        service: UserService,
+        mock_user_repository: MagicMock,
+        mock_admin_user_repository: MagicMock,
+        purge_user_uuid: uuid.UUID,
+        purge_user_data: UserData,
+        admin_user_info_ctx: UserInfoContext,
+    ) -> None:
+        """Purge user with endpoint delegation enabled should delegate endpoints."""
+        mock_user_repository.get_by_email_validated = AsyncMock(return_value=purge_user_data)
+        mock_admin_user_repository.check_user_vfolder_mounted_to_active_kernels_force = AsyncMock(
+            return_value=False
+        )
+        mock_admin_user_repository.delegate_endpoint_ownership_force = AsyncMock(return_value=None)
+        mock_admin_user_repository.retrieve_active_sessions_force = AsyncMock(return_value=[])
+        mock_admin_user_repository.delete_endpoints_force = AsyncMock(return_value=None)
+        mock_admin_user_repository.delete_user_vfolders_force = AsyncMock(return_value=None)
+        mock_admin_user_repository.purge_user_force = AsyncMock(return_value=None)
+
+        action = PurgeUserAction(
+            user_info_ctx=admin_user_info_ctx,
+            email=purge_user_data.email,
+            delegate_endpoint_ownership=OptionalState.update(True),
+        )
+
+        result = await service.purge_user(action)
+
+        assert result is not None
+        mock_admin_user_repository.delegate_endpoint_ownership_force.assert_called_once_with(
+            user_uuid=purge_user_uuid,
+            target_user_uuid=admin_user_info_ctx.uuid,
+            target_main_access_key=admin_user_info_ctx.main_access_key,
+        )
+        # When delegating, delete_endpoints_force should be called with delete_destroyed_only=True
+        mock_admin_user_repository.delete_endpoints_force.assert_called_once_with(
+            user_uuid=purge_user_uuid,
+            delete_destroyed_only=True,
+        )
+
+    async def test_purge_user_without_endpoint_delegation_deletes_all_endpoints(
+        self,
+        service: UserService,
+        mock_user_repository: MagicMock,
+        mock_admin_user_repository: MagicMock,
+        purge_user_uuid: uuid.UUID,
+        purge_user_data: UserData,
+        admin_user_info_ctx: UserInfoContext,
+    ) -> None:
+        """Purge user without endpoint delegation should delete all endpoints."""
+        mock_user_repository.get_by_email_validated = AsyncMock(return_value=purge_user_data)
+        mock_admin_user_repository.check_user_vfolder_mounted_to_active_kernels_force = AsyncMock(
+            return_value=False
+        )
+        mock_admin_user_repository.retrieve_active_sessions_force = AsyncMock(return_value=[])
+        mock_admin_user_repository.delete_endpoints_force = AsyncMock(return_value=None)
+        mock_admin_user_repository.delete_user_vfolders_force = AsyncMock(return_value=None)
+        mock_admin_user_repository.purge_user_force = AsyncMock(return_value=None)
+
+        action = PurgeUserAction(
+            user_info_ctx=admin_user_info_ctx,
+            email=purge_user_data.email,
+        )
+
+        result = await service.purge_user(action)
+
+        assert result is not None
+        mock_admin_user_repository.delete_endpoints_force.assert_called_once_with(
+            user_uuid=purge_user_uuid,
+            delete_destroyed_only=False,
+        )
+
+    async def test_purge_nonexistent_user_raises_error(
+        self,
+        service: UserService,
+        mock_user_repository: MagicMock,
+        admin_user_info_ctx: UserInfoContext,
+    ) -> None:
+        """Purge non-existent user should raise UserNotFound."""
+        mock_user_repository.get_by_email_validated = AsyncMock(
+            side_effect=UserNotFound("User not found")
+        )
+
+        action = PurgeUserAction(
+            user_info_ctx=admin_user_info_ctx,
+            email="nonexistent@example.com",
+        )
+
+        with pytest.raises(UserNotFound):
+            await service.purge_user(action)

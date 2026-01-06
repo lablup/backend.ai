@@ -236,10 +236,8 @@ class SessionRepository:
                 sa.select([sa.func.count()])
                 .select_from(ImageRow)
                 .where(
-                    (
-                        ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                        == f"{image_visibility}:{image_owner_id}"
-                    )
+                    ImageRow.labels["ai.backend.customized-image.owner"].as_string()
+                    == f"{image_visibility}:{image_owner_id}"
                 )
                 .where(ImageRow.status == ImageStatus.ALIVE)
             )
@@ -291,7 +289,7 @@ class SessionRepository:
             query = (
                 sa.select([scaling_groups.c.wsproxy_addr])
                 .select_from(scaling_groups)
-                .where((scaling_groups.c.name == scaling_group_name))
+                .where(scaling_groups.c.name == scaling_group_name)
             )
             result = await conn.execute(query)
             sgroup = result.first()

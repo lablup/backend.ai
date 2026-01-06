@@ -20,7 +20,7 @@ def test_encode():
                 hour=11,
                 minute=30,
                 second=22,
-                tzinfo=datetime.timezone.utc,
+                tzinfo=datetime.UTC,
             )
         },
         cls=ExtendedJSONEncoder,

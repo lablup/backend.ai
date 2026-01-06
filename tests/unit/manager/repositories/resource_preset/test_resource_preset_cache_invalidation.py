@@ -6,22 +6,48 @@ Tests the repository layer with real database and Redis/Valkey operations.
 from __future__ import annotations
 
 import uuid
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.group import GroupRow, association_groups_users
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupOpts,
+    ScalingGroupRow,
+    sgroups_for_domains,
+    sgroups_for_groups,
+    sgroups_for_keypairs,
+)
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
+from ai.backend.testutils.db import with_tables
 
 
 class TestResourcePresetCacheInvalidation:
@@ -30,14 +56,40 @@ class TestResourcePresetCacheInvalidation:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans resource preset data after each test"""
-        yield database_engine
-
-        # Cleanup all resource preset data after test
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(ResourcePresetRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents before children
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+                sgroups_for_domains,  # association table
+                sgroups_for_keypairs,  # association table
+                sgroups_for_groups,  # association table
+                association_groups_users,  # association table
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def test_scaling_group_name(
@@ -59,14 +111,7 @@ class TestResourcePresetCacheInvalidation:
             db_sess.add(scaling_group)
             await db_sess.flush()
 
-        try:
-            yield group_name
-        finally:
-            # Cleanup
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_sess.execute(
-                    sa.delete(ScalingGroupRow).where(ScalingGroupRow.name == group_name)
-                )
+        yield group_name
 
     @pytest.fixture
     async def sample_preset_creator(

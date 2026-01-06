@@ -71,7 +71,7 @@ class ImportStep(abc.ABC, Generic[InputType]):
             await storage.delete_file(model_prefix)
             log.info(f"[cleanup] Removed files: {model_prefix}")
         except Exception as e:
-            log.warning(f"[cleanup] Failed to cleanup: {model_prefix}: {str(e)}")
+            log.warning(f"[cleanup] Failed to cleanup: {model_prefix}: {e!s}")
 
 
 class ImportPipeline:

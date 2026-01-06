@@ -37,30 +37,43 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserRole
-from ai.backend.manager.models import (
-    AgentRow,
-    DomainRow,
-    GroupRow,
-    KernelRow,
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.group import GroupRow, association_groups_users
+from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
-    KeyPairRow,
     ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.scaling_group import (
     ScalingGroupOpts,
     ScalingGroupRow,
-    SessionRow,
-    UserResourcePolicyRow,
-    UserRow,
-    association_groups_users,
     sgroups_for_domains,
+    sgroups_for_groups,
+    sgroups_for_keypairs,
 )
-from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.resource_preset.repository import (
     ResourcePresetRepository,
 )
 from ai.backend.manager.repositories.resource_preset.types import (
     CheckPresetsResult,
 )
+from ai.backend.testutils.db import with_tables
 
 
 class TestCheckPresetsOccupiedSlots:
@@ -72,24 +85,40 @@ class TestCheckPresetsOccupiedSlots:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans test data after each test"""
-        yield database_engine
-
-        # Cleanup all test data after test
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(KernelRow))
-            await db_sess.execute(sa.delete(SessionRow))
-            await db_sess.execute(sa.delete(AgentRow))
-            await db_sess.execute(sa.delete(KeyPairRow))
-            await db_sess.execute(sa.delete(UserRow))
-            await db_sess.execute(sa.delete(GroupRow))
-            await db_sess.execute(sa.delete(ScalingGroupRow))
-            await db_sess.execute(sa.delete(DomainRow))
-            await db_sess.execute(sa.delete(KeyPairResourcePolicyRow))
-            await db_sess.execute(sa.delete(ProjectResourcePolicyRow))
-            await db_sess.execute(sa.delete(UserResourcePolicyRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents before children
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+                sgroups_for_domains,  # association table
+                sgroups_for_keypairs,  # association table
+                sgroups_for_groups,  # association table
+                association_groups_users,  # association table
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def test_domain_name(

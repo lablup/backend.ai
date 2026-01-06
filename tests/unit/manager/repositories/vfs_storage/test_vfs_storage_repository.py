@@ -6,15 +6,15 @@ Tests the repository layer with real database operations.
 from __future__ import annotations
 
 import uuid
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfs_storage import VFSStorageRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
+from ai.backend.testutils.db import with_tables
 
 
 class TestVFSStorageRepository:
@@ -27,14 +27,14 @@ class TestVFSStorageRepository:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans VFS storage data after each test"""
-        yield database_engine
-
-        # Cleanup all VFS storage data after test
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(VFSStorageRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [VFSStorageRow],
+        ):
+            yield database_connection
 
     @pytest.fixture
     def vfs_storage_repository(

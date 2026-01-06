@@ -24,10 +24,10 @@ from ai.backend.manager.models.scheduling_history import (
 from ai.backend.manager.repositories.base import CreatorSpec
 
 __all__ = (
-    "SessionSchedulingHistoryCreatorSpec",
-    "KernelSchedulingHistoryCreatorSpec",
     "DeploymentHistoryCreatorSpec",
+    "KernelSchedulingHistoryCreatorSpec",
     "RouteHistoryCreatorSpec",
+    "SessionSchedulingHistoryCreatorSpec",
 )
 
 

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import secrets
 import signal
+from collections.abc import Mapping
 from http import HTTPStatus
 from pickle import PickleError
-from typing import Any, Mapping
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest

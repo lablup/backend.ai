@@ -1,5 +1,5 @@
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.events.event_types.artifact_registry.anycast import (

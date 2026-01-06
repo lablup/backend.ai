@@ -1,10 +1,9 @@
 import ipaddress
 from pathlib import Path
-from typing import Optional, Union
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
-Numeric = Union[int, float]
+Numeric = int | float
 
 
 def ask_host(prompt: str, default: str = "127.0.0.1", allow_hostname=False) -> str:
@@ -15,7 +14,7 @@ def ask_host(prompt: str, default: str = "127.0.0.1", allow_hostname=False) -> s
         try:
             if allow_hostname:
                 url = user_reply
-                if not (user_reply.startswith("http://") or user_reply.startswith("https://")):
+                if not user_reply.startswith(("http://", "https://")):
                     url = f"http://{user_reply}"
                 try:
                     urlopen(url)
@@ -59,12 +58,10 @@ def ask_string(prompt: str, default: str = "", use_default: bool = True) -> str:
             if user_reply == "":
                 return default
             return user_reply
-        else:
-            user_reply = input(f"{prompt} (if you don't want, just leave empty): ")
-            return user_reply
+        return input(f"{prompt} (if you don't want, just leave empty): ")
 
 
-def ask_string_in_array(prompt: str, choices: list, default: str) -> Optional[str]:
+def ask_string_in_array(prompt: str, choices: list, default: str) -> str | None:
     if default and default not in choices:
         print("Default value should be in choices args.")
         return None
@@ -124,16 +121,14 @@ def ask_yn(prompt: str = "Are you sure?", default: str = "y") -> bool:
     else:
         raise ValueError("default must be given either 'y' or 'n'.")
     while True:
-        user_reply = input("{0} [{1}] ".format(prompt, choices)).lower()
+        user_reply = input(f"{prompt} [{choices}] ").lower()
         if user_reply == "":
             user_reply = default
         if user_reply in ("y", "yes", "n", "no"):
             break
         else:
             print("Please answer in y/yes/n/no.")
-    if user_reply[:1].lower() == "y":
-        return True
-    return False
+    return user_reply[:1].lower() == "y"
 
 
 def ask_tf(prompt: str = "Are you sure?", default: str = "true") -> bool:
@@ -151,6 +146,4 @@ def ask_tf(prompt: str = "Are you sure?", default: str = "true") -> bool:
             break
         else:
             print("Please answer in t/true/f/false.")
-    if user_reply[:1].lower() == "t":
-        return True
-    return False
+    return user_reply[:1].lower() == "t"

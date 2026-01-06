@@ -19,9 +19,8 @@ from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
     SchedulingData,
 )
-
-from ..results import ScheduleResult
-from ..types import (
+from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
+from ai.backend.manager.sokovan.scheduler.types import (
     AllocationBatch,
     KeypairOccupancy,
     SchedulingConfig,
@@ -31,6 +30,7 @@ from ..types import (
     SessionWorkload,
     SystemSnapshot,
 )
+
 from .allocators.allocator import SchedulingAllocator
 from .selectors.concentrated import ConcentratedAgentSelector
 from .selectors.dispersed import DispersedAgentSelector

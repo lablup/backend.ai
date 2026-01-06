@@ -1,12 +1,12 @@
 import json
+from collections.abc import Callable
 from contextlib import closing
-from typing import Callable, Tuple
 
-from ...utils.cli import EOF, ClientRunnerFunc, decode
-from ..conftest import User
+from ai.backend.test.cli_integration.conftest import User
+from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
-def test_add_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
+def test_add_user(run_admin: ClientRunnerFunc, users: tuple[User, ...]):
     """
     Testcase for user addition.
     """
@@ -48,7 +48,7 @@ def test_add_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
     assert isinstance(user_list, list), "Expected user list"
     added_users = tuple(get_user_from_list(user_list, user.username) for user in users)
 
-    for i, (added_user, user) in enumerate(zip(added_users, users)):
+    for i, (added_user, user) in enumerate(zip(added_users, users, strict=True)):
         assert bool(added_user), f"Added account doesn't exist: Account#{i + 1}"
         assert added_user.get("email") == user.email, f"E-mail mismatch: Account#{i + 1}"
         assert added_user.get("full_name") == user.full_name, f"Full name mismatch: Account#{i + 1}"
@@ -61,7 +61,7 @@ def test_add_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
 
 def test_update_user(
     run_admin: ClientRunnerFunc,
-    users: Tuple[User, ...],
+    users: tuple[User, ...],
     gen_username: Callable[[], str],
     gen_fullname: Callable[[], str],
 ):
@@ -88,7 +88,7 @@ def test_update_user(
     )
 
     # Update user
-    for updated_user, user in zip(updated_users, users):
+    for updated_user, user in zip(updated_users, users, strict=True):
         update_arguments = [
             "--output=json",
             "admin",
@@ -137,7 +137,7 @@ def test_update_user(
         )
 
 
-def test_delete_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
+def test_delete_user(run_admin: ClientRunnerFunc, users: tuple[User, ...]):
     """
     !!Run this testcase after running test_add_user
     Testcase for user deletion.

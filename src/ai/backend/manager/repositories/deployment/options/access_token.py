@@ -132,5 +132,4 @@ class AccessTokenOrders:
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return EndpointTokenRow.created_at.asc()
-        else:
-            return EndpointTokenRow.created_at.desc()
+        return EndpointTokenRow.created_at.desc()

@@ -3,24 +3,25 @@ from __future__ import annotations
 import logging
 import ssl
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field, fields
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Mapping, NewType, Optional, TypedDict
+from typing import Any, NewType, Optional, TypedDict
 
 import aiohttp
 import jwt
 from yarl import URL
 
 from ai.backend.logging import BraceStyleAdapter
-
-from ...errors import (
+from ai.backend.storage.errors import (
     ExternalStorageServiceError,
     QuotaScopeAlreadyExists,
     VolumeNotInitializedError,
 )
-from ...types import CapacityUsage
+from ai.backend.storage.types import CapacityUsage
+
 from .config import APIVersion
 from .exceptions import (
     VASTAPIError,
@@ -89,8 +90,8 @@ class VASTClusterInfo:
     max_file_size: int = -1
     max_performance: Performance = field(default_factory=default_perf)
 
-    def __init__(self, **kwargs):
-        names = set([f.name for f in fields(self)])
+    def __init__(self, **kwargs) -> None:
+        names = {f.name for f in fields(self)}
         for k, v in kwargs.items():
             if k in names:
                 setattr(self, k, v)
@@ -116,8 +117,8 @@ class VASTQuota:
     used_capacity: int
     percent_capacity: int
 
-    def __init__(self, **kwargs):
-        names = set([f.name for f in fields(self)])
+    def __init__(self, **kwargs) -> None:
+        names = {f.name for f in fields(self)}
         for k, v in kwargs.items():
             if k in names:
                 setattr(self, k, v)
@@ -181,7 +182,7 @@ class VASTAPIClient:
         if self.force_login:
             return await self._login()
 
-        current_dt = datetime.now(timezone.utc)
+        current_dt = datetime.now(UTC)
 
         def get_exp_dt(token: str) -> datetime:
             decoded: Mapping[str, Any] = jwt.decode(
@@ -191,15 +192,15 @@ class VASTAPIClient:
                     "verify_signature": False,
                 },
             )
-            return datetime.fromtimestamp(decoded["exp"])
+            return datetime.fromtimestamp(decoded["exp"], tz=UTC)
 
         if self._auth_token is None:
             return await self._login()
-        elif get_exp_dt(self._auth_token["access_token"]) > current_dt + TOKEN_EXPIRATION_BUFFER:
+        if get_exp_dt(self._auth_token["access_token"]) > current_dt + TOKEN_EXPIRATION_BUFFER:
             # The access token has not expired yet
             # Auth requests using the access token
             return
-        elif get_exp_dt(self._auth_token["refresh_token"]) > current_dt + TOKEN_EXPIRATION_BUFFER:
+        if get_exp_dt(self._auth_token["refresh_token"]) > current_dt + TOKEN_EXPIRATION_BUFFER:
             # The access token has expired but the refresh token has not expired
             # Refresh tokens
             return await self._refresh()
@@ -209,7 +210,7 @@ class VASTAPIClient:
         try:
             self._auth_token = TokenPair(access_token=data["access"], refresh_token=data["refresh"])
         except KeyError:
-            raise VASTAPIError(f"Cannot parse token with given data (d:{str(data)})")
+            raise VASTAPIError(f"Cannot parse token with given data (d:{data!s})")
 
     async def _refresh(self) -> None:
         if self._auth_token is None:
@@ -218,7 +219,7 @@ class VASTAPIClient:
             base_url=self.api_endpoint,
         ) as sess:
             response = await sess.post(
-                f"/api/{str(self.api_version)}/token/refresh/",
+                f"/api/{self.api_version!s}/token/refresh/",
                 headers={
                     "Accept": "*/*",
                 },
@@ -233,7 +234,7 @@ class VASTAPIClient:
             base_url=self.api_endpoint,
         ) as sess:
             response = await sess.post(
-                f"/api/{str(self.api_version)}/token/",
+                f"/api/{self.api_version!s}/token/",
                 headers={
                     "Accept": "*/*",
                 },
@@ -284,9 +285,7 @@ class VASTAPIClient:
             VASTInvalidParameterError,
         ) as e:
             log.warning(
-                f"Error occurs during communicating with Vast data API. Login and retry (e:{
-                    repr(e)
-                })"
+                f"Error occurs during communicating with Vast data API. Login and retry (e:{e!r})"
             )
             await self._login()
             return await func(
@@ -321,7 +320,7 @@ class VASTAPIClient:
             response = await self._build_request(
                 sess,
                 GET,
-                f"quotas/{str(vast_quota_id)}/",
+                f"quotas/{vast_quota_id!s}/",
             )
             if response.status == 404:
                 return None
@@ -371,7 +370,7 @@ class VASTAPIClient:
                 case 201 | 200:
                     pass
                 case 400 | 401:
-                    raise VASTInvalidParameterError(f"Invalid parameter (data:{str(data)})")
+                    raise VASTInvalidParameterError(f"Invalid parameter (data:{data!s})")
                 case 403:
                     raise VASTUnauthorizedError
                 case 503:
@@ -417,7 +416,7 @@ class VASTAPIClient:
                 case 2:
                     pass
                 case 4:
-                    raise VASTInvalidParameterError(f"Invalid parameter (data:{str(data)})")
+                    raise VASTInvalidParameterError(f"Invalid parameter (data:{data!s})")
                 case 5:
                     err_msg = data.get("detail", "VAST server error")
                     raise VASTUnknownError(err_msg)

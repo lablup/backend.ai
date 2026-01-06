@@ -1,7 +1,7 @@
 import asyncio
 import logging
-from collections.abc import Collection, Iterable
-from typing import Callable, Optional
+from collections.abc import Callable, Collection, Iterable
+from typing import Optional
 
 import sqlalchemy as sa
 
@@ -25,6 +25,14 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.resource import InstanceNotFound
+from ai.backend.manager.models.agent import AgentStatus, agents
+from ai.backend.manager.models.kernel import (
+    KernelRow,
+    by_kernel_ids,
+)
+from ai.backend.manager.models.utils import (
+    ExtendedAsyncSAEngine,
+)
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.agent.actions.handle_heartbeat import HandleHeartbeatAction
 from ai.backend.manager.services.agent.actions.mark_agent_exit import MarkAgentExitAction
@@ -36,15 +44,6 @@ from ai.backend.manager.services.agent.actions.remove_agent_from_images_by_canon
     RemoveAgentFromImagesByCanonicalsAction,
 )
 from ai.backend.manager.services.processors import Processors
-
-from ...models.agent import AgentStatus, agents
-from ...models.kernel import (
-    KernelRow,
-    by_kernel_ids,
-)
-from ...models.utils import (
-    ExtendedAsyncSAEngine,
-)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

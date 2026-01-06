@@ -31,21 +31,29 @@ from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserRole
-from ai.backend.manager.models import (
-    AgentRow,
-    DomainRow,
-    GroupRow,
-    KernelRow,
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
-    KeyPairRow,
     ProjectResourcePolicyRow,
-    ScalingGroupOpts,
-    ScalingGroupRow,
-    SessionRow,
     UserResourcePolicyRow,
-    UserRow,
 )
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.schedule.repository import (
     KernelTerminationResult,
     MarkTerminatingResult,
@@ -54,16 +62,51 @@ from ai.backend.manager.repositories.schedule.repository import (
     TerminatingKernelData,
     TerminatingSessionData,
 )
+from ai.backend.testutils.db import with_tables
+
+
+@pytest.fixture
+async def db_with_cleanup(
+    database_connection: ExtendedAsyncSAEngine,
+) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+    async with with_tables(
+        database_connection,
+        [
+            # FK dependency order: parents first
+            DomainRow,
+            ScalingGroupRow,
+            UserResourcePolicyRow,
+            ProjectResourcePolicyRow,
+            KeyPairResourcePolicyRow,
+            UserRoleRow,
+            UserRow,
+            KeyPairRow,
+            GroupRow,
+            ImageRow,
+            VFolderRow,
+            EndpointRow,
+            DeploymentPolicyRow,
+            DeploymentAutoScalingPolicyRow,
+            DeploymentRevisionRow,
+            SessionRow,
+            AgentRow,
+            KernelRow,
+            RoutingRow,
+            ResourcePresetRow,
+        ],
+    ):
+        yield database_connection
 
 
 @pytest.fixture
 async def sample_domain_and_policies(
-    database_engine: ExtendedAsyncSAEngine,
+    db_with_cleanup: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """Create sample domain and resource policies for testing"""
     data: dict[str, Any] = {}
 
-    async with database_engine.begin_session() as db_sess:
+    async with db_with_cleanup.begin_session() as db_sess:
         # Create domain
         domain = DomainRow(
             name="test-termination-domain",
@@ -112,23 +155,15 @@ async def sample_domain_and_policies(
 
     yield data
 
-    # Cleanup
-    async with database_engine.begin_session() as db_sess:
-        await db_sess.delete(kp_policy)
-        await db_sess.delete(project_policy)
-        await db_sess.delete(user_policy)
-        await db_sess.delete(domain)
-        await db_sess.commit()
-
 
 @pytest.fixture
 async def sample_scaling_group_and_agent(
-    database_engine: ExtendedAsyncSAEngine,
+    db_with_cleanup: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """Create sample scaling group and agent for testing"""
     data: dict[str, Any] = {}
 
-    async with database_engine.begin_session() as db_sess:
+    async with db_with_cleanup.begin_session() as db_sess:
         # Create scaling group
         sg = ScalingGroupRow(
             name="test-termination-sgroup",
@@ -167,23 +202,17 @@ async def sample_scaling_group_and_agent(
 
     yield data
 
-    # Cleanup
-    async with database_engine.begin_session() as db_sess:
-        await db_sess.delete(agent)
-        await db_sess.delete(sg)
-        await db_sess.commit()
-
 
 @pytest.fixture
 async def sample_user_and_keypair(
-    database_engine: ExtendedAsyncSAEngine,
+    db_with_cleanup: ExtendedAsyncSAEngine,
     sample_domain_and_policies: dict[str, Any],
 ) -> AsyncGenerator[dict[str, Any], None]:
     """Create sample user, group, and keypair for testing"""
     data: dict[str, Any] = {}
     domain = sample_domain_and_policies["domain"]
 
-    async with database_engine.begin_session() as db_sess:
+    async with db_with_cleanup.begin_session() as db_sess:
         # Create group
         group = GroupRow(
             id=uuid.uuid4(),
@@ -236,17 +265,10 @@ async def sample_user_and_keypair(
 
     yield data
 
-    # Cleanup
-    async with database_engine.begin_session() as db_sess:
-        await db_sess.delete(keypair)
-        await db_sess.delete(user)
-        await db_sess.delete(group)
-        await db_sess.commit()
-
 
 @pytest.fixture
 async def sample_sessions_for_termination(
-    database_engine: ExtendedAsyncSAEngine,
+    db_with_cleanup: ExtendedAsyncSAEngine,
     sample_domain_and_policies: dict[str, Any],
     sample_scaling_group_and_agent: dict[str, Any],
     sample_user_and_keypair: dict[str, Any],
@@ -264,7 +286,7 @@ async def sample_sessions_for_termination(
     user = sample_user_and_keypair["user"]
     keypair = sample_user_and_keypair["keypair"]
 
-    async with database_engine.begin_session() as db_sess:
+    async with db_with_cleanup.begin_session() as db_sess:
         # Session states to test
         session_configs = [
             (SessionStatus.PENDING, None, None),  # Pending session - should be CANCELLED
@@ -348,14 +370,6 @@ async def sample_sessions_for_termination(
 
     yield data
 
-    # Cleanup
-    async with database_engine.begin_session() as db_sess:
-        for kernel in data["kernels"]:
-            await db_sess.delete(kernel)
-        for session in data["sessions"]:
-            await db_sess.delete(session)
-        await db_sess.commit()
-
 
 @pytest.fixture
 def mock_valkey_stat_client() -> ValkeyStatClient:
@@ -379,13 +393,13 @@ def mock_config_provider() -> ManagerConfigProvider:
 
 @pytest.fixture
 async def schedule_repository(
-    database_engine: ExtendedAsyncSAEngine,
+    db_with_cleanup: ExtendedAsyncSAEngine,
     mock_valkey_stat_client: ValkeyStatClient,
     mock_config_provider: ManagerConfigProvider,
 ) -> ScheduleRepository:
     """Create ScheduleRepository instance"""
     return ScheduleRepository(
-        db=database_engine,
+        db=db_with_cleanup,
         valkey_stat=mock_valkey_stat_client,
         config_provider=mock_config_provider,
     )
@@ -434,7 +448,7 @@ class TestSessionTermination:
         self,
         schedule_repository: ScheduleRepository,
         sample_sessions_for_termination: dict[str, Any],
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ):
         """Test that mark_sessions_terminating correctly updates database"""
         sessions = sample_sessions_for_termination["sessions"]
@@ -449,7 +463,7 @@ class TestSessionTermination:
         assert len(result.terminating_sessions) == 1
 
         # Verify database updates
-        async with database_engine.begin_readonly_session() as db_sess:
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
             # Check session status
             stmt = sa.select(SessionRow).where(SessionRow.id == running_session.id)
             updated_session = await db_sess.scalar(stmt)
@@ -502,7 +516,7 @@ class TestSessionTermination:
         self,
         schedule_repository: ScheduleRepository,
         sample_sessions_for_termination: dict[str, Any],
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ):
         """Test batch update with all kernels terminated successfully"""
         sessions = sample_sessions_for_termination["sessions"]
@@ -537,7 +551,7 @@ class TestSessionTermination:
         await schedule_repository.batch_update_terminated_status(termination_results)
 
         # Verify database updates
-        async with database_engine.begin_readonly_session() as db_sess:
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
             # Check session status
             stmt = sa.select(SessionRow).where(SessionRow.id == running_session.id)
             updated_session = await db_sess.scalar(stmt)
@@ -554,7 +568,7 @@ class TestSessionTermination:
         self,
         schedule_repository: ScheduleRepository,
         sample_sessions_for_termination: dict[str, Any],
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ):
         """Test batch update with some kernels failing to terminate"""
         sessions = sample_sessions_for_termination["sessions"]
@@ -592,7 +606,7 @@ class TestSessionTermination:
         await schedule_repository.batch_update_terminated_status(termination_results)
 
         # Verify database state - session should remain TERMINATING
-        async with database_engine.begin_readonly_session() as db_sess:
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
             # Session should still be TERMINATING due to failure
             stmt = sa.select(SessionRow).where(SessionRow.id == running_session.id)
             updated_session = await db_sess.scalar(stmt)
@@ -637,7 +651,7 @@ class TestSessionTermination:
         self,
         schedule_repository: ScheduleRepository,
         sample_sessions_for_termination: dict[str, Any],
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ):
         """Test that PENDING sessions are properly cancelled"""
         sessions = sample_sessions_for_termination["sessions"]
@@ -654,7 +668,7 @@ class TestSessionTermination:
         assert str(pending_session.id) in result.cancelled_sessions
 
         # Verify database updates
-        async with database_engine.begin_readonly_session() as db_sess:
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
             stmt = sa.select(SessionRow).where(SessionRow.id == pending_session.id)
             updated_session = await db_sess.scalar(stmt)
             assert updated_session.status == SessionStatus.CANCELLED

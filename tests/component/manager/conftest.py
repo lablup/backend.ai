@@ -12,23 +12,13 @@ import shutil
 import tempfile
 import textwrap
 import uuid
+from collections.abc import AsyncIterator, Callable, Iterator, Mapping, Sequence
+from contextlib import AbstractAsyncContextManager
 from datetime import datetime
 from decimal import Decimal
 from functools import partial, update_wrapper
 from pathlib import Path
-from typing import (
-    Any,
-    AsyncContextManager,
-    AsyncIterator,
-    Callable,
-    Iterator,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-)
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import aiofiles.os
@@ -66,34 +56,32 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.models import (
-    DomainRow,
-    GroupRow,
-    ImageRow,
-    KernelRow,
-    ProjectResourcePolicyRow,
-    ScalingGroupRow,
-    SessionRow,
-    UserResourcePolicyRow,
-    UserRow,
-    agents,
-    domains,
-    kernels,
-    keypairs,
-    scaling_groups,
-    users,
-    vfolders,
-)
+from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.base import (
     pgsql_connect_opts,
     populate_fixture,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.domain import DomainRow, domains
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageAliasRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.models.image import ImageAliasRow, ImageRow
+from ai.backend.manager.models.kernel import KernelRow, kernels
+from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.resource_policy import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupOpts,
+    ScalingGroupRow,
+    scaling_groups,
+)
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import session_templates
+from ai.backend.manager.models.user import UserRow, users
 from ai.backend.manager.models.utils import connect_database
+from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.server import build_root_app, config_provider_ctx, etcd_ctx
@@ -168,7 +156,7 @@ def vfolder_mount(test_id):
     yield ret
     try:
         shutil.rmtree(ret.parent)
-    except IOError:
+    except OSError:
         pass
 
 
@@ -291,7 +279,7 @@ def bootstrap_config(
     yield bootstrap_config
     try:
         shutil.rmtree(ipc_base_path)
-    except IOError:
+    except OSError:
         pass
 
 
@@ -578,7 +566,7 @@ async def database_fixture(
             return str(obj)
         if isinstance(obj, datetime):
             return str(obj)
-        if isinstance(obj, enum.Enum) or isinstance(obj, enum.StrEnum):
+        if isinstance(obj, (enum.Enum, enum.StrEnum)):
             return obj.value
         if isinstance(obj, yarl.URL):
             return str(obj)
@@ -630,18 +618,18 @@ async def database_fixture(
         )
         try:
             async with engine.begin() as conn:
-                await conn.execute((vfolders.delete()))
-                await conn.execute((kernels.delete()))
-                await conn.execute((SessionRow.__table__.delete()))
-                await conn.execute((agents.delete()))
-                await conn.execute((session_templates.delete()))
-                await conn.execute((keypairs.delete()))
-                await conn.execute((users.delete()))
-                await conn.execute((scaling_groups.delete()))
-                await conn.execute((domains.delete()))
-                await conn.execute((ImageAliasRow.__table__.delete()))
-                await conn.execute((ImageRow.__table__.delete()))
-                await conn.execute((ContainerRegistryRow.__table__.delete()))
+                await conn.execute(vfolders.delete())
+                await conn.execute(kernels.delete())
+                await conn.execute(SessionRow.__table__.delete())
+                await conn.execute(agents.delete())
+                await conn.execute(session_templates.delete())
+                await conn.execute(keypairs.delete())
+                await conn.execute(users.delete())
+                await conn.execute(scaling_groups.delete())
+                await conn.execute(domains.delete())
+                await conn.execute(ImageAliasRow.__table__.delete())
+                await conn.execute(ImageRow.__table__.delete())
+                await conn.execute(ContainerRegistryRow.__table__.delete())
         finally:
             await engine.dispose()
 
@@ -730,23 +718,23 @@ async def create_app_and_client(bootstrap_config) -> AsyncIterator:
     client: Client | None = None
     client_session: aiohttp.ClientSession | None = None
     runner: web.BaseRunner | None = None
-    _outer_ctxs: List[AsyncContextManager] = []
+    _outer_ctxs: list[AbstractAsyncContextManager] = []
 
     async def app_builder(
-        cleanup_contexts: Optional[Sequence[CleanupContext]] = None,
-        subapp_pkgs: Optional[Sequence[str]] = None,
-        scheduler_opts: Optional[Mapping[str, Any]] = None,
-    ) -> Tuple[web.Application, Client]:
+        cleanup_contexts: Sequence[CleanupContext] | None = None,
+        subapp_pkgs: Sequence[str] | None = None,
+        scheduler_opts: Mapping[str, Any] | None = None,
+    ) -> tuple[web.Application, Client]:
         nonlocal client, client_session, runner
         nonlocal _outer_ctxs
 
         if scheduler_opts is None:
             scheduler_opts = {}
         _cleanup_ctxs = []
-        _outer_ctx_classes: List[Type[AsyncContextManager]] = []
+        _outer_ctx_classes: list[type[AbstractAsyncContextManager]] = []
         if cleanup_contexts is not None:
             for ctx in cleanup_contexts:
-                # if isinstance(ctx, AsyncContextManager):
+                # if isinstance(ctx, AbstractAsyncContextManager):
                 if ctx.__name__ in ["webapp_plugins_ctx"]:
                     _outer_ctx_classes.append(ctx)  # type: ignore
                 else:
@@ -880,7 +868,7 @@ def get_headers(app, default_keypair, bootstrap_config):
         signature = hmac.new(sign_key, sign_bytes, hash_type).hexdigest()
         headers["Authorization"] = (
             f"BackendAI signMethod=HMAC-{hash_type.upper()}, "
-            + f"credential={keypair['access_key']}:{signature}"
+            f"credential={keypair['access_key']}:{signature}"
         )
         return headers
 

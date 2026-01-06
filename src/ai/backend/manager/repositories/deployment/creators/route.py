@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Any, Optional
-
-from typing_extensions import override
+from typing import Any, Optional, override
 
 from ai.backend.manager.data.deployment.types import RouteStatus, RouteTrafficStatus
 from ai.backend.manager.models.routing import RoutingRow

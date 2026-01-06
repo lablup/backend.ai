@@ -1,4 +1,5 @@
-from typing import Any, Mapping, Sequence, override
+from collections.abc import Mapping, Sequence
+from typing import Any, override
 
 from ai.backend.manager.config.loader.types import AbstractConfigLoader
 

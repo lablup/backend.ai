@@ -71,7 +71,7 @@ async def test_proxy_web(
     proxy_app_fixture,
 ):
     api_app, recv_queue, api_port = api_app_fixture
-    api_url = "http://127.0.0.1:{}".format(api_port)
+    api_url = f"http://127.0.0.1:{api_port}"
     monkeypatch.setenv("BACKEND_ACCESS_KEY", example_keypair[0])
     monkeypatch.setenv("BACKEND_SECRET_KEY", example_keypair[1])
     monkeypatch.setenv("BACKEND_ENDPOINT", api_url)
@@ -79,7 +79,7 @@ async def test_proxy_web(
     proxy_app, proxy_port = proxy_app_fixture
     proxy_timeout = aiohttp.ClientTimeout(connect=1.0)
     async with aiohttp.ClientSession(timeout=proxy_timeout) as proxy_client:
-        proxy_url = "http://127.0.0.1:{}".format(proxy_port)
+        proxy_url = f"http://127.0.0.1:{proxy_port}"
         data = {"test": 1234}
         async with proxy_client.request("POST", proxy_url + "/echo", json=data) as resp:
             assert resp.status == HTTPStatus.OK
@@ -99,7 +99,7 @@ async def test_proxy_web_502(
     unused_tcp_port_factory,
 ):
     api_port = unused_tcp_port_factory()
-    api_url = "http://127.0.0.1:{}".format(api_port)
+    api_url = f"http://127.0.0.1:{api_port}"
     monkeypatch.setenv("BACKEND_ACCESS_KEY", example_keypair[0])
     monkeypatch.setenv("BACKEND_SECRET_KEY", example_keypair[1])
     monkeypatch.setenv("BACKEND_ENDPOINT", api_url)
@@ -108,7 +108,7 @@ async def test_proxy_web_502(
     proxy_timeout = aiohttp.ClientTimeout(connect=1.0)
     async with aiohttp.ClientSession(timeout=proxy_timeout) as proxy_client:
         proxy_app, proxy_port = proxy_app_fixture
-        proxy_url = "http://127.0.0.1:{}".format(proxy_port)
+        proxy_url = f"http://127.0.0.1:{proxy_port}"
         data = {"test": 1234}
         async with proxy_client.request("POST", proxy_url + "/echo", json=data) as resp:
             assert resp.status == HTTPStatus.BAD_GATEWAY
@@ -126,7 +126,7 @@ async def test_proxy_websocket(
     proxy_app_fixture,
 ):
     api_app, recv_queue, api_port = api_app_fixture
-    api_url = "http://127.0.0.1:{}".format(api_port)
+    api_url = f"http://127.0.0.1:{api_port}"
     monkeypatch.setenv("BACKEND_ACCESS_KEY", example_keypair[0])
     monkeypatch.setenv("BACKEND_SECRET_KEY", example_keypair[1])
     monkeypatch.setenv("BACKEND_ENDPOINT", api_url)
@@ -134,7 +134,7 @@ async def test_proxy_websocket(
     proxy_timeout = aiohttp.ClientTimeout(connect=1.0)
     async with aiohttp.ClientSession(timeout=proxy_timeout) as proxy_client:
         proxy_app, proxy_port = proxy_app_fixture
-        proxy_url = "http://127.0.0.1:{}".format(proxy_port)
+        proxy_url = f"http://127.0.0.1:{proxy_port}"
         ws = await proxy_client.ws_connect(proxy_url + "/stream/echo")
         await ws.send_str("test")
         assert await ws.receive_str() == "test"

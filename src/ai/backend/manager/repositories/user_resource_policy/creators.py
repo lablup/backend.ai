@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, override
+from typing import TYPE_CHECKING, override
 
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 
@@ -14,10 +14,10 @@ class UserResourcePolicyCreatorSpec(CreatorSpec["UserResourcePolicyRow"]):
     """CreatorSpec for user resource policy."""
 
     name: str
-    max_vfolder_count: Optional[int]
-    max_quota_scope_size: Optional[int]
-    max_session_count_per_model_session: Optional[int]
-    max_customized_image_count: Optional[int]
+    max_vfolder_count: int
+    max_quota_scope_size: int
+    max_session_count_per_model_session: int
+    max_customized_image_count: int
 
     @override
     def build_row(self) -> UserResourcePolicyRow:

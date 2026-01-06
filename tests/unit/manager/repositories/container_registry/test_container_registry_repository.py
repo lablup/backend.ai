@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import uuid
-from contextlib import asynccontextmanager
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import AsyncGenerator, Optional
 from uuid import UUID
 
 import pytest
@@ -17,18 +16,36 @@ from ai.backend.manager.errors.image import (
     ContainerRegistryGroupsAssociationNotFound,
     ContainerRegistryNotFound,
 )
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import (
+    DeploymentAutoScalingPolicyRow,
+)
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.container_registry.admin_repository import (
     AdminContainerRegistryRepository,
@@ -40,6 +57,7 @@ from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
 )
 from ai.backend.manager.types import OptionalState, TriState
+from ai.backend.testutils.db import with_tables
 
 
 @dataclass
@@ -80,212 +98,168 @@ class TestContainerRegistryRepository:
     """Integration tests for ContainerRegistryRepository using real database"""
 
     @pytest.fixture
-    def repository(self, database_engine: ExtendedAsyncSAEngine) -> ContainerRegistryRepository:
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,  # UserRow relationship dependency
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+                ContainerRegistryRow,
+                AssociationContainerRegistriesGroupsRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ContainerRegistryRepository:
         """Create ContainerRegistryRepository instance with real database"""
-        return ContainerRegistryRepository(db=database_engine)
+        return ContainerRegistryRepository(db=db_with_cleanup)
 
     @pytest.fixture
     def admin_repository(
-        self, database_engine: ExtendedAsyncSAEngine
+        self, db_with_cleanup: ExtendedAsyncSAEngine
     ) -> AdminContainerRegistryRepository:
         """Create AdminContainerRegistryRepository instance with real database"""
-        return AdminContainerRegistryRepository(db=database_engine)
+        return AdminContainerRegistryRepository(db=db_with_cleanup)
 
     @pytest.fixture
-    async def test_registry_factory(self, database_engine: ExtendedAsyncSAEngine):
-        """Factory fixture for creating test registries with automatic cleanup."""
-        created_registries: list[tuple[str, str]] = []
+    async def sample_domain(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
+        """Pre-created domain for group tests. Returns domain name."""
+        domain_name = "test-domain-" + str(uuid.uuid4())[:8]
+        async with db_with_cleanup.begin_session() as session:
+            domain = DomainRow(name=domain_name, total_resource_slots={})
+            session.add(domain)
+            await session.commit()
+        return domain_name
 
-        @asynccontextmanager
-        async def _create_registry(
-            registry_name: Optional[str] = None,
-            project: Optional[str] = None,
-            username: Optional[str] = None,
-            password: Optional[str] = None,
-            ssl_verify: bool = True,
-            is_global: bool = True,
-            extra: Optional[dict[str, str]] = None,
-        ) -> AsyncGenerator[ContainerRegistryData, None]:
-            """Create a test container registry with random names and ensure cleanup."""
-            if registry_name is None:
-                registry_name = str(uuid.uuid4())[:8] + ".example.com"
-            if project is None:
-                project = "project-" + str(uuid.uuid4())[:8]
+    @pytest.fixture
+    async def sample_groups(
+        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_domain: str
+    ) -> list[UUID]:
+        """Pre-created 2 groups with required policies. Depends on sample_domain."""
+        resource_policy_name = f"test-policy-{sample_domain}"
+        group_ids: list[UUID] = []
 
-            async with database_engine.begin_session() as session:
-                registry = ContainerRegistryRow(
-                    url=f"https://{registry_name}",
-                    registry_name=registry_name,
-                    type=ContainerRegistryType.HARBOR2,
-                    project=project,
-                    username=username,
-                    password=password,
-                    ssl_verify=ssl_verify,
-                    is_global=is_global,
-                    extra=extra,
+        async with db_with_cleanup.begin_session() as session:
+            # Create resource policies
+            user_policy = UserResourcePolicyRow(
+                name=resource_policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=10,
+                max_customized_image_count=10,
+            )
+            session.add(user_policy)
+
+            project_policy = ProjectResourcePolicyRow(
+                name=resource_policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_network_count=3,
+            )
+            session.add(project_policy)
+
+            # Create 2 groups
+            for i in range(2):
+                group = GroupRow(
+                    name=f"test-group-{i}-{sample_domain}",
+                    domain_name=sample_domain,
+                    total_resource_slots={},
+                    resource_policy=resource_policy_name,
                 )
-                session.add(registry)
+                session.add(group)
                 await session.flush()
+                group_ids.append(group.id)
 
-                registry_data = registry.to_dataclass()
-                created_registries.append((registry_name, project))
-
-            try:
-                yield registry_data
-            finally:
-                pass  # Cleanup handled in teardown
-
-        yield _create_registry
-
-        # Cleanup all created registries
-        async with database_engine.begin_session() as session:
-            for registry_name, project in created_registries:
-                await session.execute(
-                    sa.delete(ImageRow).where(
-                        (ImageRow.registry == registry_name)
-                        & (ImageRow.project == project if project else sa.true())
-                    )
-                )
-                await session.execute(
-                    sa.delete(ContainerRegistryRow).where(
-                        (ContainerRegistryRow.registry_name == registry_name)
-                        & (ContainerRegistryRow.project == project if project else sa.true())
-                    )
-                )
+            await session.commit()
+        return group_ids
 
     @pytest.fixture
-    async def test_image_factory(self, database_engine: ExtendedAsyncSAEngine):
-        """Factory fixture for creating test images with automatic cleanup."""
-        created_image_ids: list[UUID] = []
+    async def test_registry(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ContainerRegistryData:
+        """Fixture that provides a pre-created test registry. TRUNCATE CASCADE handles cleanup."""
+        registry_name = str(uuid.uuid4())[:8] + ".example.com"
+        project = "project-" + str(uuid.uuid4())[:8]
 
-        async def _create_image(
-            registry_id: UUID,
-            registry_name: str,
-            project: Optional[str] = None,
-            image_name: Optional[str] = None,
-            status: ImageStatus = ImageStatus.ALIVE,
-        ) -> UUID:
-            """Create a test image for the registry with random names."""
-            if project is None:
-                project = "project-" + str(uuid.uuid4())[:8]
-            if image_name is None:
-                image_name = "image-" + str(uuid.uuid4())[:8]
-
-            async with database_engine.begin_session() as session:
-                image = ImageRow(
-                    name=f"{registry_name}/{project or 'library'}/{image_name}:latest",
-                    registry=registry_name,
-                    registry_id=registry_id,
-                    project=project,
-                    image=image_name,
-                    tag="latest",
-                    architecture="x86_64",
-                    is_local=False,
-                    type=ImageType.COMPUTE,
-                    config_digest="sha256:test",
-                    size_bytes=1024 * 1024,  # 1MB
-                    accelerators=None,
-                    resources={},
-                    labels={},
-                    status=status,
-                )
-                session.add(image)
-                await session.flush()
-                created_image_ids.append(image.id)
-
-            return image.id
-
-        yield _create_image
-
-        # Cleanup all created images
-        async with database_engine.begin_session() as session:
-            if created_image_ids:
-                await session.execute(sa.delete(ImageRow).where(ImageRow.id.in_(created_image_ids)))
+        async with db_with_cleanup.begin_session() as session:
+            registry = ContainerRegistryRow(
+                id=uuid.uuid4(),
+                url=f"https://{registry_name}",
+                registry_name=registry_name,
+                type=ContainerRegistryType.HARBOR2,
+                project=project,
+            )
+            session.add(registry)
+            await session.commit()
+            await session.refresh(registry)  # Ensure all attributes are loaded
+            return registry.to_dataclass()
 
     @pytest.fixture
-    async def test_groups_factory(self, database_engine: ExtendedAsyncSAEngine):
-        """Factory fixture for creating test groups with automatic cleanup."""
-        created_resources: list[tuple[str, list[UUID]]] = []
+    async def test_registry_with_custom_props(
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> ContainerRegistryData:
+        """Fixture that provides a registry with custom properties for detailed testing."""
+        registry_name = "test-registry"
+        project = "test-project"
 
-        @asynccontextmanager
-        async def _create_groups(
-            domain_name: Optional[str] = None, group_count: int = 2
-        ) -> AsyncGenerator[list[UUID], None]:
-            """Create test groups for allowed_groups testing."""
-            if domain_name is None:
-                domain_name = "test-domain-" + str(uuid.uuid4())[:8]
-
-            resource_policy_name = f"test-policy-{domain_name}"
-            group_ids: list[UUID] = []
-
-            async with database_engine.begin_session() as session:
-                # Create domain
-                domain = DomainRow(name=domain_name, total_resource_slots={})
-                session.add(domain)
-
-                # Create resource policies
-                user_policy = UserResourcePolicyRow(
-                    name=resource_policy_name,
-                    max_vfolder_count=0,
-                    max_quota_scope_size=-1,
-                    max_session_count_per_model_session=10,
-                    max_customized_image_count=10,
-                )
-                session.add(user_policy)
-
-                project_policy = ProjectResourcePolicyRow(
-                    name=resource_policy_name,
-                    max_vfolder_count=0,
-                    max_quota_scope_size=-1,
-                    max_network_count=3,
-                )
-                session.add(project_policy)
-
-                # Create groups
-                for i in range(group_count):
-                    group = GroupRow(
-                        name=f"test-group-{i}-{domain_name}",
-                        domain_name=domain_name,
-                        total_resource_slots={},
-                        resource_policy=resource_policy_name,
-                    )
-                    session.add(group)
-                    await session.flush()
-                    group_ids.append(group.id)
-
-            created_resources.append((domain_name, group_ids))
-
-            try:
-                yield group_ids
-            finally:
-                pass  # Cleanup handled in teardown
-
-        yield _create_groups
-
-        # Cleanup all created resources
-        for domain_name, group_ids in created_resources:
-            resource_policy_name = f"test-policy-{domain_name}"
-            async with database_engine.begin_session() as session:
-                await session.execute(sa.delete(GroupRow).where(GroupRow.id.in_(group_ids)))
-                await session.execute(
-                    sa.delete(ProjectResourcePolicyRow).where(
-                        ProjectResourcePolicyRow.name == resource_policy_name
-                    )
-                )
-                await session.execute(
-                    sa.delete(UserResourcePolicyRow).where(
-                        UserResourcePolicyRow.name == resource_policy_name
-                    )
-                )
-                await session.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
+        async with db_with_cleanup.begin_session() as session:
+            registry = ContainerRegistryRow(
+                id=uuid.uuid4(),
+                url=f"https://{registry_name}",
+                registry_name=registry_name,
+                type=ContainerRegistryType.HARBOR2,
+                project=project,
+                username="test-user",
+                password="test-pass",
+                ssl_verify=False,
+                is_global=False,
+            )
+            session.add(registry)
+            await session.commit()
+            await session.refresh(registry)  # Ensure all attributes are loaded
+            return registry.to_dataclass()
 
     @pytest.fixture
     async def sample_registry(
-        self, test_registry_factory
-    ) -> AsyncGenerator[ContainerRegistryData, None]:
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> ContainerRegistryData:
         """Pre-created single registry for simple tests."""
-        async with test_registry_factory() as registry:
-            yield registry
+        registry_name = str(uuid.uuid4())[:8] + ".example.com"
+        project = "project-" + str(uuid.uuid4())[:8]
+
+        async with db_with_cleanup.begin_session() as session:
+            registry = ContainerRegistryRow(
+                id=uuid.uuid4(),
+                url=f"https://{registry_name}",
+                registry_name=registry_name,
+                type=ContainerRegistryType.HARBOR2,
+                project=project,
+            )
+            session.add(registry)
+            await session.commit()
+            await session.refresh(registry)
+            return registry.to_dataclass()
 
     @pytest.mark.asyncio
     async def test_get_by_registry_and_project_success(
@@ -314,13 +288,34 @@ class TestContainerRegistryRepository:
 
     @pytest.fixture
     async def two_registries_same_name(
-        self, test_registry_factory
-    ) -> AsyncGenerator[_TwoRegistries, None]:
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> _TwoRegistries:
         """Pre-created two registries with the same name but different projects."""
         registry_name = "test-registry-" + str(uuid.uuid4())[:8] + ".example.com"
-        async with test_registry_factory(registry_name=registry_name) as registry1:
-            async with test_registry_factory(registry_name=registry_name) as registry2:
-                yield _TwoRegistries(registry1=registry1, registry2=registry2)
+
+        async with db_with_cleanup.begin_session() as session:
+            registry1 = ContainerRegistryRow(
+                id=uuid.uuid4(),
+                url=f"https://{registry_name}",
+                registry_name=registry_name,
+                type=ContainerRegistryType.HARBOR2,
+                project="project-" + str(uuid.uuid4())[:8],
+            )
+            registry2 = ContainerRegistryRow(
+                id=uuid.uuid4(),
+                url=f"https://{registry_name}",
+                registry_name=registry_name,
+                type=ContainerRegistryType.HARBOR2,
+                project="project-" + str(uuid.uuid4())[:8],
+            )
+            session.add_all([registry1, registry2])
+            await session.commit()
+            await session.refresh(registry1)
+            await session.refresh(registry2)
+            return _TwoRegistries(
+                registry1=registry1.to_dataclass(),
+                registry2=registry2.to_dataclass(),
+            )
 
     @pytest.mark.asyncio
     async def test_get_by_registry_name(
@@ -341,12 +336,35 @@ class TestContainerRegistryRepository:
 
     @pytest.fixture
     async def two_registries_different_names(
-        self, test_registry_factory
-    ) -> AsyncGenerator[_TwoRegistries, None]:
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> _TwoRegistries:
         """Pre-created two registries with different names."""
-        async with test_registry_factory() as registry1:
-            async with test_registry_factory() as registry2:
-                yield _TwoRegistries(registry1=registry1, registry2=registry2)
+        async with db_with_cleanup.begin_session() as session:
+            registry1_name = str(uuid.uuid4())[:8] + ".example.com"
+            registry2_name = str(uuid.uuid4())[:8] + ".example.com"
+
+            registry1 = ContainerRegistryRow(
+                id=uuid.uuid4(),
+                url=f"https://{registry1_name}",
+                registry_name=registry1_name,
+                type=ContainerRegistryType.HARBOR2,
+                project="project-" + str(uuid.uuid4())[:8],
+            )
+            registry2 = ContainerRegistryRow(
+                id=uuid.uuid4(),
+                url=f"https://{registry2_name}",
+                registry_name=registry2_name,
+                type=ContainerRegistryType.HARBOR2,
+                project="project-" + str(uuid.uuid4())[:8],
+            )
+            session.add_all([registry1, registry2])
+            await session.commit()
+            await session.refresh(registry1)
+            await session.refresh(registry2)
+            return _TwoRegistries(
+                registry1=registry1.to_dataclass(),
+                registry2=registry2.to_dataclass(),
+            )
 
     @pytest.mark.asyncio
     async def test_get_all(
@@ -363,27 +381,69 @@ class TestContainerRegistryRepository:
 
     @pytest.fixture
     async def sample_registry_with_images(
-        self, test_registry_factory, test_image_factory
-    ) -> AsyncGenerator[_RegistryWithImages, None]:
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> _RegistryWithImages:
         """Pre-created registry with 2 images."""
-        async with test_registry_factory() as registry:
-            image_id1 = await test_image_factory(
-                registry_id=registry.id,
-                registry_name=registry.registry_name,
-                project=registry.project,
+        registry_name = str(uuid.uuid4())[:8] + ".example.com"
+        project = "project-" + str(uuid.uuid4())[:8]
+
+        async with db_with_cleanup.begin_session() as session:
+            registry = ContainerRegistryRow(
+                id=uuid.uuid4(),
+                url=f"https://{registry_name}",
+                registry_name=registry_name,
+                type=ContainerRegistryType.HARBOR2,
+                project=project,
             )
-            image_id2 = await test_image_factory(
+            session.add(registry)
+
+            image1 = ImageRow(
+                name=f"{registry_name}/{project}/image-1:latest",
+                registry=registry_name,
                 registry_id=registry.id,
-                registry_name=registry.registry_name,
-                project=registry.project,
+                project=project,
+                image="image-1",
+                tag="latest",
+                architecture="x86_64",
+                is_local=False,
+                type=ImageType.COMPUTE,
+                config_digest="sha256:test1",
+                size_bytes=1024 * 1024,
+                accelerators=None,
+                resources={},
+                labels={},
+                status=ImageStatus.ALIVE,
             )
-            yield _RegistryWithImages(registry=registry, image_ids=[image_id1, image_id2])
+            image2 = ImageRow(
+                name=f"{registry_name}/{project}/image-2:latest",
+                registry=registry_name,
+                registry_id=registry.id,
+                project=project,
+                image="image-2",
+                tag="latest",
+                architecture="x86_64",
+                is_local=False,
+                type=ImageType.COMPUTE,
+                config_digest="sha256:test2",
+                size_bytes=1024 * 1024,
+                accelerators=None,
+                resources={},
+                labels={},
+                status=ImageStatus.ALIVE,
+            )
+            session.add_all([image1, image2])
+            await session.commit()
+            await session.refresh(registry)
+            return _RegistryWithImages(
+                registry=registry.to_dataclass(),
+                image_ids=[image1.id, image2.id],
+            )
 
     @pytest.mark.asyncio
     async def test_clear_images(
         self,
         repository: ContainerRegistryRepository,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         sample_registry_with_images: _RegistryWithImages,
     ) -> None:
         """Test clearing images for a registry"""
@@ -398,7 +458,7 @@ class TestContainerRegistryRepository:
         assert result.registry_name == registry.registry_name
 
         # Verify images are marked as deleted
-        async with database_engine.begin_readonly_session() as session:
+        async with db_with_cleanup.begin_readonly_session() as session:
             images = (
                 (await session.execute(sa.select(ImageRow).where(ImageRow.id.in_(image_ids))))
                 .scalars()
@@ -414,34 +474,81 @@ class TestContainerRegistryRepository:
 
     @pytest.fixture
     async def two_registries_with_images(
-        self, test_registry_factory, test_image_factory
-    ) -> AsyncGenerator[_TwoRegistriesWithImages, None]:
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> _TwoRegistriesWithImages:
         """Pre-created two registries (same name, different projects) each with one image."""
         registry_name = "test-registry-" + str(uuid.uuid4())[:8] + ".example.com"
-        async with test_registry_factory(registry_name=registry_name) as registry1:
-            async with test_registry_factory(registry_name=registry_name) as registry2:
-                image_id1 = await test_image_factory(
-                    registry_id=registry1.id,
-                    registry_name=registry1.registry_name,
-                    project=registry1.project,
-                )
-                image_id2 = await test_image_factory(
-                    registry_id=registry2.id,
-                    registry_name=registry2.registry_name,
-                    project=registry2.project,
-                )
-                yield _TwoRegistriesWithImages(
-                    registry1=registry1,
-                    image1_id=image_id1,
-                    registry2=registry2,
-                    image2_id=image_id2,
-                )
+        project1 = "project-" + str(uuid.uuid4())[:8]
+        project2 = "project-" + str(uuid.uuid4())[:8]
+
+        async with db_with_cleanup.begin_session() as session:
+            registry1 = ContainerRegistryRow(
+                id=uuid.uuid4(),
+                url=f"https://{registry_name}",
+                registry_name=registry_name,
+                type=ContainerRegistryType.HARBOR2,
+                project=project1,
+            )
+            registry2 = ContainerRegistryRow(
+                id=uuid.uuid4(),
+                url=f"https://{registry_name}",
+                registry_name=registry_name,
+                type=ContainerRegistryType.HARBOR2,
+                project=project2,
+            )
+            session.add_all([registry1, registry2])
+
+            image1 = ImageRow(
+                name=f"{registry_name}/{project1}/image-1:latest",
+                registry=registry_name,
+                registry_id=registry1.id,
+                project=project1,
+                image="image-1",
+                tag="latest",
+                architecture="x86_64",
+                is_local=False,
+                type=ImageType.COMPUTE,
+                config_digest="sha256:test1",
+                size_bytes=1024 * 1024,
+                accelerators=None,
+                resources={},
+                labels={},
+                status=ImageStatus.ALIVE,
+            )
+            image2 = ImageRow(
+                name=f"{registry_name}/{project2}/image-2:latest",
+                registry=registry_name,
+                registry_id=registry2.id,
+                project=project2,
+                image="image-2",
+                tag="latest",
+                architecture="x86_64",
+                is_local=False,
+                type=ImageType.COMPUTE,
+                config_digest="sha256:test2",
+                size_bytes=1024 * 1024,
+                accelerators=None,
+                resources={},
+                labels={},
+                status=ImageStatus.ALIVE,
+            )
+            session.add_all([image1, image2])
+            await session.commit()
+            await session.refresh(registry1)
+            await session.refresh(registry2)
+
+            return _TwoRegistriesWithImages(
+                registry1=registry1.to_dataclass(),
+                image1_id=image1.id,
+                registry2=registry2.to_dataclass(),
+                image2_id=image2.id,
+            )
 
     @pytest.mark.asyncio
     async def test_clear_images_with_project_filter(
         self,
         repository: ContainerRegistryRepository,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         two_registries_with_images: _TwoRegistriesWithImages,
     ) -> None:
         """Test clearing images with project filter doesn't affect other projects"""
@@ -453,7 +560,7 @@ class TestContainerRegistryRepository:
         await repository.clear_images(reg1.registry_name, reg1.project)
 
         # Then - Verify only project1 images are deleted
-        async with database_engine.begin_readonly_session() as session:
+        async with db_with_cleanup.begin_readonly_session() as session:
             img_p1 = await session.scalar(sa.select(ImageRow).where(ImageRow.id == img1_id))
             img_p2 = await session.scalar(sa.select(ImageRow).where(ImageRow.id == img2_id))
 
@@ -487,16 +594,28 @@ class TestContainerRegistryRepository:
 
     @pytest.fixture
     async def registry_for_modification(
-        self, test_registry_factory
-    ) -> AsyncGenerator[ContainerRegistryData, None]:
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> ContainerRegistryData:
         """Pre-created registry with specific initial values for modification testing."""
-        async with test_registry_factory(
-            username="initial-user",
-            password="initial-password",
-            ssl_verify=False,
-            extra={"initial_key": "initial_value"},
-        ) as registry:
-            yield registry
+        registry_name = str(uuid.uuid4())[:8] + ".example.com"
+        project = "project-" + str(uuid.uuid4())[:8]
+
+        async with db_with_cleanup.begin_session() as session:
+            registry = ContainerRegistryRow(
+                id=uuid.uuid4(),
+                url=f"https://{registry_name}",
+                registry_name=registry_name,
+                type=ContainerRegistryType.HARBOR2,
+                project=project,
+                username="initial-user",
+                password="initial-password",
+                ssl_verify=False,
+                extra={"initial_key": "initial_value"},
+            )
+            session.add(registry)
+            await session.commit()
+            await session.refresh(registry)
+            return registry.to_dataclass()
 
     @pytest.mark.asyncio
     async def test_modify_registry_success(
@@ -575,25 +694,33 @@ class TestContainerRegistryRepository:
 
     @pytest.fixture
     async def registry_and_groups_for_adding(
-        self, test_registry_factory, test_groups_factory, database_engine: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[_RegistryWithAvailableGroups, None]:
-        """Pre-created registry and groups for testing adding allowed_groups."""
-        async with test_registry_factory() as registry:
-            async with test_groups_factory(group_count=2) as group_ids:
-                yield self._RegistryWithAvailableGroups(registry=registry, group_ids=group_ids)
-                # Cleanup associations
-                async with database_engine.begin_session() as session:
-                    await session.execute(
-                        sa.delete(AssociationContainerRegistriesGroupsRow).where(
-                            AssociationContainerRegistriesGroupsRow.group_id.in_(group_ids)
-                        )
-                    )
+        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_groups: list[UUID]
+    ) -> _RegistryWithAvailableGroups:
+        """Pre-created registry and 2 groups for testing adding allowed_groups."""
+        registry_name = str(uuid.uuid4())[:8] + ".example.com"
+        project = "project-" + str(uuid.uuid4())[:8]
+
+        async with db_with_cleanup.begin_session() as session:
+            registry = ContainerRegistryRow(
+                id=uuid.uuid4(),
+                url=f"https://{registry_name}",
+                registry_name=registry_name,
+                type=ContainerRegistryType.HARBOR2,
+                project=project,
+            )
+            session.add(registry)
+            await session.commit()
+            await session.refresh(registry)
+            return self._RegistryWithAvailableGroups(
+                registry=registry.to_dataclass(),
+                group_ids=sample_groups,
+            )
 
     @pytest.mark.asyncio
     async def test_modify_registry_add_allowed_groups(
         self,
         repository: ContainerRegistryRepository,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         registry_and_groups_for_adding: _RegistryWithAvailableGroups,
     ) -> None:
         """Test adding allowed_groups to an existing registry"""
@@ -625,7 +752,7 @@ class TestContainerRegistryRepository:
         assert result is not None
 
         # Then - Verify associations were created
-        async with database_engine.begin_readonly_session() as session:
+        async with db_with_cleanup.begin_readonly_session() as session:
             associations = (
                 (
                     await session.execute(
@@ -646,26 +773,70 @@ class TestContainerRegistryRepository:
 
     @pytest.fixture
     async def registry_with_associated_groups(
-        self, test_registry_factory, test_groups_factory, database_engine: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[_RegistryWithGroups, None]:
+        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_domain: str
+    ) -> _RegistryWithGroups:
         """Pre-created registry with 3 groups already associated."""
-        async with test_registry_factory() as registry:
-            async with test_groups_factory(group_count=3) as group_ids:
-                # Associate all groups with the registry
-                async with database_engine.begin_session() as session:
-                    for gid in group_ids:
-                        assoc = AssociationContainerRegistriesGroupsRow()
-                        assoc.registry_id = registry.id
-                        assoc.group_id = gid
-                        session.add(assoc)
+        registry_name = str(uuid.uuid4())[:8] + ".example.com"
+        project = "project-" + str(uuid.uuid4())[:8]
+        resource_policy_name = f"test-policy-{sample_domain}-3groups"
+        group_ids: list[UUID] = []
 
-                yield _RegistryWithGroups(registry=registry, group_ids=group_ids)
+        async with db_with_cleanup.begin_session() as session:
+            # Create registry
+            registry = ContainerRegistryRow(
+                id=uuid.uuid4(),
+                url=f"https://{registry_name}",
+                registry_name=registry_name,
+                type=ContainerRegistryType.HARBOR2,
+                project=project,
+            )
+            session.add(registry)
+
+            # Create resource policies
+            user_policy = UserResourcePolicyRow(
+                name=resource_policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=10,
+                max_customized_image_count=10,
+            )
+            session.add(user_policy)
+
+            project_policy = ProjectResourcePolicyRow(
+                name=resource_policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_network_count=3,
+            )
+            session.add(project_policy)
+
+            # Create 3 groups and associate them
+            for i in range(3):
+                group = GroupRow(
+                    name=f"test-group-{i}-{sample_domain}-assoc",
+                    domain_name=sample_domain,
+                    total_resource_slots={},
+                    resource_policy=resource_policy_name,
+                )
+                session.add(group)
+                await session.flush()
+                group_ids.append(group.id)
+
+                # Associate with registry
+                assoc = AssociationContainerRegistriesGroupsRow()
+                assoc.registry_id = registry.id
+                assoc.group_id = group.id
+                session.add(assoc)
+
+            await session.commit()
+            await session.refresh(registry)
+            return _RegistryWithGroups(registry=registry.to_dataclass(), group_ids=group_ids)
 
     @pytest.mark.asyncio
     async def test_modify_registry_remove_allowed_groups(
         self,
         repository: ContainerRegistryRepository,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         registry_with_associated_groups: _RegistryWithGroups,
     ) -> None:
         """Test removing allowed_groups from an existing registry"""
@@ -699,7 +870,7 @@ class TestContainerRegistryRepository:
         assert result is not None
 
         # Then - Verify one group was removed
-        async with database_engine.begin_readonly_session() as session:
+        async with db_with_cleanup.begin_readonly_session() as session:
             associations = (
                 (
                     await session.execute(
@@ -730,31 +901,76 @@ class TestContainerRegistryRepository:
 
     @pytest.fixture
     async def registry_with_partial_groups(
-        self, test_registry_factory, test_groups_factory, database_engine: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[_RegistryWithPartialGroups, None]:
+        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_domain: str
+    ) -> _RegistryWithPartialGroups:
         """Pre-created registry with 2 out of 4 groups associated."""
-        async with test_registry_factory() as registry:
-            async with test_groups_factory(group_count=4) as group_ids:
-                # Associate first 2 groups with the registry
-                async with database_engine.begin_session() as session:
-                    for gid in group_ids[:2]:
-                        assoc = AssociationContainerRegistriesGroupsRow()
-                        assoc.registry_id = registry.id
-                        assoc.group_id = gid
-                        session.add(assoc)
+        registry_name = str(uuid.uuid4())[:8] + ".example.com"
+        project = "project-" + str(uuid.uuid4())[:8]
+        resource_policy_name = f"test-policy-{sample_domain}-4groups"
+        group_ids: list[UUID] = []
 
-                yield self._RegistryWithPartialGroups(
-                    registry=registry,
-                    all_group_ids=group_ids,
-                    initially_associated_group_ids=group_ids[:2],
-                    available_group_ids=group_ids[2:],
+        async with db_with_cleanup.begin_session() as session:
+            # Create registry
+            registry = ContainerRegistryRow(
+                id=uuid.uuid4(),
+                url=f"https://{registry_name}",
+                registry_name=registry_name,
+                type=ContainerRegistryType.HARBOR2,
+                project=project,
+            )
+            session.add(registry)
+
+            # Create resource policies
+            user_policy = UserResourcePolicyRow(
+                name=resource_policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=10,
+                max_customized_image_count=10,
+            )
+            session.add(user_policy)
+
+            project_policy = ProjectResourcePolicyRow(
+                name=resource_policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_network_count=3,
+            )
+            session.add(project_policy)
+
+            # Create 4 groups
+            for i in range(4):
+                group = GroupRow(
+                    name=f"test-group-{i}-{sample_domain}-partial",
+                    domain_name=sample_domain,
+                    total_resource_slots={},
+                    resource_policy=resource_policy_name,
                 )
+                session.add(group)
+                await session.flush()
+                group_ids.append(group.id)
+
+            # Associate first 2 groups with the registry
+            for gid in group_ids[:2]:
+                assoc = AssociationContainerRegistriesGroupsRow()
+                assoc.registry_id = registry.id
+                assoc.group_id = gid
+                session.add(assoc)
+
+            await session.commit()
+            await session.refresh(registry)
+            return self._RegistryWithPartialGroups(
+                registry=registry.to_dataclass(),
+                all_group_ids=group_ids,
+                initially_associated_group_ids=group_ids[:2],
+                available_group_ids=group_ids[2:],
+            )
 
     @pytest.mark.asyncio
     async def test_modify_registry_add_and_remove_allowed_groups(
         self,
         repository: ContainerRegistryRepository,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         registry_with_partial_groups: _RegistryWithPartialGroups,
     ) -> None:
         """Test adding and removing allowed_groups simultaneously"""
@@ -789,7 +1005,7 @@ class TestContainerRegistryRepository:
         assert result is not None
 
         # Then - Verify group 0 removed, groups 2,3 added, group 1 remains
-        async with database_engine.begin_readonly_session() as session:
+        async with db_with_cleanup.begin_readonly_session() as session:
             associations = (
                 (
                     await session.execute(
@@ -871,7 +1087,6 @@ class TestContainerRegistryRepository:
     async def test_modify_registry_add_duplicate_allowed_groups(
         self,
         repository: ContainerRegistryRepository,
-        database_engine: ExtendedAsyncSAEngine,
         registry_with_partial_groups: _RegistryWithPartialGroups,
         updater_spec_with_two_duplicate_two_new_allowed_groups: ContainerRegistryUpdaterSpec,
     ) -> None:
@@ -885,3 +1100,64 @@ class TestContainerRegistryRepository:
                     pk_value=registry_with_partial_groups.registry.id,
                 )
             )
+
+    @pytest.mark.asyncio
+    async def test_delete_registry_success(
+        self,
+        repository: ContainerRegistryRepository,
+        test_registry: ContainerRegistryData,
+    ) -> None:
+        """Test successful registry deletion"""
+        # Given: A pre-created test registry
+        registry_id = test_registry.id
+        registry_name = test_registry.registry_name
+
+        # When: Delete the registry
+        purger = Purger(row_class=ContainerRegistryRow, pk_value=registry_id)
+        result = await repository.delete_registry(purger)
+
+        # Then: Returns deleted registry data
+        assert result.id == registry_id
+        assert result.registry_name == registry_name
+
+        # And: Registry no longer exists
+        with pytest.raises(ContainerRegistryNotFound):
+            purger = Purger(row_class=ContainerRegistryRow, pk_value=registry_id)
+            await repository.delete_registry(purger)
+
+    @pytest.mark.asyncio
+    async def test_delete_registry_not_found(
+        self,
+        repository: ContainerRegistryRepository,
+    ) -> None:
+        """Test deletion of non-existent registry raises error"""
+        # Given: Non-existent registry ID
+        non_existent_id = uuid.uuid4()
+
+        # When/Then: Raises ContainerRegistryNotFound
+        with pytest.raises(ContainerRegistryNotFound):
+            purger = Purger(row_class=ContainerRegistryRow, pk_value=non_existent_id)
+            await repository.delete_registry(purger)
+
+    @pytest.mark.asyncio
+    async def test_delete_registry_returns_data_before_deletion(
+        self,
+        repository: ContainerRegistryRepository,
+        test_registry_with_custom_props: ContainerRegistryData,
+    ) -> None:
+        """Test that delete_registry returns complete data before deletion"""
+        # Given: A registry with custom properties
+        registry = test_registry_with_custom_props
+
+        # When: Delete the registry
+        purger = Purger(row_class=ContainerRegistryRow, pk_value=registry.id)
+        result = await repository.delete_registry(purger)
+
+        # Then: Returns all registry data with correct properties
+        assert result.id == registry.id
+        assert result.registry_name == "test-registry"
+        assert result.project == "test-project"
+        assert result.username == "test-user"
+        assert result.password == "test-pass"
+        assert result.ssl_verify is False
+        assert result.is_global is False

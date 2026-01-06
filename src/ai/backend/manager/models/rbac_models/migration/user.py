@@ -65,11 +65,10 @@ def get_user_self_role_creation_input(user: UserData) -> RoleCreateInput:
     Create a self role and permissions for a user.
     This role allows the user to manage their own data.
     """
-    role_input = RoleCreateInput(
+    return RoleCreateInput(
         name=user.role_name(),
         source=RoleSource.SYSTEM,
     )
-    return role_input
 
 
 def get_superadmin_role_creation_input() -> RoleCreateInput:
@@ -77,11 +76,10 @@ def get_superadmin_role_creation_input() -> RoleCreateInput:
     Create a superadmin role and permissions.
     This role allows full access to all entities.
     """
-    role_input = RoleCreateInput(
+    return RoleCreateInput(
         name=f"{ROLE_NAME_PREFIX}superadmin",
         source=RoleSource.SYSTEM,
     )
-    return role_input
 
 
 def get_monitor_role_creation_input() -> RoleCreateInput:
@@ -89,8 +87,7 @@ def get_monitor_role_creation_input() -> RoleCreateInput:
     Create a monitor role and permissions.
     This role allows read-only access to all entities.
     """
-    role_input = RoleCreateInput(
+    return RoleCreateInput(
         name=f"{ROLE_NAME_PREFIX}monitor",
         source=RoleSource.SYSTEM,
     )
-    return role_input

@@ -1,16 +1,11 @@
 import logging
+from collections.abc import Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
-    Set,
-    Tuple,
 )
 
 import aiodocker
@@ -57,13 +52,13 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 class LPUPlugin(AbstractComputePlugin):
     key = DeviceName(PREFIX)
-    slot_types: Sequence[Tuple[SlotName, SlotTypes]] = ((SlotName(SLOT_NAME), SlotTypes("count")),)
-    exclusive_slot_types: Set[str] = {SLOT_NAME}
+    slot_types: Sequence[tuple[SlotName, SlotTypes]] = ((SlotName(SLOT_NAME), SlotTypes("count")),)
+    exclusive_slot_types: set[str] = {SLOT_NAME}
 
     device_mask: Sequence[DeviceId] = []
     enabled: bool = True
 
-    _all_devices: Optional[List[LPUDevice]]
+    _all_devices: Optional[list[LPUDevice]]
 
     async def init(self, context: Any = None) -> None:
         self._all_devices = None
@@ -82,7 +77,7 @@ class LPUPlugin(AbstractComputePlugin):
             log.warning("could not find LPU.")
             self.enabled = False
 
-    async def list_devices(self) -> List[LPUDevice]:
+    async def list_devices(self) -> list[LPUDevice]:
         if self._all_devices is not None:
             return self._all_devices
         self._all_devices = await lpu_api.list_devices()
@@ -165,20 +160,19 @@ class LPUPlugin(AbstractComputePlugin):
 
     async def create_alloc_map(self) -> DiscretePropertyAllocMap:
         devices = await self.list_devices()
-        dpam = DiscretePropertyAllocMap(
+        return DiscretePropertyAllocMap(
             device_slots={
                 dev.device_id: (DeviceSlotInfo(SlotTypes.COUNT, SlotName(SLOT_NAME), Decimal(1)))
                 for dev in devices
             },
             exclusive_slot_types=self.exclusive_slot_types,
         )
-        return dpam
 
     async def generate_mounts(
         self,
         source_path: Path,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         libpath = Path("/opt/hyperdex")
         return [
             MountInfo(MountTypes.BIND, libpath, libpath),
@@ -189,7 +183,7 @@ class LPUPlugin(AbstractComputePlugin):
         docker: aiodocker.docker.Docker,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Mapping[str, Any]:
-        assigned_devices: List[str] = []
+        assigned_devices: list[str] = []
         for dev in await self.list_devices():
             if dev.device_id in device_alloc.get(SlotName(SLOT_NAME), {}).keys():
                 assigned_devices.extend(
@@ -225,11 +219,11 @@ class LPUPlugin(AbstractComputePlugin):
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Sequence[DeviceModelInfo]:
-        device_ids: List[DeviceId] = []
+        device_ids: list[DeviceId] = []
         if SlotName(SLOT_NAME) in device_alloc:
             device_ids.extend(device_alloc[SlotName(SLOT_NAME)].keys())
         available_devices = await self.list_devices()
-        attached_devices: List[DeviceModelInfo] = []
+        attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
                 proc = device.processing_units
@@ -292,7 +286,7 @@ class LPUPlugin(AbstractComputePlugin):
         if not self.enabled:
             return data
 
-        active_device_id_set: Set[DeviceId] = set()
+        active_device_id_set: set[DeviceId] = set()
         for slot_type, per_device_alloc in device_alloc.items():
             for dev_id, alloc in per_device_alloc.items():
                 if alloc > 0:
@@ -315,7 +309,7 @@ class LPUPlugin(AbstractComputePlugin):
     async def get_docker_networks(
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
-    ) -> List[str]:
+    ) -> list[str]:
         return []
 
     async def gather_process_measures(

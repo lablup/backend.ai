@@ -56,7 +56,7 @@ async def test_execute_with_retry():
 
 
 @pytest.mark.asyncio
-async def test_execute_with_trx_retry(database_engine):
+async def test_execute_with_trx_retry(database_connection):
     class DummyDBError(Exception):
         def __init__(self, pgcode):
             self.pgcode = pgcode
@@ -80,27 +80,27 @@ async def test_execute_with_trx_retry(database_engine):
         raise sa.exc.DBAPIError("DUMMY_SQL", params=None, orig=DummyDBError("40001"))
 
     with pytest.raises(sa.exc.IntegrityError):
-        async with database_engine.connect() as conn:
+        async with database_connection.connect() as conn:
             await execute_with_txn_retry(
-                txn_func_generic_failure, database_engine.begin_session, conn
+                txn_func_generic_failure, database_connection.begin_session, conn
             )
 
     with pytest.raises(ZeroDivisionError):
-        async with database_engine.connect() as conn:
+        async with database_connection.connect() as conn:
             await execute_with_txn_retry(
-                txn_func_generic_failure_2, database_engine.begin_session, conn
+                txn_func_generic_failure_2, database_connection.begin_session, conn
             )
 
     with pytest.raises(asyncio.TimeoutError) as e:
-        async with database_engine.connect() as conn:
+        async with database_connection.connect() as conn:
             await execute_with_txn_retry(
-                txn_func_permanent_serialization_failure, database_engine.begin_session, conn
+                txn_func_permanent_serialization_failure, database_connection.begin_session, conn
             )
     assert "serialization failed" in e.value.args[0].lower()
 
-    async with database_engine.connect() as conn:
+    async with database_connection.connect() as conn:
         ret = await execute_with_txn_retry(
-            txn_func_temporary_serialization_failure, database_engine.begin_session, conn
+            txn_func_temporary_serialization_failure, database_connection.begin_session, conn
         )
     assert ret == 1234
 

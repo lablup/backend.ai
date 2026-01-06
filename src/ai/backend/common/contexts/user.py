@@ -1,6 +1,7 @@
+from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Iterator, Optional
+from typing import Optional
 
 from ai.backend.common.data.user.types import UserData
 

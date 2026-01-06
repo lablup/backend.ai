@@ -6,8 +6,8 @@ from graphene.test import Client
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
+from ai.backend.manager.api.gql_legacy.schema import GraphQueryContext, Mutation, Query
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
-from ai.backend.manager.models.gql import GraphQueryContext, Mutation, Query
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.admin_repository import (
     AdminContainerRegistryRepository,

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import AsyncGenerator
 from datetime import datetime
 from decimal import Decimal
-from typing import AsyncGenerator
 from unittest.mock import MagicMock
 
 import pytest
@@ -32,7 +32,6 @@ from ai.backend.manager.data.deployment.types import ModelRevisionData
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import AutoScalingPolicyNotFound, DeploymentPolicyNotFound
-from ai.backend.manager.models import KeyPairResourcePolicyRow, KeyPairRow
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyData,
@@ -51,10 +50,14 @@ from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import (
@@ -65,6 +68,7 @@ from ai.backend.manager.models.session import (
 )
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.purger import Purger
@@ -85,6 +89,7 @@ from ai.backend.manager.repositories.deployment.updaters import (
     RevisionStateUpdaterSpec,
 )
 from ai.backend.manager.types import OptionalState, TriState
+from ai.backend.testutils.db import with_tables
 
 
 def create_test_password_info(password: str) -> PasswordInfo:
@@ -103,32 +108,37 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans deployment data after each test."""
-        yield database_engine
-
-        # Cleanup in reverse dependency order
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(RoutingRow))
-            await db_sess.execute(sa.delete(EndpointRow))
-            await db_sess.execute(sa.delete(KernelRow))
-            await db_sess.execute(sa.delete(SessionRow))
-            await db_sess.execute(sa.delete(KeyPairRow))
-            await db_sess.execute(sa.delete(GroupRow))
-            await db_sess.execute(sa.delete(UserRow))
-            await db_sess.execute(sa.delete(KeyPairResourcePolicyRow))
-            await db_sess.execute(sa.delete(ProjectResourcePolicyRow))
-            await db_sess.execute(sa.delete(UserResourcePolicyRow))
-            await db_sess.execute(sa.delete(AgentRow))
-            await db_sess.execute(sa.delete(ScalingGroupRow))
-            await db_sess.execute(sa.delete(DomainRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
+                AgentRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,  # UserRow relationship dependency
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                VFolderRow,
+                SessionRow,
+                KernelRow,
+                EndpointRow,
+                RoutingRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -142,15 +152,15 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 allowed_docker_registries=[],
             )
             db_sess.add(domain)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield domain_name
+        return domain_name
 
     @pytest.fixture
     async def test_scaling_group_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test scaling group and return name."""
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
@@ -165,16 +175,16 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 scheduler_opts=ScalingGroupOpts(),
             )
             db_sess.add(sgroup)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield sgroup_name
+        return sgroup_name
 
     @pytest.fixture
     async def test_agent_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
-    ) -> AsyncGenerator[AgentId, None]:
+    ) -> AgentId:
         """Create test agent and return agent ID."""
         agent_id = AgentId(f"i-{uuid.uuid4().hex[:12]}")
 
@@ -193,15 +203,15 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 version="24.03.0",
             )
             db_sess.add(agent)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield agent_id
+        return agent_id
 
     @pytest.fixture
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test resource policy and return policy name."""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
@@ -209,20 +219,20 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             policy = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_session_count_per_model_session=5,
                 max_customized_image_count=3,
             )
             db_sess.add(policy)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield policy_name
+        return policy_name
 
     @pytest.fixture
     async def test_keypair_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test keypair resource policy and return policy name."""
         policy_name = f"test-kp-policy-{uuid.uuid4().hex[:8]}"
 
@@ -244,9 +254,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 idle_timeout=3600,
             )
             db_sess.add(policy)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield policy_name
+        return policy_name
 
     @pytest.fixture
     async def test_user_uuid(
@@ -254,7 +264,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test user and return user UUID."""
         user_uuid = uuid.uuid4()
 
@@ -272,15 +282,15 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 resource_policy=test_resource_policy_name,
             )
             db_sess.add(user)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield user_uuid
+        return user_uuid
 
     @pytest.fixture
     async def test_project_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test project resource policy and return policy name."""
         policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
 
@@ -292,9 +302,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 max_network_count=5,
             )
             db_sess.add(policy)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield policy_name
+        return policy_name
 
     @pytest.fixture
     async def test_group_id(
@@ -302,7 +312,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_project_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test group and return group ID."""
         group_id = uuid.uuid4()
 
@@ -314,9 +324,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield group_id
+        return group_id
 
     @pytest.fixture
     async def test_access_key(
@@ -324,7 +334,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user_uuid: uuid.UUID,
         test_keypair_resource_policy_name: str,
-    ) -> AsyncGenerator[AccessKey, None]:
+    ) -> AccessKey:
         """Create test keypair and return access key."""
         access_key = AccessKey(f"AKIATEST{uuid.uuid4().hex[:12].upper()}")
 
@@ -344,9 +354,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 resource_policy=test_keypair_resource_policy_name,
             )
             db_sess.add(keypair)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield access_key
+        return access_key
 
     @pytest.fixture
     async def test_session_id(
@@ -357,7 +367,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         test_domain_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
-    ) -> AsyncGenerator[SessionId, None]:
+    ) -> SessionId:
         """Create test session and return session ID."""
         session_id = SessionId(uuid.uuid4())
 
@@ -381,9 +391,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 result=SessionResult.UNDEFINED,
             )
             db_sess.add(session)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield session_id
+        return session_id
 
     @pytest.fixture
     async def test_kernel_with_inference_port(
@@ -396,7 +406,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         test_domain_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
-    ) -> AsyncGenerator[tuple[uuid.UUID, str, int], None]:
+    ) -> tuple[uuid.UUID, str, int]:
         """Create test kernel with inference port and return (kernel_id, host, port)."""
         kernel_id = uuid.uuid4()
         kernel_host = "10.0.1.5"
@@ -445,9 +455,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 stdout_port=2004,
             )
             db_sess.add(kernel)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield (kernel_id, kernel_host, inference_port)
+        return (kernel_id, kernel_host, inference_port)
 
     @pytest.fixture
     async def test_kernel_without_inference_port(
@@ -460,7 +470,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         test_domain_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test kernel without inference port and return kernel_id."""
         kernel_id = uuid.uuid4()
 
@@ -507,9 +517,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 stdout_port=2004,
             )
             db_sess.add(kernel)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield kernel_id
+        return kernel_id
 
     @pytest.fixture
     async def test_endpoint_id(
@@ -519,7 +529,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         test_scaling_group_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test endpoint and return endpoint ID."""
         endpoint_id = uuid.uuid4()
 
@@ -542,9 +552,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield endpoint_id
+        return endpoint_id
 
     @pytest.fixture
     async def test_route_id(
@@ -555,7 +565,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         test_domain_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test route and return route ID."""
         route_id = uuid.uuid4()
 
@@ -570,15 +580,15 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 traffic_ratio=1.0,
             )
             db_sess.add(route)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield route_id
+        return route_id
 
     @pytest.fixture
-    async def deployment_repository(
+    def deployment_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[DeploymentRepository, None]:
+    ) -> DeploymentRepository:
         """Create DeploymentRepository instance with database and mocked dependencies."""
         # Create mock dependencies
         storage_manager = MagicMock()
@@ -586,14 +596,13 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         valkey_live = MagicMock()
         valkey_schedule = MagicMock()
 
-        repo = DeploymentRepository(
+        return DeploymentRepository(
             db=db_with_cleanup,
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
         )
-        yield repo
 
     @pytest.mark.asyncio
     async def test_fetch_single_route_with_inference_port(
@@ -816,20 +825,24 @@ class TestGetDefaultArchitectureFromScalingGroup:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans data after each test."""
-        yield database_engine
-
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(AgentRow))
-            await db_sess.execute(sa.delete(ScalingGroupRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
+                AgentRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def test_scaling_group_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test scaling group and return name."""
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
@@ -844,15 +857,15 @@ class TestGetDefaultArchitectureFromScalingGroup:
                 scheduler_opts=ScalingGroupOpts(),
             )
             db_sess.add(sgroup)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield sgroup_name
+        return sgroup_name
 
     @pytest.fixture
     async def other_scaling_group_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create another scaling group for isolation tests."""
         sgroup_name = f"other-sgroup-{uuid.uuid4().hex[:8]}"
 
@@ -867,29 +880,28 @@ class TestGetDefaultArchitectureFromScalingGroup:
                 scheduler_opts=ScalingGroupOpts(),
             )
             db_sess.add(sgroup)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield sgroup_name
+        return sgroup_name
 
     @pytest.fixture
-    async def deployment_repository(
+    def deployment_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[DeploymentRepository, None]:
+    ) -> DeploymentRepository:
         """Create DeploymentRepository instance."""
         storage_manager = MagicMock()
         valkey_stat = MagicMock()
         valkey_live = MagicMock()
         valkey_schedule = MagicMock()
 
-        repo = DeploymentRepository(
+        return DeploymentRepository(
             db=db_with_cleanup,
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
         )
-        yield repo
 
     async def _create_agent(
         self,
@@ -926,7 +938,7 @@ class TestGetDefaultArchitectureFromScalingGroup:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
-    ) -> AsyncGenerator[list[AgentId], None]:
+    ) -> list[AgentId]:
         """Create 3 x86_64 agents and 2 aarch64 agents."""
         agent_ids: list[AgentId] = []
         for i in range(3):
@@ -947,29 +959,28 @@ class TestGetDefaultArchitectureFromScalingGroup:
             )
             agent_ids.append(agent_id)
 
-        yield agent_ids
+        return agent_ids
 
     @pytest.fixture
     async def single_aarch64_agent(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
-    ) -> AsyncGenerator[AgentId, None]:
+    ) -> AgentId:
         """Create a single aarch64 agent."""
-        agent_id = await self._create_agent(
+        return await self._create_agent(
             db_with_cleanup,
             test_scaling_group_name,
             "aarch64",
             suffix="single",
         )
-        yield agent_id
 
     @pytest.fixture
     async def alive_x86_and_lost_aarch64_agents(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
-    ) -> AsyncGenerator[list[AgentId], None]:
+    ) -> list[AgentId]:
         """Create 1 ALIVE x86_64 agent and 3 LOST aarch64 agents."""
         agent_ids: list[AgentId] = []
 
@@ -992,14 +1003,14 @@ class TestGetDefaultArchitectureFromScalingGroup:
             )
             agent_ids.append(agent_id)
 
-        yield agent_ids
+        return agent_ids
 
     @pytest.fixture
     async def schedulable_x86_and_non_schedulable_aarch64_agents(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
-    ) -> AsyncGenerator[list[AgentId], None]:
+    ) -> list[AgentId]:
         """Create 1 schedulable x86_64 agent and 3 non-schedulable aarch64 agents."""
         agent_ids: list[AgentId] = []
 
@@ -1022,7 +1033,7 @@ class TestGetDefaultArchitectureFromScalingGroup:
             )
             agent_ids.append(agent_id)
 
-        yield agent_ids
+        return agent_ids
 
     @pytest.fixture
     async def agents_in_different_scaling_groups(
@@ -1030,7 +1041,7 @@ class TestGetDefaultArchitectureFromScalingGroup:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
         other_scaling_group_name: str,
-    ) -> AsyncGenerator[list[AgentId], None]:
+    ) -> list[AgentId]:
         """Create 1 agent in target group and 3 agents in other group."""
         agent_ids: list[AgentId] = []
 
@@ -1051,7 +1062,7 @@ class TestGetDefaultArchitectureFromScalingGroup:
             )
             agent_ids.append(agent_id)
 
-        yield agent_ids
+        return agent_ids
 
     @pytest.mark.asyncio
     async def test_returns_most_common_architecture(
@@ -1159,27 +1170,33 @@ class TestDeploymentRevisionOperations:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans data after each test."""
-        yield database_engine
-
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(DeploymentRevisionRow))
-            await db_sess.execute(sa.delete(EndpointRow))
-            await db_sess.execute(sa.delete(ImageRow))
-            await db_sess.execute(sa.delete(GroupRow))
-            await db_sess.execute(sa.delete(UserRow))
-            await db_sess.execute(sa.delete(UserResourcePolicyRow))
-            await db_sess.execute(sa.delete(ProjectResourcePolicyRow))
-            await db_sess.execute(sa.delete(ScalingGroupRow))
-            await db_sess.execute(sa.delete(DomainRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                UserRoleRow,  # UserRow relationship dependency
+                UserRow,
+                GroupRow,
+                VFolderRow,
+                ImageRow,
+                EndpointRow,
+                DeploymentRevisionRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -1193,15 +1210,15 @@ class TestDeploymentRevisionOperations:
                 allowed_docker_registries=[],
             )
             db_sess.add(domain)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield domain_name
+        return domain_name
 
     @pytest.fixture
     async def test_scaling_group_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test scaling group and return name."""
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
@@ -1216,15 +1233,15 @@ class TestDeploymentRevisionOperations:
                 scheduler_opts=ScalingGroupOpts(),
             )
             db_sess.add(sgroup)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield sgroup_name
+        return sgroup_name
 
     @pytest.fixture
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test resource policy and return policy name."""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
@@ -1232,20 +1249,20 @@ class TestDeploymentRevisionOperations:
             policy = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_session_count_per_model_session=5,
                 max_customized_image_count=3,
             )
             db_sess.add(policy)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield policy_name
+        return policy_name
 
     @pytest.fixture
     async def test_project_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test project resource policy and return policy name."""
         policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
 
@@ -1257,9 +1274,9 @@ class TestDeploymentRevisionOperations:
                 max_network_count=5,
             )
             db_sess.add(policy)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield policy_name
+        return policy_name
 
     @pytest.fixture
     async def test_user_uuid(
@@ -1267,7 +1284,7 @@ class TestDeploymentRevisionOperations:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test user and return user UUID."""
         user_uuid = uuid.uuid4()
 
@@ -1285,9 +1302,9 @@ class TestDeploymentRevisionOperations:
                 resource_policy=test_resource_policy_name,
             )
             db_sess.add(user)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield user_uuid
+        return user_uuid
 
     @pytest.fixture
     async def test_group_id(
@@ -1295,7 +1312,7 @@ class TestDeploymentRevisionOperations:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_project_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test group and return group ID."""
         group_id = uuid.uuid4()
 
@@ -1307,15 +1324,15 @@ class TestDeploymentRevisionOperations:
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield group_id
+        return group_id
 
     @pytest.fixture
     async def test_image_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test image and return image ID."""
         async with db_with_cleanup.begin_session() as db_sess:
             image = ImageRow(
@@ -1332,10 +1349,8 @@ class TestDeploymentRevisionOperations:
                 labels={},
             )
             db_sess.add(image)
-            await db_sess.flush()
-            image_id = image.id
-
-        yield image_id
+            await db_sess.commit()
+            return image.id
 
     @pytest.fixture
     async def test_endpoint_id(
@@ -1346,7 +1361,7 @@ class TestDeploymentRevisionOperations:
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
         test_image_id: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test endpoint and return endpoint ID."""
         endpoint_id = uuid.uuid4()
 
@@ -1375,29 +1390,28 @@ class TestDeploymentRevisionOperations:
                 extra_mounts=[],
             )
             db_sess.add(endpoint)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield endpoint_id
+        return endpoint_id
 
     @pytest.fixture
-    async def deployment_repository(
+    def deployment_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[DeploymentRepository, None]:
+    ) -> DeploymentRepository:
         """Create DeploymentRepository instance."""
         storage_manager = MagicMock()
         valkey_stat = MagicMock()
         valkey_live = MagicMock()
         valkey_schedule = MagicMock()
 
-        repo = DeploymentRepository(
+        return DeploymentRepository(
             db=db_with_cleanup,
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
         )
-        yield repo
 
     @pytest.fixture
     async def test_revision_data(
@@ -1406,7 +1420,7 @@ class TestDeploymentRevisionOperations:
         test_endpoint_id: uuid.UUID,
         test_image_id: uuid.UUID,
         test_scaling_group_name: str,
-    ) -> AsyncGenerator[ModelRevisionData, None]:
+    ) -> ModelRevisionData:
         """Create a single test revision."""
 
         spec = DeploymentRevisionCreatorSpec(
@@ -1429,8 +1443,7 @@ class TestDeploymentRevisionOperations:
             runtime_variant=RuntimeVariant.CUSTOM,
             extra_mounts=[],
         )
-        revision = await deployment_repository.create_revision(Creator(spec=spec))
-        yield revision
+        return await deployment_repository.create_revision(Creator(spec=spec))
 
     @pytest.fixture
     async def test_multiple_revisions(
@@ -1439,7 +1452,7 @@ class TestDeploymentRevisionOperations:
         test_endpoint_id: uuid.UUID,
         test_image_id: uuid.UUID,
         test_scaling_group_name: str,
-    ) -> AsyncGenerator[list[ModelRevisionData], None]:
+    ) -> list[ModelRevisionData]:
         """Create multiple test revisions (revision 1, 2, 3)."""
         revisions: list[ModelRevisionData] = []
         for rev_num in [1, 2, 3]:
@@ -1465,7 +1478,7 @@ class TestDeploymentRevisionOperations:
             )
             revision = await deployment_repository.create_revision(Creator(spec=spec))
             revisions.append(revision)
-        yield revisions
+        return revisions
 
     @pytest.fixture
     async def test_five_revisions(
@@ -1474,7 +1487,7 @@ class TestDeploymentRevisionOperations:
         test_endpoint_id: uuid.UUID,
         test_image_id: uuid.UUID,
         test_scaling_group_name: str,
-    ) -> AsyncGenerator[list[ModelRevisionData], None]:
+    ) -> list[ModelRevisionData]:
         """Create 5 test revisions for pagination tests."""
         revisions: list[ModelRevisionData] = []
         for rev_num in range(1, 6):
@@ -1500,7 +1513,7 @@ class TestDeploymentRevisionOperations:
             )
             revision = await deployment_repository.create_revision(Creator(spec=spec))
             revisions.append(revision)
-        yield revisions
+        return revisions
 
     @pytest.mark.asyncio
     async def test_create_revision(
@@ -1801,26 +1814,32 @@ class TestDeploymentAutoScalingPolicyOperations:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans data after each test."""
-        yield database_engine
-
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(DeploymentAutoScalingPolicyRow))
-            await db_sess.execute(sa.delete(EndpointRow))
-            await db_sess.execute(sa.delete(GroupRow))
-            await db_sess.execute(sa.delete(UserRow))
-            await db_sess.execute(sa.delete(UserResourcePolicyRow))
-            await db_sess.execute(sa.delete(ProjectResourcePolicyRow))
-            await db_sess.execute(sa.delete(ScalingGroupRow))
-            await db_sess.execute(sa.delete(DomainRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                UserRoleRow,  # UserRow relationship dependency
+                UserRow,
+                GroupRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentAutoScalingPolicyRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -1834,15 +1853,15 @@ class TestDeploymentAutoScalingPolicyOperations:
                 allowed_docker_registries=[],
             )
             db_sess.add(domain)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield domain_name
+        return domain_name
 
     @pytest.fixture
     async def test_scaling_group_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test scaling group and return name."""
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
@@ -1857,15 +1876,15 @@ class TestDeploymentAutoScalingPolicyOperations:
                 scheduler_opts=ScalingGroupOpts(),
             )
             db_sess.add(sgroup)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield sgroup_name
+        return sgroup_name
 
     @pytest.fixture
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test resource policy and return policy name."""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
@@ -1873,20 +1892,20 @@ class TestDeploymentAutoScalingPolicyOperations:
             policy = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_session_count_per_model_session=5,
                 max_customized_image_count=3,
             )
             db_sess.add(policy)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield policy_name
+        return policy_name
 
     @pytest.fixture
     async def test_project_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test project resource policy and return policy name."""
         policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
 
@@ -1898,9 +1917,9 @@ class TestDeploymentAutoScalingPolicyOperations:
                 max_network_count=5,
             )
             db_sess.add(policy)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield policy_name
+        return policy_name
 
     @pytest.fixture
     async def test_user_uuid(
@@ -1908,7 +1927,7 @@ class TestDeploymentAutoScalingPolicyOperations:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test user and return user UUID."""
         user_uuid = uuid.uuid4()
 
@@ -1926,9 +1945,9 @@ class TestDeploymentAutoScalingPolicyOperations:
                 resource_policy=test_resource_policy_name,
             )
             db_sess.add(user)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield user_uuid
+        return user_uuid
 
     @pytest.fixture
     async def test_group_id(
@@ -1936,7 +1955,7 @@ class TestDeploymentAutoScalingPolicyOperations:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_project_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test group and return group ID."""
         group_id = uuid.uuid4()
 
@@ -1948,9 +1967,9 @@ class TestDeploymentAutoScalingPolicyOperations:
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield group_id
+        return group_id
 
     @pytest.fixture
     async def test_endpoint_id(
@@ -1960,7 +1979,7 @@ class TestDeploymentAutoScalingPolicyOperations:
         test_scaling_group_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test endpoint and return endpoint ID."""
         endpoint_id = uuid.uuid4()
 
@@ -1983,36 +2002,35 @@ class TestDeploymentAutoScalingPolicyOperations:
                 resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield endpoint_id
+        return endpoint_id
 
     @pytest.fixture
-    async def deployment_repository(
+    def deployment_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[DeploymentRepository, None]:
+    ) -> DeploymentRepository:
         """Create DeploymentRepository instance."""
         storage_manager = MagicMock()
         valkey_stat = MagicMock()
         valkey_live = MagicMock()
         valkey_schedule = MagicMock()
 
-        repo = DeploymentRepository(
+        return DeploymentRepository(
             db=db_with_cleanup,
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
         )
-        yield repo
 
     @pytest.fixture
     async def test_auto_scaling_policy_data(
         self,
         deployment_repository: DeploymentRepository,
         test_endpoint_id: uuid.UUID,
-    ) -> AsyncGenerator[DeploymentAutoScalingPolicyData, None]:
+    ) -> DeploymentAutoScalingPolicyData:
         """Create a single test auto-scaling policy."""
         spec = DeploymentAutoScalingPolicyCreatorSpec(
             endpoint_id=test_endpoint_id,
@@ -2027,8 +2045,7 @@ class TestDeploymentAutoScalingPolicyOperations:
             scale_down_step_size=1,
             cooldown_seconds=300,
         )
-        policy = await deployment_repository.create_auto_scaling_policy(Creator(spec=spec))
-        yield policy
+        return await deployment_repository.create_auto_scaling_policy(Creator(spec=spec))
 
     @pytest.mark.asyncio
     async def test_create_auto_scaling_policy(
@@ -2182,26 +2199,32 @@ class TestDeploymentPolicyOperations:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans data after each test."""
-        yield database_engine
-
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(DeploymentPolicyRow))
-            await db_sess.execute(sa.delete(EndpointRow))
-            await db_sess.execute(sa.delete(GroupRow))
-            await db_sess.execute(sa.delete(UserRow))
-            await db_sess.execute(sa.delete(UserResourcePolicyRow))
-            await db_sess.execute(sa.delete(ProjectResourcePolicyRow))
-            await db_sess.execute(sa.delete(ScalingGroupRow))
-            await db_sess.execute(sa.delete(DomainRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                UserRoleRow,  # UserRow relationship dependency
+                UserRow,
+                GroupRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -2215,15 +2238,15 @@ class TestDeploymentPolicyOperations:
                 allowed_docker_registries=[],
             )
             db_sess.add(domain)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield domain_name
+        return domain_name
 
     @pytest.fixture
     async def test_scaling_group_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test scaling group and return name."""
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
@@ -2238,15 +2261,15 @@ class TestDeploymentPolicyOperations:
                 scheduler_opts=ScalingGroupOpts(),
             )
             db_sess.add(sgroup)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield sgroup_name
+        return sgroup_name
 
     @pytest.fixture
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test resource policy and return policy name."""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
@@ -2254,20 +2277,20 @@ class TestDeploymentPolicyOperations:
             policy = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_session_count_per_model_session=5,
                 max_customized_image_count=3,
             )
             db_sess.add(policy)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield policy_name
+        return policy_name
 
     @pytest.fixture
     async def test_project_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test project resource policy and return policy name."""
         policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
 
@@ -2279,9 +2302,9 @@ class TestDeploymentPolicyOperations:
                 max_network_count=5,
             )
             db_sess.add(policy)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield policy_name
+        return policy_name
 
     @pytest.fixture
     async def test_user_uuid(
@@ -2289,7 +2312,7 @@ class TestDeploymentPolicyOperations:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test user and return user UUID."""
         user_uuid = uuid.uuid4()
 
@@ -2307,9 +2330,9 @@ class TestDeploymentPolicyOperations:
                 resource_policy=test_resource_policy_name,
             )
             db_sess.add(user)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield user_uuid
+        return user_uuid
 
     @pytest.fixture
     async def test_group_id(
@@ -2317,7 +2340,7 @@ class TestDeploymentPolicyOperations:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_project_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test group and return group ID."""
         group_id = uuid.uuid4()
 
@@ -2329,9 +2352,9 @@ class TestDeploymentPolicyOperations:
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield group_id
+        return group_id
 
     @pytest.fixture
     async def test_endpoint_id(
@@ -2341,7 +2364,7 @@ class TestDeploymentPolicyOperations:
         test_scaling_group_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test endpoint and return endpoint ID."""
         endpoint_id = uuid.uuid4()
 
@@ -2364,36 +2387,35 @@ class TestDeploymentPolicyOperations:
                 resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield endpoint_id
+        return endpoint_id
 
     @pytest.fixture
-    async def deployment_repository(
+    def deployment_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[DeploymentRepository, None]:
+    ) -> DeploymentRepository:
         """Create DeploymentRepository instance."""
         storage_manager = MagicMock()
         valkey_stat = MagicMock()
         valkey_live = MagicMock()
         valkey_schedule = MagicMock()
 
-        repo = DeploymentRepository(
+        return DeploymentRepository(
             db=db_with_cleanup,
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
         )
-        yield repo
 
     @pytest.fixture
     async def test_deployment_policy_data(
         self,
         deployment_repository: DeploymentRepository,
         test_endpoint_id: uuid.UUID,
-    ) -> AsyncGenerator[DeploymentPolicyData, None]:
+    ) -> DeploymentPolicyData:
         """Create a single test deployment policy."""
         spec = DeploymentPolicyCreatorSpec(
             endpoint_id=test_endpoint_id,
@@ -2401,8 +2423,7 @@ class TestDeploymentPolicyOperations:
             strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
             rollback_on_failure=False,
         )
-        policy = await deployment_repository.create_deployment_policy(Creator(spec=spec))
-        yield policy
+        return await deployment_repository.create_deployment_policy(Creator(spec=spec))
 
     @pytest.mark.asyncio
     async def test_create_deployment_policy(
@@ -2538,26 +2559,32 @@ class TestRouteOperations:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans data after each test."""
-        yield database_engine
-
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(RoutingRow))
-            await db_sess.execute(sa.delete(EndpointRow))
-            await db_sess.execute(sa.delete(GroupRow))
-            await db_sess.execute(sa.delete(UserRow))
-            await db_sess.execute(sa.delete(UserResourcePolicyRow))
-            await db_sess.execute(sa.delete(ProjectResourcePolicyRow))
-            await db_sess.execute(sa.delete(ScalingGroupRow))
-            await db_sess.execute(sa.delete(DomainRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                UserRoleRow,  # UserRow relationship dependency
+                UserRow,
+                GroupRow,
+                VFolderRow,
+                EndpointRow,
+                RoutingRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -2571,15 +2598,15 @@ class TestRouteOperations:
                 allowed_docker_registries=[],
             )
             db_sess.add(domain)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield domain_name
+        return domain_name
 
     @pytest.fixture
     async def test_scaling_group_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test scaling group and return name."""
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
@@ -2594,15 +2621,15 @@ class TestRouteOperations:
                 scheduler_opts=ScalingGroupOpts(),
             )
             db_sess.add(sgroup)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield sgroup_name
+        return sgroup_name
 
     @pytest.fixture
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test resource policy and return policy name."""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
@@ -2610,20 +2637,20 @@ class TestRouteOperations:
             policy = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_session_count_per_model_session=5,
                 max_customized_image_count=3,
             )
             db_sess.add(policy)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield policy_name
+        return policy_name
 
     @pytest.fixture
     async def test_project_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test project resource policy and return policy name."""
         policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
 
@@ -2635,9 +2662,9 @@ class TestRouteOperations:
                 max_network_count=5,
             )
             db_sess.add(policy)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield policy_name
+        return policy_name
 
     @pytest.fixture
     async def test_user_uuid(
@@ -2645,7 +2672,7 @@ class TestRouteOperations:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test user and return user UUID."""
         user_uuid = uuid.uuid4()
 
@@ -2663,9 +2690,9 @@ class TestRouteOperations:
                 resource_policy=test_resource_policy_name,
             )
             db_sess.add(user)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield user_uuid
+        return user_uuid
 
     @pytest.fixture
     async def test_group_id(
@@ -2673,7 +2700,7 @@ class TestRouteOperations:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_project_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test group and return group ID."""
         group_id = uuid.uuid4()
 
@@ -2685,9 +2712,9 @@ class TestRouteOperations:
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield group_id
+        return group_id
 
     @pytest.fixture
     async def test_endpoint_id(
@@ -2697,7 +2724,7 @@ class TestRouteOperations:
         test_scaling_group_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test endpoint and return endpoint ID."""
         endpoint_id = uuid.uuid4()
 
@@ -2720,29 +2747,28 @@ class TestRouteOperations:
                 resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield endpoint_id
+        return endpoint_id
 
     @pytest.fixture
-    async def deployment_repository(
+    def deployment_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[DeploymentRepository, None]:
+    ) -> DeploymentRepository:
         """Create DeploymentRepository instance."""
         storage_manager = MagicMock()
         valkey_stat = MagicMock()
         valkey_live = MagicMock()
         valkey_schedule = MagicMock()
 
-        repo = DeploymentRepository(
+        return DeploymentRepository(
             db=db_with_cleanup,
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
         )
-        yield repo
 
     @pytest.mark.asyncio
     async def test_create_route(

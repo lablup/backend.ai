@@ -16,7 +16,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--separator",
-    help="Separator between the words in the generated password (default: none)",  # NOQA
+    help="Separator between the words in the generated password (default: none)",
     default="-",
 )
 parser.add_argument(
@@ -25,7 +25,7 @@ parser.add_argument(
 parser.add_argument(
     "-e",
     "--minimum-entropy",
-    help="Minimum entropy for generated passphrase. Doesn't reflect actual password's entropy.",  # NOQA
+    help="Minimum entropy for generated passphrase. Doesn't reflect actual password's entropy.",
     default=90,
 )
 args = parser.parse_args()

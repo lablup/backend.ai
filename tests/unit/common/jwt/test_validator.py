@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt as pyjwt
 import pytest
@@ -78,7 +78,7 @@ def test_validate_token_with_expired_token(
 ) -> None:
     """Test that validator rejects expired tokens."""
     # Create token that expired 1 hour ago
-    past_time = datetime.now(timezone.utc) - timedelta(hours=1)
+    past_time = datetime.now(UTC) - timedelta(hours=1)
 
     payload = {
         "exp": int((past_time + timedelta(seconds=900)).timestamp()),
@@ -134,8 +134,8 @@ def test_validate_token_with_missing_claims(
     """Test that validator rejects tokens with missing required claims."""
     # Create token with missing claims
     payload = {
-        "exp": int((datetime.now(timezone.utc) + timedelta(seconds=900)).timestamp()),
-        "iat": int(datetime.now(timezone.utc).timestamp()),
+        "exp": int((datetime.now(UTC) + timedelta(seconds=900)).timestamp()),
+        "iat": int(datetime.now(UTC).timestamp()),
         # Missing: access_key, role
     }
 
@@ -157,8 +157,8 @@ def test_validate_token_with_invalid_role(
 ) -> None:
     """Test that validator rejects tokens with invalid role."""
     payload = {
-        "exp": int((datetime.now(timezone.utc) + timedelta(seconds=900)).timestamp()),
-        "iat": int(datetime.now(timezone.utc).timestamp()),
+        "exp": int((datetime.now(UTC) + timedelta(seconds=900)).timestamp()),
+        "iat": int(datetime.now(UTC).timestamp()),
         "access_key": str(user_context.access_key),
         "role": "invalid_role",  # Not in valid_roles
     }

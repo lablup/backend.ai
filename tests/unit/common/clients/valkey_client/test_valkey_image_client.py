@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import random
-from typing import AsyncGenerator, cast
+from collections.abc import AsyncGenerator
+from typing import cast
 
 import pytest
 
@@ -19,7 +20,7 @@ class TestValkeyImageClient:
     @pytest.fixture
     async def valkey_image_client(
         self,
-        redis_container,  # noqa: F811
+        redis_container,
     ) -> AsyncGenerator[ValkeyImageClient, None]:
         """Valkey client that auto-cleans installed image data after each test"""
         hostport_pair: HostPortPairModel = redis_container[1]

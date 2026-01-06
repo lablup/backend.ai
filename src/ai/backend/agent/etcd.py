@@ -1,5 +1,6 @@
-from collections.abc import AsyncGenerator, Iterable, Mapping
-from typing import ChainMap, MutableMapping, Optional, cast, override
+from collections import ChainMap
+from collections.abc import AsyncGenerator, Iterable, Mapping, MutableMapping
+from typing import Optional, cast, override
 
 from etcd_client import CondVar
 

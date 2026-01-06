@@ -130,8 +130,10 @@ class NotificationChannelAdapter(BaseFilterAdapter):
         if filter.name is not None:
             condition = self.convert_string_filter(
                 filter.name,
-                equals_fn=NotificationChannelConditions.by_name_equals,
-                contains_fn=NotificationChannelConditions.by_name_contains,
+                contains_factory=NotificationChannelConditions.by_name_contains,
+                equals_factory=NotificationChannelConditions.by_name_equals,
+                starts_with_factory=NotificationChannelConditions.by_name_starts_with,
+                ends_with_factory=NotificationChannelConditions.by_name_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -152,12 +154,11 @@ class NotificationChannelAdapter(BaseFilterAdapter):
 
         if order.field == NotificationChannelOrderField.NAME:
             return NotificationChannelOrders.name(ascending=ascending)
-        elif order.field == NotificationChannelOrderField.CREATED_AT:
+        if order.field == NotificationChannelOrderField.CREATED_AT:
             return NotificationChannelOrders.created_at(ascending=ascending)
-        elif order.field == NotificationChannelOrderField.UPDATED_AT:
+        if order.field == NotificationChannelOrderField.UPDATED_AT:
             return NotificationChannelOrders.updated_at(ascending=ascending)
-        else:
-            raise ValueError(f"Unknown order field: {order.field}")
+        raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""
@@ -233,8 +234,10 @@ class NotificationRuleAdapter(BaseFilterAdapter):
         if filter.name is not None:
             condition = self.convert_string_filter(
                 filter.name,
-                equals_fn=NotificationRuleConditions.by_name_equals,
-                contains_fn=NotificationRuleConditions.by_name_contains,
+                contains_factory=NotificationRuleConditions.by_name_contains,
+                equals_factory=NotificationRuleConditions.by_name_equals,
+                starts_with_factory=NotificationRuleConditions.by_name_starts_with,
+                ends_with_factory=NotificationRuleConditions.by_name_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -255,12 +258,11 @@ class NotificationRuleAdapter(BaseFilterAdapter):
 
         if order.field == NotificationRuleOrderField.NAME:
             return NotificationRuleOrders.name(ascending=ascending)
-        elif order.field == NotificationRuleOrderField.CREATED_AT:
+        if order.field == NotificationRuleOrderField.CREATED_AT:
             return NotificationRuleOrders.created_at(ascending=ascending)
-        elif order.field == NotificationRuleOrderField.UPDATED_AT:
+        if order.field == NotificationRuleOrderField.UPDATED_AT:
             return NotificationRuleOrders.updated_at(ascending=ascending)
-        else:
-            raise ValueError(f"Unknown order field: {order.field}")
+        raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""

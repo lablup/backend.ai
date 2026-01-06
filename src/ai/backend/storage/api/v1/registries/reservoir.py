@@ -24,11 +24,10 @@ from ai.backend.storage.services.artifacts.reservoir import (
     ReservoirServiceArgs,
     create_reservoir_import_pipeline,
 )
-
-from ....utils import log_client_api_entry
+from ai.backend.storage.utils import log_client_api_entry
 
 if TYPE_CHECKING:
-    from ....context import RootContext
+    from ai.backend.storage.context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

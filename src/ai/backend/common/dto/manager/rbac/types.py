@@ -15,14 +15,14 @@ from ai.backend.common.data.permission.types import (
 )
 
 __all__ = (
-    "RoleStatus",
-    "RoleSource",
+    "AssignedUserOrderField",
     "EntityType",
     "OperationType",
-    "PermissionStatus",
     "OrderDirection",
+    "PermissionStatus",
     "RoleOrderField",
-    "AssignedUserOrderField",
+    "RoleSource",
+    "RoleStatus",
 )
 
 

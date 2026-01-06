@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
@@ -15,8 +15,7 @@ from ai.backend.manager.services.model_serving.actions.list_errors import (
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )
-
-from ...utils import ScenarioBase
+from ai.backend.testutils.scenario import ScenarioBase
 
 
 @pytest.fixture
@@ -32,22 +31,20 @@ def mock_check_requester_access_list_errors(mocker, model_serving_service):
 
 @pytest.fixture
 def mock_get_endpoint_by_id_force_list_errors(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.admin_repository,
         "get_endpoint_by_id_force",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 @pytest.fixture
 def mock_get_endpoint_by_id_validated_list_errors(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.repository,
         "get_endpoint_by_id_validated",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 class TestListErrors:
@@ -70,7 +67,7 @@ class TestListErrors:
                         ErrorInfo(
                             session_id=uuid.UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
                             error={
-                                "timestamp": datetime.utcnow().isoformat(),
+                                "timestamp": datetime.now(tz=UTC).isoformat(),
                                 "error_type": "OOMKilled",
                                 "message": "Container killed due to out of memory",
                             },
@@ -78,7 +75,7 @@ class TestListErrors:
                         ErrorInfo(
                             session_id=uuid.UUID("bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
                             error={
-                                "timestamp": datetime.utcnow().isoformat(),
+                                "timestamp": datetime.now(tz=UTC).isoformat(),
                                 "error_type": "ImagePullError",
                                 "message": "Failed to pull image",
                             },
@@ -103,7 +100,7 @@ class TestListErrors:
                         ErrorInfo(
                             session_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
                             error={
-                                "timestamp": datetime.utcnow().isoformat(),
+                                "timestamp": datetime.now(tz=UTC).isoformat(),
                                 "error_type": "OOMKilled",
                                 "message": "Container killed due to out of memory",
                             },

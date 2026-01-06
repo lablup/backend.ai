@@ -56,6 +56,9 @@ from ai.backend.manager.api.gql.domain import Domain
 from ai.backend.manager.api.gql.project import Project
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.user import User
+from ai.backend.manager.api.gql_legacy.domain import DomainNode
+from ai.backend.manager.api.gql_legacy.group import GroupNode
+from ai.backend.manager.api.gql_legacy.user import UserNode
 from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig, NewDeploymentCreator
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
@@ -68,9 +71,6 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.errors.service import DeploymentPolicyNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.gql_models.domain import DomainNode
-from ai.backend.manager.models.gql_models.group import GroupNode
-from ai.backend.manager.models.gql_models.user import UserNode
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
@@ -433,9 +433,9 @@ class DeploymentFilter(GQLFilter):
     endpoint_url: Optional[StringFilter] = None
     ids_in: strawberry.Private[Optional[Sequence[UUID]]] = None
 
-    AND: Optional[list["DeploymentFilter"]] = None
-    OR: Optional[list["DeploymentFilter"]] = None
-    NOT: Optional[list["DeploymentFilter"]] = None
+    AND: Optional[list[DeploymentFilter]] = None
+    OR: Optional[list[DeploymentFilter]] = None
+    NOT: Optional[list[DeploymentFilter]] = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -450,6 +450,8 @@ class DeploymentFilter(GQLFilter):
             name_condition = self.name.build_query_condition(
                 contains_factory=DeploymentConditions.by_name_contains,
                 equals_factory=DeploymentConditions.by_name_equals,
+                starts_with_factory=DeploymentConditions.by_name_starts_with,
+                ends_with_factory=DeploymentConditions.by_name_ends_with,
             )
             if name_condition:
                 field_conditions.append(name_condition)
@@ -473,6 +475,8 @@ class DeploymentFilter(GQLFilter):
             tags_condition = self.tags.build_query_condition(
                 contains_factory=DeploymentConditions.by_tag_contains,
                 equals_factory=DeploymentConditions.by_tag_equals,
+                starts_with_factory=DeploymentConditions.by_tag_starts_with,
+                ends_with_factory=DeploymentConditions.by_tag_ends_with,
             )
             if tags_condition:
                 field_conditions.append(tags_condition)
@@ -482,6 +486,8 @@ class DeploymentFilter(GQLFilter):
             url_condition = self.endpoint_url.build_query_condition(
                 contains_factory=DeploymentConditions.by_url_contains,
                 equals_factory=DeploymentConditions.by_url_equals,
+                starts_with_factory=DeploymentConditions.by_url_starts_with,
+                ends_with_factory=DeploymentConditions.by_url_ends_with,
             )
             if url_condition:
                 field_conditions.append(url_condition)

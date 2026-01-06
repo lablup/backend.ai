@@ -6,8 +6,9 @@ Mock-based unit tests for verifying orphan kernel cleanup logic.
 
 from __future__ import annotations
 
+from collections.abc import MutableMapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, MutableMapping, Protocol
+from typing import TYPE_CHECKING, Protocol
 from unittest.mock import AsyncMock, PropertyMock
 from uuid import uuid4
 

@@ -3,12 +3,13 @@ Tests for NotificationRepository functionality.
 Tests the repository layer with real database operations.
 """
 
+from __future__ import annotations
+
 import uuid
-from datetime import datetime
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.common.types import BinarySize
 from ai.backend.manager.data.notification import (
@@ -18,14 +19,32 @@ from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,
     NotificationRuleNotFound,
 )
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.notification import (
     NotificationChannelRow,
     NotificationChannelType,
     NotificationRuleRow,
     WebhookConfig,
 )
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import (
     PasswordHashAlgorithm,
     PasswordInfo,
@@ -34,6 +53,7 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.notification import NotificationRepository
@@ -49,6 +69,7 @@ from ai.backend.manager.repositories.notification.updaters import (
     NotificationChannelUpdaterSpec,
     NotificationRuleUpdaterSpec,
 )
+from ai.backend.testutils.db import with_tables
 
 
 class TestNotificationRepository:
@@ -57,21 +78,45 @@ class TestNotificationRepository:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine that auto-cleans notification data after each test"""
-        yield database_engine
-
-        # Cleanup all notification data after test
-        async with database_engine.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(NotificationRuleRow))
-            await db_sess.execute(sa.delete(NotificationChannelRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # Base rows in FK dependency order (parents before children)
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+                # Test-specific rows
+                NotificationChannelRow,
+                NotificationRuleRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -85,20 +130,15 @@ class TestNotificationRepository:
                 allowed_docker_registries=[],
             )
             db_sess.add(domain)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        try:
-            yield domain_name
-        finally:
-            # Cleanup
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
+        return domain_name
 
     @pytest.fixture
     async def test_resource_policy_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test resource policy and return policy name"""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
@@ -106,23 +146,14 @@ class TestNotificationRepository:
             policy = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
                 max_session_count_per_model_session=5,
                 max_customized_image_count=3,
             )
             db_sess.add(policy)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        try:
-            yield policy_name
-        finally:
-            # Cleanup
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_sess.execute(
-                    sa.delete(UserResourcePolicyRow).where(
-                        UserResourcePolicyRow.name == policy_name
-                    )
-                )
+        return policy_name
 
     @pytest.fixture
     async def test_user(
@@ -130,7 +161,7 @@ class TestNotificationRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_resource_policy_name: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test user and return user UUID"""
         user_uuid = uuid.uuid4()
 
@@ -155,24 +186,17 @@ class TestNotificationRepository:
                 resource_policy=test_resource_policy_name,
             )
             db_sess.add(user)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        try:
-            yield user_uuid
-        finally:
-            # Cleanup
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
+        return user_uuid
 
     @pytest.fixture
     async def sample_channel_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create sample notification channel directly in DB and return its ID"""
-        from datetime import datetime
-
         channel_id = uuid.uuid4()
         config = WebhookConfig(url="https://example.com/webhook", method="POST")
 
@@ -185,13 +209,13 @@ class TestNotificationRepository:
                 config=config.model_dump(),
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             db_sess.add(channel)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield channel_id
+        return channel_id
 
     @pytest.fixture
     async def sample_rule_id(
@@ -199,10 +223,8 @@ class TestNotificationRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_channel_id: uuid.UUID,
         test_user: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create sample notification rule directly in DB and return its ID"""
-        from datetime import datetime
-
         rule_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
@@ -215,22 +237,22 @@ class TestNotificationRepository:
                 message_template="Session {{ session_id }} started",
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             db_sess.add(rule)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield rule_id
+        return rule_id
 
     @pytest.fixture
     async def sample_channels_for_pagination(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> list[uuid.UUID]:
         """Create 25 sample channels for pagination testing"""
-        channel_ids = []
+        channel_ids: list[uuid.UUID] = []
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(25):
                 channel_id = uuid.uuid4()
@@ -243,23 +265,23 @@ class TestNotificationRepository:
                     config=config.model_dump(),
                     enabled=True,
                     created_by=test_user,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
+                    created_at=datetime.now(tz=UTC),
+                    updated_at=datetime.now(tz=UTC),
                 )
                 db_sess.add(channel)
                 channel_ids.append(channel_id)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield channel_ids
+        return channel_ids
 
     @pytest.fixture
     async def sample_channels_small(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> list[uuid.UUID]:
         """Create 5 sample channels for boundary testing"""
-        channel_ids = []
+        channel_ids: list[uuid.UUID] = []
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(5):
                 channel_id = uuid.uuid4()
@@ -272,23 +294,23 @@ class TestNotificationRepository:
                     config=config.model_dump(),
                     enabled=True,
                     created_by=test_user,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
+                    created_at=datetime.now(tz=UTC),
+                    updated_at=datetime.now(tz=UTC),
                 )
                 db_sess.add(channel)
                 channel_ids.append(channel_id)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield channel_ids
+        return channel_ids
 
     @pytest.fixture
     async def sample_channels_mixed_enabled(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> list[uuid.UUID]:
         """Create 20 sample channels (10 enabled, 10 disabled) for filter testing"""
-        channel_ids = []
+        channel_ids: list[uuid.UUID] = []
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(20):
                 channel_id = uuid.uuid4()
@@ -301,23 +323,23 @@ class TestNotificationRepository:
                     config=config.model_dump(),
                     enabled=(i % 2 == 0),  # Even indexes enabled
                     created_by=test_user,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
+                    created_at=datetime.now(tz=UTC),
+                    updated_at=datetime.now(tz=UTC),
                 )
                 db_sess.add(channel)
                 channel_ids.append(channel_id)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield channel_ids
+        return channel_ids
 
     @pytest.fixture
     async def sample_channels_medium(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> list[uuid.UUID]:
         """Create 15 sample channels for no-pagination testing"""
-        channel_ids = []
+        channel_ids: list[uuid.UUID] = []
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(15):
                 channel_id = uuid.uuid4()
@@ -330,23 +352,22 @@ class TestNotificationRepository:
                     config=config.model_dump(),
                     enabled=True,
                     created_by=test_user,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
+                    created_at=datetime.now(tz=UTC),
+                    updated_at=datetime.now(tz=UTC),
                 )
                 db_sess.add(channel)
                 channel_ids.append(channel_id)
-            await db_sess.flush()
+            await db_sess.commit()
 
-        yield channel_ids
+        return channel_ids
 
     @pytest.fixture
-    async def notification_repository(
+    def notification_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[NotificationRepository, None]:
+    ) -> NotificationRepository:
         """Create NotificationRepository instance with database"""
-        repo = NotificationRepository(db=db_with_cleanup)
-        yield repo
+        return NotificationRepository(db=db_with_cleanup)
 
     @pytest.mark.asyncio
     async def test_create_channel(
@@ -447,7 +468,6 @@ class TestNotificationRepository:
         test_user: uuid.UUID,
     ) -> None:
         """Test listing all channels"""
-        from datetime import datetime
 
         config = WebhookConfig(url="https://example.com/webhook")
 
@@ -461,8 +481,8 @@ class TestNotificationRepository:
                 config=config.model_dump(),
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             disabled_channel = NotificationChannelRow(
                 id=uuid.uuid4(),
@@ -472,8 +492,8 @@ class TestNotificationRepository:
                 config=config.model_dump(),
                 enabled=False,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             db_sess.add(enabled_channel)
             db_sess.add(disabled_channel)
@@ -545,7 +565,6 @@ class TestNotificationRepository:
         test_user: uuid.UUID,
     ) -> None:
         """Test retrieving rules matching a rule type"""
-        from datetime import datetime
 
         # Create rules directly in DB
         async with db_with_cleanup.begin_session() as db_sess:
@@ -559,8 +578,8 @@ class TestNotificationRepository:
                 message_template="Session started",
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             # Create non-matching rule
             non_matching_rule = NotificationRuleRow(
@@ -572,8 +591,8 @@ class TestNotificationRepository:
                 message_template="Session terminated",
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             # Create disabled matching rule
             disabled_rule = NotificationRuleRow(
@@ -585,8 +604,8 @@ class TestNotificationRepository:
                 message_template="Disabled",
                 enabled=False,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             db_sess.add(matching_rule)
             db_sess.add(non_matching_rule)
@@ -648,7 +667,6 @@ class TestNotificationRepository:
         test_user: uuid.UUID,
     ) -> None:
         """Test listing notification rules with filters"""
-        from datetime import datetime
 
         # Create rules directly in DB
         async with db_with_cleanup.begin_session() as db_sess:
@@ -662,8 +680,8 @@ class TestNotificationRepository:
                 message_template="Test",
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             # Create another session.started rule (disabled)
             rule2 = NotificationRuleRow(
@@ -675,8 +693,8 @@ class TestNotificationRepository:
                 message_template="Test",
                 enabled=False,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             # Create session.terminated rule (enabled)
             rule3 = NotificationRuleRow(
@@ -688,8 +706,8 @@ class TestNotificationRepository:
                 message_template="Test",
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             db_sess.add(rule1)
             db_sess.add(rule2)
@@ -739,7 +757,6 @@ class TestNotificationRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Test deleting a channel that has associated rules"""
-        from datetime import datetime
 
         config = WebhookConfig(url="https://example.com/webhook")
         channel_id = uuid.uuid4()
@@ -755,8 +772,8 @@ class TestNotificationRepository:
                 config=config.model_dump(),
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             rule = NotificationRuleRow(
                 id=rule_id,
@@ -767,8 +784,8 @@ class TestNotificationRepository:
                 message_template="Test",
                 enabled=True,
                 created_by=test_user,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=datetime.now(tz=UTC),
+                updated_at=datetime.now(tz=UTC),
             )
             db_sess.add(channel)
             db_sess.add(rule)

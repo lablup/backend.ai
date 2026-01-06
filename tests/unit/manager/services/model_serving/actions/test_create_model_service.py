@@ -21,8 +21,7 @@ from ai.backend.manager.services.model_serving.exceptions import InvalidAPIParam
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )
-
-from ...utils import ScenarioBase
+from ai.backend.testutils.scenario import ScenarioBase
 
 
 @pytest.fixture
@@ -96,12 +95,11 @@ def mock_check_endpoint_name_uniqueness(mocker, mock_repositories):
 
 @pytest.fixture
 def mock_create_endpoint_validated(mocker, mock_repositories):
-    mock = mocker.patch.object(
+    return mocker.patch.object(
         mock_repositories.repository,
         "create_endpoint_validated",
         new_callable=AsyncMock,
     )
-    return mock
 
 
 class TestCreateModelService:

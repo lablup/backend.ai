@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -32,7 +31,7 @@ class TestAgentRpcHealthChecker:
         default_response: Mapping[str, Any] = {
             "overall_healthy": True,
             "connectivity_checks": [],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         client.health = AsyncMock(return_value=default_response)
 
@@ -141,7 +140,7 @@ class TestAgentRpcHealthChecker:
     async def test_connection_timeout(self, mock_agent_client: AgentClient) -> None:
         """Test health check failure when RPC call times out."""
         # Configure mock to simulate timeout
-        mock_health = AsyncMock(side_effect=asyncio.TimeoutError())
+        mock_health = AsyncMock(side_effect=TimeoutError())
         mock_agent_client.health = mock_health  # type: ignore[method-assign]
 
         checker = AgentRpcHealthChecker(

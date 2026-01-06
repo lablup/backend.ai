@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import pytest
 import sqlalchemy as sa
@@ -13,23 +13,33 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.errors.resource import ProjectHasActiveEndpointsError
-from ai.backend.manager.models import (
-    DomainRow,
-    EndpointRow,
-    GroupRow,
-    ProjectResourcePolicyRow,
-    RoutingRow,
-    ScalingGroupRow,
-    SessionRow,
-    UserResourcePolicyRow,
-    UserRow,
-)
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.user import UserRole, UserStatus
+from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.group.admin_repository import AdminGroupRepository
+from ai.backend.testutils.db import with_tables
 
 
 class TestAdminGroupRepositoryDeleteEndpoints:
@@ -48,29 +58,42 @@ class TestAdminGroupRepositoryDeleteEndpoints:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database engine with cleanup after each test"""
-        yield database_engine
-
-        # Cleanup test data in correct order (respecting FK constraints)
-        async with database_engine.begin_session() as session:
-            # Delete in reverse dependency order: routings → sessions → endpoints → groups → users → policies → domains → scaling_groups
-            await session.execute(sa.delete(RoutingRow))
-            await session.execute(sa.delete(SessionRow))
-            await session.execute(sa.delete(EndpointRow))
-            await session.execute(sa.delete(GroupRow))
-            await session.execute(sa.delete(UserRow))
-            await session.execute(sa.delete(ProjectResourcePolicyRow))
-            await session.execute(sa.delete(UserResourcePolicyRow))
-            await session.execute(sa.delete(DomainRow))
-            await session.execute(sa.delete(ScalingGroupRow))
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents before children
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+            ],
+        ):
+            yield database_connection
 
     @pytest.fixture
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> str:
         """Create test domain"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -86,9 +109,9 @@ class TestAdminGroupRepositoryDeleteEndpoints:
                 integration_id=None,
             )
             session.add(domain)
-            await session.flush()
+            await session.commit()
 
-        yield domain_name
+        return domain_name
 
     @pytest.fixture
     async def test_user(
@@ -96,7 +119,7 @@ class TestAdminGroupRepositoryDeleteEndpoints:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: str,
         test_password_info: PasswordInfo,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test user"""
         user_uuid = uuid.uuid4()
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
@@ -128,16 +151,16 @@ class TestAdminGroupRepositoryDeleteEndpoints:
                 resource_policy=policy_name,
             )
             session.add(user)
-            await session.flush()
+            await session.commit()
 
-        yield user_uuid
+        return user_uuid
 
     @pytest.fixture
     async def test_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: str,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create test group"""
         group_id = uuid.uuid4()
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
@@ -166,9 +189,9 @@ class TestAdminGroupRepositoryDeleteEndpoints:
                 type=ProjectType.GENERAL,
             )
             session.add(group)
-            await session.flush()
+            await session.commit()
 
-        yield group_id
+        return group_id
 
     @pytest.fixture
     async def storage_manager_mock(self) -> StorageSessionManager:
@@ -198,7 +221,7 @@ class TestAdminGroupRepositoryDeleteEndpoints:
         test_domain: str,
         test_user: uuid.UUID,
         test_group: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+    ) -> list[uuid.UUID]:
         """Create two inactive endpoints with routing entries (no sessions)"""
         endpoint_ids = []
         sgroup_name = f"default-{uuid.uuid4().hex[:8]}"
@@ -250,9 +273,9 @@ class TestAdminGroupRepositoryDeleteEndpoints:
                 )
                 session.add(routing)
 
-            await session.flush()
+            await session.commit()
 
-        yield endpoint_ids
+        return endpoint_ids
 
     @pytest.fixture
     async def inactive_endpoint_with_session_and_routing(
@@ -261,7 +284,7 @@ class TestAdminGroupRepositoryDeleteEndpoints:
         test_domain: str,
         test_user: uuid.UUID,
         test_group: uuid.UUID,
-    ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
+    ) -> dict[str, uuid.UUID]:
         """Create one inactive endpoint with a session and routing entry"""
         endpoint_id = uuid.uuid4()
         session_id = uuid.uuid4()
@@ -330,9 +353,9 @@ class TestAdminGroupRepositoryDeleteEndpoints:
             )
             session.add(routing)
 
-            await session.flush()
+            await session.commit()
 
-        yield {"endpoint_id": endpoint_id, "session_id": session_id}
+        return {"endpoint_id": endpoint_id, "session_id": session_id}
 
     @pytest.fixture
     async def active_endpoint(
@@ -341,7 +364,7 @@ class TestAdminGroupRepositoryDeleteEndpoints:
         test_domain: str,
         test_user: uuid.UUID,
         test_group: uuid.UUID,
-    ) -> AsyncGenerator[uuid.UUID, None]:
+    ) -> uuid.UUID:
         """Create one active endpoint (lifecycle_stage=CREATED)"""
         endpoint_id = uuid.uuid4()
         image_id = uuid.uuid4()
@@ -378,9 +401,9 @@ class TestAdminGroupRepositoryDeleteEndpoints:
                 cluster_size=1,
             )
             session.add(endpoint)
-            await session.flush()
+            await session.commit()
 
-        yield endpoint_id
+        return endpoint_id
 
     @pytest.fixture
     async def multiple_endpoints_with_sessions(
@@ -389,7 +412,7 @@ class TestAdminGroupRepositoryDeleteEndpoints:
         test_domain: str,
         test_user: uuid.UUID,
         test_group: uuid.UUID,
-    ) -> AsyncGenerator[dict[str, list[uuid.UUID]], None]:
+    ) -> dict[str, list[uuid.UUID]]:
         """Create 3 inactive endpoints, each with a session and routing entry"""
         endpoint_ids = []
         session_ids = []
@@ -463,9 +486,9 @@ class TestAdminGroupRepositoryDeleteEndpoints:
                 )
                 session.add(routing)
 
-            await session.flush()
+            await session.commit()
 
-        yield {"endpoint_ids": endpoint_ids, "session_ids": session_ids}
+        return {"endpoint_ids": endpoint_ids, "session_ids": session_ids}
 
     # Test cases
 

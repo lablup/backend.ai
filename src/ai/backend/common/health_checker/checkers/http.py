@@ -2,13 +2,19 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from http import HTTPMethod
 
 import aiohttp
 
-from ..abc import StaticServiceHealthChecker
-from ..types import API, ComponentHealthStatus, ComponentId, ServiceGroup, ServiceHealth
+from ai.backend.common.health_checker.abc import StaticServiceHealthChecker
+from ai.backend.common.health_checker.types import (
+    API,
+    ComponentHealthStatus,
+    ComponentId,
+    ServiceGroup,
+    ServiceHealth,
+)
 
 
 class HttpHealthChecker(StaticServiceHealthChecker):
@@ -65,7 +71,7 @@ class HttpHealthChecker(StaticServiceHealthChecker):
         Returns:
             ServiceHealth containing status for the HTTP endpoint
         """
-        check_time = datetime.now(timezone.utc)
+        check_time = datetime.now(UTC)
 
         try:
             async with asyncio.timeout(self._timeout):
@@ -82,7 +88,7 @@ class HttpHealthChecker(StaticServiceHealthChecker):
                             last_checked_at=check_time,
                             error_message=None,
                         )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             status = ComponentHealthStatus(
                 is_healthy=False,
                 last_checked_at=check_time,

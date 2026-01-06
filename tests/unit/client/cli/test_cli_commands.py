@@ -21,7 +21,7 @@ def test_print_help_for_unknown_command(runner, cli_entrypoint):
 
 def test_config(runner, cli_entrypoint, monkeypatch, example_keypair, unused_tcp_port_factory):
     api_port = unused_tcp_port_factory()
-    api_url = "http://127.0.0.1:{}".format(api_port)
+    api_url = f"http://127.0.0.1:{api_port}"
     set_config(None)
     monkeypatch.setenv("BACKEND_ACCESS_KEY", example_keypair[0])
     monkeypatch.setenv("BACKEND_SECRET_KEY", example_keypair[1])
@@ -65,7 +65,7 @@ def test_run_file_or_code_required(
     runner, cli_entrypoint, monkeypatch, example_keypair, unused_tcp_port_factory
 ):
     api_port = unused_tcp_port_factory()
-    api_url = "http://127.0.0.1:{}".format(api_port)
+    api_url = f"http://127.0.0.1:{api_port}"
     monkeypatch.setenv("BACKEND_ACCESS_KEY", example_keypair[0])
     monkeypatch.setenv("BACKEND_SECRET_KEY", example_keypair[1])
     monkeypatch.setenv("BACKEND_ENDPOINT", api_url)

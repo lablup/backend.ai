@@ -61,9 +61,9 @@ from ai.backend.logging import BraceStyleAdapter
 from .types import HostPortPair, QueueSentinel
 
 __all__ = (
+    "AsyncEtcd",
     "quote",
     "unquote",
-    "AsyncEtcd",
 )
 
 Event = namedtuple("Event", "key event value")
@@ -331,17 +331,14 @@ class AsyncEtcd(AbstractKVStore):
         await self.get("_")
 
     def _mangle_key(self, k: str) -> str:
-        if k.startswith("/"):
-            k = k[1:]
+        k = k.removeprefix("/")
         return f"/sorna/{self.ns}/{k}"
 
     def _demangle_key(self, k: bytes | str) -> str:
         if isinstance(k, bytes):
             k = k.decode(self.encoding)
         prefix = f"/sorna/{self.ns}/"
-        if k.startswith(prefix):
-            k = k[len(prefix) :]
-        return k
+        return k.removeprefix(prefix)
 
     def _merge_scope_prefix_map(
         self,
@@ -578,7 +575,7 @@ class AsyncEtcd(AbstractKVStore):
 
         configs = [
             make_dict_from_pairs(f"{_slash(scope_prefix)}{key_prefix}", pairs, "/")
-            for scope_prefix, pairs in zip(scope_prefixes, pair_sets)
+            for scope_prefix, pairs in zip(scope_prefixes, pair_sets, strict=True)
         ]
         return ChainMap(*configs)
 
@@ -673,7 +670,7 @@ class AsyncEtcd(AbstractKVStore):
                     if wait_timeout is not None:
                         try:
                             ev = await asyncio.wait_for(iterator.__anext__(), wait_timeout)
-                        except asyncio.TimeoutError:
+                        except TimeoutError:
                             pass
                     yield Event(
                         bytes(ev.key).decode(self.encoding)[scope_prefix_len:],

@@ -1,7 +1,7 @@
 import asyncio
 import glob
+from collections.abc import AsyncIterable, Mapping
 from pathlib import Path
-from typing import AsyncIterable, Mapping
 
 
 class RngdAPI:

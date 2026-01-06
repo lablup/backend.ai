@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import click
 import graphene
 
-from ..models.gql import Mutation, Query
+from ai.backend.manager.api.gql_legacy.schema import Mutation, Query
 
 if TYPE_CHECKING:
     from .context import CLIContext

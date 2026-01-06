@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from typing import Sequence, Tuple
+from collections.abc import Sequence
 
 from aiohttp import web
 
@@ -21,7 +21,7 @@ class WebappPlugin(AbstractPlugin, metaclass=ABCMeta):
     async def create_app(
         self,
         cors_options: CORSOptions,
-    ) -> Tuple[web.Application, Sequence[WebMiddleware]]:
+    ) -> tuple[web.Application, Sequence[WebMiddleware]]:
         pass
 
 

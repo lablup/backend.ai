@@ -17,7 +17,6 @@ from typing import (
 import attr
 from graphql import UndefinedType
 from pydantic import AliasChoices, BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from strawberry.types.unset import UnsetType
 
 from ai.backend.common.types import MountPermission, MountTypes
@@ -26,11 +25,6 @@ if TYPE_CHECKING:
     from ai.backend.common.lock import AbstractDistributedLock
 
     from .defs import LockID
-    from .models import SessionRow
-
-
-class SessionGetter(Protocol):
-    def __call__(self, *, db_session: SASession) -> SessionRow: ...
 
 
 # Sentinel is a special object that indicates a special status instead of a value
@@ -106,7 +100,7 @@ class TriState(Generic[TVal]):
     _state: _TriStateEnum
     _value: Optional[TVal]
 
-    def __init__(self, state: _TriStateEnum, value: Optional[TVal]):
+    def __init__(self, state: _TriStateEnum, value: Optional[TVal]) -> None:
         """
         Initialize a TriState object with the given state and value.
         Do not call this constructor directly. Use the class methods instead.
@@ -118,7 +112,7 @@ class TriState(Generic[TVal]):
     def from_graphql(cls, value: Optional[TVal] | UndefinedType) -> TriState[TVal]:
         if value is None:
             return cls.nullify()
-        if isinstance(value, UndefinedType) or isinstance(value, UnsetType):
+        if isinstance(value, (UndefinedType, UnsetType)):
             return cls.nop()
         return cls.update(value)
 
@@ -179,7 +173,7 @@ class OptionalState(Generic[TVal]):
     _state: _TriStateEnum
     _value: Optional[TVal]
 
-    def __init__(self, state: _TriStateEnum, value: Optional[TVal]):
+    def __init__(self, state: _TriStateEnum, value: Optional[TVal]) -> None:
         if state == _TriStateEnum.NULLIFY:
             raise ValueError("OptionalState cannot be NULLIFY")
         self._state = state
@@ -187,7 +181,7 @@ class OptionalState(Generic[TVal]):
 
     @classmethod
     def from_graphql(cls, value: Optional[TVal] | UndefinedType | UnsetType) -> OptionalState[TVal]:
-        if isinstance(value, UndefinedType) or isinstance(value, UnsetType):
+        if isinstance(value, (UndefinedType, UnsetType)):
             return OptionalState.nop()
         if value is None:
             raise ValueError("OptionalState cannot be NULLIFY")

@@ -18,8 +18,7 @@ from ai.backend.manager.models.vfolder import (
 from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountPermission
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-
-from ..actions.invite import (
+from ai.backend.manager.services.vfolder.actions.invite import (
     AcceptInvitationAction,
     AcceptInvitationActionResult,
     InviteVFolderAction,
@@ -37,7 +36,7 @@ from ..actions.invite import (
     UpdateInvitedVFolderMountPermissionAction,
     UpdateInvitedVFolderMountPermissionActionResult,
 )
-from ..types import VFolderInvitationInfo
+from ai.backend.manager.services.vfolder.types import VFolderInvitationInfo
 
 # TODO: Detach privilege check from the service.
 #       The service should only handle the business logic.
@@ -184,7 +183,7 @@ class VFolderInviteService:
             # Update invitation state
             await self._vfolder_repository.update_invitation_state(action.invitation_id, state)
 
-        except (asyncio.CancelledError, asyncio.TimeoutError):
+        except (TimeoutError, asyncio.CancelledError):
             raise
         except Exception as e:
             if not isinstance(e, (VFolderInvitationNotFound, VFolderNotFound, Forbidden)):

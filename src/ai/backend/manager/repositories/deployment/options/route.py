@@ -94,19 +94,16 @@ class RouteOrders:
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return RoutingRow.created_at.asc()
-        else:
-            return RoutingRow.created_at.desc()
+        return RoutingRow.created_at.desc()
 
     @staticmethod
     def status(ascending: bool = True) -> QueryOrder:
         if ascending:
             return RoutingRow.status.asc()
-        else:
-            return RoutingRow.status.desc()
+        return RoutingRow.status.desc()
 
     @staticmethod
     def traffic_ratio(ascending: bool = True) -> QueryOrder:
         if ascending:
             return RoutingRow.traffic_ratio.asc()
-        else:
-            return RoutingRow.traffic_ratio.desc()
+        return RoutingRow.traffic_ratio.desc()

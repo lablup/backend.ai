@@ -5,7 +5,7 @@ from .types import (
 )
 
 __all__ = (
-    "AppConfigScopeType",
     "AppConfigData",
+    "AppConfigScopeType",
     "MergedAppConfig",
 )

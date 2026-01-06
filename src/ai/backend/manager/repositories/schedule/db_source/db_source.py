@@ -2,8 +2,9 @@
 
 import logging
 from collections import defaultdict
+from collections.abc import Mapping
 from datetime import datetime
-from typing import Mapping, Optional, cast
+from typing import Optional, cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -26,23 +27,42 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
-from ai.backend.manager.models import (
-    AgentRow,
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_policy import (
     DefaultForUnspecified,
-    DomainRow,
-    GroupRow,
-    KernelRow,
     KeyPairResourcePolicyRow,
-    KeyPairRow,
-    ScalingGroupRow,
-    SessionDependencyRow,
-    SessionRow,
-    UserRow,
 )
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_merge,
 )
+from ai.backend.manager.repositories.schedule.types.agent import AgentMeta
+from ai.backend.manager.repositories.schedule.types.allocation import (
+    AllocationBatch,
+    SchedulingFailure,
+    SessionAllocation,
+)
+from ai.backend.manager.repositories.schedule.types.base import SchedulingSpec
+from ai.backend.manager.repositories.schedule.types.scaling_group import ScalingGroupMeta
+from ai.backend.manager.repositories.schedule.types.scheduling import SchedulingData
+from ai.backend.manager.repositories.schedule.types.session import (
+    KernelData,
+    MarkTerminatingResult,
+    PendingSessionData,
+    PendingSessions,
+    SessionTerminationResult,
+    SweptSessionInfo,
+    TerminatingKernelData,
+    TerminatingSessionData,
+)
+from ai.backend.manager.repositories.schedule.types.snapshot import ResourcePolicies, SnapshotData
 from ai.backend.manager.sokovan.scheduler.types import (
     AgentOccupancy,
     KeypairOccupancy,
@@ -53,26 +73,6 @@ from ai.backend.manager.sokovan.scheduler.types import (
     UserResourcePolicy,
 )
 
-from ..types.agent import AgentMeta
-from ..types.allocation import (
-    AllocationBatch,
-    SchedulingFailure,
-    SessionAllocation,
-)
-from ..types.base import SchedulingSpec
-from ..types.scaling_group import ScalingGroupMeta
-from ..types.scheduling import SchedulingData
-from ..types.session import (
-    KernelData,
-    MarkTerminatingResult,
-    PendingSessionData,
-    PendingSessions,
-    SessionTerminationResult,
-    SweptSessionInfo,
-    TerminatingKernelData,
-    TerminatingSessionData,
-)
-from ..types.snapshot import ResourcePolicies, SnapshotData
 from .types import SessionRowCache
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -99,7 +99,7 @@ class ScheduleDBSource:
 
     _db: ExtendedAsyncSAEngine
 
-    def __init__(self, db: ExtendedAsyncSAEngine):
+    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
     async def get_scheduling_data(self, scaling_group: str, spec: SchedulingSpec) -> SchedulingData:
