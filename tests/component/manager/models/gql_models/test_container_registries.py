@@ -53,7 +53,7 @@ def get_graphquery_context(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST)
+@pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST, indirect=True)
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -151,7 +151,7 @@ async def test_harbor_create_project_quota(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST)
+@pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST, indirect=True)
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -249,7 +249,7 @@ async def test_harbor_update_project_quota(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST)
+@pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST, indirect=True)
 @pytest.mark.parametrize(
     "test_case",
     [

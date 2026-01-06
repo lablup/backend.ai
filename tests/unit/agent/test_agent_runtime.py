@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+# Explicitly import to ensure Pants includes this module in the test build
+import ai.backend.agent.dummy  # noqa: F401
 from ai.backend.agent.errors import AgentIdNotFoundError
 from ai.backend.agent.runtime import AgentRuntime
 from ai.backend.common.types import AgentId
