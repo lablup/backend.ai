@@ -5,6 +5,7 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
+from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.data.notification import NotificationChannelType, NotificationRuleType
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
@@ -21,20 +22,54 @@ class NotificationChannelConditions:
         return inner
 
     @staticmethod
-    def by_name_contains(name: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return NotificationChannelRow.name.ilike(f"%{name}%")
-            return NotificationChannelRow.name.like(f"%{name}%")
+            if spec.case_insensitive:
+                condition = NotificationChannelRow.name.ilike(f"%{spec.value}%")
+            else:
+                condition = NotificationChannelRow.name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_name_equals(name: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(NotificationChannelRow.name) == name.lower()
-            return NotificationChannelRow.name == name
+            if spec.case_insensitive:
+                condition = sa.func.lower(NotificationChannelRow.name) == spec.value.lower()
+            else:
+                condition = NotificationChannelRow.name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = NotificationChannelRow.name.ilike(f"{spec.value}%")
+            else:
+                condition = NotificationChannelRow.name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = NotificationChannelRow.name.ilike(f"%{spec.value}")
+            else:
+                condition = NotificationChannelRow.name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -122,20 +157,54 @@ class NotificationRuleConditions:
         return inner
 
     @staticmethod
-    def by_name_contains(name: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return NotificationRuleRow.name.ilike(f"%{name}%")
-            return NotificationRuleRow.name.like(f"%{name}%")
+            if spec.case_insensitive:
+                condition = NotificationRuleRow.name.ilike(f"%{spec.value}%")
+            else:
+                condition = NotificationRuleRow.name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_name_equals(name: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(NotificationRuleRow.name) == name.lower()
-            return NotificationRuleRow.name == name
+            if spec.case_insensitive:
+                condition = sa.func.lower(NotificationRuleRow.name) == spec.value.lower()
+            else:
+                condition = NotificationRuleRow.name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = NotificationRuleRow.name.ilike(f"{spec.value}%")
+            else:
+                condition = NotificationRuleRow.name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = NotificationRuleRow.name.ilike(f"%{spec.value}")
+            else:
+                condition = NotificationRuleRow.name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 

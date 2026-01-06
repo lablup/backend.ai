@@ -16,11 +16,9 @@ Backend.AI Enhancement Proposals
 ## Status Lifecycle
 
 ```
-Draft → Accepted → Implemented
-          ↓
-       Rejected
-          ↓
-       Superseded
+Draft ──────→ Accepted ──→ Implemented
+  │              │
+  └─→ Rejected ←─┘
 ```
 
 | Status | Description |
@@ -28,8 +26,7 @@ Draft → Accepted → Implemented
 | Draft | Initial proposal, under discussion |
 | Accepted | Approved for implementation, target version assigned |
 | Implemented | Implementation complete, actual version recorded |
-| Rejected | Proposal was rejected |
-| Superseded | Replaced by another BEP |
+| Rejected | Proposal was rejected or cancelled |
 
 ### Status Transition Rules
 
@@ -37,10 +34,8 @@ Draft → Accepted → Implemented
 |------|-----|------|------------------|
 | Draft | Accepted | Proposal approved by maintainers | Set `Target-Version` |
 | Draft | Rejected | Proposal rejected after discussion | Document rejection reason |
-| Draft | Superseded | Replaced by another BEP | Link to new BEP |
 | Accepted | Implemented | Implementation merged to main | Set `Implemented-Version` |
 | Accepted | Rejected | Implementation cancelled | Document cancellation reason |
-| Accepted | Superseded | Replaced by another BEP | Link to new BEP |
 
 ## Version Fields
 
@@ -113,6 +108,7 @@ BEP numbers start from 1000.
 | [1018](BEP-1018-local-cache-for-model-vfolders.md) | Local Cache for Model VFolders | Joongi Kim | Draft |
 | [1019](BEP-1019-minio-artifact-registry-storage.md) | MinIO Artifact Registry Storage | Gyubong Lee | Accepted |
 | 1020 | VFolder Destination Support for Artifact Import | Gyubong Lee | Draft |
+| [1021](BEP-1021-gql-string-filter-enhancement.md) | GQL StringFilter Enhancement | Hyeokjin Kim | Implemented |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
@@ -132,20 +128,3 @@ proposals/
 │   └── refs/
 └── BEP-1018-simple-proposal.md         # No supporting files needed
 ```
-
-## Rules for PR title
-
-Each PR either creates or updates the BEP documents with the squash-merge strategy.
-Please put the high-level summary of the update in the PR title as they will become the commit message of the main branch.
-Individual commits inside each PR may be freely titled.
-
-Examples:
-
-* "BEP-9999 (new): A shiny new feature" (with the document title)
-* "BEP-9999 (update): Change the implementation plan" (with the summary of change)
-* "BEP-9999 (update): Remove unnecessary API changes" (with the summary of change)
-* "BEP-9999 (accept): Planned for 26.2.0" (with the target version)
-* "BEP-9999 (reject): Decided to drop because ..." (with the short description of rejection)
-* "BEP-9999 (revise): Update integration with ZZZ subsystem" (with the summary of revision)
-* "BEP-9999 (implement): Completed in 26.2.1" (with the actual version)
-* "BEP-9999 (supersede): Replaced by BEP-XXXX" (with the new BEP number)

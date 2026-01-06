@@ -195,6 +195,8 @@ class NotificationChannelFilter(GQLFilter):
             name_condition = self.name.build_query_condition(
                 contains_factory=NotificationChannelConditions.by_name_contains,
                 equals_factory=NotificationChannelConditions.by_name_equals,
+                starts_with_factory=NotificationChannelConditions.by_name_starts_with,
+                ends_with_factory=NotificationChannelConditions.by_name_ends_with,
             )
             if name_condition:
                 field_conditions.append(name_condition)
@@ -282,6 +284,8 @@ class NotificationRuleFilter(GQLFilter):
             name_condition = self.name.build_query_condition(
                 contains_factory=NotificationRuleConditions.by_name_contains,
                 equals_factory=NotificationRuleConditions.by_name_equals,
+                starts_with_factory=NotificationRuleConditions.by_name_starts_with,
+                ends_with_factory=NotificationRuleConditions.by_name_ends_with,
             )
             if name_condition:
                 field_conditions.append(name_condition)

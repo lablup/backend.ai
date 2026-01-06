@@ -125,8 +125,10 @@ class RoleAdapter(BaseFilterAdapter):
         if filter.name is not None:
             condition = self.convert_string_filter(
                 filter.name,
-                equals_fn=RoleConditions.by_name_equals,
-                contains_fn=RoleConditions.by_name_contains,
+                contains_factory=RoleConditions.by_name_contains,
+                equals_factory=RoleConditions.by_name_equals,
+                starts_with_factory=RoleConditions.by_name_starts_with,
+                ends_with_factory=RoleConditions.by_name_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)

@@ -188,6 +188,8 @@ class ArtifactFilter(GQLFilter):
             name_condition = self.name.build_query_condition(
                 contains_factory=ArtifactConditions.by_name_contains,
                 equals_factory=ArtifactConditions.by_name_equals,
+                starts_with_factory=ArtifactConditions.by_name_starts_with,
+                ends_with_factory=ArtifactConditions.by_name_ends_with,
             )
             if name_condition:
                 field_conditions.append(name_condition)
@@ -197,6 +199,8 @@ class ArtifactFilter(GQLFilter):
             registry_condition = self.registry.build_query_condition(
                 contains_factory=ArtifactConditions.by_registry_contains,
                 equals_factory=ArtifactConditions.by_registry_equals,
+                starts_with_factory=ArtifactConditions.by_registry_starts_with,
+                ends_with_factory=ArtifactConditions.by_registry_ends_with,
             )
             if registry_condition:
                 field_conditions.append(registry_condition)
@@ -206,6 +210,8 @@ class ArtifactFilter(GQLFilter):
             source_condition = self.source.build_query_condition(
                 contains_factory=ArtifactConditions.by_source_contains,
                 equals_factory=ArtifactConditions.by_source_equals,
+                starts_with_factory=ArtifactConditions.by_source_starts_with,
+                ends_with_factory=ArtifactConditions.by_source_ends_with,
             )
             if source_condition:
                 field_conditions.append(source_condition)
@@ -361,6 +367,8 @@ class ArtifactRevisionFilter(GQLFilter):
             version_condition = self.version.build_query_condition(
                 contains_factory=ArtifactRevisionConditions.by_version_contains,
                 equals_factory=ArtifactRevisionConditions.by_version_equals,
+                starts_with_factory=ArtifactRevisionConditions.by_version_starts_with,
+                ends_with_factory=ArtifactRevisionConditions.by_version_ends_with,
             )
             if version_condition:
                 field_conditions.append(version_condition)
