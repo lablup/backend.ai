@@ -4,18 +4,16 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, override
+from typing import override
 
 from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.models.audit_log import AuditLogRow
 from ai.backend.manager.repositories.base import CreatorSpec
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.audit_log import AuditLogRow
 
 __all__ = ("AuditLogCreatorSpec",)
 
 
-class AuditLogCreatorSpec(CreatorSpec["AuditLogRow"]):
+class AuditLogCreatorSpec(CreatorSpec[AuditLogRow]):
     """Creator spec for creating an audit log entry."""
 
     def __init__(
@@ -45,8 +43,6 @@ class AuditLogCreatorSpec(CreatorSpec["AuditLogRow"]):
 
     @override
     def build_row(self) -> AuditLogRow:
-        from ai.backend.manager.models.audit_log import AuditLogRow
-
         return AuditLogRow(
             action_id=self._action_id,
             entity_type=self._entity_type,

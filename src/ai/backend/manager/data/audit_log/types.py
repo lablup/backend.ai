@@ -16,7 +16,7 @@ class AuditLogData:
     created_at: datetime
     description: str
     status: OperationStatus
-    entity_id: str | None = None
-    request_id: str | None = None
-    triggered_by: str | None = None
-    duration: timedelta | None = None
+    entity_id: str | None
+    request_id: str | None
+    triggered_by: str | None
+    duration: timedelta | None
