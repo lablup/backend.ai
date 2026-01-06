@@ -113,6 +113,7 @@ BEP numbers start from 1000.
 | [1018](BEP-1018-local-cache-for-model-vfolders.md) | Local Cache for Model VFolders | Joongi Kim | Draft |
 | [1019](BEP-1019-minio-artifact-registry-storage.md) | MinIO Artifact Registry Storage | Gyubong Lee | Accepted |
 | 1020 | VFolder Destination Support for Artifact Import | Gyubong Lee | Draft |
+| [1021](BEP-1021-gql-string-filter-enhancement.md) | GQL StringFilter Enhancement | Hyeokjin Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
