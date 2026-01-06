@@ -18,13 +18,17 @@ from pydantic import (
 )
 
 from ai.backend.common.config import BaseConfigSchema
+from ai.backend.common.configs import (
+    EtcdConfig,
+    OTELConfig,
+    PyroscopeConfig,
+    ServiceDiscoveryConfig,
+)
 from ai.backend.common.configs.jwt import SharedJWTConfig
 from ai.backend.common.configs.redis import RedisConfig
-from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     CommaSeparatedStrList,
-    HostPortPair,
 )
 from ai.backend.logging.config import LoggingConfig
 
@@ -834,59 +838,6 @@ class APIConfig(BaseConfigSchema):
     )
 
 
-class EtcdConfig(BaseConfigSchema):
-    namespace: str = Field(
-        default="ETCD_NAMESPACE",
-        description="""
-        Namespace prefix for etcd keys used by Backend.AI.
-        Allows multiple Backend.AI clusters to share the same etcd cluster.
-        All Backend.AI related keys will be stored under this namespace.
-        """,
-        examples=["local", "backend"],
-    )
-    addr: HostPortPair | list[HostPortPair] = Field(
-        default=HostPortPair(host="127.0.0.1", port=2379),
-        description="""
-        Network address of the etcd server.
-        Default is the standard etcd port on localhost.
-        In production, should point to one or more etcd instance endpoint(s).
-        """,
-        examples=[
-            {"host": "127.0.0.1", "port": 2379},  # single endpoint
-            [
-                {"host": "127.0.0.4", "port": 2379},
-                {"host": "127.0.0.5", "port": 2379},
-            ],  # multiple endpoints
-        ],
-    )
-    user: Optional[str] = Field(
-        default=None,
-        description="""
-        Username for authenticating with etcd.
-        Optional if etcd doesn't require authentication.
-        Should be set along with password for secure deployments.
-        """,
-        examples=["backend", "manager"],
-    )
-    password: Optional[str] = Field(
-        default=None,
-        description="""
-        Password for authenticating with etcd.
-        Optional if etcd doesn't require authentication.
-        Can be a direct password or environment variable reference.
-        """,
-        examples=["develove", "ETCD_PASSWORD"],
-    )
-
-    def to_dataclass(self) -> EtcdConfigData:
-        return EtcdConfigData(
-            namespace=self.namespace,
-            addrs=self.addr if isinstance(self.addr, list) else [self.addr],
-            user=self.user,
-            password=self.password,
-        )
-
-
 class RedisHelperConfig(BaseConfigSchema):
     socket_timeout: float = Field(
         default=5.0,
@@ -1064,40 +1015,6 @@ class WebServerConfig(BaseConfigSchema):
     )
 
 
-class LogLevel(enum.StrEnum):
-    CRITICAL = "CRITICAL"
-    ERROR = "ERROR"
-    WARNING = "WARNING"
-    INFO = "INFO"
-    DEBUG = "DEBUG"
-
-
-class OTELConfig(BaseConfigSchema):
-    enabled: bool = Field(
-        default=False,
-        description="""
-        Whether to enable OpenTelemetry.
-        """,
-        examples=[True, False],
-    )
-    log_level: LogLevel = Field(
-        default=LogLevel.INFO,
-        description="""
-        OpenTelemetry log level.
-        """,
-        examples=["INFO", "DEBUG"],
-        validation_alias=AliasChoices("log_level", "log-level"),
-        serialization_alias="log-level",
-    )
-    endpoint: str = Field(
-        default="http://127.0.0.1:4317",
-        description="""
-        OpenTelemetry endpoint.
-        """,
-        examples=["http://127.0.0.1:4317"],
-    )
-
-
 class ApolloRouterConfig(BaseConfigSchema):
     enabled: bool = Field(
         default=False,
@@ -1204,10 +1121,33 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         """,
     )
     otel: OTELConfig = Field(
-        default_factory=OTELConfig,
+        default_factory=OTELConfig,  # type: ignore[arg-type]
         description="""
         OpenTelemetry configuration.
         """,
+    )
+    etcd: EtcdConfig = Field(
+        default_factory=EtcdConfig,  # type: ignore[arg-type]
+        description="""
+        Etcd configuration settings.
+        Used for distributed coordination.
+        """,
+    )
+    pyroscope: PyroscopeConfig = Field(
+        default_factory=PyroscopeConfig,  # type: ignore[arg-type]
+        description="""
+        Pyroscope profiling configuration.
+        Controls integration with the Pyroscope performance profiling tool.
+        """,
+    )
+    service_discovery: ServiceDiscoveryConfig = Field(
+        default_factory=ServiceDiscoveryConfig,  # type: ignore[arg-type]
+        description="""
+        Service discovery configuration.
+        Controls how services are discovered and connected.
+        """,
+        validation_alias=AliasChoices("service-discovery", "service_discovery"),
+        serialization_alias="service-discovery",
     )
     apollo_router: ApolloRouterConfig = Field(
         default_factory=ApolloRouterConfig,

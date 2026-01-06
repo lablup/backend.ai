@@ -4,14 +4,14 @@ from typing import Any, Self
 
 from pydantic import BaseModel, Field
 
+from ai.backend.common.configs.etcd import EtcdConfig
+from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.logging.config import LoggingConfig
 from ai.backend.logging.types import LogLevel
 from ai.backend.manager.config.unified import (
     DatabaseConfig,
     DebugConfig,
-    EtcdConfig,
     ManagerConfig,
-    PyroscopeConfig,
 )
 
 from .constant import MANAGER_LOCAL_CFG_OVERRIDE_ENVS
@@ -32,7 +32,7 @@ class BootstrapConfig(BaseModel):
         """,
     )
     etcd: EtcdConfig = Field(
-        default_factory=EtcdConfig,
+        default_factory=EtcdConfig,  # type: ignore[arg-type]
         description="""
         Etcd configuration settings.
         Used for distributed coordination between manager instances.
@@ -56,7 +56,7 @@ class BootstrapConfig(BaseModel):
         """,
     )
     pyroscope: PyroscopeConfig = Field(
-        default_factory=PyroscopeConfig,
+        default_factory=PyroscopeConfig,  # type: ignore[arg-type]
         description="""
         Pyroscope profiling configuration.
         Controls integration with the Pyroscope performance profiling tool.
