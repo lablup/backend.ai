@@ -84,7 +84,11 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionEnqueueData,
 )
 from ai.backend.manager.repositories.scheduler.types.snapshot import ResourcePolicies, SnapshotData
-from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
+from ai.backend.manager.sokovan.scheduler.results import (
+    HandlerKernelData,
+    HandlerSessionData,
+    ScheduledSessionData,
+)
 from ai.backend.manager.sokovan.scheduler.types import (
     AgentOccupancy,
     AllocationBatch,
@@ -3532,3 +3536,148 @@ class ScheduleDBSource:
                 total_free_slots=total_free_slots,
                 total_capacity_slots=total_capacity_slots,
             )
+
+    # =========================================================================
+    # Handler-specific methods for SessionLifecycleHandler pattern
+    # =========================================================================
+
+    async def fetch_sessions_for_handler(
+        self,
+        scaling_group: str,
+        session_statuses: list[SessionStatus],
+        kernel_statuses: list[KernelStatus],
+    ) -> list[HandlerSessionData]:
+        """Fetch sessions for handler execution based on status filters.
+
+        Args:
+            scaling_group: The scaling group to filter by
+            session_statuses: Session statuses to include
+            kernel_statuses: If non-empty, only include sessions where ALL kernels
+                           match these statuses. If empty, include sessions regardless
+                           of kernel status.
+
+        Returns:
+            List of HandlerSessionData with kernel information
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            stmt = (
+                sa.select(SessionRow)
+                .where(
+                    SessionRow.scaling_group_name == scaling_group,
+                    SessionRow.status.in_(session_statuses),
+                )
+                .options(selectinload(SessionRow.kernels))
+            )
+            result = await db_sess.execute(stmt)
+            sessions = result.scalars().all()
+
+            handler_sessions: list[HandlerSessionData] = []
+            for session in sessions:
+                # If kernel_statuses is specified, check if all kernels match
+                if kernel_statuses:
+                    if not session.kernels:
+                        continue
+                    all_match = all(kernel.status in kernel_statuses for kernel in session.kernels)
+                    if not all_match:
+                        continue
+
+                # Build kernel data list
+                kernel_data = [
+                    HandlerKernelData(
+                        kernel_id=kernel.id,
+                        agent_id=kernel.agent,
+                        status=kernel.status,
+                        container_id=kernel.container_id,
+                        occupied_slots=kernel.occupied_slots,
+                    )
+                    for kernel in session.kernels
+                ]
+
+                handler_sessions.append(
+                    HandlerSessionData(
+                        session_id=session.id,
+                        creation_id=session.creation_id,
+                        access_key=session.access_key,
+                        status=session.status,
+                        scaling_group=session.scaling_group_name,
+                        session_type=session.session_type,
+                        status_info=session.status_info,
+                        kernels=kernel_data,
+                    )
+                )
+
+            return handler_sessions
+
+    async def update_sessions_status_bulk(
+        self,
+        session_ids: list[SessionId],
+        from_statuses: list[SessionStatus],
+        to_status: SessionStatus,
+        reason: Optional[str] = None,
+    ) -> int:
+        """Update session statuses in bulk.
+
+        Args:
+            session_ids: List of session IDs to update
+            from_statuses: Only update sessions currently in these statuses (safety check)
+            to_status: The new status to set
+            reason: Optional reason to set in status_info
+
+        Returns:
+            Number of rows updated
+        """
+        if not session_ids:
+            return 0
+
+        async with self._begin_session_read_committed() as db_sess:
+            values: dict[str, SessionStatus | str] = {"status": to_status}
+            if reason is not None:
+                values["status_info"] = reason
+
+            stmt = (
+                sa.update(SessionRow.__table__)
+                .where(
+                    SessionRow.id.in_(session_ids),
+                    SessionRow.status.in_(from_statuses),
+                )
+                .values(**values)
+            )
+            result = await db_sess.execute(stmt)
+            return result.rowcount
+
+    async def update_kernels_status_bulk(
+        self,
+        session_ids: list[SessionId],
+        from_statuses: list[KernelStatus],
+        to_status: KernelStatus,
+        reason: Optional[str] = None,
+    ) -> int:
+        """Update kernel statuses for sessions in bulk.
+
+        Args:
+            session_ids: List of session IDs whose kernels to update
+            from_statuses: Only update kernels currently in these statuses
+            to_status: The new status to set
+            reason: Optional reason to set in status_info
+
+        Returns:
+            Number of rows updated
+        """
+        if not session_ids:
+            return 0
+
+        async with self._begin_session_read_committed() as db_sess:
+            values: dict[str, KernelStatus | str] = {"status": to_status}
+            if reason is not None:
+                values["status_info"] = reason
+
+            stmt = (
+                sa.update(KernelRow.__table__)
+                .where(
+                    KernelRow.session_id.in_(session_ids),
+                    KernelRow.status.in_(from_statuses),
+                )
+                .values(**values)
+            )
+            result = await db_sess.execute(stmt)
+            return result.rowcount

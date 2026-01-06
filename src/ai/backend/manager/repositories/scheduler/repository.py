@@ -29,7 +29,7 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
+from ai.backend.manager.sokovan.scheduler.results import HandlerSessionData, ScheduledSessionData
 from ai.backend.manager.sokovan.scheduler.types import (
     AllocationBatch,
     KernelCreationInfo,
@@ -692,3 +692,85 @@ class SchedulerRepository:
             log.warning("Failed to update total resource slots cache: {}", e)
 
         return total_resource_data
+
+    # =========================================================================
+    # Handler-specific methods for SessionLifecycleHandler pattern
+    # =========================================================================
+
+    @scheduler_repository_resilience.apply()
+    async def get_sessions_for_handler(
+        self,
+        scaling_group: str,
+        session_statuses: list[SessionStatus],
+        kernel_statuses: list[KernelStatus],
+    ) -> list[HandlerSessionData]:
+        """Get sessions for handler execution based on status filters.
+
+        This method is used by SessionLifecycleHandler implementations.
+        The coordinator calls this to query sessions before passing to handlers.
+
+        Args:
+            scaling_group: The scaling group to filter by (first parameter for consistency)
+            session_statuses: Session statuses to include
+            kernel_statuses: Kernel statuses to filter by. If non-empty, only includes
+                           sessions where ALL kernels match. If empty, includes all
+                           sessions regardless of kernel status.
+
+        Returns:
+            List of HandlerSessionData with kernel information
+        """
+        return await self._db_source.fetch_sessions_for_handler(
+            scaling_group, session_statuses, kernel_statuses
+        )
+
+    @scheduler_repository_resilience.apply()
+    async def update_sessions_status_bulk(
+        self,
+        session_ids: list[SessionId],
+        from_statuses: list[SessionStatus],
+        to_status: SessionStatus,
+        reason: Optional[str] = None,
+    ) -> int:
+        """Update session statuses in bulk.
+
+        This method is used by the coordinator to apply status transitions
+        based on handler execution results.
+
+        Args:
+            session_ids: List of session IDs to update
+            from_statuses: Only update sessions currently in these statuses (safety check)
+            to_status: The new status to set
+            reason: Optional reason to set in status_info
+
+        Returns:
+            Number of rows updated
+        """
+        return await self._db_source.update_sessions_status_bulk(
+            session_ids, from_statuses, to_status, reason
+        )
+
+    @scheduler_repository_resilience.apply()
+    async def update_kernels_status_bulk(
+        self,
+        session_ids: list[SessionId],
+        from_statuses: list[KernelStatus],
+        to_status: KernelStatus,
+        reason: Optional[str] = None,
+    ) -> int:
+        """Update kernel statuses for sessions in bulk.
+
+        This method is used when kernel status transitions need to accompany
+        session status transitions.
+
+        Args:
+            session_ids: List of session IDs whose kernels to update
+            from_statuses: Only update kernels currently in these statuses
+            to_status: The new status to set
+            reason: Optional reason to set in status_info
+
+        Returns:
+            Number of rows updated
+        """
+        return await self._db_source.update_kernels_status_bulk(
+            session_ids, from_statuses, to_status, reason
+        )
