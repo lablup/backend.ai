@@ -5,21 +5,21 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
-from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.creator import BulkCreator
 
 from .base import ScalingGroupAction
 
 
 @dataclass
-class AssociateScalingGroupWithDomainAction(ScalingGroupAction):
-    """Action to associate a single scaling group with a domain."""
+class AssociateScalingGroupWithDomainsAction(ScalingGroupAction):
+    """Action to associate a scaling group with multiple domains."""
 
-    creator: Creator[ScalingGroupForDomainRow]
+    bulk_creator: BulkCreator[ScalingGroupForDomainRow]
 
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "associate_with_domain"
+        return "associate_with_domains"
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -27,8 +27,8 @@ class AssociateScalingGroupWithDomainAction(ScalingGroupAction):
 
 
 @dataclass
-class AssociateScalingGroupWithDomainActionResult(BaseActionResult):
-    """Result of associating a scaling group with a domain."""
+class AssociateScalingGroupWithDomainsActionResult(BaseActionResult):
+    """Result of associating a scaling group with domains."""
 
     @override
     def entity_id(self) -> Optional[str]:

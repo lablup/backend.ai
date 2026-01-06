@@ -33,7 +33,7 @@ from ai.backend.manager.models.scaling_group import (
 )
 from ai.backend.manager.registry import check_scaling_group
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.repositories.scaling_group.creators import (
@@ -49,11 +49,11 @@ from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupUpdaterSpec,
 )
 from ai.backend.manager.services.scaling_group.actions.associate_with_domain import (
-    AssociateScalingGroupWithDomainAction,
+    AssociateScalingGroupWithDomainsAction,
 )
 from ai.backend.manager.services.scaling_group.actions.create import CreateScalingGroupAction
 from ai.backend.manager.services.scaling_group.actions.disassociate_with_domain import (
-    DisassociateScalingGroupWithDomainAction,
+    DisassociateScalingGroupWithDomainsAction,
 )
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
@@ -378,66 +378,70 @@ class TestScalingGroupService:
 
     # Associate Tests
 
-    async def test_associate_scaling_group_with_domain_success(
+    async def test_associate_scaling_group_with_domains_success(
         self,
         scaling_group_service: ScalingGroupService,
         mock_repository: MagicMock,
     ) -> None:
-        """Test associating a scaling group with a domain"""
-        mock_repository.associate_scaling_group_with_domain = AsyncMock(return_value=None)
+        """Test associating a scaling group with domains"""
+        mock_repository.associate_scaling_group_with_domains = AsyncMock(return_value=None)
 
-        creator: Creator[ScalingGroupForDomainRow] = Creator(
-            spec=ScalingGroupForDomainCreatorSpec(
-                scaling_group="test-sgroup",
-                domain="test-domain",
-            )
+        bulk_creator: BulkCreator[ScalingGroupForDomainRow] = BulkCreator(
+            specs=[
+                ScalingGroupForDomainCreatorSpec(
+                    scaling_group="test-sgroup",
+                    domain="test-domain",
+                )
+            ]
         )
-        action = AssociateScalingGroupWithDomainAction(creator=creator)
-        result = await scaling_group_service.associate_scaling_group_with_domain(action)
+        action = AssociateScalingGroupWithDomainsAction(bulk_creator=bulk_creator)
+        result = await scaling_group_service.associate_scaling_group_with_domains(action)
 
         assert result is not None
-        mock_repository.associate_scaling_group_with_domain.assert_called_once_with(creator)
+        mock_repository.associate_scaling_group_with_domains.assert_called_once_with(bulk_creator)
 
-    async def test_associate_scaling_group_with_domain_repository_error_propagates(
+    async def test_associate_scaling_group_with_domains_repository_error_propagates(
         self,
         scaling_group_service: ScalingGroupService,
         mock_repository: MagicMock,
     ) -> None:
         """Test that repository errors propagate through the service for association"""
-        mock_repository.associate_scaling_group_with_domain = AsyncMock(
+        mock_repository.associate_scaling_group_with_domains = AsyncMock(
             side_effect=IntegrityError("statement", {}, Exception("Duplicate entry"))
         )
 
-        creator: Creator[ScalingGroupForDomainRow] = Creator(
-            spec=ScalingGroupForDomainCreatorSpec(
-                scaling_group="test-sgroup",
-                domain="test-domain",
-            )
+        bulk_creator: BulkCreator[ScalingGroupForDomainRow] = BulkCreator(
+            specs=[
+                ScalingGroupForDomainCreatorSpec(
+                    scaling_group="test-sgroup",
+                    domain="test-domain",
+                )
+            ]
         )
-        action = AssociateScalingGroupWithDomainAction(creator=creator)
+        action = AssociateScalingGroupWithDomainsAction(bulk_creator=bulk_creator)
 
         with pytest.raises(IntegrityError):
-            await scaling_group_service.associate_scaling_group_with_domain(action)
+            await scaling_group_service.associate_scaling_group_with_domains(action)
 
     # Disassociate Tests
 
-    async def test_disassociate_scaling_group_with_domain_success(
+    async def test_disassociate_scaling_group_with_domains_success(
         self,
         scaling_group_service: ScalingGroupService,
         mock_repository: MagicMock,
     ) -> None:
-        """Test disassociating a scaling group from a domain"""
-        mock_repository.disassociate_scaling_group_with_domain = AsyncMock(return_value=None)
+        """Test disassociating a scaling group from domains"""
+        mock_repository.disassociate_scaling_group_with_domains = AsyncMock(return_value=None)
 
         purger = create_scaling_group_for_domain_purger(
             scaling_group="test-sgroup",
             domain="test-domain",
         )
-        action = DisassociateScalingGroupWithDomainAction(purger=purger)
-        result = await scaling_group_service.disassociate_scaling_group_with_domain(action)
+        action = DisassociateScalingGroupWithDomainsAction(purger=purger)
+        result = await scaling_group_service.disassociate_scaling_group_with_domains(action)
 
         assert result is not None
-        mock_repository.disassociate_scaling_group_with_domain.assert_called_once_with(purger)
+        mock_repository.disassociate_scaling_group_with_domains.assert_called_once_with(purger)
 
 
 class TestCheckScalingGroup:

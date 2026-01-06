@@ -40,7 +40,7 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
@@ -760,20 +760,22 @@ class TestScalingGroupRepositoryDB:
         assert result.metadata.description == "Test scaling group for cascade delete"
 
     # Associate Tests
-    async def test_associate_scaling_group_with_domain_success(
+    async def test_associate_scaling_group_with_domains_success(
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_association: str,
         sample_domain: str,
     ) -> None:
-        """Test associating a scaling group with a domain"""
-        creator = Creator(
-            spec=ScalingGroupForDomainCreatorSpec(
-                scaling_group=sample_scaling_group_for_association,
-                domain=sample_domain,
-            )
+        """Test associating a scaling group with domains"""
+        bulk_creator = BulkCreator(
+            specs=[
+                ScalingGroupForDomainCreatorSpec(
+                    scaling_group=sample_scaling_group_for_association,
+                    domain=sample_domain,
+                )
+            ]
         )
-        await scaling_group_repository.associate_scaling_group_with_domain(creator)
+        await scaling_group_repository.associate_scaling_group_with_domains(bulk_creator)
 
         # Verify association using repository method
         association_exists = (
@@ -785,21 +787,23 @@ class TestScalingGroupRepositoryDB:
         assert association_exists is True
 
     # Disassociate Tests
-    async def test_disassociate_scaling_group_with_domain_success(
+    async def test_disassociate_scaling_group_with_domains_success(
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_association: str,
         sample_domain: str,
     ) -> None:
-        """Test disassociating a scaling group from a domain"""
+        """Test disassociating a scaling group from domains"""
         # First, associate the scaling group with the domain
-        creator = Creator(
-            spec=ScalingGroupForDomainCreatorSpec(
-                scaling_group=sample_scaling_group_for_association,
-                domain=sample_domain,
-            )
+        bulk_creator = BulkCreator(
+            specs=[
+                ScalingGroupForDomainCreatorSpec(
+                    scaling_group=sample_scaling_group_for_association,
+                    domain=sample_domain,
+                )
+            ]
         )
-        await scaling_group_repository.associate_scaling_group_with_domain(creator)
+        await scaling_group_repository.associate_scaling_group_with_domains(bulk_creator)
 
         # Verify association exists using repository method
         association_exists = (
@@ -815,7 +819,7 @@ class TestScalingGroupRepositoryDB:
             scaling_group=sample_scaling_group_for_association,
             domain=sample_domain,
         )
-        await scaling_group_repository.disassociate_scaling_group_with_domain(purger)
+        await scaling_group_repository.disassociate_scaling_group_with_domains(purger)
 
         # Verify association is removed using repository method
         association_exists = (
@@ -826,7 +830,7 @@ class TestScalingGroupRepositoryDB:
         )
         assert association_exists is False
 
-    async def test_disassociate_scaling_group_with_domain_nonexistent(
+    async def test_disassociate_scaling_group_with_domains_nonexistent(
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_association: str,
@@ -838,4 +842,97 @@ class TestScalingGroupRepositoryDB:
             scaling_group=sample_scaling_group_for_association,
             domain=sample_domain,
         )
-        await scaling_group_repository.disassociate_scaling_group_with_domain(purger)
+        await scaling_group_repository.disassociate_scaling_group_with_domains(purger)
+
+    # Multiple Domains Tests
+
+    @pytest.fixture
+    async def sample_multiple_domains(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[list[str], None]:
+        """Create multiple sample domains for bulk testing"""
+        domain_names = [f"test-domain-bulk-{i}" for i in range(3)]
+        async with db_with_cleanup.begin_session() as db_sess:
+            for domain_name in domain_names:
+                domain = DomainRow(
+                    name=domain_name,
+                    description=f"Test domain {domain_name}",
+                    is_active=True,
+                    total_resource_slots={},
+                )
+                db_sess.add(domain)
+
+        yield domain_names
+
+    @pytest.fixture
+    async def sample_scaling_group_with_multiple_domain_associations(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_scaling_group_for_association: str,
+        sample_multiple_domains: list[str],
+    ) -> AsyncGenerator[tuple[str, list[str]], None]:
+        """Create a scaling group with multiple domain associations for testing"""
+        async with db_with_cleanup.begin_session() as db_sess:
+            for domain in sample_multiple_domains:
+                association = ScalingGroupForDomainRow(
+                    scaling_group=sample_scaling_group_for_association,
+                    domain=domain,
+                )
+                db_sess.add(association)
+
+        yield sample_scaling_group_for_association, sample_multiple_domains
+
+    async def test_associate_scaling_group_with_multiple_domains(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        sample_scaling_group_for_association: str,
+        sample_multiple_domains: list[str],
+    ) -> None:
+        """Test associating a scaling group with multiple domains at once"""
+        bulk_creator = BulkCreator(
+            specs=[
+                ScalingGroupForDomainCreatorSpec(
+                    scaling_group=sample_scaling_group_for_association,
+                    domain=domain,
+                )
+                for domain in sample_multiple_domains
+            ]
+        )
+        await scaling_group_repository.associate_scaling_group_with_domains(bulk_creator)
+
+        # Verify all associations exist
+        for domain in sample_multiple_domains:
+            association_exists = (
+                await scaling_group_repository.check_scaling_group_domain_association_exists(
+                    scaling_group=sample_scaling_group_for_association,
+                    domain=domain,
+                )
+            )
+            assert association_exists is True
+
+    async def test_disassociate_scaling_group_with_multiple_domains(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        sample_scaling_group_with_multiple_domain_associations: tuple[str, list[str]],
+    ) -> None:
+        """Test disassociating a scaling group from multiple domains"""
+        scaling_group, domains = sample_scaling_group_with_multiple_domain_associations
+
+        # Disassociate all domains one by one
+        for domain in domains:
+            purger = create_scaling_group_for_domain_purger(
+                scaling_group=scaling_group,
+                domain=domain,
+            )
+            await scaling_group_repository.disassociate_scaling_group_with_domains(purger)
+
+        # Verify all associations are removed
+        for domain in domains:
+            association_exists = (
+                await scaling_group_repository.check_scaling_group_domain_association_exists(
+                    scaling_group=scaling_group,
+                    domain=domain,
+                )
+            )
+            assert association_exists is False

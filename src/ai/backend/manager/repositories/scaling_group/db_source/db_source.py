@@ -14,7 +14,12 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.creator import (
+    BulkCreator,
+    Creator,
+    execute_bulk_creator,
+    execute_creator,
+)
 from ai.backend.manager.repositories.base.purger import (
     BatchPurger,
     Purger,
@@ -149,19 +154,19 @@ class ScalingGroupDBSource:
                 raise ScalingGroupNotFound(f"Scaling group not found (name:{updater.pk_value})")
             return result.row.to_dataclass()
 
-    async def associate_scaling_group_with_domain(
+    async def associate_scaling_group_with_domains(
         self,
-        creator: Creator[ScalingGroupForDomainRow],
+        bulk_creator: BulkCreator[ScalingGroupForDomainRow],
     ) -> None:
-        """Associates a single scaling group with a domain."""
+        """Associates a scaling group with multiple domains."""
         async with self._db.begin_session() as session:
-            await execute_creator(session, creator)
+            await execute_bulk_creator(session, bulk_creator)
 
-    async def disassociate_scaling_group_with_domain(
+    async def disassociate_scaling_group_with_domains(
         self,
         purger: BatchPurger[ScalingGroupForDomainRow],
     ) -> None:
-        """Disassociates a single scaling group from a domain."""
+        """Disassociates a scaling group from multiple domains."""
         async with self._db.begin_session() as session:
             await execute_batch_purger(session, purger)
 

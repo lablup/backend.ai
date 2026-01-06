@@ -14,7 +14,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData, ScalingGroupListResult
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.purger import BatchPurger, Purger
 from ai.backend.manager.repositories.base.updater import Updater
 
@@ -90,19 +90,19 @@ class ScalingGroupRepository:
         """
         return await self._db_source.update_scaling_group(updater)
 
-    async def associate_scaling_group_with_domain(
+    async def associate_scaling_group_with_domains(
         self,
-        creator: Creator[ScalingGroupForDomainRow],
+        bulk_creator: BulkCreator[ScalingGroupForDomainRow],
     ) -> None:
-        """Associates a single scaling group with a domain."""
-        await self._db_source.associate_scaling_group_with_domain(creator)
+        """Associates a scaling group with multiple domains."""
+        await self._db_source.associate_scaling_group_with_domains(bulk_creator)
 
-    async def disassociate_scaling_group_with_domain(
+    async def disassociate_scaling_group_with_domains(
         self,
         purger: BatchPurger[ScalingGroupForDomainRow],
     ) -> None:
-        """Disassociates a single scaling group from a domain."""
-        await self._db_source.disassociate_scaling_group_with_domain(purger)
+        """Disassociates a scaling group from multiple domains."""
+        await self._db_source.disassociate_scaling_group_with_domains(purger)
 
     async def check_scaling_group_domain_association_exists(
         self,

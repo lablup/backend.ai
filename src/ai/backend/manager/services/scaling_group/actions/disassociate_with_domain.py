@@ -11,15 +11,15 @@ from .base import ScalingGroupAction
 
 
 @dataclass
-class DisassociateScalingGroupWithDomainAction(ScalingGroupAction):
-    """Action to disassociate a single scaling group from a domain."""
+class DisassociateScalingGroupWithDomainsAction(ScalingGroupAction):
+    """Action to disassociate a scaling group from multiple domains."""
 
     purger: BatchPurger[ScalingGroupForDomainRow]
 
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "disassociate_with_domain"
+        return "disassociate_with_domains"
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -27,8 +27,8 @@ class DisassociateScalingGroupWithDomainAction(ScalingGroupAction):
 
 
 @dataclass
-class DisassociateScalingGroupWithDomainActionResult(BaseActionResult):
-    """Result of disassociating a scaling group from a domain."""
+class DisassociateScalingGroupWithDomainsActionResult(BaseActionResult):
+    """Result of disassociating a scaling group from domains."""
 
     @override
     def entity_id(self) -> Optional[str]:
