@@ -80,8 +80,10 @@ class AssignedUserAdapter(BaseFilterAdapter):
         if filter.username is not None:
             condition = self.convert_string_filter(
                 filter.username,
-                equals_fn=AssignedUserConditions.by_username_equals,
-                contains_fn=AssignedUserConditions.by_username_contains,
+                contains_factory=AssignedUserConditions.by_username_contains,
+                equals_factory=AssignedUserConditions.by_username_equals,
+                starts_with_factory=AssignedUserConditions.by_username_starts_with,
+                ends_with_factory=AssignedUserConditions.by_username_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -90,8 +92,10 @@ class AssignedUserAdapter(BaseFilterAdapter):
         if filter.email is not None:
             condition = self.convert_string_filter(
                 filter.email,
-                equals_fn=AssignedUserConditions.by_email_equals,
-                contains_fn=AssignedUserConditions.by_email_contains,
+                contains_factory=AssignedUserConditions.by_email_contains,
+                equals_factory=AssignedUserConditions.by_email_equals,
+                starts_with_factory=AssignedUserConditions.by_email_starts_with,
+                ends_with_factory=AssignedUserConditions.by_email_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)

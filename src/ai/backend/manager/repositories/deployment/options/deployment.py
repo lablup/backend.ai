@@ -83,20 +83,54 @@ class DeploymentConditions:
         return inner
 
     @staticmethod
-    def by_domain_name_equals(value: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_domain_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(EndpointRow.domain) == value.lower()
-            return EndpointRow.domain == value
+            if spec.case_insensitive:
+                condition = sa.func.lower(EndpointRow.domain) == spec.value.lower()
+            else:
+                condition = EndpointRow.domain == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_contains(value: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_domain_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(EndpointRow.domain).contains(value.lower())
-            return EndpointRow.domain.contains(value)
+            if spec.case_insensitive:
+                condition = EndpointRow.domain.ilike(f"%{spec.value}%")
+            else:
+                condition = EndpointRow.domain.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = EndpointRow.domain.ilike(f"{spec.value}%")
+            else:
+                condition = EndpointRow.domain.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = EndpointRow.domain.ilike(f"%{spec.value}")
+            else:
+                condition = EndpointRow.domain.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 

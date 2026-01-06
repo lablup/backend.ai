@@ -4,6 +4,7 @@ import uuid
 
 import sqlalchemy as sa
 
+from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import EntityType, RoleSource, ScopeType
 from ai.backend.manager.models.rbac_models.permission.object_permission import (
@@ -22,20 +23,54 @@ class RoleConditions:
     """Query conditions for roles."""
 
     @staticmethod
-    def by_name_contains(name: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return RoleRow.name.ilike(f"%{name}%")  # type: ignore[attr-defined]
-            return RoleRow.name.like(f"%{name}%")  # type: ignore[attr-defined]
+            if spec.case_insensitive:
+                condition = RoleRow.name.ilike(f"%{spec.value}%")  # type: ignore[attr-defined]
+            else:
+                condition = RoleRow.name.like(f"%{spec.value}%")  # type: ignore[attr-defined]
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_name_equals(name: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(RoleRow.name) == name.lower()
-            return RoleRow.name == name
+            if spec.case_insensitive:
+                condition = sa.func.lower(RoleRow.name) == spec.value.lower()
+            else:
+                condition = RoleRow.name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = RoleRow.name.ilike(f"{spec.value}%")  # type: ignore[attr-defined]
+            else:
+                condition = RoleRow.name.like(f"{spec.value}%")  # type: ignore[attr-defined]
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = RoleRow.name.ilike(f"%{spec.value}")  # type: ignore[attr-defined]
+            else:
+                condition = RoleRow.name.like(f"%{spec.value}")  # type: ignore[attr-defined]
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -155,38 +190,106 @@ class AssignedUserConditions:
         return inner
 
     @staticmethod
-    def by_username_contains(username: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_username_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return UserRow.username.ilike(f"%{username}%")  # type: ignore[attr-defined]
-            return UserRow.username.like(f"%{username}%")  # type: ignore[attr-defined]
+            if spec.case_insensitive:
+                condition = UserRow.username.ilike(f"%{spec.value}%")  # type: ignore[attr-defined]
+            else:
+                condition = UserRow.username.like(f"%{spec.value}%")  # type: ignore[attr-defined]
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_username_equals(username: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_username_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(UserRow.username) == username.lower()
-            return UserRow.username == username
+            if spec.case_insensitive:
+                condition = sa.func.lower(UserRow.username) == spec.value.lower()
+            else:
+                condition = UserRow.username == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_email_contains(email: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_username_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return UserRow.email.ilike(f"%{email}%")  # type: ignore[attr-defined]
-            return UserRow.email.like(f"%{email}%")  # type: ignore[attr-defined]
+            if spec.case_insensitive:
+                condition = UserRow.username.ilike(f"{spec.value}%")  # type: ignore[attr-defined]
+            else:
+                condition = UserRow.username.like(f"{spec.value}%")  # type: ignore[attr-defined]
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_email_equals(email: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_username_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(UserRow.email) == email.lower()
-            return UserRow.email == email
+            if spec.case_insensitive:
+                condition = UserRow.username.ilike(f"%{spec.value}")  # type: ignore[attr-defined]
+            else:
+                condition = UserRow.username.like(f"%{spec.value}")  # type: ignore[attr-defined]
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_email_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.email.ilike(f"%{spec.value}%")  # type: ignore[attr-defined]
+            else:
+                condition = UserRow.email.like(f"%{spec.value}%")  # type: ignore[attr-defined]
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_email_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(UserRow.email) == spec.value.lower()
+            else:
+                condition = UserRow.email == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_email_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.email.ilike(f"{spec.value}%")  # type: ignore[attr-defined]
+            else:
+                condition = UserRow.email.like(f"{spec.value}%")  # type: ignore[attr-defined]
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_email_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.email.ilike(f"%{spec.value}")  # type: ignore[attr-defined]
+            else:
+                condition = UserRow.email.like(f"%{spec.value}")  # type: ignore[attr-defined]
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
