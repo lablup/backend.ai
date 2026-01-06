@@ -71,7 +71,7 @@ The current artifact import flow works as follows:
 
 On the Model Store page, users need the ability to download models directly to their own vfolders:
 
-1. User clicks the "Model Import to Model Store" button on the Model Store page.
+1. User clicks the "Import Model to My VFolder" button on the Model Store page.
 2. A vfolder selection page is displayed, where the user can create a model-type vfolder or select an existing one.
 3. The selected vfolder ID is passed to the `import_artifacts` mutation, and the model is downloaded to that vfolder instead of the preconfigured storage.
 
