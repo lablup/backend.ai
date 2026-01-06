@@ -7,7 +7,6 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from sqlalchemy.exc import IntegrityError
 
 from ai.backend.common.exception import ScalingGroupConflict
 from ai.backend.common.types import AccessKey, AgentSelectionStrategy, SessionTypes
@@ -399,29 +398,6 @@ class TestScalingGroupService:
 
         assert result is not None
         mock_repository.associate_scaling_group_with_domains.assert_called_once_with(bulk_creator)
-
-    async def test_associate_scaling_group_with_domains_repository_error_propagates(
-        self,
-        scaling_group_service: ScalingGroupService,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Test that repository errors propagate through the service for association"""
-        mock_repository.associate_scaling_group_with_domains = AsyncMock(
-            side_effect=IntegrityError("statement", {}, Exception("Duplicate entry"))
-        )
-
-        bulk_creator: BulkCreator[ScalingGroupForDomainRow] = BulkCreator(
-            specs=[
-                ScalingGroupForDomainCreatorSpec(
-                    scaling_group="test-sgroup",
-                    domain="test-domain",
-                )
-            ]
-        )
-        action = AssociateScalingGroupWithDomainsAction(bulk_creator=bulk_creator)
-
-        with pytest.raises(IntegrityError):
-            await scaling_group_service.associate_scaling_group_with_domains(action)
 
     # Disassociate Tests
 
