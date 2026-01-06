@@ -57,7 +57,20 @@ class TestAuditLogRepository:
                 triggered_by=None,
                 duration=None,
             )
-            creator = Creator(spec=AuditLogCreatorSpec(data))
+            creator = Creator(
+                spec=AuditLogCreatorSpec(
+                    action_id=data.action_id,
+                    entity_type=data.entity_type,
+                    operation=data.operation,
+                    created_at=data.created_at,
+                    description=data.description,
+                    status=data.status,
+                    entity_id=data.entity_id,
+                    request_id=data.request_id,
+                    triggered_by=data.triggered_by,
+                    duration=data.duration,
+                )
+            )
             result = await audit_log_repository.create(creator)
             assert result.status == status
 

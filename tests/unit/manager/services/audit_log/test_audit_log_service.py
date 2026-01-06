@@ -48,7 +48,20 @@ class TestAuditLogService:
     ) -> None:
         mock_repository.create = AsyncMock(return_value=sample_audit_log_data)
 
-        creator = Creator(spec=AuditLogCreatorSpec(sample_audit_log_data))
+        creator = Creator(
+            spec=AuditLogCreatorSpec(
+                action_id=sample_audit_log_data.action_id,
+                entity_type=sample_audit_log_data.entity_type,
+                operation=sample_audit_log_data.operation,
+                created_at=sample_audit_log_data.created_at,
+                description=sample_audit_log_data.description,
+                status=sample_audit_log_data.status,
+                entity_id=sample_audit_log_data.entity_id,
+                request_id=sample_audit_log_data.request_id,
+                triggered_by=sample_audit_log_data.triggered_by,
+                duration=sample_audit_log_data.duration,
+            )
+        )
         action = CreateAuditLogAction(creator=creator)
         result = await audit_log_service.create(action)
 
