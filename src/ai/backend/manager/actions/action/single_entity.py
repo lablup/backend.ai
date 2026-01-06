@@ -17,11 +17,19 @@ class BaseSingleEntityAction(BaseAction):
 
     @classmethod
     @abstractmethod
-    def root_entity_type(cls) -> EntityType | None:
+    def field_type(cls) -> EntityType | None:
+        """
+        Returns the entity type of this action's target when it exists as a field
+        of another entity. Returns None if this entity is not a field.
+        """
         raise NotImplementedError
 
     @abstractmethod
-    def root_entity_id(self) -> str | None:
+    def field_id(self) -> str | None:
+        """
+        Returns the entity ID of this action's target when it exists as a field
+        of another entity. Returns None if this entity is not a field.
+        """
         raise NotImplementedError
 
     @classmethod

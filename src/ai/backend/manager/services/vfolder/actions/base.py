@@ -58,11 +58,11 @@ class VFolderSingleEntityAction(BaseSingleEntityAction):
 
     @override
     @classmethod
-    def root_entity_type(cls) -> EntityType | None:
+    def field_type(cls) -> EntityType | None:
         return None
 
     @override
-    def root_entity_id(self) -> str | None:
+    def field_id(self) -> str | None:
         return None
 
 

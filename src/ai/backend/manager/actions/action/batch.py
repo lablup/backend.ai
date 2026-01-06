@@ -18,13 +18,18 @@ class BaseBatchAction(BaseAction):
 
     @classmethod
     @abstractmethod
-    def root_entity_type(cls) -> EntityType | None:
+    def field_type(cls) -> EntityType | None:
+        """
+        Returns the entity type of this action's targets when they exist as fields
+        of another entity. Returns None if these entities are not fields.
+        """
         raise NotImplementedError
 
     @abstractmethod
-    def root_entity_ids(self) -> Mapping[str, str | None]:
+    def field_ids(self) -> Mapping[str, str | None]:
         """
-        Returns a mapping of entity IDs to their corresponding root entity IDs.
+        Returns a mapping of target entity IDs to their field entity IDs.
+        The value is None if the corresponding entity is not a field.
         """
         raise NotImplementedError
 
