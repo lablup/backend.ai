@@ -12,10 +12,24 @@ import pytest
 
 from ai.backend.common.types import BinarySize
 from ai.backend.manager.data.error_log.types import ErrorLogData, ErrorLogSeverity
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.error_logs import ErrorLogRow
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.user import (
     PasswordHashAlgorithm,
     PasswordInfo,
@@ -24,6 +38,7 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.error_log import ErrorLogCreatorSpec, ErrorLogRepository
 from ai.backend.testutils.db import with_tables
@@ -41,10 +56,24 @@ class TestErrorLogRepository:
         async with with_tables(
             database_connection,
             [
+                # FK dependency order: parents before children
                 DomainRow,
+                ScalingGroupRow,
                 UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
                 UserRoleRow,
                 UserRow,
+                KeyPairRow,
+                GroupRow,
+                AgentRow,
+                VFolderRow,
+                ImageRow,
+                ResourcePresetRow,
+                EndpointRow,
+                DeploymentRevisionRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentPolicyRow,
                 ErrorLogRow,
             ],
         ):
@@ -166,7 +195,6 @@ class TestErrorLogRepository:
             ErrorLogCreatorSpec(
                 severity=ErrorLogSeverity.WARNING,
                 source="storage",
-                user=None,
                 message="Storage warning",
                 context_lang="ko",
                 context_env={"storage_id": "storage-001"},
@@ -182,7 +210,7 @@ class TestErrorLogRepository:
             result = await error_log_repository.create(creator)
             created_logs.append(result)
 
-        # Verify all logs were created
+        # Verify all logs were created with correct data
         assert len(created_logs) == 3
 
         # Verify first log (CRITICAL)
