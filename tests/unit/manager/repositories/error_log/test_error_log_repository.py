@@ -7,14 +7,13 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import UTC, datetime
 
 import pytest
 
 from ai.backend.common.types import BinarySize
 from ai.backend.manager.data.error_log.types import ErrorLogData, ErrorLogSeverity
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.error_log import ErrorLogRow
+from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.user import (
@@ -144,18 +143,11 @@ class TestErrorLogRepository:
         test_user_id: uuid.UUID,
     ) -> None:
         """Test creating multiple error logs and verifying them"""
-        now = datetime.now(tz=UTC)
-
-        # Create multiple error logs with different severities
-        error_logs_data = [
-            ErrorLogData(
-                id=uuid.uuid4(),  # This will be ignored, ID is auto-generated
-                created_at=now,
+        error_log_specs = [
+            ErrorLogCreatorSpec(
                 severity=ErrorLogSeverity.CRITICAL,
                 source="manager",
                 user=test_user_id,
-                is_read=False,
-                is_cleared=False,
                 message="Critical error occurred",
                 context_lang="en",
                 context_env={"version": "1.0.0"},
@@ -163,42 +155,30 @@ class TestErrorLogRepository:
                 request_status=500,
                 traceback="Traceback: ...",
             ),
-            ErrorLogData(
-                id=uuid.uuid4(),
-                created_at=now,
+            ErrorLogCreatorSpec(
                 severity=ErrorLogSeverity.ERROR,
                 source="agent",
                 user=test_user_id,
-                is_read=False,
-                is_cleared=False,
                 message="Error in agent",
                 context_lang="en",
                 context_env={"agent_id": "agent-001"},
-                request_url=None,
-                request_status=None,
-                traceback=None,
             ),
-            ErrorLogData(
-                id=uuid.uuid4(),
-                created_at=now,
+            ErrorLogCreatorSpec(
                 severity=ErrorLogSeverity.WARNING,
                 source="storage",
-                user=None,  # No user for system warning
-                is_read=False,
-                is_cleared=False,
+                user=None,
                 message="Storage warning",
                 context_lang="ko",
                 context_env={"storage_id": "storage-001"},
                 request_url="/api/v1/storage",
                 request_status=400,
-                traceback=None,
             ),
         ]
 
         created_logs: list[ErrorLogData] = []
 
-        for data in error_logs_data:
-            creator = Creator(spec=ErrorLogCreatorSpec(data))
+        for spec in error_log_specs:
+            creator = Creator(spec=spec)
             result = await error_log_repository.create(creator)
             created_logs.append(result)
 
