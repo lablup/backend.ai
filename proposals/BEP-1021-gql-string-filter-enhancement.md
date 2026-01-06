@@ -1,10 +1,10 @@
 ---
 Author: Hyeokjin Kim (hj.kim@lablup.com)
-Status: Draft
+Status: Implemented
 Created: 2026-01-06
 Created-Version: 26.1.0
-Target-Version:
-Implemented-Version:
+Target-Version: 26.1.0
+Implemented-Version: 26.1.0
 ---
 
 # GQL StringFilter Enhancement
@@ -15,20 +15,24 @@ Implemented-Version:
 
 ## Motivation
 
-The `StringFilter` GraphQL input type defines 10 filter fields for string matching operations:
-- `contains`, `i_contains` (case-insensitive)
-- `starts_with`, `i_starts_with` (case-insensitive)
-- `ends_with`, `i_ends_with` (case-insensitive)
-- `equals`, `i_equals` (case-insensitive)
-- `not_equals`, `i_not_equals` (case-insensitive)
+The `StringFilter` GraphQL input type should provide a complete set of string matching operations:
 
-However, the `build_query_condition()` method only implements **4 of these 10 fields**:
-- `equals`, `i_equals`
-- `contains`, `i_contains`
+| Operation | Basic | Case-insensitive | NOT | Case-insensitive NOT |
+|-----------|-------|------------------|-----|---------------------|
+| equals | `equals` | `iEquals` | `notEquals` | `iNotEquals` |
+| contains | `contains` | `iContains` | `notContains` | `iNotContains` |
+| starts_with | `startsWith` | `iStartsWith` | `notStartsWith` | `iNotStartsWith` |
+| ends_with | `endsWith` | `iEndsWith` | `notEndsWith` | `iNotEndsWith` |
 
-The remaining 6 fields (`starts_with`, `i_starts_with`, `ends_with`, `i_ends_with`, `not_equals`, `i_not_equals`) are silently ignored. Users expect all filter fields to work, but these fields have no effect on query results, causing confusion and unexpected behavior.
+**Total: 16 filter fields**
 
-## Current Design
+However, the previous `build_query_condition()` method only implemented **4 of these fields**:
+- `equals`, `iEquals`
+- `contains`, `iContains`
+
+The remaining fields were silently ignored, causing confusion and unexpected behavior.
+
+## Current Design (Before Enhancement)
 
 ```python
 @strawberry.input
@@ -64,9 +68,10 @@ class StringFilter:
 
 ### Problems
 
-1. **Silent failure**: 6 filter fields are ignored without any error or warning
-2. **Incomplete API**: Users cannot use `starts_with`, `ends_with`, or `not_equals` operations
-3. **Factory signature limitation**: Current factory signature `Callable[[str, bool], QueryCondition]` cannot express negation
+1. **Silent failure**: Most filter fields are ignored without any error or warning
+2. **Incomplete API**: Users cannot use `starts_with`, `ends_with`, or any negation operations
+3. **Missing NOT variants**: No `not_contains`, `not_starts_with`, `not_ends_with` fields
+4. **Factory signature limitation**: Current factory signature `Callable[[str, bool], QueryCondition]` cannot express negation
 
 ## Proposed Design
 
@@ -75,13 +80,15 @@ class StringFilter:
 Introduce a dataclass to encapsulate match parameters:
 
 ```python
-@dataclass
+@dataclass(frozen=True)
 class StringMatchSpec:
     """Specification for string matching operations."""
     value: str
-    case_insensitive: bool = False
-    negated: bool = False
+    case_insensitive: bool
+    negated: bool
 ```
+
+All fields are required with no defaults to ensure explicit specification of matching behavior.
 
 ### Updated Factory Signature
 
@@ -108,31 +115,75 @@ def build_query_condition(
     """
     # equals operations
     if self.equals:
-        return equals_factory(StringMatchSpec(self.equals))
+        return equals_factory(
+            StringMatchSpec(self.equals, case_insensitive=False, negated=False)
+        )
     if self.i_equals:
-        return equals_factory(StringMatchSpec(self.i_equals, case_insensitive=True))
+        return equals_factory(
+            StringMatchSpec(self.i_equals, case_insensitive=True, negated=False)
+        )
     if self.not_equals:
-        return equals_factory(StringMatchSpec(self.not_equals, negated=True))
+        return equals_factory(
+            StringMatchSpec(self.not_equals, case_insensitive=False, negated=True)
+        )
     if self.i_not_equals:
-        return equals_factory(StringMatchSpec(self.i_not_equals, case_insensitive=True, negated=True))
+        return equals_factory(
+            StringMatchSpec(self.i_not_equals, case_insensitive=True, negated=True)
+        )
 
     # contains operations
     if self.contains:
-        return contains_factory(StringMatchSpec(self.contains))
+        return contains_factory(
+            StringMatchSpec(self.contains, case_insensitive=False, negated=False)
+        )
     if self.i_contains:
-        return contains_factory(StringMatchSpec(self.i_contains, case_insensitive=True))
+        return contains_factory(
+            StringMatchSpec(self.i_contains, case_insensitive=True, negated=False)
+        )
+    if self.not_contains:
+        return contains_factory(
+            StringMatchSpec(self.not_contains, case_insensitive=False, negated=True)
+        )
+    if self.i_not_contains:
+        return contains_factory(
+            StringMatchSpec(self.i_not_contains, case_insensitive=True, negated=True)
+        )
 
     # starts_with operations
     if self.starts_with:
-        return starts_with_factory(StringMatchSpec(self.starts_with))
+        return starts_with_factory(
+            StringMatchSpec(self.starts_with, case_insensitive=False, negated=False)
+        )
     if self.i_starts_with:
-        return starts_with_factory(StringMatchSpec(self.i_starts_with, case_insensitive=True))
+        return starts_with_factory(
+            StringMatchSpec(self.i_starts_with, case_insensitive=True, negated=False)
+        )
+    if self.not_starts_with:
+        return starts_with_factory(
+            StringMatchSpec(self.not_starts_with, case_insensitive=False, negated=True)
+        )
+    if self.i_not_starts_with:
+        return starts_with_factory(
+            StringMatchSpec(self.i_not_starts_with, case_insensitive=True, negated=True)
+        )
 
     # ends_with operations
     if self.ends_with:
-        return ends_with_factory(StringMatchSpec(self.ends_with))
+        return ends_with_factory(
+            StringMatchSpec(self.ends_with, case_insensitive=False, negated=False)
+        )
     if self.i_ends_with:
-        return ends_with_factory(StringMatchSpec(self.i_ends_with, case_insensitive=True))
+        return ends_with_factory(
+            StringMatchSpec(self.i_ends_with, case_insensitive=True, negated=False)
+        )
+    if self.not_ends_with:
+        return ends_with_factory(
+            StringMatchSpec(self.not_ends_with, case_insensitive=False, negated=True)
+        )
+    if self.i_not_ends_with:
+        return ends_with_factory(
+            StringMatchSpec(self.i_not_ends_with, case_insensitive=True, negated=True)
+        )
 
     return None
 ```
@@ -222,15 +273,28 @@ class ScalingGroupFilterAdapter:
 - Update other adapters using `StringFilter` (search codebase for usages)
 
 ### Phase 3: Testing
-- Add unit tests for all 10 filter fields
+- Add unit tests for all 16 filter fields
 - Add unit tests for negation operations
 - Add integration tests for GraphQL queries
 
-## Open Questions
+## Design Decisions
 
-- Should we add `not_contains`, `not_starts_with`, `not_ends_with` fields to `StringFilter` for explicit negation?
-  - Current proposal uses `not_equals` and `i_not_equals` only
-  - Adding these would provide complete negation coverage but increase API surface
+### Complete NOT Variants
+
+We decided to add all NOT variants (not_contains, i_not_contains, not_starts_with, i_not_starts_with, not_ends_with, i_not_ends_with) to provide complete negation coverage:
+
+- **Consistency**: All 4 operations (equals, contains, starts_with, ends_with) now have the same 4 variants (basic, case-insensitive, NOT, case-insensitive NOT)
+- **API completeness**: Users can perform any combination of string matching without workarounds
+- **Future-proof**: No need to add more fields later
+
+### No Default Values in StringMatchSpec
+
+`StringMatchSpec` requires all fields explicitly:
+- `value: str` - the search value
+- `case_insensitive: bool` - whether to ignore case
+- `negated: bool` - whether to negate the condition
+
+This design ensures that calling code explicitly specifies all matching behavior, reducing bugs from incorrect defaults.
 
 ## References
 

@@ -261,6 +261,8 @@ class ModelRevisionFilter(GQLFilter):
             name_condition = self.name.build_query_condition(
                 contains_factory=RevisionConditions.by_name_contains,
                 equals_factory=RevisionConditions.by_name_equals,
+                starts_with_factory=RevisionConditions.by_name_starts_with,
+                ends_with_factory=RevisionConditions.by_name_ends_with,
             )
             if name_condition:
                 field_conditions.append(name_condition)
