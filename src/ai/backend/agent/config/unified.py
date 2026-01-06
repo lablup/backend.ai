@@ -44,7 +44,6 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.configs.redis import RedisConfig
-from ai.backend.common.configs.validation_context import BaseConfigValidationContext
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     GroupID,
@@ -60,6 +59,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
+from ai.backend.logging.validation_context import BaseConfigValidationContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
