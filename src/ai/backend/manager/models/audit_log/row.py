@@ -10,6 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -115,3 +116,18 @@ class AuditLogRow(Base):
 
     def __repr__(self) -> str:
         return self.__str__()
+
+    def to_dataclass(self) -> AuditLogData:
+        return AuditLogData(
+            id=self.id,
+            action_id=self.action_id,
+            entity_type=self.entity_type,
+            operation=self.operation,
+            created_at=self.created_at,
+            description=self.description,
+            status=self.status,
+            entity_id=self.entity_id,
+            request_id=self.request_id,
+            triggered_by=self.triggered_by,
+            duration=self.duration,
+        )
