@@ -1013,14 +1013,37 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         original_cpus = len(cpu_alloc.get(SlotName("cpu"), {}))
         boost_duration = self.local_config.container.cpu_boost_duration
 
-        # Create a background task to restore CPU after boost_duration
-        asyncio.create_task(
+        # Lazily initialize the tracking structure for CPU boost restoration tasks.
+        tasks_by_container = getattr(self, "_cpu_boost_restore_tasks", None)
+        if tasks_by_container is None:
+            tasks_by_container = {}
+            setattr(self, "_cpu_boost_restore_tasks", tasks_by_container)
+
+        # Create a background task to restore CPU after boost_duration and track it.
+        task = asyncio.create_task(
             self._restore_cpu_from_boost(
                 container_id,
                 original_cpus,
                 boost_duration,
             )
         )
+
+        container_tasks = tasks_by_container.setdefault(container_id, set())
+        container_tasks.add(task)
+
+        def _cleanup_task(t: asyncio.Task, cid: str = container_id) -> None:
+            # Remove the completed task from the tracking structure.
+            container_map = getattr(self, "_cpu_boost_restore_tasks", None)
+            if not isinstance(container_map, dict):
+                return
+            tasks = container_map.get(cid)
+            if tasks is None:
+                return
+            tasks.discard(t)
+            if not tasks:
+                container_map.pop(cid, None)
+
+        task.add_done_callback(_cleanup_task)
         log.debug(
             "Scheduled CPU boost restoration for container {} in {} seconds",
             container_id[:12],
