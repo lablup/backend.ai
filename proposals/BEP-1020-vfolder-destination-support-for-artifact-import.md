@@ -4,7 +4,7 @@ Status: Draft
 Created: 2026-01-06
 Created-Version: 26.1.0
 Target-Version: 26.1.0
-Implemented-Version: 26.1.0
+Implemented-Version:
 ---
 
 # VFolder Destination Support for Artifact Import
