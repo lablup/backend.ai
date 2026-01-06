@@ -13,7 +13,6 @@ from ai.backend.manager.models.image import (
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.image.admin_repository import AdminImageRepository
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
@@ -94,13 +93,13 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 class ImageService:
     _agent_registry: AgentRegistry
     _image_repository: ImageRepository
-    _admin_image_repository: AdminImageRepository
+    _admin_image_repository: ImageRepository
 
     def __init__(
         self,
         agent_registry: AgentRegistry,
         image_repository: ImageRepository,
-        admin_image_repository: AdminImageRepository,
+        admin_image_repository: ImageRepository,
     ) -> None:
         self._agent_registry = agent_registry
         self._image_repository = image_repository

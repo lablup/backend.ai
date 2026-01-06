@@ -286,3 +286,112 @@ class ImageRepository:
         Raises ForgetImageActionGenericForbiddenError if user doesn't own the image.
         """
         return await self._db_source.remove_image_and_aliases_with_validation(image_id, user_id)
+
+    # Backward-compatible wrappers for admin operations
+    # These methods will be removed after service layer migration is complete
+
+    async def soft_delete_image_force(
+        self, identifiers: list[ImageAlias | ImageRef | ImageIdentifier]
+    ) -> ImageData:
+        """
+        Marks an image as deleted without checking ownership.
+        This is a forceful deletion and should be used with caution.
+
+        Deprecated: This method bypasses ownership checks.
+        """
+        from sqlalchemy.ext.asyncio import AsyncSession as SASession
+
+        from ai.backend.manager.models.image import ImageRow
+
+        async def _resolve_image(
+            session: SASession,
+            identifiers: list[ImageAlias | ImageRef | ImageIdentifier],
+        ) -> ImageRow:
+            return await ImageRow.resolve(session, identifiers)
+
+        async with self._db_source._db.begin_session() as session:
+            row = await _resolve_image(session, identifiers)
+            await row.mark_as_deleted(session)
+            return row.to_dataclass()
+
+    async def soft_delete_image_by_id_force(self, image_id: UUID) -> ImageData:
+        """
+        Marks an image as deleted by its ID without checking ownership.
+        This is a forceful deletion and should be used with caution.
+
+        Deprecated: This method bypasses ownership checks.
+        """
+        from sqlalchemy.ext.asyncio import AsyncSession as SASession
+
+        from ai.backend.manager.errors.image import ImageNotFound
+        from ai.backend.manager.models.image import ImageRow
+
+        async def _get_image_by_id(
+            session: SASession, image_id: UUID, load_aliases: bool = False
+        ) -> ImageRow:
+            image_row = await ImageRow.get(session, image_id, load_aliases=load_aliases)
+            if not image_row:
+                raise ImageNotFound()
+            return image_row
+
+        async with self._db_source._db.begin_session() as session:
+            image_row = await _get_image_by_id(session, image_id)
+            await image_row.mark_as_deleted(session)
+            return image_row.to_dataclass()
+
+    async def delete_image_with_aliases_force(self, image_id: UUID) -> ImageData:
+        """
+        Deletes an image and all its aliases without checking ownership.
+        This is a forceful deletion and should be used with caution.
+
+        Deprecated: This method bypasses ownership checks.
+        """
+        from sqlalchemy.exc import DBAPIError
+        from sqlalchemy.ext.asyncio import AsyncSession as SASession
+
+        from ai.backend.manager.errors.image import ImageNotFound, PurgeImageActionByIdObjectDBError
+        from ai.backend.manager.models.image import ImageRow
+
+        async def _get_image_by_id(
+            session: SASession, image_id: UUID, load_aliases: bool = False
+        ) -> ImageRow:
+            image_row = await ImageRow.get(session, image_id, load_aliases=load_aliases)
+            if not image_row:
+                raise ImageNotFound()
+            return image_row
+
+        try:
+            async with self._db_source._db.begin_session() as session:
+                image_row = await _get_image_by_id(session, image_id, load_aliases=True)
+                data = image_row.to_dataclass()
+                for alias in image_row.aliases:
+                    await session.delete(alias)
+                await session.delete(image_row)
+            return data
+        except DBAPIError as e:
+            raise PurgeImageActionByIdObjectDBError(str(e))
+
+    async def untag_image_from_registry_force(self, image_id: UUID) -> ImageData:
+        """
+        Untags an image from registry without ownership check.
+        This is an admin-only operation.
+
+        Deprecated: This method bypasses ownership checks.
+        """
+        from sqlalchemy.ext.asyncio import AsyncSession as SASession
+
+        from ai.backend.manager.errors.image import ImageNotFound
+        from ai.backend.manager.models.image import ImageRow
+
+        async def _get_image_by_id(
+            session: SASession, image_id: UUID, load_aliases: bool = False
+        ) -> ImageRow:
+            image_row = await ImageRow.get(session, image_id, load_aliases=load_aliases)
+            if not image_row:
+                raise ImageNotFound()
+            return image_row
+
+        async with self._db_source._db.begin_readonly_session() as session:
+            image_row = await _get_image_by_id(session, image_id, load_aliases=True)
+            await image_row.untag_image_from_registry(self._db_source._db, session)
+            return image_row.to_dataclass()

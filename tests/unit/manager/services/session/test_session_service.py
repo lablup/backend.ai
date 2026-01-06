@@ -27,7 +27,6 @@ from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.scheduler import MarkTerminatingResult
-from ai.backend.manager.repositories.session.admin_repository import AdminSessionRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.session.actions.complete import (
     CompleteAction,
@@ -78,7 +77,7 @@ def mock_session_repository() -> MagicMock:
 @pytest.fixture
 def mock_admin_session_repository() -> MagicMock:
     """Create mocked admin session repository."""
-    return MagicMock(spec=AdminSessionRepository)
+    return MagicMock(spec=SessionRepository)
 
 
 @pytest.fixture

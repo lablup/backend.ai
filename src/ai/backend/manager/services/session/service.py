@@ -73,7 +73,6 @@ from ai.backend.manager.models.session import (
 )
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.session.admin_repository import AdminSessionRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
@@ -202,7 +201,7 @@ class SessionServiceArgs:
     error_monitor: ErrorPluginContext
     idle_checker_host: IdleCheckerHost
     session_repository: SessionRepository
-    admin_session_repository: AdminSessionRepository
+    admin_session_repository: SessionRepository
     scheduling_controller: SchedulingController
 
 
@@ -214,7 +213,7 @@ class SessionService:
     _error_monitor: ErrorPluginContext
     _idle_checker_host: IdleCheckerHost
     _session_repository: SessionRepository
-    _admin_session_repository: AdminSessionRepository
+    _admin_session_repository: SessionRepository
     _scheduling_controller: SchedulingController
     _database_ptask_group: aiotools.PersistentTaskGroup
     _rpc_ptask_group: aiotools.PersistentTaskGroup

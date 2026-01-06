@@ -116,7 +116,20 @@ class ContainerRegistryRepository:
         self,
         registry_name: str,
         project: Optional[str] = None,
+        skip_permission_check: bool = False,
     ) -> ContainerRegistryData:
+        """
+        Get container registry by name and project.
+
+        Args:
+            registry_name: Name of the registry
+            project: Optional project filter
+            skip_permission_check: If True, bypasses permission validation (superadmin only)
+        """
+        if not skip_permission_check:
+            # TODO: Add permission validation when needed
+            pass
+
         async with self._db.begin_readonly_session() as session:
             result = await self._get_by_registry_and_project(session, registry_name, project)
             if not result:
@@ -124,7 +137,22 @@ class ContainerRegistryRepository:
             return result
 
     @container_registry_repository_resilience.apply()
-    async def get_by_registry_name(self, registry_name: str) -> list[ContainerRegistryData]:
+    async def get_by_registry_name(
+        self,
+        registry_name: str,
+        skip_permission_check: bool = False,
+    ) -> list[ContainerRegistryData]:
+        """
+        Get container registries by name.
+
+        Args:
+            registry_name: Name of the registry
+            skip_permission_check: If True, bypasses permission validation (superadmin only)
+        """
+        if not skip_permission_check:
+            # TODO: Add permission validation when needed
+            pass
+
         async with self._db.begin_readonly_session() as session:
             stmt = sa.select(ContainerRegistryRow).where(
                 ContainerRegistryRow.registry_name == registry_name
@@ -134,7 +162,17 @@ class ContainerRegistryRepository:
             return [row.to_dataclass() for row in rows]
 
     @container_registry_repository_resilience.apply()
-    async def get_all(self) -> list[ContainerRegistryData]:
+    async def get_all(self, skip_permission_check: bool = False) -> list[ContainerRegistryData]:
+        """
+        Get all container registries.
+
+        Args:
+            skip_permission_check: If True, bypasses permission validation (superadmin only)
+        """
+        if not skip_permission_check:
+            # TODO: Add permission validation when needed
+            pass
+
         async with self._db.begin_readonly_session() as session:
             stmt = sa.select(ContainerRegistryRow)
             result = await session.execute(stmt)
@@ -146,7 +184,21 @@ class ContainerRegistryRepository:
         self,
         registry_name: str,
         project: Optional[str] = None,
+        skip_permission_check: bool = False,
     ) -> ContainerRegistryData:
+        """
+        Clear images from a container registry.
+
+        Args:
+            registry_name: Name of the registry
+            project: Optional project filter
+            skip_permission_check: If True, bypasses permission validation (superadmin only)
+        """
+        if not skip_permission_check:
+            # TODO: Add permission validation when needed
+            # Currently no permission checks are implemented in the original code
+            pass
+
         async with self._db.begin_session() as session:
             # Clear images
             update_stmt = (
@@ -218,3 +270,52 @@ class ContainerRegistryRepository:
 
         row: Optional[ContainerRegistryRow] = await session.scalar(stmt)
         return row.to_dataclass() if row else None
+
+    # Backward-compatible wrappers for admin operations
+    # These methods will be removed after service layer migration is complete
+
+    async def clear_images_force(
+        self,
+        registry_name: str,
+        project: Optional[str] = None,
+    ) -> ContainerRegistryData:
+        """
+        Forcefully clear images from a container registry without any validation.
+        This is an admin-only operation that should be used with caution.
+
+        Deprecated: Use clear_images(skip_permission_check=True) instead.
+        """
+        return await self.clear_images(registry_name, project, skip_permission_check=True)
+
+    async def get_by_registry_and_project_force(
+        self,
+        registry_name: str,
+        project: Optional[str] = None,
+    ) -> ContainerRegistryData:
+        """
+        Forcefully get container registry by name and project without any validation.
+        This is an admin-only operation that should be used with caution.
+
+        Deprecated: Use get_by_registry_and_project(skip_permission_check=True) instead.
+        """
+        return await self.get_by_registry_and_project(
+            registry_name, project, skip_permission_check=True
+        )
+
+    async def get_by_registry_name_force(self, registry_name: str) -> list[ContainerRegistryData]:
+        """
+        Forcefully get container registries by name without any validation.
+        This is an admin-only operation that should be used with caution.
+
+        Deprecated: Use get_by_registry_name(skip_permission_check=True) instead.
+        """
+        return await self.get_by_registry_name(registry_name, skip_permission_check=True)
+
+    async def get_all_force(self) -> list[ContainerRegistryData]:
+        """
+        Forcefully get all container registries without any validation.
+        This is an admin-only operation that should be used with caution.
+
+        Deprecated: Use get_all(skip_permission_check=True) instead.
+        """
+        return await self.get_all(skip_permission_check=True)

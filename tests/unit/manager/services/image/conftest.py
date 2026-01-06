@@ -23,7 +23,6 @@ from ai.backend.manager.data.image.types import (
     ImageResourcesData,
 )
 from ai.backend.manager.models.image import ImageStatus, ImageType
-from ai.backend.manager.repositories.image.admin_repository import AdminImageRepository
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
@@ -46,7 +45,7 @@ def mock_image_repository() -> MagicMock:
 @pytest.fixture
 def mock_admin_image_repository() -> MagicMock:
     """Mock AdminImageRepository for testing."""
-    return MagicMock(spec=AdminImageRepository)
+    return MagicMock(spec=ImageRepository)
 
 
 @pytest.fixture

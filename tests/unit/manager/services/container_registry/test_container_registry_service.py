@@ -25,9 +25,6 @@ from ai.backend.manager.data.image.types import (
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.container_registry.admin_repository import (
-    AdminContainerRegistryRepository,
-)
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
@@ -64,7 +61,7 @@ def mock_container_registry_repository() -> MagicMock:
 @pytest.fixture
 def mock_admin_container_registry_repository() -> MagicMock:
     """Create mocked admin container registry repository."""
-    return MagicMock(spec=AdminContainerRegistryRepository)
+    return MagicMock(spec=ContainerRegistryRepository)
 
 
 @pytest.fixture

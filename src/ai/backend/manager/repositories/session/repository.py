@@ -68,15 +68,57 @@ class SessionRepository:
             return UserData.from_row(user)
 
     @session_repository_resilience.apply()
-    async def get_session_validated(
+    async def get_session(
         self,
         session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
+        owner_access_key: Optional[AccessKey] = None,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
         eager_loading_op: Optional[list] = None,
+        skip_permission_check: bool = False,
     ) -> SessionRow:
+        """
+        Get session with optional ownership validation.
+
+        Args:
+            session_name_or_id: Session ID or name
+            owner_access_key: Owner's access key (required if skip_permission_check=False)
+            kernel_loading_strategy: Strategy for loading kernels
+            allow_stale: Allow stale sessions
+            eager_loading_op: SQLAlchemy eager loading options
+            skip_permission_check: If True, bypasses ownership validation (superadmin only)
+        """
+        if not skip_permission_check:
+            if owner_access_key is None:
+                raise ValueError("owner_access_key is required when skip_permission_check=False")
+
         async with self._db.begin_readonly_session() as db_sess:
+            if skip_permission_check:
+                # Force mode: get session by ID without ownership check
+                if isinstance(session_name_or_id, str):
+                    try:
+                        session_id = SessionId(uuid.UUID(session_name_or_id))
+                    except ValueError:
+                        # If not a valid UUID, treat as session name and search
+                        # But without owner_access_key, we can't use get_session
+                        # So we do a simple query by ID only
+                        raise SessionNotFound(
+                            f"Session name lookup requires ownership validation: {session_name_or_id}"
+                        )
+                else:
+                    session_id = session_name_or_id
+
+                query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
+                if eager_loading_op:
+                    for op in eager_loading_op:
+                        query_stmt = query_stmt.options(op)
+
+                session_row = await db_sess.scalar(query_stmt)
+                if session_row is None:
+                    raise SessionNotFound(f"Session not found (id:{session_id})")
+
+                return session_row
+            # Validated mode: use existing ownership check
             return await SessionRow.get_session(
                 db_sess,
                 session_name_or_id,
@@ -85,6 +127,29 @@ class SessionRepository:
                 allow_stale=allow_stale,
                 eager_loading_op=eager_loading_op,
             )
+
+    @session_repository_resilience.apply()
+    async def get_session_validated(
+        self,
+        session_name_or_id: str | SessionId,
+        owner_access_key: AccessKey,
+        kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        allow_stale: bool = False,
+        eager_loading_op: Optional[list] = None,
+    ) -> SessionRow:
+        """
+        Backward-compatible wrapper for get_session with ownership validation.
+
+        Deprecated: Use get_session(skip_permission_check=False) instead.
+        """
+        return await self.get_session(
+            session_name_or_id,
+            owner_access_key,
+            kernel_loading_strategy,
+            allow_stale,
+            eager_loading_op,
+            skip_permission_check=False,
+        )
 
     @session_repository_resilience.apply()
     async def match_sessions(
@@ -556,3 +621,42 @@ class SessionRepository:
                     selectinload(SessionRow.routing).options(noload("*")),
                 ],
             )
+
+    # Backward-compatible wrappers for admin operations
+    # These methods will be removed after service layer migration is complete
+
+    async def get_session_force(
+        self,
+        session_id: SessionId,
+        kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        allow_stale: bool = False,
+        eager_loading_op: Optional[list] = None,
+    ) -> SessionRow:
+        """
+        Get session without ownership validation (superadmin only).
+
+        Deprecated: Use get_session(skip_permission_check=True) instead.
+        """
+        return await self.get_session(
+            session_id,
+            owner_access_key=None,
+            kernel_loading_strategy=kernel_loading_strategy,
+            allow_stale=allow_stale,
+            eager_loading_op=eager_loading_op,
+            skip_permission_check=True,
+        )
+
+    async def get_session_to_determine_status_force(
+        self,
+        session_id: SessionId,
+    ) -> SessionRow:
+        """
+        Get session for status determination without ownership checks.
+
+        Deprecated: Use get_session(skip_permission_check=True) instead.
+        """
+        return await self.get_session(
+            session_id,
+            owner_access_key=None,
+            skip_permission_check=True,
+        )

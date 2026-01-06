@@ -4,9 +4,6 @@ from ai.backend.manager.container_registry import get_container_registry_cls
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.container_registry.admin_repository import (
-    AdminContainerRegistryRepository,
-)
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
@@ -46,13 +43,13 @@ if TYPE_CHECKING:
 class ContainerRegistryService:
     _db: ExtendedAsyncSAEngine
     _container_registry_repository: ContainerRegistryRepository
-    _admin_container_registry_repository: AdminContainerRegistryRepository
+    _admin_container_registry_repository: ContainerRegistryRepository
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         container_registry_repository: ContainerRegistryRepository,
-        admin_container_registry_repository: AdminContainerRegistryRepository,
+        admin_container_registry_repository: ContainerRegistryRepository,
     ) -> None:
         self._db = db
         self._container_registry_repository = container_registry_repository
