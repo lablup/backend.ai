@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import io
+import traceback
 from pathlib import Path
 
-from rich.console import ConsoleRenderable
+from rich.console import Console, ConsoleRenderable
 from rich.text import Text
+from rich.traceback import Traceback
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -45,9 +48,61 @@ class SetupLog(RichLog):
         Binding("enter", "continue", show=False),
     ]
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, log_file: str | None = None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._continue = asyncio.Event()
+        self._log_file = log_file
+        self._log_file_handle = None
+        if self._log_file:
+            try:
+                self._log_file_handle = open(self._log_file, "a", encoding="utf-8")
+            except Exception:
+                pass
+
+    def write(
+        self,
+        content: object,
+        width: int | None = None,
+        expand: bool = False,
+        shrink: bool = True,
+        scroll_end: bool | None = None,
+    ) -> SetupLog:
+        """Write content to the log and optionally to a file."""
+        # Always write to the RichLog widget
+        super().write(content, width=width, expand=expand, shrink=shrink, scroll_end=scroll_end)
+
+        # Also write to log file if configured
+        if self._log_file_handle is not None:
+            try:
+                if isinstance(content, str):
+                    self._log_file_handle.write(content + "\n")
+                elif isinstance(content, Text):
+                    self._log_file_handle.write(content.plain + "\n")
+                elif isinstance(content, Traceback):
+                    # Render Traceback to plain text using Rich Console
+                    string_io = io.StringIO()
+                    console = Console(file=string_io, force_terminal=False, width=120)
+                    console.print(content)
+                    self._log_file_handle.write(string_io.getvalue())
+                elif isinstance(content, Exception):
+                    # Write exception with full traceback
+                    self._log_file_handle.write(f"Error: {content}\n")
+                    tb_str = "".join(traceback.format_exception(type(content), content, content.__traceback__))
+                    self._log_file_handle.write(tb_str)
+                else:
+                    # For other ConsoleRenderable objects, try to render them
+                    try:
+                        string_io = io.StringIO()
+                        console = Console(file=string_io, force_terminal=False, width=120)
+                        console.print(content)
+                        self._log_file_handle.write(string_io.getvalue())
+                    except Exception:
+                        # Fallback to str()
+                        self._log_file_handle.write(str(content) + "\n")
+                self._log_file_handle.flush()
+            except Exception:
+                pass
+        return self
 
     async def wait_continue(self) -> None:
         """
@@ -60,6 +115,13 @@ class SetupLog(RichLog):
 
     async def action_continue(self) -> None:
         self._continue.set()
+
+    def __del__(self) -> None:
+        if self._log_file_handle is not None:
+            try:
+                self._log_file_handle.close()
+            except Exception:
+                pass
 
 
 class InputDialog(Static):

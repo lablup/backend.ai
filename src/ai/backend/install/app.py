@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import textwrap
 from pathlib import Path
 from weakref import WeakSet
@@ -56,9 +57,10 @@ class DevSetup(Static):
 
     def compose(self) -> ComposeResult:
         yield Label("Development Setup", classes="mode-title")
+        log_file = os.environ.get("BACKENDAI_INSTALL_LOG_FILE")
         with TabbedContent():
             with TabPane("Install Log", id="tab-dev-log"):
-                yield SetupLog(wrap=True, classes="log")
+                yield SetupLog(wrap=True, classes="log", log_file=log_file)
             with TabPane("Install Report", id="tab-dev-report"):
                 yield Label("Installation is not complete.")
 
@@ -113,9 +115,10 @@ class PackageSetup(Static):
 
     def compose(self) -> ComposeResult:
         yield Label("Package Setup", classes="mode-title")
+        log_file = os.environ.get("BACKENDAI_INSTALL_LOG_FILE")
         with TabbedContent():
             with TabPane("Install Log", id="tab-pkg-log"):
-                yield SetupLog(wrap=True, classes="log")
+                yield SetupLog(wrap=True, classes="log", log_file=log_file)
             with TabPane("Install Report", id="tab-pkg-report"):
                 yield Label("Installation is not complete.")
 
