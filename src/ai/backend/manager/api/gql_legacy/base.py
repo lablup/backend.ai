@@ -935,6 +935,39 @@ class _StmtWithConditions:
     conditions: list[WhereClauseType]
 
 
+def _apply_ordering(
+    stmt: sa.sql.Select,
+    id_column: sa.Column,
+    ordering_item_list: list[OrderingItem],
+    pagination_order: ConnectionPaginationOrder | None,
+) -> sa.sql.Select:
+    """
+    Apply ORDER BY clauses for cursor-based pagination with deterministic ordering.
+    This function applies the user-specified ordering columns first, then adds the id column
+    as the last tiebreaker to ensure deterministic ordering (required for stable cursor pagination).
+    """
+    match pagination_order:
+        case ConnectionPaginationOrder.FORWARD | None:
+            # Default ordering by id column (ascending for forward pagination)
+            id_ordering_item = OrderingItem(id_column, OrderDirection.ASC)
+            set_ordering = lambda col, direction: (
+                col.asc() if direction == OrderDirection.ASC else col.desc()
+            )
+        case ConnectionPaginationOrder.BACKWARD:
+            # Default ordering by id column (descending for backward pagination)
+            id_ordering_item = OrderingItem(id_column, OrderDirection.DESC)
+            # Reverse ordering direction for backward pagination
+            set_ordering = lambda col, direction: (
+                col.desc() if direction == OrderDirection.ASC else col.asc()
+            )
+
+    # Apply ordering to stmt (id column should be applied last for deterministic ordering)
+    for col, direction in [*ordering_item_list, id_ordering_item]:
+        stmt = stmt.order_by(set_ordering(col, direction))
+
+    return stmt
+
+
 def _apply_filter_conditions(
     stmt: sa.sql.Select,
     orm_class,
@@ -1047,28 +1080,10 @@ def _build_sql_stmt_from_connection_args(
     # Parse explicit ordering from order_expr parameter (if provided)
     ordering_item_list: list[OrderingItem] = []
     if order_expr is not None:
-        parser = order_expr.parser
-        ordering_item_list = parser.parse_order(orm_class, order_expr.expr)
+        ordering_item_list = order_expr.parser.parse_order(orm_class, order_expr.expr)
 
     # Apply ORDER BY for cursor-based pagination
-    match pagination_order:
-        case ConnectionPaginationOrder.FORWARD | None:
-            # Default ordering by id column (ascending for forward pagination)
-            id_ordering_item = OrderingItem(id_column, OrderDirection.ASC)
-            set_ordering = lambda col, direction: (
-                col.asc() if direction == OrderDirection.ASC else col.desc()
-            )
-        case ConnectionPaginationOrder.BACKWARD:
-            # Default ordering by id column (descending for backward pagination)
-            id_ordering_item = OrderingItem(id_column, OrderDirection.DESC)
-            # Reverse ordering direction for backward pagination
-            set_ordering = lambda col, direction: (
-                col.desc() if direction == OrderDirection.ASC else col.asc()
-            )
-
-    # Apply ordering to stmt (id column should be applied last for deterministic ordering)
-    for col, direction in [*ordering_item_list, id_ordering_item]:
-        stmt = stmt.order_by(set_ordering(col, direction))
+    stmt = _apply_ordering(stmt, id_column, ordering_item_list, pagination_order)
 
     # Apply filter conditions
     filter_conditions = []
@@ -1081,7 +1096,6 @@ def _build_sql_stmt_from_connection_args(
 
     # Apply cursor pagination WHERE conditions (to stmt only)
     cursor_conditions = []
-    cursor_id, pagination_order, _ = connection_args
     if cursor_id is not None:
         cursor_result = _apply_cursor_pagination(
             info, stmt, id_column, ordering_item_list, cursor_id, pagination_order
