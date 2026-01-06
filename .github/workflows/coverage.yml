@@ -29,8 +29,9 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
     - name: Bootstrap Pants
-      uses: ./actions/init-pants
+      uses: pantsbuild/actions/init-pants@v10
       with:
+        gha-cache-key: v0
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Run the full test suite
