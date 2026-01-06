@@ -1,5 +1,5 @@
 import uuid
-from collections.abc import AsyncGenerator, Callable, Mapping
+from collections.abc import AsyncGenerator, Callable
 from datetime import UTC, datetime
 from typing import Any, Optional
 
@@ -119,76 +119,6 @@ class TestScalingGroupRepositoryDB:
             use_host_network=use_host_network,
         )
         return Creator(spec=spec)
-
-    def _create_scaling_group_updater(
-        self,
-        name: str,
-        description: Optional[TriState[str]] = None,
-        is_active: Optional[OptionalState[bool]] = None,
-        is_public: Optional[OptionalState[bool]] = None,
-        wsproxy_addr: Optional[TriState[str]] = None,
-        wsproxy_api_token: Optional[TriState[str]] = None,
-        driver: Optional[OptionalState[str]] = None,
-        driver_opts: Optional[OptionalState[Mapping[str, Any]]] = None,
-        scheduler: Optional[OptionalState[str]] = None,
-        scheduler_opts: Optional[OptionalState[ScalingGroupOpts]] = None,
-        use_host_network: Optional[OptionalState[bool]] = None,
-    ) -> Updater[ScalingGroupRow]:
-        """Create a ScalingGroupUpdaterSpec with the given parameters."""
-        # Build sub-specs only if any of their fields are provided
-        status_spec: ScalingGroupStatusUpdaterSpec | None = None
-        if is_active is not None or is_public is not None:
-            status_spec = ScalingGroupStatusUpdaterSpec(
-                is_active=is_active if is_active is not None else OptionalState.nop(),
-                is_public=is_public if is_public is not None else OptionalState.nop(),
-            )
-
-        metadata_spec: ScalingGroupMetadataUpdaterSpec | None = None
-        if description is not None:
-            metadata_spec = ScalingGroupMetadataUpdaterSpec(
-                description=description,
-            )
-
-        network_spec: ScalingGroupNetworkConfigUpdaterSpec | None = None
-        if (
-            wsproxy_addr is not None
-            or wsproxy_api_token is not None
-            or use_host_network is not None
-        ):
-            network_spec = ScalingGroupNetworkConfigUpdaterSpec(
-                wsproxy_addr=wsproxy_addr if wsproxy_addr is not None else TriState.nop(),
-                wsproxy_api_token=(
-                    wsproxy_api_token if wsproxy_api_token is not None else TriState.nop()
-                ),
-                use_host_network=(
-                    use_host_network if use_host_network is not None else OptionalState.nop()
-                ),
-            )
-
-        driver_spec: ScalingGroupDriverConfigUpdaterSpec | None = None
-        if driver is not None or driver_opts is not None:
-            driver_spec = ScalingGroupDriverConfigUpdaterSpec(
-                driver=driver if driver is not None else OptionalState.nop(),
-                driver_opts=driver_opts if driver_opts is not None else OptionalState.nop(),
-            )
-
-        scheduler_spec: ScalingGroupSchedulerConfigUpdaterSpec | None = None
-        if scheduler is not None or scheduler_opts is not None:
-            scheduler_spec = ScalingGroupSchedulerConfigUpdaterSpec(
-                scheduler=scheduler if scheduler is not None else OptionalState.nop(),
-                scheduler_opts=scheduler_opts
-                if scheduler_opts is not None
-                else OptionalState.nop(),
-            )
-
-        spec = ScalingGroupUpdaterSpec(
-            status=status_spec,
-            metadata=metadata_spec,
-            network=network_spec,
-            driver=driver_spec,
-            scheduler=scheduler_spec,
-        )
-        return Updater(spec=spec, pk_value=name)
 
     async def _create_scaling_groups(
         self,
@@ -678,19 +608,29 @@ class TestScalingGroupRepositoryDB:
         new_scheduler_opts = ScalingGroupOpts(
             allowed_session_types=[SessionTypes.BATCH],
         )
-        updater = self._create_scaling_group_updater(
-            name=sample_scaling_group_for_update,
-            description=TriState.update("Updated description"),
-            is_active=OptionalState.update(False),
-            is_public=OptionalState.update(False),
-            wsproxy_addr=TriState.update("http://new-wsproxy:5000"),
-            wsproxy_api_token=TriState.update("new-token"),
-            driver=OptionalState.update("docker"),
-            driver_opts=OptionalState.update({"new_opt": "value"}),
-            scheduler=OptionalState.update("drf"),
-            scheduler_opts=OptionalState.update(new_scheduler_opts),
-            use_host_network=OptionalState.update(True),
+        spec = ScalingGroupUpdaterSpec(
+            status=ScalingGroupStatusUpdaterSpec(
+                is_active=OptionalState.update(False),
+                is_public=OptionalState.update(False),
+            ),
+            metadata=ScalingGroupMetadataUpdaterSpec(
+                description=TriState.update("Updated description"),
+            ),
+            network=ScalingGroupNetworkConfigUpdaterSpec(
+                wsproxy_addr=TriState.update("http://new-wsproxy:5000"),
+                wsproxy_api_token=TriState.update("new-token"),
+                use_host_network=OptionalState.update(True),
+            ),
+            driver=ScalingGroupDriverConfigUpdaterSpec(
+                driver=OptionalState.update("docker"),
+                driver_opts=OptionalState.update({"new_opt": "value"}),
+            ),
+            scheduler=ScalingGroupSchedulerConfigUpdaterSpec(
+                scheduler=OptionalState.update("drf"),
+                scheduler_opts=OptionalState.update(new_scheduler_opts),
+            ),
         )
+        updater = Updater(spec=spec, pk_value=sample_scaling_group_for_update)
         result = await scaling_group_repository.update_scaling_group(updater)
 
         assert result.metadata.description == "Updated description"
@@ -709,10 +649,12 @@ class TestScalingGroupRepositoryDB:
         scaling_group_repository: ScalingGroupRepository,
     ) -> None:
         """Test updating a non-existent scaling group raises ScalingGroupNotFound"""
-        updater = self._create_scaling_group_updater(
-            name="test-sgroup-nonexistent",
-            description=TriState.update("Updated description"),
+        spec = ScalingGroupUpdaterSpec(
+            metadata=ScalingGroupMetadataUpdaterSpec(
+                description=TriState.update("Updated description"),
+            ),
         )
+        updater = Updater(spec=spec, pk_value="test-sgroup-nonexistent")
 
         with pytest.raises(ScalingGroupNotFound):
             await scaling_group_repository.update_scaling_group(updater)
