@@ -38,6 +38,7 @@ When multiple people add entries simultaneously, Git merge conflicts will natura
 | 1017 | Model Scanner and Downloader | Bokeum Kim | Accepted |
 | 1018 | Local Cache for Model VFolders | Joongi Kim | Draft |
 | 1019 | MinIO Artifact Registry Storage | Gyubong Lee | Accepted |
+| 1020 | VFolder Destination Support for Artifact Import | Gyubong Lee | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## Rules for PR title
