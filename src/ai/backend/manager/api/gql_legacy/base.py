@@ -1015,15 +1015,16 @@ def _apply_cursor_pagination(
             subq = sa.select(col).where(id_column == cursor_row_id).scalar_subquery()
             cursor_conditions.append(subq_to_condition(col, subq, direction))
 
-        # Add id-based cursor WHERE condition.
+        # Add id-based cursor WHERE condition ONLY when no explicit ordering is provided.
         # This is CRITICAL for pagination to work when no explicit order_expr is provided.
-        # Without this, the loop above doesn't execute (ordering_item_list is empty),
-        # and no cursor filtering happens, causing the same first page to be returned repeatedly.
-        match pagination_order:
-            case ConnectionPaginationOrder.FORWARD | None:
-                cursor_conditions.append(id_column > cursor_row_id)
-            case ConnectionPaginationOrder.BACKWARD:
-                cursor_conditions.append(id_column < cursor_row_id)
+        # When ordering_item_list is not empty, the id condition is already embedded
+        # in the ordering cursor conditions above (via condition_when_same_with_subq).
+        if not ordering_item_list:
+            match pagination_order:
+                case ConnectionPaginationOrder.FORWARD | None:
+                    cursor_conditions.append(id_column > cursor_row_id)
+                case ConnectionPaginationOrder.BACKWARD:
+                    cursor_conditions.append(id_column < cursor_row_id)
 
         for cond in cursor_conditions:
             stmt = stmt.where(cond)
