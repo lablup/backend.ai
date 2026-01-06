@@ -12,6 +12,7 @@ from collections.abc import (
     MutableMapping,
     Sequence,
 )
+from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -928,53 +929,66 @@ def validate_connection_args(
     return ConnectionArgs(cursor, order, requested_page_size)
 
 
-def _build_sql_stmt_from_connection_args(
-    info: graphene.ResolveInfo,
+@dataclass
+class _StmtWithConditions:
+    stmt: sa.sql.Select
+    conditions: list[WhereClauseType]
+
+
+def _apply_filter_conditions(
+    stmt: sa.sql.Select,
     orm_class,
+    filter_expr: FilterExprArg | None,
+) -> _StmtWithConditions:
+    """
+    Filter conditions should be applied to both the main query statement and the count statement,
+    as they define which items are included in the result set regardless of pagination.
+    """
+    filter_conditions: list[WhereClauseType] = []
+
+    if filter_expr is not None:
+        condition_parser = filter_expr.parser
+        filter_cond = condition_parser.parse_filter(orm_class, filter_expr.expr)
+        filter_conditions.append(filter_cond)
+        stmt = stmt.where(filter_cond)
+
+    return _StmtWithConditions(stmt, filter_conditions)
+
+
+def _apply_cursor_pagination(
+    info: graphene.ResolveInfo,
+    stmt: sa.sql.Select,
     id_column: sa.Column,
-    filter_expr: FilterExprArg | None = None,
-    order_expr: OrderExprArg | None = None,
-    *,
+    ordering_item_list: list[OrderingItem],
     connection_args: ConnectionArgs,
-) -> tuple[sa.sql.Select, sa.sql.Select, list[WhereClauseType]]:
-    stmt = sa.select(orm_class)
-    count_stmt = sa.select(sa.func.count()).select_from(orm_class)
-    conditions: list[WhereClauseType] = []
+) -> _StmtWithConditions:
+    """
+    Apply cursor-based pagination WHERE conditions to the statement.
+    """
+    cursor_conditions: list[WhereClauseType] = []
+    cursor_id, pagination_order, _ = connection_args
 
-    cursor_id, pagination_order, requested_page_size = connection_args
-
-    ordering_item_list: list[OrderingItem] = []
-    if order_expr is not None:
-        parser = order_expr.parser
-        ordering_item_list = parser.parse_order(orm_class, order_expr.expr)
-
-    # Apply SQL order_by
-    match pagination_order:
-        case ConnectionPaginationOrder.FORWARD | None:
-            # Default ordering by id column
-            id_ordering_item = OrderingItem(id_column, OrderDirection.ASC)
-            set_ordering = lambda col, direction: (
-                col.asc() if direction == OrderDirection.ASC else col.desc()
-            )
-        case ConnectionPaginationOrder.BACKWARD:
-            # Default ordering by id column
-            id_ordering_item = OrderingItem(id_column, OrderDirection.DESC)
-            set_ordering = lambda col, direction: (
-                col.desc() if direction == OrderDirection.ASC else col.asc()
-            )
-    # id column should be applied last
-    for col, direction in [*ordering_item_list, id_ordering_item]:
-        stmt = stmt.order_by(set_ordering(col, direction))
-
-    # Set cursor by comparing scalar values of subquery that queried by cursor id
     if cursor_id is not None:
-        _, cursor_row_id = AsyncNode.resolve_global_id(info, cursor_id)
+        _, cursor_row_id_str = AsyncNode.resolve_global_id(info, cursor_id)
+
+        cursor_row_id: UUID | str
+        try:
+            cursor_row_id = uuid.UUID(cursor_row_id_str)
+        except (ValueError, AttributeError):
+            # Fall back to string if not a valid UUID (for other ID types)
+            cursor_row_id = cursor_row_id_str
 
         def subq_to_condition(
             column_to_be_compared: InstrumentedAttribute,
             subquery: ScalarSelect,
             direction: OrderDirection,
         ) -> WhereClauseType:
+            """Generate cursor condition for a specific ordering column.
+
+            This handles cursor conditions when explicit order_expr is provided.
+            For example, if ordering by "created_at DESC", this ensures we only get items
+            where created_at < cursor_created_at, or where created_at = cursor_created_at but id < cursor_id.
+            """
             match pagination_order:
                 case ConnectionPaginationOrder.FORWARD | None:
                     if direction == OrderDirection.ASC:
@@ -982,7 +996,7 @@ def _build_sql_stmt_from_connection_args(
                     else:
                         cond = column_to_be_compared < subquery
 
-                    # Comparing ID field - The direction of inequality sign - is not effected by `direction` argument here
+                    # Comparing ID field - The direction of inequality sign is not affected by `direction` argument here
                     # because the ordering direction of ID field is always determined by `pagination_order` only.
                     condition_when_same_with_subq = (column_to_be_compared == subquery) & (
                         id_column > cursor_row_id
@@ -998,22 +1012,84 @@ def _build_sql_stmt_from_connection_args(
 
             return cond | condition_when_same_with_subq
 
+        # Add cursor conditions for explicit ordering columns (if any)
         for col, direction in ordering_item_list:
             subq = sa.select(col).where(id_column == cursor_row_id).scalar_subquery()
-            conditions.append(subq_to_condition(col, subq, direction))
+            cursor_conditions.append(subq_to_condition(col, subq, direction))
 
+        # Add id-based cursor WHERE condition.
+        # This is CRITICAL for pagination to work when no explicit order_expr is provided.
+        # Without this, the loop above doesn't execute (ordering_item_list is empty),
+        # and no cursor filtering happens, causing the same first page to be returned repeatedly.
+        match pagination_order:
+            case ConnectionPaginationOrder.FORWARD | None:
+                cursor_conditions.append(id_column > cursor_row_id)
+            case ConnectionPaginationOrder.BACKWARD:
+                cursor_conditions.append(id_column < cursor_row_id)
+
+        for cond in cursor_conditions:
+            stmt = stmt.where(cond)
+
+    return _StmtWithConditions(stmt, cursor_conditions)
+
+
+def _build_sql_stmt_from_connection_args(
+    info: graphene.ResolveInfo,
+    orm_class,
+    id_column: sa.Column,
+    filter_expr: FilterExprArg | None = None,
+    order_expr: OrderExprArg | None = None,
+    *,
+    connection_args: ConnectionArgs,
+) -> tuple[sa.sql.Select, sa.sql.Select, list[WhereClauseType]]:
+    stmt = sa.select(orm_class)
+    count_stmt = sa.select(sa.func.count()).select_from(orm_class)
+
+    cursor_id, pagination_order, requested_page_size = connection_args
+
+    # Parse explicit ordering from order_expr parameter (if provided)
+    ordering_item_list: list[OrderingItem] = []
+    if order_expr is not None:
+        parser = order_expr.parser
+        ordering_item_list = parser.parse_order(orm_class, order_expr.expr)
+
+    # ===== Apply ORDER BY for cursor-based pagination =====
+    match pagination_order:
+        case ConnectionPaginationOrder.FORWARD | None:
+            # Default ordering by id column (ascending for forward pagination)
+            id_ordering_item = OrderingItem(id_column, OrderDirection.ASC)
+            set_ordering = lambda col, direction: (
+                col.asc() if direction == OrderDirection.ASC else col.desc()
+            )
+        case ConnectionPaginationOrder.BACKWARD:
+            # Default ordering by id column (descending for backward pagination)
+            id_ordering_item = OrderingItem(id_column, OrderDirection.DESC)
+            # Reverse ordering direction for backward pagination
+            set_ordering = lambda col, direction: (
+                col.desc() if direction == OrderDirection.ASC else col.asc()
+            )
+
+    # Apply ordering to stmt (id column should be applied last for deterministic ordering)
+    for col, direction in [*ordering_item_list, id_ordering_item]:
+        stmt = stmt.order_by(set_ordering(col, direction))
+
+    # Apply filter conditions (to both stmt and count_stmt)
+    filter_result = _apply_filter_conditions(stmt, orm_class, filter_expr)
+    stmt = filter_result.stmt
+    for cond in filter_result.conditions:
+        count_stmt = count_stmt.where(cond)
+
+    # Apply cursor pagination WHERE conditions (to stmt only)
+    cursor_result = _apply_cursor_pagination(
+        info, stmt, id_column, ordering_item_list, connection_args
+    )
+    stmt = cursor_result.stmt
+
+    # Apply LIMIT (to stmt only)
     if requested_page_size is not None:
-        # Add 1 to determine has_next_page or has_previous_page
         stmt = stmt.limit(requested_page_size + 1)
 
-    if filter_expr is not None:
-        condition_parser = filter_expr.parser
-        conditions.append(condition_parser.parse_filter(orm_class, filter_expr.expr))
-
-    for cond in conditions:
-        stmt = stmt.where(cond)
-        count_stmt = count_stmt.where(cond)
-    return stmt, count_stmt, conditions
+    return stmt, count_stmt, [*filter_result.conditions, *cursor_result.conditions]
 
 
 def _build_sql_stmt_from_sql_arg(
