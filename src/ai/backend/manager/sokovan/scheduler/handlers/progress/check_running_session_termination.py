@@ -144,8 +144,8 @@ class CheckRunningSessionTerminationLifecycleHandler(SessionLifecycleHandler):
 
     async def execute(
         self,
-        sessions: Sequence[HandlerSessionData],
         scaling_group: str,
+        sessions: Sequence[HandlerSessionData],
     ) -> SessionExecutionResult:
         """Mark RUNNING sessions with all kernels TERMINATED as TERMINATING.
 

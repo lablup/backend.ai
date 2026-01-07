@@ -18,6 +18,7 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.repositories.scheduler import (
     KernelTerminationResult,
     SchedulerRepository,
+    TerminatingSessionData,
 )
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData, ScheduleResult
@@ -61,6 +62,32 @@ class SessionTerminator:
         # Fetch all terminating sessions
         terminating_sessions = await self._repository.get_terminating_sessions()
 
+        return await self._terminate_sessions_internal(terminating_sessions)
+
+    async def terminate_sessions_for_handler(
+        self,
+        terminating_sessions: list[TerminatingSessionData],
+    ) -> None:
+        """
+        Send termination requests for the given sessions.
+
+        Handler-specific method that works with pre-fetched data.
+        Used by TerminateSessionsLifecycleHandler.
+
+        :param terminating_sessions: List of sessions to terminate with kernel details
+        """
+        await self._terminate_sessions_internal(terminating_sessions)
+
+    async def _terminate_sessions_internal(
+        self,
+        terminating_sessions: list[TerminatingSessionData],
+    ) -> ScheduleResult:
+        """
+        Internal implementation for terminating sessions.
+
+        :param terminating_sessions: List of sessions to terminate
+        :return: Empty ScheduleResult (no status updates performed here)
+        """
         if not terminating_sessions:
             log.debug("No sessions to terminate")
             return ScheduleResult()

@@ -135,8 +135,8 @@ class SweepStaleKernelsLifecycleHandler(SessionLifecycleHandler):
 
     async def execute(
         self,
-        sessions: Sequence[HandlerSessionData],
         scaling_group: str,
+        sessions: Sequence[HandlerSessionData],
     ) -> SessionExecutionResult:
         """Sweep kernels with stale presence status.
 

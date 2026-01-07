@@ -131,8 +131,8 @@ class CheckPullingProgressLifecycleHandler(SessionLifecycleHandler):
 
     async def execute(
         self,
-        sessions: Sequence[HandlerSessionData],
         scaling_group: str,
+        sessions: Sequence[HandlerSessionData],
     ) -> SessionExecutionResult:
         """Return all provided sessions as successes.
 

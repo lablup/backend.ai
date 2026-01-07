@@ -130,26 +130,21 @@ class SessionProvisioner:
         sequncer = self._sequencer_pool[name]
         return SchedulingSequencer(sequncer)
 
-    async def schedule_scaling_group(self, scaling_group: str) -> ScheduleResult:
+    async def schedule_scaling_group(
+        self,
+        scaling_group: str,
+        scheduling_data: SchedulingData,
+    ) -> ScheduleResult:
         """
         Schedule sessions for a specific scaling group.
+
         Args:
             scaling_group: The scaling group to schedule for.
+            scheduling_data: Pre-fetched scheduling data from Handler.
+
         Returns:
             ScheduleResult containing count and session data
         """
-        # Single optimized call to get all scheduling data
-        # This consolidates: get_scaling_group_info_for_sokovan, get_pending_sessions,
-        # get_system_snapshot, and get_scheduling_config into ONE DB session
-        scheduling_data = await self._repository.get_scheduling_data(scaling_group)
-
-        if scheduling_data is None:
-            log.trace(
-                "No pending sessions for scaling group {}. Skipping scheduling.",
-                scaling_group,
-            )
-            return ScheduleResult()
-
         # Schedule using the scheduling data - no more DB calls needed
         return await self._schedule_queued_sessions_with_data(scaling_group, scheduling_data)
 

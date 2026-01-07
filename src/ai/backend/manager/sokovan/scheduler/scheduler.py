@@ -91,9 +91,21 @@ class Scheduler:
         for scaling_group in scaling_groups:
             try:
                 log.trace("Scheduling sessions for scaling group: {}", scaling_group)
+
+                # Fetch scheduling data for this scaling group
+                scheduling_data = await self._repository.get_scheduling_data(scaling_group)
+                if scheduling_data is None:
+                    log.trace(
+                        "No pending sessions for scaling group {}. Skipping.",
+                        scaling_group,
+                    )
+                    continue
+
                 # Schedule sessions for this scaling group via provisioner
                 with self._phase_metrics.measure_phase("scheduler", scaling_group, "scheduling"):
-                    scheduled_result = await self._provisioner.schedule_scaling_group(scaling_group)
+                    scheduled_result = await self._provisioner.schedule_scaling_group(
+                        scaling_group, scheduling_data
+                    )
                 all_scheduled_sessions.extend(scheduled_result.scheduled_sessions)
                 if scheduled_result.scheduled_sessions:
                     log.info(

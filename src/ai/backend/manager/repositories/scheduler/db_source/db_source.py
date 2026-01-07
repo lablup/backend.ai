@@ -886,6 +886,70 @@ class ScheduleDBSource:
 
             return terminating_sessions
 
+    async def get_terminating_sessions_by_ids(
+        self,
+        session_ids: list[SessionId],
+    ) -> list[TerminatingSessionData]:
+        """
+        Fetch terminating sessions by session IDs.
+
+        This method is used by handlers that need detailed session data
+        (TerminatingSessionData) beyond what the coordinator provides (HandlerSessionData).
+
+        :param session_ids: List of session IDs to fetch
+        :return: List of TerminatingSessionData objects with kernel details
+        """
+        if not session_ids:
+            return []
+
+        async with self._begin_readonly_session_read_committed() as session:
+            query = (
+                sa.select(SessionRow)
+                .where(SessionRow.id.in_(session_ids))
+                .options(
+                    selectinload(SessionRow.kernels).options(
+                        load_only(
+                            KernelRow.id,
+                            KernelRow.status,
+                            KernelRow.container_id,
+                            KernelRow.agent,
+                            KernelRow.agent_addr,
+                            KernelRow.occupied_slots,
+                        )
+                    )
+                )
+            )
+            result = await session.execute(query)
+            session_rows = list(result.scalars().all())
+
+            terminating_sessions = []
+            for session_row in session_rows:
+                kernels = [
+                    TerminatingKernelData(
+                        kernel_id=str(kernel.id),
+                        status=kernel.status,
+                        container_id=kernel.container_id,
+                        agent_id=kernel.agent,
+                        agent_addr=kernel.agent_addr,
+                        occupied_slots=kernel.occupied_slots,
+                    )
+                    for kernel in session_row.kernels
+                ]
+
+                terminating_sessions.append(
+                    TerminatingSessionData(
+                        session_id=session_row.id,
+                        access_key=session_row.access_key,
+                        creation_id=session_row.creation_id,
+                        status=session_row.status,
+                        status_info=session_row.status_info or "UNKNOWN",
+                        session_type=session_row.session_type,
+                        kernels=kernels,
+                    )
+                )
+
+            return terminating_sessions
+
     async def get_terminating_kernels_with_lost_agents(
         self,
     ) -> list[TerminatingKernelWithAgentData]:
@@ -3816,6 +3880,207 @@ class ScheduleDBSource:
                 sessions_map[session_id].kernels.append(kernel_binding)
 
         return list(sessions_map.values())
+
+    async def get_sessions_for_start_by_ids(
+        self,
+        session_ids: list[SessionId],
+    ) -> SessionsForStartWithImages:
+        """
+        Get sessions for starting by session IDs.
+
+        This method is used by handlers that need additional session data
+        beyond what the coordinator provides (HandlerSessionData).
+
+        :param session_ids: List of session IDs to fetch
+        :return: SessionsForStartWithImages object with sessions and image configs
+        """
+        if not session_ids:
+            return SessionsForStartWithImages(sessions=[], image_configs={})
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            # Get sessions with all fields needed for starting
+            sessions_for_start = await self._fetch_sessions_for_start_by_ids(db_sess, session_ids)
+
+            # Collect unique images to resolve
+            unique_images: set[ImageIdentifier] = set()
+            for session in sessions_for_start:
+                for kernel in session.kernels:
+                    unique_images.add(
+                        ImageIdentifier(canonical=kernel.image, architecture=kernel.architecture)
+                    )
+
+            # Resolve all images and build ImageConfigData
+            image_configs = await self._resolve_image_configs(db_sess, unique_images)
+
+            return SessionsForStartWithImages(
+                sessions=sessions_for_start, image_configs=image_configs
+            )
+
+    async def _fetch_sessions_for_start_by_ids(
+        self,
+        db_sess: SASession,
+        session_ids: list[SessionId],
+    ) -> list[SessionDataForStart]:
+        """
+        Get sessions with all fields needed for starting by session IDs.
+        """
+        stmt = (
+            sa.select(
+                SessionRow.id,
+                SessionRow.creation_id,
+                SessionRow.access_key,
+                SessionRow.session_type,
+                SessionRow.name,
+                SessionRow.environ,
+                SessionRow.cluster_mode,
+                SessionRow.user_uuid,
+                KernelRow.id.label("kernel_id"),
+                KernelRow.agent,
+                KernelRow.agent_addr,
+                KernelRow.scaling_group,
+                KernelRow.image,
+                KernelRow.architecture,
+                KernelRow.cluster_role,
+                KernelRow.cluster_idx,
+                KernelRow.local_rank,
+                KernelRow.cluster_hostname,
+                KernelRow.uid,
+                KernelRow.main_gid,
+                KernelRow.gids,
+                KernelRow.requested_slots,
+                KernelRow.resource_opts,
+                KernelRow.bootstrap_script,
+                KernelRow.startup_command,
+                KernelRow.preopen_ports,
+                KernelRow.internal_data,
+                KernelRow.vfolder_mounts,
+                KernelRow.status.label("kernel_status"),
+                KernelRow.status_changed,
+            )
+            .select_from(SessionRow)
+            .outerjoin(KernelRow, SessionRow.id == KernelRow.session_id)
+            .where(SessionRow.id.in_(session_ids))
+            .order_by(SessionRow.created_at, SessionRow.id, KernelRow.cluster_idx)
+        )
+        result = await db_sess.execute(stmt)
+        rows = result.fetchall()
+
+        # Group rows by session
+        from collections import defaultdict
+
+        session_data: dict[SessionId, dict] = defaultdict(lambda: {"kernels": []})
+        user_uuids = set()
+
+        for row in rows:
+            session_id = row.id
+            if "info" not in session_data[session_id]:
+                session_data[session_id]["info"] = {
+                    "id": row.id,
+                    "creation_id": row.creation_id,
+                    "access_key": row.access_key,
+                    "session_type": row.session_type,
+                    "name": row.name,
+                    "environ": row.environ,
+                    "cluster_mode": row.cluster_mode,
+                    "user_uuid": row.user_uuid,
+                }
+                if row.user_uuid:
+                    user_uuids.add(row.user_uuid)
+
+            if row.kernel_id:  # Only add kernel if it exists
+                session_data[session_id]["kernels"].append({
+                    "kernel_id": row.kernel_id,
+                    "agent": row.agent,
+                    "agent_addr": row.agent_addr,
+                    "scaling_group": row.scaling_group,
+                    "image": row.image,
+                    "architecture": row.architecture,
+                    "kernel_status": row.kernel_status,
+                    "status_changed": row.status_changed,
+                    "cluster_role": row.cluster_role,
+                    "cluster_idx": row.cluster_idx,
+                    "local_rank": row.local_rank,
+                    "cluster_hostname": row.cluster_hostname,
+                    "uid": row.uid,
+                    "main_gid": row.main_gid,
+                    "gids": row.gids,
+                    "requested_slots": row.requested_slots,
+                    "resource_opts": row.resource_opts,
+                    "bootstrap_script": row.bootstrap_script,
+                    "startup_command": row.startup_command,
+                    "preopen_ports": row.preopen_ports,
+                    "internal_data": row.internal_data,
+                    "vfolder_mounts": row.vfolder_mounts,
+                })
+
+        # Load user info for sessions
+        user_map = {}
+        if user_uuids:
+            user_query = sa.select(
+                UserRow.uuid,
+                UserRow.email,
+                UserRow.username,
+            ).where(UserRow.uuid.in_(user_uuids))
+            user_result = await db_sess.execute(user_query)
+            user_map = {row.uuid: row for row in user_result.fetchall()}
+
+        # Convert to dataclass
+        sessions_for_start: list[SessionDataForStart] = []
+        for session_id, data in session_data.items():
+            session_info = data["info"]
+
+            # Get user info
+            user_info = user_map.get(session_info["user_uuid"])
+            if not user_info:
+                log.warning(f"User info not found for session {session_id}")
+                continue
+
+            # Convert kernels
+            kernel_bindings = [
+                KernelBindingData(
+                    kernel_id=k["kernel_id"],
+                    agent_id=k["agent"],
+                    agent_addr=k["agent_addr"],
+                    scaling_group=k["scaling_group"],
+                    image=k["image"],
+                    architecture=k["architecture"],
+                    status=k["kernel_status"],
+                    status_changed=k["status_changed"].timestamp() if k["status_changed"] else None,
+                    cluster_role=k["cluster_role"],
+                    cluster_idx=k["cluster_idx"],
+                    local_rank=k["local_rank"],
+                    cluster_hostname=k["cluster_hostname"],
+                    uid=k["uid"],
+                    main_gid=k["main_gid"],
+                    gids=k["gids"] or [],
+                    requested_slots=k["requested_slots"] or ResourceSlot(),
+                    resource_opts=k["resource_opts"] or {},
+                    bootstrap_script=k["bootstrap_script"],
+                    startup_command=k["startup_command"],
+                    preopen_ports=k["preopen_ports"] or [],
+                    internal_data=k["internal_data"],
+                    vfolder_mounts=k["vfolder_mounts"] or [],
+                )
+                for k in data["kernels"]
+            ]
+
+            sessions_for_start.append(
+                SessionDataForStart(
+                    session_id=session_info["id"],
+                    creation_id=session_info["creation_id"],
+                    access_key=session_info["access_key"],
+                    session_type=session_info["session_type"],
+                    name=session_info["name"],
+                    cluster_mode=session_info["cluster_mode"],
+                    kernels=kernel_bindings,
+                    environ=session_info.get("environ", {}),
+                    user_uuid=session_info["user_uuid"],
+                    user_email=user_info.email,
+                    user_name=user_info.username,
+                )
+            )
+
+        return sessions_for_start
 
     # ========================================================================
     # Search methods (BatchQuerier pattern)

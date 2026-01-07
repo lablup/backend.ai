@@ -138,8 +138,8 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
 
     async def execute(
         self,
-        sessions: Sequence[HandlerSessionData],
         scaling_group: str,
+        sessions: Sequence[HandlerSessionData],
     ) -> SessionExecutionResult:
         """Start kernels on agents for PREPARED sessions.
 

@@ -136,14 +136,14 @@ class SessionLifecycleHandler(ABC):
     @abstractmethod
     async def execute(
         self,
-        sessions: Sequence[HandlerSessionData],
         scaling_group: str,
+        sessions: Sequence[HandlerSessionData],
     ) -> SessionExecutionResult:
         """Execute the handler logic on the given sessions.
 
         Args:
-            sessions: Sessions queried by coordinator based on target_statuses()
             scaling_group: The scaling group being processed
+            sessions: Sessions queried by coordinator based on target_statuses()
 
         Returns:
             Result containing successes, failures, and stales for status transitions

@@ -154,8 +154,8 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
 
     async def execute(
         self,
-        sessions: Sequence[HandlerSessionData],
         scaling_group: str,
+        sessions: Sequence[HandlerSessionData],
     ) -> SessionExecutionResult:
         """Schedule pending sessions for a scaling group.
 
@@ -168,8 +168,19 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         if not sessions:
             return result
 
-        # Delegate to existing Provisioner method
-        schedule_result = await self._provisioner.schedule_scaling_group(scaling_group)
+        # Fetch scheduling data required by Provisioner
+        scheduling_data = await self._repository.get_scheduling_data(scaling_group)
+        if scheduling_data is None:
+            log.debug(
+                "No scheduling data for scaling group {}. Skipping scheduling.",
+                scaling_group,
+            )
+            return result
+
+        # Delegate to Provisioner with pre-fetched data
+        schedule_result = await self._provisioner.schedule_scaling_group(
+            scaling_group, scheduling_data
+        )
 
         # Mark scheduled sessions as success for status transition
         for event_data in schedule_result.scheduled_sessions:

@@ -122,12 +122,12 @@ class RetryCreatingLifecycleHandler(SessionLifecycleHandler):
 
     async def execute(
         self,
-        sessions: Sequence[HandlerSessionData],
         scaling_group: str,
+        sessions: Sequence[HandlerSessionData],
     ) -> SessionExecutionResult:
         """Check and retry stuck CREATING sessions.
 
-        Delegates to Launcher's retry method which handles:
+        Fetches detailed session data and delegates to Launcher's retry method which handles:
         - Filtering truly stuck sessions
         - Checking with agents if sessions are actively creating
         - Updating retry counts
@@ -138,11 +138,25 @@ class RetryCreatingLifecycleHandler(SessionLifecycleHandler):
         if not sessions:
             return result
 
-        # Delegate to existing Launcher method which handles all the logic
-        await self._launcher.retry_creating_sessions()
+        # Extract session IDs from HandlerSessionData
+        session_ids = [s.session_id for s in sessions]
 
-        # Don't mark any status changes - the Launcher handles retry counts
-        # and moves sessions to TERMINATING if max retries exceeded
+        # Fetch detailed session data (SessionDataForStart) from repository
+        sessions_with_images = await self._repository.get_sessions_for_start_by_ids(session_ids)
+        sessions_for_start = sessions_with_images.sessions
+        image_configs = sessions_with_images.image_configs
+
+        if not sessions_for_start:
+            return result
+
+        # Delegate to Launcher's handler-specific method
+        retried_session_ids = await self._launcher.retry_creating_for_handler(
+            sessions_for_start, image_configs
+        )
+
+        # Sessions that were retried are successes
+        # Launcher internally handles retry count and marks stale sessions
+        result.successes.extend(retried_session_ids)
 
         return result
 

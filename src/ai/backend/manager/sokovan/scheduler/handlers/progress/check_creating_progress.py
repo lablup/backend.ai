@@ -150,8 +150,8 @@ class CheckCreatingProgressLifecycleHandler(SessionLifecycleHandler):
 
     async def execute(
         self,
-        sessions: Sequence[HandlerSessionData],
         scaling_group: str,
+        sessions: Sequence[HandlerSessionData],
     ) -> SessionExecutionResult:
         """Execute on_transition_to_running hooks and prepare for RUNNING transition.
 

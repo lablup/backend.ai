@@ -8,6 +8,7 @@ from .types.session import (
     SessionTerminationResult,
     TerminatingKernelData,
     TerminatingKernelWithAgentData,
+    TerminatingSessionData,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "SessionTerminationResult",
     "TerminatingKernelData",
     "TerminatingKernelWithAgentData",
+    "TerminatingSessionData",
 ]

@@ -333,7 +333,7 @@ class ScheduleCoordinator:
                             continue
 
                         # Execute handler logic
-                        result = await handler.execute(sessions, scaling_group)
+                        result = await handler.execute(scaling_group, sessions)
                         all_results.merge(result)
 
                     # Apply status transitions

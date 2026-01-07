@@ -141,8 +141,8 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
 
     async def execute(
         self,
-        sessions: Sequence[HandlerSessionData],
         scaling_group: str,
+        sessions: Sequence[HandlerSessionData],
     ) -> SessionExecutionResult:
         """Trigger image pulling for SCHEDULED sessions.
 

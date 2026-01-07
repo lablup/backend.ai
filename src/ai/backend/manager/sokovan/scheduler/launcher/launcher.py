@@ -944,3 +944,119 @@ class SessionLauncher:
             for session in sessions_to_retry
         ]
         return ScheduleResult(scheduled_sessions=scheduled_data)
+
+    async def retry_preparing_for_handler(
+        self,
+        sessions: list[SessionDataForPull],
+        image_configs: dict[str, ImageConfigData],
+    ) -> list[SessionId]:
+        """
+        Retry PREPARING/PULLING sessions for the given sessions list.
+
+        Handler-specific method that works with pre-fetched data.
+        Used by RetryPreparingLifecycleHandler.
+
+        :param sessions: List of sessions to check for retry
+        :param image_configs: Image configurations indexed by image name
+        :return: List of session IDs that were retried
+        """
+        PREPARING_CHECK_THRESHOLD = 10.0  # 10 seconds
+
+        if not sessions:
+            return []
+
+        # Filter sessions that haven't changed status for threshold time
+        stuck_sessions = self._filter_stuck_sessions_for_pull(sessions, PREPARING_CHECK_THRESHOLD)
+
+        if not stuck_sessions:
+            return []
+
+        # Check which sessions are actually stuck (not actively pulling)
+        truly_stuck_sessions = await self._check_truly_stuck_pulling_sessions(
+            stuck_sessions, image_configs
+        )
+
+        if not truly_stuck_sessions:
+            log.debug("All sessions are actively pulling, no retry needed")
+            return []
+
+        log.info("Retrying {} truly stuck PREPARING/PULLING sessions", len(truly_stuck_sessions))
+
+        # Update retry counts and get sessions that should continue retrying
+        stuck_session_ids = [session.session_id for session in truly_stuck_sessions]
+        sessions_to_retry_ids = await self._repository.batch_update_stuck_session_retries(
+            stuck_session_ids, SERVICE_MAX_RETRIES
+        )
+
+        if not sessions_to_retry_ids:
+            log.info("All stuck sessions exceeded max retries, moved to PENDING")
+            return []
+
+        # Filter sessions that should be retried based on returned IDs
+        sessions_to_retry = [
+            session
+            for session in truly_stuck_sessions
+            if session.session_id in sessions_to_retry_ids
+        ]
+
+        # Use the existing _trigger_image_pulling_for_sessions method
+        await self._trigger_image_pulling_for_sessions(sessions_to_retry, image_configs)
+
+        return list(sessions_to_retry_ids)
+
+    async def retry_creating_for_handler(
+        self,
+        sessions: list[SessionDataForStart],
+        image_configs: dict[str, ImageConfigData],
+    ) -> list[SessionId]:
+        """
+        Retry CREATING sessions for the given sessions list.
+
+        Handler-specific method that works with pre-fetched data.
+        Used by RetryCreatingLifecycleHandler.
+
+        :param sessions: List of sessions to check for retry
+        :param image_configs: Image configurations indexed by image name
+        :return: List of session IDs that were retried
+        """
+        CREATING_CHECK_THRESHOLD = 10.0  # 10 seconds
+
+        if not sessions:
+            return []
+
+        # Filter sessions that haven't changed status for threshold time
+        stuck_sessions = self._filter_stuck_sessions_for_start(sessions, CREATING_CHECK_THRESHOLD)
+
+        if not stuck_sessions:
+            return []
+
+        # Check which sessions are truly stuck (not actively creating)
+        truly_stuck_sessions = await self._check_truly_stuck_creating_sessions(stuck_sessions)
+
+        if not truly_stuck_sessions:
+            log.debug("All sessions are actively creating kernels, no retry needed")
+            return []
+
+        log.info("Retrying {} truly stuck CREATING sessions", len(truly_stuck_sessions))
+
+        # Update retry counts and get sessions that should continue retrying
+        stuck_session_ids = [session.session_id for session in truly_stuck_sessions]
+        sessions_to_retry_ids = await self._repository.batch_update_stuck_session_retries(
+            stuck_session_ids, SERVICE_MAX_RETRIES
+        )
+
+        if not sessions_to_retry_ids:
+            log.info("All stuck sessions exceeded max retries, moved to PENDING")
+            return []
+
+        # Filter sessions that should be retried based on returned IDs
+        sessions_to_retry = [
+            session
+            for session in truly_stuck_sessions
+            if session.session_id in sessions_to_retry_ids
+        ]
+
+        # Use the existing _start_sessions_concurrently method to retry
+        await self._start_sessions_concurrently(sessions_to_retry, image_configs)
+
+        return list(sessions_to_retry_ids)

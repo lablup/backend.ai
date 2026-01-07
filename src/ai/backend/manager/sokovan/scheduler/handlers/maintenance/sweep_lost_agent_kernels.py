@@ -116,8 +116,8 @@ class SweepLostAgentKernelsLifecycleHandler(SessionLifecycleHandler):
 
     async def execute(
         self,
-        sessions: Sequence[HandlerSessionData],
         scaling_group: str,
+        sessions: Sequence[HandlerSessionData],
     ) -> SessionExecutionResult:
         """Sweep kernels with lost or missing agents.
 

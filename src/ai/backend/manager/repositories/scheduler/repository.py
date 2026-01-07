@@ -199,6 +199,22 @@ class SchedulerRepository:
         return await self._db_source.get_terminating_sessions()
 
     @scheduler_repository_resilience.apply()
+    async def get_terminating_sessions_by_ids(
+        self,
+        session_ids: list[SessionId],
+    ) -> list[TerminatingSessionData]:
+        """
+        Get terminating sessions by session IDs.
+
+        This method is used by handlers that need detailed session data
+        (TerminatingSessionData) beyond what the coordinator provides (HandlerSessionData).
+
+        :param session_ids: List of session IDs to fetch
+        :return: List of TerminatingSessionData objects with kernel details
+        """
+        return await self._db_source.get_terminating_sessions_by_ids(session_ids)
+
+    @scheduler_repository_resilience.apply()
     async def get_terminating_kernels_with_lost_agents(
         self,
     ) -> list[TerminatingKernelWithAgentData]:
@@ -561,6 +577,23 @@ class SchedulerRepository:
         :return: SessionsForStartWithImages object
         """
         return await self._db_source.get_sessions_for_start(session_statuses, kernel_statuses)
+
+    @scheduler_repository_resilience.apply()
+    async def get_sessions_for_start_by_ids(
+        self,
+        session_ids: list[SessionId],
+    ) -> SessionsForStartWithImages:
+        """
+        Get sessions for starting by session IDs.
+
+        This method is used by handlers that need additional session data
+        (SessionDataForStart and ImageConfigData) beyond what the coordinator
+        provides (HandlerSessionData).
+
+        :param session_ids: List of session IDs to fetch
+        :return: SessionsForStartWithImages object with sessions and image configs
+        """
+        return await self._db_source.get_sessions_for_start_by_ids(session_ids)
 
     @scheduler_repository_resilience.apply()
     async def update_sessions_to_preparing(self, session_ids: list[SessionId]) -> None:

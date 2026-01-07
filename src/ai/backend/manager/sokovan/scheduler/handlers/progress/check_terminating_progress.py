@@ -154,8 +154,8 @@ class CheckTerminatingProgressLifecycleHandler(SessionLifecycleHandler):
 
     async def execute(
         self,
-        sessions: Sequence[HandlerSessionData],
         scaling_group: str,
+        sessions: Sequence[HandlerSessionData],
     ) -> SessionExecutionResult:
         """Execute on_transition_to_terminated hooks and prepare for TERMINATED transition.
 

@@ -131,30 +131,33 @@ class TerminateSessionsLifecycleHandler(SessionLifecycleHandler):
 
     async def execute(
         self,
-        sessions: Sequence[HandlerSessionData],
         scaling_group: str,
+        sessions: Sequence[HandlerSessionData],
     ) -> SessionExecutionResult:
         """Send termination RPC calls for TERMINATING sessions.
 
         The coordinator provides basic session info (HandlerSessionData).
         This handler:
-        1. Uses existing Terminator.terminate_sessions() for the actual work
-        2. Returns empty result (no status transitions needed)
-
-        Note: For simplicity, we delegate to the existing Terminator which
-        handles all sessions at once. The scaling_group parameter is not used
-        here because termination doesn't need scaling group filtering.
+        1. Fetches detailed session data (TerminatingSessionData) from repository
+        2. Delegates to Terminator's handler-specific method
+        3. Returns empty result (no status transitions needed)
         """
         result = SessionExecutionResult()
 
         if not sessions:
             return result
 
-        # Delegate to existing Terminator which handles:
-        # - Fetching full session/kernel data
-        # - Sending termination RPC to agents
-        # - Triggering sweep for kernels without agents
-        await self._terminator.terminate_sessions()
+        # Extract session IDs from HandlerSessionData
+        session_ids = [s.session_id for s in sessions]
+
+        # Fetch detailed session data (TerminatingSessionData) from repository
+        terminating_sessions = await self._repository.get_terminating_sessions_by_ids(session_ids)
+
+        if not terminating_sessions:
+            return result
+
+        # Delegate to Terminator's handler-specific method
+        await self._terminator.terminate_sessions_for_handler(terminating_sessions)
 
         # Don't mark as success - status updates happen via agent events
         # The Coordinator won't update any status because success_status is None

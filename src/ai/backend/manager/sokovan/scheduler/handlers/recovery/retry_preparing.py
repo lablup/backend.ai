@@ -122,12 +122,12 @@ class RetryPreparingLifecycleHandler(SessionLifecycleHandler):
 
     async def execute(
         self,
-        sessions: Sequence[HandlerSessionData],
         scaling_group: str,
+        sessions: Sequence[HandlerSessionData],
     ) -> SessionExecutionResult:
         """Check and retry stuck PREPARING/PULLING sessions.
 
-        Delegates to Launcher's retry method which handles:
+        Fetches detailed session data and delegates to Launcher's retry method which handles:
         - Filtering truly stuck sessions
         - Checking with agents if sessions are actively pulling
         - Updating retry counts
@@ -138,13 +138,25 @@ class RetryPreparingLifecycleHandler(SessionLifecycleHandler):
         if not sessions:
             return result
 
-        # Delegate to existing Launcher method which handles all the logic
-        # The Launcher method works on all sessions, not scaling group specific
-        # This is acceptable for retry operations as they're maintenance tasks
-        await self._launcher.retry_preparing_sessions()
+        # Extract session IDs from HandlerSessionData
+        session_ids = [s.session_id for s in sessions]
 
-        # Don't mark any status changes - the Launcher handles retry counts
-        # and moves sessions to PENDING if max retries exceeded
+        # Fetch detailed session data (SessionDataForPull) from repository
+        sessions_with_images = await self._repository.get_sessions_for_pull_by_ids(session_ids)
+        sessions_for_pull = sessions_with_images.sessions
+        image_configs = sessions_with_images.image_configs
+
+        if not sessions_for_pull:
+            return result
+
+        # Delegate to Launcher's handler-specific method
+        retried_session_ids = await self._launcher.retry_preparing_for_handler(
+            sessions_for_pull, image_configs
+        )
+
+        # Sessions that were retried are successes
+        # Launcher internally handles retry count and marks stale sessions
+        result.successes.extend(retried_session_ids)
 
         return result
 
