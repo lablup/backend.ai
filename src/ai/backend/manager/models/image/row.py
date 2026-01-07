@@ -81,6 +81,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask.bgtask import ProgressReporter
+    from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -301,6 +302,12 @@ def _get_image_endpoint_join_condition():
     return ImageRow.id == foreign(EndpointRow.image)
 
 
+def _get_container_registry_join_condition():
+    from ai.backend.manager.models.container_registry import ContainerRegistryRow
+
+    return ContainerRegistryRow.id == foreign(ImageRow.registry_id)
+
+
 class ImageRow(Base):
     __tablename__ = "images"
     __table_args__ = (
@@ -369,7 +376,7 @@ class ImageRow(Base):
     registry_row = relationship(
         "ContainerRegistryRow",
         back_populates="image_rows",
-        primaryjoin="ContainerRegistryRow.id == foreign(ImageRow.registry_id)",
+        primaryjoin=_get_container_registry_join_condition,
     )
 
     def __init__(

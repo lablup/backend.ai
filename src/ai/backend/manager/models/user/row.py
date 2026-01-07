@@ -137,6 +137,30 @@ def _get_kernel_row_join_condition():
     return UserRow.uuid == foreign(KernelRow.user_uuid)
 
 
+def _get_created_endpoints_join_condition():
+    from ai.backend.manager.models.endpoint import EndpointRow
+
+    return foreign(EndpointRow.created_user) == UserRow.uuid
+
+
+def _get_owned_endpoints_join_condition():
+    from ai.backend.manager.models.endpoint import EndpointRow
+
+    return foreign(EndpointRow.session_owner) == UserRow.uuid
+
+
+def _get_vfolder_rows_join_condition():
+    from ai.backend.manager.models.vfolder import VFolderRow
+
+    return UserRow.uuid == foreign(VFolderRow.user)
+
+
+def _get_role_assignments_join_condition():
+    from ai.backend.manager.models.rbac_models import UserRoleRow
+
+    return UserRow.uuid == foreign(UserRoleRow.user_id)
+
+
 class UserRow(Base):
     __table__ = users
     # from ai.backend.manager.models.keypair import KeyPairRow
@@ -161,12 +185,12 @@ class UserRow(Base):
     created_endpoints = relationship(
         "EndpointRow",
         back_populates="created_user_row",
-        primaryjoin="foreign(EndpointRow.created_user) == UserRow.uuid",
+        primaryjoin=_get_created_endpoints_join_condition,
     )
     owned_endpoints = relationship(
         "EndpointRow",
         back_populates="session_owner_row",
-        primaryjoin="foreign(EndpointRow.session_owner) == UserRow.uuid",
+        primaryjoin=_get_owned_endpoints_join_condition,
     )
 
     main_keypair = relationship("KeyPairRow", foreign_keys=users.c.main_access_key)
@@ -174,13 +198,13 @@ class UserRow(Base):
     vfolder_rows = relationship(
         "VFolderRow",
         back_populates="user_row",
-        primaryjoin="UserRow.uuid == foreign(VFolderRow.user)",
+        primaryjoin=_get_vfolder_rows_join_condition,
     )
 
     role_assignments = relationship(
         "UserRoleRow",
         back_populates="user_row",
-        primaryjoin="UserRow.uuid == foreign(UserRoleRow.user_id)",
+        primaryjoin=_get_role_assignments_join_condition,
     )
 
     @classmethod

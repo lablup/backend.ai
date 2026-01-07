@@ -99,9 +99,9 @@ from ai.backend.manager.types import MountOptionModel, UserScope
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+    from ai.backend.manager.api.gql_legacy.schema import GraphQueryContext
     from ai.backend.manager.data.deployment.creator import DeploymentCreator
     from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-    from ai.backend.manager.models.gql import GraphQueryContext
 
 __all__ = (
     "EndpointAutoScalingRuleRow",
@@ -116,6 +116,30 @@ __all__ = (
 ModelServiceSerializableConnectionInfo: TypeAlias = dict[str, list[dict[str, Any]]]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+
+
+def _get_endpoint_tokens_join_condition():
+    return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
+
+
+def _get_endpoint_revisions_join_condition():
+    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+
+    return EndpointRow.id == foreign(DeploymentRevisionRow.endpoint)
+
+
+def _get_endpoint_auto_scaling_policy_join_condition():
+    from ai.backend.manager.models.deployment_auto_scaling_policy import (
+        DeploymentAutoScalingPolicyRow,
+    )
+
+    return EndpointRow.id == foreign(DeploymentAutoScalingPolicyRow.endpoint)
+
+
+def _get_endpoint_deployment_policy_join_condition():
+    from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+
+    return EndpointRow.id == foreign(DeploymentPolicyRow.endpoint)
 
 
 class EndpointRow(Base):
@@ -250,7 +274,7 @@ class EndpointRow(Base):
     tokens = relationship(
         "EndpointTokenRow",
         back_populates="endpoint_row",
-        primaryjoin="foreign(EndpointTokenRow.endpoint) == EndpointRow.id",
+        primaryjoin=_get_endpoint_tokens_join_condition,
     )
     endpoint_auto_scaling_rules = relationship(
         "EndpointAutoScalingRuleRow", back_populates="endpoint_row"
@@ -279,20 +303,20 @@ class EndpointRow(Base):
     revisions = relationship(
         "DeploymentRevisionRow",
         back_populates="endpoint_row",
-        primaryjoin="EndpointRow.id == foreign(DeploymentRevisionRow.endpoint)",
+        primaryjoin=_get_endpoint_revisions_join_condition,
     )
 
     auto_scaling_policy = relationship(
         "DeploymentAutoScalingPolicyRow",
         back_populates="endpoint_row",
-        primaryjoin="EndpointRow.id == foreign(DeploymentAutoScalingPolicyRow.endpoint)",
+        primaryjoin=_get_endpoint_auto_scaling_policy_join_condition,
         uselist=False,
     )
 
     deployment_policy = relationship(
         "DeploymentPolicyRow",
         back_populates="endpoint_row",
-        primaryjoin="EndpointRow.id == foreign(DeploymentPolicyRow.endpoint)",
+        primaryjoin=_get_endpoint_deployment_policy_join_condition,
         uselist=False,
     )
 
