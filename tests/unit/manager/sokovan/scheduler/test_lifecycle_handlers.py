@@ -12,9 +12,40 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.types import AccessKey, SessionId, SessionTypes
-from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.common.types import (
+    AccessKey,
+    ResourceSlot,
+    SessionId,
+    SessionResult,
+    SessionTypes,
+)
+from ai.backend.manager.data.kernel.types import (
+    ClusterConfig,
+    ImageInfo,
+    KernelInfo,
+    KernelStatus,
+    LifecycleStatus,
+    Metadata,
+    Metrics,
+    NetworkConfig,
+    RelatedSessionInfo,
+    ResourceInfo,
+    RuntimeConfig,
+    UserPermission,
+)
+from ai.backend.manager.data.session.types import (
+    ImageSpec,
+    MountSpec,
+    ResourceSpec,
+    SessionExecution,
+    SessionIdentity,
+    SessionInfo,
+    SessionLifecycle,
+    SessionMetadata,
+    SessionMetrics,
+    SessionNetwork,
+    SessionStatus,
+)
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.scheduler.handlers import (
     CheckCreatingProgressLifecycleHandler,
@@ -23,41 +54,154 @@ from ai.backend.manager.sokovan.scheduler.handlers import (
     CheckTerminatingProgressLifecycleHandler,
 )
 from ai.backend.manager.sokovan.scheduler.results import (
-    HandlerKernelData,
-    HandlerSessionData,
     ScheduledSessionData,
     SessionExecutionResult,
 )
+from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
-def create_handler_session_data(
+def create_session_with_kernels(
     status: SessionStatus,
     scaling_group: str = "default",
     kernel_status: KernelStatus = KernelStatus.RUNNING,
     num_kernels: int = 1,
-) -> HandlerSessionData:
-    """Helper to create test HandlerSessionData."""
+) -> SessionWithKernels:
+    """Helper to create test SessionWithKernels."""
     session_id = SessionId(uuid4())
-    kernels = [
-        HandlerKernelData(
-            kernel_id=uuid4(),
-            agent_id=None,
-            status=kernel_status,
-        )
-        for _ in range(num_kernels)
-    ]
-    return HandlerSessionData(
-        session_id=session_id,
-        creation_id=str(uuid4()),
-        access_key=AccessKey("test-key"),
-        status=status,
-        scaling_group=scaling_group,
-        session_type=SessionTypes.INTERACTIVE,
-        kernels=kernels,
+    creation_id = str(uuid4())
+    access_key = "test-key"
+
+    session_info = SessionInfo(
+        identity=SessionIdentity(
+            id=session_id,
+            creation_id=creation_id,
+            name="test-session",
+            session_type=SessionTypes.INTERACTIVE,
+            priority=0,
+        ),
+        metadata=SessionMetadata(
+            name="test-session",
+            domain_name="default",
+            group_id=uuid4(),
+            user_uuid=uuid4(),
+            access_key=access_key,
+            session_type=SessionTypes.INTERACTIVE,
+            priority=0,
+            created_at=None,
+            tag=None,
+        ),
+        resource=ResourceSpec(
+            cluster_mode="single-node",
+            cluster_size=1,
+            occupying_slots=ResourceSlot(),
+            requested_slots=ResourceSlot(),
+            scaling_group_name=scaling_group,
+            target_sgroup_names=None,
+            agent_ids=None,
+        ),
+        image=ImageSpec(images=None, tag=None),
+        mounts=MountSpec(vfolder_mounts=None),
+        execution=SessionExecution(
+            environ=None,
+            bootstrap_script=None,
+            startup_command=None,
+            use_host_network=False,
+            callback_url=None,
+        ),
+        lifecycle=SessionLifecycle(
+            status=status,
+            result=SessionResult.UNDEFINED,
+            created_at=None,
+            terminated_at=None,
+            starts_at=None,
+            status_changed=None,
+            batch_timeout=None,
+            status_info=None,
+            status_data=None,
+            status_history=None,
+        ),
+        metrics=SessionMetrics(num_queries=0, last_stat=None),
+        network=SessionNetwork(network_type=None, network_id=None),
     )
+
+    kernel_infos = []
+    for i in range(num_kernels):
+        kernel_info = KernelInfo(
+            id=uuid4(),
+            session=RelatedSessionInfo(
+                session_id=str(session_id),
+                creation_id=creation_id,
+                name="test-session",
+                session_type=SessionTypes.INTERACTIVE,
+            ),
+            user_permission=UserPermission(
+                user_uuid=uuid4(),
+                access_key=access_key,
+                domain_name="default",
+                group_id=uuid4(),
+                uid=None,
+                main_gid=None,
+                gids=None,
+            ),
+            image=ImageInfo(identifier=None, registry=None, tag=None, architecture=None),
+            network=NetworkConfig(
+                kernel_host=None,
+                repl_in_port=0,
+                repl_out_port=0,
+                stdin_port=0,
+                stdout_port=0,
+                service_ports=None,
+                preopen_ports=None,
+                use_host_network=False,
+            ),
+            cluster=ClusterConfig(
+                cluster_mode="single-node",
+                cluster_size=1,
+                cluster_role="main" if i == 0 else "sub",
+                cluster_idx=i,
+                local_rank=i,
+                cluster_hostname="",
+            ),
+            resource=ResourceInfo(
+                scaling_group=scaling_group,
+                agent=None,
+                agent_addr=None,
+                container_id=None,
+                occupied_slots=ResourceSlot(),
+                requested_slots=ResourceSlot(),
+                occupied_shares={},
+                attached_devices={},
+                resource_opts={},
+            ),
+            runtime=RuntimeConfig(
+                environ=None,
+                mounts=None,
+                mount_map=None,
+                vfolder_mounts=None,
+                bootstrap_script=None,
+                startup_command=None,
+            ),
+            lifecycle=LifecycleStatus(
+                status=kernel_status,
+                result=SessionResult.UNDEFINED,
+                created_at=None,
+                terminated_at=None,
+                starts_at=None,
+                status_changed=None,
+                status_info=None,
+                status_data=None,
+                status_history=None,
+                last_seen=None,
+            ),
+            metrics=Metrics(num_queries=0, last_stat=None, container_log=None),
+            metadata=Metadata(callback_url=None, internal_data=None),
+        )
+        kernel_infos.append(kernel_info)
+
+    return SessionWithKernels(session_info=session_info, kernel_infos=kernel_infos)
 
 
 class TestCheckPullingProgressLifecycleHandler:
@@ -111,18 +255,18 @@ class TestCheckPullingProgressLifecycleHandler:
         self, handler: CheckPullingProgressLifecycleHandler
     ) -> None:
         """Test execute marks all sessions as success."""
-        sessions: Sequence[HandlerSessionData] = [
-            create_handler_session_data(
+        sessions: Sequence[SessionWithKernels] = [
+            create_session_with_kernels(
                 SessionStatus.PREPARING,
                 kernel_status=KernelStatus.PREPARED,
             ),
-            create_handler_session_data(
+            create_session_with_kernels(
                 SessionStatus.PULLING,
                 kernel_status=KernelStatus.RUNNING,
             ),
         ]
 
-        result = await handler.execute(sessions, "default")
+        result = await handler.execute("default", sessions)
 
         assert len(result.successes) == 2
         assert len(result.failures) == 0
@@ -133,7 +277,7 @@ class TestCheckPullingProgressLifecycleHandler:
         self, handler: CheckPullingProgressLifecycleHandler
     ) -> None:
         """Test execute with empty sessions."""
-        result = await handler.execute([], "default")
+        result = await handler.execute("default", [])
 
         assert len(result.successes) == 0
         assert len(result.failures) == 0
@@ -143,19 +287,19 @@ class TestCheckPullingProgressLifecycleHandler:
         self, handler: CheckPullingProgressLifecycleHandler
     ) -> None:
         """Test execute includes correct scheduled data for post-processing."""
-        session = create_handler_session_data(
+        session = create_session_with_kernels(
             SessionStatus.PREPARING,
             kernel_status=KernelStatus.PREPARED,
         )
-        sessions: Sequence[HandlerSessionData] = [session]
+        sessions: Sequence[SessionWithKernels] = [session]
 
-        result = await handler.execute(sessions, "default")
+        result = await handler.execute("default", sessions)
 
         assert len(result.scheduled_data) == 1
         scheduled = result.scheduled_data[0]
-        assert scheduled.session_id == session.session_id
-        assert scheduled.creation_id == session.creation_id
-        assert scheduled.access_key == session.access_key
+        assert scheduled.session_id == session.session_info.identity.id
+        assert scheduled.creation_id == session.session_info.identity.creation_id
+        assert scheduled.access_key == session.session_info.metadata.access_key
         assert scheduled.reason == "triggered-by-scheduler"
 
 
@@ -239,7 +383,7 @@ class TestCheckCreatingProgressLifecycleHandler:
         self, handler: CheckCreatingProgressLifecycleHandler
     ) -> None:
         """Test execute with empty sessions returns empty result."""
-        result = await handler.execute([], "default")
+        result = await handler.execute("default", [])
 
         assert len(result.successes) == 0
         assert len(result.failures) == 0
@@ -329,7 +473,7 @@ class TestCheckTerminatingProgressLifecycleHandler:
         self, handler: CheckTerminatingProgressLifecycleHandler
     ) -> None:
         """Test execute with empty sessions returns empty result."""
-        result = await handler.execute([], "default")
+        result = await handler.execute("default", [])
 
         assert len(result.successes) == 0
         assert len(result.failures) == 0
@@ -401,18 +545,18 @@ class TestCheckRunningSessionTerminationLifecycleHandler:
         self, handler: CheckRunningSessionTerminationLifecycleHandler
     ) -> None:
         """Test execute marks RUNNING sessions with all kernels TERMINATED for termination."""
-        sessions: Sequence[HandlerSessionData] = [
-            create_handler_session_data(
+        sessions: Sequence[SessionWithKernels] = [
+            create_session_with_kernels(
                 SessionStatus.RUNNING,
                 kernel_status=KernelStatus.TERMINATED,
             ),
-            create_handler_session_data(
+            create_session_with_kernels(
                 SessionStatus.RUNNING,
                 kernel_status=KernelStatus.TERMINATED,
             ),
         ]
 
-        result = await handler.execute(sessions, "default")
+        result = await handler.execute("default", sessions)
 
         assert len(result.successes) == 2
         assert len(result.failures) == 0
@@ -423,7 +567,7 @@ class TestCheckRunningSessionTerminationLifecycleHandler:
         self, handler: CheckRunningSessionTerminationLifecycleHandler
     ) -> None:
         """Test execute with empty sessions."""
-        result = await handler.execute([], "default")
+        result = await handler.execute("default", [])
 
         assert len(result.successes) == 0
         assert result.needs_post_processing() is False
@@ -432,13 +576,13 @@ class TestCheckRunningSessionTerminationLifecycleHandler:
         self, handler: CheckRunningSessionTerminationLifecycleHandler
     ) -> None:
         """Test execute sets ABNORMAL_TERMINATION as reason."""
-        session = create_handler_session_data(
+        session = create_session_with_kernels(
             SessionStatus.RUNNING,
             kernel_status=KernelStatus.TERMINATED,
         )
-        sessions: Sequence[HandlerSessionData] = [session]
+        sessions: Sequence[SessionWithKernels] = [session]
 
-        result = await handler.execute(sessions, "default")
+        result = await handler.execute("default", sessions)
 
         assert len(result.scheduled_data) == 1
         assert result.scheduled_data[0].reason == "ABNORMAL_TERMINATION"

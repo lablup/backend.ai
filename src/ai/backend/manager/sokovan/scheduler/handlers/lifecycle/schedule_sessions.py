@@ -23,11 +23,11 @@ from ai.backend.manager.sokovan.scheduler.handlers.base import (
     SessionLifecycleHandler,
 )
 from ai.backend.manager.sokovan.scheduler.results import (
-    HandlerSessionData,
     ScheduleResult,
     SessionExecutionResult,
 )
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
+from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 if TYPE_CHECKING:
@@ -155,7 +155,7 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
     async def execute(
         self,
         scaling_group: str,
-        sessions: Sequence[HandlerSessionData],
+        sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Schedule pending sessions for a scaling group.
 

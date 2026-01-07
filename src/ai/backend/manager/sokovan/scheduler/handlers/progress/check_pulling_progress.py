@@ -11,6 +11,7 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SchedulingBroadcastEvent,
 )
 from ai.backend.common.events.types import AbstractBroadcastEvent
+from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
@@ -20,12 +21,12 @@ from ai.backend.manager.sokovan.scheduler.handlers.base import (
     SessionLifecycleHandler,
 )
 from ai.backend.manager.sokovan.scheduler.results import (
-    HandlerSessionData,
     ScheduledSessionData,
     ScheduleResult,
     SessionExecutionResult,
 )
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
+from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -132,7 +133,7 @@ class CheckPullingProgressLifecycleHandler(SessionLifecycleHandler):
     async def execute(
         self,
         scaling_group: str,
-        sessions: Sequence[HandlerSessionData],
+        sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Return all provided sessions as successes.
 
@@ -143,12 +144,13 @@ class CheckPullingProgressLifecycleHandler(SessionLifecycleHandler):
         result = SessionExecutionResult()
 
         for session in sessions:
-            result.successes.append(session.session_id)
+            session_info = session.session_info
+            result.successes.append(session_info.identity.id)
             result.scheduled_data.append(
                 ScheduledSessionData(
-                    session_id=session.session_id,
-                    creation_id=session.creation_id,
-                    access_key=session.access_key,
+                    session_id=session_info.identity.id,
+                    creation_id=session_info.identity.creation_id,
+                    access_key=AccessKey(session_info.metadata.access_key),
                     reason="triggered-by-scheduler",
                 )
             )

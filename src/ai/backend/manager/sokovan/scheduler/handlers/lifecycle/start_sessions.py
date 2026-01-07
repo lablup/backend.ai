@@ -11,6 +11,7 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SchedulingBroadcastEvent,
 )
 from ai.backend.common.events.types import AbstractBroadcastEvent
+from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
@@ -23,12 +24,12 @@ from ai.backend.manager.sokovan.scheduler.handlers.base import (
     SessionLifecycleHandler,
 )
 from ai.backend.manager.sokovan.scheduler.results import (
-    HandlerSessionData,
     ScheduledSessionData,
     ScheduleResult,
     SessionExecutionResult,
 )
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
+from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
@@ -139,13 +140,13 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
     async def execute(
         self,
         scaling_group: str,
-        sessions: Sequence[HandlerSessionData],
+        sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Start kernels on agents for PREPARED sessions.
 
-        The coordinator provides basic session info (HandlerSessionData).
+        The coordinator provides SessionWithKernels data.
         This handler:
-        1. Extracts session IDs from HandlerSessionData
+        1. Extracts session IDs from SessionWithKernels
         2. Queries Repository for additional data (SessionDataForStart + ImageConfigData)
         3. Starts kernels on agents via Launcher
         """
@@ -154,8 +155,8 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
         if not sessions:
             return result
 
-        # Extract session IDs from HandlerSessionData
-        session_ids = [s.session_id for s in sessions]
+        # Extract session IDs from SessionWithKernels
+        session_ids = [s.session_info.identity.id for s in sessions]
 
         # Query Repository for additional data needed by Launcher
         # Use search_sessions_with_kernels_and_user to get user info for session start
@@ -173,12 +174,13 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
 
         # Mark all sessions as success for status transition
         for session in sessions:
-            result.successes.append(session.session_id)
+            session_info = session.session_info
+            result.successes.append(session_info.identity.id)
             result.scheduled_data.append(
                 ScheduledSessionData(
-                    session_id=session.session_id,
-                    creation_id=session.creation_id,
-                    access_key=session.access_key,
+                    session_id=session_info.identity.id,
+                    creation_id=session_info.identity.creation_id,
+                    access_key=AccessKey(session_info.metadata.access_key),
                     reason="triggered-by-scheduler",
                 )
             )

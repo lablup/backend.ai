@@ -17,12 +17,12 @@ from ai.backend.manager.sokovan.scheduler.handlers.base import (
     SessionLifecycleHandler,
 )
 from ai.backend.manager.sokovan.scheduler.results import (
-    HandlerSessionData,
     ScheduledSessionData,
     ScheduleResult,
     SessionExecutionResult,
 )
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
+from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.terminator.terminator import SessionTerminator
@@ -121,11 +121,11 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
     async def execute(
         self,
         scaling_group: str,
-        sessions: Sequence[HandlerSessionData],
+        sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Sweep stale sessions including those with pending timeout.
 
-        The coordinator provides basic session info (HandlerSessionData).
+        The coordinator provides SessionWithKernels with full SessionInfo/KernelInfo.
         This handler:
         1. Fetches detailed timeout data from repository
         2. Delegates to Terminator's handler-specific method
@@ -136,13 +136,11 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
         if not sessions:
             return result
 
-        # Extract session IDs from HandlerSessionData
-        session_ids = [s.session_id for s in sessions]
+        # Extract session IDs from SessionWithKernels
+        session_ids = [s.session_info.identity.id for s in sessions]
 
         # Fetch detailed session data with timeout info
-        timed_out_sessions = await self._repository.get_pending_timeout_sessions_by_ids(
-            session_ids
-        )
+        timed_out_sessions = await self._repository.get_pending_timeout_sessions_by_ids(session_ids)
 
         if not timed_out_sessions:
             return result
@@ -151,7 +149,7 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
         swept_ids = await self._terminator.sweep_stale_sessions_for_handler(timed_out_sessions)
 
         # Build scheduled data for post-processing
-        session_map = {s.session_id: s for s in sessions}
+        session_map = {s.session_info.identity.id: s for s in sessions}
         for swept_id in swept_ids:
             result.stales.append(swept_id)
             if swept_id in session_map:
@@ -159,8 +157,8 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
                 result.scheduled_data.append(
                     ScheduledSessionData(
                         session_id=swept_id,
-                        creation_id=session_data.creation_id,
-                        access_key=session_data.access_key,
+                        creation_id=session_data.session_info.identity.creation_id,
+                        access_key=AccessKey(session_data.session_info.metadata.access_key),
                         reason="sweeped-as-stale",
                     )
                 )

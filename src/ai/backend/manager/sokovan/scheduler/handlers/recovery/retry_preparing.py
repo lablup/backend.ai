@@ -17,11 +17,11 @@ from ai.backend.manager.sokovan.scheduler.handlers.base import (
     SessionLifecycleHandler,
 )
 from ai.backend.manager.sokovan.scheduler.results import (
-    HandlerSessionData,
     ScheduleResult,
     SessionExecutionResult,
 )
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
+from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 if TYPE_CHECKING:
@@ -123,7 +123,7 @@ class RetryPreparingLifecycleHandler(SessionLifecycleHandler):
     async def execute(
         self,
         scaling_group: str,
-        sessions: Sequence[HandlerSessionData],
+        sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Check and retry stuck PREPARING/PULLING sessions.
 
@@ -138,8 +138,8 @@ class RetryPreparingLifecycleHandler(SessionLifecycleHandler):
         if not sessions:
             return result
 
-        # Extract session IDs from HandlerSessionData
-        session_ids = [s.session_id for s in sessions]
+        # Extract session IDs from SessionWithKernels
+        session_ids = [s.session_info.identity.id for s in sessions]
 
         # Fetch detailed session data (SessionDataForPull) from repository
         sessions_with_images = await self._repository.get_sessions_for_pull_by_ids(session_ids)

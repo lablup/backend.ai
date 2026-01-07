@@ -24,7 +24,7 @@ from ai.backend.manager.repositories.scheduler import (
 )
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData, ScheduleResult
-from ai.backend.manager.sokovan.scheduler.types import SessionTransitionData
+from ai.backend.manager.sokovan.scheduler.types import SessionTransitionData, SessionWithKernels
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -480,12 +480,12 @@ class SessionTerminator:
 
     async def sweep_stale_kernels_for_handler(
         self,
-        sessions: list[SessionTransitionData],
-    ) -> list[SessionTransitionData]:
+        sessions: list[SessionWithKernels],
+    ) -> list[SessionWithKernels]:
         """
         Sweep stale kernels from given sessions.
 
-        Handler-specific method that works with pre-fetched session data.
+        Handler-specific method that works with SessionWithKernels data.
         Used by SweepStaleKernelsLifecycleHandler.
 
         :param sessions: List of RUNNING sessions to check for stale kernels
@@ -498,9 +498,10 @@ class SessionTerminator:
         running_kernel_ids: list[KernelId] = []
         agent_ids: set[AgentId] = set()
         for session in sessions:
-            for kernel in session.kernels:
-                running_kernel_ids.append(KernelId(UUID(kernel.kernel_id)))
-                agent_ids.add(kernel.agent_id)
+            for kernel_info in session.kernel_infos:
+                running_kernel_ids.append(KernelId(kernel_info.id))
+                if kernel_info.resource.agent:
+                    agent_ids.add(AgentId(kernel_info.resource.agent))
 
         if not running_kernel_ids:
             return []
@@ -511,8 +512,8 @@ class SessionTerminator:
         )
 
         # 2. Filter STALE kernels (None status or STALE presence)
-        stale_kernel_id_set: set[str] = {
-            str(kernel_id)
+        stale_kernel_id_set: set[UUID] = {
+            kernel_id
             for kernel_id in running_kernel_ids
             if (status := statuses.get(kernel_id)) is None
             or status.presence == HealthCheckStatus.STALE
@@ -522,23 +523,26 @@ class SessionTerminator:
 
         # 3. Check with agent RPC - only explicit False terminates
         dead_kernel_ids: list[str] = []
-        affected_sessions: list[SessionTransitionData] = []
+        affected_sessions: list[SessionWithKernels] = []
 
         for session in sessions:
-            for kernel in session.kernels:
-                if kernel.kernel_id not in stale_kernel_id_set:
+            for kernel_info in session.kernel_infos:
+                if kernel_info.id not in stale_kernel_id_set:
+                    continue
+                if not kernel_info.resource.agent:
                     continue
                 try:
-                    agent_client = self._agent_pool.get_agent_client(kernel.agent_id)
-                    is_running = await agent_client.check_running(kernel.kernel_id)
+                    agent_id = AgentId(kernel_info.resource.agent)
+                    agent_client = self._agent_pool.get_agent_client(agent_id)
+                    is_running = await agent_client.check_running(str(kernel_info.id))
                     if is_running is False:
-                        dead_kernel_ids.append(kernel.kernel_id)
+                        dead_kernel_ids.append(str(kernel_info.id))
                         if session not in affected_sessions:
                             affected_sessions.append(session)
                 except Exception as e:
                     log.warning(
                         "Failed to check kernel {} status: {}. Skipping.",
-                        kernel.kernel_id,
+                        kernel_info.id,
                         e,
                     )
 

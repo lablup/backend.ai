@@ -19,12 +19,12 @@ from ai.backend.manager.sokovan.scheduler.handlers.base import (
     SessionLifecycleHandler,
 )
 from ai.backend.manager.sokovan.scheduler.results import (
-    HandlerSessionData,
     ScheduledSessionData,
     ScheduleResult,
     SessionExecutionResult,
 )
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
+from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -145,7 +145,7 @@ class CheckRunningSessionTerminationLifecycleHandler(SessionLifecycleHandler):
     async def execute(
         self,
         scaling_group: str,
-        sessions: Sequence[HandlerSessionData],
+        sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Mark RUNNING sessions with all kernels TERMINATED as TERMINATING.
 
@@ -155,12 +155,13 @@ class CheckRunningSessionTerminationLifecycleHandler(SessionLifecycleHandler):
         result = SessionExecutionResult()
 
         for session in sessions:
-            result.successes.append(session.session_id)
+            session_info = session.session_info
+            result.successes.append(session_info.identity.id)
             result.scheduled_data.append(
                 ScheduledSessionData(
-                    session_id=session.session_id,
-                    creation_id=session.creation_id,
-                    access_key=session.access_key,
+                    session_id=session_info.identity.id,
+                    creation_id=session_info.identity.creation_id,
+                    access_key=AccessKey(session_info.metadata.access_key),
                     reason="ABNORMAL_TERMINATION",
                 )
             )

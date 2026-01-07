@@ -844,6 +844,18 @@ class SessionWithKernels:
     session_info: SessionInfo
     kernel_infos: list[KernelInfo]
 
+    @property
+    def main_kernel(self) -> KernelInfo:
+        """Get the main kernel (kernel with DEFAULT_ROLE as cluster_role)."""
+        main_kernels = [k for k in self.kernel_infos if k.cluster.cluster_role == DEFAULT_ROLE]
+        if len(main_kernels) > 1:
+            raise TooManyKernelsFound(
+                f"Session {self.session_info.identity.id} has more than 1 main kernel"
+            )
+        if len(main_kernels) == 0:
+            raise MainKernelNotFound(f"Session {self.session_info.identity.id} has no main kernel")
+        return main_kernels[0]
+
 
 @dataclass
 class SchedulerExecutionError:

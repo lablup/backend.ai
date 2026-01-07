@@ -17,11 +17,11 @@ from ai.backend.manager.sokovan.scheduler.handlers.base import (
     SessionLifecycleHandler,
 )
 from ai.backend.manager.sokovan.scheduler.results import (
-    HandlerSessionData,
     ScheduleResult,
     SessionExecutionResult,
 )
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
+from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.terminator.terminator import SessionTerminator
@@ -69,7 +69,7 @@ class SweepLostAgentKernelsLifecycleHandler(SessionLifecycleHandler):
     """Handler for sweeping kernels with lost or missing agents.
 
     Following the DeploymentCoordinator pattern:
-    - Coordinator queries sessions with TERMINATING status (provides HandlerSessionData)
+    - Coordinator queries sessions with TERMINATING status (provides SessionWithKernels)
     - Handler fetches kernels with lost/missing agents and terminates them
     - Kernel status is updated to TERMINATED (session status updated by other handlers)
     """
@@ -120,11 +120,11 @@ class SweepLostAgentKernelsLifecycleHandler(SessionLifecycleHandler):
     async def execute(
         self,
         scaling_group: str,
-        sessions: Sequence[HandlerSessionData],
+        sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Sweep kernels with lost or missing agents.
 
-        The coordinator provides basic session info (HandlerSessionData).
+        The coordinator provides SessionWithKernels data.
         This handler:
         1. Fetches kernels with lost/missing agents from repository
         2. Delegates to Terminator's handler-specific method
@@ -135,8 +135,8 @@ class SweepLostAgentKernelsLifecycleHandler(SessionLifecycleHandler):
         if not sessions:
             return result
 
-        # Extract session IDs from HandlerSessionData
-        session_ids = [s.session_id for s in sessions]
+        # Extract session IDs from SessionWithKernels
+        session_ids = [s.session_info.identity.id for s in sessions]
 
         # Fetch kernels with lost or missing agents
         lost_kernels = await self._repository.get_terminating_kernels_with_lost_agents_by_ids(

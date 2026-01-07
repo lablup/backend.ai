@@ -30,7 +30,7 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.sokovan.scheduler.results import HandlerSessionData, ScheduledSessionData
+from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
 from ai.backend.manager.sokovan.scheduler.types import (
     AllocationBatch,
     KernelCreationInfo,
@@ -38,12 +38,17 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionsForPullWithImages,
     SessionsForStartWithImages,
     SessionTransitionData,
+    SessionWithKernels,
 )
 
 from .cache_source.cache_source import ScheduleCacheSource
 from .db_source.db_source import ScheduleDBSource
 from .types.base import SchedulingSpec
 from .types.scheduling import SchedulingData
+from .types.search import (
+    SessionWithKernelsAndUserSearchResult,
+    SessionWithKernelsSearchResult,
+)
 from .types.session import (
     KernelTerminationResult,
     MarkTerminatingResult,
@@ -51,11 +56,6 @@ from .types.session import (
     SweptSessionInfo,
     TerminatingKernelWithAgentData,
     TerminatingSessionData,
-)
-from .types.search import (
-    SessionSearchResult,
-    SessionWithKernelsAndUserSearchResult,
-    SessionWithKernelsSearchResult,
 )
 from .types.session_creation import (
     AllowedScalingGroup,
@@ -793,11 +793,13 @@ class SchedulerRepository:
         scaling_group: str,
         session_statuses: list[SessionStatus],
         kernel_statuses: list[KernelStatus],
-    ) -> list[HandlerSessionData]:
+    ) -> list[SessionWithKernels]:
         """Get sessions for handler execution based on status filters.
 
         This method is used by SessionLifecycleHandler implementations.
         The coordinator calls this to query sessions before passing to handlers.
+
+        Uses SessionInfo and KernelInfo types for unified data representation.
 
         Args:
             scaling_group: The scaling group to filter by (first parameter for consistency)
@@ -807,7 +809,7 @@ class SchedulerRepository:
                            sessions regardless of kernel status.
 
         Returns:
-            List of HandlerSessionData with kernel information
+            List of SessionWithKernels containing SessionInfo and KernelInfo objects.
         """
         return await self._db_source.fetch_sessions_for_handler(
             scaling_group, session_statuses, kernel_statuses
@@ -870,25 +872,6 @@ class SchedulerRepository:
     # ========================================================================
 
     @scheduler_repository_resilience.apply()
-    async def search_sessions(
-        self,
-        querier: BatchQuerier,
-    ) -> SessionSearchResult:
-        """Search sessions with pagination and filtering.
-
-        Returns basic session info (HandlerSessionData) without kernel details.
-        Use search_sessions_with_kernels when kernel data is also needed.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-                     Use NoPagination for scheduler batch operations.
-
-        Returns:
-            SessionSearchResult with items, total_count, and pagination info
-        """
-        return await self._db_source.search_sessions(querier)
-
-    @scheduler_repository_resilience.apply()
     async def search_sessions_with_kernels(
         self,
         querier: BatchQuerier,
@@ -925,3 +908,22 @@ class SchedulerRepository:
             SessionWithKernelsAndUserSearchResult with sessions, image_configs, and pagination info
         """
         return await self._db_source.search_sessions_with_kernels_and_user(querier)
+
+    @scheduler_repository_resilience.apply()
+    async def search_sessions_with_kernels_for_handler(
+        self,
+        querier: BatchQuerier,
+    ) -> list[SessionWithKernels]:
+        """Search sessions with their kernels using SessionInfo/KernelInfo for handlers.
+
+        This method uses the unified SessionInfo and KernelInfo types,
+        providing full session and kernel data for handler execution.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+                     Conditions should target SessionRow columns.
+
+        Returns:
+            List of SessionWithKernels containing SessionInfo and KernelInfo objects.
+        """
+        return await self._db_source.search_sessions_with_kernels_for_handler(querier)

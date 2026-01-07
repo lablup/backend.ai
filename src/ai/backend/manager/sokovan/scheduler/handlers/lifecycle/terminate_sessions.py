@@ -11,19 +11,17 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
-from ai.backend.manager.repositories.scheduler.options import SessionConditions
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.handlers.base import (
     SchedulerHandler,
     SessionLifecycleHandler,
 )
 from ai.backend.manager.sokovan.scheduler.results import (
-    HandlerSessionData,
     ScheduleResult,
     SessionExecutionResult,
 )
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
+from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 if TYPE_CHECKING:
@@ -132,11 +130,11 @@ class TerminateSessionsLifecycleHandler(SessionLifecycleHandler):
     async def execute(
         self,
         scaling_group: str,
-        sessions: Sequence[HandlerSessionData],
+        sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Send termination RPC calls for TERMINATING sessions.
 
-        The coordinator provides basic session info (HandlerSessionData).
+        The coordinator provides SessionWithKernels data.
         This handler:
         1. Fetches detailed session data (TerminatingSessionData) from repository
         2. Delegates to Terminator's handler-specific method
@@ -147,8 +145,8 @@ class TerminateSessionsLifecycleHandler(SessionLifecycleHandler):
         if not sessions:
             return result
 
-        # Extract session IDs from HandlerSessionData
-        session_ids = [s.session_id for s in sessions]
+        # Extract session IDs from SessionWithKernels
+        session_ids = [s.session_info.identity.id for s in sessions]
 
         # Fetch detailed session data (TerminatingSessionData) from repository
         terminating_sessions = await self._repository.get_terminating_sessions_by_ids(session_ids)

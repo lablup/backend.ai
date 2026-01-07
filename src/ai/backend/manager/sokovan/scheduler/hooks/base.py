@@ -12,7 +12,7 @@ from ai.backend.manager.clients.agent.pool import AgentPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.sokovan.scheduler.types import SessionTransitionData
+from ai.backend.manager.sokovan.scheduler.types import SessionTransitionData, SessionWithKernels
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -44,6 +44,35 @@ class AbstractSessionHook(ABC):
         :raises Exception: If cleanup fails (will be logged but ignored)
         """
         raise NotImplementedError
+
+    async def on_transition_to_running_v2(self, session: SessionWithKernels) -> None:
+        """
+        Called when a session is about to transition from CREATING to RUNNING.
+        Uses SessionWithKernels instead of SessionTransitionData.
+
+        Default implementation delegates to on_transition_to_running by converting data.
+        Subclasses can override for optimized implementations.
+
+        :param session: SessionWithKernels with session and kernel information
+        :raises Exception: If the hook fails and transition should not proceed
+        """
+        # Default: no-op. Subclasses that need this should override.
+        pass
+
+    async def on_transition_to_terminated_v2(self, session: SessionWithKernels) -> None:
+        """
+        Called when a session is about to transition from TERMINATING to TERMINATED.
+        Uses SessionWithKernels instead of SessionTransitionData.
+        Best-effort cleanup - exceptions are logged but don't prevent termination.
+
+        Default implementation delegates to on_transition_to_terminated by converting data.
+        Subclasses can override for optimized implementations.
+
+        :param session: SessionWithKernels with session and kernel information
+        :raises Exception: If cleanup fails (will be logged but ignored)
+        """
+        # Default: no-op. Subclasses that need this should override.
+        pass
 
 
 @dataclass
@@ -192,6 +221,39 @@ class SessionHook(AbstractSessionHook):
                 except Exception:
                     log.exception(f"Failed to destroy the overlay network {network_id}.")
 
+    async def on_transition_to_running_v2(self, session: SessionWithKernels) -> None:
+        """Execute session hook with SessionWithKernels data.
+
+        Note: Notifications are not yet supported through _v2 path.
+        This will be implemented when SessionWithKernels has all required fields.
+        """
+        await self._session_hook.on_transition_to_running_v2(session)
+        # TODO: Add notification support when SessionWithKernels has required fields
+        log.debug(
+            "Executed on_transition_to_running_v2 for session {}",
+            session.session_info.identity.id,
+        )
+
+    async def on_transition_to_terminated_v2(self, session: SessionWithKernels) -> None:
+        """Execute session hook with SessionWithKernels data.
+
+        Note: Network cleanup and notifications are not yet supported through _v2 path.
+        This will be implemented when SessionWithKernels has all required fields.
+        """
+        try:
+            await self._session_hook.on_transition_to_terminated_v2(session)
+        except Exception as e:
+            log.error(
+                "Error during cleanup for session {}: {}",
+                session.session_info.identity.id,
+                str(e),
+            )
+        # TODO: Add notification and network cleanup when SessionWithKernels has required fields
+        log.debug(
+            "Executed on_transition_to_terminated_v2 for session {}",
+            session.session_info.identity.id,
+        )
+
 
 class NoOpSessionHook(AbstractSessionHook):
     """Default no-op hook for session types that don't need special handling."""
@@ -208,4 +270,18 @@ class NoOpSessionHook(AbstractSessionHook):
             "No-op cleanup for session {} (type: {})",
             session.session_id,
             session.session_type,
+        )
+
+    async def on_transition_to_running_v2(self, session: SessionWithKernels) -> None:
+        log.debug(
+            "No-op hook for session {} (type: {})",
+            session.session_info.identity.id,
+            session.session_info.identity.session_type,
+        )
+
+    async def on_transition_to_terminated_v2(self, session: SessionWithKernels) -> None:
+        log.debug(
+            "No-op cleanup for session {} (type: {})",
+            session.session_info.identity.id,
+            session.session_info.identity.session_type,
         )

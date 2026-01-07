@@ -25,12 +25,12 @@ from ai.backend.manager.sokovan.scheduler.handlers.base import (
 )
 from ai.backend.manager.sokovan.scheduler.hooks.registry import HookRegistry
 from ai.backend.manager.sokovan.scheduler.results import (
-    HandlerSessionData,
     ScheduledSessionData,
     ScheduleResult,
     SessionExecutionResult,
 )
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
+from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -155,12 +155,12 @@ class CheckTerminatingProgressLifecycleHandler(SessionLifecycleHandler):
     async def execute(
         self,
         scaling_group: str,
-        sessions: Sequence[HandlerSessionData],
+        sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Execute on_transition_to_terminated hooks and prepare for TERMINATED transition.
 
         This handler needs to:
-        1. Fetch full session data for hook execution
+        1. Use provided SessionWithKernels data for hook execution
         2. Execute cleanup hooks (best-effort, don't block termination)
         3. Update sessions via repository
         4. Return successes for status transition
@@ -170,50 +170,38 @@ class CheckTerminatingProgressLifecycleHandler(SessionLifecycleHandler):
         if not sessions:
             return result
 
-        # Get session IDs for fetching full data
-        session_ids = [s.session_id for s in sessions]
-
-        # Fetch full transition data for hook execution
-        sessions_data = await self._repository.get_sessions_for_transition(
-            [SessionStatus.TERMINATING],
-            [KernelStatus.TERMINATED],
+        log.info(
+            "session types to terminate: {}",
+            [s.session_info.metadata.session_type for s in sessions],
         )
-
-        # Filter to only sessions in our batch
-        session_id_set = set(session_ids)
-        sessions_data = [s for s in sessions_data if s.session_id in session_id_set]
-
-        if not sessions_data:
-            return result
-
-        log.info("session types to terminate: {}", [s.session_type for s in sessions_data])
 
         # Execute hooks concurrently (best-effort - failures don't block termination)
         hook_coroutines = [
-            self._hook_registry.get_hook(session_data.session_type).on_transition_to_terminated(
-                session_data
-            )
-            for session_data in sessions_data
+            self._hook_registry.get_hook(
+                session.session_info.metadata.session_type
+            ).on_transition_to_terminated_v2(session)
+            for session in sessions
         ]
 
         hook_results = await asyncio.gather(*hook_coroutines, return_exceptions=True)
 
         # All sessions proceed to termination regardless of hook failures
-        for session_data, hook_result in zip(sessions_data, hook_results, strict=True):
+        for session, hook_result in zip(sessions, hook_results, strict=True):
+            session_info = session.session_info
             if isinstance(hook_result, BaseException):
                 log.error(
                     "Termination hook failed with exception for session {} (will still terminate): {}",
-                    session_data.session_id,
+                    session_info.identity.id,
                     hook_result,
                 )
             # Always include in successes - termination always proceeds
-            result.successes.append(session_data.session_id)
+            result.successes.append(session_info.identity.id)
             result.scheduled_data.append(
                 ScheduledSessionData(
-                    session_id=session_data.session_id,
-                    creation_id=session_data.creation_id,
-                    access_key=session_data.access_key,
-                    reason=session_data.status_info or "unknown",
+                    session_id=session_info.identity.id,
+                    creation_id=session_info.identity.creation_id,
+                    access_key=AccessKey(session_info.metadata.access_key),
+                    reason=session_info.lifecycle.status_info or "unknown",
                 )
             )
 

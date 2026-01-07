@@ -1,16 +1,19 @@
-"""Query conditions and orders for scheduler sessions and kernels."""
+"""Query conditions and orders for scheduler sessions, kernels, and users."""
 
 from __future__ import annotations
 
 from collections.abc import Collection
+from uuid import UUID
 
 import sqlalchemy as sa
 
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 
@@ -56,7 +59,14 @@ class SessionOrders:
 
 
 class KernelConditions:
-    """Query conditions for kernels (used in session-kernel joins)."""
+    """Query conditions for kernels."""
+
+    @staticmethod
+    def by_session_ids(session_ids: Collection[SessionId]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelRow.session_id.in_(session_ids)
+
+        return inner
 
     @staticmethod
     def by_statuses(statuses: Collection[KernelStatus]) -> QueryCondition:
@@ -74,3 +84,44 @@ class KernelOrders:
         if ascending:
             return KernelRow.cluster_idx.asc()
         return KernelRow.cluster_idx.desc()
+
+
+class UserConditions:
+    """Query conditions for users."""
+
+    @staticmethod
+    def by_uuids(user_uuids: Collection[UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.uuid.in_(user_uuids)
+
+        return inner
+
+
+class ImageConditions:
+    """Query conditions for images."""
+
+    @staticmethod
+    def by_identifiers(identifiers: Collection[tuple[str, str]]) -> QueryCondition:
+        """Filter images by list of (canonical, architecture) tuples.
+
+        Args:
+            identifiers: Collection of (canonical, architecture) tuples
+
+        Returns:
+            QueryCondition that matches any of the identifiers
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if not identifiers:
+                return sa.literal(False)
+
+            conditions = [
+                sa.and_(
+                    ImageRow.name == canonical,
+                    ImageRow.architecture == architecture,
+                )
+                for canonical, architecture in identifiers
+            ]
+            return sa.or_(*conditions)
+
+        return inner

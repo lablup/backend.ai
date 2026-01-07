@@ -10,10 +10,10 @@ from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.kernel import KernelStatus
 from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.sokovan.scheduler.results import (
-    HandlerSessionData,
     ScheduleResult,
     SessionExecutionResult,
 )
+from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
 
 class SchedulerHandler(ABC):
@@ -137,13 +137,13 @@ class SessionLifecycleHandler(ABC):
     async def execute(
         self,
         scaling_group: str,
-        sessions: Sequence[HandlerSessionData],
+        sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Execute the handler logic on the given sessions.
 
         Args:
             scaling_group: The scaling group being processed
-            sessions: Sessions queried by coordinator based on target_statuses()
+            sessions: Sessions with full SessionInfo and KernelInfo data
 
         Returns:
             Result containing successes, failures, and stales for status transitions

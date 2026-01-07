@@ -19,12 +19,12 @@ from ai.backend.manager.sokovan.scheduler.handlers.base import (
     SessionLifecycleHandler,
 )
 from ai.backend.manager.sokovan.scheduler.results import (
-    HandlerSessionData,
     ScheduledSessionData,
     ScheduleResult,
     SessionExecutionResult,
 )
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
+from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.terminator.terminator import SessionTerminator
@@ -141,13 +141,13 @@ class SweepStaleKernelsLifecycleHandler(SessionLifecycleHandler):
     async def execute(
         self,
         scaling_group: str,
-        sessions: Sequence[HandlerSessionData],
+        sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Sweep kernels with stale presence status.
 
-        The coordinator provides basic session info (HandlerSessionData).
+        The coordinator provides SessionWithKernels with full SessionInfo/KernelInfo.
         This handler:
-        1. Fetches detailed session data with kernel info
+        1. Uses provided session/kernel data directly
         2. Checks kernel presence in Redis via Terminator
         3. Confirms with agent and terminates stale kernels
         4. Returns affected sessions for post-processing
@@ -157,27 +157,17 @@ class SweepStaleKernelsLifecycleHandler(SessionLifecycleHandler):
         if not sessions:
             return result
 
-        # Extract session IDs and fetch detailed session data for transition
-        session_ids = [s.session_id for s in sessions]
-        sessions_for_transition = await self._repository.get_sessions_for_transition_by_ids(
-            session_ids
-        )
-
-        if not sessions_for_transition:
-            return result
-
         # Delegate to Terminator's handler-specific method
-        affected_sessions = await self._terminator.sweep_stale_kernels_for_handler(
-            sessions_for_transition
-        )
+        # Terminator now accepts SessionWithKernels directly
+        affected_sessions = await self._terminator.sweep_stale_kernels_for_handler(list(sessions))
 
         # Build scheduled data for affected sessions
         for session in affected_sessions:
             result.scheduled_data.append(
                 ScheduledSessionData(
-                    session_id=session.session_id,
-                    creation_id=session.creation_id,
-                    access_key=session.access_key,
+                    session_id=session.session_info.identity.id,
+                    creation_id=session.session_info.identity.creation_id,
+                    access_key=AccessKey(session.session_info.metadata.access_key),
                     reason="STALE_KERNEL",
                 )
             )

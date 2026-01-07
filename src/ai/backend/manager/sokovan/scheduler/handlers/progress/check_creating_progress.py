@@ -12,7 +12,7 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SchedulingBroadcastEvent,
 )
 from ai.backend.common.events.types import AbstractBroadcastEvent
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
@@ -25,13 +25,12 @@ from ai.backend.manager.sokovan.scheduler.handlers.base import (
 )
 from ai.backend.manager.sokovan.scheduler.hooks.registry import HookRegistry
 from ai.backend.manager.sokovan.scheduler.results import (
-    HandlerSessionData,
     ScheduledSessionData,
     ScheduleResult,
     SessionExecutionResult,
 )
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
-from ai.backend.manager.sokovan.scheduler.types import SessionRunningData
+from ai.backend.manager.sokovan.scheduler.types import SessionRunningData, SessionWithKernels
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 if TYPE_CHECKING:
@@ -151,13 +150,13 @@ class CheckCreatingProgressLifecycleHandler(SessionLifecycleHandler):
     async def execute(
         self,
         scaling_group: str,
-        sessions: Sequence[HandlerSessionData],
+        sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Execute on_transition_to_running hooks and prepare for RUNNING transition.
 
         This handler needs to:
-        1. Fetch full session data for hook execution
-        2. Execute hooks (on_transition_to_running)
+        1. Use provided SessionWithKernels data for hook execution
+        2. Execute hooks (on_transition_to_running_v2)
         3. Calculate occupied_slots from all kernels
         4. Update sessions with occupying_slots (via repository)
         5. Return successes for status transition
@@ -167,42 +166,24 @@ class CheckCreatingProgressLifecycleHandler(SessionLifecycleHandler):
         if not sessions:
             return result
 
-        # Get session IDs for fetching full data
-        session_ids = [s.session_id for s in sessions]
-
-        # Fetch full transition data for hook execution
-        # Using existing repository method that returns SessionTransitionData
-        # Note: This handler needs SessionTransitionData which includes session_type
-        # for hook execution (get_hook requires session_type)
-        sessions_data = await self._repository.get_sessions_for_transition(
-            [SessionStatus.CREATING],
-            [KernelStatus.RUNNING],
-        )
-
-        # Filter to only sessions in our batch (by session_id)
-        session_id_set = set(session_ids)
-        sessions_data = [s for s in sessions_data if s.session_id in session_id_set]
-
-        if not sessions_data:
-            return result
-
         # Execute hooks concurrently
         sessions_running_data: list[SessionRunningData] = []
 
         hook_coroutines = [
-            self._hook_registry.get_hook(session_data.session_type).on_transition_to_running(
-                session_data
-            )
-            for session_data in sessions_data
+            self._hook_registry.get_hook(
+                session.session_info.metadata.session_type
+            ).on_transition_to_running_v2(session)
+            for session in sessions
         ]
 
         hook_results = await asyncio.gather(*hook_coroutines, return_exceptions=True)
 
-        for session_data, hook_result in zip(sessions_data, hook_results, strict=True):
+        for session, hook_result in zip(sessions, hook_results, strict=True):
+            session_info = session.session_info
             if isinstance(hook_result, BaseException):
                 log.error(
                     "Hook failed with exception for session {}: {}",
-                    session_data.session_id,
+                    session_info.identity.id,
                     hook_result,
                 )
                 # Don't include in successes - session stays in CREATING
@@ -210,13 +191,13 @@ class CheckCreatingProgressLifecycleHandler(SessionLifecycleHandler):
 
             # Calculate total occupying_slots from all kernels
             total_occupying_slots = ResourceSlot()
-            for kernel in session_data.kernels:
-                if kernel.occupied_slots:
-                    total_occupying_slots += kernel.occupied_slots
+            for kernel_info in session.kernel_infos:
+                if kernel_info.resource.occupied_slots:
+                    total_occupying_slots += kernel_info.resource.occupied_slots
 
             sessions_running_data.append(
                 SessionRunningData(
-                    session_id=session_data.session_id,
+                    session_id=session_info.identity.id,
                     occupying_slots=total_occupying_slots,
                 )
             )
@@ -225,20 +206,18 @@ class CheckCreatingProgressLifecycleHandler(SessionLifecycleHandler):
         if sessions_running_data:
             await self._repository.update_sessions_to_running(sessions_running_data)
 
-            # Build success result
+            # Build success result - find matching SessionWithKernels for ScheduledSessionData
+            session_map = {s.session_info.identity.id: s for s in sessions}
             for running_data in sessions_running_data:
                 result.successes.append(running_data.session_id)
-                # Find original session data for ScheduledSessionData
-                original = next(
-                    (s for s in sessions_data if s.session_id == running_data.session_id),
-                    None,
-                )
-                if original:
+                original_session = session_map.get(running_data.session_id)
+                if original_session:
+                    original_info = original_session.session_info
                     result.scheduled_data.append(
                         ScheduledSessionData(
-                            session_id=original.session_id,
-                            creation_id=original.creation_id,
-                            access_key=original.access_key,
+                            session_id=original_info.identity.id,
+                            creation_id=original_info.identity.creation_id,
+                            access_key=AccessKey(original_info.metadata.access_key),
                             reason="triggered-by-scheduler",
                         )
                     )
