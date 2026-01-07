@@ -14,6 +14,7 @@ from ai.backend.common.api_handlers import (
     api_handler,
 )
 from ai.backend.common.contexts.request_id import current_request_id
+from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.common.dto.storage.request import (
     ReservoirImportModelsReq,
 )
@@ -21,6 +22,7 @@ from ai.backend.common.dto.storage.response import (
     ReservoirImportModelsResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.api.types import VFolderStorageSetupResult
 from ai.backend.storage.services.artifacts.reservoir import (
     ReservoirService,
     ReservoirServiceArgs,
@@ -32,6 +34,7 @@ from ai.backend.storage.utils import log_client_api_entry
 from ai.backend.storage.volumes.pool import VolumePool
 
 if TYPE_CHECKING:
+    from ai.backend.common.types import VFolderID
     from ai.backend.storage.context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -52,6 +55,61 @@ class ReservoirRegistryAPIHandler:
         self._volume_pool = volume_pool
         self._storage_pool = storage_pool
 
+    async def _setup_vfolder_storage(
+        self,
+        vfid: VFolderID,
+        storage_step_mappings: dict[ArtifactStorageImportStep, str],
+    ) -> VFolderStorageSetupResult:
+        """Setup VFolderStorage for import operations.
+
+        Creates a temporary VFolderStorage, registers it to the storage pool,
+        and returns updated storage_step_mappings along with a cleanup callback.
+
+        Args:
+            vfid: VFolder ID to create storage for
+            storage_step_mappings: Original storage step mappings
+
+        Returns:
+            VFolderStorageSetupResult with updated mappings and cleanup callback
+        """
+        request_id = current_request_id()
+        # Get the volume name from storage_step_mappings
+        # When vfid is provided, all steps should use the same volume (vfolder's host)
+        volume_names = set(storage_step_mappings.values())
+        if len(volume_names) != 1:
+            log.warning(f"Multiple volume names in storage_step_mappings with vfid: {volume_names}")
+        volume_name = next(iter(volume_names))
+
+        # Create VFolderStorage
+        async with self._volume_pool.get_volume_by_name(volume_name) as volume:
+            vfolder_storage_name = f"vfolder_{request_id}"
+            vfolder_storage = VFolderStorage(
+                name=vfolder_storage_name,
+                volume=volume,
+                vfid=vfid,
+            )
+
+            # Register to storage pool
+            self._storage_pool.add_storage(vfolder_storage_name, vfolder_storage)
+
+            log.info(
+                f"Created VFolderStorage: name={vfolder_storage_name}, vfid={vfid}, "
+                f"volume={volume_name}"
+            )
+
+        # Override storage_step_mappings to use VFolderStorage
+        updated_mappings = dict.fromkeys(storage_step_mappings.keys(), vfolder_storage_name)
+
+        # Create cleanup callback to remove VFolderStorage after task completion
+        def _cleanup() -> None:
+            self._storage_pool.remove_storage(vfolder_storage_name)
+            log.info(f"Removed VFolderStorage: name={vfolder_storage_name}")
+
+        return VFolderStorageSetupResult(
+            storage_step_mappings=updated_mappings,
+            cleanup_callback=_cleanup,
+        )
+
     @api_handler
     async def import_models(
         self,
@@ -63,51 +121,15 @@ class ReservoirRegistryAPIHandler:
         await log_client_api_entry(log, "import_models", None)
 
         storage_step_mappings = body.parsed.storage_step_mappings
-        vfolder_storage_name: str | None = None
         cleanup_callback: Callable[[], None] | None = None
 
         # If vfid is provided, create VFolderStorage and register it
         if body.parsed.vfid is not None:
-            vfid = body.parsed.vfid
-            request_id = current_request_id()
-            # Get the volume name from storage_step_mappings
-            # When vfid is provided, all steps should use the same volume (vfolder's host)
-            volume_names = set(storage_step_mappings.values())
-            if len(volume_names) != 1:
-                log.warning(
-                    f"Multiple volume names in storage_step_mappings with vfid: {volume_names}"
-                )
-            volume_name = next(iter(volume_names))
-
-            # Create VFolderStorage
-            async with self._volume_pool.get_volume_by_name(volume_name) as volume:
-                vfolder_storage_name = f"vfolder_{request_id}"
-                vfolder_storage = VFolderStorage(
-                    name=vfolder_storage_name,
-                    volume=volume,
-                    vfid=vfid,
-                )
-
-                # Register to storage pool
-                self._storage_pool.add_storage(vfolder_storage_name, vfolder_storage)
-
-                log.info(
-                    f"Created VFolderStorage: name={vfolder_storage_name}, vfid={vfid}, "
-                    f"volume={volume_name}"
-                )
-
-            # Override storage_step_mappings to use VFolderStorage
-            storage_step_mappings = dict.fromkeys(
-                storage_step_mappings.keys(), vfolder_storage_name
+            setup_result = await self._setup_vfolder_storage(
+                body.parsed.vfid, storage_step_mappings
             )
-
-            # Create cleanup callback to remove VFolderStorage after task completion
-            def _cleanup() -> None:
-                if vfolder_storage_name is not None:
-                    self._storage_pool.remove_storage(vfolder_storage_name)
-                    log.info(f"Removed VFolderStorage: name={vfolder_storage_name}")
-
-            cleanup_callback = _cleanup
+            storage_step_mappings = setup_result.storage_step_mappings
+            cleanup_callback = setup_result.cleanup_callback
 
         # Create import pipeline based on storage step mappings
         pipeline = create_reservoir_import_pipeline(

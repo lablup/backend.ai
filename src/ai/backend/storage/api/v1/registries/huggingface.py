@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
 from http import HTTPStatus
 from typing import TYPE_CHECKING
 from urllib.parse import unquote
@@ -37,6 +36,7 @@ from ai.backend.common.dto.storage.response import (
     HuggingFaceScanModelsResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.api.types import VFolderStorageSetupResult
 from ai.backend.storage.config.unified import (
     HuggingfaceConfig,
     LegacyHuggingfaceConfig,
@@ -58,14 +58,6 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-@dataclass
-class _VFolderStorageSetupResult:
-    """Result of VFolderStorage setup for import operations."""
-
-    storage_step_mappings: dict[ArtifactStorageImportStep, str]
-    cleanup_callback: Callable[[], None] | None
-
-
 class HuggingFaceRegistryAPIHandler:
     _huggingface_service: HuggingFaceService
     _volume_pool: VolumePool
@@ -85,7 +77,7 @@ class HuggingFaceRegistryAPIHandler:
         self,
         vfid: VFolderID,
         storage_step_mappings: dict[ArtifactStorageImportStep, str],
-    ) -> _VFolderStorageSetupResult:
+    ) -> VFolderStorageSetupResult:
         """Setup VFolderStorage for import operations.
 
         Creates a temporary VFolderStorage, registers it to the storage pool,
@@ -131,7 +123,7 @@ class HuggingFaceRegistryAPIHandler:
             self._storage_pool.remove_storage(vfolder_storage_name)
             log.info(f"Removed VFolderStorage: name={vfolder_storage_name}")
 
-        return _VFolderStorageSetupResult(
+        return VFolderStorageSetupResult(
             storage_step_mappings=updated_mappings,
             cleanup_callback=_cleanup,
         )
