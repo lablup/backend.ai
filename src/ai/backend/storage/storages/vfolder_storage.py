@@ -43,7 +43,7 @@ class VFolderStorage(AbstractStorage):
 
     _name: str
     _base_path: Path
-    _vfid: VFolderID
+    _vfolder_id: VFolderID
     _upload_chunk_size: int
     _download_chunk_size: int
 
@@ -51,19 +51,19 @@ class VFolderStorage(AbstractStorage):
         self,
         name: str,
         volume: AbstractVolume,
-        vfid: VFolderID,
+        vfolder_id: VFolderID,
         *,
         upload_chunk_size: int = DEFAULT_UPLOAD_CHUNK_SIZE,
         download_chunk_size: int = DEFAULT_DOWNLOAD_CHUNK_SIZE,
     ) -> None:
         self._name = name
-        self._vfid = vfid
-        self._base_path = volume.mangle_vfpath(vfid)
+        self._vfolder_id = vfolder_id
+        self._base_path = volume.mangle_vfpath(vfolder_id)
         self._upload_chunk_size = upload_chunk_size
         self._download_chunk_size = download_chunk_size
 
         log.info(
-            f"VFolderStorage initialized: name={name}, vfid={vfid}, base_path={self._base_path}"
+            f"VFolderStorage initialized: name={name}, vfolder_id={vfolder_id}, base_path={self._base_path}"
         )
 
     @property
@@ -75,8 +75,8 @@ class VFolderStorage(AbstractStorage):
         return self._base_path
 
     @property
-    def vfid(self) -> VFolderID:
-        return self._vfid
+    def vfolder_id(self) -> VFolderID:
+        return self._vfolder_id
 
     def resolve_path(self, filepath: str) -> Path:
         """

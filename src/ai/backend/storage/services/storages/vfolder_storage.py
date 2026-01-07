@@ -54,7 +54,7 @@ class VFolderStorageService:
         and returns updated storage_step_mappings along with a cleanup callback.
 
         Args:
-            vfid: VFolder ID to create storage for
+            vfolder_id: VFolder ID to create storage for
             storage_step_mappings: Original storage step mappings
 
         Returns:
@@ -71,7 +71,7 @@ class VFolderStorageService:
             vfolder_storage = VFolderStorage(
                 name=vfolder_storage_name,
                 volume=volume,
-                vfid=vfolder_id,
+                vfolder_id=vfolder_id,
             )
             self._storage_pool.add_storage(vfolder_storage_name, vfolder_storage)
 

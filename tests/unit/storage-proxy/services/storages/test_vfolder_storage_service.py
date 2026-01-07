@@ -90,7 +90,7 @@ class TestVFolderStorageServiceSetup:
         )
 
         result = await service.setup(
-            vfid=sample_vfid,
+            vfolder_id=sample_vfid,
             storage_step_mappings=sample_storage_step_mappings,
         )
 
