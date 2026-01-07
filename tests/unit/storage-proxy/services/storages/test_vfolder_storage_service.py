@@ -109,7 +109,7 @@ class TestVFolderStorageServiceSetup:
         registered_name, registered_storage = mock_storage_pool.add_storage.call_args[0]
         assert registered_name == expected_storage_name
         assert isinstance(registered_storage, VFolderStorage)
-        assert registered_storage.vfid == sample_vfid
+        assert registered_storage.vfolder_id == sample_vfid
         assert registered_storage.base_path == expected_base_path
 
         # Verify all mappings point to the new storage
