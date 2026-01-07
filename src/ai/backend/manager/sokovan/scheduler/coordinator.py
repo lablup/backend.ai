@@ -379,10 +379,15 @@ class ScheduleCoordinator:
         :param schedule_type: Type of scheduling operation
         :return: True if operation was performed, False otherwise
         """
+        # Check if there's a lifecycle handler for this schedule type
+        # Lifecycle handlers use the new DeploymentCoordinator pattern
+        if schedule_type in self._lifecycle_handlers:
+            return await self.process_lifecycle_schedule(schedule_type)
+
         try:
             log.debug("Processing schedule type: {}", schedule_type.value)
 
-            # Get handler from map and execute
+            # Get handler from map and execute (legacy pattern)
             handler = self._schedule_handlers.get(schedule_type)
             if not handler:
                 log.warning("No handler for schedule type: {}", schedule_type.value)
