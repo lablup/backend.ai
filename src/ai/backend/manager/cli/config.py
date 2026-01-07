@@ -10,9 +10,9 @@ import pathlib
 import click
 
 from ai.backend.common.configs.generator import (
+    GeneratorConfig,
     TOMLGenerator,
 )
-from ai.backend.common.configs.sample_generator import generate_sample_config_file
 from ai.backend.common.meta import ConfigEnvironment
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
@@ -42,63 +42,6 @@ def cli() -> None:
     help="Output path for the generated sample configuration file. (default: sample.toml)",
 )
 @click.option(
-    "--overwrite",
-    is_flag=True,
-    help="Overwrite the output file if it already exists.",
-)
-@click.pass_obj
-def generate_sample(
-    cli_ctx: CLIContext,
-    output: pathlib.Path,
-    overwrite: bool,
-) -> None:
-    """
-    Generate a sample configuration file from the ManagerUnifiedConfig schema.
-
-    This command creates a TOML configuration file with all available options,
-    their default values, descriptions, and examples based on the Pydantic
-    model definition of ManagerUnifiedConfig.
-    """
-    if output.exists() and not overwrite:
-        click.echo(
-            f"Error: Output file '{output}' already exists. Use --overwrite to replace it.",
-            err=True,
-        )
-        return
-
-    header_comment = """
-Backend.AI Manager Configuration Sample
-
-This is a sample configuration file for the Backend.AI Manager.
-All configuration options are documented with their descriptions,
-default values, and examples.
-
-Generated automatically from the ManagerUnifiedConfig schema.
-"""
-
-    try:
-        generate_sample_config_file(
-            ManagerUnifiedConfig, str(output), header_comment=header_comment.strip()
-        )
-        log.info(f"Sample configuration file generated successfully: {output}")
-    except Exception as e:
-        raise click.ClickException(f"Failed to generate sample configuration: {e}")
-
-
-@cli.command("generate-sample-v2")
-@click.option(
-    "-o",
-    "--output",
-    type=click.Path(
-        file_okay=True,
-        dir_okay=False,
-        writable=True,
-        path_type=pathlib.Path,
-    ),
-    default="./configs/manager/sample-v2.toml",
-    help="Output path for the generated configuration file.",
-)
-@click.option(
     "-e",
     "--env",
     type=click.Choice(["local", "prod"]),
@@ -116,7 +59,7 @@ Generated automatically from the ManagerUnifiedConfig schema.
     help="Show actual secret values instead of masking them.",
 )
 @click.pass_obj
-def generate_sample_v2(
+def generate_sample(
     cli_ctx: CLIContext,
     output: pathlib.Path,
     env: str,
@@ -124,7 +67,7 @@ def generate_sample_v2(
     unmask_secrets: bool,
 ) -> None:
     """
-    Generate a sample configuration file using the new BackendAIConfigMeta-based generator.
+    Generate a sample configuration file from the ManagerUnifiedConfig schema.
 
     This command creates a TOML configuration file with environment-specific examples
     (local or prod), proper secret masking, and comprehensive documentation from
@@ -155,8 +98,6 @@ Generated using BackendAIConfigMeta annotations.
     config_env = ConfigEnvironment.LOCAL if env == "local" else ConfigEnvironment.PROD
 
     try:
-        from ai.backend.common.configs.generator import GeneratorConfig
-
         generator_config = GeneratorConfig(mask_secrets=not unmask_secrets)
         generator = TOMLGenerator(env=config_env, config=generator_config)
         generator.generate_to_file(ManagerUnifiedConfig, output, header=header_comment.strip())

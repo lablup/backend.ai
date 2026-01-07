@@ -48,7 +48,7 @@ class BootstrapConfig(BaseModel):
         """,
     )
     logging: LoggingConfig = Field(
-        default_factory=LoggingConfig,
+        default_factory=LoggingConfig,  # type: ignore[arg-type]
         description="""
         Logging system configuration.
         Controls how logs are formatted, filtered, and stored.
