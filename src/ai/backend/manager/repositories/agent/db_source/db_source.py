@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Optional
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, with_loader_criteria
 
 from ai.backend.common.exception import AgentNotFound
 from ai.backend.common.types import AgentId, ImageID
@@ -149,13 +149,12 @@ class AgentDBSource:
         """Searches agents with total count."""
 
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(
-                AgentRow,
-                sa.func.count().over().label("total_count"),
-            ).options(
-                selectinload(AgentRow.kernels).where(
-                    KernelRow.status.in_(KernelStatus.resource_occupied_statuses())
-                )
+            query = sa.select(AgentRow).options(
+                selectinload(AgentRow.kernels),
+                with_loader_criteria(
+                    KernelRow,
+                    KernelRow.status.in_(KernelStatus.resource_occupied_statuses()),
+                ),
             )
 
             result = await execute_batch_querier(
