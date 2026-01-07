@@ -74,6 +74,13 @@ class StoragePool(AbstractStoragePool):
                         storage_name, artifact_storage_config.object_storage
                     )
 
+                case ArtifactStorageType.VFOLDER_STORAGE:
+                    # VFolder storage is dynamically created at runtime using VFolderID,
+                    # not from static configuration in the storage pool
+                    log.debug(
+                        f"Skipping VFolder storage: {storage_name} (created dynamically at runtime)"
+                    )
+
                 case ArtifactStorageType.GIT_LFS:
                     raise GenericNotImplementedError("Git LFS storage is not supported yet")
 

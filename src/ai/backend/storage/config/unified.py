@@ -864,6 +864,9 @@ class ArtifactRegistryStorageConfig(BaseConfigSchema):
             case ArtifactStorageType.VFS_STORAGE:
                 if self.vfs_storage is None:
                     raise InvalidConfigError("vfs config is required when storage_type is 'vfs'")
+            case ArtifactStorageType.VFOLDER_STORAGE:
+                # VFolder storage is dynamically created using VFolderID from reservoir config
+                pass
             case ArtifactStorageType.GIT_LFS:
                 raise GenericNotImplementedError("git_lfs is not supported yet")
 
