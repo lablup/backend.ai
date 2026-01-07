@@ -17,6 +17,7 @@ backend_packages = [
 pants_ignore = [
     ".*/",
     "/dist/",
+    "/docker/",
     "__pycache__",
     "*~",  # vim swap/backup files
     "/scripts/",

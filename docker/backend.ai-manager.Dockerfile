@@ -15,7 +15,7 @@ RUN mkdir -p /tmp/backend.ai/ipc /var/log/backend.ai /etc/backend.ai /app/fixtur
 WORKDIR /app
 
 # Copy entrypoint script
-COPY entrypoint.sh /app/entrypoint.sh
+COPY docker/backend.ai-manager-entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
 # Set the default command to run the entrypoint script
