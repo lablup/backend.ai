@@ -186,6 +186,99 @@ class TestSingleKernelSession:
         assert session_data.kernels[0].main_gid == 1000
         assert session_data.kernels[0].gids == [100, 200]
 
+    async def test_single_kernel_batch_session(
+        self, scheduling_controller, mock_repository
+    ) -> None:
+        """Test creating a batch session with startup_command."""
+        session_name = "batch-session-test"
+        startup_command = "python train.py --epochs 100"
+
+        spec = SessionCreationSpec(
+            session_creation_id="test-batch-001",
+            session_name=session_name,
+            access_key=AccessKey("test-access-key"),
+            user_scope=UserScope(
+                domain_name="default",
+                group_id=uuid.uuid4(),
+                user_uuid=uuid.uuid4(),
+                user_role="user",
+            ),
+            session_type=SessionTypes.BATCH,
+            cluster_mode=ClusterMode.SINGLE_NODE,
+            cluster_size=1,
+            priority=10,
+            resource_policy={
+                "max_containers_per_session": 5,
+            },
+            kernel_specs=[
+                cast(
+                    KernelEnqueueingConfig,
+                    {
+                        "image_ref": MagicMock(canonical="python:3.9"),
+                        "resources": {"cpu": "2", "mem": "4g"},
+                    },
+                )
+            ],
+            creation_spec={
+                "mounts": ["home"],
+                "environ": {"TEST_VAR": "test_value"},
+            },
+            startup_command=startup_command,
+        )
+
+        # Setup mock context
+        mock_repository.fetch_session_creation_data.return_value = SessionCreationContext(
+            scaling_group_network=ScalingGroupNetworkInfo(use_host_network=False),
+            allowed_scaling_groups=[
+                AllowedScalingGroup(
+                    name="default", is_private=False, scheduler_opts=ScalingGroupOpts()
+                )
+            ],
+            image_infos={
+                "python:3.9": ImageInfo(
+                    canonical="python:3.9",
+                    architecture="x86_64",
+                    registry="docker.io",
+                    labels={},
+                    resource_spec={
+                        "cpu": {"min": "1", "max": "16"},
+                        "mem": {"min": "1g", "max": "32g"},
+                    },
+                )
+            },
+            vfolder_mounts=[
+                VFolderMount(
+                    name="home",
+                    vfid=VFolderID(quota_scope_id=None, folder_id=uuid.uuid4()),
+                    vfsubpath=PurePosixPath("."),
+                    host_path=PurePosixPath("/data/vfolders/home"),
+                    kernel_path=PurePosixPath("/home/work"),
+                    mount_perm=MountPermission.READ_WRITE,
+                    usage_mode=VFolderUsageMode.GENERAL,
+                )
+            ],
+            dotfile_data={"bashrc": "export PS1='$ '"},
+            container_user_info=ContainerUserInfo(
+                uid=1000,
+                main_gid=1000,
+                supplementary_gids=[100, 200],
+            ),
+        )
+
+        # Execute
+        await scheduling_controller.enqueue_session(spec)
+
+        # Verify
+        mock_repository.enqueue_session.assert_called_once()
+
+        # Check the session data passed to repository
+        session_data = mock_repository.enqueue_session.call_args[0][0]
+        assert session_data.name == session_name
+        assert session_data.session_type == SessionTypes.BATCH
+        assert session_data.startup_command == startup_command
+        assert session_data.cluster_size == 1
+        assert len(session_data.kernels) == 1
+
 
 class TestMultiContainerSession:
     """Test cases for multi-container sessions."""
