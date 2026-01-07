@@ -8,6 +8,10 @@ from ai.backend.manager.services.audit_log.actions.create import (
     CreateAuditLogAction,
     CreateAuditLogActionResult,
 )
+from ai.backend.manager.services.audit_log.actions.search import (
+    SearchAuditLogsAction,
+    SearchAuditLogsActionResult,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.audit_log import AuditLogRepository
@@ -24,3 +28,12 @@ class AuditLogService:
     async def create(self, action: CreateAuditLogAction) -> CreateAuditLogActionResult:
         data = await self._audit_log_repository.create(action.creator)
         return CreateAuditLogActionResult(audit_log_id=data.id)
+
+    async def search(self, action: SearchAuditLogsAction) -> SearchAuditLogsActionResult:
+        result = await self._audit_log_repository.search(action.querier)
+        return SearchAuditLogsActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
