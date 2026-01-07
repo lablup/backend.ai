@@ -527,6 +527,7 @@ class ReservoirService:
         storage_step_mappings: dict[ArtifactStorageImportStep, str],
         pipeline: ImportPipeline,
         artifact_revision_ids: list[uuid.UUID],
+        on_complete: Callable[[], None] | None = None,
     ) -> uuid.UUID:
         async def _import_models_batch(reporter: ProgressReporter) -> DispatchResult:
             model_count = len(models)
@@ -594,6 +595,9 @@ class ReservoirService:
             except Exception as e:
                 log.error(f"Batch model import failed: {e!s}")
                 return DispatchResult.error(f"Batch import failed: {e!s}")
+            finally:
+                if on_complete is not None:
+                    on_complete()
 
             return DispatchResult.success(None)
 

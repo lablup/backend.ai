@@ -529,6 +529,12 @@ class ScanArtifactsInput:
 )
 class ImportArtifactsInput:
     artifact_revision_ids: list[ID]
+    vfolder_id: Optional[ID] = strawberry.field(
+        default=None,
+        description="Optional vfolder ID to use as the download destination. "
+        "If provided, artifacts will be downloaded to this vfolder's path "
+        "using the vfolder's storage host for all import steps.",
+    )
 
 
 @strawberry.input(description="Added in 25.15.0")
