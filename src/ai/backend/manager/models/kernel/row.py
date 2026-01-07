@@ -16,10 +16,19 @@ from typing import (
 )
 
 import sqlalchemy as sa
+import yarl
 from dateutil.tz import tzutc
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import foreign, load_only, noload, relationship, selectinload
+from sqlalchemy.orm import (
+    Mapped,
+    foreign,
+    load_only,
+    mapped_column,
+    noload,
+    relationship,
+    selectinload,
+)
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
@@ -51,6 +60,11 @@ from ai.backend.manager.data.kernel.types import (
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+    from ai.backend.manager.models.agent import AgentRow
+    from ai.backend.manager.models.group import GroupRow
+    from ai.backend.manager.models.image import ImageRow
+    from ai.backend.manager.models.session import SessionRow
+    from ai.backend.manager.models.user import UserRow
 
 from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.defs import DEFAULT_ROLE
@@ -68,12 +82,11 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     EnumType,
-    KernelIDColumn,
+    KernelIDColumnType,
     ResourceSlotColumn,
     SessionIDColumnType,
     StrEnumType,
     StructuredJSONObjectListColumn,
-    URLColumn,
 )
 from ai.backend.manager.models.types import QueryCondition
 from ai.backend.manager.models.user import users
@@ -360,11 +373,13 @@ class KernelRow(Base):
 
     # The Backend.AI-side UUID for each kernel
     # (mapped to a container in the docker backend and a pod in the k8s backend)
-    id = KernelIDColumn()
+    id: Mapped[KernelId] = mapped_column(
+        "id", KernelIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
     # session_id == id when the kernel is the main container in a multi-container session or a
     # single-container session.
     # Otherwise, it refers the kernel ID of the main container of the belonged multi-container session.
-    session_id = sa.Column(
+    session_id: Mapped[SessionId] = mapped_column(
         "session_id",
         SessionIDColumnType,
         sa.ForeignKey("sessions.id"),
@@ -372,13 +387,13 @@ class KernelRow(Base):
         index=True,
         nullable=False,
     )
-    session_creation_id = sa.Column(
-        "session_creation_id", sa.String(length=32), unique=False, index=False
+    session_creation_id: Mapped[str | None] = mapped_column(
+        "session_creation_id", sa.String(length=32), unique=False, index=False, nullable=True
     )
-    session_name = sa.Column(
-        "session_name", sa.String(length=64), unique=False, index=True
+    session_name: Mapped[str | None] = mapped_column(
+        "session_name", sa.String(length=64), unique=False, index=True, nullable=True
     )  # previously sess_id
-    session_type = sa.Column(
+    session_type: Mapped[SessionTypes] = mapped_column(
         "session_type",
         StrEnumType(SessionTypes, use_name=True),
         index=True,
@@ -386,85 +401,129 @@ class KernelRow(Base):
         default=SessionTypes.INTERACTIVE,
         server_default=SessionTypes.INTERACTIVE.name,
     )
-    cluster_mode = sa.Column(
+    cluster_mode: Mapped[str] = mapped_column(
         "cluster_mode",
         sa.String(length=16),
         nullable=False,
         default=ClusterMode.SINGLE_NODE,
         server_default=ClusterMode.SINGLE_NODE.name,
     )
-    cluster_size = sa.Column("cluster_size", sa.Integer, nullable=False, default=1)
-    cluster_role = sa.Column(
+    cluster_size: Mapped[int] = mapped_column("cluster_size", sa.Integer, nullable=False, default=1)
+    cluster_role: Mapped[str] = mapped_column(
         "cluster_role", sa.String(length=16), nullable=False, default=DEFAULT_ROLE, index=True
     )
-    cluster_idx = sa.Column("cluster_idx", sa.Integer, nullable=False, default=0)
-    local_rank = sa.Column("local_rank", sa.Integer, nullable=False, default=0)
-    cluster_hostname = sa.Column(
+    cluster_idx: Mapped[int] = mapped_column("cluster_idx", sa.Integer, nullable=False, default=0)
+    local_rank: Mapped[int] = mapped_column("local_rank", sa.Integer, nullable=False, default=0)
+    cluster_hostname: Mapped[str] = mapped_column(
         "cluster_hostname", sa.String(length=64), nullable=False, default=default_hostname
     )
-    uid = sa.Column("uid", sa.Integer, nullable=True, server_default=sa.null())
-    main_gid = sa.Column("main_gid", sa.Integer, nullable=True, server_default=sa.null())
-    gids = sa.Column("gids", sa.ARRAY(sa.Integer), nullable=True, server_default=sa.null())
+    uid: Mapped[int | None] = mapped_column(
+        "uid", sa.Integer, nullable=True, server_default=sa.null()
+    )
+    main_gid: Mapped[int | None] = mapped_column(
+        "main_gid", sa.Integer, nullable=True, server_default=sa.null()
+    )
+    gids: Mapped[list[int] | None] = mapped_column(
+        "gids", sa.ARRAY(sa.Integer), nullable=True, server_default=sa.null()
+    )
 
     # Resource ownership
-    scaling_group = sa.Column(
+    scaling_group: Mapped[str | None] = mapped_column(
         "scaling_group", sa.ForeignKey("scaling_groups.name"), index=True, nullable=True
     )
-    agent = sa.Column("agent", sa.String(length=64), sa.ForeignKey("agents.id"), nullable=True)
-    agent_addr = sa.Column("agent_addr", sa.String(length=128), nullable=True)
-    domain_name = sa.Column(
+    agent: Mapped[str | None] = mapped_column(
+        "agent", sa.String(length=64), sa.ForeignKey("agents.id"), nullable=True
+    )
+    agent_addr: Mapped[str | None] = mapped_column(
+        "agent_addr", sa.String(length=128), nullable=True
+    )
+    domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False
     )
-    group_id = sa.Column("group_id", GUID, sa.ForeignKey("groups.id"), nullable=False)
-    user_uuid = sa.Column("user_uuid", GUID, nullable=False)
-    access_key = sa.Column("access_key", sa.String(length=20))
+    group_id: Mapped[uuid.UUID] = mapped_column(
+        "group_id", GUID, sa.ForeignKey("groups.id"), nullable=False
+    )
+    user_uuid: Mapped[uuid.UUID] = mapped_column("user_uuid", GUID, nullable=False)
+    access_key: Mapped[str | None] = mapped_column(
+        "access_key", sa.String(length=20), nullable=True
+    )
     # `image` is a string representing canonical name which shaped "<REGISTRY>/<PROJECT>/<IMAGE_NAME>:<TAG>".
-    image = sa.Column("image", sa.String(length=512))
+    image: Mapped[str | None] = mapped_column("image", sa.String(length=512), nullable=True)
     # ForeignKeyIDColumn("image_id", "images.id")
-    architecture = sa.Column("architecture", sa.String(length=32), default="x86_64")
-    registry = sa.Column("registry", sa.String(length=512))
-    tag = sa.Column("tag", sa.String(length=64), nullable=True)
+    architecture: Mapped[str | None] = mapped_column(
+        "architecture", sa.String(length=32), default="x86_64", nullable=True
+    )
+    registry: Mapped[str | None] = mapped_column("registry", sa.String(length=512), nullable=True)
+    tag: Mapped[str | None] = mapped_column("tag", sa.String(length=64), nullable=True)
     # Resource occupation
-    container_id = sa.Column("container_id", sa.String(length=64))
-    occupied_slots = sa.Column("occupied_slots", ResourceSlotColumn(), nullable=False)
-    requested_slots = sa.Column(
+    container_id: Mapped[str | None] = mapped_column(
+        "container_id", sa.String(length=64), nullable=True
+    )
+    occupied_slots: Mapped[ResourceSlot] = mapped_column(
+        "occupied_slots", ResourceSlotColumn(), nullable=False
+    )
+    requested_slots: Mapped[ResourceSlot] = mapped_column(
         "requested_slots", ResourceSlotColumn(), nullable=False, default=ResourceSlot()
     )
-    occupied_shares = sa.Column(
+    occupied_shares: Mapped[dict[str, Any]] = mapped_column(
         "occupied_shares", pgsql.JSONB(), nullable=False, default={}
     )  # legacy
-    environ = sa.Column("environ", sa.ARRAY(sa.String), nullable=True)
-    mounts = sa.Column(
+    environ: Mapped[list[str] | None] = mapped_column("environ", sa.ARRAY(sa.String), nullable=True)
+    mounts: Mapped[list[str] | None] = mapped_column(
         "mounts", sa.ARRAY(sa.String), nullable=True
     )  # list of list; legacy since 22.03
-    mount_map = sa.Column(
+    mount_map: Mapped[dict[str, Any] | None] = mapped_column(
         "mount_map", pgsql.JSONB(), nullable=True, default={}
     )  # legacy since 22.03
-    vfolder_mounts = sa.Column(
+    vfolder_mounts: Mapped[list[VFolderMount] | None] = mapped_column(
         "vfolder_mounts", StructuredJSONObjectListColumn(VFolderMount), nullable=True
     )
-    attached_devices = sa.Column("attached_devices", pgsql.JSONB(), nullable=True, default={})
-    resource_opts = sa.Column("resource_opts", pgsql.JSONB(), nullable=True, default={})
-    bootstrap_script = sa.Column("bootstrap_script", sa.String(length=16 * 1024), nullable=True)
+    attached_devices: Mapped[dict[str, Any] | None] = mapped_column(
+        "attached_devices", pgsql.JSONB(), nullable=True, default={}
+    )
+    resource_opts: Mapped[dict[str, Any] | None] = mapped_column(
+        "resource_opts", pgsql.JSONB(), nullable=True, default={}
+    )
+    bootstrap_script: Mapped[str | None] = mapped_column(
+        "bootstrap_script", sa.String(length=16 * 1024), nullable=True
+    )
     # Port mappings
     # If kernel_host is NULL, it is assumed to be same to the agent host or IP.
-    kernel_host = sa.Column("kernel_host", sa.String(length=128), nullable=True)
-    repl_in_port = sa.Column("repl_in_port", sa.Integer(), nullable=False)
-    repl_out_port = sa.Column("repl_out_port", sa.Integer(), nullable=False)
-    stdin_port = sa.Column("stdin_port", sa.Integer(), nullable=False)  # legacy for stream_pty
-    stdout_port = sa.Column("stdout_port", sa.Integer(), nullable=False)  # legacy for stream_pty
-    service_ports = sa.Column("service_ports", pgsql.JSONB(), nullable=True)
-    preopen_ports = sa.Column("preopen_ports", sa.ARRAY(sa.Integer), nullable=True)
-    use_host_network = sa.Column("use_host_network", sa.Boolean(), default=False, nullable=False)
-    # Lifecycle
-    created_at = sa.Column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True
+    kernel_host: Mapped[str | None] = mapped_column(
+        "kernel_host", sa.String(length=128), nullable=True
     )
-    terminated_at = sa.Column(
+    repl_in_port: Mapped[int] = mapped_column("repl_in_port", sa.Integer(), nullable=False)
+    repl_out_port: Mapped[int] = mapped_column("repl_out_port", sa.Integer(), nullable=False)
+    stdin_port: Mapped[int] = mapped_column(
+        "stdin_port", sa.Integer(), nullable=False
+    )  # legacy for stream_pty
+    stdout_port: Mapped[int] = mapped_column(
+        "stdout_port", sa.Integer(), nullable=False
+    )  # legacy for stream_pty
+    service_ports: Mapped[dict[str, Any] | None] = mapped_column(
+        "service_ports", pgsql.JSONB(), nullable=True
+    )
+    preopen_ports: Mapped[list[int] | None] = mapped_column(
+        "preopen_ports", sa.ARRAY(sa.Integer), nullable=True
+    )
+    use_host_network: Mapped[bool] = mapped_column(
+        "use_host_network", sa.Boolean(), default=False, nullable=False
+    )
+    # Lifecycle
+    created_at: Mapped[datetime | None] = mapped_column(
+        "created_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.func.now(),
+        index=True,
+        nullable=True,
+    )
+    terminated_at: Mapped[datetime | None] = mapped_column(
         "terminated_at", sa.DateTime(timezone=True), nullable=True, default=sa.null(), index=True
     )
-    starts_at = sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null())
-    status = sa.Column(
+    starts_at: Mapped[datetime | None] = mapped_column(
+        "starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null()
+    )
+    status: Mapped[KernelStatus] = mapped_column(
         "status",
         StrEnumType(KernelStatus),
         default=KernelStatus.PENDING,
@@ -472,13 +531,17 @@ class KernelRow(Base):
         nullable=False,
         index=True,
     )
-    status_changed = sa.Column(
+    status_changed: Mapped[datetime | None] = mapped_column(
         "status_changed", sa.DateTime(timezone=True), nullable=True, index=True
     )
-    status_info = sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null())
+    status_info: Mapped[str | None] = mapped_column(
+        "status_info", sa.Unicode(), nullable=True, default=sa.null()
+    )
     # status_info contains a kebab-cased string that expresses a summary of the last status change.
     # Examples: "user-requested", "self-terminated", "predicate-checks-failed", "no-available-instances"
-    status_data = sa.Column("status_data", pgsql.JSONB(), nullable=True, default=sa.null())
+    status_data: Mapped[dict[str, Any] | None] = mapped_column(
+        "status_data", pgsql.JSONB(), nullable=True, default=sa.null()
+    )
     # status_data contains a JSON object that contains detailed data for the last status change.
     # During scheduling (as PENDING + ("no-available-instances" | "predicate-checks-failed")):
     # {
@@ -514,10 +577,14 @@ class KernelRow(Base):
     #         // used to prevent duplication of SessionTerminatedEvent
     #   }
     # }
-    status_history = sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null())
-    callback_url = sa.Column("callback_url", URLColumn, nullable=True, default=sa.null())
-    startup_command = sa.Column("startup_command", sa.Text, nullable=True)
-    result = sa.Column(
+    status_history: Mapped[dict[str, Any] | None] = mapped_column(
+        "status_history", pgsql.JSONB(), nullable=True, default=sa.null()
+    )
+    callback_url: Mapped[yarl.URL | None] = mapped_column(
+        "callback_url", sa.UnicodeText, nullable=True, default=sa.null()
+    )
+    startup_command: Mapped[str | None] = mapped_column("startup_command", sa.Text, nullable=True)
+    result: Mapped[SessionResult] = mapped_column(
         "result",
         EnumType(SessionResult),
         default=SessionResult.UNDEFINED,
@@ -525,12 +592,20 @@ class KernelRow(Base):
         nullable=False,
         index=True,
     )
-    internal_data = sa.Column("internal_data", pgsql.JSONB(), nullable=True)
-    container_log = sa.Column("container_log", sa.LargeBinary(), nullable=True)
+    internal_data: Mapped[dict[str, Any] | None] = mapped_column(
+        "internal_data", pgsql.JSONB(), nullable=True
+    )
+    container_log: Mapped[bytes | None] = mapped_column(
+        "container_log", sa.LargeBinary(), nullable=True
+    )
     # Resource metrics measured upon termination
-    num_queries = sa.Column("num_queries", sa.BigInteger(), default=0)
-    last_stat = sa.Column("last_stat", pgsql.JSONB(), nullable=True, default=sa.null())
-    last_seen = sa.Column(
+    num_queries: Mapped[int | None] = mapped_column(
+        "num_queries", sa.BigInteger(), default=0, nullable=True
+    )
+    last_stat: Mapped[dict[str, Any] | None] = mapped_column(
+        "last_stat", pgsql.JSONB(), nullable=True, default=sa.null()
+    )
+    last_seen: Mapped[datetime | None] = mapped_column(
         "last_seen",
         sa.DateTime(timezone=True),
         nullable=True,
@@ -549,15 +624,15 @@ class KernelRow(Base):
         ),
     )
 
-    session = relationship("SessionRow", back_populates="kernels")
-    image_row = relationship(
+    session: Mapped[SessionRow] = relationship("SessionRow", back_populates="kernels")
+    image_row: Mapped[ImageRow | None] = relationship(
         "ImageRow",
         foreign_keys="KernelRow.image",
         primaryjoin=_get_image_row_join_condition,
     )
-    agent_row = relationship("AgentRow", back_populates="kernels")
-    group_row = relationship("GroupRow", back_populates="kernels")
-    user_row = relationship(
+    agent_row: Mapped[AgentRow | None] = relationship("AgentRow", back_populates="kernels")
+    group_row: Mapped[GroupRow] = relationship("GroupRow", back_populates="kernels")
+    user_row: Mapped[UserRow] = relationship(
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
         back_populates="kernels",

@@ -23,15 +23,18 @@ from uuid import UUID
 import aiotools
 import redis.exceptions
 import sqlalchemy as sa
+import yarl
 from dateutil.tz import tzutc
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
+    Mapped,
     contains_eager,
     foreign,
     joinedload,
     load_only,
+    mapped_column,
     noload,
     relationship,
     selectinload,
@@ -103,9 +106,8 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     EnumType,
-    ForeignKeyIDColumn,
     ResourceSlotColumn,
-    SessionIDColumn,
+    SessionIDColumnType,
     StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
@@ -142,6 +144,10 @@ from ai.backend.manager.models.utils import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.models.domain import DomainRow
+    from ai.backend.manager.models.keypair import KeyPairRow
+    from ai.backend.manager.models.scaling_group import ScalingGroupRow
+    from ai.backend.manager.models.user import UserRow
     from ai.backend.manager.registry import AgentRegistry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -667,10 +673,14 @@ def _get_user_row_join_condition():
 
 class SessionRow(Base):
     __tablename__ = "sessions"
-    id = SessionIDColumn()
-    creation_id = sa.Column("creation_id", sa.String(length=32), unique=False, index=False)
-    name = sa.Column("name", sa.String(length=64), unique=False, index=True)
-    session_type = sa.Column(
+    id: Mapped[SessionId] = mapped_column(
+        "id", SessionIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    creation_id: Mapped[str | None] = mapped_column(
+        "creation_id", sa.String(length=32), unique=False, index=False
+    )
+    name: Mapped[str | None] = mapped_column("name", sa.String(length=64), unique=False, index=True)
+    session_type: Mapped[SessionTypes] = mapped_column(
         "session_type",
         StrEnumType(SessionTypes, use_name=True),
         index=True,
@@ -678,7 +688,7 @@ class SessionRow(Base):
         default=SessionTypes.INTERACTIVE,
         server_default=SessionTypes.INTERACTIVE.name,
     )
-    priority = sa.Column(
+    priority: Mapped[int] = mapped_column(
         "priority",
         sa.Integer(),
         nullable=False,
@@ -686,48 +696,56 @@ class SessionRow(Base):
         index=True,
     )
 
-    cluster_mode = sa.Column(
+    cluster_mode: Mapped[str] = mapped_column(
         "cluster_mode",
         sa.String(length=16),
         nullable=False,
         default=ClusterMode.SINGLE_NODE,
         server_default=ClusterMode.SINGLE_NODE.name,
     )
-    cluster_size = sa.Column("cluster_size", sa.Integer, nullable=False, default=1)
-    agent_ids = sa.Column("agent_ids", sa.ARRAY(sa.String), nullable=True)
-    designated_agent_ids = sa.Column("designated_agent_ids", sa.ARRAY(sa.String), nullable=True)
-    kernels = relationship("KernelRow", back_populates="session")
+    cluster_size: Mapped[int] = mapped_column("cluster_size", sa.Integer, nullable=False, default=1)
+    agent_ids: Mapped[list[str] | None] = mapped_column(
+        "agent_ids", sa.ARRAY(sa.String), nullable=True
+    )
+    designated_agent_ids: Mapped[list[str] | None] = mapped_column(
+        "designated_agent_ids", sa.ARRAY(sa.String), nullable=True
+    )
+    kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="session")
 
     # Resource ownership
-    scaling_group_name = sa.Column(
+    scaling_group_name: Mapped[str | None] = mapped_column(
         "scaling_group_name", sa.ForeignKey("scaling_groups.name"), index=True, nullable=True
     )
-    scaling_group = relationship("ScalingGroupRow", back_populates="sessions")
-    target_sgroup_names = sa.Column(
+    scaling_group: Mapped[ScalingGroupRow | None] = relationship(
+        "ScalingGroupRow", back_populates="sessions"
+    )
+    target_sgroup_names: Mapped[list[str] | None] = mapped_column(
         "target_sgroup_names",
         sa.ARRAY(sa.String(length=64)),
         default="{}",
         server_default="{}",
         nullable=True,
     )
-    domain_name = sa.Column(
+    domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False
     )
-    domain = relationship("DomainRow", back_populates="sessions")
-    group_id = ForeignKeyIDColumn("group_id", "groups.id", nullable=False)
-    group = relationship("GroupRow", back_populates="sessions")
-    user_uuid = sa.Column(
+    domain: Mapped[DomainRow] = relationship("DomainRow", back_populates="sessions")
+    group_id: Mapped[UUID] = mapped_column(
+        "group_id", GUID, sa.ForeignKey("groups.id"), nullable=False
+    )
+    group: Mapped[GroupRow] = relationship("GroupRow", back_populates="sessions")
+    user_uuid: Mapped[UUID] = mapped_column(
         "user_uuid", GUID, server_default=sa.text("uuid_generate_v4()"), nullable=False
     )
-    user = relationship(
+    user: Mapped[UserRow] = relationship(
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
         back_populates="sessions",
         foreign_keys=[user_uuid],
     )
 
-    access_key = sa.Column("access_key", sa.String(length=20))
-    access_key_row = relationship(
+    access_key: Mapped[str | None] = mapped_column("access_key", sa.String(length=20))
+    access_key_row: Mapped[KeyPairRow | None] = relationship(
         "KeyPairRow",
         primaryjoin=_get_keypair_row_join_condition,
         back_populates="sessions",
@@ -735,34 +753,46 @@ class SessionRow(Base):
     )
 
     # `image` column is identical to kernels `image` column.
-    images = sa.Column("images", sa.ARRAY(sa.String), nullable=True)
-    tag = sa.Column("tag", sa.String(length=64), nullable=True)
+    images: Mapped[list[str] | None] = mapped_column("images", sa.ARRAY(sa.String), nullable=True)
+    tag: Mapped[str | None] = mapped_column("tag", sa.String(length=64), nullable=True)
 
     # Resource occupation
-    # occupied_slots = sa.Column('occupied_slots', ResourceSlotColumn(), nullable=False)
-    occupying_slots = sa.Column("occupying_slots", ResourceSlotColumn(), nullable=False)
-    requested_slots = sa.Column("requested_slots", ResourceSlotColumn(), nullable=False)
-    vfolder_mounts = sa.Column(
+    # occupied_slots = mapped_column('occupied_slots', ResourceSlotColumn(), nullable=False)
+    occupying_slots: Mapped[ResourceSlot] = mapped_column(
+        "occupying_slots", ResourceSlotColumn(), nullable=False
+    )
+    requested_slots: Mapped[ResourceSlot] = mapped_column(
+        "requested_slots", ResourceSlotColumn(), nullable=False
+    )
+    vfolder_mounts: Mapped[list[VFolderMount] | None] = mapped_column(
         "vfolder_mounts", StructuredJSONObjectListColumn(VFolderMount), nullable=True
     )
-    environ = sa.Column("environ", pgsql.JSONB(), nullable=True, default={})
-    bootstrap_script = sa.Column("bootstrap_script", sa.String(length=16 * 1024), nullable=True)
-    use_host_network = sa.Column("use_host_network", sa.Boolean(), default=False, nullable=False)
+    environ: Mapped[dict[str, Any] | None] = mapped_column(
+        "environ", pgsql.JSONB(), nullable=True, default={}
+    )
+    bootstrap_script: Mapped[str | None] = mapped_column(
+        "bootstrap_script", sa.String(length=16 * 1024), nullable=True
+    )
+    use_host_network: Mapped[bool] = mapped_column(
+        "use_host_network", sa.Boolean(), default=False, nullable=False
+    )
 
     # Lifecycle
     # Deprecated: Not used anymore
-    timeout = sa.Column("timeout", sa.BigInteger(), nullable=True)
-    batch_timeout = sa.Column(
+    timeout: Mapped[int | None] = mapped_column("timeout", sa.BigInteger(), nullable=True)
+    batch_timeout: Mapped[int | None] = mapped_column(
         "batch_timeout", sa.BigInteger(), nullable=True
     )  # Used to set timeout of batch sessions
-    created_at = sa.Column(
+    created_at: Mapped[datetime | None] = mapped_column(
         "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True
     )
-    terminated_at = sa.Column(
+    terminated_at: Mapped[datetime | None] = mapped_column(
         "terminated_at", sa.DateTime(timezone=True), nullable=True, default=sa.null(), index=True
     )
-    starts_at = sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null())
-    status = sa.Column(
+    starts_at: Mapped[datetime | None] = mapped_column(
+        "starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null()
+    )
+    status: Mapped[SessionStatus] = mapped_column(
         "status",
         StrEnumType(SessionStatus),
         default=SessionStatus.PENDING,
@@ -770,9 +800,13 @@ class SessionRow(Base):
         nullable=False,
         index=True,
     )
-    status_info = sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null())
+    status_info: Mapped[str | None] = mapped_column(
+        "status_info", sa.Unicode(), nullable=True, default=sa.null()
+    )
 
-    status_data = sa.Column("status_data", pgsql.JSONB(), nullable=True, default=sa.null())
+    status_data: Mapped[dict[str, Any] | None] = mapped_column(
+        "status_data", pgsql.JSONB(), nullable=True, default=sa.null()
+    )
     # status_data contains a JSON object that contains detailed data for the last status change.
     # During scheduling (as PENDING + ("no-available-instances" | "predicate-checks-failed")):
     # {
@@ -808,11 +842,15 @@ class SessionRow(Base):
     #         // used to prevent duplication of SessionTerminatedEvent
     #   }
     # }
-    status_history = sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null())
-    callback_url = sa.Column("callback_url", URLColumn, nullable=True, default=sa.null())
+    status_history: Mapped[dict[str, Any] | None] = mapped_column(
+        "status_history", pgsql.JSONB(), nullable=True, default=sa.null()
+    )
+    callback_url: Mapped[yarl.URL | None] = mapped_column(
+        "callback_url", URLColumn, nullable=True, default=sa.null()
+    )
 
-    startup_command = sa.Column("startup_command", sa.Text, nullable=True)
-    result = sa.Column(
+    startup_command: Mapped[str | None] = mapped_column("startup_command", sa.Text, nullable=True)
+    result: Mapped[SessionResult] = mapped_column(
         "result",
         EnumType(SessionResult),
         default=SessionResult.UNDEFINED,
@@ -822,18 +860,24 @@ class SessionRow(Base):
     )
 
     # Resource metrics measured upon termination
-    num_queries = sa.Column("num_queries", sa.BigInteger(), default=0)
-    last_stat = sa.Column("last_stat", pgsql.JSONB(), nullable=True, default=sa.null())
+    num_queries: Mapped[int | None] = mapped_column("num_queries", sa.BigInteger(), default=0)
+    last_stat: Mapped[dict[str, Any] | None] = mapped_column(
+        "last_stat", pgsql.JSONB(), nullable=True, default=sa.null()
+    )
 
-    network_type = sa.Column("network_type", StrEnumType(NetworkType), nullable=True)
+    network_type: Mapped[NetworkType | None] = mapped_column(
+        "network_type", StrEnumType(NetworkType), nullable=True
+    )
     """Setting this column to null means this session does not utilize inter-container networking feature"""
-    network_id = sa.Column("network_id", sa.String(length=128), nullable=True)
+    network_id: Mapped[str | None] = mapped_column(
+        "network_id", sa.String(length=128), nullable=True
+    )
     """
     Depending on the network_type, this column may contain a network ID or other information.
     Use `get_network_ref()` method to reveal actual network ref (generated by network plugin).
     """
 
-    routing = relationship("RoutingRow", back_populates="session_row")
+    routing: Mapped[list[RoutingRow]] = relationship("RoutingRow", back_populates="session_row")
 
     __table_args__ = (
         # indexing
@@ -1835,14 +1879,14 @@ class SessionLifecycleManager:
 
 class SessionDependencyRow(Base):
     __tablename__ = "session_dependencies"
-    session_id = sa.Column(
+    session_id: Mapped[UUID] = mapped_column(
         "session_id",
         GUID,
         sa.ForeignKey("sessions.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )
-    depends_on = sa.Column(
+    depends_on: Mapped[UUID] = mapped_column(
         "depends_on",
         GUID,
         sa.ForeignKey("sessions.id", onupdate="CASCADE", ondelete="CASCADE"),
