@@ -119,6 +119,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
 def _get_endpoint_tokens_join_condition():
+    from ai.backend.manager.models.endpoint import EndpointTokenRow
+
     return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
 
 
