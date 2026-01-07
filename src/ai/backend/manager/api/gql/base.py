@@ -203,6 +203,75 @@ class IntFilter:
         )
 
 
+@strawberry.input(description="Added in 26.1.0. Filter for UUID fields.")
+class UUIDFilter:
+    # Basic operations
+    equals: str | None = None
+    in_: list[str] | None = strawberry.field(name="in", default=None)
+
+    # NOT operations
+    not_equals: str | None = None
+    not_in: list[str] | None = None
+    # Case-insensitive operations
+    i_equals: str | None = None
+    i_in: list[str] | None = None
+
+    # Case-insensitive NOT operations
+    i_not_equals: str | None = None
+    i_not_in: list[str] | None = None
+
+    def build_query_condition(
+        self,
+        equals_factory: Callable[[StringMatchSpec], QueryCondition],
+        in_factory: Callable[[StringMatchSpec], QueryCondition],
+    ) -> QueryCondition | None:
+        """Build a query condition from this filter using the provided factory callables.
+
+        Args:
+            equals_factory: Factory for exact match (=) operations
+            in_factory: Factory for IN operations
+
+        Returns:
+            QueryCondition if any filter field is set, None otherwise
+        """
+        # equals operations
+        if self.equals:
+            return equals_factory(
+                StringMatchSpec(self.equals, case_insensitive=False, negated=False)
+            )
+        if self.i_equals:
+            return equals_factory(
+                StringMatchSpec(self.i_equals, case_insensitive=True, negated=False)
+            )
+        if self.not_equals:
+            return equals_factory(
+                StringMatchSpec(self.not_equals, case_insensitive=False, negated=True)
+            )
+        if self.i_not_equals:
+            return equals_factory(
+                StringMatchSpec(self.i_not_equals, case_insensitive=True, negated=True)
+            )
+
+        if self.in_:
+            return in_factory(
+                StringMatchSpec(",".join(self.in_), case_insensitive=False, negated=False)
+            )
+        if self.i_in:
+            return in_factory(
+                StringMatchSpec(",".join(self.i_in), case_insensitive=True, negated=False)
+            )
+        if self.not_in:
+            return in_factory(
+                StringMatchSpec(",".join(self.not_in), case_insensitive=False, negated=True)
+            )
+        if self.i_not_in:
+            return in_factory(
+                StringMatchSpec(",".join(self.i_not_in), case_insensitive=True, negated=True)
+            )
+
+        return None
+
+
 @strawberry.input
 class DateTimeFilter:
     """Filter for datetime fields."""
