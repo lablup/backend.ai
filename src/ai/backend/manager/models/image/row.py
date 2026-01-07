@@ -6,6 +6,7 @@ import logging
 import uuid
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
@@ -21,7 +22,15 @@ from uuid import UUID
 import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
-from sqlalchemy.orm import foreign, joinedload, load_only, relationship, selectinload
+from sqlalchemy.orm import (
+    Mapped,
+    foreign,
+    joinedload,
+    load_only,
+    mapped_column,
+    relationship,
+    selectinload,
+)
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common.container_registry import ContainerRegistryType
@@ -58,8 +67,6 @@ from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.models.base import (
     GUID,
     Base,
-    ForeignKeyIDColumn,
-    IDColumn,
     StrEnumType,
     StructuredJSONColumn,
 )
@@ -82,6 +89,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 if TYPE_CHECKING:
     from ai.backend.common.bgtask.bgtask import ProgressReporter
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
+    from ai.backend.manager.models.endpoint import EndpointRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -316,34 +324,37 @@ class ImageRow(Base):
         ),
     )
 
-    id = IDColumn("id")
-    name = sa.Column("name", sa.String, nullable=False, index=True)
-    project = sa.Column("project", sa.String, nullable=True)
-    image = sa.Column("image", sa.String, nullable=False, index=True)
-    created_at = sa.Column(
+    id: Mapped[UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    name: Mapped[str] = mapped_column("name", sa.String, nullable=False, index=True)
+    project: Mapped[str | None] = mapped_column("project", sa.String, nullable=True)
+    image: Mapped[str] = mapped_column("image", sa.String, nullable=False, index=True)
+    created_at: Mapped[datetime | None] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
         server_default=sa.func.now(),
         index=True,
+        nullable=True,
     )
-    tag = sa.Column("tag", sa.TEXT)
-    registry = sa.Column("registry", sa.String, nullable=False, index=True)
-    registry_id = sa.Column("registry_id", GUID, nullable=False, index=True)
-    architecture = sa.Column(
+    tag: Mapped[str | None] = mapped_column("tag", sa.TEXT, nullable=True)
+    registry: Mapped[str] = mapped_column("registry", sa.String, nullable=False, index=True)
+    registry_id: Mapped[UUID] = mapped_column("registry_id", GUID, nullable=False, index=True)
+    architecture: Mapped[str] = mapped_column(
         "architecture", sa.String, nullable=False, index=True, default="x86_64"
     )
-    config_digest = sa.Column("config_digest", sa.CHAR(length=72), nullable=False)
-    size_bytes = sa.Column("size_bytes", sa.BigInteger, nullable=False)
-    is_local = sa.Column(
+    config_digest: Mapped[str] = mapped_column("config_digest", sa.CHAR(length=72), nullable=False)
+    size_bytes: Mapped[int] = mapped_column("size_bytes", sa.BigInteger, nullable=False)
+    is_local: Mapped[bool] = mapped_column(
         "is_local",
         sa.Boolean,
         nullable=False,
         server_default=sa.sql.expression.false(),
     )
-    type = sa.Column("type", sa.Enum(ImageType), nullable=False)
-    accelerators = sa.Column("accelerators", sa.String)
-    labels = sa.Column("labels", sa.JSON, nullable=False, default=dict)
-    _resources = sa.Column(
+    type: Mapped[ImageType] = mapped_column("type", sa.Enum(ImageType), nullable=False)
+    accelerators: Mapped[str | None] = mapped_column("accelerators", sa.String, nullable=True)
+    labels: Mapped[dict[str, Any]] = mapped_column("labels", sa.JSON, nullable=False, default=dict)
+    _resources: Mapped[dict[str, Any]] = mapped_column(
         "resources",
         StructuredJSONColumn(
             t.Mapping(
@@ -357,7 +368,7 @@ class ImageRow(Base):
         nullable=False,
     )  # Custom resource limits designated by the user
 
-    status = sa.Column(
+    status: Mapped[ImageStatus] = mapped_column(
         "status",
         StrEnumType(ImageStatus),
         default=ImageStatus.ALIVE,
@@ -365,15 +376,15 @@ class ImageRow(Base):
         nullable=False,
     )
 
-    aliases: relationship
+    aliases: Mapped[list[ImageAliasRow]] = relationship("ImageAliasRow", back_populates="image")
     # sessions = relationship("SessionRow", back_populates="image_row")
-    endpoints = relationship(
+    endpoints: Mapped[list[EndpointRow]] = relationship(
         "EndpointRow",
         primaryjoin=_get_image_endpoint_join_condition,
         back_populates="image_row",
     )
 
-    registry_row = relationship(
+    registry_row: Mapped[ContainerRegistryRow] = relationship(
         "ContainerRegistryRow",
         back_populates="image_rows",
         primaryjoin=_get_container_registry_join_condition,
@@ -986,10 +997,14 @@ async def bulk_get_image_configs(
 
 class ImageAliasRow(Base):
     __tablename__ = "image_aliases"
-    id = IDColumn("id")
-    alias = sa.Column("alias", sa.String, unique=True, index=True)
-    image_id = ForeignKeyIDColumn("image", "images.id", nullable=False)
-    image: relationship
+    id: Mapped[UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    alias: Mapped[str | None] = mapped_column("alias", sa.String, unique=True, index=True)
+    image_id: Mapped[UUID] = mapped_column(
+        "image", GUID, sa.ForeignKey("images.id"), nullable=False
+    )
+    image: Mapped[ImageRow] = relationship("ImageRow", back_populates="aliases")
 
     @classmethod
     async def create(
@@ -1020,10 +1035,6 @@ class ImageAliasRow(Base):
 
     def to_dataclass(self) -> ImageAliasData:
         return ImageAliasData(id=self.id, alias=self.alias)
-
-
-ImageRow.aliases = relationship("ImageAliasRow", back_populates="image")
-ImageAliasRow.image = relationship("ImageRow", back_populates="aliases")
 
 
 WhereClauseType: TypeAlias = (

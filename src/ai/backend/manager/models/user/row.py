@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+import uuid as uuid_mod
 from collections.abc import Callable, Sequence
+from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -15,8 +17,9 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import foreign, joinedload, relationship, selectinload
+from sqlalchemy.orm import Mapped, foreign, joinedload, mapped_column, relationship, selectinload
 
+from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_serving.types import UserData as ModelServingUserData
@@ -24,11 +27,10 @@ from ai.backend.manager.data.user.types import UserData, UserRole, UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.base import (
+    GUID,
     Base,
     EnumValueType,
-    IDColumn,
     IPColumn,
-    mapper_registry,
 )
 from ai.backend.manager.models.hasher import PasswordHasherFactory
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordColumn, PasswordInfo
@@ -40,7 +42,15 @@ from ai.backend.manager.models.types import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
+    from ai.backend.manager.models.domain import DomainRow
+    from ai.backend.manager.models.endpoint import EndpointRow
+    from ai.backend.manager.models.group import AssocGroupUserRow
+    from ai.backend.manager.models.kernel import KernelRow
     from ai.backend.manager.models.keypair import KeyPairRow
+    from ai.backend.manager.models.rbac_models import UserRoleRow
+    from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+    from ai.backend.manager.models.session import SessionRow
+    from ai.backend.manager.models.vfolder import VFolderRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -65,62 +75,6 @@ INACTIVE_USER_STATUSES = (
     UserStatus.INACTIVE,
     UserStatus.DELETED,
     UserStatus.BEFORE_VERIFICATION,
-)
-
-
-users = sa.Table(
-    "users",
-    mapper_registry.metadata,
-    IDColumn("uuid"),
-    sa.Column("username", sa.String(length=64), unique=True),
-    sa.Column("email", sa.String(length=64), index=True, nullable=False, unique=True),
-    sa.Column("password", PasswordColumn()),
-    sa.Column("need_password_change", sa.Boolean),
-    sa.Column(
-        "password_changed_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-    ),
-    sa.Column("full_name", sa.String(length=64)),
-    sa.Column("description", sa.String(length=500)),
-    sa.Column("status", EnumValueType(UserStatus), default=UserStatus.ACTIVE, nullable=False),
-    sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null()),
-    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    sa.Column(
-        "modified_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.current_timestamp(),
-    ),
-    #: Field for synchronization with external services.
-    sa.Column("integration_id", sa.String(length=512)),
-    sa.Column("domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), index=True),
-    sa.Column("role", EnumValueType(UserRole), default=UserRole.USER),
-    sa.Column("allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True),
-    sa.Column("totp_key", sa.String(length=32)),
-    sa.Column("totp_activated", sa.Boolean, server_default=sa.false(), default=False),
-    sa.Column("totp_activated_at", sa.DateTime(timezone=True), nullable=True),
-    sa.Column(
-        "resource_policy",
-        sa.String(length=256),
-        sa.ForeignKey("user_resource_policies.name"),
-        nullable=False,
-    ),
-    sa.Column(
-        "sudo_session_enabled",
-        sa.Boolean,
-        default=False,
-        nullable=False,
-    ),
-    sa.Column(
-        "main_access_key",
-        sa.String(length=20),
-        sa.ForeignKey("keypairs.access_key", ondelete="SET NULL"),
-        nullable=True,  # keypairs.user is non-nullable
-    ),
-    sa.Column("container_uid", sa.Integer, nullable=True, server_default=sa.null()),
-    sa.Column("container_main_gid", sa.Integer, nullable=True, server_default=sa.null()),
-    sa.Column("container_gids", sa.ARRAY(sa.Integer), nullable=True, server_default=sa.null()),
 )
 
 
@@ -192,63 +146,154 @@ def _get_main_keypair_join_condition():
 
 
 class UserRow(Base):
-    __table__ = users
-    # from ai.backend.manager.models.keypair import KeyPairRow
+    __tablename__ = "users"
 
-    sessions = relationship(
+    uuid: Mapped[uuid_mod.UUID] = mapped_column(
+        "uuid", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    username: Mapped[str | None] = mapped_column(
+        "username", sa.String(length=64), unique=True, nullable=True
+    )
+    email: Mapped[str] = mapped_column(
+        "email", sa.String(length=64), index=True, nullable=False, unique=True
+    )
+    password: Mapped[str | None] = mapped_column("password", PasswordColumn(), nullable=True)
+    need_password_change: Mapped[bool | None] = mapped_column(
+        "need_password_change", sa.Boolean, nullable=True
+    )
+    password_changed_at: Mapped[datetime | None] = mapped_column(
+        "password_changed_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.func.now(),
+        nullable=True,
+    )
+    full_name: Mapped[str | None] = mapped_column("full_name", sa.String(length=64), nullable=True)
+    description: Mapped[str | None] = mapped_column(
+        "description", sa.String(length=500), nullable=True
+    )
+    status: Mapped[UserStatus] = mapped_column(
+        "status", EnumValueType(UserStatus), default=UserStatus.ACTIVE, nullable=False
+    )
+    status_info: Mapped[str | None] = mapped_column(
+        "status_info", sa.Unicode(), nullable=True, default=sa.null()
+    )
+    created_at: Mapped[datetime | None] = mapped_column(
+        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=True
+    )
+    modified_at: Mapped[datetime | None] = mapped_column(
+        "modified_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.func.now(),
+        onupdate=sa.func.current_timestamp(),
+        nullable=True,
+    )
+    #: Field for synchronization with external services.
+    integration_id: Mapped[str | None] = mapped_column(
+        "integration_id", sa.String(length=512), nullable=True
+    )
+    domain_name: Mapped[str | None] = mapped_column(
+        "domain_name",
+        sa.String(length=64),
+        sa.ForeignKey("domains.name"),
+        index=True,
+        nullable=True,
+    )
+    role: Mapped[UserRole | None] = mapped_column(
+        "role", EnumValueType(UserRole), default=UserRole.USER, nullable=True
+    )
+    allowed_client_ip: Mapped[list[ReadableCIDR] | None] = mapped_column(
+        "allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True
+    )
+    totp_key: Mapped[str | None] = mapped_column("totp_key", sa.String(length=32), nullable=True)
+    totp_activated: Mapped[bool | None] = mapped_column(
+        "totp_activated", sa.Boolean, server_default=sa.false(), default=False, nullable=True
+    )
+    totp_activated_at: Mapped[datetime | None] = mapped_column(
+        "totp_activated_at", sa.DateTime(timezone=True), nullable=True
+    )
+    resource_policy: Mapped[str] = mapped_column(
+        "resource_policy",
+        sa.String(length=256),
+        sa.ForeignKey("user_resource_policies.name"),
+        nullable=False,
+    )
+    sudo_session_enabled: Mapped[bool] = mapped_column(
+        "sudo_session_enabled",
+        sa.Boolean,
+        default=False,
+        nullable=False,
+    )
+    main_access_key: Mapped[str | None] = mapped_column(
+        "main_access_key",
+        sa.String(length=20),
+        sa.ForeignKey("keypairs.access_key", ondelete="SET NULL"),
+        nullable=True,  # keypairs.user is non-nullable
+    )
+    container_uid: Mapped[int | None] = mapped_column(
+        "container_uid", sa.Integer, nullable=True, server_default=sa.null()
+    )
+    container_main_gid: Mapped[int | None] = mapped_column(
+        "container_main_gid", sa.Integer, nullable=True, server_default=sa.null()
+    )
+    container_gids: Mapped[list[int] | None] = mapped_column(
+        "container_gids", sa.ARRAY(sa.Integer), nullable=True, server_default=sa.null()
+    )
+
+    # Relationships
+    sessions: Mapped[list[SessionRow]] = relationship(
         "SessionRow",
         back_populates="user",
         primaryjoin=_get_session_row_join_condition,
         foreign_keys="SessionRow.user_uuid",
     )
-    kernels = relationship(
+    kernels: Mapped[list[KernelRow]] = relationship(
         "KernelRow",
         back_populates="user_row",
         primaryjoin=_get_kernel_row_join_condition,
         foreign_keys="KernelRow.user_uuid",
     )
-    domain = relationship(
+    domain: Mapped[DomainRow | None] = relationship(
         "DomainRow", back_populates="users", primaryjoin=_get_domain_join_condition
     )
-    groups = relationship(
+    groups: Mapped[list[AssocGroupUserRow]] = relationship(
         "AssocGroupUserRow", back_populates="user", primaryjoin=_get_groups_join_condition
     )
-    resource_policy_row = relationship(
+    resource_policy_row: Mapped[UserResourcePolicyRow] = relationship(
         "UserResourcePolicyRow",
         back_populates="users",
         primaryjoin=_get_resource_policy_join_condition,
     )
-    keypairs = relationship(
+    keypairs: Mapped[list[KeyPairRow]] = relationship(
         "KeyPairRow",
         back_populates="user_row",
         primaryjoin=_get_keypairs_join_condition,
         foreign_keys="KeyPairRow.user",
     )
 
-    created_endpoints = relationship(
+    created_endpoints: Mapped[list[EndpointRow]] = relationship(
         "EndpointRow",
         back_populates="created_user_row",
         primaryjoin=_get_created_endpoints_join_condition,
     )
-    owned_endpoints = relationship(
+    owned_endpoints: Mapped[list[EndpointRow]] = relationship(
         "EndpointRow",
         back_populates="session_owner_row",
         primaryjoin=_get_owned_endpoints_join_condition,
     )
 
-    main_keypair = relationship(
+    main_keypair: Mapped[KeyPairRow | None] = relationship(
         "KeyPairRow",
         primaryjoin=_get_main_keypair_join_condition,
-        foreign_keys=users.c.main_access_key,
+        foreign_keys="UserRow.main_access_key",
     )
 
-    vfolder_rows = relationship(
+    vfolder_rows: Mapped[list[VFolderRow]] = relationship(
         "VFolderRow",
         back_populates="user_row",
         primaryjoin=_get_vfolder_rows_join_condition,
     )
 
-    role_assignments = relationship(
+    role_assignments: Mapped[list[UserRoleRow]] = relationship(
         "UserRoleRow",
         back_populates="user_row",
         primaryjoin=_get_role_assignments_join_condition,
@@ -387,6 +432,10 @@ class UserRow(Base):
             container_main_gid=self.container_main_gid,
             container_gids=self.container_gids,
         )
+
+
+# For compatibility
+users = UserRow.__table__
 
 
 def by_user_uuid(

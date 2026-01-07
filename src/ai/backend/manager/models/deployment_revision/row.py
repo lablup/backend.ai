@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import logging
+import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import foreign, relationship
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.types import (
     ClusterMode,
+    ResourceSlot,
     RuntimeVariant,
     VFolderMount,
 )
@@ -24,7 +27,6 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.models.base import (
     GUID,
     Base,
-    IDColumn,
     ResourceSlotColumn,
     StrEnumType,
     StructuredJSONObjectListColumn,
@@ -32,6 +34,8 @@ from ai.backend.manager.models.base import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.models.endpoint import EndpointRow
+    from ai.backend.manager.models.image import ImageRow
     from ai.backend.manager.models.routing import RoutingRow
 
 __all__ = ("DeploymentRevisionRow",)
@@ -77,50 +81,66 @@ class DeploymentRevisionRow(Base):
         sa.Index("ix_deployment_revisions_endpoint", "endpoint"),
     )
 
-    id = IDColumn()
-    endpoint = sa.Column("endpoint", GUID, nullable=False)
-    revision_number = sa.Column("revision_number", sa.Integer, nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    endpoint: Mapped[uuid.UUID] = mapped_column("endpoint", GUID, nullable=False)
+    revision_number: Mapped[int] = mapped_column("revision_number", sa.Integer, nullable=False)
 
     # Image configuration
-    image = sa.Column("image", GUID, nullable=False)
+    image: Mapped[uuid.UUID] = mapped_column("image", GUID, nullable=False)
 
     # Model configuration
-    model = sa.Column("model", GUID, nullable=True)
-    model_mount_destination = sa.Column(
+    model: Mapped[uuid.UUID | None] = mapped_column("model", GUID, nullable=True)
+    model_mount_destination: Mapped[str] = mapped_column(
         "model_mount_destination",
         sa.String(length=1024),
         nullable=False,
         default="/models",
         server_default="/models",
     )
-    model_definition_path = sa.Column("model_definition_path", sa.String(length=128), nullable=True)
-    model_definition = sa.Column("model_definition", pgsql.JSONB(), nullable=True)
+    model_definition_path: Mapped[str | None] = mapped_column(
+        "model_definition_path", sa.String(length=128), nullable=True
+    )
+    model_definition: Mapped[dict | None] = mapped_column(
+        "model_definition", pgsql.JSONB(), nullable=True
+    )
 
     # Resource configuration
-    resource_group = sa.Column("resource_group", sa.String(length=64), nullable=False)
-    resource_slots = sa.Column("resource_slots", ResourceSlotColumn(), nullable=False)
-    resource_opts = sa.Column(
+    resource_group: Mapped[str] = mapped_column(
+        "resource_group", sa.String(length=64), nullable=False
+    )
+    resource_slots: Mapped[ResourceSlot] = mapped_column(
+        "resource_slots", ResourceSlotColumn(), nullable=False
+    )
+    resource_opts: Mapped[dict] = mapped_column(
         "resource_opts", pgsql.JSONB(), nullable=False, default={}, server_default="{}"
     )
 
     # Cluster configuration
-    cluster_mode = sa.Column(
+    cluster_mode: Mapped[str] = mapped_column(
         "cluster_mode",
         sa.String(length=16),
         nullable=False,
         default=ClusterMode.SINGLE_NODE,
         server_default=ClusterMode.SINGLE_NODE.name,
     )
-    cluster_size = sa.Column(
+    cluster_size: Mapped[int] = mapped_column(
         "cluster_size", sa.Integer, nullable=False, default=1, server_default="1"
     )
 
     # Execution configuration
-    startup_command = sa.Column("startup_command", sa.Text, nullable=True)
-    bootstrap_script = sa.Column("bootstrap_script", sa.String(length=16 * 1024), nullable=True)
-    environ = sa.Column("environ", pgsql.JSONB(), nullable=False, default={}, server_default="{}")
-    callback_url = sa.Column("callback_url", URLColumn, nullable=True, default=sa.null())
-    runtime_variant = sa.Column(
+    startup_command: Mapped[str | None] = mapped_column("startup_command", sa.Text, nullable=True)
+    bootstrap_script: Mapped[str | None] = mapped_column(
+        "bootstrap_script", sa.String(length=16 * 1024), nullable=True
+    )
+    environ: Mapped[dict] = mapped_column(
+        "environ", pgsql.JSONB(), nullable=False, default={}, server_default="{}"
+    )
+    callback_url: Mapped[str | None] = mapped_column(
+        "callback_url", URLColumn, nullable=True, default=sa.null()
+    )
+    runtime_variant: Mapped[RuntimeVariant] = mapped_column(
         "runtime_variant",
         StrEnumType(RuntimeVariant),
         nullable=False,
@@ -128,7 +148,7 @@ class DeploymentRevisionRow(Base):
     )
 
     # Mount configuration
-    extra_mounts = sa.Column(
+    extra_mounts: Mapped[list[VFolderMount]] = mapped_column(
         "extra_mounts",
         StructuredJSONObjectListColumn(VFolderMount),
         nullable=False,
@@ -137,7 +157,7 @@ class DeploymentRevisionRow(Base):
     )
 
     # Metadata
-    created_at = sa.Column(
+    created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
         server_default=sa.func.now(),
@@ -145,16 +165,16 @@ class DeploymentRevisionRow(Base):
     )
 
     # Relationships (without FK constraints)
-    endpoint_row = relationship(
+    endpoint_row: Mapped[EndpointRow] = relationship(
         "EndpointRow",
         back_populates="revisions",
         primaryjoin=_get_endpoint_join_condition,
     )
-    image_row = relationship(
+    image_row: Mapped[ImageRow] = relationship(
         "ImageRow",
         primaryjoin=_get_image_join_condition,
     )
-    routings: list[RoutingRow] = relationship(
+    routings: Mapped[list[RoutingRow]] = relationship(
         "RoutingRow",
         primaryjoin=_get_routings_join_condition,
         viewonly=True,

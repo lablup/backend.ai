@@ -5,6 +5,7 @@ from collections.abc import Callable, Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import (
+    TYPE_CHECKING,
     Any,
     Optional,
     Self,
@@ -21,7 +22,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import foreign, joinedload, load_only, relationship, selectinload
+from sqlalchemy.orm import Mapped, foreign, joinedload, load_only, mapped_column, relationship, selectinload
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common import validators as tx
@@ -53,6 +54,14 @@ from ai.backend.manager.models.rbac.permission_defs import ScalingGroupPermissio
 from ai.backend.manager.models.types import QueryCondition
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.agent import AgentRow
+    from ai.backend.manager.models.domain import DomainRow
+    from ai.backend.manager.models.group import GroupRow
+    from ai.backend.manager.models.keypair import KeyPairRow
+    from ai.backend.manager.models.resource_preset import ResourcePresetRow
+    from ai.backend.manager.models.session import SessionRow
 
 __all__: Sequence[str] = (
     # table defs
@@ -136,14 +145,14 @@ class ScalingGroupOpts(JSONSerializableMixin):
 
 class ScalingGroupForDomainRow(Base):
     __tablename__ = "sgroups_for_domains"
-    id = IDColumn()
-    scaling_group = sa.Column(
+    id: Mapped[uuid.UUID] = IDColumn()
+    scaling_group: Mapped[str] = mapped_column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )
-    domain = sa.Column(
+    domain: Mapped[str] = mapped_column(
         "domain",
         sa.ForeignKey("domains.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
@@ -153,11 +162,11 @@ class ScalingGroupForDomainRow(Base):
         # constraint
         sa.UniqueConstraint("scaling_group", "domain", name="uq_sgroup_domain"),
     )
-    sgroup_row = relationship(
+    sgroup_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow",
         back_populates="sgroup_for_domains_rows",
     )
-    domain_row = relationship(
+    domain_row: Mapped[DomainRow] = relationship(
         "DomainRow",
         back_populates="sgroup_for_domains_rows",
     )
@@ -169,14 +178,14 @@ sgroups_for_domains = ScalingGroupForDomainRow.__table__
 
 class ScalingGroupForProjectRow(Base):
     __tablename__ = "sgroups_for_groups"
-    id = IDColumn()
-    scaling_group = sa.Column(
+    id: Mapped[uuid.UUID] = IDColumn()
+    scaling_group: Mapped[str] = mapped_column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )
-    group = sa.Column(
+    group: Mapped[uuid.UUID] = mapped_column(
         "group",
         sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
@@ -187,11 +196,11 @@ class ScalingGroupForProjectRow(Base):
         # constraint
         sa.UniqueConstraint("scaling_group", "group", name="uq_sgroup_ugroup"),
     )
-    sgroup_row = relationship(
+    sgroup_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow",
         back_populates="sgroup_for_groups_rows",
     )
-    project_row = relationship(
+    project_row: Mapped[GroupRow] = relationship(
         "GroupRow",
         back_populates="sgroup_for_groups_rows",
     )
@@ -203,14 +212,14 @@ sgroups_for_groups = ScalingGroupForProjectRow.__table__
 
 class ScalingGroupForKeypairsRow(Base):
     __tablename__ = "sgroups_for_keypairs"
-    id = IDColumn()
-    scaling_group = sa.Column(
+    id: Mapped[uuid.UUID] = IDColumn()
+    scaling_group: Mapped[str] = mapped_column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )
-    access_key = sa.Column(
+    access_key: Mapped[str] = mapped_column(
         "access_key",
         sa.ForeignKey("keypairs.access_key", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
@@ -220,11 +229,11 @@ class ScalingGroupForKeypairsRow(Base):
         # constraint
         sa.UniqueConstraint("scaling_group", "access_key", name="uq_sgroup_akey"),
     )
-    sgroup_row = relationship(
+    sgroup_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow",
         back_populates="sgroup_for_keypairs_rows",
     )
-    keypair_row = relationship(
+    keypair_row: Mapped[KeyPairRow] = relationship(
         "KeyPairRow",
         back_populates="sgroup_for_keypairs_rows",
     )
@@ -242,42 +251,54 @@ def _get_resource_preset_join_condition():
 
 class ScalingGroupRow(Base):
     __tablename__ = "scaling_groups"
-    name = sa.Column("name", sa.String(length=64), primary_key=True)
-    description = sa.Column("description", sa.String(length=512))
-    is_active = sa.Column("is_active", sa.Boolean, index=True, default=True)
-    is_public = sa.Column(
+    name: Mapped[str] = mapped_column("name", sa.String(length=64), primary_key=True)
+    description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
+    is_active: Mapped[bool | None] = mapped_column(
+        "is_active", sa.Boolean, index=True, default=True
+    )
+    is_public: Mapped[bool] = mapped_column(
         "is_public", sa.Boolean, index=True, default=True, server_default=true(), nullable=False
     )
-    created_at = sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now())
-    wsproxy_addr = sa.Column("wsproxy_addr", sa.String(length=1024), nullable=True)
-    wsproxy_api_token = sa.Column("wsproxy_api_token", sa.String(length=128), nullable=True)
-    driver = sa.Column("driver", sa.String(length=64), nullable=False)
-    driver_opts = sa.Column("driver_opts", pgsql.JSONB(), nullable=False, default={})
-    scheduler = sa.Column("scheduler", sa.String(length=64), nullable=False)
-    use_host_network = sa.Column("use_host_network", sa.Boolean, nullable=False, default=False)
-    scheduler_opts = sa.Column(
+    created_at: Mapped[datetime | None] = mapped_column(
+        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+    wsproxy_addr: Mapped[str | None] = mapped_column(
+        "wsproxy_addr", sa.String(length=1024), nullable=True
+    )
+    wsproxy_api_token: Mapped[str | None] = mapped_column(
+        "wsproxy_api_token", sa.String(length=128), nullable=True
+    )
+    driver: Mapped[str] = mapped_column("driver", sa.String(length=64), nullable=False)
+    driver_opts: Mapped[dict[str, Any]] = mapped_column(
+        "driver_opts", pgsql.JSONB(), nullable=False, default={}
+    )
+    scheduler: Mapped[str] = mapped_column("scheduler", sa.String(length=64), nullable=False)
+    use_host_network: Mapped[bool] = mapped_column(
+        "use_host_network", sa.Boolean, nullable=False, default=False
+    )
+    scheduler_opts: Mapped[ScalingGroupOpts] = mapped_column(
         "scheduler_opts",
         StructuredJSONObjectColumn(ScalingGroupOpts),
         nullable=False,
         default={},
     )
 
-    sessions = relationship("SessionRow", back_populates="scaling_group")
-    agents = relationship("AgentRow", back_populates="scaling_group_row")
+    sessions: Mapped[list[SessionRow]] = relationship("SessionRow", back_populates="scaling_group")
+    agents: Mapped[list[AgentRow]] = relationship("AgentRow", back_populates="scaling_group_row")
 
-    sgroup_for_domains_rows = relationship(
+    sgroup_for_domains_rows: Mapped[list[ScalingGroupForDomainRow]] = relationship(
         "ScalingGroupForDomainRow",
         back_populates="sgroup_row",
     )
-    sgroup_for_groups_rows = relationship(
+    sgroup_for_groups_rows: Mapped[list[ScalingGroupForProjectRow]] = relationship(
         "ScalingGroupForProjectRow",
         back_populates="sgroup_row",
     )
-    sgroup_for_keypairs_rows = relationship(
+    sgroup_for_keypairs_rows: Mapped[list[ScalingGroupForKeypairsRow]] = relationship(
         "ScalingGroupForKeypairsRow",
         back_populates="sgroup_row",
     )
-    resource_preset_rows = relationship(
+    resource_preset_rows: Mapped[list[ResourcePresetRow]] = relationship(
         "ResourcePresetRow",
         back_populates="scaling_group_row",
         primaryjoin=_get_resource_preset_join_condition,

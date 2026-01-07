@@ -20,7 +20,7 @@ import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import foreign, joinedload, load_only, relationship, selectinload
+from sqlalchemy.orm import Mapped, foreign, joinedload, load_only, mapped_column, relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import msgpack
@@ -63,7 +63,15 @@ from ai.backend.manager.models.types import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
+    from ai.backend.manager.models.domain import DomainRow
+    from ai.backend.manager.models.kernel import KernelRow
+    from ai.backend.manager.models.network import NetworkRow
     from ai.backend.manager.models.rbac import ContainerRegistryScope
+    from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
+    from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow
+    from ai.backend.manager.models.session import SessionRow
+    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.vfolder import VFolderRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -112,8 +120,8 @@ container_registry_iv = t.Dict({}) | t.Dict({
 
 class AssocGroupUserRow(Base):
     __table__ = association_groups_users
-    user = relationship("UserRow", back_populates="groups")
-    group = relationship("GroupRow", back_populates="users")
+    user: Mapped[UserRow] = relationship("UserRow", back_populates="groups")
+    group: Mapped[GroupRow] = relationship("GroupRow", back_populates="users")
 
 
 groups = sa.Table(
@@ -196,23 +204,31 @@ def _get_association_container_registries_groups_join_condition():
 
 class GroupRow(Base):
     __table__ = groups
-    sessions = relationship("SessionRow", back_populates="group")
-    domain = relationship("DomainRow", back_populates="groups")
-    sgroup_for_groups_rows = relationship("ScalingGroupForProjectRow", back_populates="project_row")
-    users = relationship("AssocGroupUserRow", back_populates="group")
-    resource_policy_row = relationship("ProjectResourcePolicyRow", back_populates="projects")
-    kernels = relationship("KernelRow", back_populates="group_row")
-    networks = relationship(
+    sessions: Mapped[list[SessionRow]] = relationship("SessionRow", back_populates="group")
+    domain: Mapped[DomainRow] = relationship("DomainRow", back_populates="groups")
+    sgroup_for_groups_rows: Mapped[list[ScalingGroupForProjectRow]] = relationship(
+        "ScalingGroupForProjectRow", back_populates="project_row"
+    )
+    users: Mapped[list[AssocGroupUserRow]] = relationship(
+        "AssocGroupUserRow", back_populates="group"
+    )
+    resource_policy_row: Mapped[ProjectResourcePolicyRow] = relationship(
+        "ProjectResourcePolicyRow", back_populates="projects"
+    )
+    kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="group_row")
+    networks: Mapped[list[NetworkRow]] = relationship(
         "NetworkRow",
         back_populates="project_row",
         primaryjoin=_get_network_join_condition,
     )
-    vfolder_rows = relationship(
+    vfolder_rows: Mapped[list[VFolderRow]] = relationship(
         "VFolderRow",
         back_populates="group_row",
         primaryjoin=_get_vfolder_join_condition,
     )
-    association_container_registries_groups_rows = relationship(
+    association_container_registries_groups_rows: Mapped[
+        list[AssociationContainerRegistriesGroupsRow]
+    ] = relationship(
         "AssociationContainerRegistriesGroupsRow",
         back_populates="group_row",
         primaryjoin=_get_association_container_registries_groups_join_condition,

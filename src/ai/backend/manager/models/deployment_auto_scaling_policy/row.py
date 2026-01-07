@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy.orm import foreign, relationship
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
 from ai.backend.logging import BraceStyleAdapter
@@ -21,7 +21,7 @@ from ai.backend.manager.models.base import (
 )
 
 if TYPE_CHECKING:
-    pass
+    from ai.backend.manager.models.endpoint import EndpointRow
 
 __all__ = ("DeploymentAutoScalingPolicyRow",)
 
@@ -50,56 +50,62 @@ class DeploymentAutoScalingPolicyRow(Base):
         sa.Index("ix_deployment_auto_scaling_policies_endpoint", "endpoint"),
     )
 
-    id = IDColumn()
-    endpoint = sa.Column("endpoint", GUID, nullable=False)
+    id: Mapped[UUID] = IDColumn()
+    endpoint: Mapped[UUID] = mapped_column("endpoint", GUID, nullable=False)
 
     # Replica bounds (always enforced)
-    min_replicas = sa.Column(
+    min_replicas: Mapped[int] = mapped_column(
         "min_replicas", sa.Integer, nullable=False, default=1, server_default="1"
     )
-    max_replicas = sa.Column(
+    max_replicas: Mapped[int] = mapped_column(
         "max_replicas", sa.Integer, nullable=False, default=10, server_default="10"
     )
 
     # Metric configuration
-    metric_source = sa.Column(
+    metric_source: Mapped[AutoScalingMetricSource | None] = mapped_column(
         "metric_source",
         StrEnumType(AutoScalingMetricSource, use_name=False),
         nullable=True,
     )
-    metric_name = sa.Column("metric_name", sa.Text, nullable=True)
-    comparator = sa.Column(
+    metric_name: Mapped[str | None] = mapped_column("metric_name", sa.Text, nullable=True)
+    comparator: Mapped[AutoScalingMetricComparator | None] = mapped_column(
         "comparator",
         StrEnumType(AutoScalingMetricComparator, use_name=False),
         nullable=True,
     )
 
     # Dual thresholds for hysteresis
-    scale_up_threshold = sa.Column("scale_up_threshold", DecimalType(), nullable=True)
-    scale_down_threshold = sa.Column("scale_down_threshold", DecimalType(), nullable=True)
+    scale_up_threshold: Mapped[Decimal | None] = mapped_column(
+        "scale_up_threshold", DecimalType(), nullable=True
+    )
+    scale_down_threshold: Mapped[Decimal | None] = mapped_column(
+        "scale_down_threshold", DecimalType(), nullable=True
+    )
 
     # Step sizes
-    scale_up_step_size = sa.Column(
+    scale_up_step_size: Mapped[int] = mapped_column(
         "scale_up_step_size", sa.Integer, nullable=False, default=1, server_default="1"
     )
-    scale_down_step_size = sa.Column(
+    scale_down_step_size: Mapped[int] = mapped_column(
         "scale_down_step_size", sa.Integer, nullable=False, default=1, server_default="1"
     )
 
     # Cooldown
-    cooldown_seconds = sa.Column(
+    cooldown_seconds: Mapped[int] = mapped_column(
         "cooldown_seconds", sa.Integer, nullable=False, default=300, server_default="300"
     )
-    last_scaled_at = sa.Column("last_scaled_at", sa.DateTime(timezone=True), nullable=True)
+    last_scaled_at: Mapped[datetime | None] = mapped_column(
+        "last_scaled_at", sa.DateTime(timezone=True), nullable=True
+    )
 
     # Timestamps
-    created_at = sa.Column(
+    created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
         server_default=sa.func.now(),
         nullable=False,
     )
-    updated_at = sa.Column(
+    updated_at: Mapped[datetime | None] = mapped_column(
         "updated_at",
         sa.DateTime(timezone=True),
         onupdate=sa.func.now(),
@@ -107,7 +113,7 @@ class DeploymentAutoScalingPolicyRow(Base):
     )
 
     # Relationships (without FK constraints)
-    endpoint_row = relationship(
+    endpoint_row: Mapped[EndpointRow] = relationship(
         "EndpointRow",
         back_populates="auto_scaling_policy",
         primaryjoin=_get_endpoint_join_condition,
