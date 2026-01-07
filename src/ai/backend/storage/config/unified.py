@@ -59,7 +59,7 @@ class VolumeInfoConfig(BaseConfigSchema):
                 "filesystem, 'purestorage' for Pure Storage arrays, and 'cephfs' for Ceph distributed "
                 "filesystem. The backend determines how files are stored, accessed, and managed."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(local="vfs", prod="purestorage"),
         ),
     ]
@@ -72,7 +72,7 @@ class VolumeInfoConfig(BaseConfigSchema):
                 "directory with appropriate read/write permissions for the storage-proxy process. "
                 "For network storage backends, this is the local mount point."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(
                 local="/var/lib/backend.ai/volumes", prod="/mnt/storage/backend.ai"
             ),
@@ -87,7 +87,7 @@ class VolumeInfoConfig(BaseConfigSchema):
                 "are relative to this prefix. Use '.' for the volume root, or specify a subdirectory "
                 "to organize data within the volume."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(local=".", prod="data"),
         ),
     ]
@@ -100,7 +100,7 @@ class VolumeInfoConfig(BaseConfigSchema):
                 "may support different options for tuning performance, enabling features, or "
                 "connecting to external services. Refer to the backend documentation for details."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
         ),
     ]
 
@@ -127,7 +127,7 @@ class ClientAPIConfig(BaseConfigSchema):
                 "Clients connect to this address for file operations like upload, download, "
                 "and directory listing. Use '0.0.0.0' to listen on all interfaces in production."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(local="127.0.0.1:6021", prod="0.0.0.0:6021"),
         ),
     ]
@@ -143,7 +143,7 @@ class ClientAPIConfig(BaseConfigSchema):
                 "connect using HTTPS. Requires ssl_cert and ssl_privkey to be configured. "
                 "Strongly recommended for production to protect data in transit."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -160,7 +160,7 @@ class ClientAPIConfig(BaseConfigSchema):
                 "Required when ssl_enabled is true. Use certificates from a trusted CA "
                 "for production deployments."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(local="", prod="/etc/ssl/certs/storage-proxy.crt"),
         ),
     ]
@@ -177,7 +177,7 @@ class ClientAPIConfig(BaseConfigSchema):
                 "Required when ssl_enabled is true. Keep this file secure with restricted "
                 "permissions (e.g., 0600)."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             secret=True,
         ),
     ]
@@ -197,7 +197,7 @@ class ManagerAPIConfig(BaseConfigSchema):
                 "Backend.AI Manager connects to this address for storage control operations "
                 "like volume management and quota enforcement."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(local="127.0.0.1:6022", prod="0.0.0.0:6022"),
         ),
     ]
@@ -214,7 +214,7 @@ class ManagerAPIConfig(BaseConfigSchema):
                 "this storage-proxy. In containerized or NAT environments, this should be the "
                 "externally routable address, not the bind address."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(local="127.0.0.1:6022", prod="storage.example.com:6022"),
         ),
     ]
@@ -231,7 +231,7 @@ class ManagerAPIConfig(BaseConfigSchema):
                 "Used when compute kernels need to access storage-proxy from within containers. "
                 "'host.docker.internal' is the Docker DNS name for the host machine."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(local="host.docker.internal:6023", prod="storage-internal:6023"),
         ),
     ]
@@ -248,7 +248,7 @@ class ManagerAPIConfig(BaseConfigSchema):
                 "containers. This endpoint handles internal file operations from running sessions. "
                 "Typically bound to localhost or an internal network interface."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(local="127.0.0.1:16023", prod="0.0.0.0:16023"),
         ),
     ]
@@ -264,7 +264,7 @@ class ManagerAPIConfig(BaseConfigSchema):
                 "must connect using HTTPS. Requires ssl_cert and ssl_privkey to be configured. "
                 "Recommended for production deployments."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -281,7 +281,7 @@ class ManagerAPIConfig(BaseConfigSchema):
                 "Required when ssl_enabled is true. Use certificates from a trusted CA "
                 "for production deployments."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(local="", prod="/etc/ssl/certs/storage-proxy.crt"),
         ),
     ]
@@ -298,7 +298,7 @@ class ManagerAPIConfig(BaseConfigSchema):
                 "Required when ssl_enabled is true. Keep this file secure with restricted "
                 "permissions (e.g., 0600)."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             secret=True,
         ),
     ]
@@ -311,7 +311,7 @@ class ManagerAPIConfig(BaseConfigSchema):
                 "Must match the storage-proxy secret configured in the Backend.AI Manager. "
                 "Keep this value secure and do not expose in logs."
             ),
-            added_version="25.10.0",
+            added_version="22.03.0",
             secret=True,
         ),
     ]
@@ -327,7 +327,7 @@ class APIConfig(BaseConfigSchema):
                 "the storage-proxy accepts connections from end users and client applications "
                 "for file operations such as upload, download, and directory listing."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             composite=True,
         ),
     ]
@@ -340,7 +340,7 @@ class APIConfig(BaseConfigSchema):
                 "the storage-proxy accepts connections from Backend.AI Manager for control "
                 "operations such as volume management and quota enforcement."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             composite=True,
         ),
     ]
@@ -356,7 +356,7 @@ class DebugConfig(BaseConfigSchema):
                 "including detailed logging and diagnostic tools. Should be disabled in production "
                 "for security and performance reasons."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -369,7 +369,7 @@ class DebugConfig(BaseConfigSchema):
                 "are never awaited, slow callbacks, and other async programming issues. "
                 "Adds significant overhead, use only during development."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -388,7 +388,7 @@ class DebugConfig(BaseConfigSchema):
                 "information about running asyncio tasks including full stack traces and "
                 "task creation context. Useful for debugging complex async workflows."
             ),
-            added_version="25.10.0",
+            added_version="23.09.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -405,7 +405,7 @@ class DebugConfig(BaseConfigSchema):
                 "substantial log output, but is useful for debugging event-related issues "
                 "and understanding the flow of operations through the system."
             ),
-            added_version="25.10.0",
+            added_version="24.09.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -425,7 +425,7 @@ class StorageProxyConfig(BaseConfigSchema):
                 "sockets. This directory is automatically created if it doesn't exist. "
                 "Used for low-latency communication between storage-proxy processes."
             ),
-            added_version="25.10.0",
+            added_version="22.03.4",
             example=ConfigExample(local="/tmp/backend.ai/ipc", prod="/var/run/backend.ai/ipc"),
         ),
     ]
@@ -441,7 +441,7 @@ class StorageProxyConfig(BaseConfigSchema):
                 "service discovery, log correlation, and coordination among multiple "
                 "storage-proxy instances. Should be unique across all storage-proxy nodes."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(local="storage-proxy-dev", prod="storage-proxy-1"),
         ),
     ]
@@ -460,7 +460,7 @@ class StorageProxyConfig(BaseConfigSchema):
                 "Defaults to the number of CPU cores available. Increase for I/O-bound "
                 "workloads or decrease to limit resource usage."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(local="1", prod="4"),
         ),
     ]
@@ -477,7 +477,7 @@ class StorageProxyConfig(BaseConfigSchema):
                 "managers and init systems to track the running process. Set to /dev/null "
                 "to disable this feature."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(local="/dev/null", prod="/var/run/storage-proxy.pid"),
         ),
     ]
@@ -494,7 +494,7 @@ class StorageProxyConfig(BaseConfigSchema):
                 "standard library implementation with good compatibility. 'uvloop' is a faster "
                 "alternative built on libuv but may have compatibility issues with some extensions."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(local="asyncio", prod="uvloop"),
         ),
     ]
@@ -512,7 +512,7 @@ class StorageProxyConfig(BaseConfigSchema):
                 "Prevents excessive memory usage and response times when scanning large "
                 "directories. Set to 0 for unlimited (not recommended)."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(local="1000", prod="5000"),
         ),
     ]
@@ -529,7 +529,7 @@ class StorageProxyConfig(BaseConfigSchema):
                 "from excessively large uploads. Supports size suffixes: k (KB), m (MB), g (GB), "
                 "t (TB). Example: '100g' for 100 gigabytes."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(local="10g", prod="100g"),
         ),
     ]
@@ -542,7 +542,7 @@ class StorageProxyConfig(BaseConfigSchema):
                 "client requests. Must be kept secure and shared only with authorized services. "
                 "Use a long, random string for production deployments."
             ),
-            added_version="25.10.0",
+            added_version="22.03.0",
             secret=True,
         ),
     ]
@@ -558,7 +558,7 @@ class StorageProxyConfig(BaseConfigSchema):
                 "clients must re-authenticate. Shorter durations improve security but "
                 "require more frequent re-authentication. Supports duration suffixes: s, m, h, d."
             ),
-            added_version="25.10.0",
+            added_version="22.06.0",
             example=ConfigExample(local="24h", prod="1h"),
         ),
     ]
@@ -571,7 +571,7 @@ class StorageProxyConfig(BaseConfigSchema):
                 "ownership and access permissions. Defaults to the UID of the current "
                 "file's owner. Set to a dedicated service user in production."
             ),
-            added_version="25.10.0",
+            added_version="22.03.0",
             example=ConfigExample(local="1000", prod="nobody"),
         ),
     ]
@@ -584,7 +584,7 @@ class StorageProxyConfig(BaseConfigSchema):
                 "ownership and access permissions. Defaults to the GID of the current "
                 "file's owner. Set to a dedicated service group in production."
             ),
-            added_version="25.10.0",
+            added_version="22.03.0",
             example=ConfigExample(local="1000", prod="nogroup"),
         ),
     ]
@@ -605,7 +605,7 @@ class StorageProxyConfig(BaseConfigSchema):
                 "interface for inspecting running asyncio tasks and debugging issues. "
                 "Connect via telnet or netcat to this port for interactive debugging."
             ),
-            added_version="25.10.0",
+            added_version="23.09.0",
             example=ConfigExample(local="38300", prod="38300"),
         ),
     ]
@@ -624,7 +624,7 @@ class StorageProxyConfig(BaseConfigSchema):
                 "interface for monitoring asyncio tasks and system state. Access via "
                 "HTTP to view real-time task information and metrics."
             ),
-            added_version="25.10.0",
+            added_version="23.09.0",
             example=ConfigExample(local="39300", prod="39300"),
         ),
     ]
@@ -643,7 +643,7 @@ class StorageProxyConfig(BaseConfigSchema):
                 "feature is enabled to receive commands from the watcher process. "
                 "Set to None to disable or use default paths."
             ),
-            added_version="25.10.0",
+            added_version="23.09.0",
             example=ConfigExample(local="", prod="/var/run/backend.ai/watcher-in"),
         ),
     ]
@@ -662,7 +662,7 @@ class StorageProxyConfig(BaseConfigSchema):
                 "feature is enabled to send status updates to the watcher process. "
                 "Set to None to disable or use default paths."
             ),
-            added_version="25.10.0",
+            added_version="23.09.0",
             example=ConfigExample(local="", prod="/var/run/backend.ai/watcher-out"),
         ),
     ]
@@ -679,7 +679,7 @@ class StorageProxyConfig(BaseConfigSchema):
                 "supervision capabilities. When enabled, the storage-proxy communicates "
                 "with an external watcher process for health monitoring and management."
             ),
-            added_version="25.10.0",
+            added_version="23.09.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -698,7 +698,7 @@ class StorageProxyConfig(BaseConfigSchema):
                 "event communication. May provide better scalability and performance for "
                 "event handling in multi-node deployments. Requires Redis configuration."
             ),
-            added_version="25.10.0",
+            added_version="24.09.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -717,7 +717,7 @@ class StorageProxyConfig(BaseConfigSchema):
                 "in non-existent quota scopes. If true, quota scopes are created on demand. "
                 "If false, VFolder creation fails when the quota scope doesn't exist."
             ),
-            added_version="25.10.0",
+            added_version="25.19.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -737,7 +737,7 @@ class PresignedUploadConfig(BaseConfigSchema):
                 "than this are uploaded in a single request. Set to None to use the default "
                 "behavior. Typical value is 5MB (5242880 bytes) for S3-compatible storage."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="5242880", prod="5242880"),
         ),
     ]
@@ -754,7 +754,7 @@ class PresignedUploadConfig(BaseConfigSchema):
                 "this are rejected. Set to None to allow unlimited size (limited only by "
                 "storage backend constraints). Use to prevent storage quota abuse."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="5368709120", prod="10737418240"),
         ),
     ]
@@ -767,7 +767,7 @@ class PresignedUploadConfig(BaseConfigSchema):
                 "the URL becomes invalid and clients must request a new one. Balance security "
                 "(shorter) vs. usability for large uploads (longer)."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="300", prod="3600"),
         ),
     ]
@@ -783,7 +783,7 @@ class PresignedDownloadConfig(BaseConfigSchema):
                 "the URL becomes invalid and clients must request a new one. Balance security "
                 "(shorter) vs. usability for slow connections (longer)."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="300", prod="3600"),
         ),
     ]
@@ -802,7 +802,7 @@ class VFSStorageConfig(BaseConfigSchema):
                 "serves as the root for all VFS operations. Must be an existing directory "
                 "with appropriate read/write permissions for the storage-proxy process."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="/data/ai-models", prod="/mnt/storage/vfs"),
         ),
     ]
@@ -815,7 +815,7 @@ class VFSStorageConfig(BaseConfigSchema):
                 "storage within the base directory, such as separating models, datasets, "
                 "or user data. Set to None to use the base_path directly."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="user-data"),
         ),
     ]
@@ -828,7 +828,7 @@ class VFSStorageConfig(BaseConfigSchema):
                 "cleared when the server starts. Useful for cache storage or temporary "
                 "workspaces that should be cleaned up on restart."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -846,7 +846,7 @@ class VFSStorageConfig(BaseConfigSchema):
                 "reduce overhead but increase memory usage. Smaller chunks are better for "
                 "low-bandwidth connections. Default is 64KB (65536 bytes)."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="65536", prod="1048576"),
         ),
     ]
@@ -864,7 +864,7 @@ class VFSStorageConfig(BaseConfigSchema):
                 "improve throughput for large files. Smaller chunks reduce memory usage and "
                 "provide better progress reporting. Default is 64KB (65536 bytes)."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="65536", prod="1048576"),
         ),
     ]
@@ -881,7 +881,7 @@ class VFSStorageConfig(BaseConfigSchema):
                 "exceeding this size are rejected. Set to None to allow unlimited file "
                 "sizes (limited only by available storage space)."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="1073741824", prod="10737418240"),
         ),
     ]
@@ -898,7 +898,7 @@ class ObjectStorageConfig(BaseConfigSchema):
                 "the protocol (http or https) and port if non-standard. Examples: MinIO, "
                 "AWS S3, Google Cloud Storage with S3 compatibility enabled."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="http://localhost:9000", prod="https://s3.amazonaws.com"),
         ),
     ]
@@ -914,7 +914,7 @@ class ObjectStorageConfig(BaseConfigSchema):
                 "For AWS S3, this is the IAM user's access key. For MinIO, this is "
                 "the configured access key. Keep secure and rotate periodically."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             secret=True,
         ),
     ]
@@ -930,7 +930,7 @@ class ObjectStorageConfig(BaseConfigSchema):
                 "Must be kept secure and never exposed in logs or error messages. "
                 "Pair this with the access_key for authentication."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             secret=True,
         ),
     ]
@@ -943,7 +943,7 @@ class ObjectStorageConfig(BaseConfigSchema):
                 "represents a logical container for storing objects. Buckets must already "
                 "exist in the object storage service unless auto-creation is enabled."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="dev-bucket", prod="prod-data-bucket"),
         ),
     ]
@@ -956,7 +956,7 @@ class ObjectStorageConfig(BaseConfigSchema):
                 "use region codes like 'us-east-1' or 'ap-northeast-2'. For local MinIO, "
                 "use any valid region string (e.g., 'us-east-1')."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="us-east-1", prod="ap-northeast-2"),
         ),
     ]
@@ -973,7 +973,7 @@ class ObjectStorageConfig(BaseConfigSchema):
                 "clients to upload directly to object storage without proxying through "
                 "the storage-proxy, improving performance for large files."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -990,7 +990,7 @@ class ObjectStorageConfig(BaseConfigSchema):
                 "clients to download directly from object storage without proxying through "
                 "the storage-proxy, improving performance for large files."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1008,7 +1008,7 @@ class ObjectStorageConfig(BaseConfigSchema):
                 "Must be at least 5MiB (5242880 bytes) due to S3 API requirements. "
                 "Larger chunks reduce API calls but increase memory usage."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="5242880", prod="10485760"),
         ),
     ]
@@ -1025,7 +1025,7 @@ class ObjectStorageConfig(BaseConfigSchema):
                 "Smaller chunks provide better responsiveness but increase overhead. "
                 "Default is 8KB which works well for most use cases."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="8192", prod="65536"),
         ),
     ]
@@ -1044,7 +1044,7 @@ class ObjectStorageConfig(BaseConfigSchema):
                 "Reservoir is Backend.AI's artifact registry feature. Adjust based on "
                 "network latency and file sizes typically downloaded."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="8192", prod="65536"),
         ),
     ]
@@ -1060,7 +1060,7 @@ class LegacyObjectStorageConfig(ObjectStorageConfig):
                 "reference this storage instance from other configurations and API calls. "
                 "Should be descriptive and follow naming conventions (lowercase, hyphens)."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="minio-dev", prod="s3-production"),
         ),
     ]
@@ -1076,7 +1076,7 @@ class HuggingfaceConfig(BaseConfigSchema):
                 "HuggingFace Hub (https://huggingface.co). Change this to connect to "
                 "self-hosted HuggingFace instances or enterprise deployments."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="https://huggingface.co", prod="https://huggingface.co"),
         ),
     ]
@@ -1089,7 +1089,7 @@ class HuggingfaceConfig(BaseConfigSchema):
                 "gated models and private repositories. Generate tokens at "
                 "https://huggingface.co/settings/tokens. Keep this value secure."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             secret=True,
         ),
     ]
@@ -1106,7 +1106,7 @@ class HuggingfaceConfig(BaseConfigSchema):
                 "Larger chunks improve throughput but increase memory usage. "
                 "Default is 8KB which provides good balance for most use cases."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="8192", prod="65536"),
         ),
     ]
@@ -1123,7 +1123,7 @@ class LegacyHuggingfaceConfig(HuggingfaceConfig):
                 "this configuration type. Used internally to identify and deserialize "
                 "the correct registry configuration class."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="huggingface", prod="huggingface"),
         ),
     ]
@@ -1139,7 +1139,7 @@ class ReservoirConfig(BaseConfigSchema):
                 "artifact registry feature for managing ML models and datasets. Can point to "
                 "HuggingFace or a self-hosted Reservoir instance."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(
                 local="https://huggingface.co", prod="https://reservoir.example.com"
             ),
@@ -1158,7 +1158,7 @@ class ReservoirConfig(BaseConfigSchema):
                 "storage (S3-compatible). Required when the Reservoir uses object storage backend. "
                 "Not needed for HuggingFace-backed registries."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             secret=True,
         ),
     ]
@@ -1175,7 +1175,7 @@ class ReservoirConfig(BaseConfigSchema):
                 "storage (S3-compatible). Must be kept secure. Pair with object_storage_access_key "
                 "for authentication."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             secret=True,
         ),
     ]
@@ -1192,7 +1192,7 @@ class ReservoirConfig(BaseConfigSchema):
                 "using AWS S3 or region-aware S3-compatible storage. Use standard region codes "
                 "like 'us-east-1' or 'ap-northeast-2'."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="us-east-1", prod="ap-northeast-2"),
         ),
     ]
@@ -1210,7 +1210,7 @@ class ReservoirConfig(BaseConfigSchema):
                 "Required for VFS-backed registries to handle file operations through Manager. "
                 "Not needed when using object storage backend."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="http://localhost:8091", prod="https://api.example.com"),
         ),
     ]
@@ -1227,7 +1227,7 @@ class ReservoirConfig(BaseConfigSchema):
                 "Reservoir. This is a Backend.AI user access key, not an object storage key. "
                 "Required when manager_endpoint is specified."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             secret=True,
         ),
     ]
@@ -1244,7 +1244,7 @@ class ReservoirConfig(BaseConfigSchema):
                 "Reservoir. Pair with manager_access_key for authentication. "
                 "Keep this value secure."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             secret=True,
         ),
     ]
@@ -1261,7 +1261,7 @@ class ReservoirConfig(BaseConfigSchema):
                 "Reservoir. Ensures compatibility between storage-proxy and Manager versions. "
                 "Example: 'v8' for API version 8."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="v8", prod="v8"),
         ),
     ]
@@ -1278,7 +1278,7 @@ class ReservoirConfig(BaseConfigSchema):
                 "References a storage defined elsewhere in the configuration. Required when "
                 "using VFS-backed Reservoir to identify the target storage."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="vfs-local", prod="vfs-production"),
         ),
     ]
@@ -1294,7 +1294,7 @@ class LegacyReservoirConfig(ReservoirConfig):
                 "this configuration type. Used internally to identify and deserialize "
                 "the correct registry configuration class."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="reservoir", prod="reservoir"),
         ),
     ]
@@ -1314,7 +1314,7 @@ class ReservoirClientConfig(BaseConfigSchema):
                 "connection, sending, and receiving data. Set to None for no timeout. "
                 "Default 300 seconds (5 minutes) accommodates large file transfers."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="300", prod="600"),
         ),
     ]
@@ -1331,7 +1331,7 @@ class ReservoirClientConfig(BaseConfigSchema):
                 "Limits wait time when all pool connections are in use. Set to None for "
                 "no timeout (wait indefinitely for an available connection)."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="60"),
         ),
     ]
@@ -1348,7 +1348,7 @@ class ReservoirClientConfig(BaseConfigSchema):
                 "Controls how long to wait for the initial connection handshake. "
                 "Default 30 seconds is suitable for most network conditions."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="30", prod="60"),
         ),
     ]
@@ -1365,7 +1365,7 @@ class ReservoirClientConfig(BaseConfigSchema):
                 "Controls maximum wait time between data packets. Set to None for no "
                 "timeout, useful for slow transfers over unreliable networks."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="300"),
         ),
     ]
@@ -1381,7 +1381,7 @@ class ArtifactRegistryStorageConfig(BaseConfigSchema):
                 "accessed. Options: 'object_storage' for S3-compatible storage, 'vfs_storage' "
                 "for local filesystem, 'git_lfs' for Git LFS (not yet supported)."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="vfs_storage", prod="object_storage"),
         ),
     ]
@@ -1398,7 +1398,7 @@ class ArtifactRegistryStorageConfig(BaseConfigSchema):
                 "storage_type is 'object_storage'. Provides scalable, distributed storage "
                 "suitable for production deployments with large artifact collections."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1411,7 +1411,7 @@ class ArtifactRegistryStorageConfig(BaseConfigSchema):
                 "storage_type is 'vfs_storage'. Uses local filesystem for storage, suitable "
                 "for development or single-node deployments."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1446,7 +1446,7 @@ class LegacyArtifactRegistryConfig(BaseConfigSchema):
                 "reference this registry from other configurations and API calls. Should be "
                 "descriptive and indicate the registry type or purpose."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="huggingface-dev", prod="huggingface-prod"),
         ),
     ]
@@ -1459,7 +1459,7 @@ class LegacyArtifactRegistryConfig(BaseConfigSchema):
                 "(huggingface or reservoir). Uses discriminator field 'type' to determine "
                 "which configuration schema to apply."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1475,7 +1475,7 @@ class ArtifactRegistryConfig(BaseConfigSchema):
                 "registry for downloading models and datasets. Options: 'huggingface' for "
                 "HuggingFace Hub, 'reservoir' for Backend.AI Reservoir."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="huggingface", prod="reservoir"),
         ),
     ]
@@ -1488,7 +1488,7 @@ class ArtifactRegistryConfig(BaseConfigSchema):
                 "'huggingface'. Connects to HuggingFace Hub for accessing public and private "
                 "ML models, datasets, and spaces."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1501,7 +1501,7 @@ class ArtifactRegistryConfig(BaseConfigSchema):
                 "is 'reservoir'. Reservoir is Backend.AI's native artifact registry for "
                 "managing ML models and datasets within your infrastructure."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1536,7 +1536,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "the storage-proxy including node identification, worker processes, ports, "
                 "and authentication secrets. This is the main configuration section."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1549,7 +1549,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "CPU and memory profiling for performance analysis. Enable this to collect "
                 "profiling data and send to a Pyroscope server for analysis."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1562,7 +1562,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "rotation settings. Proper logging configuration is essential for monitoring "
                 "and debugging storage-proxy in production environments."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1575,7 +1575,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "the storage-proxy accepts requests from users (client API) and from "
                 "Backend.AI Manager (manager API) including SSL and address settings."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1588,7 +1588,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "storage backend and its settings. Multiple volumes can be configured to "
                 "provide different storage backends (VFS, Pure Storage, CephFS, etc.)."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
     debug: Annotated[
@@ -1600,7 +1600,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "asyncio debug mode, enhanced task monitoring, and verbose event logging. "
                 "Should be disabled in production for security and performance."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1617,7 +1617,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "itself with and discovers other services in the Backend.AI cluster. "
                 "Essential for multi-node deployments and automatic failover."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1630,7 +1630,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "Enables integration with observability platforms like Jaeger, Zipkin, or "
                 "commercial APM solutions for request tracing across services."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1643,7 +1643,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "cluster coordination, configuration sharing, and service discovery in "
                 "Backend.AI. Required for multi-node deployments."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1656,7 +1656,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "configurations for backward compatibility. Each entry defines connection "
                 "settings for an S3-compatible object storage service."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             deprecated_version="25.10.0",
             deprecation_hint="Use artifact_storages dictionary instead for new deployments.",
         ),
@@ -1670,7 +1670,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "registry configurations for backward compatibility. Each entry defines "
                 "connection settings for a model/dataset registry service."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             deprecated_version="25.10.0",
             deprecation_hint="Use artifact_registries dictionary instead for new deployments.",
         ),
@@ -1689,7 +1689,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "Defines storage backends for artifact files (models, datasets). Each entry "
                 "can be object storage (S3) or VFS depending on deployment requirements."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
     artifact_registries: Annotated[
@@ -1705,7 +1705,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "Defines external registries for discovering and downloading ML artifacts. "
                 "Supports HuggingFace Hub and Backend.AI Reservoir registries."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
     reservoir_client: Annotated[
@@ -1721,7 +1721,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "timeout settings for API calls to Reservoir services. Tune these values "
                 "based on network conditions and expected transfer sizes."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
