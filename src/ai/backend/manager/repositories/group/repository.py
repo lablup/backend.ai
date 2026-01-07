@@ -38,7 +38,12 @@ from ai.backend.manager.errors.storage import VFolderOperationFailed
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import GroupRow, association_groups_users, groups
-from ai.backend.manager.models.kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, kernels
+from ai.backend.manager.models.kernel import (
+    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    LIVE_STATUS,
+    RESOURCE_USAGE_KERNEL_STATUSES,
+    kernels,
+)
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.routing import RoutingRow
@@ -46,6 +51,14 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
+from ai.backend.manager.models.vfolder import (
+    VFolderDeletionInfo,
+    VFolderRow,
+    VFolderStatusSet,
+    initiate_vfolder_deletion,
+    vfolder_status_map,
+    vfolders,
+)
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
@@ -397,12 +410,6 @@ class GroupRepository:
         self, session: SASession, group_id: uuid.UUID
     ) -> bool:
         """Check if group has vfolders mounted to active kernels."""
-        from ai.backend.manager.models.kernel import (
-            AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-            kernels,
-        )
-        from ai.backend.manager.models.vfolder import vfolders
-
         # Get group vfolder IDs
         query = sa.select([vfolders.c.id]).select_from(vfolders).where(vfolders.c.group == group_id)
         result = await session.execute(query)
@@ -432,11 +439,6 @@ class GroupRepository:
         self, session: SASession, group_id: uuid.UUID
     ) -> bool:
         """Check if group has active kernels."""
-        from ai.backend.manager.models.kernel import (
-            AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-            kernels,
-        )
-
         query = (
             sa.select([sa.func.count()])
             .select_from(kernels)
@@ -450,14 +452,6 @@ class GroupRepository:
 
     async def _delete_group_vfolders(self, group_id: uuid.UUID) -> int:
         """Delete all vfolders belonging to the group."""
-        from ai.backend.manager.models.vfolder import (
-            VFolderDeletionInfo,
-            VFolderRow,
-            VFolderStatusSet,
-            initiate_vfolder_deletion,
-            vfolder_status_map,
-        )
-
         target_vfs: list[VFolderDeletionInfo] = []
         async with self._db.begin_session() as session:
             query = sa.select(VFolderRow).where(
@@ -488,8 +482,6 @@ class GroupRepository:
 
     async def _delete_group_kernels(self, session: SASession, group_id: uuid.UUID) -> int:
         """Delete all kernels belonging to the group."""
-        from ai.backend.manager.models.kernel import kernels
-
         query = sa.delete(kernels).where(kernels.c.group_id == group_id)
         result = await session.execute(query)
         return result.rowcount
