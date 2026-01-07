@@ -701,7 +701,8 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     reporter_monitor = ReporterMonitor(reporter_hub)
     prometheus_monitor = PrometheusMonitor()
-    audit_log_monitor = AuditLogMonitor(root_ctx.db)
+    audit_log_monitor = AuditLogMonitor(root_ctx.repositories.audit_log.repository)
+
     root_ctx.processors = Processors.create(
         ProcessorArgs(
             service_args=ServiceArgs(
@@ -726,7 +727,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 event_producer=root_ctx.event_producer,
                 agent_cache=root_ctx.agent_cache,
                 notification_center=root_ctx.notification_center,
-            )
+            ),
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
     )
