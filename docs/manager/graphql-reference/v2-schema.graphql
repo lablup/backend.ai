@@ -94,7 +94,7 @@ type AddRevisionPayload {
   revision: ModelRevision!
 }
 
-"""Added in 25.19.0. Filter options for querying agents"""
+"""Added in 26.1.0. Filter options for querying agents"""
 input AgentFilter {
   id: StringFilter = null
   status: AgentStatusFilter = null
@@ -105,7 +105,7 @@ input AgentFilter {
   NOT: [AgentFilter!] = null
 }
 
-"""Added in 25.19.0. Network-related information for an agent"""
+"""Added in 26.1.0. Network-related information for an agent"""
 type AgentNetworkInfo {
   """Logical region where the agent is deployed."""
   region: String!
@@ -118,13 +118,13 @@ type AgentNetworkInfo {
   addr: String!
 }
 
-"""Added in 25.19.0. Options for ordering agents"""
+"""Added in 26.1.0. Options for ordering agents"""
 input AgentOrderBy {
   field: AgentOrderField!
   direction: OrderDirection! = ASC
 }
 
-"""Added in 25.19.0. Order by specification for agents"""
+"""Added in 26.1.0. Order by specification for agents"""
 enum AgentOrderField {
   ID
   FIRST_CONTACT
@@ -132,6 +132,7 @@ enum AgentOrderField {
   SCHEDULABLE
 }
 
+"""Added in 26.1.0. Permissions related to agent operations"""
 enum AgentPermission {
   READ_ATTRIBUTE
   UPDATE_ATTRIBUTE
@@ -180,7 +181,7 @@ enum AgentStatus {
 }
 
 """
-Added in 25.19.0. Filter options for agent status within AgentFilter.
+Added in 26.1.0. Filter options for agent status within AgentFilter.
 It includes options to filter whether agent status is in a specific list or equals a specific value.
 """
 input AgentStatusFilter {
@@ -188,7 +189,7 @@ input AgentStatusFilter {
   equals: AgentStatus = null
 }
 
-"""Added in 25.19.0. Status and lifecycle information for an agent"""
+"""Added in 26.1.0. Status and lifecycle information for an agent"""
 type AgentStatusInfo {
   """
   Current operational status of the agent.
@@ -227,7 +228,7 @@ type AgentStatusInfo {
   schedulable: Boolean!
 }
 
-"""Added in 25.19.0. System and configuration information for an agent"""
+"""Added in 26.1.0. System and configuration information for an agent"""
 type AgentSystemInfo {
   """
   Hardware architecture of the agent's host system (e.g., "x86_64", "aarch64").
@@ -238,7 +239,7 @@ type AgentSystemInfo {
 
   """
   Version string of the Backend.AI agent software running on this node.
-  Follows semantic versioning (e.g., "25.19.0") and helps identify
+  Follows semantic versioning (e.g., "26.1.0") and helps identify
   compatibility and available features.
   """
   version: String!
@@ -248,7 +249,7 @@ type AgentSystemInfo {
   Retained for backward compatibility and schema consistency.
   Originally intended to control automatic termination of misbehaving sessions.
   """
-  autoTerminateAbusingKernel: Boolean!
+  autoTerminateAbusingKernel: Boolean! @deprecated(reason: "Legacy feature no longer in use.")
 
   """
   List of compute plugin metadata supported by this agent.
@@ -259,7 +260,7 @@ type AgentSystemInfo {
   computePlugins: JSON!
 }
 
-"""Added in 25.19.0. Strawberry-based Agent type replacing AgentNode."""
+"""Added in 26.1.0. Strawberry-based Agent type replacing AgentNode."""
 type AgentV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -307,7 +308,7 @@ type AgentV2 implements Node {
 }
 
 """
-Added in 25.19.0. Relay-style connection type for paginated lists of agents
+Added in 26.1.0. Relay-style connection type for paginated lists of agents
 """
 type AgentV2Connection {
   """Pagination data for this connection"""
