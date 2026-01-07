@@ -344,3 +344,15 @@ class UnsupportedStorageTypeError(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+class VFolderStorageNamespaceNotResolvableError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/vfolder-storage-namespace-not-resolvable"
+    error_title = "VFolder storage namespace is not resolvable via static configuration."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )

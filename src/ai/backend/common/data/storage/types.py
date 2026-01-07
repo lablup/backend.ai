@@ -6,6 +6,7 @@ import enum
 class ArtifactStorageType(enum.StrEnum):
     OBJECT_STORAGE = "object_storage"
     VFS_STORAGE = "vfs_storage"
+    VFOLDER_STORAGE = "vfolder_storage"
     GIT_LFS = "git_lfs"
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from dataclasses import dataclass
 from typing import Final, Optional, cast
 from uuid import UUID
 
@@ -53,7 +54,11 @@ from ai.backend.manager.errors.artifact_registry import (
     InvalidArtifactRegistryTypeError,
 )
 from ai.backend.manager.errors.common import ServerMisconfiguredError
-from ai.backend.manager.errors.storage import UnsupportedStorageTypeError, VFolderNotFound
+from ai.backend.manager.errors.storage import (
+    UnsupportedStorageTypeError,
+    VFolderNotFound,
+    VFolderStorageNamespaceNotResolvableError,
+)
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
@@ -123,6 +128,17 @@ _REMOTE_ARTIFACT_MAX_WAIT_TIME: Final[int] = 3600  # 1 hour
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
+@dataclass(frozen=True)
+class _ImportDestinationData:
+    """Resolved import destination information."""
+
+    storage_host: str
+    storage_step_mappings: dict[ArtifactStorageImportStep, str]
+    vfid: VFolderID | None
+    storage_type: str | None
+    namespace_id: UUID | None
+
+
 class ArtifactRevisionService:
     _artifact_repository: ArtifactRepository
     _artifact_registry_repository: ArtifactRegistryRepository
@@ -176,10 +192,70 @@ class ArtifactRevisionService:
                 return cast(ReservoirObjectStorageConfig, reservoir_config.config).bucket_name
             case ArtifactStorageType.VFS_STORAGE.value:
                 return cast(ReservoirVFSStorageConfig, reservoir_config.config).subpath
+            case ArtifactStorageType.VFOLDER_STORAGE.value:
+                # VFolder storage namespace is not resolvable via static configuration.
+                # vfolder_id is provided dynamically as an argument to import_artifacts.
+                raise VFolderStorageNamespaceNotResolvableError(
+                    "VFolder storage namespace must be resolved dynamically via vfolder_id argument"
+                )
             case _:
                 raise UnsupportedStorageTypeError(
                     f"Unsupported storage type: {reservoir_config.config.storage_type}"
                 )
+
+    async def _resolve_import_destination(
+        self,
+        action: ImportArtifactRevisionAction,
+        reservoir_config: ReservoirConfig,
+    ) -> _ImportDestinationData:
+        """Resolve import destination based on vfolder_id or reservoir configuration.
+
+        Args:
+            action: Import revision action containing optional vfolder_id
+            reservoir_config: Reservoir configuration
+
+        Returns:
+            ImportDestinationInfo with resolved destination details
+        """
+        if action.vfolder_id:
+            vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_id)
+            if vfolder_data is None:
+                raise VFolderNotFound(f"VFolder with id {action.vfolder_id} not found")
+            vfid = VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)
+            # vfolder.host format: "{proxy_name}:{volume_name}"
+            proxy_name, volume_name = vfolder_data.host.split(":", 1)
+            storage_host = proxy_name  # storage proxy client only needs proxy name
+            # Override storage_step_mappings to use vfolder's volume for all steps
+            storage_step_mappings: dict[ArtifactStorageImportStep, str] = dict.fromkeys(
+                [
+                    ArtifactStorageImportStep.DOWNLOAD,
+                    ArtifactStorageImportStep.VERIFY,
+                    ArtifactStorageImportStep.ARCHIVE,
+                ],
+                volume_name,  # storage step mappings use volume name
+            )
+            return _ImportDestinationData(
+                storage_host=storage_host,
+                storage_step_mappings=storage_step_mappings,
+                vfid=vfid,
+                storage_type=None,
+                namespace_id=None,
+            )
+        storage_type = reservoir_config.config.storage_type
+        reservoir_archive_storage = reservoir_config.archive_storage
+        # Get bucket name or subpath depending on storage type
+        namespace = self._resolve_storage_namespace(reservoir_config)
+        storage_host, namespace_id, _ = await self._get_storage_info(
+            reservoir_archive_storage, namespace
+        )
+        storage_step_mappings = reservoir_config.resolve_storage_step_selection()
+        return _ImportDestinationData(
+            storage_host=storage_host,
+            storage_step_mappings=storage_step_mappings,
+            vfid=None,
+            storage_type=storage_type,
+            namespace_id=namespace_id,
+        )
 
     async def _get_storage_info(
         self, storage_name: str, namespace: str
@@ -397,38 +473,11 @@ class ArtifactRevisionService:
             if reservoir_config is None:
                 raise ServerMisconfiguredError("Reservoir configuration is missing")
 
-            # Handle vfolder destination
-            vfid: VFolderID | None = None
-            if action.vfolder_id:
-                vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_id)
-                if vfolder_data is None:
-                    raise VFolderNotFound(f"VFolder with id {action.vfolder_id} not found")
-                vfid = VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)
-                # vfolder.host format: "{proxy_name}:{volume_name}"
-                proxy_name, volume_name = vfolder_data.host.split(":", 1)
-                storage_host = proxy_name  # storage proxy client only needs proxy name
-                # Override storage_step_mappings to use vfolder's volume for all steps
-                storage_step_mappings: dict[ArtifactStorageImportStep, str] = dict.fromkeys(
-                    [
-                        ArtifactStorageImportStep.DOWNLOAD,
-                        ArtifactStorageImportStep.VERIFY,
-                        ArtifactStorageImportStep.ARCHIVE,
-                    ],
-                    volume_name,  # storage step mappings use volume name
-                )
-                storage_type = "vfs"  # vfolder is always VFS type
-                namespace_id = None  # Not applicable for vfolder destination
-            else:
-                storage_type = reservoir_config.config.storage_type
-                reservoir_archive_storage = reservoir_config.archive_storage
-                # Get bucket name or subpath depending on storage type
-                namespace = self._resolve_storage_namespace(reservoir_config)
-                storage_host, namespace_id, _ = await self._get_storage_info(
-                    reservoir_archive_storage, namespace
-                )
-                storage_step_mappings = reservoir_config.resolve_storage_step_selection()
+            dest = await self._resolve_import_destination(action, reservoir_config)
 
-            storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_host)
+            storage_proxy_client = self._storage_manager.get_manager_facing_client(
+                dest.storage_host
+            )
             task_id: UUID
             match artifact.registry_type:
                 case ArtifactRegistryType.HUGGINGFACE:
@@ -466,8 +515,8 @@ class ArtifactRevisionService:
                                 ModelTarget(model_id=artifact.name, revision=revision_data.version)
                             ],
                             registry_name=huggingface_registry_data.name,
-                            storage_step_mappings=storage_step_mappings,
-                            vfid=vfid,
+                            storage_step_mappings=dest.storage_step_mappings,
+                            vfid=dest.vfid,
                         )
                     )
                     task_id = huggingface_result.task_id
@@ -566,9 +615,9 @@ class ArtifactRevisionService:
                                     )
                                 ],
                                 registry_name=registry_data.name,
-                                storage_step_mappings=storage_step_mappings,
+                                storage_step_mappings=dest.storage_step_mappings,
                                 artifact_revision_ids=[str(action.artifact_revision_id)],
-                                vfid=vfid,
+                                vfid=dest.vfid,
                             )
                         )
 
@@ -579,10 +628,10 @@ class ArtifactRevisionService:
                     )
 
             # Associate with storage namespace only when not using vfolder destination
-            if namespace_id is not None:
+            if dest.namespace_id is not None:
                 await self.associate_with_storage(
                     AssociateWithStorageAction(
-                        revision_data.id, namespace_id, ArtifactStorageType(storage_type)
+                        revision_data.id, dest.namespace_id, ArtifactStorageType(dest.storage_type)
                     )
                 )
 
