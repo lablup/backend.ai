@@ -35,7 +35,6 @@ from ai.backend.manager.api.resource import (
 )
 from ai.backend.manager.errors.auth import AuthorizationFailed
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
