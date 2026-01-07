@@ -4,8 +4,8 @@ Scheduler operation handlers.
 
 from .base import SchedulerHandler, SessionLifecycleHandler
 from .lifecycle.schedule_sessions import ScheduleSessionsHandler
-from .lifecycle.start_sessions import StartSessionsHandler
-from .lifecycle.terminate_sessions import TerminateSessionsHandler
+from .lifecycle.start_sessions import StartSessionsHandler, StartSessionsLifecycleHandler
+from .lifecycle.terminate_sessions import TerminateSessionsHandler, TerminateSessionsLifecycleHandler
 from .maintenance.sweep_lost_agent_kernels import SweepLostAgentKernelsHandler
 from .maintenance.sweep_sessions import SweepSessionsHandler
 from .maintenance.sweep_stale_kernels import SweepStaleKernelsHandler
@@ -55,4 +55,6 @@ __all__ = [
     "CheckPullingProgressLifecycleHandler",
     "CheckRunningSessionTerminationLifecycleHandler",
     "CheckTerminatingProgressLifecycleHandler",
+    "StartSessionsLifecycleHandler",
+    "TerminateSessionsLifecycleHandler",
 ]

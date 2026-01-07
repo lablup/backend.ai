@@ -34,6 +34,7 @@ from .handlers import (
     CheckCreatingProgressHandler,
     CheckCreatingProgressLifecycleHandler,
     CheckPreconditionHandler,
+    CheckPreconditionLifecycleHandler,
     CheckPullingProgressHandler,
     CheckPullingProgressLifecycleHandler,
     CheckRunningSessionTerminationHandler,
@@ -46,10 +47,12 @@ from .handlers import (
     ScheduleSessionsHandler,
     SessionLifecycleHandler,
     StartSessionsHandler,
+    StartSessionsLifecycleHandler,
     SweepLostAgentKernelsHandler,
     SweepSessionsHandler,
     SweepStaleKernelsHandler,
     TerminateSessionsHandler,
+    TerminateSessionsLifecycleHandler,
 )
 from .kernel import KernelStateEngine
 from .recorder import RecorderContext
@@ -193,8 +196,23 @@ class ScheduleCoordinator:
         # Get hook registry from scheduler for handlers that need it
         hook_registry = self._scheduler._hook_registry
 
+        # Get launcher and terminator from scheduler for handlers that need them
+        launcher = self._scheduler._launcher
+        terminator = self._scheduler._terminator
+
         return {
+            ScheduleType.CHECK_PRECONDITION: CheckPreconditionLifecycleHandler(
+                launcher,
+                self._repository,
+                self._scheduling_controller,
+                self._event_producer,
+            ),
             ScheduleType.CHECK_PULLING_PROGRESS: CheckPullingProgressLifecycleHandler(
+                self._event_producer,
+            ),
+            ScheduleType.START: StartSessionsLifecycleHandler(
+                launcher,
+                self._repository,
                 self._event_producer,
             ),
             ScheduleType.CHECK_CREATING_PROGRESS: CheckCreatingProgressLifecycleHandler(
@@ -202,6 +220,10 @@ class ScheduleCoordinator:
                 self._event_producer,
                 self._repository,
                 hook_registry,
+            ),
+            ScheduleType.TERMINATE: TerminateSessionsLifecycleHandler(
+                terminator,
+                self._repository,
             ),
             ScheduleType.CHECK_TERMINATING_PROGRESS: CheckTerminatingProgressLifecycleHandler(
                 self._scheduling_controller,
