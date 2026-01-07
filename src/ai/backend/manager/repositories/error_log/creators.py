@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 import uuid
 from dataclasses import dataclass
 from typing import Any, override
@@ -24,6 +25,7 @@ class ErrorLogCreatorSpec(CreatorSpec[ErrorLogRow]):
     request_url: str | None = None
     request_status: int | None = None
     traceback: str | None = None
+    created_at: datetime | None = None
 
     @override
     def build_row(self) -> ErrorLogRow:
@@ -39,4 +41,5 @@ class ErrorLogCreatorSpec(CreatorSpec[ErrorLogRow]):
             request_url=self.request_url,
             request_status=self.request_status,
             traceback=self.traceback,
+            created_at=self.created_at,
         )
