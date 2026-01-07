@@ -76,6 +76,7 @@ class TestVFolderStorageServiceSetup:
 
     async def test_setup_creates_and_registers_vfolder_storage(
         self,
+        mock_volume: MagicMock,
         mock_volume_pool: MagicMock,
         mock_storage_pool: MagicMock,
         mock_request_id: MagicMock,
@@ -93,24 +94,28 @@ class TestVFolderStorageServiceSetup:
             storage_step_mappings=sample_storage_step_mappings,
         )
 
+        expected_storage_name = f"vfolder_storage_{mock_request_id.return_value}"
+        expected_volume_name = next(iter(sample_storage_step_mappings.values()))
+        expected_base_path = mock_volume.mangle_vfpath.return_value
+
         # Verify result type and structure
         assert isinstance(result, VFolderStorageSetupResult)
 
         # Verify volume was retrieved
-        mock_volume_pool.get_volume_by_name.assert_called_once_with("artifact_volume")
+        mock_volume_pool.get_volume_by_name.assert_called_once_with(expected_volume_name)
 
         # Verify storage was registered with correct name and instance
         mock_storage_pool.add_storage.assert_called_once()
         registered_name, registered_storage = mock_storage_pool.add_storage.call_args[0]
-        assert registered_name == "vfolder_storage_test-request-id"
+        assert registered_name == expected_storage_name
         assert isinstance(registered_storage, VFolderStorage)
         assert registered_storage.vfid == sample_vfid
-        assert registered_storage.base_path == Path("/mnt/vfolder/test-path")
+        assert registered_storage.base_path == expected_base_path
 
         # Verify all mappings point to the new storage
         for step in sample_storage_step_mappings:
-            assert result.storage_step_mappings[step] == "vfolder_storage_test-request-id"
+            assert result.storage_step_mappings[step] == expected_storage_name
 
         # Verify cleanup callback removes storage
         result.cleanup_callback()
-        mock_storage_pool.remove_storage.assert_called_once_with("vfolder_storage_test-request-id")
+        mock_storage_pool.remove_storage.assert_called_once_with(expected_storage_name)
