@@ -1925,7 +1925,24 @@ class ReservoirVFSStorageConfig(BaseConfigSchema):
     )
 
 
-StorageSpecificConfig = ReservoirObjectStorageConfig | ReservoirVFSStorageConfig
+# Reserved config type for VFolder storage.
+# VFolder storage is dynamically registered/unregistered at runtime when vfolder_id is provided
+# as an argument to import_artifacts. This config type is reserved for common configuration
+# options that may be applied to VFolder storage in the future.
+class ReservoirVFolderStorageConfig(BaseConfigSchema):
+    storage_type: Literal["vfolder_storage"] = Field(
+        default="vfolder_storage",
+        description="""
+        Type of the storage configuration.
+        This is used to identify the specific storage type for VFolder-based storage.
+        """,
+        alias="type",
+    )
+
+
+StorageSpecificConfig = (
+    ReservoirObjectStorageConfig | ReservoirVFSStorageConfig | ReservoirVFolderStorageConfig
+)
 
 
 class ReservoirConfig(BaseConfigSchema):
