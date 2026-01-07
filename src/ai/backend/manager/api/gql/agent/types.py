@@ -22,6 +22,29 @@ from ai.backend.manager.repositories.base import (
 
 
 @strawberry.enum(
+    name="AgentPermission",
+    description="Added in 25.19.0. Permissions related to agent operations",
+)
+class AgentPermissionGQL(StrEnum):
+    READ_ATTRIBUTE = "read_attribute"
+    UPDATE_ATTRIBUTE = "update_attribute"
+    CREATE_COMPUTE_SESSION = "create_compute_session"
+    CREATE_SERVICE = "create_service"
+
+    @classmethod
+    def from_agent_permission(cls, permission: AgentPermission) -> "AgentPermissionGQL":
+        match permission:
+            case AgentPermission.READ_ATTRIBUTE:
+                return AgentPermissionGQL.READ_ATTRIBUTE
+            case AgentPermission.UPDATE_ATTRIBUTE:
+                return AgentPermissionGQL.UPDATE_ATTRIBUTE
+            case AgentPermission.CREATE_COMPUTE_SESSION:
+                return AgentPermissionGQL.CREATE_COMPUTE_SESSION
+            case AgentPermission.CREATE_SERVICE:
+                return AgentPermissionGQL.CREATE_SERVICE
+
+
+@strawberry.enum(
     name="AgentOrderField",
     description="Added in 25.19.0. Order by specification for agents",
 )
@@ -63,6 +86,8 @@ class AgentFilterGQL(GQLFilter):
             name_condition = self.id.build_query_condition(
                 contains_factory=AgentConditions.by_id_contains,
                 equals_factory=AgentConditions.by_id_equals,
+                starts_with_factory=AgentConditions.by_id_starts_with,
+                ends_with_factory=AgentConditions.by_id_ends_with,
             )
             if name_condition is not None:
                 field_conditions.append(name_condition)
@@ -77,6 +102,8 @@ class AgentFilterGQL(GQLFilter):
             scaling_group_condition = self.scaling_group.build_query_condition(
                 contains_factory=AgentConditions.by_scaling_group_contains,
                 equals_factory=AgentConditions.by_scaling_group_equals,
+                starts_with_factory=AgentConditions.by_scaling_group_starts_with,
+                ends_with_factory=AgentConditions.by_scaling_group_ends_with,
             )
             if scaling_group_condition is not None:
                 field_conditions.append(scaling_group_condition)
@@ -281,7 +308,7 @@ class AgentV2GQL(Node):
             Provides the agent's region and network address for manager-to-agent communication.
         """)
     )
-    permissions: list[AgentPermission] = strawberry.field(
+    permissions: list[AgentPermissionGQL] = strawberry.field(
         description=dedent_strip("""
             List of permissions the current authenticated user has on this agent.
             Determines which operations (read attributes, create sessions, etc.)
@@ -324,7 +351,9 @@ class AgentV2GQL(Node):
                 region=data.region,
                 addr=data.addr,
             ),
-            permissions=detail_data.permissions,
+            permissions=[
+                AgentPermissionGQL.from_agent_permission(p) for p in detail_data.permissions
+            ],
             scaling_group=data.scaling_group,
         )
 
@@ -338,6 +367,6 @@ AgentV2Edge = Edge[AgentV2GQL]
 class AgentV2Connection(Connection[AgentV2GQL]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs):
+    def __init__(self, *args, count: int, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
