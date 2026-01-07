@@ -130,6 +130,23 @@ class SessionLauncher:
         ]
         return ScheduleResult(scheduled_sessions=scheduled_data)
 
+    async def trigger_image_pulling(
+        self,
+        sessions: list[SessionDataForPull],
+        image_configs: dict[str, ImageConfigData],
+    ) -> None:
+        """
+        Trigger image checking and pulling on agents for the given sessions.
+
+        Public method for SessionLifecycleHandler pattern.
+        Used by CheckPreconditionLifecycleHandler to trigger image pulling
+        after coordinator queries sessions.
+
+        :param sessions: List of sessions with kernels
+        :param image_configs: Image configurations indexed by image name
+        """
+        await self._trigger_image_pulling_for_sessions(sessions, image_configs)
+
     async def _trigger_image_pulling_for_sessions(
         self,
         sessions: list[SessionDataForPull],
@@ -137,6 +154,8 @@ class SessionLauncher:
     ) -> None:
         """
         Trigger image checking and pulling on agents for the given sessions.
+
+        Internal implementation method.
 
         :param sessions: List of sessions with kernels
         :param image_configs: Image configurations indexed by image name

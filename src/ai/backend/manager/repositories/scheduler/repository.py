@@ -29,6 +29,7 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.sokovan.scheduler.results import HandlerSessionData, ScheduledSessionData
 from ai.backend.manager.sokovan.scheduler.types import (
     AllocationBatch,
@@ -50,6 +51,11 @@ from .types.session import (
     SweptSessionInfo,
     TerminatingKernelWithAgentData,
     TerminatingSessionData,
+)
+from .types.search import (
+    SessionSearchResult,
+    SessionWithKernelsAndUserSearchResult,
+    SessionWithKernelsSearchResult,
 )
 from .types.session_creation import (
     AllowedScalingGroup,
@@ -524,6 +530,23 @@ class SchedulerRepository:
         return await self._db_source.get_sessions_for_pull(statuses, kernel_statuses)
 
     @scheduler_repository_resilience.apply()
+    async def get_sessions_for_pull_by_ids(
+        self,
+        session_ids: list[SessionId],
+    ) -> SessionsForPullWithImages:
+        """
+        Get sessions for image pulling by session IDs.
+
+        This method is used by handlers that need additional session data
+        (SessionDataForPull and ImageConfigData) beyond what the coordinator
+        provides (HandlerSessionData).
+
+        :param session_ids: List of session IDs to fetch
+        :return: SessionsForPullWithImages object with sessions and image configs
+        """
+        return await self._db_source.get_sessions_for_pull_by_ids(session_ids)
+
+    @scheduler_repository_resilience.apply()
     async def get_sessions_for_start(
         self,
         session_statuses: list[SessionStatus],
@@ -774,3 +797,64 @@ class SchedulerRepository:
         return await self._db_source.update_kernels_status_bulk(
             session_ids, from_statuses, to_status, reason
         )
+
+    # ========================================================================
+    # Search methods (BatchQuerier pattern)
+    # ========================================================================
+
+    @scheduler_repository_resilience.apply()
+    async def search_sessions(
+        self,
+        querier: BatchQuerier,
+    ) -> SessionSearchResult:
+        """Search sessions with pagination and filtering.
+
+        Returns basic session info (HandlerSessionData) without kernel details.
+        Use search_sessions_with_kernels when kernel data is also needed.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+                     Use NoPagination for scheduler batch operations.
+
+        Returns:
+            SessionSearchResult with items, total_count, and pagination info
+        """
+        return await self._db_source.search_sessions(querier)
+
+    @scheduler_repository_resilience.apply()
+    async def search_sessions_with_kernels(
+        self,
+        querier: BatchQuerier,
+    ) -> SessionWithKernelsSearchResult:
+        """Search sessions with kernel data and image configs.
+
+        Returns session data with full kernel details and resolved image configs.
+        Use this when kernel binding information is needed (e.g., image pulling).
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+                     Use NoPagination for scheduler batch operations.
+
+        Returns:
+            SessionWithKernelsSearchResult with sessions, image_configs, and pagination info
+        """
+        return await self._db_source.search_sessions_with_kernels(querier)
+
+    @scheduler_repository_resilience.apply()
+    async def search_sessions_with_kernels_and_user(
+        self,
+        querier: BatchQuerier,
+    ) -> SessionWithKernelsAndUserSearchResult:
+        """Search sessions with kernel data, user info, and image configs.
+
+        Returns session data with full kernel details, user information, and
+        resolved image configs. Use this when starting sessions.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+                     Use NoPagination for scheduler batch operations.
+
+        Returns:
+            SessionWithKernelsAndUserSearchResult with sessions, image_configs, and pagination info
+        """
+        return await self._db_source.search_sessions_with_kernels_and_user(querier)

@@ -13,7 +13,10 @@ from .progress.check_creating_progress import (
     CheckCreatingProgressHandler,
     CheckCreatingProgressLifecycleHandler,
 )
-from .progress.check_precondition import CheckPreconditionHandler
+from .progress.check_precondition import (
+    CheckPreconditionHandler,
+    CheckPreconditionLifecycleHandler,
+)
 from .progress.check_pulling_progress import (
     CheckPullingProgressHandler,
     CheckPullingProgressLifecycleHandler,
@@ -48,6 +51,7 @@ __all__ = [
     # New lifecycle handlers (SessionLifecycleHandler interface)
     "SessionLifecycleHandler",
     "CheckCreatingProgressLifecycleHandler",
+    "CheckPreconditionLifecycleHandler",
     "CheckPullingProgressLifecycleHandler",
     "CheckRunningSessionTerminationLifecycleHandler",
     "CheckTerminatingProgressLifecycleHandler",

@@ -15,6 +15,7 @@ from .creator import (
 from .pagination import (
     CursorBackwardPagination,
     CursorForwardPagination,
+    NoPagination,
     OffsetPagination,
     PageInfoResult,
     QueryPagination,
@@ -69,6 +70,7 @@ __all__ = [
     "CursorConditionFactory",
     # Pagination
     "QueryPagination",
+    "NoPagination",
     "OffsetPagination",
     "CursorForwardPagination",
     "CursorBackwardPagination",
