@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Optional
 
 import strawberry
 from strawberry import Info
@@ -33,14 +32,14 @@ def _get_agent_pagination_spec() -> PaginationSpec:
 
 async def fetch_agents(
     info: Info[StrawberryGQLContext],
-    filter: Optional[AgentFilterGQL] = None,
-    order_by: Optional[list[AgentOrderByGQL]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    filter: AgentFilterGQL | None = None,
+    order_by: list[AgentOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> AgentV2Connection:
     querier = info.context.gql_adapter.build_querier(
         PaginationOptions(
@@ -65,8 +64,8 @@ async def fetch_agents(
     return AgentV2Connection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
             start_cursor=edges[0].cursor if edges else None,
             end_cursor=edges[-1].cursor if edges else None,
         ),
