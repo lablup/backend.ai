@@ -25,10 +25,8 @@ from ai.backend.storage.services.artifacts.reservoir import (
     ReservoirServiceArgs,
     create_reservoir_import_pipeline,
 )
-from ai.backend.storage.storages.storage_pool import StoragePool
-from ai.backend.storage.storages.vfolder_storage import VFolderStorage
+from ai.backend.storage.services.storages.vfolder_storage import VFolderStorageService
 from ai.backend.storage.utils import log_client_api_entry
-from ai.backend.storage.volumes.pool import VolumePool
 
 if TYPE_CHECKING:
     from ai.backend.storage.context import RootContext
@@ -38,18 +36,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class ReservoirRegistryAPIHandler:
     _reservoir_service: ReservoirService
-    _volume_pool: VolumePool
-    _storage_pool: StoragePool
+    _vfolder_storage_service: VFolderStorageService
 
     def __init__(
         self,
         reservoir_service: ReservoirService,
-        volume_pool: VolumePool,
-        storage_pool: StoragePool,
+        vfolder_storage_service: VFolderStorageService,
     ) -> None:
         self._reservoir_service = reservoir_service
-        self._volume_pool = volume_pool
-        self._storage_pool = storage_pool
+        self._vfolder_storage_service = vfolder_storage_service
 
     @api_handler
     async def import_models(
@@ -66,11 +61,9 @@ class ReservoirRegistryAPIHandler:
 
         # If vfid is provided, create VFolderStorage and register it
         if body.parsed.vfid is not None:
-            setup_result = await VFolderStorage.setup(
+            setup_result = await self._vfolder_storage_service.setup(
                 vfid=body.parsed.vfid,
                 storage_step_mappings=storage_step_mappings,
-                volume_pool=self._volume_pool,
-                storage_pool=self._storage_pool,
             )
             storage_step_mappings = setup_result.storage_step_mappings
             cleanup_callback = setup_result.cleanup_callback
@@ -118,10 +111,13 @@ def create_app(ctx: RootContext) -> web.Application:
             redis_client=ctx.valkey_artifact_client,
         )
     )
-    reservoir_api_handler = ReservoirRegistryAPIHandler(
-        reservoir_service=reservoir_service,
+    vfolder_storage_service = VFolderStorageService(
         volume_pool=ctx.volume_pool,
         storage_pool=ctx.storage_pool,
+    )
+    reservoir_api_handler = ReservoirRegistryAPIHandler(
+        reservoir_service=reservoir_service,
+        vfolder_storage_service=vfolder_storage_service,
     )
 
     app.router.add_route("POST", "/import", reservoir_api_handler.import_models)
