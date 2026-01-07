@@ -161,6 +161,36 @@ def _get_role_assignments_join_condition():
     return UserRow.uuid == foreign(UserRoleRow.user_id)
 
 
+def _get_domain_join_condition():
+    from ai.backend.manager.models.domain import DomainRow
+
+    return DomainRow.name == foreign(UserRow.domain_name)
+
+
+def _get_groups_join_condition():
+    from ai.backend.manager.models.group import AssocGroupUserRow
+
+    return foreign(AssocGroupUserRow.user_id) == UserRow.uuid
+
+
+def _get_resource_policy_join_condition():
+    from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+
+    return UserResourcePolicyRow.name == foreign(UserRow.resource_policy)
+
+
+def _get_keypairs_join_condition():
+    from ai.backend.manager.models.keypair import KeyPairRow
+
+    return foreign(KeyPairRow.user) == UserRow.uuid
+
+
+def _get_main_keypair_join_condition():
+    from ai.backend.manager.models.keypair import KeyPairRow
+
+    return KeyPairRow.access_key == foreign(UserRow.main_access_key)
+
+
 class UserRow(Base):
     __table__ = users
     # from ai.backend.manager.models.keypair import KeyPairRow
@@ -177,10 +207,23 @@ class UserRow(Base):
         primaryjoin=_get_kernel_row_join_condition,
         foreign_keys="KernelRow.user_uuid",
     )
-    domain = relationship("DomainRow", back_populates="users")
-    groups = relationship("AssocGroupUserRow", back_populates="user")
-    resource_policy_row = relationship("UserResourcePolicyRow", back_populates="users")
-    keypairs = relationship("KeyPairRow", back_populates="user_row", foreign_keys="KeyPairRow.user")
+    domain = relationship(
+        "DomainRow", back_populates="users", primaryjoin=_get_domain_join_condition
+    )
+    groups = relationship(
+        "AssocGroupUserRow", back_populates="user", primaryjoin=_get_groups_join_condition
+    )
+    resource_policy_row = relationship(
+        "UserResourcePolicyRow",
+        back_populates="users",
+        primaryjoin=_get_resource_policy_join_condition,
+    )
+    keypairs = relationship(
+        "KeyPairRow",
+        back_populates="user_row",
+        primaryjoin=_get_keypairs_join_condition,
+        foreign_keys="KeyPairRow.user",
+    )
 
     created_endpoints = relationship(
         "EndpointRow",
@@ -193,7 +236,11 @@ class UserRow(Base):
         primaryjoin=_get_owned_endpoints_join_condition,
     )
 
-    main_keypair = relationship("KeyPairRow", foreign_keys=users.c.main_access_key)
+    main_keypair = relationship(
+        "KeyPairRow",
+        primaryjoin=_get_main_keypair_join_condition,
+        foreign_keys=users.c.main_access_key,
+    )
 
     vfolder_rows = relationship(
         "VFolderRow",
