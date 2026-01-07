@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from http import HTTPStatus
 from typing import TYPE_CHECKING
 from urllib.parse import unquote
@@ -14,6 +15,7 @@ from ai.backend.common.api_handlers import (
     QueryParam,
     api_handler,
 )
+from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.dto.storage.request import (
@@ -42,7 +44,10 @@ from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceServiceArgs,
     create_huggingface_import_pipeline,
 )
+from ai.backend.storage.storages.storage_pool import StoragePool
+from ai.backend.storage.storages.vfolder_storage import VFolderStorage
 from ai.backend.storage.utils import log_client_api_entry
+from ai.backend.storage.volumes.pool import VolumePool
 
 if TYPE_CHECKING:
     from ai.backend.storage.context import RootContext
@@ -52,9 +57,18 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class HuggingFaceRegistryAPIHandler:
     _huggingface_service: HuggingFaceService
+    _volume_pool: VolumePool
+    _storage_pool: StoragePool
 
-    def __init__(self, huggingface_service: HuggingFaceService) -> None:
+    def __init__(
+        self,
+        huggingface_service: HuggingFaceService,
+        volume_pool: VolumePool,
+        storage_pool: StoragePool,
+    ) -> None:
         self._huggingface_service = huggingface_service
+        self._volume_pool = volume_pool
+        self._storage_pool = storage_pool
 
     @api_handler
     async def scan_models(
@@ -174,11 +188,58 @@ class HuggingFaceRegistryAPIHandler:
         """
         await log_client_api_entry(log, "import_models", body.parsed)
 
+        storage_step_mappings = body.parsed.storage_step_mappings
+        vfolder_storage_name: str | None = None
+        cleanup_callback: Callable[[], None] | None = None
+
+        # If vfid is provided, create VFolderStorage and register it
+        if body.parsed.vfid is not None:
+            vfid = body.parsed.vfid
+            request_id = current_request_id()
+            # Get the volume name from storage_step_mappings
+            # When vfid is provided, all steps should use the same volume (vfolder's host)
+            volume_names = set(storage_step_mappings.values())
+            if len(volume_names) != 1:
+                log.warning(
+                    f"Multiple volume names in storage_step_mappings with vfid: {volume_names}"
+                )
+            volume_name = next(iter(volume_names))
+
+            # Create VFolderStorage
+            async with self._volume_pool.get_volume_by_name(volume_name) as volume:
+                vfolder_storage_name = f"vfolder_{request_id}"
+                vfolder_storage = VFolderStorage(
+                    name=vfolder_storage_name,
+                    volume=volume,
+                    vfid=vfid,
+                )
+
+                # Register to storage pool
+                self._storage_pool.add_storage(vfolder_storage_name, vfolder_storage)
+
+                log.info(
+                    f"Created VFolderStorage: name={vfolder_storage_name}, vfid={vfid}, "
+                    f"volume={volume_name}"
+                )
+
+            # Override storage_step_mappings to use VFolderStorage
+            storage_step_mappings = dict.fromkeys(
+                storage_step_mappings.keys(), vfolder_storage_name
+            )
+
+            # Create cleanup callback to remove VFolderStorage after task completion
+            def _cleanup() -> None:
+                if vfolder_storage_name is not None:
+                    self._storage_pool.remove_storage(vfolder_storage_name)
+                    log.info(f"Removed VFolderStorage: name={vfolder_storage_name}")
+
+            cleanup_callback = _cleanup
+
         # Create import pipeline based on storage step mappings
         pipeline = create_huggingface_import_pipeline(
             registry_configs=self._huggingface_service._registry_configs,
             transfer_manager=self._huggingface_service._transfer_manager,
-            storage_step_mappings=body.parsed.storage_step_mappings,
+            storage_step_mappings=storage_step_mappings,
             artifact_verifier_ctx=self._huggingface_service._artifact_verifier_ctx,
             event_producer=self._huggingface_service._event_producer,
             redis_client=self._huggingface_service._redis_client,
@@ -187,8 +248,9 @@ class HuggingFaceRegistryAPIHandler:
         task_id = await self._huggingface_service.import_models_batch(
             registry_name=body.parsed.registry_name,
             models=body.parsed.models,
-            storage_step_mappings=body.parsed.storage_step_mappings,
+            storage_step_mappings=storage_step_mappings,
             pipeline=pipeline,
+            on_complete=cleanup_callback,
         )
 
         response = HuggingFaceImportModelsResponse(
@@ -228,7 +290,11 @@ def create_app(ctx: RootContext) -> web.Application:
             redis_client=ctx.valkey_artifact_client,
         )
     )
-    huggingface_api_handler = HuggingFaceRegistryAPIHandler(huggingface_service=huggingface_service)
+    huggingface_api_handler = HuggingFaceRegistryAPIHandler(
+        huggingface_service=huggingface_service,
+        volume_pool=ctx.volume_pool,
+        storage_pool=ctx.storage_pool,
+    )
 
     app.router.add_route("POST", "/scan", huggingface_api_handler.scan_models)
     app.router.add_route("POST", "/import", huggingface_api_handler.import_models)

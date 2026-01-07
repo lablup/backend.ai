@@ -620,12 +620,16 @@ class HuggingFaceService:
         models: list[ModelTarget],
         storage_step_mappings: dict[ArtifactStorageImportStep, str],
         pipeline: ImportPipeline,
+        on_complete: Callable[[], None] | None = None,
     ) -> uuid.UUID:
         """Import multiple HuggingFace models to storage in batch.
 
         Args:
             registry_name: Name of the HuggingFace registry
             models: List of HuggingFace models to import
+            storage_step_mappings: Mapping of import steps to storage names
+            pipeline: Import pipeline to execute
+            on_complete: Optional callback to invoke when batch import completes
 
         Raises:
             HuggingFaceAPIError: If API call fails
@@ -700,6 +704,9 @@ class HuggingFaceService:
             except Exception as e:
                 log.error(f"Batch model import failed: {e!s}")
                 return DispatchResult.error(f"Batch import failed: {e!s}")
+            finally:
+                if on_complete is not None:
+                    on_complete()
 
             return DispatchResult.success(None)
 
