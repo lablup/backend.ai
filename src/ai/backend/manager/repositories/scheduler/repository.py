@@ -144,6 +144,17 @@ class SchedulerRepository:
         return await self._db_source.get_pending_timeout_sessions()
 
     @scheduler_repository_resilience.apply()
+    async def get_pending_timeout_sessions_by_ids(
+        self,
+        session_ids: list[SessionId],
+    ) -> list[SweptSessionInfo]:
+        """
+        Get sessions that have exceeded their pending timeout from given session IDs.
+        Used by SweepSessionsLifecycleHandler for scaling group based processing.
+        """
+        return await self._db_source.get_pending_timeout_sessions_by_ids(session_ids)
+
+    @scheduler_repository_resilience.apply()
     async def batch_update_terminated_status(
         self,
         session_results: list[SessionTerminationResult],
@@ -223,6 +234,18 @@ class SchedulerRepository:
         For lost agent cleanup operations.
         """
         return await self._db_source.get_terminating_kernels_with_lost_agents()
+
+    @scheduler_repository_resilience.apply()
+    async def get_terminating_kernels_with_lost_agents_by_ids(
+        self,
+        session_ids: list[SessionId],
+    ) -> list[TerminatingKernelWithAgentData]:
+        """
+        Get kernels in TERMINATING sessions that have lost or missing agents
+        from given session IDs.
+        Used by SweepLostAgentKernelsLifecycleHandler for scaling group based processing.
+        """
+        return await self._db_source.get_terminating_kernels_with_lost_agents_by_ids(session_ids)
 
     async def _get_known_slot_types(self) -> Mapping[SlotName, SlotTypes]:
         """
@@ -397,6 +420,17 @@ class SchedulerRepository:
         :return: List of sessions ready for transition with detailed information
         """
         return await self._db_source.get_sessions_for_transition(session_statuses, kernel_statuses)
+
+    @scheduler_repository_resilience.apply()
+    async def get_sessions_for_transition_by_ids(
+        self,
+        session_ids: list[SessionId],
+    ) -> list[SessionTransitionData]:
+        """
+        Get sessions ready for state transition from given session IDs.
+        Used by SweepStaleKernelsLifecycleHandler for scaling group based processing.
+        """
+        return await self._db_source.get_sessions_for_transition_by_ids(session_ids)
 
     @scheduler_repository_resilience.apply()
     async def update_sessions_to_running(self, sessions_data: list[SessionRunningData]) -> None:

@@ -264,16 +264,16 @@ class ScheduleCoordinator:
             ),
             # Maintenance handlers
             ScheduleType.SWEEP: SweepSessionsLifecycleHandler(
-                self._scheduler,
+                terminator,
                 self._repository,
             ),
             ScheduleType.SWEEP_LOST_AGENT_KERNELS: SweepLostAgentKernelsLifecycleHandler(
-                self._scheduler,
+                terminator,
                 self._repository,
             ),
             ScheduleType.SWEEP_STALE_KERNELS: SweepStaleKernelsLifecycleHandler(
+                terminator,
                 self._valkey_schedule,
-                self._scheduler,
                 self._repository,
             ),
         }

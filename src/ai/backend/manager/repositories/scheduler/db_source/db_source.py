@@ -1039,6 +1039,113 @@ class ScheduleDBSource:
 
         return timed_out_sessions
 
+    async def get_pending_timeout_sessions_by_ids(
+        self,
+        session_ids: list[SessionId],
+    ) -> list[SweptSessionInfo]:
+        """
+        Get sessions that have exceeded their pending timeout from given session IDs.
+
+        :param session_ids: Pre-filtered session IDs from Coordinator
+        :return: List of sessions that have timed out
+        """
+        if not session_ids:
+            return []
+
+        now = datetime.now(tzutc())
+        timed_out_sessions: list[SweptSessionInfo] = []
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = (
+                sa.select(
+                    SessionRow.id,
+                    SessionRow.creation_id,
+                    SessionRow.access_key,
+                    SessionRow.created_at,
+                    ScalingGroupRow.scheduler_opts,
+                )
+                .select_from(SessionRow)
+                .join(ScalingGroupRow, SessionRow.scaling_group_name == ScalingGroupRow.name)
+                .where(
+                    SessionRow.id.in_(session_ids),
+                    SessionRow.status == SessionStatus.PENDING,
+                )
+            )
+
+            result = await db_sess.execute(query)
+            pending_sessions = result.fetchall()
+
+            for row in pending_sessions:
+                scheduler_opts = row.scheduler_opts
+                if not scheduler_opts:
+                    continue
+
+                timeout = scheduler_opts.pending_timeout
+                if timeout.total_seconds() <= 0:
+                    continue
+
+                elapsed_time = now - row.created_at
+                if elapsed_time >= timeout:
+                    timed_out_sessions.append(
+                        SweptSessionInfo(
+                            session_id=row.id,
+                            creation_id=row.creation_id,
+                            access_key=row.access_key,
+                        )
+                    )
+
+        return timed_out_sessions
+
+    async def get_terminating_kernels_with_lost_agents_by_ids(
+        self,
+        session_ids: list[SessionId],
+    ) -> list[TerminatingKernelWithAgentData]:
+        """
+        Fetch kernels in TERMINATING state that have lost or missing agents
+        from given session IDs.
+
+        :param session_ids: Pre-filtered session IDs from Coordinator
+        :return: List of kernels with lost agents
+        """
+        if not session_ids:
+            return []
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = (
+                sa.select(
+                    KernelRow.id,
+                    KernelRow.session_id,
+                    KernelRow.status,
+                    KernelRow.agent,
+                    AgentRow.status.label("agent_status"),
+                )
+                .select_from(KernelRow)
+                .outerjoin(AgentRow, KernelRow.agent == AgentRow.id)
+                .where(
+                    KernelRow.session_id.in_(session_ids),
+                    KernelRow.status == KernelStatus.TERMINATING,
+                    sa.or_(
+                        KernelRow.agent.is_(None),  # No agent assigned
+                        AgentRow.status.in_(
+                            AgentStatus.unavailable_statuses()
+                        ),  # Agent unavailable
+                    ),
+                )
+            )
+            result = await db_sess.execute(query)
+            rows = result.fetchall()
+
+            return [
+                TerminatingKernelWithAgentData(
+                    kernel_id=str(row.id),
+                    session_id=row.session_id,
+                    status=row.status,
+                    agent_id=row.agent,
+                    agent_status=str(row.agent_status) if row.agent_status else None,
+                )
+                for row in rows
+            ]
+
     async def enqueue_session(
         self,
         session_data: SessionEnqueueData,
@@ -2566,6 +2673,65 @@ class ScheduleDBSource:
                     if session.access_key
                     else AccessKey(""),
                     cluster_mode=ClusterMode(session.cluster_mode),
+                    kernels=kernel_data,
+                    batch_timeout=session.batch_timeout,
+                    status_info=session.status_info,
+                )
+
+                ready_sessions.append(session_data)
+
+            return ready_sessions
+
+    async def get_sessions_for_transition_by_ids(
+        self,
+        session_ids: list[SessionId],
+    ) -> list[SessionTransitionData]:
+        """
+        Get sessions ready for state transition from given session IDs.
+
+        :param session_ids: Pre-filtered session IDs from Coordinator
+        :return: List of sessions with detailed information for transition
+        """
+        if not session_ids:
+            return []
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            # Find sessions by IDs
+            stmt = (
+                sa.select(SessionRow)
+                .where(SessionRow.id.in_(session_ids))
+                .options(selectinload(SessionRow.kernels))
+            )
+            result = await db_sess.execute(stmt)
+            sessions = result.scalars().all()
+
+            ready_sessions: list[SessionTransitionData] = []
+            for session in sessions:
+                # Build kernel transition data
+                kernel_data = [
+                    KernelTransitionData(
+                        kernel_id=str(kernel.id),
+                        agent_id=kernel.agent,
+                        agent_addr=kernel.agent_addr,
+                        cluster_role=kernel.cluster_role,
+                        container_id=kernel.container_id,
+                        startup_command=kernel.startup_command,
+                        status_info=kernel.status_info,
+                        occupied_slots=kernel.occupied_slots,
+                    )
+                    for kernel in session.kernels
+                ]
+
+                # Build session transition data
+                session_data = SessionTransitionData(
+                    session_id=session.id,
+                    creation_id=session.creation_id,
+                    session_name=session.name,
+                    network_type=session.network_type,
+                    network_id=session.network_id,
+                    session_type=session.session_type,
+                    access_key=session.access_key,
+                    cluster_mode=session.cluster_mode,
                     kernels=kernel_data,
                     batch_timeout=session.batch_timeout,
                     status_info=session.status_info,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.types import AccessKey
@@ -20,10 +20,14 @@ from ai.backend.manager.sokovan.scheduler.handlers.base import (
 )
 from ai.backend.manager.sokovan.scheduler.results import (
     HandlerSessionData,
+    ScheduledSessionData,
     ScheduleResult,
     SessionExecutionResult,
 )
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
+
+if TYPE_CHECKING:
+    from ai.backend.manager.sokovan.scheduler.terminator.terminator import SessionTerminator
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -83,19 +87,20 @@ class SweepStaleKernelsLifecycleHandler(SessionLifecycleHandler):
     """Handler for sweeping kernels with stale presence status.
 
     Following the DeploymentCoordinator pattern:
-    - Coordinator queries sessions with kernels that may be stale
+    - Coordinator queries RUNNING sessions (provides HandlerSessionData)
     - Handler checks kernel presence in Redis and terminates stale ones
     - Before termination, confirms with agent that kernel is truly gone
+    - Returns affected sessions for triggering CHECK_RUNNING_SESSION_TERMINATION
     """
 
     def __init__(
         self,
+        terminator: SessionTerminator,
         valkey_schedule_client: ValkeyScheduleClient,
-        scheduler: Scheduler,
         repository: SchedulerRepository,
     ) -> None:
+        self._terminator = terminator
         self._valkey_schedule_client = valkey_schedule_client
-        self._scheduler = scheduler
         self._repository = repository
 
     @classmethod
@@ -110,12 +115,12 @@ class SweepStaleKernelsLifecycleHandler(SessionLifecycleHandler):
 
     @classmethod
     def target_kernel_statuses(cls) -> list[KernelStatus]:
-        """Any kernel status for stale check."""
-        return []
+        """Running kernels that may be stale."""
+        return [KernelStatus.RUNNING]
 
     @classmethod
     def success_status(cls) -> Optional[SessionStatus]:
-        """No success status for sweep handler."""
+        """No success status - kernel status updated, not session status."""
         return None
 
     @classmethod
@@ -125,8 +130,8 @@ class SweepStaleKernelsLifecycleHandler(SessionLifecycleHandler):
 
     @classmethod
     def stale_status(cls) -> Optional[SessionStatus]:
-        """Stale kernels lead to TERMINATING status."""
-        return SessionStatus.TERMINATING
+        """No stale status - this handler updates kernel status only."""
+        return None
 
     @property
     def lock_id(self) -> Optional[LockID]:
@@ -140,39 +145,59 @@ class SweepStaleKernelsLifecycleHandler(SessionLifecycleHandler):
     ) -> SessionExecutionResult:
         """Sweep kernels with stale presence status.
 
-        Delegates to Scheduler's sweep method which handles:
-        - Checking kernel presence status in Redis
-        - Confirming with agent that kernels are truly gone
-        - Terminating stale kernels
+        The coordinator provides basic session info (HandlerSessionData).
+        This handler:
+        1. Fetches detailed session data with kernel info
+        2. Checks kernel presence in Redis via Terminator
+        3. Confirms with agent and terminates stale kernels
+        4. Returns affected sessions for post-processing
         """
         result = SessionExecutionResult()
 
         if not sessions:
             return result
 
-        # Delegate to existing Scheduler method
-        schedule_result = await self._scheduler.sweep_stale_kernels()
+        # Extract session IDs and fetch detailed session data for transition
+        session_ids = [s.session_id for s in sessions]
+        sessions_for_transition = await self._repository.get_sessions_for_transition_by_ids(
+            session_ids
+        )
 
-        # Mark swept sessions as stale for status transition
-        for event_data in schedule_result.scheduled_sessions:
-            result.stales.append(event_data.session_id)
-            result.scheduled_data.append(event_data)
+        if not sessions_for_transition:
+            return result
+
+        # Delegate to Terminator's handler-specific method
+        affected_sessions = await self._terminator.sweep_stale_kernels_for_handler(
+            sessions_for_transition
+        )
+
+        # Build scheduled data for affected sessions
+        for session in affected_sessions:
+            result.scheduled_data.append(
+                ScheduledSessionData(
+                    session_id=session.session_id,
+                    creation_id=session.creation_id,
+                    access_key=session.access_key,
+                    reason="STALE_KERNEL",
+                )
+            )
 
         return result
 
     async def post_process(self, result: SessionExecutionResult) -> None:
         """Trigger CHECK_RUNNING_SESSION_TERMINATION and invalidate cache."""
-        log.info("Swept {} stale kernels", len(result.stales))
+        log.info("Swept kernels affecting {} sessions", len(result.scheduled_data))
 
-        # Trigger CHECK_RUNNING_SESSION_TERMINATION to check if sessions need termination
-        await self._valkey_schedule_client.mark_schedule_needed(
-            ScheduleType.CHECK_RUNNING_SESSION_TERMINATION
-        )
+        if result.scheduled_data:
+            # Trigger CHECK_RUNNING_SESSION_TERMINATION to check if sessions need termination
+            await self._valkey_schedule_client.mark_schedule_needed(
+                ScheduleType.CHECK_RUNNING_SESSION_TERMINATION
+            )
 
-        # Invalidate cache for affected access keys
-        affected_keys: set[AccessKey] = {
-            event_data.access_key for event_data in result.scheduled_data
-        }
-        if affected_keys:
-            await self._repository.invalidate_kernel_related_cache(list(affected_keys))
-            log.debug("Invalidated kernel-related cache for {} access keys", len(affected_keys))
+            # Invalidate cache for affected access keys
+            affected_keys: set[AccessKey] = {
+                event_data.access_key for event_data in result.scheduled_data
+            }
+            if affected_keys:
+                await self._repository.invalidate_kernel_related_cache(list(affected_keys))
+                log.debug("Invalidated kernel-related cache for {} access keys", len(affected_keys))
