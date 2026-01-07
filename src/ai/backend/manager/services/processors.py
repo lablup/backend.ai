@@ -194,9 +194,7 @@ class Services:
             repositories.user.repository,
             repositories.user.admin_repository,
         )
-        image_service = ImageService(
-            args.agent_registry, repositories.image.repository, repositories.image.admin_repository
-        )
+        image_service = ImageService(args.agent_registry, repositories.image.repository)
         container_registry_service = ContainerRegistryService(
             args.db,
             repositories.container_registry.repository,

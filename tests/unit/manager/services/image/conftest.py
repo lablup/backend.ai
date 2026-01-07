@@ -23,7 +23,6 @@ from ai.backend.manager.data.image.types import (
     ImageResourcesData,
 )
 from ai.backend.manager.models.image import ImageStatus, ImageType
-from ai.backend.manager.repositories.image.admin_repository import AdminImageRepository
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
@@ -44,12 +43,6 @@ def mock_image_repository() -> MagicMock:
 
 
 @pytest.fixture
-def mock_admin_image_repository() -> MagicMock:
-    """Mock AdminImageRepository for testing."""
-    return MagicMock(spec=AdminImageRepository)
-
-
-@pytest.fixture
 def mock_agent_registry() -> MagicMock:
     """Mock AgentRegistry for testing."""
     return MagicMock(spec="AgentRegistry")
@@ -58,14 +51,12 @@ def mock_agent_registry() -> MagicMock:
 @pytest.fixture
 def image_service(
     mock_image_repository: MagicMock,
-    mock_admin_image_repository: MagicMock,
     mock_agent_registry: MagicMock,
 ) -> ImageService:
     """Create ImageService with mock dependencies."""
     return ImageService(
         agent_registry=mock_agent_registry,
         image_repository=mock_image_repository,
-        admin_image_repository=mock_admin_image_repository,
     )
 
 
