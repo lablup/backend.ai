@@ -104,13 +104,13 @@ class ModelServingEventHandler:
                 _, group_id, resource_policy = await query_userinfo(
                     db_sess,
                     created_user.uuid,
-                    created_user["access_key"],
+                    created_user.access_key,
                     created_user.role,
                     created_user.domain_name,
                     None,
                     endpoint.domain,
                     endpoint.project,
-                    query_on_behalf_of=session_owner["access_key"],
+                    query_on_behalf_of=session_owner.access_key,
                 )
 
                 image_row = await ImageRow.resolve(
@@ -131,10 +131,10 @@ class ModelServingEventHandler:
                     UserScope(
                         domain_name=endpoint.domain,
                         group_id=group_id,
-                        user_uuid=session_owner["uuid"],
-                        user_role=session_owner["role"],
+                        user_uuid=session_owner.uuid,
+                        user_role=session_owner.role,
                     ),
-                    session_owner["access_key"],
+                    session_owner.access_key,
                     resource_policy,
                     SessionTypes.INFERENCE,
                     {

@@ -359,7 +359,7 @@ class AgentRegistry:
             cols = [agents.c.id, agents.c.public_key]
             if field is not None:
                 cols.append(field)
-            query = sa.select(cols).select_from(agents).where(agents.c.id == inst_id)
+            query = sa.select(*cols).select_from(agents).where(agents.c.id == inst_id)
             result = await conn.execute(query)
             row = result.first()
             if not row:

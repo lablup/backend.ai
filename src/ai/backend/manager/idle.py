@@ -531,7 +531,7 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
         """
         if self.user_initial_grace_period is None:
             return None
-        user_created_at: datetime = kernel["user_created_at"]
+        user_created_at: datetime = kernel.user_created_at
         return user_created_at + self.user_initial_grace_period
 
     @property
@@ -758,9 +758,9 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         Check the kernel is timeout or not.
         And save remaining time until timeout of kernel to Redis.
         """
-        session_id = kernel["session_id"]
+        session_id = kernel.session_id
 
-        if SessionTypes(kernel["session_type"]) == SessionTypes.BATCH:
+        if SessionTypes(kernel.session_type) == SessionTypes.BATCH:
             return True
 
         active_streams = await self._redis_live.count_active_connections(session_id)
@@ -776,8 +776,8 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         # setting idle_timeout:
         # - zero/inf means "infinite"
         # - negative means "undefined"
-        if policy["idle_timeout"] >= 0:
-            idle_timeout = float(policy["idle_timeout"])
+        if policy.idle_timeout >= 0:
+            idle_timeout = float(policy.idle_timeout)
         if (idle_timeout <= 0) or (math.isinf(idle_timeout) and idle_timeout > 0):
             return True
         tz = grace_period_end.tzinfo if grace_period_end is not None else None
@@ -834,13 +834,13 @@ class SessionLifetimeChecker(BaseIdleChecker):
         And save remaining time until `max_session_lifetime` of kernel to Redis.
         """
 
-        session_id = kernel["session_id"]
-        if (max_session_lifetime := policy["max_session_lifetime"]) > 0:
+        session_id = kernel.session_id
+        if (max_session_lifetime := policy.max_session_lifetime) > 0:
             # TODO: once per-status time tracking is implemented, let's change created_at
             #       to the timestamp when the session entered PREPARING status.
             idle_timeout = timedelta(seconds=max_session_lifetime)
             now: datetime = await get_db_now(dbconn)
-            kernel_created_at: datetime = kernel["created_at"]
+            kernel_created_at: datetime = kernel.created_at
             remaining = calculate_remaining_time(
                 now, kernel_created_at, idle_timeout, grace_period_end
             )
@@ -1003,7 +1003,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
     def get_time_window(self, policy: Row) -> timedelta:
         # Respect idle_timeout, from keypair resource policy, over time_window.
-        if (idle_timeout := policy["idle_timeout"]) >= 0:
+        if (idle_timeout := policy.idle_timeout) >= 0:
             return timedelta(seconds=idle_timeout)
         return self.time_window
 
@@ -1026,13 +1026,13 @@ class UtilizationIdleChecker(BaseIdleChecker):
         Check the the average utilization of kernel and whether it exceeds the threshold or not.
         And save the average utilization of kernel to Redis.
         """
-        session_id = kernel["session_id"]
+        session_id = kernel.session_id
 
         interval = IdleCheckerHost.check_interval
         # time_window: Utilization is calculated within this window.
         time_window: timedelta = self.get_time_window(policy)
-        occupied_slots = cast(ResourceSlot, kernel["occupied_slots"])
-        requested_slots = cast(ResourceSlot, kernel["requested_slots"])
+        occupied_slots = cast(ResourceSlot, kernel.occupied_slots)
+        requested_slots = cast(ResourceSlot, kernel.requested_slots)
         excluded_resources: set[str] = set()
 
         util_series_key = f"session.{session_id}.util_series"
@@ -1070,7 +1070,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         # Report time remaining until the first time window is full as expire time
         db_now: datetime = await get_db_now(dbconn)
-        kernel_created_at: datetime = kernel["created_at"]
+        kernel_created_at: datetime = kernel.created_at
         if grace_period_end is not None:
             start_from = max(grace_period_end, kernel_created_at)
         else:
@@ -1105,14 +1105,14 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 excluded_resources.add(resource_key)
 
         # Get current utilization data from all containers of the session.
-        if kernel["cluster_size"] > 1:
+        if kernel.cluster_size > 1:
             query = sa.select(kernels.c.id).where(
                 (kernels.c.session_id == session_id) & (kernels.c.status.in_(LIVE_STATUS)),
             )
             rows = (await dbconn.execute(query)).fetchall()
-            kernel_ids = [k["id"] for k in rows]
+            kernel_ids = [k.id for k in rows]
         else:
-            kernel_ids = [kernel["id"]]
+            kernel_ids = [kernel.id]
         current_utilizations = await self.get_current_utilization(kernel_ids, occupied_slots)
         if current_utilizations is None:
             return True

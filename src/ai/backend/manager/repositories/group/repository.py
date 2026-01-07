@@ -12,6 +12,7 @@ from uuid import UUID
 import aiotools
 import msgpack
 import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import (
@@ -211,7 +212,7 @@ class GroupRepository:
                 )
                 .where(groups.c.id == group_id)
             )
-            if result.rowcount > 0:
+            if cast(CursorResult, result).rowcount > 0:
                 return
             raise ProjectNotFound(f"Group not found: {group_id}")
 

@@ -8,6 +8,7 @@ from typing import Optional, cast
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, selectinload
@@ -906,7 +907,7 @@ class ScheduleDBSource:
         result = await db_sess.execute(session_update_query)
 
         # Check if session was actually updated
-        if result.rowcount == 0:
+        if cast(CursorResult, result).rowcount == 0:
             log.warning(
                 "Session {} was not in PENDING status, skipping allocation",
                 allocation.session_id,
@@ -979,7 +980,7 @@ class ScheduleDBSource:
         result = await db_sess.execute(session_query)
 
         # Check if session was actually updated
-        if result.rowcount == 0:
+        if cast(CursorResult, result).rowcount == 0:
             log.warning(
                 "Session {} was not in PENDING status, skipping failure status update",
                 failure.session_id,

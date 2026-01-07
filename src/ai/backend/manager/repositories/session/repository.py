@@ -293,7 +293,7 @@ class SessionRepository:
             )
             result = await conn.execute(query)
             sgroup = result.first()
-            return sgroup["wsproxy_addr"] if sgroup else None
+            return sgroup.wsproxy_addr if sgroup else None
 
     @session_repository_resilience.apply()
     async def get_session_by_id(

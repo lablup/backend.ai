@@ -2,9 +2,10 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
 from datetime import UTC, datetime
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload, sessionmaker
 from sqlalchemy.sql import Select
@@ -613,7 +614,7 @@ class ArtifactDBSource:
                 )
             )
 
-            if delete_result.rowcount == 0:
+            if cast(CursorResult, delete_result).rowcount == 0:
                 raise ArtifactAssociationDeletionError("Failed to delete association")
 
             return association_data

@@ -349,7 +349,7 @@ class UserRepository:
 
         gids_to_join = list(group_ids)
         if model_store_project:
-            gids_to_join.append(model_store_project["id"])
+            gids_to_join.append(model_store_project.id)
 
         if gids_to_join:
             query = (

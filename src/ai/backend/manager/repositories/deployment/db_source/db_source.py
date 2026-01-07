@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Any, Optional, cast
 
 import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload, sessionmaker
@@ -467,7 +468,7 @@ class DeploymentDBSource:
                 .values(lifecycle_stage=lifecycle)
             )
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     async def get_modified_endpoint(
         self,
@@ -631,7 +632,7 @@ class DeploymentDBSource:
                 EndpointAutoScalingRuleRow.id == rule_id
             )
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     # New Model Deployment Auto-scaling Rule methods (using new types)
 
@@ -752,7 +753,7 @@ class DeploymentDBSource:
                 .values(session=session_id, status=RouteStatus.PROVISIONING)
             )
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     async def update_route(
         self,
@@ -781,7 +782,7 @@ class DeploymentDBSource:
 
             query = sa.update(RoutingRow).where(RoutingRow.id == route_id).values(**values)
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     async def update_route_traffic_ratio(
         self,
@@ -796,7 +797,7 @@ class DeploymentDBSource:
                 .values(traffic_ratio=traffic_ratio)
             )
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     async def delete_route(
         self,
@@ -806,7 +807,7 @@ class DeploymentDBSource:
         async with self._begin_session_read_committed() as db_sess:
             query = sa.delete(RoutingRow).where(RoutingRow.id == route_id)
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     async def search_routes(
         self,
@@ -999,7 +1000,7 @@ class DeploymentDBSource:
         # Then delete the endpoint itself
         endpoint_query = sa.delete(EndpointRow).where(EndpointRow.id == endpoint_id)
         result = await db_sess.execute(endpoint_query)
-        return result.rowcount > 0
+        return cast(CursorResult, result).rowcount > 0
 
     async def _fetch_endpoint_and_routes(
         self,
@@ -1111,7 +1112,7 @@ class DeploymentDBSource:
                 .values(last_triggered_at=triggered_at)
             )
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     async def fetch_kernels_by_session_ids(
         self,

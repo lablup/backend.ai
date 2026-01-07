@@ -263,7 +263,7 @@ class VfolderRepository:
             result = await session.execute(query)
             if cast(CursorResult, result).rowcount != 1:
                 raise DBOperationFailed(
-                    f"Failed to insert vfolder: expected 1 row, got {result.rowcount}"
+                    f"Failed to insert vfolder: expected 1 row, got {cast(CursorResult, result).rowcount}"
                 )
             match params.ownership_type:
                 case VFolderOwnershipType.USER:
