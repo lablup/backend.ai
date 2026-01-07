@@ -628,7 +628,7 @@ class ArtifactRevisionService:
                     )
 
             # Associate with storage namespace only when not using vfolder destination
-            if dest.namespace_id is not None:
+            if dest.namespace_id is not None and dest.storage_type is not None:
                 await self.associate_with_storage(
                     AssociateWithStorageAction(
                         revision_data.id, dest.namespace_id, ArtifactStorageType(dest.storage_type)
