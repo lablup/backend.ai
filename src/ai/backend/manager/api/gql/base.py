@@ -33,6 +33,16 @@ class StringMatchSpec:
     negated: bool
 
 
+@dataclass(frozen=True)
+class UUIDMatchSpec:
+    """Specification for UUID matching operations in query conditions."""
+
+    value: uuid.UUID | list[uuid.UUID]
+    case_insensitive: bool
+    negated: bool
+    is_list_operation: bool = False
+
+
 @strawberry.scalar
 class ByteSize(str):
     """
@@ -206,67 +216,88 @@ class IntFilter:
 @strawberry.input(description="Added in 26.1.0. Filter for UUID fields.")
 class UUIDFilter:
     # Basic operations
-    equals: str | None = None
-    in_: list[str] | None = strawberry.field(name="in", default=None)
+    equals: uuid.UUID | None = None
+    in_: list[uuid.UUID] | None = strawberry.field(name="in", default=None)
 
     # NOT operations
-    not_equals: str | None = None
-    not_in: list[str] | None = None
+    not_equals: uuid.UUID | None = None
+    not_in: list[uuid.UUID] | None = None
+
     # Case-insensitive operations
-    i_equals: str | None = None
-    i_in: list[str] | None = None
+    i_equals: uuid.UUID | None = None
 
     # Case-insensitive NOT operations
-    i_not_equals: str | None = None
-    i_not_in: list[str] | None = None
+    i_not_equals: uuid.UUID | None = None
 
     def build_query_condition(
         self,
-        equals_factory: Callable[[StringMatchSpec], QueryCondition],
-        in_factory: Callable[[StringMatchSpec], QueryCondition],
+        factory: Callable[[UUIDMatchSpec], QueryCondition],
     ) -> QueryCondition | None:
-        """Build a query condition from this filter using the provided factory callables.
+        """Build a query condition from this filter using the provided factory callable.
 
         Args:
-            equals_factory: Factory for exact match (=) operations
-            in_factory: Factory for IN operations
+            factory: Factory function that creates QueryCondition from UUIDMatchSpec.
+                    The spec's is_list_operation flag indicates whether it's an IN operation.
 
         Returns:
             QueryCondition if any filter field is set, None otherwise
         """
         # equals operations
         if self.equals:
-            return equals_factory(
-                StringMatchSpec(self.equals, case_insensitive=False, negated=False)
+            return factory(
+                UUIDMatchSpec(
+                    value=self.equals,
+                    case_insensitive=False,
+                    negated=False,
+                    is_list_operation=False,
+                )
             )
         if self.i_equals:
-            return equals_factory(
-                StringMatchSpec(self.i_equals, case_insensitive=True, negated=False)
+            return factory(
+                UUIDMatchSpec(
+                    value=self.i_equals,
+                    case_insensitive=True,
+                    negated=False,
+                    is_list_operation=False,
+                )
             )
         if self.not_equals:
-            return equals_factory(
-                StringMatchSpec(self.not_equals, case_insensitive=False, negated=True)
+            return factory(
+                UUIDMatchSpec(
+                    value=self.not_equals,
+                    case_insensitive=False,
+                    negated=True,
+                    is_list_operation=False,
+                )
             )
         if self.i_not_equals:
-            return equals_factory(
-                StringMatchSpec(self.i_not_equals, case_insensitive=True, negated=True)
+            return factory(
+                UUIDMatchSpec(
+                    value=self.i_not_equals,
+                    case_insensitive=True,
+                    negated=True,
+                    is_list_operation=False,
+                )
             )
 
+        # in operations
         if self.in_:
-            return in_factory(
-                StringMatchSpec(",".join(self.in_), case_insensitive=False, negated=False)
-            )
-        if self.i_in:
-            return in_factory(
-                StringMatchSpec(",".join(self.i_in), case_insensitive=True, negated=False)
+            return factory(
+                UUIDMatchSpec(
+                    value=self.in_,
+                    case_insensitive=False,
+                    negated=False,
+                    is_list_operation=True,
+                )
             )
         if self.not_in:
-            return in_factory(
-                StringMatchSpec(",".join(self.not_in), case_insensitive=False, negated=True)
-            )
-        if self.i_not_in:
-            return in_factory(
-                StringMatchSpec(",".join(self.i_not_in), case_insensitive=True, negated=True)
+            return factory(
+                UUIDMatchSpec(
+                    value=self.not_in,
+                    case_insensitive=False,
+                    negated=True,
+                    is_list_operation=True,
+                )
             )
 
         return None
