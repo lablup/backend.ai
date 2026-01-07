@@ -17,7 +17,6 @@ from ai.backend.manager.data.notification import (
 from ai.backend.manager.models.base import (
     GUID,
     Base,
-    IDColumn,
 )
 
 if TYPE_CHECKING:
@@ -50,7 +49,9 @@ def _get_notification_channel_creator_join_condition():
 class NotificationChannelRow(Base):
     __tablename__ = "notification_channels"
 
-    id: Mapped[uuid.UUID] = IDColumn()
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
     name: Mapped[str] = mapped_column("name", sa.String(length=256), nullable=False)
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
     channel_type: Mapped[str] = mapped_column(
@@ -135,7 +136,9 @@ def _get_notification_rule_creator_join_condition():
 class NotificationRuleRow(Base):
     __tablename__ = "notification_rules"
 
-    id: Mapped[uuid.UUID] = IDColumn()
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
     name: Mapped[str] = mapped_column("name", sa.String(length=256), nullable=False)
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
     rule_type: Mapped[str] = mapped_column(

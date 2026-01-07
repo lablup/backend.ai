@@ -18,7 +18,6 @@ from ai.backend.manager.data.artifact.types import (
 from ai.backend.manager.models.base import (
     GUID,
     Base,
-    IDColumn,
 )
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
 from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
@@ -46,7 +45,9 @@ class ArtifactRow(Base):
 
     __tablename__ = "artifacts"
 
-    id: Mapped[uuid.UUID] = IDColumn("id")
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
     type: Mapped[ArtifactType] = mapped_column(
         "type", sa.Enum(ArtifactType), index=True, nullable=False
     )

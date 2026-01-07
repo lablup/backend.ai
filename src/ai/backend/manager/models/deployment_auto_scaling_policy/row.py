@@ -16,7 +16,6 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     DecimalType,
-    IDColumn,
     StrEnumType,
 )
 
@@ -50,7 +49,9 @@ class DeploymentAutoScalingPolicyRow(Base):
         sa.Index("ix_deployment_auto_scaling_policies_endpoint", "endpoint"),
     )
 
-    id: Mapped[UUID] = IDColumn()
+    id: Mapped[UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
     endpoint: Mapped[UUID] = mapped_column("endpoint", GUID, nullable=False)
 
     # Replica bounds (always enforced)

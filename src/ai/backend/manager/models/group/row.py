@@ -24,6 +24,7 @@ from sqlalchemy.orm import Mapped, foreign, joinedload, load_only, mapped_column
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import msgpack
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.group.types import GroupData, ProjectType
 from ai.backend.manager.defs import RESERVED_DOTFILES
@@ -35,12 +36,10 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     EnumValueType,
-    IDColumn,
     ResourceSlotColumn,
     SlugType,
     StructuredJSONColumn,
     VFolderHostPermissionColumn,
-    mapper_registry,
 )
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
@@ -93,25 +92,6 @@ __all__: Sequence[str] = (
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
 
-association_groups_users = sa.Table(
-    "association_groups_users",
-    mapper_registry.metadata,
-    IDColumn(),
-    sa.Column(
-        "user_id",
-        GUID,
-        sa.ForeignKey("users.uuid", onupdate="CASCADE", ondelete="CASCADE"),
-        nullable=False,
-    ),
-    sa.Column(
-        "group_id",
-        GUID,
-        sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
-        nullable=False,
-    ),
-    sa.UniqueConstraint("user_id", "group_id", name="uq_association_user_id_group_id"),
-)
-
 container_registry_iv = t.Dict({}) | t.Dict({
     t.Key("registry"): t.String(),
     t.Key("project"): t.String(),
@@ -119,66 +99,100 @@ container_registry_iv = t.Dict({}) | t.Dict({
 
 
 class AssocGroupUserRow(Base):
-    __table__ = association_groups_users
+    __tablename__ = "association_groups_users"
+    __table_args__ = (
+        sa.UniqueConstraint("user_id", "group_id", name="uq_association_user_id_group_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        "user_id",
+        GUID,
+        sa.ForeignKey("users.uuid", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+    )
+    group_id: Mapped[uuid.UUID] = mapped_column(
+        "group_id",
+        GUID,
+        sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+    )
+
     user: Mapped[UserRow] = relationship("UserRow", back_populates="groups")
     group: Mapped[GroupRow] = relationship("GroupRow", back_populates="users")
 
 
-groups = sa.Table(
-    "groups",
-    mapper_registry.metadata,
-    IDColumn("id"),
-    sa.Column("name", SlugType(length=64, allow_unicode=True, allow_dot=True), nullable=False),
-    sa.Column("description", sa.String(length=512)),
-    sa.Column("is_active", sa.Boolean, default=True),
-    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    sa.Column(
+# NOTE: Deprecated legacy table reference for backward compatibility.
+# Use AssocGroupUserRow class directly for new code.
+association_groups_users = AssocGroupUserRow.__table__
+
+
+class GroupRow(Base):
+    __tablename__ = "groups"
+    __table_args__ = (
+        sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    name: Mapped[str] = mapped_column(
+        "name", SlugType(length=64, allow_unicode=True, allow_dot=True), nullable=False
+    )
+    description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
+    is_active: Mapped[bool | None] = mapped_column("is_active", sa.Boolean, default=True)
+    created_at: Mapped[datetime | None] = mapped_column(
+        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+    modified_at: Mapped[datetime | None] = mapped_column(
         "modified_at",
         sa.DateTime(timezone=True),
         server_default=sa.func.now(),
         onupdate=sa.func.current_timestamp(),
-    ),
+    )
     #: Field for synchronization with external services.
-    sa.Column("integration_id", sa.String(length=512)),
-    sa.Column(
+    integration_id: Mapped[str | None] = mapped_column("integration_id", sa.String(length=512))
+    domain_name: Mapped[str] = mapped_column(
         "domain_name",
         sa.String(length=64),
         sa.ForeignKey("domains.name", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
         index=True,
-    ),
+    )
     # TODO: separate resource-related fields with new domain resource policy table when needed.
-    sa.Column("total_resource_slots", ResourceSlotColumn(), default=dict),
-    sa.Column(
+    total_resource_slots: Mapped[ResourceSlot] = mapped_column(
+        "total_resource_slots", ResourceSlotColumn(), default=dict, nullable=False
+    )
+    allowed_vfolder_hosts: Mapped[VFolderHostPermissionMap] = mapped_column(
         "allowed_vfolder_hosts",
         VFolderHostPermissionColumn(),
         nullable=False,
         default=dict,
-    ),
+    )
     # dotfiles column, \x90 means empty list in msgpack
-    sa.Column(
+    dotfiles: Mapped[bytes] = mapped_column(
         "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
-    ),
-    sa.Column(
+    )
+    resource_policy: Mapped[str] = mapped_column(
         "resource_policy",
         sa.String(length=256),
         sa.ForeignKey("project_resource_policies.name"),
         nullable=False,
-    ),
-    sa.Column(
+    )
+    type: Mapped[ProjectType] = mapped_column(
         "type",
         EnumValueType(ProjectType),
         nullable=False,
         default=ProjectType.GENERAL,
-    ),
-    sa.Column(
+    )
+    container_registry: Mapped[dict | None] = mapped_column(
         "container_registry",
         StructuredJSONColumn(container_registry_iv),
         nullable=True,
         default=None,
-    ),
-    sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
-)
+    )
 
 
 # Defined for avoiding circular import
@@ -204,6 +218,7 @@ def _get_association_container_registries_groups_join_condition():
 
 class GroupRow(Base):
     __table__ = groups
+
     sessions: Mapped[list[SessionRow]] = relationship("SessionRow", back_populates="group")
     domain: Mapped[DomainRow] = relationship("DomainRow", back_populates="groups")
     sgroup_for_groups_rows: Mapped[list[ScalingGroupForProjectRow]] = relationship(
@@ -257,7 +272,7 @@ class GroupRow(Base):
         cls,
         session: AsyncSession,
         project_id: uuid.UUID,
-        load_resource_policy=False,
+        load_resource_policy: bool = False,
     ) -> GroupRow:
         query = sa.select(GroupRow).filter(GroupRow.id == project_id)
         if load_resource_policy:
@@ -332,6 +347,11 @@ class GroupRow(Base):
         if not rows:
             raise ObjectNotFound(f"Project with id {project_id} not found")
         return rows[0]
+
+
+# NOTE: Deprecated legacy table reference for backward compatibility.
+# Use GroupRow class directly for new code.
+groups = GroupRow.__table__
 
 
 def by_id(project_id: uuid.UUID) -> QueryCondition:

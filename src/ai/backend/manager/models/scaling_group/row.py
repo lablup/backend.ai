@@ -34,8 +34,8 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 from ai.backend.manager.models.base import (
+    GUID,
     Base,
-    IDColumn,
     StructuredJSONObjectColumn,
 )
 from ai.backend.manager.models.group import resolve_group_name_or_id, resolve_groups
@@ -145,7 +145,9 @@ class ScalingGroupOpts(JSONSerializableMixin):
 
 class ScalingGroupForDomainRow(Base):
     __tablename__ = "sgroups_for_domains"
-    id: Mapped[uuid.UUID] = IDColumn()
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
     scaling_group: Mapped[str] = mapped_column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
@@ -178,7 +180,9 @@ sgroups_for_domains = ScalingGroupForDomainRow.__table__
 
 class ScalingGroupForProjectRow(Base):
     __tablename__ = "sgroups_for_groups"
-    id: Mapped[uuid.UUID] = IDColumn()
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
     scaling_group: Mapped[str] = mapped_column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
@@ -212,7 +216,9 @@ sgroups_for_groups = ScalingGroupForProjectRow.__table__
 
 class ScalingGroupForKeypairsRow(Base):
     __tablename__ = "sgroups_for_keypairs"
-    id: Mapped[uuid.UUID] = IDColumn()
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
     scaling_group: Mapped[str] = mapped_column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),

@@ -1,19 +1,20 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Optional, Self
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import foreign, relationship
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.base import (
+    GUID,
     Base,
-    IDColumn,
     ResourceSlotColumn,
 )
 
@@ -44,7 +45,9 @@ def _get_scaling_group_join_condition():
 
 class ResourcePresetRow(Base):
     __tablename__ = "resource_presets"
-    id = IDColumn()
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
     name = sa.Column("name", sa.String(length=256), nullable=False)
     resource_slots = sa.Column("resource_slots", ResourceSlotColumn(), nullable=False)
     shared_memory = sa.Column("shared_memory", sa.BigInteger(), nullable=True)
