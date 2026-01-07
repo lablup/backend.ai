@@ -33,6 +33,8 @@ from ai.backend.manager.services.artifact_registry.processors import ArtifactReg
 from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
 from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
 from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
+from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
+from ai.backend.manager.services.audit_log.service import AuditLogService
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
@@ -158,6 +160,7 @@ class Services:
     artifact_registry: ArtifactRegistryService
     deployment: DeploymentService
     storage_namespace: StorageNamespaceService
+    audit_log: AuditLogService
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -325,6 +328,7 @@ class Services:
         storage_namespace_service = StorageNamespaceService(
             repositories.storage_namespace.repository
         )
+        audit_log_service = AuditLogService(repositories.audit_log.repository)
 
         return cls(
             agent=agent_service,
@@ -356,6 +360,7 @@ class Services:
             artifact_registry=artifact_registry_service,
             deployment=deployment_service,
             storage_namespace=storage_namespace_service,
+            audit_log=audit_log_service,
         )
 
 
@@ -395,6 +400,7 @@ class Processors(AbstractProcessorPackage):
     artifact_revision: ArtifactRevisionProcessors
     deployment: DeploymentProcessors
     storage_namespace: StorageNamespaceProcessors
+    audit_log: AuditLogProcessors
 
     @classmethod
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
@@ -456,6 +462,7 @@ class Processors(AbstractProcessorPackage):
         storage_namespace_processors = StorageNamespaceProcessors(
             services.storage_namespace, action_monitors
         )
+        audit_log_processors = AuditLogProcessors(services.audit_log, [])
 
         return cls(
             agent=agent_processors,
@@ -487,6 +494,7 @@ class Processors(AbstractProcessorPackage):
             artifact_revision=artifact_revision_processors,
             deployment=deployment_processors,
             storage_namespace=storage_namespace_processors,
+            audit_log=audit_log_processors,
         )
 
     @override
@@ -521,4 +529,5 @@ class Processors(AbstractProcessorPackage):
             *self.artifact.supported_actions(),
             *(self.deployment.supported_actions() if self.deployment else []),
             *self.storage_namespace.supported_actions(),
+            *self.audit_log.supported_actions(),
         ]
