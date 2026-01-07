@@ -105,6 +105,9 @@ Start each component in separate terminals:
 Set up client environment:
 ```bash
 source env-local-user-session.sh
+# This script prints your default User ID and Password;
+./backend.ai login
+# When prompted, enter the User ID and Password shown above.
 ```
 
 Run a simple Python session:
