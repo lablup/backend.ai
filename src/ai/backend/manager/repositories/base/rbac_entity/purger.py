@@ -109,7 +109,7 @@ async def _get_related_roles(
             ),
         )
     )
-    return role_scalars.all()
+    return role_scalars.unique().all()
 
 
 async def _delete_main_object_row(
@@ -163,13 +163,32 @@ async def _delete_rbac_entity(
         association_ids.append(assoc_row.id)
         scopes.append(assoc_row.parsed_scope_id())
 
+    # Calculate remaining associations per scope after deletion
+    remaining_assocs_by_scope: dict[tuple[str, str], int] = {}
+    for scope in scopes:
+        count = await db_sess.scalar(
+            sa.select(sa.func.count())
+            .select_from(AssociationScopesEntitiesRow)
+            .where(
+                sa.and_(
+                    AssociationScopesEntitiesRow.scope_type == scope.scope_type,
+                    AssociationScopesEntitiesRow.scope_id == scope.scope_id,
+                    AssociationScopesEntitiesRow.id.not_in(association_ids),  # type: ignore[attr-defined]
+                )
+            )
+        )
+        remaining_assocs_by_scope[(scope.scope_type.value, scope.scope_id)] = count or 0
+
     # Check all roles associated with the entity as object permission
     role_rows = await _get_related_roles(db_sess, entity_id, scopes)
     for role_row in role_rows:
         for obj_perm_row in role_row.object_permission_rows:
             object_permission_ids.append(obj_perm_row.id)
         for perm_group_row in role_row.permission_group_rows:
-            permission_group_ids.append(perm_group_row.id)
+            # Only delete permission group if no other entities remain in the same scope
+            scope_key = (perm_group_row.scope_type.value, perm_group_row.scope_id)
+            if remaining_assocs_by_scope.get(scope_key, 0) == 0:
+                permission_group_ids.append(perm_group_row.id)
 
     await db_sess.execute(
         sa.delete(ObjectPermissionRow).where(ObjectPermissionRow.id.in_(object_permission_ids))  # type: ignore[attr-defined]
