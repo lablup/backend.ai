@@ -42,15 +42,21 @@ from .handlers import (
     CheckTerminatingProgressHandler,
     CheckTerminatingProgressLifecycleHandler,
     RetryCreatingHandler,
+    RetryCreatingLifecycleHandler,
     RetryPreparingHandler,
+    RetryPreparingLifecycleHandler,
     SchedulerHandler,
     ScheduleSessionsHandler,
+    ScheduleSessionsLifecycleHandler,
     SessionLifecycleHandler,
     StartSessionsHandler,
     StartSessionsLifecycleHandler,
     SweepLostAgentKernelsHandler,
+    SweepLostAgentKernelsLifecycleHandler,
     SweepSessionsHandler,
+    SweepSessionsLifecycleHandler,
     SweepStaleKernelsHandler,
+    SweepStaleKernelsLifecycleHandler,
     TerminateSessionsHandler,
     TerminateSessionsLifecycleHandler,
 )
@@ -200,7 +206,17 @@ class ScheduleCoordinator:
         launcher = self._scheduler._launcher
         terminator = self._scheduler._terminator
 
+        # Get provisioner for schedule sessions handler
+        provisioner = self._scheduler._provisioner
+
         return {
+            # Lifecycle handlers
+            ScheduleType.SCHEDULE: ScheduleSessionsLifecycleHandler(
+                provisioner,
+                self._scheduling_controller,
+                self._event_producer,
+                self._repository,
+            ),
             ScheduleType.CHECK_PRECONDITION: CheckPreconditionLifecycleHandler(
                 launcher,
                 self._repository,
@@ -236,6 +252,29 @@ class ScheduleCoordinator:
                     self._valkey_schedule,
                     self._repository,
                 )
+            ),
+            # Recovery handlers
+            ScheduleType.RETRY_PREPARING: RetryPreparingLifecycleHandler(
+                launcher,
+                self._repository,
+            ),
+            ScheduleType.RETRY_CREATING: RetryCreatingLifecycleHandler(
+                launcher,
+                self._repository,
+            ),
+            # Maintenance handlers
+            ScheduleType.SWEEP: SweepSessionsLifecycleHandler(
+                self._scheduler,
+                self._repository,
+            ),
+            ScheduleType.SWEEP_LOST_AGENT_KERNELS: SweepLostAgentKernelsLifecycleHandler(
+                self._scheduler,
+                self._repository,
+            ),
+            ScheduleType.SWEEP_STALE_KERNELS: SweepStaleKernelsLifecycleHandler(
+                self._valkey_schedule,
+                self._scheduler,
+                self._repository,
             ),
         }
 
