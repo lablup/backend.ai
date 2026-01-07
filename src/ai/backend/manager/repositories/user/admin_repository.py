@@ -251,17 +251,17 @@ class AdminUserRepository:
         Check if no active kernel is using the user's virtual folders.
         """
         result = await conn.execute(
-            sa.select([vfolders.c.id]).select_from(vfolders).where(vfolders.c.user == user_uuid),
+            sa.select(vfolders.c.id).select_from(vfolders).where(vfolders.c.user == user_uuid),
         )
         rows = result.fetchall()
         user_vfolder_ids = [row.id for row in rows]
         query = (
-            sa.select([kernels.c.mounts])
+            sa.select(kernels.c.mounts)
             .select_from(kernels)
             .where(kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
         )
         async for row in await conn.stream(query):
-            for _mount in row["mounts"]:
+            for _mount in row.mounts:
                 try:
                     vfolder_id = UUID(_mount[2])
                     if vfolder_id in user_vfolder_ids:
@@ -284,7 +284,7 @@ class AdminUserRepository:
         """
         # Gather target user's virtual folders' names.
         query = (
-            sa.select([vfolders.c.name])
+            sa.select(vfolders.c.name)
             .select_from(vfolders)
             .where(vfolders.c.user == target_user_uuid)
         )
@@ -298,7 +298,7 @@ class AdminUserRepository:
             vfolder_permissions.c.vfolder == vfolders.c.id,
         )
         query = (
-            sa.select([vfolders.c.id, vfolders.c.name])
+            sa.select(vfolders.c.id, vfolders.c.name)
             .select_from(j)
             .where(vfolders.c.user == deleted_user_uuid)
         )
@@ -394,7 +394,7 @@ class AdminUserRepository:
         Delete user's all keypairs with Valkey cleanup.
         """
         ak_rows = await conn.execute(
-            sa.select([keypairs.c.access_key]).where(keypairs.c.user == user_uuid),
+            sa.select(keypairs.c.access_key).where(keypairs.c.user == user_uuid),
         )
         if (row := ak_rows.first()) and (access_key := row.access_key):
             # Log concurrency used only when there is at least one keypair.

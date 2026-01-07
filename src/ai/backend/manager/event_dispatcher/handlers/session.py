@@ -269,7 +269,7 @@ class SessionEventHandler:
                         )
                         endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
 
-                        query = sa.select([sa.func.count("*")]).where(
+                        query = sa.select(sa.func.count("*")).where(
                             (RoutingRow.endpoint == endpoint.id)
                             & (RoutingRow.status == RouteStatus.HEALTHY)
                         )

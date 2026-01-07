@@ -278,7 +278,7 @@ class IdleCheckerHost:
         async with self._db.begin_readonly() as conn:
             j = sa.join(kernels, users, kernels.c.user_uuid == users.c.uuid)
             query = (
-                sa.select([
+                sa.select(
                     kernels.c.id,
                     kernels.c.access_key,
                     kernels.c.session_id,
@@ -288,7 +288,7 @@ class IdleCheckerHost:
                     kernels.c.requested_slots,
                     kernels.c.cluster_size,
                     users.c.created_at.label("user_created_at"),
-                ])
+                )
                 .select_from(j)
                 .where(
                     (kernels.c.status.in_(LIVE_STATUS))
@@ -300,13 +300,13 @@ class IdleCheckerHost:
             rows = result.fetchall()
             for kernel in rows:
                 grace_period_end = await self._grace_period_checker.get_grace_period_end(kernel)
-                policy = policy_cache.get(kernel["access_key"], None)
+                policy = policy_cache.get(kernel.access_key, None)
                 if policy is None:
                     query = (
-                        sa.select([
+                        sa.select(
                             keypair_resource_policies.c.max_session_lifetime,
                             keypair_resource_policies.c.idle_timeout,
-                        ])
+                        )
                         .select_from(
                             sa.join(
                                 keypairs,
@@ -314,15 +314,15 @@ class IdleCheckerHost:
                                 keypair_resource_policies.c.name == keypairs.c.resource_policy,
                             ),
                         )
-                        .where(keypairs.c.access_key == kernel["access_key"])
+                        .where(keypairs.c.access_key == kernel.access_key)
                     )
                     result = await conn.execute(query)
                     policy = result.first()
                     if policy is None:
                         raise IdlePolicyNotFound(
-                            f"Resource policy not found for access_key={kernel['access_key']}"
+                            f"Resource policy not found for access_key={kernel.access_key}"
                         )
-                    policy_cache[kernel["access_key"]] = policy
+                    policy_cache[kernel.access_key] = policy
 
                 check_tasks = [
                     checker.check_idleness(kernel, conn, policy, grace_period_end=grace_period_end)
@@ -343,11 +343,11 @@ class IdleCheckerHost:
                         log.info(
                             "The {} idle checker triggered termination of s:{}",
                             checker.name,
-                            kernel["session_id"],
+                            kernel.session_id,
                         )
                         if not terminated:
                             terminated = True
-                            await checker.callback_idle_session(kernel["session_id"])
+                            await checker.callback_idle_session(kernel.session_id)
                 if errors:
                     raise IdleCheckerError("idle checker(s) raise errors", errors)
 
@@ -1106,7 +1106,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         # Get current utilization data from all containers of the session.
         if kernel["cluster_size"] > 1:
-            query = sa.select([kernels.c.id]).where(
+            query = sa.select(kernels.c.id).where(
                 (kernels.c.session_id == session_id) & (kernels.c.status.in_(LIVE_STATUS)),
             )
             rows = (await dbconn.execute(query)).fetchall()

@@ -460,7 +460,7 @@ async def check_credential_with_migration(
 
     async with db.begin_readonly() as conn:
         result = await conn.execute(
-            sa.select([users])
+            sa.select(users)
             .select_from(users)
             .where(
                 (users.c.email == email) & (users.c.domain_name == domain),
@@ -469,17 +469,17 @@ async def check_credential_with_migration(
     row = result.first()
     if row is None:
         raise AuthorizationFailed("User credential mismatch.")
-    if row["password"] is None:
+    if row.password is None:
         raise AuthorizationFailed("User credential mismatch.")
 
     try:
-        if not _verify_password(target_password_info.password, row["password"]):
+        if not _verify_password(target_password_info.password, row.password):
             raise AuthorizationFailed("User credential mismatch.")
     except ValueError:
         raise AuthorizationFailed("User credential mismatch.")
 
     # Password is valid, check if we need to migrate the hash
-    current_hash_info = HashInfo.from_hash_string(row["password"])
+    current_hash_info = HashInfo.from_hash_string(row.password)
     if current_hash_info is None:
         # Shouldn't happen since password was just verified
         return row
@@ -521,7 +521,7 @@ async def check_credential(
 
     async with db.begin_readonly() as conn:
         result = await conn.execute(
-            sa.select([users])
+            sa.select(users)
             .select_from(users)
             .where(
                 (users.c.email == email) & (users.c.domain_name == domain),
@@ -530,11 +530,11 @@ async def check_credential(
     row = result.first()
     if row is None:
         raise AuthorizationFailed("User credential mismatch.")
-    if row["password"] is None:
+    if row.password is None:
         raise AuthorizationFailed("User credential mismatch.")
 
     try:
-        if not _verify_password(password, row["password"]):
+        if not _verify_password(password, row.password):
             raise AuthorizationFailed("User credential mismatch.")
     except ValueError:
         raise AuthorizationFailed("User credential mismatch.")

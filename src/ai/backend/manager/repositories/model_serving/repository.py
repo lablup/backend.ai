@@ -393,7 +393,7 @@ class ModelServingRepository:
         """
         async with self._db.begin_readonly_session() as session:
             query = (
-                sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
+                sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
                 .select_from(scaling_groups)
                 .where(scaling_groups.c.name == scaling_group_name)
             )
@@ -403,7 +403,7 @@ class ModelServingRepository:
                 return None
 
             return ScalingGroupData(
-                wsproxy_addr=row["wsproxy_addr"], wsproxy_api_token=row["wsproxy_api_token"]
+                wsproxy_addr=row.wsproxy_addr, wsproxy_api_token=row.wsproxy_api_token
             )
 
     @model_serving_repository_resilience.apply()
@@ -529,7 +529,7 @@ class ModelServingRepository:
         """
         async with self._db.begin_readonly_session() as session:
             query = (
-                sa.select([keypair_resource_policies])
+                sa.select(keypair_resource_policies)
                 .select_from(keypair_resource_policies)
                 .where(keypair_resource_policies.c.name == policy_name)
             )

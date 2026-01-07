@@ -971,7 +971,7 @@ async def report_stats(root_ctx: RootContext, interval: float) -> None:
 
         async with root_ctx.db.begin_readonly() as conn:
             query = (
-                sa.select([sa.func.count()])
+                sa.select(sa.func.count())
                 .select_from(kernels)
                 .where(
                     (kernels.c.cluster_role == DEFAULT_ROLE)
@@ -981,22 +981,22 @@ async def report_stats(root_ctx: RootContext, interval: float) -> None:
             n = await conn.scalar(query)
             await stats_monitor.report_metric(GAUGE, "ai.backend.manager.active_kernels", n)
             subquery = (
-                sa.select([sa.func.count()])
+                sa.select(sa.func.count())
                 .select_from(keypairs)
                 .where(keypairs.c.is_active == true())
                 .group_by(keypairs.c.user_id)
             )
-            query = sa.select([sa.func.count()]).select_from(subquery.alias())
+            query = sa.select(sa.func.count()).select_from(subquery.alias())
             n = await conn.scalar(query)
             await stats_monitor.report_metric(GAUGE, "ai.backend.users.has_active_key", n)
 
             subquery = subquery.where(keypairs.c.last_used != null())
-            query = sa.select([sa.func.count()]).select_from(subquery.alias())
+            query = sa.select(sa.func.count()).select_from(subquery.alias())
             n = await conn.scalar(query)
             await stats_monitor.report_metric(GAUGE, "ai.backend.users.has_used_key", n)
 
             """
-            query = sa.select([sa.func.count()]).select_from(usage)
+            query = sa.select(sa.func.count()).select_from(usage)
             n = await conn.scalar(query)
             await stats_monitor.report_metric(
                 GAUGE, 'ai.backend.manager.accum_kernels', n)
@@ -1344,10 +1344,10 @@ async def _find_dependency_sessions(
         raise InvalidSessionData("Invalid session_name type")
 
     kernel_query = (
-        sa.select([
+        sa.select(
             kernels.c.status,
             kernels.c.status_changed,
-        ])
+        )
         .select_from(kernels)
         .where(kernels.c.session_id == session_id)
     )

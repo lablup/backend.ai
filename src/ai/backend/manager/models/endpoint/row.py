@@ -1210,18 +1210,18 @@ class ModelServiceHelper:
         )
 
         query = (
-            sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
+            sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
             .select_from(scaling_groups)
             .where(scaling_groups.c.name == checked_scaling_group)
         )
 
         result = await conn.execute(query)
         sgroup = result.first()
-        wsproxy_addr = sgroup["wsproxy_addr"]
+        wsproxy_addr = sgroup.wsproxy_addr
         if not wsproxy_addr:
             raise ServiceUnavailable("No coordinator configured for this resource group")
 
-        if not sgroup["wsproxy_api_token"]:
+        if not sgroup.wsproxy_api_token:
             raise ServiceUnavailable("Scaling group not ready to start model service")
 
         return checked_scaling_group

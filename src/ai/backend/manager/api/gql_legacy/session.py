@@ -1216,7 +1216,7 @@ class ComputeSession(graphene.ObjectType):
             .join(UserRow, SessionRow.user_uuid == UserRow.uuid)
             .join(KernelRow, SessionRow.id == KernelRow.session_id)
         )
-        query = sa.select([sa.func.count(sa.distinct(SessionRow.id))]).select_from(j)
+        query = sa.select(sa.func.count(sa.distinct(SessionRow.id))).select_from(j)
         if domain_name is not None:
             query = query.where(SessionRow.domain_name == domain_name)
         if group_id is not None:

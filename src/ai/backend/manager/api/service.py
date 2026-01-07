@@ -624,7 +624,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         owner_uuid, group_id, resource_policy = await query_userinfo(
             request, params.model_dump(by_alias=True), conn
         )
-        query = sa.select([UserRow.role]).where(UserRow.uuid == owner_uuid)
+        query = sa.select(UserRow.role).where(UserRow.uuid == owner_uuid)
         owner_role = (await conn.execute(query)).scalar()
         if not owner_role:
             raise InvalidAuthParameters("Owner role is required to create a model service")
@@ -665,10 +665,10 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         if len(matched_vfolders) == 0:
             raise VFolderNotFound
         folder_row = matched_vfolders[0]
-        if folder_row["usage_mode"] != VFolderUsageMode.MODEL:
+        if folder_row.usage_mode != VFolderUsageMode.MODEL:
             raise InvalidAPIParameters("Selected VFolder is not a model folder")
 
-        model_id = folder_row["id"]
+        model_id = folder_row.id
 
         vfolder_mounts = await ModelServiceHelper.check_extra_mounts(
             conn,
@@ -687,16 +687,16 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         )
 
     if params.runtime_variant == RuntimeVariant.CUSTOM:
-        vfid = VFolderID(folder_row["quota_scope_id"], folder_row["id"])
+        vfid = VFolderID(folder_row.quota_scope_id, folder_row.id)
         yaml_path = await ModelServiceHelper.validate_model_definition_file_exists(
             root_ctx.storage_manager,
-            folder_row["host"],
+            folder_row.host,
             vfid,
             params.config.model_definition_path,
         )
         await ModelServiceHelper.validate_model_definition(
             root_ctx.storage_manager,
-            folder_row["host"],
+            folder_row.host,
             vfid,
             yaml_path,
         )

@@ -59,7 +59,7 @@ class AuthDBSource:
         """Fetch group membership from database."""
         async with self._db.begin() as conn:
             query = (
-                sa.select([association_groups_users.c.group_id, association_groups_users.c.user_id])
+                sa.select(association_groups_users.c.group_id, association_groups_users.c.user_id)
                 .select_from(association_groups_users)
                 .where(
                     (association_groups_users.c.group_id == group_id)
@@ -78,7 +78,7 @@ class AuthDBSource:
     async def verify_email_exists(self, email: str) -> bool:
         """Verify if email exists in the database."""
         async with self._db.begin() as conn:
-            query = sa.select([users.c.email]).select_from(users).where(users.c.email == email)
+            query = sa.select(users.c.email).select_from(users).where(users.c.email == email)
             result = await conn.execute(query)
             row = result.first()
             return row is not None
@@ -111,7 +111,7 @@ class AuthDBSource:
 
             # Add to default group
             group_query = (
-                sa.select([groups.c.id])
+                sa.select(groups.c.id)
                 .select_from(groups)
                 .where((groups.c.domain_name == domain_name) & (groups.c.name == group_name))
             )
@@ -194,7 +194,7 @@ class AuthDBSource:
     async def fetch_ssh_public_key(self, access_key: str) -> Optional[str]:
         """Fetch SSH public key for an access key from database."""
         async with self._db.begin() as conn:
-            query = sa.select([keypairs.c.ssh_public_key]).where(
+            query = sa.select(keypairs.c.ssh_public_key).where(
                 keypairs.c.access_key == access_key
             )
             return await conn.scalar(query)

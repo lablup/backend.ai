@@ -249,7 +249,7 @@ class CreateNetwork(graphene.Mutation):
                 and project.domain_name != graph_ctx.user["domain_name"]
             ):
                 raise GenericForbidden
-            query = sa.select([sa.func.count("*")]).where(NetworkRow.project == project.id)
+            query = sa.select(sa.func.count("*")).where(NetworkRow.project == project.id)
             project_network_count = await db_session.scalar(query)
             if (
                 project_network_count >= 0

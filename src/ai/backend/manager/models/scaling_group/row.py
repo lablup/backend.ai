@@ -436,9 +436,9 @@ async def query_allowed_sgroups(
     group: uuid.UUID | Iterable[uuid.UUID] | str | Iterable[str],
     access_key: str,
 ) -> Sequence[Row]:
-    query = sa.select([sgroups_for_domains]).where(sgroups_for_domains.c.domain == domain_name)
+    query = sa.select(sgroups_for_domains).where(sgroups_for_domains.c.domain == domain_name)
     result = await db_conn.execute(query)
-    from_domain = {row["scaling_group"] for row in result}
+    from_domain = {row.scaling_group for row in result}
 
     group_ids: Iterable[uuid.UUID] = []
     match group:
@@ -454,17 +454,17 @@ async def query_allowed_sgroups(
         from_group = set()  # empty
     else:
         group_cond = sgroups_for_groups.c.group.in_(group_ids)
-        query = sa.select([sgroups_for_groups]).where(group_cond)
+        query = sa.select(sgroups_for_groups).where(group_cond)
         result = await db_conn.execute(query)
-        from_group = {row["scaling_group"] for row in result}
+        from_group = {row.scaling_group for row in result}
 
-    query = sa.select([sgroups_for_keypairs]).where(sgroups_for_keypairs.c.access_key == access_key)
+    query = sa.select(sgroups_for_keypairs).where(sgroups_for_keypairs.c.access_key == access_key)
     result = await db_conn.execute(query)
-    from_keypair = {row["scaling_group"] for row in result}
+    from_keypair = {row.scaling_group for row in result}
 
     sgroups = from_domain | from_group | from_keypair
     query = (
-        sa.select([scaling_groups])
+        sa.select(scaling_groups)
         .where(
             (scaling_groups.c.name.in_(sgroups)) & (scaling_groups.c.is_active),
         )

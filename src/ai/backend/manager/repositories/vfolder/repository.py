@@ -1,6 +1,8 @@
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import Any, Optional
+from typing import Any, Optional, cast
+
+from sqlalchemy.engine import CursorResult
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -257,9 +259,9 @@ class VfolderRepository:
                 "status": params.status,
             }
 
-            query = sa.insert(VFolderRow, insert_values)
+            query = sa.insert(VFolderRow).values(insert_values)
             result = await session.execute(query)
-            if result.rowcount != 1:
+            if cast(CursorResult, result).rowcount != 1:
                 raise DBOperationFailed(
                     f"Failed to insert vfolder: expected 1 row, got {result.rowcount}"
                 )
@@ -453,7 +455,7 @@ class VfolderRepository:
                 "permission": permission,
             }
 
-            query = sa.insert(VFolderPermissionRow, insert_values)
+            query = sa.insert(VFolderPermissionRow).values(insert_values)
             await session.execute(query)
 
             user_scope_creator = Creator(

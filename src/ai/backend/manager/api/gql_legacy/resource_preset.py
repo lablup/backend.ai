@@ -81,13 +81,13 @@ class ResourcePreset(graphene.ObjectType):
                     scaling_group_name=row.scaling_group_name,
                 )
             case Row():
-                shared_memory = str(row["shared_memory"]) if row["shared_memory"] else None
+                shared_memory = str(row.shared_memory) if row.shared_memory else None
                 return cls(
-                    id=row["id"],
-                    name=row["name"],
-                    resource_slots=row["resource_slots"].to_json(),
+                    id=row.id,
+                    name=row.name,
+                    resource_slots=row.resource_slots.to_json(),
                     shared_memory=shared_memory,
-                    scaling_group_name=row["scaling_group_name"],
+                    scaling_group_name=row.scaling_group_name,
                 )
             case _:
                 return None
@@ -144,7 +144,7 @@ class ResourcePreset(graphene.ObjectType):
         names: Sequence[str],
     ) -> Sequence[ResourcePreset | None]:
         query = (
-            sa.select([resource_presets])
+            sa.select(resource_presets)
             .select_from(resource_presets)
             .where(resource_presets.c.name.in_(names))
             .order_by(resource_presets.c.name)
@@ -156,7 +156,7 @@ class ResourcePreset(graphene.ObjectType):
                 query,
                 cls,
                 names,
-                lambda row: row["name"],
+                lambda row: row.name,
             )
 
 

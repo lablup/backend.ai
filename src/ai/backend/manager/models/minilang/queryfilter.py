@@ -155,7 +155,7 @@ class QueryFilterTransformer(Transformer):
                         col = get_col_from_table(self._sa_table, col_name)
                         unnested_col = sa.func.unnest(col).alias("item")
                         subq = (
-                            sa.select([sa.column("item")])
+                            sa.select(sa.column("item"))
                             .select_from(unnested_col)
                             .where(build_expr(op, sa.column("item"), val))
                         )

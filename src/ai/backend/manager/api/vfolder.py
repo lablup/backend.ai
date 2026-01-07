@@ -177,7 +177,7 @@ async def check_vfolder_status(
     available_vf_statuses = vfolder_status_map.get(status)
     if not available_vf_statuses:
         raise VFolderFilterStatusNotAvailable
-    if folder_row["status"] not in available_vf_statuses:
+    if folder_row.status not in available_vf_statuses:
         raise VFolderFilterStatusFailed
 
 
@@ -742,13 +742,13 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
         "VFOLDER.GETINFO (email:{}, ak:{}, vf:{} (resolved-from:{!r}))",
         request["user"]["email"],
         request["keypair"]["access_key"],
-        row["id"],
+        row.id,
         request.match_info["name"],
     )
     result = await root_ctx.processors.vfolder.get_vfolder.wait_for_complete(
         GetVFolderAction(
             request["user"]["uuid"],
-            vfolder_uuid=row["id"],
+            vfolder_uuid=row.id,
         )
     )
     resp = {
@@ -789,7 +789,7 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
     await check_vfolder_status(vfolder_row, VFolderStatusSet.READABLE)
     root_ctx: RootContext = request.app["_root.context"]
     proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
-        params["folder_host"], is_unmanaged(vfolder_row["unmanaged_path"])
+        params["folder_host"], is_unmanaged(vfolder_row.unmanaged_path)
     )
     log.info(
         "VFOLDER.GET_QUOTA (email:{}, volume_name:{}, vf:{})",
@@ -845,7 +845,7 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     folder_host = params["folder_host"]
     proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
-        folder_host, is_unmanaged(vfolder_row["unmanaged_path"])
+        folder_host, is_unmanaged(vfolder_row.unmanaged_path)
     )
     quota = int(params["input"]["size_bytes"])
     log.info(
@@ -931,7 +931,7 @@ async def get_usage(request: web.Request, params: Any) -> web.Response:
     await check_vfolder_status(vfolder_row, VFolderStatusSet.READABLE)
     root_ctx: RootContext = request.app["_root.context"]
     proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
-        params["folder_host"], is_unmanaged(vfolder_row["unmanaged_path"])
+        params["folder_host"], is_unmanaged(vfolder_row.unmanaged_path)
     )
     log.info(
         "VFOLDER.GET_USAGE (email:{}, volume_name:{}, vf:{})",
@@ -940,7 +940,7 @@ async def get_usage(request: web.Request, params: Any) -> web.Response:
         params["id"],
     )
     client = root_ctx.storage_manager.get_manager_facing_client(proxy_name)
-    vfid = str(VFolderID(vfolder_row["quota_scope_id"], params["id"]))
+    vfid = str(VFolderID(vfolder_row.quota_scope_id, params["id"]))
     usage = await client.get_folder_usage(volume_name, vfid)
     return web.json_response(usage, status=HTTPStatus.OK)
 
@@ -960,11 +960,11 @@ async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
     await check_vfolder_status(vfolder_row, VFolderStatusSet.READABLE)
     root_ctx: RootContext = request.app["_root.context"]
     proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
-        params["folder_host"], is_unmanaged(vfolder_row["unmanaged_path"])
+        params["folder_host"], is_unmanaged(vfolder_row.unmanaged_path)
     )
     log.info("VFOLDER.GET_USED_BYTES (volume_name:{}, vf:{})", volume_name, params["id"])
     client = root_ctx.storage_manager.get_manager_facing_client(proxy_name)
-    vfid = str(VFolderID(vfolder_row["quota_scope_id"], params["id"]))
+    vfid = str(VFolderID(vfolder_row.quota_scope_id, params["id"]))
     usage = await client.get_used_bytes(volume_name, vfid)
     return web.json_response(usage, status=HTTPStatus.OK)
 
@@ -996,7 +996,7 @@ async def rename_vfolder(
         "VFOLDER.RENAME (email:{}, ak:{}, vf:{} (resolved-from:{!r}), new-name:{})",
         request["user"]["email"],
         request["keypair"]["access_key"],
-        row["id"],
+        row.id,
         request.match_info["name"],
         new_name,
     )
@@ -1004,10 +1004,10 @@ async def rename_vfolder(
     await root_ctx.processors.vfolder.update_vfolder_attribute.wait_for_complete(
         UpdateVFolderAttributeAction(
             user_uuid=request["user"]["uuid"],
-            vfolder_uuid=row["id"],
+            vfolder_uuid=row.id,
             updater=Updater(
                 spec=params.to_updater_spec(),
-                pk_value=row["id"],
+                pk_value=row.id,
             ),
         )
     )
@@ -1032,7 +1032,7 @@ async def update_vfolder_options(
         "VFOLDER.UPDATE_OPTIONS (email:{}, ak:{}, vf:{} (resolved-from:{!r}))",
         request["user"]["email"],
         request["keypair"]["access_key"],
-        row["id"],
+        row.id,
         request.match_info["name"],
     )
     cloneable = (
@@ -1048,13 +1048,13 @@ async def update_vfolder_options(
     await root_ctx.processors.vfolder.update_vfolder_attribute.wait_for_complete(
         UpdateVFolderAttributeAction(
             user_uuid=request["user"]["uuid"],
-            vfolder_uuid=row["id"],
+            vfolder_uuid=row.id,
             updater=Updater(
                 spec=VFolderAttributeUpdaterSpec(
                     cloneable=cloneable,
                     mount_permission=mount_permission,
                 ),
-                pk_value=row["id"],
+                pk_value=row.id,
             ),
         )
     )
@@ -1078,7 +1078,7 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         "VFOLDER.MKDIR (email:{}, ak:{}, vf:{} (resolved-from:{!r}), paths:{})",
         request["user"]["email"],
         request["keypair"]["access_key"],
-        row["id"],
+        row.id,
         request.match_info["name"],
         params["path"],
     )
@@ -1086,7 +1086,7 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     result = await root_ctx.processors.vfolder_file.mkdir.wait_for_complete(
         MkdirAction(
             user_id=request["user"]["uuid"],
-            vfolder_uuid=row["id"],
+            vfolder_uuid=row.id,
             path=params["path"],
             parents=params["parents"],
             exist_ok=params["exist_ok"],
@@ -1113,7 +1113,7 @@ async def create_download_session(
         "VFOLDER.CREATE_DOWNLOAD_SESSION(email:{}, ak:{}, vf:{} (resolved-from:{!r}), path:{})",
         request["user"]["email"],
         request["keypair"]["access_key"],
-        row["id"],
+        row.id,
         request.match_info["name"],
         params["path"],
     )
@@ -1121,7 +1121,7 @@ async def create_download_session(
         CreateDownloadSessionAction(
             user_uuid=request["user"]["uuid"],
             keypair_resource_policy=request["keypair"]["resource_policy"],
-            vfolder_uuid=row["id"],
+            vfolder_uuid=row.id,
             path=params["path"],
             archive=params["archive"],
         )
@@ -1146,7 +1146,7 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
         "VFOLDER.CREATE_UPLOAD_SESSION (email:{}, ak:{}, vf:{} (resolved-from:{!r}), path:{})",
         request["user"]["email"],
         request["keypair"]["access_key"],
-        row["id"],
+        row.id,
         request.match_info["name"],
         params["path"],
     )
@@ -1154,7 +1154,7 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
         CreateUploadSessionAction(
             user_uuid=request["user"]["uuid"],
             keypair_resource_policy=request["keypair"]["resource_policy"],
-            vfolder_uuid=row["id"],
+            vfolder_uuid=row.id,
             path=params["path"],
             size=params["size"],
         )
@@ -1180,7 +1180,7 @@ async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web
         "VFOLDER.RENAME_FILE (email:{}, ak:{}, vf:{} (resolved-from:{!r}), target_path:{}, new_name:{})",
         request["user"]["email"],
         request["keypair"]["access_key"],
-        row["id"],
+        row.id,
         request.match_info["name"],
         params["target_path"],
         params["new_name"],
@@ -1189,7 +1189,7 @@ async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web
         RenameFileAction(
             user_uuid=request["user"]["uuid"],
             keypair_resource_policy=request["keypair"]["resource_policy"],
-            vfolder_uuid=row["id"],
+            vfolder_uuid=row.id,
             target_path=params["target_path"],
             new_name=params["new_name"],
         )
@@ -1213,16 +1213,16 @@ async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.R
         "VFOLDER.MOVE_FILE (email:{}, ak:{}, vf:{} (resolved-from:{!r}), src:{}, dst:{})",
         request["user"]["email"],
         request["keypair"]["access_key"],
-        row["id"],
+        row.id,
         request.match_info["name"],
         params["src"],
         params["dst"],
     )
     proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
-        row["host"], is_unmanaged(row["unmanaged_path"])
+        row.host, is_unmanaged(row.unmanaged_path)
     )
     manager_client = root_ctx.storage_manager.get_manager_facing_client(proxy_name)
-    vfid = str(VFolderID(row["quota_scope_id"], row["id"]))
+    vfid = str(VFolderID(row.quota_scope_id, row.id))
     await manager_client.move_file(volume_name, vfid, params["src"], params["dst"])
     return web.json_response({}, status=HTTPStatus.OK)
 
@@ -1244,7 +1244,7 @@ async def delete_files(request: web.Request, params: Any, row: VFolderRow) -> we
         "VFOLDER.DELETE_FILES (email:{}, ak:{}, vf:{} (resolved-from:{!r}), path:{}, recursive:{})",
         request["user"]["email"],
         request["keypair"]["access_key"],
-        row["id"],
+        row.id,
         request.match_info["name"],
         params["files"],
         recursive,
@@ -1252,7 +1252,7 @@ async def delete_files(request: web.Request, params: Any, row: VFolderRow) -> we
     await root_ctx.processors.vfolder_file.delete_files.wait_for_complete(
         DeleteFilesAction(
             user_uuid=request["user"]["uuid"],
-            vfolder_uuid=row["id"],
+            vfolder_uuid=row.id,
             files=params["files"],
             recursive=recursive,
         )
@@ -1277,7 +1277,7 @@ async def delete_files_async(request: web.Request, params: Any, row: VFolderRow)
         "VFOLDER.DELETE_FILES_ASYNC (email:{}, ak:{}, vf:{} (resolved-from:{!r}), files:{}, recursive:{})",
         request["user"]["email"],
         request["keypair"]["access_key"],
-        row["id"],
+        row.id,
         request.match_info["name"],
         params["files"],
         params["recursive"],
@@ -1286,7 +1286,7 @@ async def delete_files_async(request: web.Request, params: Any, row: VFolderRow)
     result = await root_ctx.processors.vfolder_file.delete_files_async.wait_for_complete(
         DeleteFilesAsyncAction(
             user_uuid=request["user"]["uuid"],
-            vfolder_uuid=row["id"],
+            vfolder_uuid=row.id,
             files=params["files"],
             recursive=params["recursive"],
         )
@@ -1315,14 +1315,14 @@ async def list_files(request: web.Request, params: Any, row: VFolderRow) -> web.
         "VFOLDER.LIST_FILES (email:{}, ak:{}, vf:{} (resolved-from:{!r}), path:{})",
         request["user"]["email"],
         request["keypair"]["access_key"],
-        row["id"],
+        row.id,
         request.match_info["name"],
         params["path"],
     )
     result = await root_ctx.processors.vfolder_file.list_files.wait_for_complete(
         ListFilesAction(
             user_uuid=request["user"]["uuid"],
-            vfolder_uuid=row["id"],
+            vfolder_uuid=row.id,
             path=params["path"],
         )
     )
@@ -1344,7 +1344,7 @@ async def list_sent_invitations(request: web.Request) -> web.Response:
     async with root_ctx.db.begin() as conn:
         j = sa.join(vfolders, vfolder_invitations, vfolders.c.id == vfolder_invitations.c.vfolder)
         query = (
-            sa.select([vfolder_invitations, vfolders.c.name])
+            sa.select(vfolder_invitations, vfolders.c.name)
             .select_from(j)
             .where(
                 (vfolder_invitations.c.inviter == request["user"]["email"])
@@ -1420,7 +1420,7 @@ async def invite(request: web.Request, params: Any, row: VFolderRow) -> web.Resp
         "VFOLDER.INVITE (email:{}, ak:{}, vf:{} (resolved-from:{!r}), inv.users:{})",
         request["user"]["email"],
         access_key,
-        row["id"],
+        row.id,
         request.match_info["name"],
         ",".join(invitee_emails),
     )
@@ -1428,14 +1428,14 @@ async def invite(request: web.Request, params: Any, row: VFolderRow) -> web.Resp
         user_rows = await db_session.scalars(
             sa.select(UserRow).where(UserRow.email.in_(invitee_emails))
         )
-        user_uuids = [row.uuid for row in user_rows]
+        user_uuids = [user_row.uuid for user_row in user_rows]
     if not user_uuids:
         raise VFolderNotFound("No users found with the provided emails.")
     result = await root_ctx.processors.vfolder_invite.invite_vfolder.wait_for_complete(
         InviteVFolderAction(
             keypair_resource_policy=request["keypair"]["resource_policy"],
             user_uuid=user_uuid,
-            vfolder_uuid=row["id"],
+            vfolder_uuid=row.id,
             mount_permission=perm,
             invitee_user_uuids=user_uuids,
         )
@@ -1545,7 +1545,7 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         "VFOLDER.SHARE (email:{}, ak:{}, vf:{} (resolved-from:{!r}), perm:{}, users:{})",
         request["user"]["email"],
         request["keypair"]["access_key"],
-        row["id"],
+        row.id,
         request.match_info["name"],
         params["permission"],
         ",".join(params["emails"]),
@@ -1553,7 +1553,7 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     user_uuid = request["user"]["uuid"]
     domain_name = request["user"]["domain_name"]
     resource_policy = request["keypair"]["resource_policy"]
-    if row["ownership_type"] != VFolderOwnershipType.GROUP:
+    if row.ownership_type != VFolderOwnershipType.GROUP:
         raise VFolderNotFound("Only project folders are directly sharable.")
     async with root_ctx.db.begin() as conn:
         from ai.backend.manager.models.group import association_groups_users as agus
@@ -1563,7 +1563,7 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         )
         await ensure_host_permission_allowed(
             conn,
-            row["host"],
+            row.host,
             allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_uuid,
             resource_policy=resource_policy,
@@ -1574,19 +1574,19 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         # Convert users' emails to uuids and check if user belong to the group of vfolder.
         j = users.join(agus, users.c.uuid == agus.c.user_id)
         query = (
-            sa.select([users.c.uuid, users.c.email])
+            sa.select(users.c.uuid, users.c.email)
             .select_from(j)
             .where(
                 (users.c.email.in_(params["emails"]))
                 & (users.c.email != request["user"]["email"])
-                & (agus.c.group_id == row["group"])
+                & (agus.c.group_id == row.group)
                 & (users.c.status.in_(ACTIVE_USER_STATUSES)),
             )
         )
         result = await conn.execute(query)
         user_info = result.fetchall()
-        users_to_share = [u["uuid"] for u in user_info]
-        emails_to_share = [u["email"] for u in user_info]
+        users_to_share = [u.uuid for u in user_info]
+        emails_to_share = [u.email for u in user_info]
         if len(user_info) < 1:
             raise ObjectNotFound(object_name="user")
         if len(user_info) < len(params["emails"]):
@@ -1599,11 +1599,11 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 
         # Do not share to users who have already been shared the folder.
         query = (
-            sa.select([vfolder_permissions])
+            sa.select(vfolder_permissions)
             .select_from(vfolder_permissions)
             .where(
                 (vfolder_permissions.c.user.in_(users_to_share))
-                & (vfolder_permissions.c.vfolder == row["id"]),
+                & (vfolder_permissions.c.vfolder == row.id),
             )
         )
         result = await conn.execute(query)
@@ -1616,7 +1616,7 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
                 vfolder_permissions,
                 {
                     "permission": params["permission"],
-                    "vfolder": row["id"],
+                    "vfolder": row.id,
                     "user": _user,
                 },
             )
@@ -1626,7 +1626,7 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             query = (
                 sa.update(vfolder_permissions)
                 .values(permission=params["permission"])
-                .where(vfolder_permissions.c.vfolder == row["id"])
+                .where(vfolder_permissions.c.vfolder == row.id)
                 .where(vfolder_permissions.c.user == _user)
             )
             await conn.execute(query)
@@ -1652,14 +1652,14 @@ async def unshare(request: web.Request, params: Any, row: VFolderRow) -> web.Res
         "VFOLDER.UNSHARE (email:{}, ak:{}, vf:{} (resolved-from:{!r}), users:{})",
         request["user"]["email"],
         request["keypair"]["access_key"],
-        row["id"],
+        row.id,
         request.match_info["name"],
         ",".join(params["emails"]),
     )
     user_uuid = request["user"]["uuid"]
     domain_name = request["user"]["domain_name"]
     resource_policy = request["keypair"]["resource_policy"]
-    if row["ownership_type"] != VFolderOwnershipType.GROUP:
+    if row.ownership_type != VFolderOwnershipType.GROUP:
         raise VFolderNotFound("Only project folders are directly unsharable.")
     async with root_ctx.db.begin() as conn:
         allowed_vfolder_types = (
@@ -1667,7 +1667,7 @@ async def unshare(request: web.Request, params: Any, row: VFolderRow) -> web.Res
         )
         await ensure_host_permission_allowed(
             conn,
-            row["host"],
+            row.host,
             allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_uuid,
             resource_policy=resource_policy,
@@ -1677,16 +1677,16 @@ async def unshare(request: web.Request, params: Any, row: VFolderRow) -> web.Res
 
         # Convert users' emails to uuids.
         query = (
-            sa.select([users.c.uuid]).select_from(users).where(users.c.email.in_(params["emails"]))
+            sa.select(users.c.uuid).select_from(users).where(users.c.email.in_(params["emails"]))
         )
         result = await conn.execute(query)
-        users_to_unshare = [u["uuid"] for u in result.fetchall()]
+        users_to_unshare = [u.uuid for u in result.fetchall()]
         if len(users_to_unshare) < 1:
             raise ObjectNotFound(object_name="user(s).")
 
         # Delete vfolder_permission(s).
         query = sa.delete(vfolder_permissions).where(
-            (vfolder_permissions.c.vfolder == row["id"])
+            (vfolder_permissions.c.vfolder == row.id)
             & (vfolder_permissions.c.user.in_(users_to_unshare)),
         )
         await conn.execute(query)
@@ -1702,19 +1702,19 @@ async def _delete(
     resource_policy: Mapping[str, Any],
 ) -> None:
     # Only the effective folder owner can delete the folder.
-    if not vfolder_row["is_owner"]:
+    if not vfolder_row.is_owner:
         raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
     await check_vfolder_status(vfolder_row, VFolderStatusSet.DELETABLE)
     async with root_ctx.db.begin_readonly_session() as db_session:
         # perform extra check to make sure records of alive model service not removed by foreign key rule
-        if vfolder_row["usage_mode"] == VFolderUsageMode.MODEL:
-            live_endpoints = await EndpointRow.list_by_model(db_session, vfolder_row["id"])
+        if vfolder_row.usage_mode == VFolderUsageMode.MODEL:
+            live_endpoints = await EndpointRow.list_by_model(db_session, vfolder_row.id)
             if (
                 len([e for e in live_endpoints if e.lifecycle_stage == EndpointLifecycle.CREATED])
                 > 0
             ):
                 raise ModelServiceDependencyNotCleared
-        folder_host = vfolder_row["host"]
+        folder_host = vfolder_row.host
         allowed_vfolder_types = (
             await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
@@ -1728,7 +1728,7 @@ async def _delete(
             permission=VFolderHostPermission.DELETE,
         )
 
-    vfolder_row_ids = (vfolder_row["id"],)
+    vfolder_row_ids = (vfolder_row.id,)
     async with root_ctx.db.connect() as db_conn:
         await delete_vfolder_relation_rows(db_conn, root_ctx.db.begin_session, vfolder_row_ids)
     await update_vfolder_status(
@@ -1798,7 +1798,7 @@ async def delete_by_name(request: web.Request) -> web.Response:
         "VFOLDER.DELETE_BY_NAME (email:{}, ak:{}, vf:{} (resolved-from:{!r}))",
         request["user"]["email"],
         request["keypair"]["access_key"],
-        row["id"],
+        row.id,
         folder_name,
     )
     await _delete(
@@ -1842,10 +1842,10 @@ async def get_vfolder_id(request: web.Request, params: IDRequestModel) -> Compac
         "VFOLDER.GET_ID (email:{}, ak:{}, vf:{} (resolved-from:{!r}))",
         request["user"]["email"],
         request["keypair"]["access_key"],
-        row["id"],
+        row.id,
         folder_name,
     )
-    return CompactVFolderInfoModel(id=row["id"], name=folder_name)
+    return CompactVFolderInfoModel(id=row.id, name=folder_name)
 
 
 class DeleteFromTrashRequestModel(LegacyBaseRequestModel):
@@ -2000,8 +2000,8 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     rqst_user_uuid = request["user"]["uuid"]
-    vfolder_id = row["id"]
-    perm = row["permission"]
+    vfolder_id = row.id
+    perm = row.permission
 
     log.info(
         "VFOLDER.LEAVE(email:{}, ak:{}, vf:{} (resolved-from:{!r}), uid:{}, perm:{})",
@@ -2012,7 +2012,7 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         rqst_user_uuid,
         perm,
     )
-    if row["ownership_type"] == VFolderOwnershipType.GROUP:
+    if row.ownership_type == VFolderOwnershipType.GROUP:
         raise InvalidAPIParameters("Cannot leave a group vfolder.")
     await root_ctx.processors.vfolder_invite.leave_invited_vfolder.wait_for_complete(
         LeaveInvitedVFolderAction(
@@ -2047,7 +2047,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         "VFOLDER.CLONE (email:{}, ak:{}, vf:{} (resolved-from:{!r}), vft:{}, vfh:{}, umod:{}, perm:{})",
         request["user"]["email"],
         access_key,
-        row["id"],
+        row.id,
         request.match_info["name"],
         params["target_name"],
         params["folder_host"],
@@ -2058,7 +2058,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     result = await root_ctx.processors.vfolder.clone_vfolder.wait_for_complete(
         CloneVFolderAction(
             requester_user_uuid=user_uuid,
-            source_vfolder_uuid=row["id"],
+            source_vfolder_uuid=row.id,
             target_name=params["target_name"],
             target_host=params["folder_host"],
             cloneable=params["cloneable"],
@@ -2107,7 +2107,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
         j = vfolder_permissions.join(vfolders, vfolders.c.id == vfolder_permissions.c.vfolder).join(
             users, users.c.uuid == vfolder_permissions.c.user
         )
-        query = sa.select([
+        query = sa.select(
             vfolder_permissions,
             vfolders.c.id.label("vfolder_id"),
             vfolders.c.name,
@@ -2115,7 +2115,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
             vfolders.c.status,
             vfolders.c.user.label("vfolder_user"),
             users.c.email,
-        ]).select_from(j)
+        ).select_from(j)
         if target_vfid is not None:
             query = query.where(vfolders.c.id == target_vfid)
         result = await conn.execute(query)
@@ -2423,7 +2423,7 @@ async def list_mounts(request: web.Request) -> web.Response:
 
     async with root_ctx.db.begin() as conn:
         query = (
-            sa.select([agents.c.id]).select_from(agents).where(agents.c.status == AgentStatus.ALIVE)
+            sa.select(agents.c.id).select_from(agents).where(agents.c.status == AgentStatus.ALIVE)
         )
         result = await conn.execute(query)
         rows = result.fetchall()
@@ -2490,7 +2490,7 @@ async def mount_host(request: web.Request, params: Any) -> web.Response:
     # Mount on running agents.
     async with root_ctx.db.begin() as conn:
         query = (
-            sa.select([agents.c.id]).select_from(agents).where(agents.c.status == AgentStatus.ALIVE)
+            sa.select(agents.c.id).select_from(agents).where(agents.c.status == AgentStatus.ALIVE)
         )
         if params["scaling_group"] is not None:
             query = query.where(agents.c.scaling == params["scaling_group"])
@@ -2587,7 +2587,7 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
     async with root_ctx.db.begin() as conn, conn.begin():
         # Prevent unmount if target host is mounted to running kernels.
         query = (
-            sa.select([kernels.c.mounts])
+            sa.select(kernels.c.mounts)
             .select_from(kernels)
             .where(kernels.c.status != KernelStatus.TERMINATED)
         )
@@ -2607,7 +2607,7 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
             )
 
         query = (
-            sa.select([agents.c.id]).select_from(agents).where(agents.c.status == AgentStatus.ALIVE)
+            sa.select(agents.c.id).select_from(agents).where(agents.c.status == AgentStatus.ALIVE)
         )
         if params["scaling_group"] is not None:
             query = query.where(agents.c.scaling == params["scaling_group"])
@@ -2708,7 +2708,7 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
     async with root_ctx.db.begin_readonly() as conn:
         j = sa.join(users, keypairs, users.c.email == keypairs.c.user_id)
         query = (
-            sa.select([users.c.uuid, users.c.domain_name, keypairs.c.resource_policy])
+            sa.select(users.c.uuid, users.c.domain_name, keypairs.c.resource_policy)
             .select_from(j)
             .where((users.c.email == user_email) & (users.c.status == UserStatus.ACTIVE))
         )
@@ -2721,7 +2721,7 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
             raise ObjectNotFound(object_name="user")
         resource_policy_name = user_info.resource_policy
         result = await conn.execute(
-            sa.select([keypair_resource_policies.c.allowed_vfolder_hosts]).where(
+            sa.select(keypair_resource_policies.c.allowed_vfolder_hosts).where(
                 keypair_resource_policies.c.name == resource_policy_name
             )
         )
@@ -2741,7 +2741,7 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
     )
     async with root_ctx.db.begin_readonly() as conn:
         query = (
-            sa.select([vfolders.c.host])
+            sa.select(vfolders.c.host)
             .select_from(vfolders)
             .where(
                 (vfolders.c.id == vfolder_id)

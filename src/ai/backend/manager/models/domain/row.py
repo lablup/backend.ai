@@ -205,7 +205,7 @@ async def query_domain_dotfiles(
     conn: SAConnection,
     name: str,
 ) -> tuple[list[DomainDotfile], int]:
-    query = sa.select([domains.c.dotfiles]).select_from(domains).where(domains.c.name == name)
+    query = sa.select(domains.c.dotfiles).select_from(domains).where(domains.c.name == name)
     packed_dotfile = await conn.scalar(query)
     if packed_dotfile is None:
         return [], MAXIMUM_DOTFILE_SIZE

@@ -404,7 +404,7 @@ class ProjectModel(RBACModel[ProjectPermission]):
 
 def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:
     return (
-        sa.select([groups.c.id])
+        sa.select(groups.c.id)
         .select_from(groups)
         .where(
             cond & (groups.c.domain_name == domain_name),
@@ -461,7 +461,7 @@ async def resolve_groups(
             raise TypeError("unexpected type for group_name_or_id")
 
     rows = (await db_conn.execute(query)).fetchall()
-    return [row["id"] for row in rows]
+    return [row.id for row in rows]
 
 
 class GroupDotfile(TypedDict):
@@ -474,7 +474,7 @@ async def query_group_dotfiles(
     db_conn: SAConnection,
     group_id: GUID | uuid.UUID,
 ) -> tuple[list[GroupDotfile], int]:
-    query = sa.select([groups.c.dotfiles]).select_from(groups).where(groups.c.id == group_id)
+    query = sa.select(groups.c.dotfiles).select_from(groups).where(groups.c.id == group_id)
     packed_dotfile = await db_conn.scalar(query)
     if packed_dotfile is None:
         return [], MAXIMUM_DOTFILE_SIZE
@@ -486,7 +486,7 @@ async def query_group_domain(
     db_conn: SAConnection,
     group_id: GUID | uuid.UUID,
 ) -> str:
-    query = sa.select([groups.c.domain_name]).select_from(groups).where(groups.c.id == group_id)
+    query = sa.select(groups.c.domain_name).select_from(groups).where(groups.c.id == group_id)
     return await db_conn.scalar(query)
 
 

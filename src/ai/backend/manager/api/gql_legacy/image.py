@@ -329,7 +329,7 @@ class Image(graphene.ObjectType):
 
         async with ctx.db.begin() as conn:
             query = (
-                sa.select([domains.c.allowed_docker_registries])
+                sa.select(domains.c.allowed_docker_registries)
                 .select_from(domains)
                 .where(domains.c.name == domain_name)
             )

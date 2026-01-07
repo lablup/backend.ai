@@ -962,7 +962,7 @@ class ScheduleRepository:
         async with self._db.begin_readonly_session() as session:
             result = (
                 await session.execute(
-                    sa.select([AgentRow.available_slots, AgentRow.occupied_slots]).where(
+                    sa.select(AgentRow.available_slots, AgentRow.occupied_slots).where(
                         AgentRow.id == agent_id
                     )
                 )
@@ -1319,7 +1319,7 @@ class ScheduleRepository:
                 KernelRow.session_id == session_id
             )
             rows = (await session.execute(query)).fetchall()
-            return {row["id"]: row["container_id"] for row in rows}
+            return {row.id: row.container_id for row in rows}
 
     @schedule_repository_resilience.apply()
     async def autoscale_endpoints(self) -> None:

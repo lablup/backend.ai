@@ -84,7 +84,7 @@ class LocalRegistry(BaseContainerRegistry):
             config_digest = data["Id"]
             async with self.db.begin_readonly_session() as db_session:
                 already_exists = await db_session.scalar(
-                    sa.select([sa.func.count(ImageRow.id)]).where(
+                    sa.select(sa.func.count(ImageRow.id)).where(
                         sa.and_(
                             ImageRow.config_digest == config_digest,
                             ImageRow.is_local == sa.false(),

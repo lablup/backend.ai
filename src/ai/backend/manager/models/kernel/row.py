@@ -164,7 +164,7 @@ async def get_user_email(
     db_session: SASession,
     kernel: KernelRow,
 ) -> str:
-    query = sa.select([users.c.email]).select_from(users).where(users.c.uuid == kernel["user_uuid"])
+    query = sa.select(users.c.email).select_from(users).where(users.c.uuid == kernel["user_uuid"])
     result = await db_session.execute(query)
     user_email = str(result.scalar())
     return user_email.replace("@", "_")

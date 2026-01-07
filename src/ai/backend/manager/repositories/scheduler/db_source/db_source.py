@@ -2387,7 +2387,7 @@ class ScheduleDBSource:
                 raise ImageNotFound
             if not image_row.is_local:
                 query = (
-                    sa.select([domains.c.allowed_docker_registries])
+                    sa.select(domains.c.allowed_docker_registries)
                     .select_from(domains)
                     .where(domains.c.name == domain)
                 )

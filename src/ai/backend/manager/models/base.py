@@ -744,7 +744,7 @@ async def populate_fixture(
 
             match op_mode:
                 case FixtureOpModes.INSERT:
-                    stmt = sa.dialects.postgresql.insert(table, rows).on_conflict_do_nothing()
+                    stmt = sa.dialects.postgresql.insert(table).values(rows).on_conflict_do_nothing()
                     await conn.execute(stmt)
                 case FixtureOpModes.UPDATE:
                     stmt = sa.update(table)

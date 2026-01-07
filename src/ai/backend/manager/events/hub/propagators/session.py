@@ -171,7 +171,7 @@ class SessionEventPropagator(EventPropagator):
 
             async with self._db.begin_readonly(isolation_level="READ COMMITTED") as conn:
                 query = (
-                    sa.select([
+                    sa.select(
                         kernels.c.id,
                         kernels.c.session_id,
                         kernels.c.session_name,
@@ -181,7 +181,7 @@ class SessionEventPropagator(EventPropagator):
                         kernels.c.domain_name,
                         kernels.c.group_id,
                         kernels.c.user_uuid,
-                    ])
+                    )
                     .select_from(kernels)
                     .where(kernels.c.id == event.kernel_id)
                 )

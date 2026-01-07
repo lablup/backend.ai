@@ -69,15 +69,15 @@ async def create(request: web.Request, params: Any) -> web.Response:
             # Admin or superadmin is creating sessions for another user.
             # The check for admin privileges is already done in get_access_key_scope().
             query = (
-                sa.select([keypairs.c.user, users.c.role, users.c.domain_name])
+                sa.select(keypairs.c.user, users.c.role, users.c.domain_name)
                 .select_from(sa.join(keypairs, users, keypairs.c.user == users.c.uuid))
                 .where(keypairs.c.access_key == owner_access_key)
             )
             result = await conn.execute(query)
             row = result.first()
-            owner_domain = row["domain_name"]
-            owner_uuid = row["user"]
-            owner_role = row["role"]
+            owner_domain = row.domain_name
+            owner_uuid = row.user
+            owner_role = row.role
         else:
             # Normal case when the user is creating her/his own session.
             owner_domain = request["user"]["domain_name"]
@@ -85,7 +85,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             owner_role = UserRole.USER
 
         query = (
-            sa.select([domains.c.name])
+            sa.select(domains.c.name)
             .select_from(domains)
             .where(
                 (domains.c.name == owner_domain) & (domains.c.is_active),
@@ -99,7 +99,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         if owner_role == UserRole.SUPERADMIN:
             # superadmin can spawn container in any designated domain/group.
             query = (
-                sa.select([groups.c.id])
+                sa.select(groups.c.id)
                 .select_from(groups)
                 .where(
                     (groups.c.domain_name == params["domain"])
@@ -114,7 +114,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             if params["domain"] != owner_domain:
                 raise InvalidAPIParameters("You can only set the domain to the owner's domain.")
             query = (
-                sa.select([groups.c.id])
+                sa.select(groups.c.id)
                 .select_from(groups)
                 .where(
                     (groups.c.domain_name == owner_domain)
@@ -129,7 +129,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             if params["domain"] != owner_domain:
                 raise InvalidAPIParameters("You can only set the domain to your domain.")
             query = (
-                sa.select([agus.c.group_id])
+                sa.select(agus.c.group_id)
                 .select_from(agus.join(groups, agus.c.group_id == groups.c.id))
                 .where(
                     (agus.c.user_id == owner_uuid)
@@ -196,7 +196,7 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
                 users, session_templates.c.user_uuid == users.c.uuid, isouter=True
             ).join(groups, session_templates.c.group_id == groups.c.id, isouter=True)
             query = (
-                sa.select([session_templates, users.c.email, groups.c.name], use_labels=True)
+                sa.select(session_templates, users.c.email, groups.c.name, use_labels=True)
                 .select_from(j)
                 .where(
                     (session_templates.c.is_active)
@@ -277,7 +277,7 @@ async def get(request: web.Request, params: Any) -> web.Response:
 
     async with root_ctx.db.begin() as conn:
         query = (
-            sa.select([session_templates.c.template])
+            sa.select(session_templates.c.template)
             .select_from(session_templates)
             .where(
                 (session_templates.c.id == template_id)
@@ -316,7 +316,7 @@ async def put(request: web.Request, params: Any) -> web.Response:
 
     async with root_ctx.db.begin() as conn:
         query = (
-            sa.select([session_templates.c.id])
+            sa.select(session_templates.c.id)
             .select_from(session_templates)
             .where(
                 (session_templates.c.id == template_id)
@@ -366,7 +366,7 @@ async def delete(request: web.Request, params: Any) -> web.Response:
 
     async with root_ctx.db.begin() as conn:
         query = (
-            sa.select([session_templates.c.id])
+            sa.select(session_templates.c.id)
             .select_from(session_templates)
             .where(
                 (session_templates.c.id == template_id)

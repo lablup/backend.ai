@@ -307,7 +307,7 @@ async def query_owned_dotfiles(
     access_key: AccessKey,
 ) -> tuple[list[Dotfile], int]:
     query = (
-        sa.select([keypairs.c.dotfiles])
+        sa.select(keypairs.c.dotfiles)
         .select_from(keypairs)
         .where(keypairs.c.access_key == access_key)
     )
@@ -321,7 +321,7 @@ async def query_bootstrap_script(
     access_key: AccessKey,
 ) -> tuple[str, int]:
     query = (
-        sa.select([keypairs.c.bootstrap_script])
+        sa.select(keypairs.c.bootstrap_script)
         .select_from(keypairs)
         .where(keypairs.c.access_key == access_key)
     )

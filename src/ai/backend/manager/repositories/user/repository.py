@@ -398,12 +398,12 @@ class UserRepository:
         from sqlalchemy.sql.expression import bindparam
 
         result = await conn.execute(
-            sa.select([
+            sa.select(
                 keypairs.c.user,
                 keypairs.c.is_active,
                 keypairs.c.is_admin,
                 keypairs.c.access_key,
-            ])
+            )
             .select_from(keypairs)
             .where(keypairs.c.user == user_uuid)
             .order_by(sa.desc(keypairs.c.is_admin))
@@ -468,7 +468,7 @@ class UserRepository:
 
         # Add to new groups
         result = await conn.execute(
-            sa.select([groups.c.id])
+            sa.select(groups.c.id)
             .select_from(groups)
             .where(groups.c.domain_name == domain_name)
             .where(groups.c.id.in_(group_ids))
@@ -505,12 +505,12 @@ class UserRepository:
 
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select([
+                sa.select(
                     kernels.c.id,
                     kernels.c.created_at,
                     kernels.c.terminated_at,
                     kernels.c.occupied_slots,
-                ])
+                )
                 .select_from(kernels)
                 .where(
                     (kernels.c.terminated_at >= start_date)
@@ -560,7 +560,7 @@ class UserRepository:
             for idx in range(stat_length)
         ]
 
-        kernel_ids = [str(row["id"]) for row in rows]
+        kernel_ids = [str(row.id) for row in rows]
         raw_stats = await valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids)
 
         for row, raw_stat in zip(rows, raw_stats, strict=True):

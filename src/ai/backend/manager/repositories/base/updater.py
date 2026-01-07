@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
 
 from ai.backend.manager.models.base import Base
 
@@ -229,4 +230,4 @@ async def execute_batch_updater(
         stmt = stmt.where(condition())
 
     result = await db_sess.execute(stmt)
-    return BatchUpdaterResult(updated_count=result.rowcount)
+    return BatchUpdaterResult(updated_count=cast(CursorResult, result).rowcount)

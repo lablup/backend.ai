@@ -520,7 +520,7 @@ class AgentRegistry:
             if not image_ref.is_local:
                 async with self.db.begin_readonly() as conn:
                     query = (
-                        sa.select([domains.c.allowed_docker_registries])
+                        sa.select(domains.c.allowed_docker_registries)
                         .select_from(domains)
                         .where(domains.c.name == user_scope.domain_name)
                     )
@@ -849,7 +849,7 @@ class AgentRegistry:
                 requested_image_ref = image_row.image_ref
                 async with self.db.begin_readonly() as conn:
                     query = (
-                        sa.select([domains.c.allowed_docker_registries])
+                        sa.select(domains.c.allowed_docker_registries)
                         .select_from(domains)
                         .where(domains.c.name == user_scope.domain_name)
                     )
@@ -927,18 +927,18 @@ class AgentRegistry:
                     await asyncio.sleep(0.5)
                     async with self.db.begin_readonly() as conn:
                         query = (
-                            sa.select([
+                            sa.select(
                                 kernels.c.status,
                                 kernels.c.service_ports,
-                            ])
+                            )
                             .select_from(kernels)
                             .where(kernels.c.id == kernel_id)
                         )
                         result = await conn.execute(query)
                         row = result.first()
-                    if row["status"] == KernelStatus.RUNNING:
+                    if row.status == KernelStatus.RUNNING:
                         resp["status"] = "RUNNING"
-                        for item in row["service_ports"]:
+                        for item in row.service_ports:
                             response_dict = {
                                 "name": item["name"],
                                 "protocol": item["protocol"],
@@ -952,7 +952,7 @@ class AgentRegistry:
                                 response_dict["allowed_envs"] = item["allowed_envs"]
                             resp["servicePorts"].append(response_dict)
                     else:
-                        resp["status"] = row["status"].name
+                        resp["status"] = row.status.name
                 finally:
                     # Always unregister propagator
                     self._event_hub.unregister_event_propagator(propagator.id())
@@ -1833,7 +1833,7 @@ class AgentRegistry:
         async with self.db.begin_readonly_session() as db_sess:
             uuid, email, username = (
                 await db_sess.execute(
-                    sa.select([UserRow.uuid, UserRow.email, UserRow.username]).where(
+                    sa.select(UserRow.uuid, UserRow.email, UserRow.username).where(
                         UserRow.uuid == scheduled_session.user_uuid
                     )
                 )
@@ -3153,7 +3153,7 @@ class AgentRegistry:
 
         async with self.db.begin_readonly() as db_conn:
             query = (
-                sa.select([kernels.c.id, kernels.c.session_id, kernels.c.agent_addr])
+                sa.select(kernels.c.id, kernels.c.session_id, kernels.c.agent_addr)
                 .select_from(kernels)
                 .where(
                     (kernels.c.agent == agent_id)
@@ -3636,15 +3636,15 @@ class AgentRegistry:
         endpoint: EndpointData,
     ) -> str:
         query = (
-            sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
+            sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
             .select_from(scaling_groups)
             .where(scaling_groups.c.name == endpoint.resource_group)
         )
 
         result = await db_sess.execute(query)
         sgroup = result.first()
-        wsproxy_addr = sgroup["wsproxy_addr"]
-        wsproxy_api_token = sgroup["wsproxy_api_token"]
+        wsproxy_addr = sgroup.wsproxy_addr
+        wsproxy_api_token = sgroup.wsproxy_api_token
         wsproxy_client = self._load_app_proxy_client(wsproxy_addr, wsproxy_api_token)
 
         model = await VFolderRow.get(db_sess, endpoint.model)
@@ -3675,15 +3675,15 @@ class AgentRegistry:
 
     async def delete_appproxy_endpoint(self, db_sess: AsyncSession, endpoint: EndpointRow) -> None:
         query = (
-            sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
+            sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
             .select_from(scaling_groups)
             .where(scaling_groups.c.name == endpoint.resource_group)
         )
 
         result = await db_sess.execute(query)
         sgroup = result.first()
-        wsproxy_addr = sgroup["wsproxy_addr"]
-        wsproxy_api_token = sgroup["wsproxy_api_token"]
+        wsproxy_addr = sgroup.wsproxy_addr
+        wsproxy_api_token = sgroup.wsproxy_api_token
 
         wsproxy_client = self._load_app_proxy_client(wsproxy_addr, wsproxy_api_token)
         await wsproxy_client.delete_endpoint(endpoint.id)
@@ -4026,7 +4026,7 @@ async def invoke_session_callback(
                     route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
                     endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
 
-                    query = sa.select([sa.func.count("*")]).where(
+                    query = sa.select(sa.func.count("*")).where(
                         (RoutingRow.endpoint == endpoint.id)
                         & (RoutingRow.status == RouteStatus.HEALTHY)
                     )
@@ -4123,13 +4123,13 @@ async def handle_route_creation(
             _, group_id, resource_policy = await query_userinfo(
                 db_sess,
                 created_user.uuid,
-                created_user["access_key"],
+                created_user.access_key,
                 created_user.role,
                 created_user.domain_name,
                 None,
                 endpoint.domain,
                 endpoint.project,
-                query_on_behalf_of=session_owner["access_key"],
+                query_on_behalf_of=session_owner.access_key,
             )
 
             image_row = await ImageRow.resolve(
@@ -4150,10 +4150,10 @@ async def handle_route_creation(
                 UserScope(
                     domain_name=endpoint.domain,
                     group_id=group_id,
-                    user_uuid=session_owner["uuid"],
-                    user_role=session_owner["role"],
+                    user_uuid=session_owner.uuid,
+                    user_role=session_owner.role,
                 ),
-                session_owner["access_key"],
+                session_owner.access_key,
                 resource_policy,
                 SessionTypes.INFERENCE,
                 {
@@ -4225,13 +4225,13 @@ async def handle_check_agent_resource(
 ) -> None:
     async with context.db.begin_readonly() as conn:
         query = (
-            sa.select([agents.c.occupied_slots]).select_from(agents).where(agents.c.id == source)
+            sa.select(agents.c.occupied_slots).select_from(agents).where(agents.c.id == source)
         )
         result = await conn.execute(query)
         row = result.first()
         if not row:
             raise InstanceNotFound(source)
-        log.info("agent@{0} occupied slots: {1}", source, row["occupied_slots"].to_json())
+        log.info("agent@{0} occupied slots: {1}", source, row.occupied_slots.to_json())
 
 
 async def check_scaling_group(
@@ -4253,16 +4253,16 @@ async def check_scaling_group(
         access_key,
     )
     if public_sgroup_only:
-        candidates = [sgroup for sgroup in candidates if sgroup["is_public"]]
+        candidates = [sgroup for sgroup in candidates if sgroup.is_public]
     if not candidates:
         raise ScalingGroupNotFound("You have no scaling groups allowed to use.")
 
     stype = session_type.value.lower()
     if scaling_group is None:
         for sgroup in candidates:
-            allowed_session_types = sgroup["scheduler_opts"].allowed_session_types
+            allowed_session_types = sgroup.scheduler_opts.allowed_session_types
             if stype in allowed_session_types:
-                scaling_group = sgroup["name"]
+                scaling_group = sgroup.name
                 break
         else:
             raise ScalingGroupNotFound(
@@ -4271,11 +4271,11 @@ async def check_scaling_group(
     else:
         scaling_group_found = False
         for sgroup in candidates:
-            if scaling_group == sgroup["name"]:
+            if scaling_group == sgroup.name:
                 # scaling_group's unique key is 'name' field for now,
                 # but we will change scaling_group's unique key to new 'id' field.
                 scaling_group_found = True
-                allowed_session_types = sgroup["scheduler_opts"].allowed_session_types
+                allowed_session_types = sgroup.scheduler_opts.allowed_session_types
                 if stype in allowed_session_types:
                     break
         else:

@@ -114,7 +114,7 @@ class SessionRepository:
     ) -> Optional[dict]:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select([session_templates.c.template])
+                sa.select(session_templates.c.template)
                 .select_from(session_templates)
                 .where(
                     (session_templates.c.id == template_id) & session_templates.c.is_active,
@@ -129,7 +129,7 @@ class SessionRepository:
     ) -> Optional[dict]:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select([session_templates])
+                sa.select(session_templates)
                 .select_from(session_templates)
                 .where(
                     (session_templates.c.id == template_id) & session_templates.c.is_active,
@@ -233,7 +233,7 @@ class SessionRepository:
     ) -> int:
         async with self._db.begin_readonly_session() as sess:
             query = (
-                sa.select([sa.func.count()])
+                sa.select(sa.func.count())
                 .select_from(ImageRow)
                 .where(
                     ImageRow.labels["ai.backend.customized-image.owner"].as_string()
@@ -272,7 +272,7 @@ class SessionRepository:
     ) -> Optional[str]:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select([groups.c.name])
+                sa.select(groups.c.name)
                 .select_from(groups)
                 .where(
                     (groups.c.domain_name == domain_name) & (groups.c.id == group_id),
@@ -287,7 +287,7 @@ class SessionRepository:
     ) -> Optional[str]:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select([scaling_groups.c.wsproxy_addr])
+                sa.select(scaling_groups.c.wsproxy_addr)
                 .select_from(scaling_groups)
                 .where(scaling_groups.c.name == scaling_group_name)
             )

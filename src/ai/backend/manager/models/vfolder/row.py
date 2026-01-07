@@ -645,7 +645,7 @@ async def query_accessible_vfolders(
         # Scan group vfolders.
         if user_role == UserRole.ADMIN or user_role == "admin":
             query = (
-                sa.select([groups.c.id])
+                sa.select(groups.c.id)
                 .select_from(groups)
                 .where(groups.c.domain_name == domain_name)
             )
@@ -654,7 +654,7 @@ async def query_accessible_vfolders(
             group_ids = [g.id for g in grps]
         else:
             j = sa.join(agus, users, agus.c.user_id == users.c.uuid)
-            query = sa.select([agus.c.group_id]).select_from(j).where(agus.c.user_id == user_uuid)
+            query = sa.select(agus.c.group_id).select_from(j).where(agus.c.user_id == user_uuid)
             result = await conn.execute(query)
             grps = result.fetchall()
             group_ids = [g.group_id for g in grps]
@@ -721,14 +721,14 @@ async def get_allowed_vfolder_hosts_by_group(
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
-    query = sa.select([domains.c.allowed_vfolder_hosts]).where(
+    query = sa.select(domains.c.allowed_vfolder_hosts).where(
         (domains.c.name == domain_name) & (domains.c.is_active),
     )
     if values := await conn.scalar(query):
         allowed_hosts = allowed_hosts | values
     # Group's allowed_vfolder_hosts.
     if group_id is not None:
-        query = sa.select([groups.c.allowed_vfolder_hosts]).where(
+        query = sa.select(groups.c.allowed_vfolder_hosts).where(
             (groups.c.domain_name == domain_name)
             & (groups.c.id == group_id)
             & (groups.c.is_active),
@@ -756,7 +756,7 @@ async def get_allowed_vfolder_hosts_by_user(
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
-    query = sa.select([domains.c.allowed_vfolder_hosts]).where(
+    query = sa.select(domains.c.allowed_vfolder_hosts).where(
         (domains.c.name == domain_name) & (domains.c.is_active),
     )
     if values := await conn.scalar(query):
@@ -780,7 +780,7 @@ async def get_allowed_vfolder_hosts_by_user(
             ),
         )
     query = (
-        sa.select([groups.c.allowed_vfolder_hosts])
+        sa.select(groups.c.allowed_vfolder_hosts)
         .select_from(j)
         .where(
             (groups.c.domain_name == domain_name) & (groups.c.is_active),
@@ -1318,7 +1318,7 @@ async def ensure_quota_scope_accessible_by_user(
                     return
             case _:
                 query = (
-                    sa.select([agus.c.group_id])
+                    sa.select(agus.c.group_id)
                     .select_from(agus)
                     .where(
                         (agus.c.group_id == quota_scope.scope_id) & (agus.c.user_id == user["uuid"])

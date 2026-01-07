@@ -779,7 +779,7 @@ class Endpoint(graphene.ObjectType):
         user_uuid: Optional[UUID] = None,
         filter: Optional[str] = None,
     ) -> int:
-        query = sa.select([sa.func.count()]).select_from(
+        query = sa.select(sa.func.count()).select_from(
             sa.join(
                 EndpointRow,
                 UserRow,
@@ -1213,7 +1213,7 @@ class EndpointToken(graphene.ObjectType):
         domain_name: Optional[str] = None,
         user_uuid: Optional[UUID] = None,
     ) -> int:
-        query = sa.select([sa.func.count()]).select_from(EndpointTokenRow)
+        query = sa.select(sa.func.count()).select_from(EndpointTokenRow)
         if endpoint_id is not None:
             query = query.where(EndpointTokenRow.endpoint == endpoint_id)
         if project:

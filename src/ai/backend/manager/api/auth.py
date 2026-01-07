@@ -443,7 +443,7 @@ async def _query_cred_by_access_key(
             keypairs.c.resource_policy == keypair_resource_policies.c.name,
         )
         query = (
-            sa.select([keypairs, keypair_resource_policies], use_labels=True)
+            sa.select(keypairs, keypair_resource_policies, use_labels=True)
             .select_from(j)
             .where(
                 (keypairs.c.access_key == access_key) & (keypairs.c.is_active.is_(True)),
@@ -464,7 +464,7 @@ async def _query_cred_by_access_key(
             users.c.uuid == keypairs.c.user,
         )
         query = (
-            sa.select([users, user_resource_policies], use_labels=True)
+            sa.select(users, user_resource_policies, use_labels=True)
             .select_from(j)
             .where(keypairs.c.access_key == access_key)
         )
@@ -500,7 +500,7 @@ def _populate_auth_result(
             for col in users.c
             if col.name not in ("password", "description", "created_at")
         },
-        "is_admin": keypair_row["keypairs_is_admin"],
+        "is_admin": keypair_row.keypairs_is_admin,
     }
 
     validate_ip(request, auth_result["user"])
@@ -512,7 +512,7 @@ def _populate_auth_result(
     auth_result["user"]["resource_policy"] = {
         col.name: user_row[f"user_resource_policies_{col.name}"] for col in user_resource_policies.c
     }
-    auth_result["user"]["id"] = keypair_row["keypairs_user_id"]  # legacy
+    auth_result["user"]["id"] = keypair_row.keypairs_user_id  # legacy
     auth_result["is_superadmin"] = auth_result["user"]["role"] == "superadmin"
 
     # Populate the result to the per-request state dict
@@ -560,7 +560,7 @@ async def _authenticate_via_jwt(
             raise AuthorizationFailed("Access key not found in database")
 
         # 3. Validate JWT token using user's secret key
-        secret_key = keypair_row["keypairs_secret_key"]
+        secret_key = keypair_row.keypairs_secret_key
         root_ctx.jwt_validator.validate_token(jwt_token, secret_key)
 
         # 4. Populate authentication result
@@ -613,7 +613,7 @@ async def _authenticate_via_hmac(
         raise AuthorizationFailed("Access key not found in HMAC")
 
     # 4. Verify HMAC signature
-    my_signature = await sign_request(sign_method, request, keypair_row["keypairs_secret_key"])
+    my_signature = await sign_request(sign_method, request, keypair_row.keypairs_secret_key)
 
     if not secrets.compare_digest(my_signature, signature):
         raise AuthorizationFailed("HMAC signature mismatch")

@@ -1188,11 +1188,11 @@ class DeploymentDBSource:
     ) -> Mapping[str, Optional[ScalingGroupProxyTarget]]:
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = (
-                sa.select([
+                sa.select(
                     scaling_groups.c.name,
                     scaling_groups.c.wsproxy_addr,
                     scaling_groups.c.wsproxy_api_token,
-                ])
+                )
                 .select_from(scaling_groups)
                 .where(scaling_groups.c.name.in_(scaling_group))
             )

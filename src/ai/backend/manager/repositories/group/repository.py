@@ -228,7 +228,7 @@ class GroupRepository:
                 users, users.c.uuid == kernels.c.user_uuid
             )
             query = (
-                sa.select([
+                sa.select(
                     kernels.c.id,
                     kernels.c.container_id,
                     kernels.c.session_id,
@@ -254,7 +254,7 @@ class GroupRepository:
                     groups.c.name,
                     users.c.email,
                     users.c.full_name,
-                ])
+                )
                 .select_from(j)
                 .where(
                     # Filter sessions which existence period overlaps with requested period
@@ -274,34 +274,34 @@ class GroupRepository:
             result = await conn.execute(query)
             rows = result.fetchall()
 
-        kernel_ids = [str(row["id"]) for row in rows]
+        kernel_ids = [str(row.id) for row in rows]
         raw_stats = await self._valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids)
 
         objs_per_group = {}
         local_tz = self._config_provider.config.system.timezone
 
         for row, raw_stat in zip(rows, raw_stats, strict=True):
-            group_id = str(row["group_id"])
-            last_stat = row["last_stat"]
+            group_id = str(row.group_id)
+            last_stat = row.last_stat
             if not last_stat:
                 if raw_stat is None:
-                    log.warning("stat object for {} not found on redis, skipping", str(row["id"]))
+                    log.warning("stat object for {} not found on redis, skipping", str(row.id))
                     continue
                 last_stat = msgpack.unpackb(raw_stat)
             nfs = None
-            if row["vfolder_mounts"]:
+            if row.vfolder_mounts:
                 # For >=22.03, return used host directories instead of volume host, which is not so useful.
-                nfs = list({str(mount.host_path) for mount in row["vfolder_mounts"]})
-            elif row["mounts"] and isinstance(row["mounts"][0], list):
+                nfs = list({str(mount.host_path) for mount in row.vfolder_mounts})
+            elif row.mounts and isinstance(row.mounts[0], list):
                 # For the kernel records that have legacy contents of `mounts`.
-                nfs = list({mount[2] for mount in row["mounts"]})
-            if row["terminated_at"] is None:
+                nfs = list({mount[2] for mount in row.mounts})
+            if row.terminated_at is None:
                 used_time = used_days = None
             else:
-                used_time = str(row["terminated_at"] - row["created_at"])
+                used_time = str(row.terminated_at - row.created_at)
                 used_days = (
-                    row["terminated_at"].astimezone(local_tz).toordinal()
-                    - row["created_at"].astimezone(local_tz).toordinal()
+                    row.terminated_at.astimezone(local_tz).toordinal()
+                    - row.created_at.astimezone(local_tz).toordinal()
                     + 1
                 )
             device_type = set()
@@ -318,17 +318,17 @@ class GroupRepository:
                 if SlotName(key).is_accelerator():
                     gpu_allocated += value
             c_info = {
-                "id": str(row["id"]),
-                "session_id": str(row["session_id"]),
-                "container_id": row["container_id"],
-                "domain_name": row["domain_name"],
-                "group_id": str(row["group_id"]),
-                "group_name": row["name"],
-                "name": row["session_name"],
-                "access_key": row["access_key"],
-                "email": row["email"],
-                "full_name": row["full_name"],
-                "agent": row["agent"],
+                "id": str(row.id),
+                "session_id": str(row.session_id),
+                "container_id": row.container_id,
+                "domain_name": row.domain_name,
+                "group_id": str(row.group_id),
+                "group_name": row.name,
+                "name": row.session_name,
+                "access_key": row.access_key,
+                "email": row.email,
+                "full_name": row.full_name,
+                "agent": row.agent,
                 "cpu_allocated": float(row.occupied_slots.get("cpu", 0)),
                 "cpu_used": float(nmget(last_stat, "cpu_used.current", 0)),
                 "mem_allocated": int(row.occupied_slots.get("mem", 0)),
@@ -345,21 +345,21 @@ class GroupRepository:
                 "gpu_mem_allocated": float(gpu_mem_allocated),
                 "gpu_allocated": float(gpu_allocated),
                 "nfs": nfs,
-                "image_id": row["image"],  # TODO: image id
-                "image_name": row["image"],
-                "created_at": str(row["created_at"]),
-                "terminated_at": str(row["terminated_at"]),
-                "status": row["status"].name,
-                "status_info": row["status_info"],
-                "status_changed": str(row["status_changed"]),
-                "status_history": row["status_history"] or {},
-                "cluster_mode": row["cluster_mode"],
+                "image_id": row.image,  # TODO: image id
+                "image_name": row.image,
+                "created_at": str(row.created_at),
+                "terminated_at": str(row.terminated_at),
+                "status": row.status.name,
+                "status_info": row.status_info,
+                "status_changed": str(row.status_changed),
+                "status_history": row.status_history or {},
+                "cluster_mode": row.cluster_mode,
             }
             if group_id not in objs_per_group:
                 objs_per_group[group_id] = {
-                    "domain_name": row["domain_name"],
+                    "domain_name": row.domain_name,
                     "g_id": group_id,
-                    "g_name": row["name"],  # this is group's name
+                    "g_name": row.name,  # this is group's name
                     "g_cpu_allocated": c_info["cpu_allocated"],
                     "g_cpu_used": c_info["cpu_used"],
                     "g_mem_allocated": c_info["mem_allocated"],
@@ -411,14 +411,14 @@ class GroupRepository:
     ) -> bool:
         """Check if group has vfolders mounted to active kernels."""
         # Get group vfolder IDs
-        query = sa.select([vfolders.c.id]).select_from(vfolders).where(vfolders.c.group == group_id)
+        query = sa.select(vfolders.c.id).select_from(vfolders).where(vfolders.c.group == group_id)
         result = await session.execute(query)
         rows = result.fetchall()
-        group_vfolder_ids = [row["id"] for row in rows]
+        group_vfolder_ids = [row.id for row in rows]
 
         # Check if any active kernels have these vfolders mounted
         query = (
-            sa.select([kernels.c.mounts])
+            sa.select(kernels.c.mounts)
             .select_from(kernels)
             .where(
                 (kernels.c.group_id == group_id)
@@ -426,7 +426,7 @@ class GroupRepository:
             )
         )
         async for row in await session.stream(query):
-            for _mount in row["mounts"]:
+            for _mount in row.mounts:
                 try:
                     vfolder_id = uuid.UUID(_mount[2])
                     if vfolder_id in group_vfolder_ids:
@@ -440,7 +440,7 @@ class GroupRepository:
     ) -> bool:
         """Check if group has active kernels."""
         query = (
-            sa.select([sa.func.count()])
+            sa.select(sa.func.count())
             .select_from(kernels)
             .where(
                 (kernels.c.group_id == group_id)

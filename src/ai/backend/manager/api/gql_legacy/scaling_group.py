@@ -397,18 +397,18 @@ class ScalingGroup(graphene.ObjectType):
         if row is None:
             return None
         return cls(
-            name=row["name"],
-            description=row["description"],
-            is_active=row["is_active"],
-            is_public=row["is_public"],
-            created_at=row["created_at"],
-            wsproxy_addr=row["wsproxy_addr"],
-            wsproxy_api_token=row["wsproxy_api_token"],
-            driver=row["driver"],
-            driver_opts=row["driver_opts"],
-            scheduler=row["scheduler"],
-            scheduler_opts=row["scheduler_opts"].to_json(),
-            use_host_network=row["use_host_network"],
+            name=row.name,
+            description=row.description,
+            is_active=row.is_active,
+            is_public=row.is_public,
+            created_at=row.created_at,
+            wsproxy_addr=row.wsproxy_addr,
+            wsproxy_api_token=row.wsproxy_api_token,
+            driver=row.driver,
+            driver_opts=row.driver_opts,
+            scheduler=row.scheduler,
+            scheduler_opts=row.scheduler_opts.to_json(),
+            use_host_network=row.use_host_network,
         )
 
     @classmethod
@@ -448,7 +448,7 @@ class ScalingGroup(graphene.ObjectType):
         *,
         is_active: Optional[bool] = None,
     ) -> Sequence[ScalingGroup]:
-        query = sa.select([scaling_groups]).select_from(scaling_groups)
+        query = sa.select(scaling_groups).select_from(scaling_groups)
         if is_active is not None:
             query = query.where(scaling_groups.c.is_active == is_active)
         async with ctx.db.begin_readonly() as conn:
@@ -472,7 +472,7 @@ class ScalingGroup(graphene.ObjectType):
             scaling_groups.c.name == sgroups_for_domains.c.scaling_group,
         )
         query = (
-            sa.select([scaling_groups]).select_from(j).where(sgroups_for_domains.c.domain == domain)
+            sa.select(scaling_groups).select_from(j).where(sgroups_for_domains.c.domain == domain)
         )
         if is_active is not None:
             query = query.where(scaling_groups.c.is_active == is_active)
@@ -497,7 +497,7 @@ class ScalingGroup(graphene.ObjectType):
             scaling_groups.c.name == sgroups_for_groups.c.scaling_group,
         )
         query = (
-            sa.select([scaling_groups]).select_from(j).where(sgroups_for_groups.c.group == group)
+            sa.select(scaling_groups).select_from(j).where(sgroups_for_groups.c.group == group)
         )
         if is_active is not None:
             query = query.where(scaling_groups.c.is_active == is_active)
@@ -522,7 +522,7 @@ class ScalingGroup(graphene.ObjectType):
             scaling_groups.c.name == sgroups_for_keypairs.c.scaling_group,
         )
         query = (
-            sa.select([scaling_groups])
+            sa.select(scaling_groups)
             .select_from(j)
             .where(sgroups_for_keypairs.c.access_key == access_key)
         )
@@ -547,7 +547,7 @@ class ScalingGroup(graphene.ObjectType):
             scaling_groups.c.name == sgroups_for_groups.c.scaling_group,
         )
         query = (
-            sa.select([scaling_groups, sgroups_for_groups.c.group])
+            sa.select(scaling_groups, sgroups_for_groups.c.group)
             .select_from(j)
             .where(sgroups_for_groups.c.group.in_(group_ids))
         )
@@ -558,7 +558,7 @@ class ScalingGroup(graphene.ObjectType):
                 query,
                 cls,
                 group_ids,
-                lambda row: row["group"],
+                lambda row: row.group,
             )
 
     @classmethod
@@ -568,7 +568,7 @@ class ScalingGroup(graphene.ObjectType):
         names: Sequence[str],
     ) -> Sequence[ScalingGroup | None]:
         query = (
-            sa.select([scaling_groups])
+            sa.select(scaling_groups)
             .select_from(scaling_groups)
             .where(scaling_groups.c.name.in_(names))
         )
@@ -579,7 +579,7 @@ class ScalingGroup(graphene.ObjectType):
                 query,
                 cls,
                 names,
-                lambda row: row["name"],
+                lambda row: row.name,
             )
 
 

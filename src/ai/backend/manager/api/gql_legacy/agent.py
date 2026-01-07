@@ -483,7 +483,7 @@ class Agent(graphene.ObjectType):
             status_list = [AgentStatus[s] for s in raw_status.split(",")]
         elif isinstance(raw_status, AgentStatus):
             status_list = [raw_status]
-        query = sa.select([sa.func.count()]).select_from(agents)
+        query = sa.select(sa.func.count()).select_from(agents)
         if scaling_group is not None:
             query = query.where(agents.c.scaling_group == scaling_group)
         if raw_status is not None:
@@ -511,7 +511,7 @@ class Agent(graphene.ObjectType):
             status_list = [AgentStatus[s] for s in raw_status.split(",")]
         elif isinstance(raw_status, AgentStatus):
             status_list = [raw_status]
-        query = sa.select([agents]).select_from(agents).limit(limit).offset(offset)
+        query = sa.select(agents).select_from(agents).limit(limit).offset(offset)
         if scaling_group is not None:
             query = query.where(agents.c.scaling_group == scaling_group)
         if raw_status is not None:
@@ -624,7 +624,7 @@ async def _query_domain_groups_by_ak(
     kp_user_join = sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
     if domain_name is None:
         domain_query = (
-            sa.select([users.c.uuid, users.c.domain_name])
+            sa.select(users.c.uuid, users.c.domain_name)
             .select_from(kp_user_join)
             .where(keypairs.c.access_key == access_key)
         )

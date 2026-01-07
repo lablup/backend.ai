@@ -234,7 +234,7 @@ class ResourcePresetDBSource:
             association_groups_users.c.group_id == groups.c.id,
         )
         query = (
-            sa.select([groups.c.id, groups.c.total_resource_slots])
+            sa.select(groups.c.id, groups.c.total_resource_slots)
             .select_from(j)
             .where(
                 (association_groups_users.c.user_id == user_id)
@@ -247,7 +247,7 @@ class ResourcePresetDBSource:
         if row is None:
             raise ProjectNotFound(f"Project not found (name: {group_name})")
 
-        return row["id"], row["total_resource_slots"]
+        return row.id, row.total_resource_slots
 
     async def _get_domain_resource_slots(
         self,
@@ -262,7 +262,7 @@ class ResourcePresetDBSource:
         :param domain_name: Domain name
         :return: ResourceUsageData with domain resource slots
         """
-        query = sa.select([domains.c.total_resource_slots]).where(domains.c.name == domain_name)
+        query = sa.select(domains.c.total_resource_slots).where(domains.c.name == domain_name)
         result = await db_sess.execute(query)
         domain_resource_slots = result.first()[0]
         if domain_resource_slots is None:
@@ -304,7 +304,7 @@ class ResourcePresetDBSource:
 
         j = sa.join(KernelRow, SessionRow, KernelRow.session_id == SessionRow.id)
         query = (
-            sa.select([KernelRow.occupied_slots, SessionRow.scaling_group_name])
+            sa.select(KernelRow.occupied_slots, SessionRow.scaling_group_name)
             .select_from(j)
             .where(
                 (KernelRow.user_uuid == user_id)
@@ -313,8 +313,8 @@ class ResourcePresetDBSource:
             )
         )
         async for row in await db_sess.stream(query):
-            if row["occupied_slots"]:
-                per_sgroup_occupancy[row["scaling_group_name"]] += row["occupied_slots"]
+            if row.occupied_slots:
+                per_sgroup_occupancy[row.scaling_group_name] += row.occupied_slots
 
         return per_sgroup_occupancy
 
@@ -415,7 +415,7 @@ class ResourcePresetDBSource:
             for filter_obj in filters:
                 conditions.append(filter_obj.get_condition())
 
-        query = sa.select([KernelRow.occupied_slots]).where(sa.and_(*conditions))
+        query = sa.select(KernelRow.occupied_slots).where(sa.and_(*conditions))
 
         total = ResourceSlot.from_known_slots(known_slot_types)
         async for row in await db_sess.stream(query):

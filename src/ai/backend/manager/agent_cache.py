@@ -99,7 +99,7 @@ class AgentRPCCache:
         async def _fetch_agent() -> Row:
             async with self.db.begin_readonly() as conn:
                 query = (
-                    sa.select([agents.c.addr, agents.c.public_key])
+                    sa.select(agents.c.addr, agents.c.public_key)
                     .select_from(agents)
                     .where(
                         agents.c.id == agent_id,
@@ -109,7 +109,7 @@ class AgentRPCCache:
                 return result.first()
 
         agent = await execute_with_retry(_fetch_agent)
-        return agent["addr"], agent["public_key"]
+        return agent.addr, agent.public_key
 
     @actxmgr
     async def rpc_context(
