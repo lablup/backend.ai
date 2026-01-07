@@ -80,8 +80,6 @@ async def execute_creator(
         await insert_on_conflict_do_nothing(
             db_sess,
             EntityFieldRow(
-                scope_type=scope_id.scope_type,
-                scope_id=scope_id.scope_id,
                 entity_type=entity_id.entity_type,
                 entity_id=entity_id.entity_id,
                 field_type=field_id.entity_type,
