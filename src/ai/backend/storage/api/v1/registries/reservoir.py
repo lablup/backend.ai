@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import logging
-import uuid
+from collections.abc import Callable
 from http import HTTPStatus
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from aiohttp import web
 
@@ -24,6 +25,7 @@ from ai.backend.storage.services.artifacts.reservoir import (
     ReservoirServiceArgs,
     create_reservoir_import_pipeline,
 )
+from ai.backend.storage.services.storages.vfolder_storage import VFolderStorageService
 from ai.backend.storage.utils import log_client_api_entry
 
 if TYPE_CHECKING:
@@ -34,12 +36,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class ReservoirRegistryAPIHandler:
     _reservoir_service: ReservoirService
+    _vfolder_storage_service: VFolderStorageService
 
     def __init__(
         self,
         reservoir_service: ReservoirService,
+        vfolder_storage_service: VFolderStorageService,
     ) -> None:
         self._reservoir_service = reservoir_service
+        self._vfolder_storage_service = vfolder_storage_service
 
     @api_handler
     async def import_models(
@@ -51,11 +56,23 @@ class ReservoirRegistryAPIHandler:
         """
         await log_client_api_entry(log, "import_models", None)
 
+        storage_step_mappings = body.parsed.storage_step_mappings
+        cleanup_callback: Callable[[], None] | None = None
+
+        # If vfid is provided, create VFolderStorage and register it
+        if body.parsed.vfid is not None:
+            setup_result = await self._vfolder_storage_service.setup(
+                vfid=body.parsed.vfid,
+                storage_step_mappings=storage_step_mappings,
+            )
+            storage_step_mappings = setup_result.storage_step_mappings
+            cleanup_callback = setup_result.cleanup_callback
+
         # Create import pipeline based on storage step mappings
         pipeline = create_reservoir_import_pipeline(
             storage_pool=self._reservoir_service._storage_pool,
             registry_configs=self._reservoir_service._reservoir_registry_configs,
-            storage_step_mappings=body.parsed.storage_step_mappings,
+            storage_step_mappings=storage_step_mappings,
             transfer_manager=self._reservoir_service._transfer_manager,
             artifact_verifier_ctx=self._reservoir_service._artifact_verifier_ctx,
             event_producer=self._reservoir_service._event_producer,
@@ -66,11 +83,10 @@ class ReservoirRegistryAPIHandler:
         task_id = await self._reservoir_service.import_models_batch(
             registry_name=body.parsed.registry_name,
             models=body.parsed.models,
-            storage_step_mappings=body.parsed.storage_step_mappings,
+            storage_step_mappings=storage_step_mappings,
             pipeline=pipeline,
-            artifact_revision_ids=[
-                uuid.UUID(rev_id) for rev_id in body.parsed.artifact_revision_ids
-            ],
+            artifact_revision_ids=[UUID(rev_id) for rev_id in body.parsed.artifact_revision_ids],
+            on_complete=cleanup_callback,
         )
 
         return APIResponse.build(
@@ -95,8 +111,13 @@ def create_app(ctx: RootContext) -> web.Application:
             redis_client=ctx.valkey_artifact_client,
         )
     )
+    vfolder_storage_service = VFolderStorageService(
+        volume_pool=ctx.volume_pool,
+        storage_pool=ctx.storage_pool,
+    )
     reservoir_api_handler = ReservoirRegistryAPIHandler(
         reservoir_service=reservoir_service,
+        vfolder_storage_service=vfolder_storage_service,
     )
 
     app.router.add_route("POST", "/import", reservoir_api_handler.import_models)

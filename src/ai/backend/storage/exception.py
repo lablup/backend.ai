@@ -77,6 +77,19 @@ class VFolderNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
+class VFolderFileNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/storage/vfolder/file/not-found"
+    error_title = "VFolder File Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class QuotaDirectoryNotEmptyError(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/storage/quota-directory-not-empty"
     error_title = "Quota Directory Not Empty"

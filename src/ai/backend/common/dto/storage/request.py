@@ -277,6 +277,13 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
         """,
         examples=[{"download": "fast-storage", "archive": "long-term-storage"}],
     )
+    vfid: Optional[VFolderIDField] = Field(
+        default=None,
+        description="""
+        Optional vfolder ID to use as the download destination.
+        If provided, artifacts will be downloaded to this vfolder's path.
+        """,
+    )
 
 
 class HuggingFaceGetCommitHashReqPathParam(BaseRequestModel):
@@ -340,6 +347,13 @@ class ReservoirImportModelsReq(BaseRequestModel):
     # Must have 1:1 correspondence with the models list.
     artifact_revision_ids: list[str] = Field(
         description="Artifact revision IDs corresponding to each model in the models list.",
+    )
+    vfid: Optional[VFolderIDField] = Field(
+        default=None,
+        description="""
+        Optional vfolder ID to use as the download destination.
+        If provided, artifacts will be downloaded to this vfolder's path.
+        """,
     )
 
 
