@@ -19,7 +19,7 @@ from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, AsyncIterator, Final, Iterator, Sequence, cast
+from typing import Any, Final, cast
 
 import aiofiles
 import aiotools
