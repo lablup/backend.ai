@@ -531,9 +531,12 @@ class ImportArtifactsInput:
     artifact_revision_ids: list[ID]
     vfolder_id: Optional[ID] = strawberry.field(
         default=None,
-        description="Optional vfolder ID to use as the download destination. "
-        "If provided, artifacts will be downloaded to this vfolder's path "
-        "using the vfolder's storage host for all import steps.",
+        description=dedent_strip("""
+        Added in 26.1.0.
+
+        Optional vfolder ID to use as the download destination.
+        If provided, artifacts will be downloaded to this vfolder's path using the vfolder's storage host for all import steps.
+        """),
     )
 
 

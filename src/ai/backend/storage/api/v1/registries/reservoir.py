@@ -126,9 +126,7 @@ class ReservoirRegistryAPIHandler:
             models=body.parsed.models,
             storage_step_mappings=storage_step_mappings,
             pipeline=pipeline,
-            artifact_revision_ids=[
-                UUID(rev_id) for rev_id in body.parsed.artifact_revision_ids
-            ],
+            artifact_revision_ids=[UUID(rev_id) for rev_id in body.parsed.artifact_revision_ids],
             on_complete=cleanup_callback,
         )
 
