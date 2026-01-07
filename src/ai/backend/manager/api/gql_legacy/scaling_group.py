@@ -15,6 +15,7 @@ import graphene
 import graphene_federation
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
+from graphql.pyutils import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import load_only
 
@@ -657,27 +658,15 @@ class ModifyScalingGroupInput(graphene.InputObjectType):
             ),
         )
         driver_spec = ScalingGroupDriverConfigUpdaterSpec(
-            driver=(
-                OptionalState.update(self.driver)
-                if self.driver is not None
-                else OptionalState.nop()
-            ),
-            driver_opts=(
-                OptionalState.update(self.driver_opts)
-                if self.driver_opts is not None
-                else OptionalState.nop()
-            ),
+            driver=OptionalState.from_graphql(self.driver),
+            driver_opts=OptionalState.from_graphql(self.driver_opts),
         )
         scheduler_spec = ScalingGroupSchedulerConfigUpdaterSpec(
-            scheduler=(
-                OptionalState.update(self.scheduler)
-                if self.scheduler is not None
-                else OptionalState.nop()
-            ),
-            scheduler_opts=(
-                OptionalState.update(ScalingGroupOpts.from_json(self.scheduler_opts))
-                if self.scheduler_opts is not None
-                else OptionalState.nop()
+            scheduler=OptionalState.from_graphql(self.scheduler),
+            scheduler_opts=OptionalState.from_graphql(
+                ScalingGroupOpts.from_json(self.scheduler_opts)
+                if self.scheduler_opts is not None and self.scheduler_opts is not Undefined
+                else Undefined
             ),
         )
         spec = ScalingGroupUpdaterSpec(
