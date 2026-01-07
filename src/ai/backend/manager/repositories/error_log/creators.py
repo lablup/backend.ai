@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, override
 
 from ai.backend.manager.data.error_log.types import ErrorLogSeverity
