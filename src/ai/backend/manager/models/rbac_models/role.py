@@ -8,7 +8,9 @@ from typing import (
 
 import sqlalchemy as sa
 from sqlalchemy.orm import (
+    Mapped,
     foreign,
+    mapped_column,
     relationship,
 )
 
@@ -21,8 +23,8 @@ from ai.backend.manager.data.permission.status import (
 )
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.models.base import (
+    GUID,
     Base,
-    IDColumn,
     StrEnumType,
 )
 
@@ -54,40 +56,46 @@ class RoleRow(Base):
     __tablename__ = "roles"
     __table_args__ = (sa.Index("ix_id_status", "id", "status"),)
 
-    id: uuid.UUID = IDColumn()
-    name: str = sa.Column("name", sa.String(64), nullable=False)
-    description: str | None = sa.Column("description", sa.Text, nullable=True)
-    source: RoleSource = sa.Column(
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    name: Mapped[str] = mapped_column("name", sa.String(64), nullable=False)
+    description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
+    source: Mapped[RoleSource] = mapped_column(
         "source",
         StrEnumType(RoleSource, length=16),
         nullable=False,
         default=RoleSource.SYSTEM,
         server_default=str(RoleSource.SYSTEM),
     )
-    status: RoleStatus = sa.Column(
+    status: Mapped[RoleStatus] = mapped_column(
         "status",
         StrEnumType(RoleStatus),
         nullable=False,
         default=RoleStatus.ACTIVE,
         server_default=RoleStatus.ACTIVE,
     )
-    created_at: datetime = sa.Column(
+    created_at: Mapped[datetime] = mapped_column(
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
-    updated_at: datetime | None = sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True)
-    deleted_at: datetime | None = sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(
+        "updated_at", sa.DateTime(timezone=True), nullable=True
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        "deleted_at", sa.DateTime(timezone=True), nullable=True
+    )
 
-    mapped_user_role_rows: list[UserRoleRow] = relationship(
+    mapped_user_role_rows: Mapped[list[UserRoleRow]] = relationship(
         "UserRoleRow",
         back_populates="role_row",
         primaryjoin=_get_mapped_user_role_rows_join_condition,
     )
-    object_permission_rows: list[ObjectPermissionRow] = relationship(
+    object_permission_rows: Mapped[list[ObjectPermissionRow]] = relationship(
         "ObjectPermissionRow",
         back_populates="role_row",
         primaryjoin=_get_object_permission_rows_join_condition,
     )
-    permission_group_rows: list[PermissionGroupRow] = relationship(
+    permission_group_rows: Mapped[list[PermissionGroupRow]] = relationship(
         "PermissionGroupRow",
         back_populates="role_row",
         primaryjoin=_get_permission_group_rows_join_condition,

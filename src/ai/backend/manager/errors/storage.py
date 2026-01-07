@@ -37,12 +37,12 @@ class TooManyVFoldersFound(BackendAIError, web.HTTPNotFound):
     def __init__(self, matched_rows: Sequence[VFolderRow]) -> None:
         serialized_matches = [
             {
-                "id": row["id"],
-                "host": row["host"],
-                "user": row["user_email"],
-                "user_id": row["user"],
-                "group": row["group_name"],
-                "group_id": row["group"],
+                "id": row.id,
+                "host": row.host,
+                "user": row.user_email,
+                "user_id": row.user,
+                "group": row.group_name,
+                "group_id": row.group,
             }
             for row in matched_rows
         ]

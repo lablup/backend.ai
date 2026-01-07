@@ -3,13 +3,14 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, Optional, Self
+from typing import TYPE_CHECKING, Any, Self
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
+from ai.backend.common.types import ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.base import (
@@ -17,6 +18,9 @@ from ai.backend.manager.models.base import (
     Base,
     ResourceSlotColumn,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.scaling_group import ScalingGroupRow
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models"))
 
@@ -48,15 +52,19 @@ class ResourcePresetRow(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    name = sa.Column("name", sa.String(length=256), nullable=False)
-    resource_slots = sa.Column("resource_slots", ResourceSlotColumn(), nullable=False)
-    shared_memory = sa.Column("shared_memory", sa.BigInteger(), nullable=True)
+    name: Mapped[str] = mapped_column("name", sa.String(length=256), nullable=False)
+    resource_slots: Mapped[ResourceSlot] = mapped_column(
+        "resource_slots", ResourceSlotColumn(), nullable=False
+    )
+    shared_memory: Mapped[int | None] = mapped_column(
+        "shared_memory", sa.BigInteger(), nullable=True
+    )
 
     # If `scaling_group_name` is None, the preset is global
-    scaling_group_name = sa.Column(
+    scaling_group_name: Mapped[str | None] = mapped_column(
         "scaling_group_name", sa.String(length=64), nullable=True, server_default=sa.null()
     )
-    scaling_group_row = relationship(
+    scaling_group_row: Mapped[ScalingGroupRow | None] = relationship(
         "ScalingGroupRow",
         back_populates="resource_preset_rows",
         primaryjoin=_get_scaling_group_join_condition,
