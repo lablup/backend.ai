@@ -7,8 +7,8 @@ from ai.backend.manager.services.scaling_group.actions.associate_with_domain imp
     AssociateScalingGroupWithDomainsActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.associate_with_user_group import (
-    AssociateScalingGroupWithUserGroupAction,
-    AssociateScalingGroupWithUserGroupActionResult,
+    AssociateScalingGroupWithUserGroupsAction,
+    AssociateScalingGroupWithUserGroupsActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.create import (
     CreateScalingGroupAction,
@@ -94,12 +94,12 @@ class ScalingGroupService:
         await self._repository.disassociate_scaling_group_with_domains(action.purger)
         return DisassociateScalingGroupWithDomainsActionResult()
 
-    async def associate_scaling_group_with_user_group(
-        self, action: AssociateScalingGroupWithUserGroupAction
-    ) -> AssociateScalingGroupWithUserGroupActionResult:
-        """Associates a single scaling group with a user group (project)."""
-        await self._repository.associate_scaling_group_with_user_group(action.creator)
-        return AssociateScalingGroupWithUserGroupActionResult()
+    async def associate_scaling_group_with_user_groups(
+        self, action: AssociateScalingGroupWithUserGroupsAction
+    ) -> AssociateScalingGroupWithUserGroupsActionResult:
+        """Associates a scaling group with multiple user groups (projects)."""
+        await self._repository.associate_scaling_group_with_user_groups(action.bulk_creator)
+        return AssociateScalingGroupWithUserGroupsActionResult()
 
     async def disassociate_scaling_group_with_user_group(
         self, action: DisassociateScalingGroupWithUserGroupAction

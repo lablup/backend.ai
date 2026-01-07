@@ -120,12 +120,12 @@ class ScalingGroupRepository:
             domain=domain,
         )
 
-    async def associate_scaling_group_with_user_group(
+    async def associate_scaling_group_with_user_groups(
         self,
-        creator: Creator[ScalingGroupForProjectRow],
+        bulk_creator: BulkCreator[ScalingGroupForProjectRow],
     ) -> None:
-        """Associates a single scaling group with a user group (project)."""
-        await self._db_source.associate_scaling_group_with_user_group(creator)
+        """Associates a scaling group with multiple user groups (projects)."""
+        await self._db_source.associate_scaling_group_with_user_groups(bulk_creator)
 
     async def disassociate_scaling_group_with_user_group(
         self,

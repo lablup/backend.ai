@@ -8,8 +8,8 @@ from ai.backend.manager.services.scaling_group.actions.associate_with_domain imp
     AssociateScalingGroupWithDomainsActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.associate_with_user_group import (
-    AssociateScalingGroupWithUserGroupAction,
-    AssociateScalingGroupWithUserGroupActionResult,
+    AssociateScalingGroupWithUserGroupsAction,
+    AssociateScalingGroupWithUserGroupsActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.create import (
     CreateScalingGroupAction,
@@ -51,8 +51,8 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
     disassociate_scaling_group_with_domains: ActionProcessor[
         DisassociateScalingGroupWithDomainsAction, DisassociateScalingGroupWithDomainsActionResult
     ]
-    associate_scaling_group_with_user_group: ActionProcessor[
-        AssociateScalingGroupWithUserGroupAction, AssociateScalingGroupWithUserGroupActionResult
+    associate_scaling_group_with_user_groups: ActionProcessor[
+        AssociateScalingGroupWithUserGroupsAction, AssociateScalingGroupWithUserGroupsActionResult
     ]
     disassociate_scaling_group_with_user_group: ActionProcessor[
         DisassociateScalingGroupWithUserGroupAction,
@@ -70,8 +70,8 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         self.disassociate_scaling_group_with_domains = ActionProcessor(
             service.disassociate_scaling_group_with_domains, action_monitors
         )
-        self.associate_scaling_group_with_user_group = ActionProcessor(
-            service.associate_scaling_group_with_user_group, action_monitors
+        self.associate_scaling_group_with_user_groups = ActionProcessor(
+            service.associate_scaling_group_with_user_groups, action_monitors
         )
         self.disassociate_scaling_group_with_user_group = ActionProcessor(
             service.disassociate_scaling_group_with_user_group, action_monitors
@@ -86,6 +86,6 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
             SearchScalingGroupsAction.spec(),
             AssociateScalingGroupWithDomainsAction.spec(),
             DisassociateScalingGroupWithDomainsAction.spec(),
-            AssociateScalingGroupWithUserGroupAction.spec(),
+            AssociateScalingGroupWithUserGroupsAction.spec(),
             DisassociateScalingGroupWithUserGroupAction.spec(),
         ]

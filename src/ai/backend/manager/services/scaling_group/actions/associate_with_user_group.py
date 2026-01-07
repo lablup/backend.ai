@@ -5,21 +5,21 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow
-from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.creator import BulkCreator
 
 from .base import ScalingGroupAction
 
 
 @dataclass
-class AssociateScalingGroupWithUserGroupAction(ScalingGroupAction):
-    """Action to associate a single scaling group with a user group (project)."""
+class AssociateScalingGroupWithUserGroupsAction(ScalingGroupAction):
+    """Action to associate a scaling group with multiple user groups (projects)."""
 
-    creator: Creator[ScalingGroupForProjectRow]
+    bulk_creator: BulkCreator[ScalingGroupForProjectRow]
 
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "associate_with_user_group"
+        return "associate_with_user_groups"
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -27,8 +27,8 @@ class AssociateScalingGroupWithUserGroupAction(ScalingGroupAction):
 
 
 @dataclass
-class AssociateScalingGroupWithUserGroupActionResult(BaseActionResult):
-    """Result of associating a scaling group with a user group."""
+class AssociateScalingGroupWithUserGroupsActionResult(BaseActionResult):
+    """Result of associating a scaling group with user groups."""
 
     @override
     def entity_id(self) -> Optional[str]:
