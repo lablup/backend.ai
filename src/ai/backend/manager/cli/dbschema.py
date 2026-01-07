@@ -240,7 +240,11 @@ def oneshot(cli_ctx: CLIContext, alembic_config: str) -> None:
         metadata.create_all(engine, checkfirst=False)
         log.info("Stamping alembic version to head...")
         script = ScriptDirectory.from_config(alembic_cfg)
-        head_rev = script.get_heads()[0]
+        heads = script.get_heads()
+        if not heads:
+            log.warning("No alembic migration heads found, skipping version stamping")
+            return
+        head_rev = heads[0]
         connection.exec_driver_sql("CREATE TABLE alembic_version (\nversion_num varchar(32)\n);")
         connection.exec_driver_sql(f"INSERT INTO alembic_version VALUES('{head_rev}')")
 

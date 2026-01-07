@@ -38,8 +38,18 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
+from ai.backend.manager.repositories.scaling_group.updaters import (
+    ScalingGroupDriverConfigUpdaterSpec,
+    ScalingGroupMetadataUpdaterSpec,
+    ScalingGroupNetworkConfigUpdaterSpec,
+    ScalingGroupSchedulerConfigUpdaterSpec,
+    ScalingGroupStatusUpdaterSpec,
+    ScalingGroupUpdaterSpec,
+)
+from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 
 
@@ -175,6 +185,32 @@ class TestScalingGroupRepositoryDB:
         yield await self._create_scaling_groups(db_with_cleanup, 15)
 
     @pytest.fixture
+    async def sample_scaling_group_for_update(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create a single scaling group for update testing"""
+        sgroup_name = f"{uuid.uuid4()}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                description="Test scaling group for update",
+                is_active=True,
+                is_public=True,
+                created_at=datetime.now(tz=UTC),
+                wsproxy_addr=None,
+                wsproxy_api_token=None,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+                use_host_network=False,
+            )
+            db_sess.add(sgroup)
+            await db_sess.flush()
+        yield sgroup_name
+
+    @pytest.fixture
     async def sample_scaling_group_for_purge(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -185,6 +221,32 @@ class TestScalingGroupRepositoryDB:
             sgroup = ScalingGroupRow(
                 name=sgroup_name,
                 description="Test scaling group for purge",
+                is_active=True,
+                is_public=True,
+                created_at=datetime.now(tz=UTC),
+                wsproxy_addr=None,
+                wsproxy_api_token=None,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+                use_host_network=False,
+            )
+            db_sess.add(sgroup)
+            await db_sess.flush()
+        yield sgroup_name
+
+    @pytest.fixture
+    async def scaling_group_for_update(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create a single scaling group for update testing"""
+        sgroup_name = f"test-sgroup-update-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                description="Test scaling group for update",
                 is_active=True,
                 is_public=True,
                 created_at=datetime.now(tz=UTC),
@@ -534,6 +596,70 @@ class TestScalingGroupRepositoryDB:
         # Second creation with same name should raise conflict
         with pytest.raises(ScalingGroupConflict):
             await scaling_group_repository.create_scaling_group(creator)
+
+    # Update Tests
+
+    async def test_update_scaling_group_success(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        sample_scaling_group_for_update: str,
+    ) -> None:
+        """Test updating a scaling group"""
+        new_scheduler_opts = ScalingGroupOpts(
+            allowed_session_types=[SessionTypes.BATCH],
+        )
+        spec = ScalingGroupUpdaterSpec(
+            status=ScalingGroupStatusUpdaterSpec(
+                is_active=OptionalState.update(False),
+                is_public=OptionalState.update(False),
+            ),
+            metadata=ScalingGroupMetadataUpdaterSpec(
+                description=TriState.update("Updated description"),
+            ),
+            network=ScalingGroupNetworkConfigUpdaterSpec(
+                wsproxy_addr=TriState.update("http://new-wsproxy:5000"),
+                wsproxy_api_token=TriState.update("new-token"),
+                use_host_network=OptionalState.update(True),
+            ),
+            driver=ScalingGroupDriverConfigUpdaterSpec(
+                driver=OptionalState.update("docker"),
+                driver_opts=OptionalState.update({"new_opt": "value"}),
+            ),
+            scheduler=ScalingGroupSchedulerConfigUpdaterSpec(
+                scheduler=OptionalState.update("drf"),
+                scheduler_opts=OptionalState.update(new_scheduler_opts),
+            ),
+        )
+        updater = Updater(spec=spec, pk_value=sample_scaling_group_for_update)
+        result = await scaling_group_repository.update_scaling_group(updater)
+
+        assert result.metadata.description == "Updated description"
+        assert result.status.is_active is False
+        assert result.status.is_public is False
+        assert result.network.wsproxy_addr == "http://new-wsproxy:5000"
+        assert result.network.wsproxy_api_token == "new-token"
+        assert result.driver.name == "docker"
+        assert result.driver.options == {"new_opt": "value"}
+        assert result.scheduler.name.value == "drf"
+        assert SessionTypes.BATCH in result.scheduler.options.allowed_session_types
+        assert result.network.use_host_network is True
+
+    async def test_update_scaling_group_not_found(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+    ) -> None:
+        """Test updating a non-existent scaling group raises ScalingGroupNotFound"""
+        spec = ScalingGroupUpdaterSpec(
+            metadata=ScalingGroupMetadataUpdaterSpec(
+                description=TriState.update("Updated description"),
+            ),
+        )
+        updater = Updater(spec=spec, pk_value="test-sgroup-nonexistent")
+
+        with pytest.raises(ScalingGroupNotFound):
+            await scaling_group_repository.update_scaling_group(updater)
+
+    # Purge Tests
 
     async def test_purge_scaling_group_success(
         self,

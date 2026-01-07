@@ -5,6 +5,8 @@ from urllib.parse import urlencode
 import pytest
 from aioresponses import aioresponses
 
+# Explicitly import to ensure Pants includes this module in the test build
+import ai.backend.manager.api.group  # noqa: F401
 from ai.backend.manager.server import (
     database_ctx,
     hook_plugin_ctx,
@@ -16,7 +18,7 @@ from ai.backend.testutils.extra_fixtures import FIXTURES_FOR_HARBOR_CRUD_TEST
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST)
+@pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST, indirect=True)
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -104,7 +106,7 @@ async def test_harbor_create_project_quota(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST)
+@pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST, indirect=True)
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -185,7 +187,7 @@ async def test_harbor_read_project_quota(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST)
+@pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST, indirect=True)
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -273,7 +275,7 @@ async def test_harbor_update_project_quota(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST)
+@pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST, indirect=True)
 @pytest.mark.parametrize(
     "test_case",
     [

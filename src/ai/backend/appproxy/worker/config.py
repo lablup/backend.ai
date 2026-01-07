@@ -32,6 +32,13 @@ from ai.backend.appproxy.common.types import (
     ProxyProtocol,
 )
 from ai.backend.common import config
+from ai.backend.common.configs import (
+    EtcdConfig,
+    OTELConfig,
+    PyroscopeConfig,
+    ServiceDiscoveryConfig,
+)
+from ai.backend.common.meta import BackendAIConfigMeta
 from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import LogLevel
 from ai.backend.logging.config import LoggingConfig
@@ -137,36 +144,6 @@ class TraefikConfig(BaseSchema):
                 if self.wildcard_domain is None:
                     raise ValueError("wildcard_domain must be set when frontend_mode = 'wildcard'")
         return self
-
-
-class OTELConfig(BaseSchema):
-    enabled: bool = Field(
-        default=False,
-        description=(
-            "Whether to enable OpenTelemetry for tracing or logging. "
-            "When enabled, traces or log will be collected and sent to the configured OTLP endpoint."
-        ),
-    )
-    log_level: str = Field(
-        default="INFO",
-        description="Log level for OpenTelemetry logging.",
-        examples=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-    )
-    endpoint: str = Field(
-        default="http://localhost:4317",
-        description=(
-            "OTLP (OpenTelemetry Protocol) endpoint for exporting telemetry data. "
-            "Should include the host and port of the OTLP receiver."
-        ),
-        examples=["http://localhost:4317", "http://otel-collector:4317"],
-    )
-
-
-class ServiceDiscoveryConfig(BaseSchema):
-    type: ServiceDiscoveryType = Field(
-        default=ServiceDiscoveryType.REDIS,
-        description="Type of service discovery to use.",
-    )
 
 
 class ProxyWorkerConfig(BaseSchema):
@@ -384,6 +361,22 @@ class ServerConfig(BaseSchema):
     service_discovery: ServiceDiscoveryConfig = Field(
         default_factory=lambda: ServiceDiscoveryConfig(type=ServiceDiscoveryType.REDIS)
     )
+    etcd: Annotated[
+        EtcdConfig,
+        Field(default_factory=EtcdConfig),  # type: ignore[arg-type]
+        BackendAIConfigMeta(
+            description="Etcd configuration for distributed coordination.",
+            added_version="25.9.0",
+        ),
+    ]
+    pyroscope: Annotated[
+        PyroscopeConfig,
+        Field(default_factory=PyroscopeConfig),  # type: ignore[arg-type]
+        BackendAIConfigMeta(
+            description="Pyroscope profiling configuration.",
+            added_version="25.9.0",
+        ),
+    ]
 
 
 def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET) -> ServerConfig:

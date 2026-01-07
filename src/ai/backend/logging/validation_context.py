@@ -3,7 +3,7 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, ValidationInfo
 
-from ai.backend.logging.types import LogLevel
+from .types import LogLevel
 
 
 class BaseConfigValidationContext(BaseModel, ABC):
