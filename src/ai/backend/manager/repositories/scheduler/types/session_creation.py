@@ -104,6 +104,7 @@ class SessionCreationSpec:
     designated_agent_list: Optional[list[str]] = None
     internal_data: Optional[dict] = None
     public_sgroup_only: bool = True
+    startup_command: str | None = None
 
     @classmethod
     def from_deployment_info(
@@ -276,6 +277,7 @@ class SessionEnqueueData:
     bootstrap_script: Optional[str] = None
     use_host_network: bool = False
     timeout: Optional[int] = None
+    startup_command: str | None = None
 
 
 @dataclass
