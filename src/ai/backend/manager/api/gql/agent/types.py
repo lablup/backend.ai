@@ -251,7 +251,8 @@ class AgentSystemInfoGQL:
             Legacy configuration flag, no longer actively used in the system.
             Retained for backward compatibility and schema consistency.
             Originally intended to control automatic termination of misbehaving sessions.
-        """)
+        """),
+        deprecation_reason="Legacy feature no longer in use.",
     )
     compute_plugins: JSON = strawberry.field(
         description=dedent_strip("""
