@@ -15,7 +15,8 @@ from dateutil.tz import tzutc
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import load_only, selectinload, sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.resource.types import TotalResourceData
@@ -162,9 +163,8 @@ class ScheduleDBSource:
             )
             async with conn_with_isolation.begin():
                 # Configure session factory with the connection
-                sess_factory = sessionmaker(
+                sess_factory = async_sessionmaker(
                     bind=conn_with_isolation,
-                    class_=SASession,
                     expire_on_commit=False,
                 )
                 session = sess_factory()
@@ -180,9 +180,8 @@ class ScheduleDBSource:
             conn_with_isolation = await conn.execution_options(isolation_level="READ COMMITTED")
             async with conn_with_isolation.begin():
                 # Configure session factory with the connection
-                sess_factory = sessionmaker(
+                sess_factory = async_sessionmaker(
                     bind=conn_with_isolation,
-                    class_=SASession,
                     expire_on_commit=False,
                 )
                 session = sess_factory()

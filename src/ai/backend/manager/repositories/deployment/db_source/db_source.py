@@ -12,7 +12,8 @@ import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload, sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.types import (
@@ -175,9 +176,8 @@ class DeploymentDBSource:
             )
             async with conn_with_isolation.begin():
                 # Configure session factory with the connection
-                sess_factory = sessionmaker(
+                sess_factory = async_sessionmaker(
                     bind=conn_with_isolation,
-                    class_=SASession,
                     expire_on_commit=False,
                 )
                 session = sess_factory()
@@ -193,9 +193,8 @@ class DeploymentDBSource:
             conn_with_isolation = await conn.execution_options(isolation_level="READ COMMITTED")
             async with conn_with_isolation.begin():
                 # Configure session factory with the connection
-                sess_factory = sessionmaker(
+                sess_factory = async_sessionmaker(
                     bind=conn_with_isolation,
-                    class_=SASession,
                     expire_on_commit=False,
                 )
                 session = sess_factory()

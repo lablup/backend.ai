@@ -24,7 +24,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -66,8 +66,8 @@ class ExtendedAsyncSAEngine(SAEngine):
         super().__init__(*args, **kwargs)
         self._readonly_txn_count = 0
         self._generic_txn_count = 0
-        self._sess_factory = sessionmaker(self, expire_on_commit=False, class_=SASession)
-        self._readonly_sess_factory = sessionmaker(self, class_=SASession)
+        self._sess_factory = async_sessionmaker(self, expire_on_commit=False)
+        self._readonly_sess_factory = async_sessionmaker(self)
 
     def _check_generic_txn_cnt(self) -> None:
         if (
