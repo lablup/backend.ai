@@ -172,6 +172,8 @@ class CheckCreatingProgressLifecycleHandler(SessionLifecycleHandler):
 
         # Fetch full transition data for hook execution
         # Using existing repository method that returns SessionTransitionData
+        # Note: This handler needs SessionTransitionData which includes session_type
+        # for hook execution (get_hook requires session_type)
         sessions_data = await self._repository.get_sessions_for_transition(
             [SessionStatus.CREATING],
             [KernelStatus.RUNNING],
