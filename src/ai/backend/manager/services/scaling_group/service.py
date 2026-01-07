@@ -2,9 +2,17 @@ import logging
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
+from ai.backend.manager.services.scaling_group.actions.associate_with_domain import (
+    AssociateScalingGroupWithDomainsAction,
+    AssociateScalingGroupWithDomainsActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.create import (
     CreateScalingGroupAction,
     CreateScalingGroupActionResult,
+)
+from ai.backend.manager.services.scaling_group.actions.disassociate_with_domain import (
+    DisassociateScalingGroupWithDomainsAction,
+    DisassociateScalingGroupWithDomainsActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
@@ -63,3 +71,17 @@ class ScalingGroupService:
         """Modifies a scaling group."""
         scaling_group_data = await self._repository.update_scaling_group(action.updater)
         return ModifyScalingGroupActionResult(scaling_group=scaling_group_data)
+
+    async def associate_scaling_group_with_domains(
+        self, action: AssociateScalingGroupWithDomainsAction
+    ) -> AssociateScalingGroupWithDomainsActionResult:
+        """Associates a scaling group with multiple domains."""
+        await self._repository.associate_scaling_group_with_domains(action.bulk_creator)
+        return AssociateScalingGroupWithDomainsActionResult()
+
+    async def disassociate_scaling_group_with_domains(
+        self, action: DisassociateScalingGroupWithDomainsAction
+    ) -> DisassociateScalingGroupWithDomainsActionResult:
+        """Disassociates a scaling group from multiple domains."""
+        await self._repository.disassociate_scaling_group_with_domains(action.purger)
+        return DisassociateScalingGroupWithDomainsActionResult()
