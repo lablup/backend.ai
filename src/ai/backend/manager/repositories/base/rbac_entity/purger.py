@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Generic, TypeVar
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -18,37 +16,35 @@ from ai.backend.manager.data.permission.id import (
     ScopeId,
 )
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
-from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
-
-TRow = TypeVar("TRow", bound=Base)
+from ai.backend.manager.repositories.base.purger import Purger as BasePurger
+from ai.backend.manager.repositories.base.purger import PurgerResult as BasePurgerResult
+from ai.backend.manager.repositories.base.purger import TRow
 
 
 @dataclass
-class Purger(Generic[TRow]):
+class Purger(BasePurger[TRow]):
     """Single-row delete by primary key.
 
     Attributes:
-        row_class: ORM class for table access and PK detection.
-        pk_value: Primary key value to identify the target row.
+        entity_id: ObjectId identifying the target entity.
+        field_id: Optional ObjectId identifying the target field (for field-scoped entities).
     """
 
-    row_class: type[TRow]
-    pk_value: UUID | str | int
     entity_id: ObjectId
+    field_id: ObjectId | None
 
 
 @dataclass
-class PurgerResult(Generic[TRow]):
-    """Result of executing a single-row delete operation."""
-
-    row: TRow
+class PurgerResult(BasePurgerResult[TRow]):
+    pass
 
 
 async def _get_association_rows(
@@ -71,6 +67,19 @@ async def _get_related_roles(
     object_id: ObjectId,
     scopes: list[ScopeId],
 ) -> list[RoleRow]:
+    """
+    Get all roles related to the given entity as object permissions
+    And load their permission groups scoped:
+    - That have no remaining permissions.
+    - And are scoped to the given scopes.
+    """
+    perm_group_scope_conditions = [
+        (
+            PermissionGroupRow.scope_id == scope.scope_id
+            and PermissionGroupRow.scope_type == scope.scope_type
+        )
+        for scope in scopes
+    ]
     role_scalars = await db_sess.scalars(
         sa.select(RoleRow)
         .select_from(
@@ -95,8 +104,7 @@ async def _get_related_roles(
                             )
                         )
                     ),
-                    PermissionGroupRow.scope_id.in_([scope.scope_id for scope in scopes]),  # type: ignore[attr-defined]
-                    PermissionGroupRow.scope_type.in_([scope.scope_type for scope in scopes]),  # type: ignore[attr-defined]
+                    sa.or_(*perm_group_scope_conditions),
                 ),
             ),
         )
@@ -104,12 +112,65 @@ async def _get_related_roles(
     return role_scalars.all()
 
 
-async def _purge_related_rows(
+async def _delete_main_object_row(
     db_sess: SASession,
-    object_permission_ids: Iterable[UUID],
-    permission_group_ids: Iterable[UUID],
-    association_ids: Iterable[UUID],
+    purger: Purger[TRow],
+) -> TRow | None:
+    row_class = purger.row_class
+    table = row_class.__table__  # type: ignore[attr-defined]
+    pk_columns = list(table.primary_key.columns)
+
+    if len(pk_columns) != 1:
+        raise UnsupportedCompositePrimaryKeyError(
+            f"Purger only supports single-column primary keys (table: {table.name})",
+        )
+
+    stmt = sa.delete(table).where(pk_columns[0] == purger.pk_value).returning(*table.columns)
+
+    result = await db_sess.execute(stmt)
+    row_data = result.fetchone()
+
+    if row_data is None:
+        return None
+
+    deleted_row: TRow = row_class(**dict(row_data._mapping))
+    return deleted_row
+
+
+async def _delete_related_rows(
+    db_sess: SASession,
+    purger: Purger[TRow],
 ) -> None:
+    entity_id = purger.entity_id
+    field_id = purger.field_id
+    if field_id is not None:
+        await _delete_rbac_field(db_sess, field_id)
+    else:
+        await _delete_rbac_entity(db_sess, entity_id)
+
+
+async def _delete_rbac_entity(
+    db_sess: SASession,
+    entity_id: ObjectId,
+) -> None:
+    scopes: list[ScopeId] = []
+    object_permission_ids: list[UUID] = []
+    permission_group_ids: list[UUID] = []
+    association_ids: list[UUID] = []
+
+    assoc_rows = await _get_association_rows(db_sess, entity_id)
+    for assoc_row in assoc_rows:
+        association_ids.append(assoc_row.id)
+        scopes.append(assoc_row.parsed_scope_id())
+
+    # Check all roles associated with the entity as object permission
+    role_rows = await _get_related_roles(db_sess, entity_id, scopes)
+    for role_row in role_rows:
+        for obj_perm_row in role_row.object_permission_rows:
+            object_permission_ids.append(obj_perm_row.id)
+        for perm_group_row in role_row.permission_group_rows:
+            permission_group_ids.append(perm_group_row.id)
+
     await db_sess.execute(
         sa.delete(ObjectPermissionRow).where(ObjectPermissionRow.id.in_(object_permission_ids))  # type: ignore[attr-defined]
     )
@@ -123,50 +184,43 @@ async def _purge_related_rows(
     )
 
 
+async def _delete_rbac_field(
+    db_sess: SASession,
+    field_id: ObjectId,
+) -> None:
+    await db_sess.execute(
+        sa.delete(EntityFieldRow).where(
+            sa.and_(
+                EntityFieldRow.field_id == field_id.entity_id,
+                EntityFieldRow.field_type == field_id.entity_type,
+            )
+        )
+    )
+
+
 async def execute_purger(
     db_sess: SASession,
     purger: Purger[TRow],
 ) -> PurgerResult[TRow] | None:
-    row_class = purger.row_class
-    table = row_class.__table__  # type: ignore[attr-defined]
-    pk_columns = list(table.primary_key.columns)
+    """
+    Execute DELETE for a single row by primary key, along with related RBAC entries.
+    - Delete the main object row.
+    - Delete associated EntityFieldRow if field-scoped.
+    - Delete related ObjectPermissionRow and AssociationScopesEntitiesRow.
+    - Delete PermissionGroupRow if:
+        - It has no remaining PermissionRow entries.
+        - And the deleted object was the only one scoped to that permission group.
 
-    if len(pk_columns) != 1:
-        raise UnsupportedCompositePrimaryKeyError(
-            f"Purger only supports single-column primary keys (table: {table.name})",
-        )
+    Args:
+        db_sess: Async SQLAlchemy session (must be writable)
+        purger: Purger containing row_class and pk_value
 
-    scopes: list[ScopeId] = []
-    object_id = purger.entity_id
-    object_permission_ids: list[UUID] = []
-    permission_group_ids: list[UUID] = []
-    association_ids: list[UUID] = []
+    Returns:
+        PurgerResult containing the deleted row, or None if no row matched
+    """
 
-    assoc_rows = await _get_association_rows(db_sess, object_id)
-    for assoc_row in assoc_rows:
-        association_ids.append(assoc_row.id)
-        scopes.append(assoc_row.parsed_scope_id())
-
-    # Check all roles associated with the entity as object permission
-    role_rows = await _get_related_roles(db_sess, object_id, scopes)
-    for role_row in role_rows:
-        for obj_perm_row in role_row.object_permission_rows:
-            object_permission_ids.append(obj_perm_row.id)
-        for perm_group_row in role_row.permission_group_rows:
-            permission_group_ids.append(perm_group_row.id)
-    await _purge_related_rows(
-        db_sess,
-        object_permission_ids,
-        permission_group_ids,
-        association_ids,
-    )
-    stmt = sa.delete(table).where(pk_columns[0] == purger.pk_value).returning(*table.columns)
-
-    result = await db_sess.execute(stmt)
-    row_data = result.fetchone()
-
-    if row_data is None:
+    await _delete_related_rows(db_sess, purger)
+    deleted_row = await _delete_main_object_row(db_sess, purger)
+    if deleted_row is None:
         return None
-
-    deleted_row: TRow = row_class(**dict(row_data._mapping))
     return PurgerResult(row=deleted_row)
