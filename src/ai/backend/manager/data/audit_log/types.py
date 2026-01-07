@@ -20,3 +20,13 @@ class AuditLogData:
     request_id: str | None
     triggered_by: str | None
     duration: timedelta | None
+
+
+@dataclass
+class AuditLogListResult:
+    """Search result with total count and pagination info for audit logs."""
+
+    items: list[AuditLogData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool

@@ -7,9 +7,9 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogListResult
 from ai.backend.manager.models.audit_log import AuditLogRow
-from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.base import BatchQuerier, Creator
 
 from .db_source import AuditLogDBSource
 
@@ -44,3 +44,11 @@ class AuditLogRepository:
     @audit_log_repository_resilience.apply()
     async def create(self, creator: Creator[AuditLogRow]) -> AuditLogData:
         return await self._db_source.create(creator)
+
+    @audit_log_repository_resilience.apply()
+    async def search(
+        self,
+        querier: BatchQuerier,
+    ) -> AuditLogListResult:
+        """Search audit logs with querier pattern."""
+        return await self._db_source.search(querier=querier)
