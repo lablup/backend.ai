@@ -194,19 +194,19 @@ class ScalingGroupDBSource:
             result = await session.scalar(query)
             return (result or 0) > 0
 
-    async def associate_scaling_group_with_keypair(
+    async def associate_scaling_group_with_keypairs(
         self,
-        creator: Creator[ScalingGroupForKeypairsRow],
+        bulk_creator: BulkCreator[ScalingGroupForKeypairsRow],
     ) -> None:
-        """Associates a single scaling group with a keypair."""
+        """Associates a scaling group with multiple keypairs."""
         async with self._db.begin_session() as session:
-            await execute_creator(session, creator)
+            await execute_bulk_creator(session, bulk_creator)
 
-    async def disassociate_scaling_group_with_keypair(
+    async def disassociate_scaling_group_with_keypairs(
         self,
         purger: BatchPurger[ScalingGroupForKeypairsRow],
     ) -> None:
-        """Disassociates a single scaling group from a keypair."""
+        """Disassociates a scaling group from multiple keypairs."""
         async with self._db.begin_session() as session:
             await execute_batch_purger(session, purger)
 

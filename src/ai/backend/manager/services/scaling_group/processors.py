@@ -8,8 +8,8 @@ from ai.backend.manager.services.scaling_group.actions.associate_with_domain imp
     AssociateScalingGroupWithDomainsActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.associate_with_keypair import (
-    AssociateScalingGroupWithKeypairAction,
-    AssociateScalingGroupWithKeypairActionResult,
+    AssociateScalingGroupWithKeypairsAction,
+    AssociateScalingGroupWithKeypairsActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.create import (
     CreateScalingGroupAction,
@@ -20,8 +20,8 @@ from ai.backend.manager.services.scaling_group.actions.disassociate_with_domain 
     DisassociateScalingGroupWithDomainsActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.disassociate_with_keypair import (
-    DisassociateScalingGroupWithKeypairAction,
-    DisassociateScalingGroupWithKeypairActionResult,
+    DisassociateScalingGroupWithKeypairsAction,
+    DisassociateScalingGroupWithKeypairsActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
@@ -51,11 +51,11 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
     disassociate_scaling_group_with_domains: ActionProcessor[
         DisassociateScalingGroupWithDomainsAction, DisassociateScalingGroupWithDomainsActionResult
     ]
-    associate_scaling_group_with_keypair: ActionProcessor[
-        AssociateScalingGroupWithKeypairAction, AssociateScalingGroupWithKeypairActionResult
+    associate_scaling_group_with_keypairs: ActionProcessor[
+        AssociateScalingGroupWithKeypairsAction, AssociateScalingGroupWithKeypairsActionResult
     ]
-    disassociate_scaling_group_with_keypair: ActionProcessor[
-        DisassociateScalingGroupWithKeypairAction, DisassociateScalingGroupWithKeypairActionResult
+    disassociate_scaling_group_with_keypairs: ActionProcessor[
+        DisassociateScalingGroupWithKeypairsAction, DisassociateScalingGroupWithKeypairsActionResult
     ]
 
     def __init__(self, service: ScalingGroupService, action_monitors: list[ActionMonitor]) -> None:
@@ -69,11 +69,11 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         self.disassociate_scaling_group_with_domains = ActionProcessor(
             service.disassociate_scaling_group_with_domains, action_monitors
         )
-        self.associate_scaling_group_with_keypair = ActionProcessor(
-            service.associate_scaling_group_with_keypair, action_monitors
+        self.associate_scaling_group_with_keypairs = ActionProcessor(
+            service.associate_scaling_group_with_keypairs, action_monitors
         )
-        self.disassociate_scaling_group_with_keypair = ActionProcessor(
-            service.disassociate_scaling_group_with_keypair, action_monitors
+        self.disassociate_scaling_group_with_keypairs = ActionProcessor(
+            service.disassociate_scaling_group_with_keypairs, action_monitors
         )
 
     @override
@@ -85,6 +85,6 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
             SearchScalingGroupsAction.spec(),
             AssociateScalingGroupWithDomainsAction.spec(),
             DisassociateScalingGroupWithDomainsAction.spec(),
-            AssociateScalingGroupWithKeypairAction.spec(),
-            DisassociateScalingGroupWithKeypairAction.spec(),
+            AssociateScalingGroupWithKeypairsAction.spec(),
+            DisassociateScalingGroupWithKeypairsAction.spec(),
         ]

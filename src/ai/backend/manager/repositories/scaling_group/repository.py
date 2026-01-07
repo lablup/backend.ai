@@ -119,19 +119,19 @@ class ScalingGroupRepository:
             domain=domain,
         )
 
-    async def associate_scaling_group_with_keypair(
+    async def associate_scaling_group_with_keypairs(
         self,
-        creator: Creator[ScalingGroupForKeypairsRow],
+        bulk_creator: BulkCreator[ScalingGroupForKeypairsRow],
     ) -> None:
-        """Associates a single scaling group with a keypair."""
-        await self._db_source.associate_scaling_group_with_keypair(creator)
+        """Associates a scaling group with multiple keypairs."""
+        await self._db_source.associate_scaling_group_with_keypairs(bulk_creator)
 
-    async def disassociate_scaling_group_with_keypair(
+    async def disassociate_scaling_group_with_keypairs(
         self,
         purger: BatchPurger[ScalingGroupForKeypairsRow],
     ) -> None:
-        """Disassociates a single scaling group from a keypair."""
-        await self._db_source.disassociate_scaling_group_with_keypair(purger)
+        """Disassociates a scaling group from multiple keypairs."""
+        await self._db_source.disassociate_scaling_group_with_keypairs(purger)
 
     async def check_scaling_group_keypair_association_exists(
         self,

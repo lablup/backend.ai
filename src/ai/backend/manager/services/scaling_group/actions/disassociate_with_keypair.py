@@ -11,15 +11,15 @@ from .base import ScalingGroupAction
 
 
 @dataclass
-class DisassociateScalingGroupWithKeypairAction(ScalingGroupAction):
-    """Action to disassociate a single scaling group from a keypair."""
+class DisassociateScalingGroupWithKeypairsAction(ScalingGroupAction):
+    """Action to disassociate a scaling group from multiple keypairs."""
 
     purger: BatchPurger[ScalingGroupForKeypairsRow]
 
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "disassociate_with_keypair"
+        return "disassociate_with_keypairs"
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -27,8 +27,8 @@ class DisassociateScalingGroupWithKeypairAction(ScalingGroupAction):
 
 
 @dataclass
-class DisassociateScalingGroupWithKeypairActionResult(BaseActionResult):
-    """Result of disassociating a scaling group from a keypair."""
+class DisassociateScalingGroupWithKeypairsActionResult(BaseActionResult):
+    """Result of disassociating a scaling group from keypairs."""
 
     @override
     def entity_id(self) -> Optional[str]:

@@ -990,25 +990,27 @@ class TestScalingGroupRepositoryDB:
 
         yield access_key
 
-    async def test_associate_scaling_group_with_keypair_success(
+    async def test_associate_scaling_group_with_keypairs_success(
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_purge: str,
         sample_keypair: AccessKey,
     ) -> None:
-        """Test associating a scaling group with a keypair."""
+        """Test associating a scaling group with keypairs."""
         # Given: A scaling group and a keypair
         sgroup_name = sample_scaling_group_for_purge
         access_key = sample_keypair
 
         # When: Associate the scaling group with the keypair
-        creator = Creator(
-            spec=ScalingGroupForKeypairsCreatorSpec(
-                scaling_group=sgroup_name,
-                access_key=access_key,
-            )
+        bulk_creator = BulkCreator(
+            specs=[
+                ScalingGroupForKeypairsCreatorSpec(
+                    scaling_group=sgroup_name,
+                    access_key=access_key,
+                )
+            ]
         )
-        await scaling_group_repository.associate_scaling_group_with_keypair(creator)
+        await scaling_group_repository.associate_scaling_group_with_keypairs(bulk_creator)
 
         # Then: Association should exist
         association_exists = (
@@ -1018,25 +1020,27 @@ class TestScalingGroupRepositoryDB:
         )
         assert association_exists is True
 
-    async def test_disassociate_scaling_group_with_keypair_success(
+    async def test_disassociate_scaling_group_with_keypairs_success(
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_purge: str,
         sample_keypair: AccessKey,
     ) -> None:
-        """Test disassociating a scaling group from a keypair."""
+        """Test disassociating a scaling group from keypairs."""
         # Given: A scaling group associated with a keypair
         sgroup_name = sample_scaling_group_for_purge
         access_key = sample_keypair
 
         # First, associate the scaling group with the keypair using repository
-        creator = Creator(
-            spec=ScalingGroupForKeypairsCreatorSpec(
-                scaling_group=sgroup_name,
-                access_key=access_key,
-            )
+        bulk_creator = BulkCreator(
+            specs=[
+                ScalingGroupForKeypairsCreatorSpec(
+                    scaling_group=sgroup_name,
+                    access_key=access_key,
+                )
+            ]
         )
-        await scaling_group_repository.associate_scaling_group_with_keypair(creator)
+        await scaling_group_repository.associate_scaling_group_with_keypairs(bulk_creator)
 
         # Verify association exists
         association_exists = (
@@ -1051,7 +1055,7 @@ class TestScalingGroupRepositoryDB:
             scaling_group=sgroup_name,
             access_key=access_key,
         )
-        await scaling_group_repository.disassociate_scaling_group_with_keypair(purger)
+        await scaling_group_repository.disassociate_scaling_group_with_keypairs(purger)
 
         # Then: Association should no longer exist
         association_exists = (
@@ -1061,7 +1065,7 @@ class TestScalingGroupRepositoryDB:
         )
         assert association_exists is False
 
-    async def test_disassociate_nonexistent_scaling_group_with_keypair(
+    async def test_disassociate_nonexistent_scaling_group_with_keypairs(
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_purge: str,
@@ -1078,4 +1082,4 @@ class TestScalingGroupRepositoryDB:
             access_key=access_key,
         )
         # Then: Should not raise any error (BatchPurger deletes 0 rows silently)
-        await scaling_group_repository.disassociate_scaling_group_with_keypair(purger)
+        await scaling_group_repository.disassociate_scaling_group_with_keypairs(purger)

@@ -7,8 +7,8 @@ from ai.backend.manager.services.scaling_group.actions.associate_with_domain imp
     AssociateScalingGroupWithDomainsActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.associate_with_keypair import (
-    AssociateScalingGroupWithKeypairAction,
-    AssociateScalingGroupWithKeypairActionResult,
+    AssociateScalingGroupWithKeypairsAction,
+    AssociateScalingGroupWithKeypairsActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.create import (
     CreateScalingGroupAction,
@@ -19,8 +19,8 @@ from ai.backend.manager.services.scaling_group.actions.disassociate_with_domain 
     DisassociateScalingGroupWithDomainsActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.disassociate_with_keypair import (
-    DisassociateScalingGroupWithKeypairAction,
-    DisassociateScalingGroupWithKeypairActionResult,
+    DisassociateScalingGroupWithKeypairsAction,
+    DisassociateScalingGroupWithKeypairsActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
@@ -94,16 +94,16 @@ class ScalingGroupService:
         await self._repository.disassociate_scaling_group_with_domains(action.purger)
         return DisassociateScalingGroupWithDomainsActionResult()
 
-    async def associate_scaling_group_with_keypair(
-        self, action: AssociateScalingGroupWithKeypairAction
-    ) -> AssociateScalingGroupWithKeypairActionResult:
-        """Associates a scaling group with a keypair."""
-        await self._repository.associate_scaling_group_with_keypair(action.creator)
-        return AssociateScalingGroupWithKeypairActionResult()
+    async def associate_scaling_group_with_keypairs(
+        self, action: AssociateScalingGroupWithKeypairsAction
+    ) -> AssociateScalingGroupWithKeypairsActionResult:
+        """Associates a scaling group with multiple keypairs."""
+        await self._repository.associate_scaling_group_with_keypairs(action.bulk_creator)
+        return AssociateScalingGroupWithKeypairsActionResult()
 
-    async def disassociate_scaling_group_with_keypair(
-        self, action: DisassociateScalingGroupWithKeypairAction
-    ) -> DisassociateScalingGroupWithKeypairActionResult:
-        """Disassociates a scaling group from a keypair."""
-        await self._repository.disassociate_scaling_group_with_keypair(action.purger)
-        return DisassociateScalingGroupWithKeypairActionResult()
+    async def disassociate_scaling_group_with_keypairs(
+        self, action: DisassociateScalingGroupWithKeypairsAction
+    ) -> DisassociateScalingGroupWithKeypairsActionResult:
+        """Disassociates a scaling group from multiple keypairs."""
+        await self._repository.disassociate_scaling_group_with_keypairs(action.purger)
+        return DisassociateScalingGroupWithKeypairsActionResult()
