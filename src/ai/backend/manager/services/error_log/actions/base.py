@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseAction
 
