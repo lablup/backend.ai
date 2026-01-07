@@ -58,7 +58,11 @@ class DevSetup(Static):
         yield Label("Development Setup", classes="mode-title")
         with TabbedContent():
             with TabPane("Install Log", id="tab-dev-log"):
-                yield SetupLog(wrap=True, classes="log")
+                yield SetupLog(
+                    wrap=True,
+                    classes="log",
+                    non_interactive=self._non_interactive,
+                )
             with TabPane("Install Report", id="tab-dev-report"):
                 yield Label("Installation is not complete.")
 
@@ -115,7 +119,11 @@ class PackageSetup(Static):
         yield Label("Package Setup", classes="mode-title")
         with TabbedContent():
             with TabPane("Install Log", id="tab-pkg-log"):
-                yield SetupLog(wrap=True, classes="log")
+                yield SetupLog(
+                    wrap=True,
+                    classes="log",
+                    non_interactive=self._non_interactive,
+                )
             with TabPane("Install Report", id="tab-pkg-report"):
                 yield Label("Installation is not complete.")
 
