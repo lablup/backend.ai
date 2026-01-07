@@ -195,8 +195,8 @@ class EnumValueType(TypeDecorator, SchemaType, Generic[T_Enum]):
         return EnumValueType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
-    def python_type(self) -> T_Enum:
-        return self._enum_class
+    def python_type(self) -> type[T_Enum]:
+        return self._enum_cls
 
 
 class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
@@ -353,7 +353,7 @@ class StructuredJSONColumn(TypeDecorator):
 
     def load_dialect_impl(self, dialect: Dialect):
         if dialect.name == "sqlite":
-            return dialect.type_descriptor(sa.JSON)
+            return dialect.type_descriptor(sa.JSON())
         return super().load_dialect_impl(dialect)
 
     def process_bind_param(
@@ -692,7 +692,7 @@ async def populate_fixture(
                 f"Invalid fixture data for table {table_name}: expected sequence, got string"
             )
 
-        table: sa.Table = metadata.tables.get(table_name)
+        table = metadata.tables.get(table_name)
 
         if not isinstance(table, sa.Table):
             raise DataTransformationFailed(f"Table {table_name} not found in metadata")
@@ -746,13 +746,15 @@ async def populate_fixture(
 
             match op_mode:
                 case FixtureOpModes.INSERT:
-                    stmt = sa.dialects.postgresql.insert(table).values(rows).on_conflict_do_nothing()
-                    await conn.execute(stmt)
+                    insert_stmt = (
+                        sa.dialects.postgresql.insert(table).values(rows).on_conflict_do_nothing()
+                    )
+                    await conn.execute(insert_stmt)
                 case FixtureOpModes.UPDATE:
-                    stmt = sa.update(table)
+                    update_stmt = sa.update(table)
                     pkcols = []
                     for pkidx, pkcol in enumerate(table.primary_key):
-                        stmt = stmt.where(pkcol == sa.bindparam(f"_pk_{pkidx}"))
+                        update_stmt = update_stmt.where(pkcol == sa.bindparam(f"_pk_{pkidx}"))
                         pkcols.append(pkcol)
                     update_data = []
                     # Extract the data column names from the FIRST row
@@ -768,7 +770,7 @@ async def populate_fixture(
                             f"fixture for table {table_name!r} has an invalid column name: "
                             f"{e.args[0]!r}"
                         )
-                    stmt = stmt.values({
+                    update_stmt = update_stmt.values({
                         datacol.name: sa.bindparam(datacol.name) for datacol in datacols
                     })
                     for row in rows:
@@ -790,7 +792,7 @@ async def populate_fixture(
                                     f"query: {datacol.name!r}"
                                 )
                         update_data.append(update_row)
-                    await conn.execute(stmt, update_data)
+                    await conn.execute(update_stmt, update_data)
 
 
 class DecimalType(TypeDecorator, Decimal):
