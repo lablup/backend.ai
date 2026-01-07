@@ -145,13 +145,13 @@ class EnumType(TypeDecorator, SchemaType, Generic[T_Enum]):
 
     def process_result_value(
         self,
-        value: str,
+        value: Any | None,
         dialect: Dialect,
     ) -> Optional[T_Enum]:
         return self._enum_cls[value] if value else None
 
-    def copy(self, **kw) -> type[Self]:
-        return EnumType(self._enum_cls, **self._opts)
+    def copy(self, **kw) -> Self:
+        return EnumType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
     def python_type(self):
@@ -186,13 +186,13 @@ class EnumValueType(TypeDecorator, SchemaType, Generic[T_Enum]):
 
     def process_result_value(
         self,
-        value: str,
+        value: Any | None,
         dialect: Dialect,
     ) -> Optional[T_Enum]:
         return self._enum_cls(value) if value else None
 
-    def copy(self, **kw) -> type[Self]:
-        return EnumValueType(self._enum_cls, **self._opts)
+    def copy(self, **kw) -> Self:
+        return EnumValueType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
     def python_type(self) -> T_Enum:
@@ -237,8 +237,8 @@ class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
             return self._enum_cls[value]
         return self._enum_cls(value)
 
-    def copy(self, **kw) -> type[Self]:
-        return StrEnumType(self._enum_cls, self._use_name, **self._opts)
+    def copy(self, **kw) -> Self:
+        return StrEnumType(self._enum_cls, self._use_name, **self._opts)  # type: ignore[return-value]
 
     @property
     def python_type(self) -> type[T_StrEnum]:
@@ -381,8 +381,8 @@ class StructuredJSONColumn(TypeDecorator):
             return self._schema.check({})
         return self._schema.check(value)
 
-    def copy(self, **kw) -> type[Self]:
-        return StructuredJSONColumn(self._schema)
+    def copy(self, **kw) -> Self:
+        return StructuredJSONColumn(self._schema)  # type: ignore[return-value]
 
 
 class StructuredJSONObjectColumn(TypeDecorator):
@@ -403,8 +403,8 @@ class StructuredJSONObjectColumn(TypeDecorator):
     def process_result_value(self, value, dialect):
         return self._schema.from_json(value)
 
-    def copy(self, **kw) -> type[Self]:
-        return StructuredJSONObjectColumn(self._schema)
+    def copy(self, **kw) -> Self:
+        return StructuredJSONObjectColumn(self._schema)  # type: ignore[return-value]
 
 
 class StructuredJSONObjectListColumn(TypeDecorator):
@@ -431,8 +431,8 @@ class StructuredJSONObjectListColumn(TypeDecorator):
             return []
         return [self._schema.from_json(item) for item in value]
 
-    def copy(self, **kw) -> type[Self]:
-        return StructuredJSONObjectListColumn(self._schema)
+    def copy(self, **kw) -> Self:
+        return StructuredJSONObjectListColumn(self._schema)  # type: ignore[return-value]
 
 
 class URLColumn(TypeDecorator):
@@ -537,7 +537,7 @@ class VFolderHostPermissionColumn(TypeDecorator):
         if value is None:
             return {}
         return {
-            host: self.perm_col.process_bind_param(perms, None) for host, perms in value.items()
+            host: self.perm_col.process_bind_param(perms, dialect) for host, perms in value.items()
         }
 
     def process_result_value(
@@ -548,7 +548,7 @@ class VFolderHostPermissionColumn(TypeDecorator):
         if value is None:
             return VFolderHostPermissionMap()
         return VFolderHostPermissionMap({
-            host: self.perm_col.process_result_value(perms, None) for host, perms in value.items()
+            host: self.perm_col.process_result_value(perms, dialect) for host, perms in value.items()
         })
 
 
@@ -575,7 +575,7 @@ class GUID(TypeDecorator, Generic[TUUIDSubType]):
             return dialect.type_descriptor(UUID())
         return dialect.type_descriptor(CHAR(16))
 
-    def process_bind_param(self, value: TUUIDSubType | uuid.UUID, dialect):
+    def process_bind_param(self, value: Any | None, dialect):
         # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
         #       The type checker treats them as distinct derivatives of uuid.UUID.
@@ -626,7 +626,9 @@ class SlugType(TypeDecorator):
     def coerce_compared_value(self, op, value):
         return Unicode()
 
-    def process_bind_param(self, value: str, dialect) -> str:
+    def process_bind_param(self, value: Any | None, dialect) -> str | None:
+        if value is None:
+            return value
         try:
             self._tx_slug.check(value)
         except t.DataError as e:
@@ -808,7 +810,7 @@ class DecimalType(TypeDecorator, Decimal):
 
     def process_result_value(
         self,
-        value: str,
+        value: Any | None,
         dialect: Dialect,
     ) -> Optional[Decimal]:
         return Decimal(value) if value is not None else None
