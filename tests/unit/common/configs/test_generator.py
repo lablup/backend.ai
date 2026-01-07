@@ -22,6 +22,7 @@ from ai.backend.common.configs.generator import (
 from ai.backend.common.configs.inspector import FieldDocumentation, FieldSchema, FieldTypeInfo
 from ai.backend.common.meta import (
     BackendAIConfigMeta,
+    CompositeType,
     ConfigEnvironment,
     ConfigExample,
 )
@@ -373,7 +374,7 @@ class TestTOMLGenerator:
                 BackendAIConfigMeta(
                     description="Inner section",
                     added_version="25.1.0",
-                    composite=True,
+                    composite=CompositeType.FIELD,
                 ),
             ]
 

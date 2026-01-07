@@ -69,12 +69,12 @@ class TestBackendAIConfigMeta:
             added_version="25.1.0",
             example=ConfigExample(local="local-value", prod="prod-value"),
             secret=True,
-            composite=False,
+            composite=None,
         )
         assert isinstance(meta.example, ConfigExample)
         assert meta.example.local == "local-value"
         assert meta.secret is True
-        assert meta.composite is False
+        assert meta.composite is None
 
     def test_defaults(self) -> None:
         meta = BackendAIConfigMeta(
@@ -83,7 +83,7 @@ class TestBackendAIConfigMeta:
         )
         assert meta.example is None
         assert meta.secret is False
-        assert meta.composite is False
+        assert meta.composite is None
 
 
 class TestBackendAIAPIMeta:
