@@ -6,7 +6,10 @@ from typing import override
 import sqlalchemy as sa
 
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupForKeypairsRow
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForDomainRow,
+    ScalingGroupForKeypairsRow,
+)
 from ai.backend.manager.repositories.base.purger import BatchPurger, BatchPurgerSpec
 
 
