@@ -31,6 +31,9 @@ from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
+from ai.backend.manager.services.artifact_revision.destination_resolver import (
+    ArtifactImportDestinationResolver,
+)
 from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
 from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
@@ -303,6 +306,12 @@ class Services:
             config_provider=args.config_provider,
             reservoir_registry_repository=repositories.reservoir_registry.repository,
         )
+        destination_resolver = ArtifactImportDestinationResolver(
+            vfolder_repository=repositories.vfolder.repository,
+            object_storage_repository=repositories.object_storage.repository,
+            vfs_storage_repository=repositories.vfs_storage.repository,
+            storage_namespace_repository=repositories.storage_namespace.repository,
+        )
         artifact_revision_service = ArtifactRevisionService(
             artifact_repository=repositories.artifact.repository,
             artifact_registry_repository=repositories.artifact_registry.repository,
@@ -316,6 +325,7 @@ class Services:
             config_provider=args.config_provider,
             valkey_artifact_client=args.valkey_artifact_client,
             background_task_manager=args.background_task_manager,
+            destination_resolver=destination_resolver,
         )
         artifact_registry_service = ArtifactRegistryService(
             repositories.huggingface_registry.repository,

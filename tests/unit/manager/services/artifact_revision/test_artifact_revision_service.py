@@ -56,6 +56,9 @@ from ai.backend.manager.services.artifact_revision.actions.reject import (
 from ai.backend.manager.services.artifact_revision.actions.search import (
     SearchArtifactRevisionsAction,
 )
+from ai.backend.manager.services.artifact_revision.destination_resolver import (
+    ArtifactImportDestinationResolver,
+)
 from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
 
 
@@ -123,6 +126,11 @@ class TestArtifactRevisionService:
         return MagicMock()
 
     @pytest.fixture
+    def mock_destination_resolver(self) -> MagicMock:
+        """Create mocked ArtifactImportDestinationResolver"""
+        return MagicMock(spec=ArtifactImportDestinationResolver)
+
+    @pytest.fixture
     def artifact_revision_service(
         self,
         mock_artifact_repository: MagicMock,
@@ -137,6 +145,7 @@ class TestArtifactRevisionService:
         mock_config_provider: MagicMock,
         mock_valkey_artifact_client: MagicMock,
         mock_background_task_manager: MagicMock,
+        mock_destination_resolver: MagicMock,
     ) -> ArtifactRevisionService:
         """Create ArtifactRevisionService instance with mocked repositories"""
         return ArtifactRevisionService(
@@ -152,6 +161,7 @@ class TestArtifactRevisionService:
             config_provider=mock_config_provider,
             valkey_artifact_client=mock_valkey_artifact_client,
             background_task_manager=mock_background_task_manager,
+            destination_resolver=mock_destination_resolver,
         )
 
     @pytest.fixture
