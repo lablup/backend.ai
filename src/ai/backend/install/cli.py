@@ -74,7 +74,7 @@ from .types import Accelerator, CliArgs, InstallModes
     "--tls-advertised",
     is_flag=True,
     default=False,
-    help="Advertise TLS endpoints. Automatically enabled with --public-mode.",
+    help="Advertise TLS endpoints. Automatically configured when --public-mode is enabled.",
 )
 @click.option(
     "--advertised-port",
