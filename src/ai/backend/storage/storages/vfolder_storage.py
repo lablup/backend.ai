@@ -14,8 +14,8 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.errors import (
     FileStreamDownloadError,
     FileStreamUploadError,
-    StorageBucketFileNotFoundError,
 )
+from ai.backend.storage.exception import VFolderFileNotFoundError
 from ai.backend.storage.storages.vfs_storage import (
     VFSDirectoryDownloadServerStreamReader,
     VFSFileDownloadServerStreamReader,
@@ -161,7 +161,7 @@ class VFolderStorage(AbstractStorage):
             target_path = self.resolve_path(filepath)
 
             if not target_path.exists():
-                raise StorageBucketFileNotFoundError(f"File not found in vfolder: {filepath}")
+                raise VFolderFileNotFoundError(f"File not found in vfolder: {filepath}")
 
             stat_result = await aiofiles.os.stat(target_path)
 
