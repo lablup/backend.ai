@@ -14,5 +14,5 @@ RUN mkdir -p /var/log/backend.ai /etc/backend.ai
 # Set working directory
 WORKDIR /app
 
-CMD ["python", "-m", "ai.backend.appproxy.coordinator.server"]
+CMD ["python", "-m", "ai.backend.appproxy.coordinator.server", "-f", "/etc/backend.ai/proxy-coordinator.toml"]
 

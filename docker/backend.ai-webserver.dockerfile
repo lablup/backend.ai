@@ -14,5 +14,5 @@ RUN mkdir -p /var/log/backend.ai /etc/backend.ai
 # Set working directory
 WORKDIR /app
 
-CMD ["python", "-m", "ai.backend.web.server"]
+CMD ["python", "-m", "ai.backend.web.server", "-f", "/etc/backend.ai/webserver.conf"]
 

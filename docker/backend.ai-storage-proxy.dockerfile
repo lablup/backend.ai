@@ -14,5 +14,5 @@ RUN mkdir -p /var/log/backend.ai /etc/backend.ai
 # Set working directory
 WORKDIR /app
 
-CMD ["python", "-m", "ai.backend.storage.server"]
+CMD ["python", "-m", "ai.backend.storage.server", "-f", "/etc/backend.ai/storage-proxy.toml"]
 
