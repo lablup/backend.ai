@@ -7,7 +7,7 @@ from typing import Annotated, Any, get_args, get_origin
 import pytest
 from pydantic import BaseModel
 
-from ai.backend.common.meta import BackendAIConfigMeta
+from ai.backend.common.meta import BackendAIConfigMeta, CompositeType
 
 
 def get_annotation_with_metadata(model: type[BaseModel], field_name: str) -> Any:
@@ -60,7 +60,7 @@ def get_all_fields_without_meta(
 
         # Check if the field has BackendAIConfigMeta in its Annotated metadata
         has_meta = False
-        is_composite = False
+        is_composite: CompositeType | None = None
         inner_type = annotation
 
         if get_origin(annotation) is Annotated:
