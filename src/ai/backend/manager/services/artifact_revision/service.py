@@ -223,7 +223,7 @@ class ArtifactRevisionService:
                 raise VFolderNotFound(f"VFolder with id {action.vfolder_id} not found")
             vfid = VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)
             # vfolder.host format: "{proxy_name}:{volume_name}"
-            proxy_name, volume_name = vfolder_data.host.split(":", 1)
+            proxy_name, _, volume_name = vfolder_data.host.partition(":")
             storage_host = proxy_name  # storage proxy client only needs proxy name
             # Override storage_step_mappings to use vfolder's volume for all steps
             storage_step_mappings: dict[ArtifactStorageImportStep, str] = dict.fromkeys(

@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, override
 
 import aiofiles
 import aiofiles.os
 
-from ai.backend.common.artifact_storage import AbstractStorage
+from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
+from ai.backend.common.contexts.request_id import current_request_id
+from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.common.dto.storage.response import VFSFileMetaResponse
 from ai.backend.common.types import StreamReader, VFolderID
 from ai.backend.logging import BraceStyleAdapter
@@ -24,12 +28,21 @@ from ai.backend.storage.utils import normalize_filepath
 
 if TYPE_CHECKING:
     from ai.backend.storage.volumes.abc import AbstractVolume
+    from ai.backend.storage.volumes.pool import VolumePool
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 # Default chunk sizes for upload/download
 DEFAULT_UPLOAD_CHUNK_SIZE = 64 * 1024  # 64KB
 DEFAULT_DOWNLOAD_CHUNK_SIZE = 64 * 1024  # 64KB
+
+
+@dataclass
+class VFolderStorageSetupResult:
+    """Result of VFolderStorage.setup() for import operations."""
+
+    storage_step_mappings: dict[ArtifactStorageImportStep, str]
+    cleanup_callback: Callable[[], None]
 
 
 class VFolderStorage(AbstractStorage):
@@ -217,3 +230,63 @@ class VFolderStorage(AbstractStorage):
 
         except Exception as e:
             raise FileStreamUploadError(f"Delete from vfolder failed: {e!s}") from e
+
+    @classmethod
+    async def setup(
+        cls,
+        vfid: VFolderID,
+        storage_step_mappings: dict[ArtifactStorageImportStep, str],
+        volume_pool: VolumePool,
+        storage_pool: AbstractStoragePool,
+    ) -> VFolderStorageSetupResult:
+        """Setup VFolderStorage for import operations.
+
+        Creates a temporary VFolderStorage, registers it to the storage pool,
+        and returns updated storage_step_mappings along with a cleanup callback.
+
+        Args:
+            vfid: VFolder ID to create storage for
+            storage_step_mappings: Original storage step mappings
+            volume_pool: Volume pool to get volume from
+            storage_pool: Storage pool to register the storage
+
+        Returns:
+            VFolderStorageSetupResult with updated mappings and cleanup callback
+        """
+        request_id = current_request_id()
+        # Get the volume name from storage_step_mappings
+        # When vfid is provided, all steps should use the same volume (vfolder's host)
+        volume_names = set(storage_step_mappings.values())
+        if len(volume_names) != 1:
+            log.warning(f"Multiple volume names in storage_step_mappings with vfid: {volume_names}")
+        volume_name = next(iter(volume_names))
+
+        # Create VFolderStorage
+        async with volume_pool.get_volume_by_name(volume_name) as volume:
+            vfolder_storage_name = f"vfolder_storage_{request_id}"
+            vfolder_storage = cls(
+                name=vfolder_storage_name,
+                volume=volume,
+                vfid=vfid,
+            )
+
+            # Register to storage pool
+            storage_pool.add_storage(vfolder_storage_name, vfolder_storage)
+
+            log.info(
+                f"Created VFolderStorage: name={vfolder_storage_name}, vfid={vfid}, "
+                f"volume={volume_name}"
+            )
+
+        # Override storage_step_mappings to use VFolderStorage
+        updated_mappings = dict.fromkeys(storage_step_mappings.keys(), vfolder_storage_name)
+
+        # Create cleanup callback to remove VFolderStorage after task completion
+        def _cleanup() -> None:
+            storage_pool.remove_storage(vfolder_storage_name)
+            log.info(f"Removed VFolderStorage: name={vfolder_storage_name}")
+
+        return VFolderStorageSetupResult(
+            storage_step_mappings=updated_mappings,
+            cleanup_callback=_cleanup,
+        )
