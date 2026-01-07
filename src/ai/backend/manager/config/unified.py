@@ -258,7 +258,7 @@ class DatabaseConfig(BaseConfigSchema):
                 "as the main database backend for Backend.AI. PostgreSQL provides the ACID "
                 "compliance and advanced features required for reliable session and resource management."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="postgresql", prod="postgresql"),
         ),
     ]
@@ -271,7 +271,7 @@ class DatabaseConfig(BaseConfigSchema):
                 "Default is the standard PostgreSQL port (5432) on localhost. "
                 "In production, point this to your database server or cluster endpoint."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="127.0.0.1:5432", prod="db.example.com:5432"),
         ),
     ]
@@ -285,7 +285,7 @@ class DatabaseConfig(BaseConfigSchema):
                 "The database should be created before starting the manager. "
                 "Length must be between 2 and 64 characters due to PostgreSQL naming constraints."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="backend", prod="backend"),
         ),
     ]
@@ -298,7 +298,7 @@ class DatabaseConfig(BaseConfigSchema):
                 "This user must have sufficient privileges for all database operations "
                 "including creating/dropping tables, indexes, and running migrations."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="postgres", prod="backend_user"),
         ),
     ]
@@ -311,7 +311,7 @@ class DatabaseConfig(BaseConfigSchema):
                 "Can be a direct password string or an environment variable reference. "
                 "For security, using environment variables is strongly recommended in production."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             secret=True,
             example=ConfigExample(local="develove", prod="DB_PASSWORD"),
         ),
@@ -331,7 +331,7 @@ class DatabaseConfig(BaseConfigSchema):
                 "Should be tuned based on expected load, number of worker processes, "
                 "and database server capacity. Higher values improve concurrency but consume more resources."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="8", prod="16"),
         ),
     ]
@@ -350,7 +350,7 @@ class DatabaseConfig(BaseConfigSchema):
                 "Useful for handling database connections closed by the server after inactivity "
                 "or by network equipment with idle timeouts."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="-1", prod="3600"),
         ),
     ]
@@ -368,7 +368,7 @@ class DatabaseConfig(BaseConfigSchema):
                 "Adds a small overhead per connection checkout but improves reliability. "
                 "Recommended for production environments with network instability."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -387,7 +387,7 @@ class DatabaseConfig(BaseConfigSchema):
                 "These temporary connections are created when pool_size is insufficient "
                 "and are closed when returned to the pool."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="64", prod="128"),
         ),
     ]
@@ -406,7 +406,7 @@ class DatabaseConfig(BaseConfigSchema):
                 "If connections cannot be acquired within this time, an exception is raised. "
                 "Set a reasonable value in production to prevent indefinite blocking."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="0", prod="30"),
         ),
     ]
@@ -440,7 +440,7 @@ class AuthConfig(BaseConfigSchema):
                 "Set to None to disable password expiration. "
                 "Recommended for compliance with security policies."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="", prod="90d"),
         ),
     ]
@@ -458,7 +458,7 @@ class AuthConfig(BaseConfigSchema):
                 "PBKDF2_SHA256 is recommended for most deployments. "
                 "Existing passwords with different algorithms will be gradually migrated on login."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="pbkdf2_sha256", prod="pbkdf2_sha256"),
         ),
     ]
@@ -479,7 +479,7 @@ class AuthConfig(BaseConfigSchema):
                 "For PBKDF2: recommended 100,000+ (default 600,000). "
                 "The value is automatically adjusted to fit algorithm constraints."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="600000", prod="600000"),
         ),
     ]
@@ -499,7 +499,7 @@ class AuthConfig(BaseConfigSchema):
                 "Minimum: 16 bytes (128 bits), Default: 32 bytes (256 bits), Maximum: 256 bytes. "
                 "Note: bcrypt manages its own salt internally, so this setting doesn't apply to bcrypt."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="32", prod="32"),
         ),
     ]
@@ -520,7 +520,7 @@ class ManagerConfig(BaseConfigSchema):
                 "This directory must be writable by the manager process. "
                 "In production, consider using /var/run/backend.ai/ipc for better security."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="/tmp/backend.ai/ipc", prod="/var/run/backend.ai/ipc"),
         ),
     ]
@@ -540,7 +540,7 @@ class ManagerConfig(BaseConfigSchema):
                 "For optimal performance, set this to match your CPU core count. "
                 "Higher values improve request concurrency but consume more memory."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="4", prod="8"),
         ),
     ]
@@ -554,7 +554,7 @@ class ManagerConfig(BaseConfigSchema):
                 "By default, uses the hostname with an 'i-' prefix. "
                 "Must be unique across all managers in the same Backend.AI cluster."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="i-local-manager", prod="i-manager-01"),
         ),
     ]
@@ -568,7 +568,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Important for proper file permissions when creating files and sockets. "
                 "Should match the user that owns the Backend.AI installation."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="1000", prod="1000"),
         ),
     ]
@@ -582,7 +582,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Important for proper file permissions when creating files and sockets. "
                 "Should match the group that owns the Backend.AI installation."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="1000", prod="1000"),
         ),
     ]
@@ -600,7 +600,7 @@ class ManagerConfig(BaseConfigSchema):
                 "For private deployments behind a load balancer, consider using 127.0.0.1. "
                 "This is the main entry point for client API requests."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="0.0.0.0:8080", prod="0.0.0.0:8080"),
         ),
     ]
@@ -616,7 +616,7 @@ class ManagerConfig(BaseConfigSchema):
                 "This should be the externally reachable address of this manager instance. "
                 "Other components use this address to connect to the manager."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="127.0.0.1:8080", prod="manager.example.com:8080"),
         ),
     ]
@@ -632,7 +632,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Used for service discovery of internal endpoints. "
                 "Should be accessible from containers and other internal services."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(
                 local="host.docker.internal:18080", prod="manager-internal:18080"
             ),
@@ -651,7 +651,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Internal APIs are used for inter-service communication and are not exposed to clients. "
                 "Should be bound to an internal network interface in production."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="0.0.0.0:18080", prod="0.0.0.0:18080"),
         ),
     ]
@@ -668,7 +668,7 @@ class ManagerConfig(BaseConfigSchema):
                 "This file contains cryptographic key pairs for secure inter-service communication. "
                 "In production, should be stored in a secure location with restricted permissions (0600)."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             secret=True,
             example=ConfigExample(
                 local="fixtures/manager/manager.key_secret",
@@ -691,7 +691,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Should be set higher than the agent's heartbeat interval (default 10s). "
                 "Increase in environments with high network latency."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="40.0", prod="60.0"),
         ),
     ]
@@ -706,7 +706,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Should be a strong random string in production environments. "
                 "If not provided, one is auto-generated (not recommended for clustered deployments)."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             secret=True,
         ),
     ]
@@ -723,7 +723,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Strongly recommended for production deployments exposed to public networks. "
                 "Requires valid certificate (ssl_cert) and private key (ssl_privkey) when enabled."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -740,7 +740,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Required when ssl_enabled is true. "
                 "Can be a self-signed certificate for development or a CA-issued certificate for production."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="", prod="/etc/backend.ai/ssl/manager.crt"),
         ),
     ]
@@ -757,7 +757,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Required when ssl_enabled is true. "
                 "The key file should have restricted permissions (0600) for security."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             secret=True,
             example=ConfigExample(local="", prod="/etc/backend.ai/ssl/manager.key"),
         ),
@@ -776,7 +776,7 @@ class ManagerConfig(BaseConfigSchema):
                 "'uvloop' is a faster alternative based on libuv but may have compatibility issues. "
                 "Use uvloop for better performance in high-throughput scenarios."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="asyncio", prod="uvloop"),
         ),
     ]
@@ -794,7 +794,7 @@ class ManagerConfig(BaseConfigSchema):
                 "redlock (Redis), etcd (etcd v2), etcetra (etcd v3). "
                 "Choose based on your infrastructure and cluster size."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="pg_advisory", prod="pg_advisory"),
         ),
     ]
@@ -811,7 +811,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Used when distributed_lock is set to pg_advisory. "
                 "Usually the defaults work well for most deployments."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
         ),
     ]
     filelock_config: Annotated[
@@ -827,7 +827,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Used when distributed_lock is set to filelock. "
                 "Only suitable for single-node deployments."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
         ),
     ]
     redlock_config: Annotated[
@@ -843,7 +843,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Used when distributed_lock is set to redlock. "
                 "Recommended for large clusters with Redis infrastructure."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
         ),
     ]
     etcdlock_config: Annotated[
@@ -859,7 +859,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Used when distributed_lock is set to etcd or etcetra. "
                 "Recommended for clusters already using etcd for coordination."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
         ),
     ]
     session_schedule_lock_lifetime: Annotated[
@@ -878,7 +878,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Prevents deadlocks in case a manager fails during scheduling. "
                 "Increase if scheduling large sessions takes longer than 30 seconds."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="30", prod="60"),
         ),
     ]
@@ -898,7 +898,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Controls how long the manager can hold a lock while checking session creation conditions. "
                 "Should be balanced to prevent both deadlocks and race conditions."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="30", prod="60"),
         ),
     ]
@@ -917,7 +917,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Controls how long the manager can hold a lock while starting a session. "
                 "Longer values are safer but may block other managers longer on failure."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="30", prod="60"),
         ),
     ]
@@ -934,7 +934,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Useful for service management, monitoring, and graceful shutdown scripts. "
                 "Set to /dev/null by default to disable this feature."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="/dev/null", prod="/var/run/backend.ai/manager.pid"),
         ),
     ]
@@ -952,7 +952,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Useful for controlling exactly which plugins are active in production. "
                 "Leave as None to load all available plugins except disabled_plugins."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
         ),
     ]
     disabled_plugins: Annotated[
@@ -968,7 +968,7 @@ class ManagerConfig(BaseConfigSchema):
                 "These plugins won't be loaded even if they're installed. "
                 "Useful for disabling problematic or unwanted plugins without uninstalling."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
         ),
     ]
     hide_agents: Annotated[
@@ -984,7 +984,7 @@ class ManagerConfig(BaseConfigSchema):
                 "When enabled, agent details are obscured in user-facing APIs. "
                 "Recommended for multi-tenant environments to improve security and privacy."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -1004,7 +1004,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Default prioritizes GPU resources (CUDA, ROCm, TPU) over CPU and memory. "
                 "Customize based on your workload patterns."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(
                 local="cuda,rocm,tpu,cpu,mem",
                 prod="cuda,rocm,tpu,cpu,mem",
@@ -1024,7 +1024,7 @@ class ManagerConfig(BaseConfigSchema):
                 "This feature is deprecated and may be removed in future versions. "
                 "The importer handles tasks like installing additional packages."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             deprecated_version="25.10.0",
             deprecation_hint="This feature is deprecated and will be removed in a future version.",
             example=ConfigExample(
@@ -1046,7 +1046,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Default is 16 MiB (16777216 bytes), sufficient for most use cases. "
                 "Increase for applications that transfer larger data chunks."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="16777216", prod="33554432"),
         ),
     ]
@@ -1064,7 +1064,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Deprecated: Port for the aiomonitor terminal UI. "
                 "Use aiomonitor_termui_port instead."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             deprecated_version="25.10.0",
             deprecation_hint="Use aiomonitor_termui_port instead.",
         ),
@@ -1084,7 +1084,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Allows connecting via telnet to inspect running async tasks and debug issues. "
                 "Should be accessible only from trusted networks for security."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="38100", prod="38100"),
         ),
     ]
@@ -1103,7 +1103,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Provides a browser-based UI for monitoring async tasks and manager health. "
                 "Should be accessible only from trusted networks for security."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="39100", prod="39100"),
         ),
     ]
@@ -1122,7 +1122,7 @@ class ManagerConfig(BaseConfigSchema):
                 "May provide better performance for event handling in large clusters. "
                 "Not recommended for production use unless specifically tested and needed."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -1140,7 +1140,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Controls how frequently the manager broadcasts its health status. "
                 "Smaller values provide more real-time information but increase network overhead."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="60.0", prod="30.0"),
         ),
     ]
@@ -1158,7 +1158,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Status records older than this will be ignored or refreshed. "
                 "Should be greater than status_update_interval to avoid gaps."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="120", prod="90"),
         ),
     ]
@@ -1177,7 +1177,7 @@ class ManagerConfig(BaseConfigSchema):
                 "If specified, metrics endpoint will be available at this port. "
                 "Leave as None to disable public metrics exposure."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="", prod="9090"),
         ),
     ]
@@ -1194,7 +1194,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Sokovan provides improved scheduling performance with better resource utilization. "
                 "When disabled, falls back to the legacy scheduling system."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="true", prod="true"),
         ),
     ]
@@ -1235,7 +1235,7 @@ class DockerRegistryConfig(BaseConfigSchema):
                 "Disabling this is not recommended except for testing with self-signed certificates. "
                 "In production, always use verified SSL certificates."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             deprecated_version="25.10.0",
             deprecation_hint="This configuration is deprecated and may be removed in a future version.",
             example=ConfigExample(local="true", prod="true"),
@@ -1252,7 +1252,7 @@ class SMTPReporterConfig(BaseConfigSchema):
                 "Name of the SMTP reporter for identification. "
                 "Used to reference this reporter from action monitors and other configurations."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="smtp", prod="smtp"),
         ),
     ]
@@ -1264,7 +1264,7 @@ class SMTPReporterConfig(BaseConfigSchema):
                 "SMTP server hostname or IP address. "
                 "This is the mail server that will relay your notification emails."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="localhost", prod="smtp.gmail.com"),
         ),
     ]
@@ -1277,7 +1277,7 @@ class SMTPReporterConfig(BaseConfigSchema):
                 "Common ports: 25 (unencrypted), 465 (SSL/TLS), 587 (STARTTLS). "
                 "Use 465 or 587 for secure email transmission."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="25", prod="587"),
         ),
     ]
@@ -1289,7 +1289,7 @@ class SMTPReporterConfig(BaseConfigSchema):
                 "Username for authenticating with the SMTP server. "
                 "Usually an email address or account name depending on the mail provider."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="user@localhost", prod="user@example.com"),
         ),
     ]
@@ -1301,7 +1301,7 @@ class SMTPReporterConfig(BaseConfigSchema):
                 "Password for SMTP server authentication. "
                 "For Gmail, use an app-specific password instead of your account password."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             secret=True,
         ),
     ]
@@ -1313,7 +1313,7 @@ class SMTPReporterConfig(BaseConfigSchema):
                 "Email address that will appear as the sender ('From' field). "
                 "Must be authorized to send from the configured SMTP server."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="noreply@localhost", prod="noreply@example.com"),
         ),
     ]
@@ -1325,7 +1325,7 @@ class SMTPReporterConfig(BaseConfigSchema):
                 "List of email addresses to receive notification emails. "
                 "All recipients will receive the same notification content."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="admin@localhost", prod="ops-team@example.com"),
         ),
     ]
@@ -1341,7 +1341,7 @@ class SMTPReporterConfig(BaseConfigSchema):
                 "Whether to use TLS encryption for SMTP communication. "
                 "Strongly recommended for production to protect credentials and email content."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -1359,7 +1359,7 @@ class SMTPReporterConfig(BaseConfigSchema):
                 "Higher values improve throughput but consume more resources. "
                 "Adjust based on your SMTP server's rate limits."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="5", prod="10"),
         ),
     ]
@@ -1372,7 +1372,7 @@ class SMTPReporterConfig(BaseConfigSchema):
                 "Available placeholders: action_type, entity_id, status, description, "
                 "created_at, ended_at, duration. Customize to match your notification needs."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
         ),
     ]
     trigger_policy: Annotated[
@@ -1389,7 +1389,7 @@ class SMTPReporterConfig(BaseConfigSchema):
                 "ON_ERROR: Send only when errors occur. "
                 "Use ON_ERROR to reduce notification volume in production."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="ALL", prod="ON_ERROR"),
         ),
     ]
@@ -1410,7 +1410,7 @@ class ActionMonitorsConfig(BaseConfigSchema):
                 "Examples: 'session:create_from_params', 'session:create_cluster'. "
                 "Empty list means no actions are monitored."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
         ),
     ]
     reporter: Annotated[
@@ -1421,7 +1421,7 @@ class ActionMonitorsConfig(BaseConfigSchema):
                 "Name of the reporter to use for sending notifications. "
                 "Must match a configured reporter name (e.g., 'smtp', 'audit_log')."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="smtp", prod="smtp"),
         ),
     ]
@@ -1438,7 +1438,7 @@ class ReporterConfig(BaseConfigSchema):
                 "templates, and trigger policies. Multiple reporters enable routing "
                 "different notification types to different email destinations."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -1455,7 +1455,7 @@ class ReporterConfig(BaseConfigSchema):
                 "Action monitors subscribe to specific Backend.AI events and route them "
                 "to configured reporters. Enables customizable alerting based on system events."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -1471,7 +1471,7 @@ class DebugConfig(BaseConfigSchema):
                 "When enabled, activates various debugging features and verbose logging. "
                 "Should always be disabled in production for security and performance reasons."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -1484,7 +1484,7 @@ class DebugConfig(BaseConfigSchema):
                 "Helps detect issues like coroutines never awaited or excessive event loop delays. "
                 "Adds significant overhead; use only during development and debugging."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -1503,7 +1503,7 @@ class DebugConfig(BaseConfigSchema):
                 "Provides more detailed information about running asyncio tasks. "
                 "Useful for debugging complex async issues but adds monitoring overhead."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -1520,7 +1520,7 @@ class DebugConfig(BaseConfigSchema):
                 "Very verbose output useful for debugging event flow issues. "
                 "Not recommended for production due to high log volume."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -1537,7 +1537,7 @@ class DebugConfig(BaseConfigSchema):
                 "Helps diagnose scheduling issues and timing problems. "
                 "Generates many log entries; use sparingly even in development."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -1554,7 +1554,7 @@ class DebugConfig(BaseConfigSchema):
                 "Helpful for monitoring system behavior and performance trends over time. "
                 "Can be enabled in production for diagnostics when needed."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -1570,7 +1570,7 @@ class SystemConfig(BaseConfigSchema):
                 "Uses pytz-compatible timezone names (e.g., 'UTC', 'Asia/Seoul', 'America/New_York'). "
                 "Affects timestamps displayed in logs, APIs, and scheduled operations."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="UTC", prod="UTC"),
         ),
     ]
@@ -1586,7 +1586,7 @@ class ResourcesConfig(BaseConfigSchema):
                 "When true, users can see aggregate resource usage for their groups. "
                 "Useful for group-level resource monitoring and planning."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -1606,7 +1606,7 @@ class APIConfig(BaseConfigSchema):
                 "Use '*' to allow all origins (not recommended for production). "
                 "Specify comma-separated domain patterns for production security."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="*", prod="https://console.example.com"),
         ),
     ]
@@ -1625,7 +1625,7 @@ class APIConfig(BaseConfigSchema):
                 "Enables development tools like GraphiQL to explore the API schema. "
                 "Should be disabled in production to prevent information leakage."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -1644,7 +1644,7 @@ class APIConfig(BaseConfigSchema):
                 "Enables Swagger UI and similar API documentation tools. "
                 "Should be disabled in production to prevent information leakage."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -1662,7 +1662,7 @@ class APIConfig(BaseConfigSchema):
                 "Limits query complexity to prevent denial-of-service attacks. "
                 "Set to None to disable depth limiting (not recommended for production)."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="", prod="10"),
         ),
     ]
@@ -1682,7 +1682,7 @@ class APIConfig(BaseConfigSchema):
                 "Limits the number of items returned in a single request. "
                 "Set to None to use the default pagination limits."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="", prod="100"),
         ),
     ]
@@ -1694,7 +1694,7 @@ class APIConfig(BaseConfigSchema):
                 "Resource visibility and sharing settings for the API. "
                 "Controls how resource information is exposed to different user roles."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -1721,7 +1721,7 @@ class DockerImageConfig(BaseConfigSchema):
                 "'tag': Pull when image tag changes (faster, but may get unexpected updates). "
                 "'none': Never auto-pull (requires manual image management)."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="digest", prod="digest"),
         ),
     ]
@@ -1736,7 +1736,7 @@ class DockerConfig(BaseConfigSchema):
                 "Docker image management configuration. "
                 "Controls image pulling policies and registry interactions."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -1752,7 +1752,7 @@ class PluginsConfig(BaseConfigSchema):
                 "Keys are accelerator types (e.g., 'cuda', 'rocm', 'tpu'). "
                 "Values contain plugin-specific settings like allocation modes and memory management."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
         ),
     ]
     scheduler: Annotated[
@@ -1764,7 +1764,7 @@ class PluginsConfig(BaseConfigSchema):
                 "Keys are scheduler names (e.g., 'fifo', 'lifo', 'drf'). "
                 "Values contain scheduler-specific settings like retry counts and priorities."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
         ),
     ]
     agent_selector: Annotated[
@@ -1780,7 +1780,7 @@ class PluginsConfig(BaseConfigSchema):
                 "Controls how agents are chosen for session placement. "
                 "Can implement load-based, resource-based, or custom selection algorithms."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
         ),
     ]
     network: Annotated[
@@ -1792,7 +1792,7 @@ class PluginsConfig(BaseConfigSchema):
                 "Keys are network driver names (e.g., 'overlay'). "
                 "Values contain settings like MTU, subnet ranges, and encryption options."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
         ),
     ]
 
@@ -1811,7 +1811,7 @@ class InterContainerNetworkConfig(BaseConfigSchema):
                 "'overlay' enables multi-host container networking for distributed workloads. "
                 "Container communication performance depends on this setting."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="overlay", prod="overlay"),
         ),
     ]
@@ -1824,7 +1824,7 @@ class InterContainerNetworkConfig(BaseConfigSchema):
                 "When enabled, containers in the same session can communicate directly. "
                 "Required for distributed computing frameworks like Horovod or PyTorch distributed."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -1836,7 +1836,7 @@ class InterContainerNetworkConfig(BaseConfigSchema):
                 "Network plugin configuration for inter-container communication. "
                 "Allows custom network plugin settings for advanced networking scenarios."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
         ),
     ]
 
@@ -1851,7 +1851,7 @@ class SubnetNetworkConfig(BaseConfigSchema):
                 "Specifies which network range is allowed for agent-to-agent and agent-to-manager traffic. "
                 "Use '0.0.0.0/0' to allow all IPv4 addresses, or specify a restricted range for security."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="0.0.0.0/0", prod="10.0.0.0/8"),
         ),
     ]
@@ -1864,7 +1864,7 @@ class SubnetNetworkConfig(BaseConfigSchema):
                 "Specifies which network range is allocated to containers. "
                 "Use '0.0.0.0/0' to allow all IPv4 addresses, or '172.17.0.0/16' for Docker default."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="0.0.0.0/0", prod="172.17.0.0/16"),
         ),
     ]
@@ -1884,7 +1884,7 @@ class RpcConfig(BaseConfigSchema):
                 "If no activity occurs within this time, the connection is considered stale. "
                 "Increase in environments with intermittent network connectivity."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="60.0", prod="120.0"),
         ),
     ]
@@ -1904,7 +1904,7 @@ class NetworkConfig(BaseConfigSchema):
                 "Controls how containers in cluster sessions communicate with each other. "
                 "Important for distributed computing workloads."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -1916,7 +1916,7 @@ class NetworkConfig(BaseConfigSchema):
                 "Subnet configurations for Backend.AI network segmentation. "
                 "Defines IP address ranges for agents and containers."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -1928,7 +1928,7 @@ class NetworkConfig(BaseConfigSchema):
                 "RPC (Remote Procedure Call) network settings for internal service communication. "
                 "Controls timeouts and keepalive settings for manager-agent communication."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -1944,7 +1944,7 @@ class WatcherConfig(BaseConfigSchema):
                 "Used to secure communication between manager and the agent watcher component. "
                 "Should be a secure random string in production environments."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             secret=True,
         ),
     ]
@@ -1961,7 +1961,7 @@ class WatcherConfig(BaseConfigSchema):
                 "Controls how long the watcher waits for file operations to complete. "
                 "Increase for handling large files or when using slow storage systems."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="60.0", prod="120.0"),
         ),
     ]
@@ -1977,7 +1977,7 @@ class HangToleranceThresholdConfig(BaseConfigSchema):
                 "Format is a duration string like '10m' for 10 minutes or '1h' for 1 hour. "
                 "When exceeded, the system will attempt recovery actions for the session."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="10m", prod="30m"),
         ),
     ]
@@ -1990,7 +1990,7 @@ class HangToleranceThresholdConfig(BaseConfigSchema):
                 "Format is a duration string like '10m' for 10 minutes or '1h' for 1 hour. "
                 "When exceeded, the system will force-terminate the session."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="10m", prod="30m"),
         ),
     ]
@@ -2006,7 +2006,7 @@ class HangToleranceConfig(BaseConfigSchema):
                 "Defines maximum times sessions can remain in transitional states "
                 "before the system considers them hung and takes recovery action."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2026,7 +2026,7 @@ class SessionConfig(BaseConfigSchema):
                 "Controls how the system identifies sessions stuck in transitional states "
                 "and what recovery actions to take. Essential for maintaining system health."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2047,7 +2047,7 @@ class MetricConfig(BaseConfigSchema):
                 "detection, and resource optimization. Ensure the Prometheus server is accessible "
                 "from the manager and configured to scrape agent metrics."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="127.0.0.1:9090", prod="prometheus.backend.svc:9090"),
         ),
     ]
@@ -2062,7 +2062,7 @@ class MetricConfig(BaseConfigSchema):
                 "the past 1 hour. Shorter windows provide more responsive metrics but may be "
                 "noisier; longer windows smooth out spikes but delay detection of changes."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="1m", prod="1h"),
         ),
     ]
@@ -2084,7 +2084,7 @@ class IdleCheckerConfig(BaseConfigSchema):
                 "'utilization' (monitors CPU/GPU/memory usage), and 'session_lifetime' (enforces "
                 "maximum session duration). Leave empty to disable idle checking entirely."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="", prod="network_timeout,utilization"),
         ),
     ]
@@ -2105,7 +2105,7 @@ class IdleCheckerConfig(BaseConfigSchema):
                 "detect disconnected or abandoned interactive sessions. Format is a duration "
                 "string like '5m' for 5 minutes."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="5m", prod="10m"),
         ),
     ]
@@ -2121,7 +2121,7 @@ class IdleCheckerConfig(BaseConfigSchema):
                 "'thresholds-check-operator' (and/or), 'time-window' for averaging period, and "
                 "'initial-grace-period' to skip checking after session start."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
         ),
     ]
 
@@ -2137,7 +2137,7 @@ class VolumeTypeConfig(BaseConfigSchema):
                 "data. User folders are private by default and only accessible by the owner. "
                 "Set to None to disable user-level virtual folder creation entirely."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
         ),
     ]
     group: Annotated[
@@ -2151,7 +2151,7 @@ class VolumeTypeConfig(BaseConfigSchema):
                 "group. Access permissions are managed at the group level. Set to None to disable "
                 "group-level virtual folder creation."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
         ),
     ]
 
@@ -2181,7 +2181,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "available storage volumes from the proxy. Default timeout is sufficient for most "
                 "deployments, but may need adjustment for proxies with many volumes."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2199,7 +2199,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for folder creation on the storage proxy. Creating folders is typically "
                 "fast but may take longer on network-attached storage or when quotas need setup."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2216,7 +2216,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "significant time. Consider increasing this timeout for storage backends with "
                 "slow deletion performance."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2232,7 +2232,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for folder cloning operations. Cloning copies an entire folder structure "
                 "and may take considerable time depending on the data size and storage performance."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2248,7 +2248,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for retrieving the mount path of a virtual folder. This is a lightweight "
                 "operation that returns the filesystem path used by agents to mount the folder."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2266,7 +2266,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for retrieving volume hardware information. This operation queries the "
                 "underlying storage system for capacity and capability information."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2284,7 +2284,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for retrieving volume performance metrics. This operation queries I/O "
                 "statistics from the storage system for monitoring purposes."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2300,7 +2300,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for retrieving filesystem usage statistics. Returns disk space usage "
                 "information for capacity monitoring and alerting."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2318,7 +2318,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for retrieving volume-level quota settings. Queries the overall quota "
                 "configuration for a storage volume."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2334,7 +2334,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for updating volume-level quota settings. Modifies the overall quota "
                 "configuration for a storage volume."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2350,7 +2350,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for retrieving quota scope information. Quota scopes define quota limits "
                 "at user or project level within a volume."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2366,7 +2366,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for updating quota scope configuration. Updates quota limits for a "
                 "specific user or project within a volume."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2382,7 +2382,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for deleting quota scope quotas. Removes quota limits for a specific "
                 "user or project within a volume."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2396,7 +2396,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for creating directories within a virtual folder. A lightweight operation "
                 "that creates a new directory in the storage backend."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2412,7 +2412,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for renaming files or directories. This is typically a fast metadata "
                 "operation on most filesystems."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2428,7 +2428,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for synchronous file deletion operations. Deletes files immediately and "
                 "waits for completion."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2444,7 +2444,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for asynchronous file deletion operations. Initiates deletion in the "
                 "background without waiting for completion."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2460,7 +2460,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for moving files between directories. May involve data copy if moving "
                 "across different storage volumes."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2476,7 +2476,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for file upload operations. Consider increasing for large file uploads "
                 "or slow network connections."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2492,7 +2492,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for file download operations. Consider increasing for large file downloads "
                 "or slow network connections."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2508,7 +2508,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for listing files in a directory. May need adjustment for directories "
                 "with thousands of files."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2524,7 +2524,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for fetching file contents or metadata. Used for reading file information "
                 "without full download."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2542,7 +2542,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for retrieving folder disk usage. Calculates total size of a folder "
                 "including all subfolders and files."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2558,7 +2558,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for retrieving total bytes used by a folder. Returns the raw byte count "
                 "consumed by the folder."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2576,7 +2576,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for scanning HuggingFace model repositories. Searches for available "
                 "models that can be imported from HuggingFace Hub."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2594,7 +2594,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for retrieving multiple HuggingFace model metadata. Gets detailed "
                 "information about a batch of HuggingFace models."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2612,7 +2612,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for retrieving a single HuggingFace model's metadata. Gets detailed "
                 "information about one specific HuggingFace model."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2628,7 +2628,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for importing HuggingFace models to storage. Downloads model files from "
                 "HuggingFace Hub. May need significant timeout for large models."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2646,7 +2646,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for retrieving HuggingFace model commit hash. Gets the specific version "
                 "identifier for a model revision."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2664,7 +2664,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for importing models from reservoir storage. Handles model artifact "
                 "imports from the Backend.AI reservoir system."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2682,7 +2682,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for downloading files from S3-compatible storage. Used for S3 backend "
                 "storage operations."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2700,7 +2700,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for generating S3 presigned download URLs. Creates temporary authenticated "
                 "URLs for direct S3 downloads."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2718,7 +2718,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for generating S3 presigned upload URLs. Creates temporary authenticated "
                 "URLs for direct S3 uploads."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2734,7 +2734,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for deleting objects from S3-compatible storage. Removes files stored "
                 "in S3 backend storage."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2754,7 +2754,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for streaming file downloads from VFS storage. Used for efficient "
                 "large file transfers from virtual filesystem backends."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2770,7 +2770,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for listing files in VFS storage. Enumerates files and directories "
                 "in virtual filesystem backends."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2790,7 +2790,7 @@ class VolumeProxyConfig(BaseConfigSchema):
                 "direct file operations. Should include protocol, host, and port. Ensure "
                 "this endpoint is accessible from client networks and compute nodes."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(
                 local="http://localhost:6021", prod="https://storage.example.com:6021"
             ),
@@ -2809,7 +2809,7 @@ class VolumeProxyConfig(BaseConfigSchema):
                 "managing quotas, and checking storage status. Should only be accessible from "
                 "the manager's network."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(
                 local="http://localhost:6022", prod="http://storage-internal:6022"
             ),
@@ -2825,7 +2825,7 @@ class VolumeProxyConfig(BaseConfigSchema):
                 "verify that requests come from authorized manager instances. Keep this value "
                 "secure and do not expose it to clients."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             secret=True,
             example=ConfigExample(local="changeme", prod="<generate-secure-random-string>"),
         ),
@@ -2844,7 +2844,7 @@ class VolumeProxyConfig(BaseConfigSchema):
                 "during development or testing with self-signed certificates, but this reduces "
                 "security and should never be done in production."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -2862,7 +2862,7 @@ class VolumeProxyConfig(BaseConfigSchema):
                 "to virtual folders. When set, only sessions in the specified scaling groups can "
                 "create SFTP connections to this storage proxy. Leave None to allow all scaling groups."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="default", prod="sftp-group-1,sftp-group-2"),
         ),
     ]
@@ -2876,7 +2876,7 @@ class VolumeProxyConfig(BaseConfigSchema):
                 "timeouts for specific operations that may take longer than the defaults, such "
                 "as file uploads/downloads or model imports."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2896,7 +2896,7 @@ class VolumesConfig(BaseConfigSchema):
                 "and group-level folders. At minimum, user folders are typically enabled to allow "
                 "users to store their personal data and session outputs."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2914,7 +2914,7 @@ class VolumesConfig(BaseConfigSchema):
                 "configuration. When users create folders without specifying a host, this default "
                 "is used. If not set, users must explicitly specify the host for each folder."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="local:volume1", prod="nas-proxy:main-volume"),
         ),
     ]
@@ -2932,7 +2932,7 @@ class VolumesConfig(BaseConfigSchema):
                 "include 'percentage' for disk usage percentage. Additional metrics may be "
                 "available depending on the storage backend capabilities."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="percentage", prod="percentage"),
         ),
     ]
@@ -2947,7 +2947,7 @@ class VolumesConfig(BaseConfigSchema):
                 "endpoints, authentication, and settings. Multiple proxies can be configured "
                 "for different storage backends or locations."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -2976,7 +2976,7 @@ class ReservoirObjectStorageConfig(BaseConfigSchema):
                 "S3-compatible object storage backends. This discriminator field is used to "
                 "determine the storage configuration type when parsing the reservoir config."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="object_storage", prod="object_storage"),
         ),
     ]
@@ -2994,7 +2994,7 @@ class ReservoirObjectStorageConfig(BaseConfigSchema):
                 "reservoir stores model artifacts, checkpoints, and other binary assets in this "
                 "bucket. Ensure proper bucket policies are configured for access control."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="backend-ai-reservoir", prod="prod-model-artifacts"),
         ),
     ]
@@ -3010,7 +3010,7 @@ class ReservoirVFSStorageConfig(BaseConfigSchema):
                 "virtual filesystem storage backends. This discriminator field is used to "
                 "determine the storage configuration type when parsing the reservoir config."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="vfs_storage", prod="vfs_storage"),
         ),
     ]
@@ -3024,7 +3024,7 @@ class ReservoirVFSStorageConfig(BaseConfigSchema):
                 "this to organize reservoir data within a larger storage volume. Leave empty to "
                 "use the volume root."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="artifacts", prod="models/reservoir"),
         ),
     ]
@@ -3048,7 +3048,7 @@ class ReservoirConfig(BaseConfigSchema):
                 "they become available for use. This provides an additional review step for "
                 "security and quality control in production environments."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -3066,7 +3066,7 @@ class ReservoirConfig(BaseConfigSchema):
                 "to parent reservoirs. Set to False if this reservoir is standalone or is itself "
                 "a delegation target."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -3083,7 +3083,7 @@ class ReservoirConfig(BaseConfigSchema):
                 "must match a configured storage in the storage proxy. Examples include object "
                 "storage backends like MinIO or VFS storage backends."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="local-minio", prod="prod-s3-storage"),
         ),
     ]
@@ -3097,7 +3097,7 @@ class ReservoirConfig(BaseConfigSchema):
                 "for S3-compatible storage or ReservoirVFSStorageConfig for virtual filesystem "
                 "storage backends."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3115,7 +3115,7 @@ class ReservoirConfig(BaseConfigSchema):
                 "import steps like 'download' and 'archive'. Steps not specified here use the "
                 "storage_name default. This enables optimizing storage for different workload types."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
         ),
     ]
 
@@ -3158,7 +3158,7 @@ class ArtifactRegistryConfig(BaseConfigSchema):
                 "location and credentials are managed through the reservoir configuration. This "
                 "setting establishes which model registry to use for artifact storage operations."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="local-registry", prod="prod-model-registry"),
         ),
     ]
@@ -3183,7 +3183,7 @@ class DeploymentConfig(BaseConfigSchema):
                 "one if found; otherwise, the generated definition is used as fallback. This allows "
                 "customizing model serving configurations while maintaining automatic defaults."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -3201,7 +3201,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "and connection pool settings. The database stores all persistent state including "
                 "users, sessions, resources, and audit logs."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3215,7 +3215,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "instances. In multi-manager deployments, etcd ensures consistent state across "
                 "all manager nodes."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3229,7 +3229,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "service communication. This is the primary configuration block for the manager "
                 "component itself."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3247,7 +3247,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "container registry configuration through the API instead. This setting may "
                 "be removed in future versions."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             deprecated_version="25.10.0",
             deprecation_hint="Use container registry configuration through the API instead.",
             composite=True,
@@ -3263,7 +3263,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "and remote logging services. Detailed logging configuration helps with debugging "
                 "and monitoring."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3277,7 +3277,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "for identifying bottlenecks and understanding resource usage patterns in "
                 "production deployments."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3291,7 +3291,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "production environments as they may impact performance or expose sensitive "
                 "information."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3305,7 +3305,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "audit logs, action monitors, and SMTP email reporters. Each reporter type "
                 "can be independently configured."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3320,7 +3320,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "that affects all components. These settings typically apply globally across "
                 "the entire installation."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3333,7 +3333,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "behave including rate limiting, request size limits, session management, and "
                 "security settings. These settings affect how clients interact with Backend.AI."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3346,7 +3346,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "caching, session state storage, real-time messaging between components, and "
                 "background task queuing. Configure connection details and authentication here."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3359,7 +3359,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "sessions to free up resources. Multiple checker types can be enabled including "
                 "network timeout, resource utilization, and session lifetime checkers."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3372,7 +3372,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "and used for compute sessions. Includes image configuration and container "
                 "runtime defaults."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3385,7 +3385,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "scheduler plugins, hook plugins, and accelerator plugins. Plugins extend "
                 "manager functionality for custom scheduling, event handling, and hardware support."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3398,7 +3398,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "containers connect to networks and communicate with each other. Supports various "
                 "network modes including overlay networks for multi-host deployments."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3411,7 +3411,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "health. Configure connection settings for communicating with watcher instances "
                 "deployed alongside agents."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3424,7 +3424,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "behavior, and other authentication-related configurations. Ensure strong "
                 "password requirements in production environments."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3437,7 +3437,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "and verification settings used for stateless authentication between components. "
                 "Shared between manager and webserver for consistent token handling."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3450,7 +3450,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "compute sessions including default settings, timeouts, and session lifecycle "
                 "management parameters."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3463,7 +3463,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "performance metrics from Prometheus for session monitoring, idle detection, "
                 "and resource optimization."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3476,7 +3476,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "are managed, which folder types are enabled, and configures connections to "
                 "storage proxy services for file operations."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3489,7 +3489,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "CPU and memory. Accelerator plugins add custom resource slots here for GPUs "
                 "and other specialized hardware."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3502,7 +3502,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "data to an OpenTelemetry collector for request tracking across Backend.AI "
                 "components. Useful for debugging and performance analysis."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3515,7 +3515,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "and connect to each other in dynamic environments. Supports multiple discovery "
                 "mechanisms for different deployment scenarios."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3532,7 +3532,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "for artifact operations. When configured, enables model artifact management "
                 "features in Backend.AI."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3545,7 +3545,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "manages binary artifacts like trained models and checkpoints. Configure "
                 "storage backends and import workflows here."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]
@@ -3558,7 +3558,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "deployment features in Backend.AI including inference endpoint management "
                 "and model definition handling."
             ),
-            added_version="25.10.0",
+            added_version="25.8.0",
             composite=True,
         ),
     ]

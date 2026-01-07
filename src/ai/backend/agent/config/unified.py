@@ -103,7 +103,7 @@ class SyncContainerLifecyclesConfig(BaseConfigSchema):
                 "and reports discrepancies to the manager for reconciliation. Useful for detecting "
                 "orphaned containers or missed lifecycle events."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="true", prod="true"),
         ),
     ]
@@ -116,7 +116,7 @@ class SyncContainerLifecyclesConfig(BaseConfigSchema):
                 "Lower values provide faster detection of container state changes but increase "
                 "system overhead. Higher values reduce overhead but may delay detection of issues."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="10.0", prod="30.0"),
         ),
     ]
@@ -132,7 +132,7 @@ class CoreDumpConfig(BaseConfigSchema):
                 "When enabled, the agent captures core dump files for debugging crashed containers. "
                 "Requires Linux with specific kernel settings. Only enable when debugging container crashes."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -145,7 +145,7 @@ class CoreDumpConfig(BaseConfigSchema):
                 "This directory is created automatically if it doesn't exist. "
                 "Ensure sufficient disk space is available for storing core dumps."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="./coredumps", prod="/var/lib/backend.ai/coredumps"),
         ),
     ]
@@ -163,7 +163,7 @@ class CoreDumpConfig(BaseConfigSchema):
                 "When this limit is exceeded, older core dump files are automatically deleted "
                 "to free up disk space. Increase this value if you need more historical dumps for debugging."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="10", prod="20"),
         ),
     ]
@@ -181,7 +181,7 @@ class CoreDumpConfig(BaseConfigSchema):
                 "Use binary size format (e.g., '64M', '128M', '1G'). "
                 "Larger values capture more debugging information but require more storage."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="64M", prod="256M"),
         ),
     ]
@@ -240,7 +240,7 @@ class DebugConfig(BaseConfigSchema):
                 "and verbose logging across the agent. This setting is typically overridden by "
                 "command-line debug flag. Only enable in development or when troubleshooting issues."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -253,7 +253,7 @@ class DebugConfig(BaseConfigSchema):
                 "unawaited coroutines, slow callbacks, and other async programming issues. "
                 "Significantly impacts performance and should only be used for debugging async bugs."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -271,7 +271,7 @@ class DebugConfig(BaseConfigSchema):
                 "requests, input/output handling, and container communication. Use for debugging "
                 "session execution issues."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -290,7 +290,7 @@ class DebugConfig(BaseConfigSchema):
                 "Provides more detailed async task state information but adds overhead. "
                 "Useful for diagnosing async task leaks or blocking issues."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -307,7 +307,7 @@ class DebugConfig(BaseConfigSchema):
                 "Useful for post-mortem debugging of container state, filesystem, and logs. "
                 "Warning: containers will accumulate and consume resources. Only enable temporarily."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -324,7 +324,7 @@ class DebugConfig(BaseConfigSchema):
                 "Produces verbose periodic logs showing resource consumption metrics. "
                 "Useful for debugging resource tracking and quota enforcement issues."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -341,7 +341,7 @@ class DebugConfig(BaseConfigSchema):
                 "Shows environment variables, mount points, and execution settings. "
                 "Helpful for debugging container initialization or configuration issues."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -358,7 +358,7 @@ class DebugConfig(BaseConfigSchema):
                 "are assigned to which containers. Useful for debugging resource allocation "
                 "conflicts or understanding how resources are distributed."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -375,7 +375,7 @@ class DebugConfig(BaseConfigSchema):
                 "resource updates, and inter-component communication. Produces high volume "
                 "of logs but valuable for understanding agent behavior during issues."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -392,7 +392,7 @@ class DebugConfig(BaseConfigSchema):
                 "Heartbeats contain agent status and resource availability information. "
                 "Use for debugging connectivity or status synchronization issues."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -409,7 +409,7 @@ class DebugConfig(BaseConfigSchema):
                 "The manager uses heartbeats to detect agent availability. "
                 "Lower values provide faster detection of agent issues but increase network traffic."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="20.0", prod="20.0"),
         ),
     ]
@@ -426,7 +426,7 @@ class DebugConfig(BaseConfigSchema):
                 "Useful for debugging container lifecycle issues or understanding Docker behavior. "
                 "Only applicable when using Docker backend."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -438,7 +438,7 @@ class DebugConfig(BaseConfigSchema):
                 "Configuration for container core dump collection. "
                 "Core dumps help debug container crashes by providing memory snapshots at crash time."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -472,7 +472,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "'kubernetes' uses Kubernetes API for container management in K8s clusters; "
                 "'dummy' is a mock backend for testing without actual containers."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="docker", prod="docker"),
         ),
     ]
@@ -489,7 +489,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "The manager uses this endpoint to send commands like session creation, termination, "
                 "and resource queries. Use '0.0.0.0' to listen on all interfaces."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="0.0.0.0:6001", prod="0.0.0.0:6001"),
         ),
     ]
@@ -506,7 +506,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Used for inter-process communication and internal API endpoints. "
                 "This address is typically not exposed externally."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="0.0.0.0:6003", prod="0.0.0.0:6003"),
         ),
     ]
@@ -525,7 +525,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Containers use this address to communicate back with the agent. "
                 "Use 'host.docker.internal' for Docker on macOS/Windows, or the host's actual IP on Linux."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="host.docker.internal:6003", prod="192.168.1.100:6003"),
         ),
     ]
@@ -542,7 +542,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "When enabled, requires ssl_cert and ssl_key to be configured with valid certificates. "
                 "Recommended for production deployments to secure inter-component communication."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -559,7 +559,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Required when ssl_enabled is true. The certificate should be valid for the agent's "
                 "hostname and signed by a trusted CA or self-signed for internal use."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             secret=True,
             example=ConfigExample(local="", prod="/etc/backend.ai/ssl/agent.crt"),
         ),
@@ -577,7 +577,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Required when ssl_enabled is true. The key file should have restricted permissions "
                 "(e.g., 0600) and be readable only by the agent process."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             secret=True,
             example=ConfigExample(local="", prod="/etc/backend.ai/ssl/agent.key"),
         ),
@@ -595,7 +595,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Use when the agent is behind NAT or a load balancer and the listen address "
                 "differs from the externally reachable address. If not set, uses rpc_listen_addr."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="192.168.1.100:6001"),
         ),
     ]
@@ -614,7 +614,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Used with ZeroMQ CURVE authentication to verify messages from the manager. "
                 "Part of the RPC security mechanism for preventing unauthorized access."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             secret=True,
             example=ConfigExample(local="", prod="/etc/backend.ai/keys/manager.pub"),
         ),
@@ -632,7 +632,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Contains both public and private keys used for ZeroMQ CURVE authentication. "
                 "The private key must be kept secure as it proves the agent's identity."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             secret=True,
             example=ConfigExample(local="", prod="/etc/backend.ai/keys/agent.keypair"),
         ),
@@ -650,7 +650,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Used for communication between the agent and its child processes. "
                 "Directory is created automatically with appropriate permissions."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="/tmp/backend.ai/ipc", prod="/var/run/backend.ai/ipc"),
         ),
     ]
@@ -667,7 +667,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "temporary files, and data that persists across restarts but not upgrades. "
                 "Ensure sufficient disk space and appropriate permissions."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="./var/lib/backend.ai", prod="/var/lib/backend.ai"),
         ),
     ]
@@ -684,7 +684,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Virtual folders and other storage mounts are placed under this path. "
                 "Should be on a filesystem with sufficient space for user data."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="/mnt/backend.ai"),
         ),
     ]
@@ -701,7 +701,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "When true, the agent uses local filesystem paths for storage operations, "
                 "improving performance. When false, storage is accessed via network protocols."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="true", prod="true"),
         ),
     ]
@@ -718,7 +718,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Used for generating URLs that users can access to reach services "
                 "running on this agent, such as web terminals or application proxies."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="compute1.backend.ai"),
         ),
     ]
@@ -731,7 +731,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Used for geographic resource allocation and displayed in admin interfaces. "
                 "Use standard region codes like 'us-east-1', 'eu-west-1', or custom identifiers."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="us-east-1"),
         ),
     ]
@@ -748,7 +748,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Used for cost tracking, capacity planning, and displayed in admin interfaces. "
                 "Use cloud provider's instance type names like 'm5.large' or 'n1-standard-4'."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="m5.xlarge"),
         ),
     ]
@@ -765,7 +765,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Used by init systems and monitoring tools to track the agent process. "
                 "Set to /dev/null to disable PID file creation."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="/dev/null", prod="/var/run/backend.ai/agent.pid"),
         ),
     ]
@@ -782,7 +782,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "'asyncio' uses the standard library implementation (default, most compatible). "
                 "'uvloop' uses a faster libuv-based implementation (better performance, Linux only)."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="asyncio", prod="uvloop"),
         ),
     ]
@@ -799,7 +799,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "When true, the agent starts without verifying manager connectivity. "
                 "Useful for testing or when the manager becomes available after the agent starts."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -820,7 +820,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Provides real-time inspection of async tasks and event loop state. "
                 "Connect via telnet to this port for interactive debugging."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="38200", prod="38200"),
         ),
     ]
@@ -839,7 +839,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Provides a browser-based interface for inspecting async tasks. "
                 "Access via http://agent-host:port for visual debugging."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="39200", prod="39200"),
         ),
     ]
@@ -856,7 +856,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Containers connect to this server to retrieve session metadata and configuration. "
                 "Use '0.0.0.0' to listen on all interfaces or a specific IP for restricted access."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="0.0.0.0", prod="0.0.0.0"),
         ),
     ]
@@ -875,7 +875,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Containers access metadata like session ID, access key, and environment variables "
                 "through this server. Similar to cloud provider instance metadata services."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="40128", prod="40128"),
         ),
     ]
@@ -893,7 +893,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "plugins are loaded except those in block_compute_plugins. "
                 "Plugin names use Python package notation (e.g., 'ai.backend.accelerator.cuda')."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod=""),
         ),
     ]
@@ -910,7 +910,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Plugins in this list are excluded even if discovered. "
                 "Use to disable specific accelerators or features on certain nodes."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod=""),
         ),
     ]
@@ -927,7 +927,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Network plugins provide custom networking configurations for containers. "
                 "If set, only plugins in this list are loaded."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod=""),
         ),
     ]
@@ -943,7 +943,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Blocklist of network plugin names that should not be loaded by this agent. "
                 "Use to disable specific network configurations on certain nodes."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod=""),
         ),
     ]
@@ -960,7 +960,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Used when users commit their running containers as new images. "
                 "Requires sufficient disk space for container filesystem layers."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(
                 local="./tmp/backend.ai/commit", prod="/var/lib/backend.ai/commit"
             ),
@@ -979,7 +979,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "When suspicious or abusive behavior is detected in containers, "
                 "detailed reports are written here for review by administrators."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="/var/log/backend.ai/abuse"),
         ),
     ]
@@ -998,7 +998,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Provides improved event delivery reliability and scalability. "
                 "Requires Redis to be configured. Still in experimental phase."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -1015,7 +1015,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "'linuxkit' indicates Docker Desktop with LinuxKit VM (macOS/Windows). "
                 "'native' indicates native Docker on Linux. Affects filesystem and networking behavior."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="linuxkit", prod="native"),
         ),
     ]
@@ -1032,7 +1032,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Controls ownership of files created in mounted volumes. "
                 "Use 'root:root' for privileged containers or match container user for unprivileged."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="bai:bai"),
         ),
     ]
@@ -1072,7 +1072,7 @@ class OverridableAgentConfig(BaseConfigSchema):
                 "If not specified, a random UUID is generated. In multi-agent mode, "
                 "each agent must have a unique ID. Used for tracking, logging, and management."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="agent-local-1", prod="agent-prod-001"),
         ),
     ]
@@ -1091,7 +1091,7 @@ class OverridableAgentConfig(BaseConfigSchema):
                 "Containers connect to this port for the kernel runner protocol. "
                 "In multi-agent mode, each agent must use a unique port."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="6007", prod="6007"),
         ),
     ]
@@ -1108,7 +1108,7 @@ class OverridableAgentConfig(BaseConfigSchema):
                 "Scaling groups organize agents into logical clusters for resource allocation. "
                 "Users can target specific scaling groups when creating sessions."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="default", prod="gpu-cluster"),
         ),
     ]
@@ -1126,7 +1126,7 @@ class OverridableAgentConfig(BaseConfigSchema):
                 "'storage' for storage-optimized nodes. "
                 "Determines how the agent is used in workload scheduling."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="compute", prod="compute"),
         ),
     ]
@@ -1145,7 +1145,7 @@ class OverridableAgentConfig(BaseConfigSchema):
                 "or exhibit abusive behavior (e.g., crypto mining, excessive I/O). "
                 "Use with caution as it may interrupt legitimate workloads."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -1166,7 +1166,7 @@ class OverridableAgentConfig(BaseConfigSchema):
                 "Higher values speed up bulk session creation but increase resource usage. "
                 "Lower values reduce resource contention during container startup."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="4", prod="8"),
         ),
     ]
@@ -1182,7 +1182,7 @@ class OverridableAgentConfig(BaseConfigSchema):
                 "Configuration for container lifecycle synchronization between agent and manager. "
                 "Ensures container states are consistent across the system."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1224,7 +1224,7 @@ class CommonContainerConfig(BaseConfigSchema):
                 "Empty string means binding to all available interfaces (equivalent to '0.0.0.0'). "
                 "Specify a particular IP to restrict container network access."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="0.0.0.0"),
         ),
     ]
@@ -1241,7 +1241,7 @@ class CommonContainerConfig(BaseConfigSchema):
                 "Used when the bind address differs from the externally reachable address, "
                 "such as when running behind NAT or in a cloud environment."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="192.168.1.100"),
         ),
     ]
@@ -1259,7 +1259,7 @@ class CommonContainerConfig(BaseConfigSchema):
                 "This is typically set automatically by the agent based on environment detection "
                 "and should not normally be configured manually."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod=""),
         ),
     ]
@@ -1288,7 +1288,7 @@ class OverridableContainerConfig(BaseConfigSchema):
                 "Value of -1 uses the container image's default UID. "
                 "Set to match the host user's UID for proper file permissions on mounted volumes."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="-1", prod="1000"),
         ),
     ]
@@ -1305,7 +1305,7 @@ class OverridableContainerConfig(BaseConfigSchema):
                 "Value of -1 uses the container image's default GID. "
                 "Set to match the host group's GID for proper file permissions on mounted volumes."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="-1", prod="1000"),
         ),
     ]
@@ -1322,7 +1322,7 @@ class OverridableContainerConfig(BaseConfigSchema):
                 "Format is [start, end] inclusive. Containers get ports from this range for "
                 "SSH, Jupyter, and other services. In multi-agent mode, ensure non-overlapping ranges."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="[30000, 31000]", prod="[30000, 32000]"),
         ),
     ]
@@ -1340,7 +1340,7 @@ class OverridableContainerConfig(BaseConfigSchema):
                 "'cgroup' reads from cgroup filesystem directly (more accurate, requires root). "
                 "'null' disables statistics collection."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="docker", prod="docker"),
         ),
     ]
@@ -1358,7 +1358,7 @@ class OverridableContainerConfig(BaseConfigSchema):
                 "'jail' uses lightweight jailed containers for faster startup (x86_64 Linux only). "
                 "Jail provides better performance but with reduced isolation."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="docker", prod="docker"),
         ),
     ]
@@ -1375,7 +1375,7 @@ class OverridableContainerConfig(BaseConfigSchema):
                 "Only applicable when sandbox_type is 'jail'. "
                 "Use to customize jail behavior like mount points or resource limits."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod=""),
         ),
     ]
@@ -1394,7 +1394,7 @@ class OverridableContainerConfig(BaseConfigSchema):
                 "'memory' uses RAM-backed tmpfs for fast but limited storage. "
                 "'k8s-nfs' uses NFS-backed storage for Kubernetes."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="hostdir", prod="hostdir"),
         ),
     ]
@@ -1411,7 +1411,7 @@ class OverridableContainerConfig(BaseConfigSchema):
                 "Each container gets a subdirectory under this path for temporary files. "
                 "Should be on a fast filesystem with adequate space."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="./scratches", prod="/var/lib/backend.ai/scratches"),
         ),
     ]
@@ -1428,7 +1428,7 @@ class OverridableContainerConfig(BaseConfigSchema):
                 "Use binary size format (e.g., '1G', '500M'). "
                 "Value of '0' means no limit (only effective with 'hostdir' type)."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="0", prod="10G"),
         ),
     ]
@@ -1445,7 +1445,7 @@ class OverridableContainerConfig(BaseConfigSchema):
                 "Required when scratch_type is 'k8s-nfs'. "
                 "Format: 'server-ip:/export/path' or 'server-hostname:/export/path'."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="192.168.1.50:/exports/scratch"),
         ),
     ]
@@ -1462,7 +1462,7 @@ class OverridableContainerConfig(BaseConfigSchema):
                 "Required when scratch_type is 'k8s-nfs'. "
                 "Common options: 'rw,sync', 'rw,async,soft'."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="rw,sync"),
         ),
     ]
@@ -1479,7 +1479,7 @@ class OverridableContainerConfig(BaseConfigSchema):
                 "If not set, uses the default Docker bridge network. "
                 "Use to isolate Backend.AI containers on a dedicated network."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="br-backend"),
         ),
     ]
@@ -1496,7 +1496,7 @@ class OverridableContainerConfig(BaseConfigSchema):
                 "When enabled, the agent uses Docker Swarm APIs for managing containers, networks, "
                 "and services across multiple Docker hosts. Only applicable with Docker backend."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -1569,7 +1569,7 @@ class ResourceAllocationConfig(BaseConfigSchema):
                 "All agents in manual mode must specify this value. "
                 "The total allocation across all agents should not exceed available cores."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="4", prod="16"),
         ),
     ]
@@ -1583,7 +1583,7 @@ class ResourceAllocationConfig(BaseConfigSchema):
                 "All agents in manual mode must specify this value. "
                 "Use binary size format (e.g., '32G', '64G')."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="8G", prod="64G"),
         ),
     ]
@@ -1597,7 +1597,7 @@ class ResourceAllocationConfig(BaseConfigSchema):
                 "Keys are slot names (e.g., 'cuda.mem', 'cuda.shares'), values are decimal amounts. "
                 "Use to allocate GPU memory, compute shares, and other accelerator resources."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod='{"cuda.mem": "0.5", "cuda.shares": "0.5"}'),
         ),
     ]
@@ -1632,7 +1632,7 @@ class ResourceConfig(BaseConfigSchema):
                 "These cores are not available for container workloads. "
                 "Increase if the agent or system services need more resources."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="1", prod="2"),
         ),
     ]
@@ -1649,7 +1649,7 @@ class ResourceConfig(BaseConfigSchema):
                 "Subtracted from total memory when reporting available resources to the manager. "
                 "The actual reserved amount may vary slightly due to memory_align_size rounding."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="1G", prod="4G"),
         ),
     ]
@@ -1666,7 +1666,7 @@ class ResourceConfig(BaseConfigSchema):
                 "Currently unused but reserved for future features like guaranteed minimum scratch space. "
                 "Set based on expected system disk requirements."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="8G", prod="16G"),
         ),
     ]
@@ -1684,7 +1684,7 @@ class ResourceConfig(BaseConfigSchema):
                 "'auto-split' divides resources equally among agents (N agents get 1/N each). "
                 "'manual' requires explicit resource allocation per agent via allocations config."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="shared", prod="auto-split"),
         ),
     ]
@@ -1697,7 +1697,7 @@ class ResourceConfig(BaseConfigSchema):
                 "Required when allocation_mode is 'manual'. "
                 "Specifies exact CPU, memory, and device allocations for this agent."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1714,7 +1714,7 @@ class ResourceConfig(BaseConfigSchema):
                 "Absorbs small variations in available memory between nodes with similar hardware. "
                 "Should be a multiple of the system page size (typically 2MB for huge pages)."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="16M", prod="32M"),
         ),
     ]
@@ -1731,7 +1731,7 @@ class ResourceConfig(BaseConfigSchema):
                 "Resources are allocated in this sequence, which can affect placement "
                 "when multiple resource types compete for affinity (e.g., GPU and NUMA)."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(
                 local='["cuda", "rocm", "tpu", "cpu", "mem"]',
                 prod='["cuda", "rocm", "tpu", "cpu", "mem"]',
@@ -1752,7 +1752,7 @@ class ResourceConfig(BaseConfigSchema):
                 "'PACKED' fills one NUMA node before moving to the next for locality. "
                 "Affects performance characteristics of multi-socket systems."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="INTERLEAVED", prod="INTERLEAVED"),
         ),
     ]
@@ -1787,7 +1787,7 @@ class ContainerLogsConfig(BaseConfigSchema):
                 "Logs exceeding this size are truncated from the beginning. "
                 "Use binary size format (e.g., '10M', '50M')."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="10M", prod="50M"),
         ),
     ]
@@ -1804,7 +1804,7 @@ class ContainerLogsConfig(BaseConfigSchema):
                 "Larger chunks improve throughput but use more memory. "
                 "Use binary size format (e.g., '64K', '128K')."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="64K", prod="128K"),
         ),
     ]
@@ -1829,7 +1829,7 @@ class APIConfig(BaseConfigSchema):
                 "Large images or slow networks may require longer timeouts. "
                 "Default is 7200 seconds (2 hours)."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="7200", prod="7200"),
         ),
     ]
@@ -1847,7 +1847,7 @@ class APIConfig(BaseConfigSchema):
                 "Used when users save their container state as a new image. "
                 "Set to None for no timeout (may be needed for large containers)."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="7200"),
         ),
     ]
@@ -1865,7 +1865,7 @@ class APIConfig(BaseConfigSchema):
                 "Used when users push their committed images to external registries. "
                 "Set to None for no timeout."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="7200"),
         ),
     ]
@@ -1885,7 +1885,7 @@ class KernelLifecyclesConfig(BaseConfigSchema):
                 "The agent checks container health this many times before giving up. "
                 "Increase for containers with slower initialization."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="10", prod="20"),
         ),
     ]
@@ -1902,7 +1902,7 @@ class KernelLifecyclesConfig(BaseConfigSchema):
                 "If the container doesn't respond within this time, the attempt fails. "
                 "Total initialization time is approximately attempts * timeout."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="60.0", prod="120.0"),
         ),
     ]
@@ -1919,7 +1919,7 @@ class KernelLifecyclesConfig(BaseConfigSchema):
                 "If the container is not ready within this time, it's considered failed. "
                 "Should be large enough for containers with heavy startup processes."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="60.0", prod="120.0"),
         ),
     ]
@@ -1943,7 +1943,7 @@ class DockerExtraConfig(BaseConfigSchema):
                 "Used internally to verify Swarm compatibility when container.swarm_enabled is true. "
                 "This is typically auto-detected and not set manually."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -1964,7 +1964,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "Pyroscope collects CPU and memory profiles to help identify performance bottlenecks "
                 "and memory issues in the agent process."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1977,7 +1977,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "and log formatting. Proper logging setup is essential for debugging and monitoring "
                 "agent behavior in production environments."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1990,7 +1990,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "Enables integration with observability platforms like Jaeger, Zipkin, or Prometheus "
                 "for comprehensive monitoring of agent operations."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2007,7 +2007,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "other Backend.AI services in the cluster. Enables dynamic service mesh integration "
                 "and load balancing across multiple agents."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2020,7 +2020,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "asynchronous debugging, memory leak detection, and core dump collection. "
                 "Should be carefully configured in production to avoid performance overhead."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2033,7 +2033,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "key-value store for cluster coordination, configuration sharing, and service discovery. "
                 "All agents in a cluster must connect to the same etcd cluster."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2052,7 +2052,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "Controls how container stdout/stderr logs are collected, stored, and made "
                 "available to users. Important for debugging container applications."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2065,7 +2065,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "Defines timeout values for pulling, committing, and pushing container images. "
                 "Should be adjusted based on image sizes and network conditions."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2082,7 +2082,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "Controls polling intervals and timeouts during container initialization. "
                 "Affects how quickly the agent detects container startup success or failure."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2095,7 +2095,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "This field should not be manually configured in the agent configuration file. "
                 "Plugin settings are managed centrally in etcd and distributed to agents automatically."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
     redis: Annotated[
@@ -2107,7 +2107,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "Redis is used for inter-agent communication, caching, and pub/sub messaging. "
                 "This field should not be manually configured as it is injected from etcd settings."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2131,7 +2131,7 @@ class AgentSpecificConfig(BaseConfigSchema):
                 "In multi-agent mode (when 'agents' field is populated), this serves as the default "
                 "configuration that individual agents inherit and can override."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2144,7 +2144,7 @@ class AgentSpecificConfig(BaseConfigSchema):
                 "In multi-agent mode (when 'agents' field is populated), this serves as the default "
                 "configuration that individual agents inherit and can override."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2157,7 +2157,7 @@ class AgentSpecificConfig(BaseConfigSchema):
                 "In multi-agent mode (when 'agents' field is populated), this serves as the default "
                 "configuration that individual agents inherit and can override."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2191,7 +2191,7 @@ class AgentOverrideConfig(BaseConfigSchema):
                 "inherit from the global defaults if not specified. Use this to customize "
                 "specific settings like network ports or SSL certificates per agent."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2204,7 +2204,7 @@ class AgentOverrideConfig(BaseConfigSchema):
                 "Optional field that allows customizing container settings like kernel UID/GID, "
                 "port ranges, or scratch directory paths for specific agents."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2217,7 +2217,7 @@ class AgentOverrideConfig(BaseConfigSchema):
                 "Optional field that allows assigning specific CPU, memory, and device allocations "
                 "to individual agents when using MANUAL resource allocation mode."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2267,7 +2267,7 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
                 "'resource' fields serve as default values that each agent entry can override. "
                 "Each agent entry must have a unique agent ID."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]

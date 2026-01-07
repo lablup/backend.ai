@@ -51,7 +51,7 @@ class WebSocketProxyConfig(BaseConfigSchema):
                 "proxy service. Used when the webserver needs to forward WebSocket traffic "
                 "to another service. Leave empty to disable WebSocket proxying."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="ws://wsproxy.example.com:8080"),
         ),
     ]
@@ -67,7 +67,7 @@ class ServiceConfig(BaseConfigSchema):
                 "network interfaces (recommended for production), or '127.0.0.1' to restrict "
                 "to localhost only (useful for development or when behind a reverse proxy)."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="127.0.0.1", prod="0.0.0.0"),
         ),
     ]
@@ -80,7 +80,7 @@ class ServiceConfig(BaseConfigSchema):
                 "Use high ports (>1024) to run without root privileges. Common alternatives "
                 "include 8080, 8443, or 3000."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="8080", prod="8080"),
         ),
     ]
@@ -93,7 +93,7 @@ class ServiceConfig(BaseConfigSchema):
                 "this when you need to proxy WebSocket traffic through a separate service, "
                 "typically for terminal and interactive app connections."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -110,7 +110,7 @@ class ServiceConfig(BaseConfigSchema):
                 "connections are served over HTTPS. Requires ssl_cert and ssl_privkey to be "
                 "configured. Strongly recommended for production deployments."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -127,7 +127,7 @@ class ServiceConfig(BaseConfigSchema):
                 "is true. Should contain the full certificate chain including intermediate "
                 "certificates for proper validation by browsers."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="/etc/ssl/certs/webserver.crt"),
         ),
     ]
@@ -144,7 +144,7 @@ class ServiceConfig(BaseConfigSchema):
                 "is true. Keep this file secure with restricted permissions (e.g., 0600) and "
                 "never share or commit to version control."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             secret=True,
         ),
     ]
@@ -161,7 +161,7 @@ class ServiceConfig(BaseConfigSchema):
                 "The webserver serves these files directly to browsers. Defaults to the bundled "
                 "static directory within the package."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="./static", prod="/var/www/backend.ai/static"),
         ),
     ]
@@ -178,7 +178,7 @@ class ServiceConfig(BaseConfigSchema):
                 "Useful when running behind a reverse proxy that terminates SSL. Set to "
                 "'https' if the proxy handles SSL but the webserver runs on HTTP."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="https"),
         ),
     ]
@@ -191,7 +191,7 @@ class ServiceConfig(BaseConfigSchema):
                 "all features. 'static' serves only static files, useful for CDN or custom "
                 "frontend deployments that don't need the built-in UI."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="webui", prod="webui"),
         ),
     ]
@@ -208,7 +208,7 @@ class ServiceConfig(BaseConfigSchema):
                 "administrators can create new user accounts. Enable for public-facing "
                 "deployments that allow self-service signup."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -227,7 +227,7 @@ class ServiceConfig(BaseConfigSchema):
                 "password reset flows where users have forgotten their password. Enable with "
                 "caution as it may reduce security."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -246,7 +246,7 @@ class ServiceConfig(BaseConfigSchema):
                 "resource usage statistics per project (group). Useful for project managers "
                 "to track their team's resource consumption."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -262,7 +262,7 @@ class ServiceConfig(BaseConfigSchema):
                 "Allow users to switch between different sign-in methods (e.g., password, SSO). "
                 "When disabled, users must use the sign-in method configured by the administrator."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -281,7 +281,7 @@ class ServiceConfig(BaseConfigSchema):
                 "Useful for advanced users who need to use custom or unlisted images. "
                 "Disable for controlled environments."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -300,7 +300,7 @@ class ServiceConfig(BaseConfigSchema):
                 "email confirmation. Enable for internal deployments where email verification "
                 "is not required. Disable for public-facing services."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -319,7 +319,7 @@ class ServiceConfig(BaseConfigSchema):
                 "When disabled, sessions may start immediately if resources are available. "
                 "Enable for fair resource allocation in multi-user environments."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -336,7 +336,7 @@ class ServiceConfig(BaseConfigSchema):
                 "information in the browser console and may expose internal state. "
                 "Should be disabled in production for security."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -353,7 +353,7 @@ class ServiceConfig(BaseConfigSchema):
                 "Shows partial or redacted information instead of full details. Useful for "
                 "compliance with privacy regulations."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -370,7 +370,7 @@ class ServiceConfig(BaseConfigSchema):
                 "Each provider must be separately configured in the Manager. Set to None to "
                 "disable SSO and use only local authentication."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="google,keycloak"),
         ),
     ]
@@ -387,7 +387,7 @@ class ServiceConfig(BaseConfigSchema):
                 "Identifies the authentication realm within the SSO provider. Leave empty "
                 "if not using realm-based SSO."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="backend-ai"),
         ),
     ]
@@ -404,7 +404,7 @@ class ServiceConfig(BaseConfigSchema):
                 "session environments as new container images. Useful for preserving custom "
                 "environments but requires additional storage and image management."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -421,7 +421,7 @@ class ServiceConfig(BaseConfigSchema):
                 "users cannot see which physical machines their sessions run on. Enable for "
                 "security and simplified user experience."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -438,7 +438,7 @@ class ServiceConfig(BaseConfigSchema):
                 "Shown in the app download panel if enabled. Leave empty to hide "
                 "the download link."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="https://releases.example.com/backend-ai"),
         ),
     ]
@@ -455,7 +455,7 @@ class ServiceConfig(BaseConfigSchema):
                 "links to download Backend.AI desktop apps and CLI tools. Disable if "
                 "you don't want users to see download options."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="true", prod="true"),
         ),
     ]
@@ -472,7 +472,7 @@ class ServiceConfig(BaseConfigSchema):
                 "optionally set up TOTP-based 2FA for enhanced account security. "
                 "Requires proper 2FA configuration in the Manager."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -489,7 +489,7 @@ class ServiceConfig(BaseConfigSchema):
                 "configured 2FA will be prompted to do so before accessing the system. "
                 "Requires enable_2fa to be true."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -506,7 +506,7 @@ class ServiceConfig(BaseConfigSchema):
                 "image to use when users request SSH access to the system. Leave empty "
                 "to use the default system image."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="cr.backend.ai/system/ssh:latest"),
         ),
     ]
@@ -523,7 +523,7 @@ class ServiceConfig(BaseConfigSchema):
                 "statistics are calculated per directory/project hierarchy rather than "
                 "flat aggregation. Useful for organizational billing."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -542,7 +542,7 @@ class ServiceConfig(BaseConfigSchema):
                 "creating sessions. When disabled, users must choose from predefined "
                 "resource templates. Disable for simplified user experience."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="true", prod="true"),
         ),
     ]
@@ -559,7 +559,7 @@ class ServiceConfig(BaseConfigSchema):
                 "applications meant for educational environments. Leave empty to disable "
                 "educational app filtering."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="edu-"),
         ),
     ]
@@ -578,7 +578,7 @@ class ServiceConfig(BaseConfigSchema):
                 "When enabled, users can request session extension before automatic logout. "
                 "Useful for long-running work without frequent re-authentication."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -595,7 +595,7 @@ class ServiceConfig(BaseConfigSchema):
                 "are not calculated, which can improve performance for large directory "
                 "trees but provides less information to users."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="true", prod="true"),
         ),
     ]
@@ -614,7 +614,7 @@ class ServiceConfig(BaseConfigSchema):
                 "Useful for users who manage multiple projects or have admin/user dual roles. "
                 "Disable for simpler single-account workflows."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="true", prod="true"),
         ),
     ]
@@ -633,7 +633,7 @@ class ServiceConfig(BaseConfigSchema):
                 "image to use when users open the built-in file browser. Leave empty to "
                 "use the system default."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="cr.backend.ai/filebrowser:latest"),
         ),
     ]
@@ -650,7 +650,7 @@ class ServiceConfig(BaseConfigSchema):
                 "provides model versioning, sharing, and deployment capabilities. "
                 "Requires storage-proxy Reservoir configuration."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -682,7 +682,7 @@ class CSPConfig(BaseConfigSchema):
                 "when their specific directive is not set. Common values include \"'self'\" "
                 "(same origin only), \"'none'\" (block all), or specific domains."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
     connect_src: Annotated[
@@ -698,7 +698,7 @@ class CSPConfig(BaseConfigSchema):
                 "interfaces like fetch, XMLHttpRequest, and WebSocket. Essential for API calls "
                 'and WebSocket connections. Include "wss:" for WebSocket support.'
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
     img_src: Annotated[
@@ -714,7 +714,7 @@ class CSPConfig(BaseConfigSchema):
                 'Include "data:" to allow inline data URIs for images, which is common for '
                 "dynamically generated or embedded images."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
     media_src: Annotated[
@@ -730,7 +730,7 @@ class CSPConfig(BaseConfigSchema):
                 "elements. Set to \"'self'\" to only allow media from the same origin, "
                 "or include specific CDN domains."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
     font_src: Annotated[
@@ -745,7 +745,7 @@ class CSPConfig(BaseConfigSchema):
                 "CSP font-src directive. Defines valid sources for fonts loaded using @font-face. "
                 "Include font CDN domains like Google Fonts or self-hosted font locations."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
     script_src: Annotated[
@@ -761,7 +761,7 @@ class CSPConfig(BaseConfigSchema):
                 "\"'unsafe-inline'\" allows inline scripts (less secure but often required). "
                 "\"'strict-dynamic'\" can be used with nonces for better security."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
     style_src: Annotated[
@@ -777,7 +777,7 @@ class CSPConfig(BaseConfigSchema):
                 "\"'unsafe-inline'\" is often needed for frameworks that inject styles dynamically. "
                 "Consider using hashes or nonces for stricter security."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
     frame_src: Annotated[
@@ -793,7 +793,7 @@ class CSPConfig(BaseConfigSchema):
                 "using <frame> and <iframe>. Important for embedded content like Jupyter notebooks "
                 "or app proxies."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
     object_src: Annotated[
@@ -809,7 +809,7 @@ class CSPConfig(BaseConfigSchema):
                 "and <applet> elements. Typically set to \"'none'\" as these elements are "
                 "rarely needed and can be security risks."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
     frame_ancestors: Annotated[
@@ -825,7 +825,7 @@ class CSPConfig(BaseConfigSchema):
                 "using <frame>, <iframe>, or <object>. Replaces the X-Frame-Options header. "
                 "Set to \"'none'\" to prevent any embedding (clickjacking protection)."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
     form_action: Annotated[
@@ -841,7 +841,7 @@ class CSPConfig(BaseConfigSchema):
                 "targets. Set to \"'self'\" to only allow form submissions to the same origin, "
                 "preventing form hijacking attacks."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
 
@@ -866,7 +866,7 @@ class SecurityConfig(BaseConfigSchema):
                 "as middleware on incoming requests. Common policies include CORS handling, "
                 "request size limits, and rate limiting. Empty list means no additional policies."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
     response_policies: Annotated[
@@ -882,7 +882,7 @@ class SecurityConfig(BaseConfigSchema):
                 "as middleware on outgoing responses. Can include security headers like "
                 "X-Content-Type-Options, X-Frame-Options, etc. Empty list means no additional policies."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
     csp: Annotated[
@@ -894,7 +894,7 @@ class SecurityConfig(BaseConfigSchema):
                 "to protect against XSS and other injection attacks. Leave unset (None) to skip "
                 "CSP headers entirely."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -920,7 +920,7 @@ class ResourcesConfig(BaseConfigSchema):
                 "users can expose their container services to external access. Disable for "
                 "security-restricted environments."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -937,7 +937,7 @@ class ResourcesConfig(BaseConfigSchema):
                 "all TCP connections require authentication through the app proxy. Enable only "
                 "for trusted network environments."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -954,7 +954,7 @@ class ResourcesConfig(BaseConfigSchema):
                 "When disabled, ports are automatically assigned. Enable to give users "
                 "more control over service accessibility."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -973,7 +973,7 @@ class ResourcesConfig(BaseConfigSchema):
                 "UI-level limit shown to users. Actual allocation depends on resource "
                 "policies and agent availability."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="8", prod="64"),
         ),
     ]
@@ -990,7 +990,7 @@ class ResourcesConfig(BaseConfigSchema):
                 "a UI-level limit. Actual allocation depends on resource policies and agent "
                 "availability."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="16", prod="64"),
         ),
     ]
@@ -1009,7 +1009,7 @@ class ResourcesConfig(BaseConfigSchema):
                 "Applies to both full GPU allocation and MIG (Multi-Instance GPU) partitions. "
                 "Set based on your largest GPU node configuration."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="1", prod="16"),
         ),
     ]
@@ -1028,7 +1028,7 @@ class ResourcesConfig(BaseConfigSchema):
                 "Used with GPU sharing/virtualization solutions like CUDA MPS or vGPU. "
                 "Each share represents a fraction of GPU resources."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="1", prod="16"),
         ),
     ]
@@ -1047,7 +1047,7 @@ class ResourcesConfig(BaseConfigSchema):
                 "Applies to AMD Instinct and Radeon Pro GPUs. Set based on your largest "
                 "AMD GPU node configuration."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="1", prod="10"),
         ),
     ]
@@ -1066,7 +1066,7 @@ class ResourcesConfig(BaseConfigSchema):
                 "container can request. TPUs are specialized for machine learning workloads. "
                 "Set based on your TPU pod configuration."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="1", prod="8"),
         ),
     ]
@@ -1085,7 +1085,7 @@ class ResourcesConfig(BaseConfigSchema):
                 "single container can request. IPUs are optimized for machine intelligence "
                 "workloads. Set based on your IPU-POD configuration."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="1", prod="8"),
         ),
     ]
@@ -1104,7 +1104,7 @@ class ResourcesConfig(BaseConfigSchema):
                 "can request. ATOM is an AI accelerator for inference workloads. Set based "
                 "on your node configuration."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="1", prod="8"),
         ),
     ]
@@ -1123,7 +1123,7 @@ class ResourcesConfig(BaseConfigSchema):
                 "can request. Gaudi2 is optimized for deep learning training and inference. "
                 "Set based on your HLS-Gaudi2 server configuration."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="1", prod="8"),
         ),
     ]
@@ -1142,7 +1142,7 @@ class ResourcesConfig(BaseConfigSchema):
                 "can request. ATOM+ is an enhanced AI accelerator with improved performance. "
                 "Set based on your node configuration."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="1", prod="8"),
         ),
     ]
@@ -1161,7 +1161,7 @@ class ResourcesConfig(BaseConfigSchema):
                 "can request. Warboy is an NPU optimized for vision and language AI workloads. "
                 "Set based on your node configuration."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="1", prod="8"),
         ),
     ]
@@ -1178,7 +1178,7 @@ class ResourcesConfig(BaseConfigSchema):
                 "Shared memory is used for inter-process communication and some ML frameworks "
                 "like PyTorch DataLoader."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="2.0", prod="4.0"),
         ),
     ]
@@ -1195,7 +1195,7 @@ class ResourcesConfig(BaseConfigSchema):
                 "This limit applies to file uploads through the web interface. Large file "
                 "uploads may require increased server timeouts."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="4294967296", prod="4294967296"),
         ),
     ]
@@ -1216,7 +1216,7 @@ class EnvironmentsConfig(BaseConfigSchema):
                 "When set, only images matching these patterns are shown to users. "
                 "Leave empty (None) to show all available images."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
     show_non_installed_images: Annotated[
@@ -1232,7 +1232,7 @@ class EnvironmentsConfig(BaseConfigSchema):
                 "When enabled, users can see and request images that will be pulled on demand. "
                 "Disable to only show pre-installed images."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -1253,7 +1253,7 @@ class PluginConfig(BaseConfigSchema):
                 "Plugin pages extend the web interface with custom functionality. "
                 "Leave empty (None) to disable all page plugins."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
 
@@ -1272,7 +1272,7 @@ class PipelineConfig(BaseConfigSchema):
                 "Backend URL of the Pipeline service API. The web server proxies pipeline "
                 "requests to this endpoint. Use internal cluster DNS or IP in Kubernetes."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="http://127.0.0.1:9500", prod="http://pipeline-api:9500"),
         ),
     ]
@@ -1289,7 +1289,7 @@ class PipelineConfig(BaseConfigSchema):
                 "set this for users to access the Pipeline UI directly. Leave empty if Pipeline "
                 "UI is accessed through the main web interface."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="https://pipeline.example.com"),
         ),
     ]
@@ -1314,7 +1314,7 @@ class UIConfig(BaseConfigSchema):
                 "Specify a full image name like 'python:3.9-ubuntu20.04'. Leave empty to let "
                 "users choose from available images."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="cr.backend.ai/python:3.10-ubuntu22.04"),
         ),
     ]
@@ -1333,7 +1333,7 @@ class UIConfig(BaseConfigSchema):
                 "Git repository cloning. Typically set to a lightweight Python image "
                 "with common data tools."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="cr.backend.ai/python:3.10-ubuntu22.04"),
         ),
     ]
@@ -1350,7 +1350,7 @@ class UIConfig(BaseConfigSchema):
                 "Blocked menus are removed from the UI and cannot be accessed. "
                 "Use for features not available in your deployment."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
     menu_inactivelist: Annotated[
@@ -1366,7 +1366,7 @@ class UIConfig(BaseConfigSchema):
                 "Inactive menus are visible but not clickable. Use for features coming soon "
                 "or temporarily disabled."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
         ),
     ]
     enable_model_folders: Annotated[
@@ -1382,7 +1382,7 @@ class UIConfig(BaseConfigSchema):
                 "a dedicated space for storing and managing ML model artifacts. Disable if "
                 "not using model management features."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="true", prod="true"),
         ),
     ]
@@ -1403,7 +1403,7 @@ class APIConfig(BaseConfigSchema):
                 "of users and resources. Use 'default' for single-domain deployments or "
                 "specify the domain name for multi-tenant setups."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="default", prod="default"),
         ),
     ]
@@ -1419,7 +1419,7 @@ class APIConfig(BaseConfigSchema):
                 "as comma-separated values for load balancing and high availability. "
                 "The web server will distribute requests across all endpoints."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(
                 local="http://127.0.0.1:8080",
                 prod="http://manager-api:8080,http://manager-api-2:8080",
@@ -1434,7 +1434,7 @@ class APIConfig(BaseConfigSchema):
                 "Display text for the API endpoint shown in the web UI. This label appears "
                 "in settings and debugging panels. Customize for branded deployments."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="Backend.AI API", prod="Production API"),
         ),
     ]
@@ -1451,7 +1451,7 @@ class APIConfig(BaseConfigSchema):
                 "for development with self-signed certificates. Always enable in production "
                 "for security."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -1468,7 +1468,7 @@ class APIConfig(BaseConfigSchema):
                 "Default is 'sToken'. Change only if customizing the authentication flow "
                 "or integrating with external identity providers."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="sToken", prod="sToken"),
         ),
     ]
@@ -1486,7 +1486,7 @@ class APIConfig(BaseConfigSchema):
                 "concurrent API requests to prevent overloading the manager. Increase for "
                 "high-traffic deployments."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="50", prod="200"),
         ),
     ]
@@ -1511,7 +1511,7 @@ class RedisHelperConfig(BaseConfigSchema):
                 "operation takes longer than this, it will timeout. Increase for slow "
                 "networks or heavily loaded Redis servers."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="5.0", prod="10.0"),
         ),
     ]
@@ -1528,7 +1528,7 @@ class RedisHelperConfig(BaseConfigSchema):
                 "cannot be established within this time, it will fail. Increase for "
                 "remote Redis servers with high latency."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="2.0", prod="5.0"),
         ),
     ]
@@ -1545,7 +1545,7 @@ class RedisHelperConfig(BaseConfigSchema):
                 "a connection loss. Lower values provide faster reconnection but increase "
                 "CPU usage during outages."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="0.3", prod="0.5"),
         ),
     ]
@@ -1566,7 +1566,7 @@ class WebServerRedisConfig(BaseConfigSchema):
                 "numbers provide logical separation of data within the same Redis instance. "
                 "Ensure this doesn't conflict with other Backend.AI components."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="0", prod="5"),
         ),
     ]
@@ -1587,7 +1587,7 @@ class SessionConfig(BaseConfigSchema):
                 "fast access and horizontal scalability. Use a dedicated Redis instance or "
                 "database for production."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1604,7 +1604,7 @@ class SessionConfig(BaseConfigSchema):
                 "users must re-authenticate. Shorter values improve security but require "
                 "more frequent logins."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="604800", prod="86400"),
         ),
     ]
@@ -1623,7 +1623,7 @@ class SessionConfig(BaseConfigSchema):
                 "get their session extended automatically. Leave empty (None) to use fixed "
                 "session duration without extension."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="3600"),
         ),
     ]
@@ -1640,7 +1640,7 @@ class SessionConfig(BaseConfigSchema):
                 "development or after security incidents. In production, enable only if "
                 "you want to force all users to re-login on restart."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -1656,7 +1656,7 @@ class SessionConfig(BaseConfigSchema):
                 "Duration in seconds to block login attempts after exceeding the failure limit. "
                 "Default is 1200 (20 minutes). This helps prevent brute-force password attacks."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="60", prod="1200"),
         ),
     ]
@@ -1673,7 +1673,7 @@ class SessionConfig(BaseConfigSchema):
                 "failures, the IP or account is blocked for login_block_time seconds. "
                 "Lower values are more secure but may frustrate legitimate users."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="10", prod="5"),
         ),
     ]
@@ -1690,7 +1690,7 @@ class SessionConfig(BaseConfigSchema):
                 "inactive sessions are terminated. Works with session extension settings "
                 "to control idle timeout behavior."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
@@ -1709,7 +1709,7 @@ class SessionConfig(BaseConfigSchema):
                 "are reserved before the session starts for services like Jupyter or SSH. "
                 "Higher values allow more services but consume more resources."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="10", prod="5"),
         ),
     ]
@@ -1731,7 +1731,7 @@ class LicenseConfig(BaseConfigSchema):
                 "'Enterprise' for commercial deployments. This is displayed in the "
                 "UI footer and about page."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="Open Source", prod="Enterprise"),
         ),
     ]
@@ -1748,7 +1748,7 @@ class LicenseConfig(BaseConfigSchema):
                 "Empty for Open Source edition. Used to display license information "
                 "to administrators."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="2024-01-01"),
         ),
     ]
@@ -1765,7 +1765,7 @@ class LicenseConfig(BaseConfigSchema):
                 "Empty for Open Source edition. Administrators are notified when "
                 "the license is approaching expiration."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="", prod="2025-12-31"),
         ),
     ]
@@ -1795,7 +1795,7 @@ class WebServerConfig(BaseConfigSchema):
                 "performance using libuv. 'asyncio' uses Python's standard library "
                 "implementation, which may be more compatible in some environments."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="uvloop", prod="uvloop"),
         ),
     ]
@@ -1812,7 +1812,7 @@ class WebServerConfig(BaseConfigSchema):
                 "The directory is created automatically if it doesn't exist. "
                 "Must be writable by the web server process."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="/tmp/backend.ai/ipc", prod="/var/run/backend.ai/ipc"),
         ),
     ]
@@ -1828,7 +1828,7 @@ class WebServerConfig(BaseConfigSchema):
                 "Path to write the web server process ID. Used by process managers "
                 "and monitoring tools. Set to /dev/null (default) to disable PID file creation."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="/dev/null", prod="/var/run/backend.ai/webserver.pid"),
         ),
     ]
@@ -1849,7 +1849,7 @@ class ApolloRouterConfig(BaseConfigSchema):
                 "GraphQL requests are routed through Apollo Router instead of directly "
                 "to the Manager API. Useful for advanced GraphQL architectures."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -1866,7 +1866,7 @@ class ApolloRouterConfig(BaseConfigSchema):
                 "as comma-separated values for load balancing. Only used when Apollo "
                 "Router is enabled."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="http://127.0.0.1:4000", prod="http://apollo-router:4000"),
         ),
     ]
@@ -1887,7 +1887,7 @@ class DebugConfig(BaseConfigSchema):
                 "logging, detailed error messages, and development tools. Never enable "
                 "in production as it may expose sensitive information."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -1908,7 +1908,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
                 "Core service configuration including bind address, SSL settings, "
                 "and authentication options."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1920,7 +1920,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
                 "Security settings including request/response policies and Content "
                 "Security Policy (CSP) configuration."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1932,7 +1932,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
                 "Resource limits for the UI including maximum CPU, memory, and "
                 "accelerator allocations per container."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1943,7 +1943,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
             description=(
                 "Container image environment settings including allowlist and display preferences."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1952,7 +1952,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         Field(default_factory=PluginConfig),
         BackendAIConfigMeta(
             description="Web UI plugin configuration for extending the interface.",
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1963,7 +1963,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
             description=(
                 "Backend.AI Pipeline service integration settings for ML workflow automation."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1972,7 +1972,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         Field(default_factory=UIConfig),
         BackendAIConfigMeta(
             description="UI customization settings including default environments and menu visibility.",
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1984,7 +1984,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
                 "Backend.AI Manager API connection settings including endpoints and "
                 "connection limits."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -1996,7 +1996,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
                 "JWT authentication configuration shared between Manager and Web Server "
                 "for stateless token-based authentication."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2008,7 +2008,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
                 "User session management settings including Redis storage, timeouts, "
                 "and login security."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2017,7 +2017,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         Field(default_factory=LicenseConfig),
         BackendAIConfigMeta(
             description="License information displayed in the web interface.",
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2028,7 +2028,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
             description=(
                 "Core web server runtime settings including event loop and process management."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2037,7 +2037,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         Field(default_factory=OTELConfig),  # type: ignore[arg-type]
         BackendAIConfigMeta(
             description="OpenTelemetry integration for distributed tracing and metrics collection.",
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2049,7 +2049,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
                 "etcd connection settings for distributed configuration and "
                 "coordination with other Backend.AI components."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2058,7 +2058,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         Field(default_factory=PyroscopeConfig),  # type: ignore[arg-type]
         BackendAIConfigMeta(
             description="Pyroscope continuous profiling integration for performance analysis.",
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2074,7 +2074,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
                 "Service discovery configuration for automatic detection and "
                 "connection to Backend.AI services."
             ),
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2087,7 +2087,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description="Apollo Router GraphQL gateway configuration for federated schemas.",
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2096,7 +2096,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         Field(default_factory=LoggingConfig),
         BackendAIConfigMeta(
             description="Logging configuration for log levels, formats, and destinations.",
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
@@ -2105,7 +2105,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         Field(default_factory=DebugConfig),
         BackendAIConfigMeta(
             description="Debug mode settings for development and troubleshooting.",
-            added_version="25.10.0",
+            added_version="25.12.0",
             composite=True,
         ),
     ]
