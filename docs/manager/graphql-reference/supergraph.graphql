@@ -3318,7 +3318,10 @@ input ImportArtifactsInput
   artifactRevisionIds: [ID!]!
 
   """
-  Optional vfolder ID to use as the download destination. If provided, artifacts will be downloaded to this vfolder's path using the vfolder's storage host for all import steps.
+  Added in 26.1.0.
+  
+  Optional vfolder ID to use as the download destination.
+  If provided, artifacts will be downloaded to this vfolder's path using the vfolder's storage host for all import steps.
   """
   vfolderId: ID = null
 }
