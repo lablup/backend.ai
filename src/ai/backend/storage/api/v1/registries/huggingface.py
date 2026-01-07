@@ -43,10 +43,8 @@ from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceServiceArgs,
     create_huggingface_import_pipeline,
 )
-from ai.backend.storage.storages.storage_pool import StoragePool
-from ai.backend.storage.storages.vfolder_storage import VFolderStorage
+from ai.backend.storage.services.storages.vfolder_storage import VFolderStorageService
 from ai.backend.storage.utils import log_client_api_entry
-from ai.backend.storage.volumes.pool import VolumePool
 
 if TYPE_CHECKING:
     from ai.backend.storage.context import RootContext
@@ -56,18 +54,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class HuggingFaceRegistryAPIHandler:
     _huggingface_service: HuggingFaceService
-    _volume_pool: VolumePool
-    _storage_pool: StoragePool
+    _vfolder_storage_service: VFolderStorageService
 
     def __init__(
         self,
         huggingface_service: HuggingFaceService,
-        volume_pool: VolumePool,
-        storage_pool: StoragePool,
+        vfolder_storage_service: VFolderStorageService,
     ) -> None:
         self._huggingface_service = huggingface_service
-        self._volume_pool = volume_pool
-        self._storage_pool = storage_pool
+        self._vfolder_storage_service = vfolder_storage_service
 
     @api_handler
     async def scan_models(
@@ -192,11 +187,9 @@ class HuggingFaceRegistryAPIHandler:
 
         # If vfid is provided, create VFolderStorage and register it
         if body.parsed.vfid is not None:
-            setup_result = await VFolderStorage.setup(
+            setup_result = await self._vfolder_storage_service.setup(
                 vfid=body.parsed.vfid,
                 storage_step_mappings=storage_step_mappings,
-                volume_pool=self._volume_pool,
-                storage_pool=self._storage_pool,
             )
             storage_step_mappings = setup_result.storage_step_mappings
             cleanup_callback = setup_result.cleanup_callback
@@ -256,10 +249,13 @@ def create_app(ctx: RootContext) -> web.Application:
             redis_client=ctx.valkey_artifact_client,
         )
     )
-    huggingface_api_handler = HuggingFaceRegistryAPIHandler(
-        huggingface_service=huggingface_service,
+    vfolder_storage_service = VFolderStorageService(
         volume_pool=ctx.volume_pool,
         storage_pool=ctx.storage_pool,
+    )
+    huggingface_api_handler = HuggingFaceRegistryAPIHandler(
+        huggingface_service=huggingface_service,
+        vfolder_storage_service=vfolder_storage_service,
     )
 
     app.router.add_route("POST", "/scan", huggingface_api_handler.scan_models)
