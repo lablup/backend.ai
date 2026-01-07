@@ -20,7 +20,7 @@ from ai.backend.common.exception import (
 from .common import ObjectNotFound
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.vfolder import VFolderRow
+    from ai.backend.manager.models.vfolder import VFolderRow
 
 
 class TooManyVFoldersFound(BackendAIError, web.HTTPNotFound):

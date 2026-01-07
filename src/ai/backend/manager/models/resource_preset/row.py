@@ -9,6 +9,8 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
+from sqlalchemy.sql.dml import Delete, Update
+from sqlalchemy.sql.selectable import Select
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
@@ -27,18 +29,19 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models"))
 __all__: Sequence[str] = ("resource_presets",)
 
 
-type QueryStatement = sa.sql.Select
+# Type alias for statements that support .where() method
+type WhereableStatement = Select | Update | Delete
 
 
-def filter_by_name(name: str) -> Callable[[QueryStatement], QueryStatement]:
+def filter_by_name(name: str) -> Callable[[WhereableStatement], WhereableStatement]:
     return lambda query_stmt: query_stmt.where(ResourcePresetRow.name == name)
 
 
-def filter_by_id(id: UUID) -> Callable[[QueryStatement], QueryStatement]:
+def filter_by_id(id: UUID) -> Callable[[WhereableStatement], WhereableStatement]:
     return lambda query_stmt: query_stmt.where(ResourcePresetRow.id == id)
 
 
-QueryOption = Callable[[Any], Callable[[QueryStatement], QueryStatement]]
+QueryOption = Callable[[Any], Callable[[WhereableStatement], WhereableStatement]]
 
 
 def _get_scaling_group_join_condition():
@@ -93,7 +96,7 @@ class ResourcePresetRow(Base):
         data: Mapping[str, Any],
         *,
         db_session: AsyncSession,
-    ) -> Optional[Self]:
+    ) -> Self | None:
         update_stmt = sa.update(ResourcePresetRow).values(data).returning(ResourcePresetRow)
         update_stmt = query_option(update_stmt)
         stmt = (
@@ -115,7 +118,7 @@ class ResourcePresetRow(Base):
     ) -> None:
         delete_stmt = sa.delete(ResourcePresetRow)
         delete_stmt = query_option(delete_stmt)
-        return await db_session.execute(delete_stmt)
+        await db_session.execute(delete_stmt)
 
     def to_dataclass(self) -> ResourcePresetData:
         return ResourcePresetData(
