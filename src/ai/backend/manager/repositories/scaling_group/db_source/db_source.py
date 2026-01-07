@@ -230,13 +230,13 @@ class ScalingGroupDBSource:
             result = await session.execute(query)
             return result.scalar() or False
 
-    async def associate_scaling_group_with_user_group(
+    async def associate_scaling_group_with_user_groups(
         self,
-        creator: Creator[ScalingGroupForProjectRow],
+        bulk_creator: BulkCreator[ScalingGroupForProjectRow],
     ) -> None:
-        """Associates a single scaling group with a user group (project)."""
+        """Associates a scaling group with multiple user groups (projects)."""
         async with self._db.begin_session() as session:
-            await execute_creator(session, creator)
+            await execute_bulk_creator(session, bulk_creator)
 
     async def disassociate_scaling_group_with_user_group(
         self,

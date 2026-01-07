@@ -1090,25 +1090,27 @@ class TestScalingGroupRepositoryDB:
 
     # Associate/Disassociate with User Group (Project) Tests
 
-    async def test_associate_scaling_group_with_user_group_success(
+    async def test_associate_scaling_group_with_user_groups_success(
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_purge: str,
         test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
     ) -> None:
-        """Test associating a scaling group with a user group (project)."""
+        """Test associating a scaling group with user groups (projects)."""
         # Given: A scaling group and a project (group)
         sgroup_name = sample_scaling_group_for_purge
         _, _, project_id = test_user_domain_group
 
         # When: Associate the scaling group with the project
-        creator = Creator(
-            spec=ScalingGroupForProjectCreatorSpec(
-                scaling_group=sgroup_name,
-                project=project_id,
-            )
+        bulk_creator = BulkCreator(
+            specs=[
+                ScalingGroupForProjectCreatorSpec(
+                    scaling_group=sgroup_name,
+                    project=project_id,
+                )
+            ]
         )
-        await scaling_group_repository.associate_scaling_group_with_user_group(creator)
+        await scaling_group_repository.associate_scaling_group_with_user_groups(bulk_creator)
 
         # Then: Association should exist
         association_exists = (
@@ -1131,13 +1133,15 @@ class TestScalingGroupRepositoryDB:
         _, _, project_id = test_user_domain_group
 
         # First, associate the scaling group with the project using repository
-        creator = Creator(
-            spec=ScalingGroupForProjectCreatorSpec(
-                scaling_group=sgroup_name,
-                project=project_id,
-            )
+        bulk_creator = BulkCreator(
+            specs=[
+                ScalingGroupForProjectCreatorSpec(
+                    scaling_group=sgroup_name,
+                    project=project_id,
+                )
+            ]
         )
-        await scaling_group_repository.associate_scaling_group_with_user_group(creator)
+        await scaling_group_repository.associate_scaling_group_with_user_groups(bulk_creator)
 
         # Verify association exists
         association_exists = (

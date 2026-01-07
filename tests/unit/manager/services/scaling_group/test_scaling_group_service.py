@@ -62,7 +62,7 @@ from ai.backend.manager.services.scaling_group.actions.associate_with_keypair im
     AssociateScalingGroupWithKeypairsAction,
 )
 from ai.backend.manager.services.scaling_group.actions.associate_with_user_group import (
-    AssociateScalingGroupWithUserGroupAction,
+    AssociateScalingGroupWithUserGroupsAction,
 )
 from ai.backend.manager.services.scaling_group.actions.create import CreateScalingGroupAction
 from ai.backend.manager.services.scaling_group.actions.disassociate_with_domain import (
@@ -489,28 +489,32 @@ class TestScalingGroupService:
 
     # Associate/Disassociate with User Group (Project) Tests
 
-    async def test_associate_scaling_group_with_user_group_success(
+    async def test_associate_scaling_group_with_user_groups_success(
         self,
         scaling_group_service: ScalingGroupService,
         mock_repository: MagicMock,
     ) -> None:
-        """Test associating a scaling group with a user group (project)"""
-        mock_repository.associate_scaling_group_with_user_group = AsyncMock(return_value=None)
+        """Test associating a scaling group with user groups (projects)"""
+        mock_repository.associate_scaling_group_with_user_groups = AsyncMock(return_value=None)
 
         scaling_group_name = "test-scaling-group"
         project_id = uuid.uuid4()
 
-        creator: Creator[ScalingGroupForProjectRow] = Creator(
-            spec=ScalingGroupForProjectCreatorSpec(
-                scaling_group=scaling_group_name,
-                project=project_id,
-            )
+        bulk_creator: BulkCreator[ScalingGroupForProjectRow] = BulkCreator(
+            specs=[
+                ScalingGroupForProjectCreatorSpec(
+                    scaling_group=scaling_group_name,
+                    project=project_id,
+                )
+            ]
         )
-        action = AssociateScalingGroupWithUserGroupAction(creator=creator)
-        result = await scaling_group_service.associate_scaling_group_with_user_group(action)
+        action = AssociateScalingGroupWithUserGroupsAction(bulk_creator=bulk_creator)
+        result = await scaling_group_service.associate_scaling_group_with_user_groups(action)
 
         assert result is not None
-        mock_repository.associate_scaling_group_with_user_group.assert_called_once_with(creator)
+        mock_repository.associate_scaling_group_with_user_groups.assert_called_once_with(
+            bulk_creator
+        )
 
     async def test_disassociate_scaling_group_with_user_group_success(
         self,
