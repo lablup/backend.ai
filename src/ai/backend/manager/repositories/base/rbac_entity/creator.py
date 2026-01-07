@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
@@ -13,59 +13,54 @@ from ai.backend.manager.data.permission.id import (
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
+from ai.backend.manager.repositories.base.creator import Creator as BaseCreator
+from ai.backend.manager.repositories.base.creator import CreatorResult as BaseCreatorResult
+from ai.backend.manager.repositories.base.creator import CreatorSpec as BaseCreatorSpec
+
+from .utils import insert_on_conflict_do_nothing
 
 
 class RBACEntityRow(ABC):
     @abstractmethod
-    def parsed_object_id(self) -> ObjectId:
+    def scope_id(self) -> ScopeId:
+        pass
+
+    @abstractmethod
+    def entity_id(self) -> ObjectId:
+        pass
+
+    @abstractmethod
+    def field_id(self) -> ObjectId | None:
         pass
 
 
 TEntityRow = TypeVar("TEntityRow", bound=RBACEntityRow)
 
 
-class CreatorSpec(ABC, Generic[TEntityRow]):
-    """Abstract base class defining a row to insert.
-
-    Implementations specify what to create by providing:
-    - A build_row() method that returns the ORM instance to insert
-    """
-
-    @abstractmethod
-    def build_row(self) -> TEntityRow:
-        """Build ORM row instance to insert.
-
-        Returns:
-            An ORM model instance to be inserted
-        """
-        raise NotImplementedError
+class CreatorSpec(BaseCreatorSpec[TEntityRow]):
+    pass
 
 
 @dataclass
-class Creator(Generic[TEntityRow]):
-    """Bundles RBAC-aware creator spec for insert operations.
-
-    Attributes:
-        spec: CreatorSpec implementation defining what to create.
-        rbac_context: RBAC context for the creation operation.
-    """
-
-    spec: CreatorSpec[TEntityRow]
-    scope_id: ScopeId
+class Creator(BaseCreator[TEntityRow]):
+    pass
 
 
 @dataclass
-class CreatorResult(Generic[TEntityRow]):
-    """Result of executing a create operation."""
-
-    row: TEntityRow
+class CreatorResult(BaseCreatorResult[TEntityRow]):
+    pass
 
 
 async def execute_creator(
     db_sess: SASession,
     creator: Creator[TEntityRow],
 ) -> CreatorResult[TEntityRow]:
-    """Execute INSERT with RBAC-aware creator.
+    """
+    Execute INSERT with RBAC-aware creator.
+    - Insert the main entity row.
+    - Insert associated EntityFieldRow if field-scoped.
+    - Insert AssociationScopesEntitiesRow if not field-scoped.
 
     Args:
         db_sess: Async SQLAlchemy session.
@@ -78,14 +73,29 @@ async def execute_creator(
     db_sess.add(row)
     await db_sess.flush()
     await db_sess.refresh(row)
-    scope_id = creator.scope_id
-    object_id = row.parsed_object_id()
-    db_sess.add(
-        AssociationScopesEntitiesRow(
-            scope_type=scope_id.scope_type,
-            scope_id=scope_id.scope_id,
-            entity_type=object_id.entity_type,
-            entity_id=object_id.entity_id,
+    field_id = row.field_id()
+    scope_id = row.scope_id()
+    entity_id = row.entity_id()
+    if field_id is not None:
+        await insert_on_conflict_do_nothing(
+            db_sess,
+            EntityFieldRow(
+                scope_type=scope_id.scope_type,
+                scope_id=scope_id.scope_id,
+                entity_type=entity_id.entity_type,
+                entity_id=entity_id.entity_id,
+                field_type=field_id.entity_type,
+                field_id=field_id.entity_id,
+            ),
         )
-    )
+    else:
+        await insert_on_conflict_do_nothing(
+            db_sess,
+            AssociationScopesEntitiesRow(
+                scope_type=scope_id.scope_type,
+                scope_id=scope_id.scope_id,
+                entity_type=entity_id.entity_type,
+                entity_id=entity_id.entity_id,
+            ),
+        )
     return CreatorResult(row=row)

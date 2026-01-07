@@ -9,23 +9,9 @@ from typing import Generic, TypeVar
 
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.manager.data.permission.id import (
-    ObjectId,
-    ScopeId,
-)
+from ai.backend.manager.models.base import Base
 
-
-class RBACEntityRow(ABC):
-    @abstractmethod
-    def parsed_scope_id(self) -> ScopeId:
-        pass
-
-    @abstractmethod
-    def parsed_object_id(self) -> ObjectId:
-        pass
-
-
-TRow = TypeVar("TRow", bound=RBACEntityRow)
+TRow = TypeVar("TRow", bound=Base)
 
 
 class CreatorSpec(ABC, Generic[TRow]):
