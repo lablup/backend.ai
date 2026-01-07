@@ -98,7 +98,10 @@ Generated using BackendAIConfigMeta annotations.
     config_env = ConfigEnvironment.LOCAL if env == "local" else ConfigEnvironment.PROD
 
     try:
-        generator_config = GeneratorConfig(mask_secrets=not unmask_secrets)
+        generator_config = GeneratorConfig(
+            mask_secrets=not unmask_secrets,
+            include_version_comments=True,
+        )
         generator = TOMLGenerator(env=config_env, config=generator_config)
         generator.generate_to_file(WebServerUnifiedConfig, output, header=header_comment.strip())
         log.info(f"Sample configuration file generated successfully: {output}")
