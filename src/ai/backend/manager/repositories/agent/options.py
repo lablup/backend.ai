@@ -2,6 +2,7 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
+from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
@@ -9,20 +10,54 @@ from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 class AgentConditions:
     @staticmethod
-    def by_id_contains(id: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_id_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return AgentRow.id.ilike(f"%{id}%")
-            return AgentRow.id.like(f"%{id}%")
+            if spec.case_insensitive:
+                condition = AgentRow.id.ilike(f"%{spec.value}%")
+            else:
+                condition = AgentRow.id.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_id_equals(id: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_id_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(AgentRow.id) == id.lower()
-            return AgentRow.id == id
+            if spec.case_insensitive:
+                condition = sa.func.lower(AgentRow.id) == spec.value.lower()
+            else:
+                condition = AgentRow.id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_id_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = AgentRow.id.ilike(f"{spec.value}%")
+            else:
+                condition = AgentRow.id.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_id_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = AgentRow.id.ilike(f"%{spec.value}")
+            else:
+                condition = AgentRow.id.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -48,24 +83,54 @@ class AgentConditions:
         return inner
 
     @staticmethod
-    def by_scaling_group_contains(
-        scaling_group: str, case_insensitive: bool = False
-    ) -> QueryCondition:
+    def by_scaling_group_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return AgentRow.scaling_group.ilike(f"%{scaling_group}%")
-            return AgentRow.scaling_group.like(f"%{scaling_group}%")
+            if spec.case_insensitive:
+                condition = AgentRow.scaling_group.ilike(f"%{spec.value}%")
+            else:
+                condition = AgentRow.scaling_group.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_scaling_group_equals(
-        scaling_group: str, case_insensitive: bool = False
-    ) -> QueryCondition:
+    def by_scaling_group_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(AgentRow.scaling_group) == scaling_group.lower()
-            return AgentRow.scaling_group == scaling_group
+            if spec.case_insensitive:
+                condition = sa.func.lower(AgentRow.scaling_group) == spec.value.lower()
+            else:
+                condition = AgentRow.scaling_group == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_scaling_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = AgentRow.scaling_group.ilike(f"{spec.value}%")
+            else:
+                condition = AgentRow.scaling_group.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_scaling_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = AgentRow.scaling_group.ilike(f"%{spec.value}")
+            else:
+                condition = AgentRow.scaling_group.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
