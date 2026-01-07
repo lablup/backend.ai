@@ -173,7 +173,9 @@ class TestConfigInspector:
         assert field.key == "name"
         assert field.type_info.type_name == "str"
         assert field.type_info.default == "default-name"
-        assert field.type_info.required is False
+        # required is True because the field type is NOT nullable (str, not str | None)
+        # The 'required' flag determines if a field gets ## prefix in TOML output
+        assert field.type_info.required is True
         assert field.doc.description == "The name field"
         assert field.doc.added_version == "25.1.0"
 

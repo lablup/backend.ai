@@ -145,8 +145,10 @@ class ConfigInspector:
         # Get type name
         type_name = self._get_type_name(annotation)
 
-        # Check if required (no default)
-        required = field_info.default is PydanticUndefined and field_info.default_factory is None
+        # Check if nullable (Type | None pattern) - this determines "optional" in TOML output
+        # A field is required if it's NOT nullable, regardless of having a default value
+        is_nullable = self._is_nullable_type(annotation)
+        required = not is_nullable
 
         # Get default value
         default: Any = None
@@ -207,6 +209,37 @@ class ConfigInspector:
             return annotation.__name__
 
         return str(annotation)
+
+    def _is_nullable_type(self, annotation: type | None) -> bool:
+        """Check if a type annotation is nullable (Type | None).
+
+        Args:
+            annotation: The type annotation to check.
+
+        Returns:
+            True if the type is nullable (allows None), False otherwise.
+        """
+        import types
+
+        if annotation is None:
+            return True
+
+        # Handle Python 3.10+ union syntax (str | None)
+        if isinstance(annotation, types.UnionType):
+            return type(None) in annotation.__args__
+
+        origin = getattr(annotation, "__origin__", None)
+        if origin is None:
+            return False
+
+        # Check for Union types (including Optional[T] which is Union[T, None])
+        origin_name = getattr(origin, "__name__", str(origin))
+        if origin_name == "Union":
+            args = getattr(annotation, "__args__", ())
+            # Check if NoneType is one of the union members
+            return type(None) in args
+
+        return False
 
     def _extract_documentation(
         self,

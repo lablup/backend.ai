@@ -224,12 +224,10 @@ class TOMLGenerator:
             comment_lines = self._wrap_comment(field.doc.description, indent)
             lines.append(comment_lines)
 
-        # Section header
+        # Section header - sections are NOT prefixed with ## even if optional
+        # Only leaf fields get the ## prefix for optional status
         section_name = ".".join(section_path)
-        if visibility == FieldVisibility.OPTIONAL:
-            lines.append(f"{indent}## [{section_name}]")
-        else:
-            lines.append(f"{indent}[{section_name}]")
+        lines.append(f"{indent}[{section_name}]")
 
         # Child fields
         if field.children:
