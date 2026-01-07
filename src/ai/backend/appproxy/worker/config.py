@@ -38,7 +38,7 @@ from ai.backend.common.configs import (
     PyroscopeConfig,
     ServiceDiscoveryConfig,
 )
-from ai.backend.common.meta import BackendAIConfigMeta, ConfigExample
+from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
 from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import LogLevel
 from ai.backend.logging.config import LoggingConfig
@@ -325,7 +325,7 @@ class TraefikConfig(BaseSchema):
                 "Defines the base domain and TLS settings for subdomain-based application routing."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     port_proxy: Annotated[
@@ -337,7 +337,7 @@ class TraefikConfig(BaseSchema):
                 "Defines the port range and hostname for port-based application routing."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     last_used_time_marker_directory: Annotated[
@@ -662,7 +662,7 @@ class ProxyWorkerConfig(BaseSchema):
                 "Defines the bind address, base domain, and port settings for subdomain-based routing."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     port_proxy: Annotated[
@@ -674,7 +674,7 @@ class ProxyWorkerConfig(BaseSchema):
                 "Defines the host, port ranges, and advertised addresses for port-based routing."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     traefik: Annotated[
@@ -686,7 +686,7 @@ class ProxyWorkerConfig(BaseSchema):
                 "The worker configures Traefik dynamically instead of handling routing directly."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     http2: Annotated[
@@ -698,7 +698,7 @@ class ProxyWorkerConfig(BaseSchema):
                 "Defines the nghttpx binary path and API port pool for HTTP/2 proxying."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -725,7 +725,7 @@ class ProxyWorkerConfig(BaseSchema):
                 "to dedicated workers for isolation or performance."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     filtered_apps_only: Annotated[
@@ -851,7 +851,7 @@ class ServerConfig(BaseSchema):
                 "caching, pub/sub messaging for real-time updates, and session state management."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     proxy_worker: Annotated[
@@ -863,7 +863,7 @@ class ServerConfig(BaseSchema):
                 "and traffic filtering configuration."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     profiling: Annotated[
@@ -875,7 +875,7 @@ class ServerConfig(BaseSchema):
                 "Includes settings for cProfile and Pyroscope continuous profiling."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     secrets: Annotated[
@@ -887,7 +887,7 @@ class ServerConfig(BaseSchema):
                 "and coordinator. Must match the secrets configured in the coordinator."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     permit_hash: Annotated[
@@ -899,7 +899,7 @@ class ServerConfig(BaseSchema):
                 "of proxy configuration requests from the coordinator."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     logging: Annotated[
@@ -911,7 +911,7 @@ class ServerConfig(BaseSchema):
                 "Supports console, file, and external log aggregation systems."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     debug: Annotated[
@@ -923,7 +923,7 @@ class ServerConfig(BaseSchema):
                 "Enables verbose logging and additional diagnostic features when enabled."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     otel: Annotated[
@@ -942,7 +942,7 @@ class ServerConfig(BaseSchema):
                 "for visualizing request flows through the proxy worker."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     service_discovery: Annotated[
@@ -954,7 +954,7 @@ class ServerConfig(BaseSchema):
                 "components. Supports Redis-based or etcd-based service registration and discovery."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     etcd: Annotated[
@@ -966,7 +966,7 @@ class ServerConfig(BaseSchema):
                 "Used for service discovery (if etcd-based) and shared configuration management."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     pyroscope: Annotated[
@@ -978,7 +978,7 @@ class ServerConfig(BaseSchema):
                 "Sends CPU and memory profiling data to a Pyroscope server for flame graph visualization."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 

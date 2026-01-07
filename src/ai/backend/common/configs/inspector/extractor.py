@@ -9,6 +9,7 @@ from pydantic_core import PydanticUndefined
 from ai.backend.common.meta import (
     BackendAIConfigMeta,
     BackendAIFieldMeta,
+    CompositeType,
     ConfigEnvironment,
     ConfigExample,
     get_field_meta,
@@ -159,16 +160,19 @@ class ConfigInspector:
             # But we store None to avoid side effects during extraction
             default = None
 
-        # Check if secret (only for BackendAIConfigMeta)
+        # Check if secret and composite type (only for BackendAIConfigMeta)
         secret = False
+        composite_type: CompositeType | None = None
         if isinstance(meta, BackendAIConfigMeta):
             secret = meta.secret
+            composite_type = meta.composite
 
         return FieldTypeInfo(
             type_name=type_name,
             default=default,
             required=required,
             secret=secret,
+            composite_type=composite_type,
         )
 
     def _get_type_name(self, annotation: type | None) -> str:
@@ -287,18 +291,66 @@ class ConfigInspector:
         if annotation is None:
             return None
 
-        # Handle Optional types
+        # Unwrap Optional types
+        annotation = self._unwrap_optional(annotation)
+
+        # Extract the target type based on composite type
+        target_type = self._get_composite_target_type(annotation, meta.composite)
+        if target_type is None:
+            return None
+
+        # Extract children from the target BaseModel
+        if isinstance(target_type, type) and issubclass(target_type, BaseModel):
+            return self.extract(target_type)
+
+        return None
+
+    def _unwrap_optional(self, annotation: type) -> type:
+        """Unwrap Optional[T] to get T."""
         origin = getattr(annotation, "__origin__", None)
         if origin is not None:
             args = getattr(annotation, "__args__", ())
             # Check for Optional (Union with None)
             if len(args) == 2 and type(None) in args:
-                non_none = [a for a in args if a is not type(None)][0]
-                annotation = non_none
+                return [a for a in args if a is not type(None)][0]
+        return annotation
 
-        # Check if it's a BaseModel subclass
-        if isinstance(annotation, type) and issubclass(annotation, BaseModel):
-            return self.extract(annotation)
+    def _get_composite_target_type(
+        self,
+        annotation: type,
+        composite: CompositeType | None,
+    ) -> type | None:
+        """Get the target type for children extraction based on composite type.
+
+        Args:
+            annotation: The field annotation (already unwrapped from Optional).
+            composite: The composite type indicator.
+
+        Returns:
+            The target type to extract children from, or None if not found.
+        """
+        # FIELD: direct BaseModel
+        if composite == CompositeType.FIELD:
+            return annotation
+
+        origin = getattr(annotation, "__origin__", None)
+        args: tuple[type, ...] = getattr(annotation, "__args__", ())
+
+        # DICT: dict[str, T] -> extract T
+        if composite == CompositeType.DICT:
+            if origin is not None:
+                origin_name = getattr(origin, "__name__", str(origin))
+                if origin_name in ("dict", "Mapping") and len(args) >= 2:
+                    return args[1]  # Value type
+            return None
+
+        # LIST: list[T] -> extract T
+        if composite == CompositeType.LIST:
+            if origin is not None:
+                origin_name = getattr(origin, "__name__", str(origin))
+                if origin_name in ("list", "Sequence") and len(args) >= 1:
+                    return args[0]  # Item type
+            return None
 
         return None
 

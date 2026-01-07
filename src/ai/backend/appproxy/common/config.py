@@ -16,7 +16,7 @@ from pydantic import (
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
-from ai.backend.common.meta import BackendAIConfigMeta, ConfigExample
+from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
 
 from .errors import (
     GroupNotFoundError,
@@ -176,7 +176,7 @@ class RedisConfig(BaseSchema):
         BackendAIConfigMeta(
             description="Configuration for Redis helper library.",
             added_version="25.13.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -663,7 +663,7 @@ class PyroscopeConfig(BaseSchema):
         BackendAIConfigMeta(
             description="Pyroscope tags.",
             added_version="25.13.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -705,7 +705,7 @@ class ProfilingConfig(BaseSchema):
         BackendAIConfigMeta(
             description="Pyroscope configuration.",
             added_version="25.13.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 

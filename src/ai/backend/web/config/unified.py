@@ -23,7 +23,7 @@ from ai.backend.common.configs import (
 )
 from ai.backend.common.configs.jwt import SharedJWTConfig
 from ai.backend.common.configs.redis import RedisConfig
-from ai.backend.common.meta import BackendAIConfigMeta, ConfigExample
+from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     CommaSeparatedStrList,
@@ -94,7 +94,7 @@ class ServiceConfig(BaseConfigSchema):
                 "typically for terminal and interactive app connections."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     ssl_enabled: Annotated[
@@ -895,7 +895,7 @@ class SecurityConfig(BaseConfigSchema):
                 "CSP headers entirely."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -1588,7 +1588,7 @@ class SessionConfig(BaseConfigSchema):
                 "database for production."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     max_age: Annotated[
@@ -1909,7 +1909,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
                 "and authentication options."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     security: Annotated[
@@ -1921,7 +1921,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
                 "Security Policy (CSP) configuration."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     resources: Annotated[
@@ -1933,7 +1933,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
                 "accelerator allocations per container."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     environments: Annotated[
@@ -1944,7 +1944,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
                 "Container image environment settings including allowlist and display preferences."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     plugin: Annotated[
@@ -1953,7 +1953,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description="Web UI plugin configuration for extending the interface.",
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     pipeline: Annotated[
@@ -1964,7 +1964,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
                 "Backend.AI Pipeline service integration settings for ML workflow automation."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     ui: Annotated[
@@ -1973,7 +1973,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description="UI customization settings including default environments and menu visibility.",
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     api: Annotated[
@@ -1985,7 +1985,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
                 "connection limits."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     jwt: Annotated[
@@ -1997,7 +1997,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
                 "for stateless token-based authentication."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     session: Annotated[
@@ -2009,7 +2009,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
                 "and login security."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     license: Annotated[
@@ -2018,7 +2018,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description="License information displayed in the web interface.",
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     webserver: Annotated[
@@ -2029,7 +2029,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
                 "Core web server runtime settings including event loop and process management."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     otel: Annotated[
@@ -2038,7 +2038,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description="OpenTelemetry integration for distributed tracing and metrics collection.",
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     etcd: Annotated[
@@ -2050,7 +2050,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
                 "coordination with other Backend.AI components."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     pyroscope: Annotated[
@@ -2059,7 +2059,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description="Pyroscope continuous profiling integration for performance analysis.",
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     service_discovery: Annotated[
@@ -2075,7 +2075,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
                 "connection to Backend.AI services."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     apollo_router: Annotated[
@@ -2088,7 +2088,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description="Apollo Router GraphQL gateway configuration for federated schemas.",
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     logging: Annotated[
@@ -2097,7 +2097,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description="Logging configuration for log levels, formats, and destinations.",
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     debug: Annotated[
@@ -2106,7 +2106,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description="Debug mode settings for development and troubleshooting.",
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 

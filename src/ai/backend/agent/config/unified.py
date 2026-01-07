@@ -44,7 +44,7 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.configs.redis import RedisConfig
-from ai.backend.common.meta import BackendAIConfigMeta, ConfigExample
+from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     GroupID,
@@ -439,7 +439,7 @@ class DebugConfig(BaseConfigSchema):
                 "Core dumps help debug container crashes by providing memory snapshots at crash time."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -1183,7 +1183,7 @@ class OverridableAgentConfig(BaseConfigSchema):
                 "Ensures container states are consistent across the system."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -1698,7 +1698,7 @@ class ResourceConfig(BaseConfigSchema):
                 "Specifies exact CPU, memory, and device allocations for this agent."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     memory_align_size: Annotated[
@@ -1965,7 +1965,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "and memory issues in the agent process."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     logging: Annotated[
@@ -1978,7 +1978,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "agent behavior in production environments."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     otel: Annotated[
@@ -1991,7 +1991,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "for comprehensive monitoring of agent operations."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     service_discovery: Annotated[
@@ -2008,7 +2008,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "and load balancing across multiple agents."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     debug: Annotated[
@@ -2021,7 +2021,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "Should be carefully configured in production to avoid performance overhead."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     etcd: Annotated[
@@ -2034,7 +2034,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "All agents in a cluster must connect to the same etcd cluster."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -2053,7 +2053,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "available to users. Important for debugging container applications."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     api: Annotated[
@@ -2066,7 +2066,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "Should be adjusted based on image sizes and network conditions."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     kernel_lifecycles: Annotated[
@@ -2083,7 +2083,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "Affects how quickly the agent detects container startup success or failure."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     plugins: Annotated[
@@ -2108,7 +2108,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "This field should not be manually configured as it is injected from etcd settings."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -2132,7 +2132,7 @@ class AgentSpecificConfig(BaseConfigSchema):
                 "configuration that individual agents inherit and can override."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     container: Annotated[
@@ -2145,7 +2145,7 @@ class AgentSpecificConfig(BaseConfigSchema):
                 "configuration that individual agents inherit and can override."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     resource: Annotated[
@@ -2158,7 +2158,7 @@ class AgentSpecificConfig(BaseConfigSchema):
                 "configuration that individual agents inherit and can override."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -2192,7 +2192,7 @@ class AgentOverrideConfig(BaseConfigSchema):
                 "specific settings like network ports or SSL certificates per agent."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     container: Annotated[
@@ -2205,7 +2205,7 @@ class AgentOverrideConfig(BaseConfigSchema):
                 "port ranges, or scratch directory paths for specific agents."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     resource: Annotated[
@@ -2218,7 +2218,7 @@ class AgentOverrideConfig(BaseConfigSchema):
                 "to individual agents when using MANUAL resource allocation mode."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -2268,7 +2268,7 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
                 "Each agent entry must have a unique agent ID."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 

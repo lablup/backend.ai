@@ -29,7 +29,7 @@ from ai.backend.common.configs import (
     PyroscopeConfig,
     ServiceDiscoveryConfig,
 )
-from ai.backend.common.meta import BackendAIConfigMeta, ConfigExample
+from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
 from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import LogLevel
 from ai.backend.logging.config import LoggingConfig
@@ -176,7 +176,7 @@ class TraefikConfig(BaseSchema):
                 "The namespace should be set to 'traefik' to isolate Traefik's configuration keys."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -317,7 +317,7 @@ class ProxyCoordinatorConfig(BaseSchema):
                 "and timeout behavior for lock acquisition."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -425,7 +425,7 @@ class ProxyCoordinatorConfig(BaseSchema):
                 "backend. Required when enable_traefik is enabled."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -552,7 +552,7 @@ class ServerConfig(BaseSchema):
                 "Stores proxy routing rules, circuit states, and session mappings."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     redis: Annotated[
@@ -564,7 +564,7 @@ class ServerConfig(BaseSchema):
                 "caching, pub/sub messaging, and distributed locking (when using Redlock)."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     core_redis: Annotated[
@@ -577,7 +577,7 @@ class ServerConfig(BaseSchema):
                 "Manager core. If not specified, the coordinator uses the 'redis' configuration above."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     proxy_coordinator: Annotated[
@@ -589,7 +589,7 @@ class ServerConfig(BaseSchema):
                 "and worker management configuration."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     profiling: Annotated[
@@ -601,7 +601,7 @@ class ServerConfig(BaseSchema):
                 "Includes settings for cProfile and Pyroscope continuous profiling."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     secrets: Annotated[
@@ -613,7 +613,7 @@ class ServerConfig(BaseSchema):
                 "and other Backend.AI components. Must match the secrets configured in Manager."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     permit_hash: Annotated[
@@ -625,7 +625,7 @@ class ServerConfig(BaseSchema):
                 "of proxy configuration requests from the Backend.AI Manager."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     logging: Annotated[
@@ -637,7 +637,7 @@ class ServerConfig(BaseSchema):
                 "Supports console, file, and external log aggregation systems."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     debug: Annotated[
@@ -649,7 +649,7 @@ class ServerConfig(BaseSchema):
                 "Enables verbose logging and additional diagnostic features when enabled."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     otel: Annotated[
@@ -666,7 +666,7 @@ class ServerConfig(BaseSchema):
                 "for visualizing request flows across Backend.AI components."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     service_discovery: Annotated[
@@ -678,7 +678,7 @@ class ServerConfig(BaseSchema):
                 "Supports Redis-based or etcd-based service registration and discovery."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     etcd: Annotated[
@@ -690,7 +690,7 @@ class ServerConfig(BaseSchema):
                 "Used for service discovery (if etcd-based) and Traefik integration."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     pyroscope: Annotated[
@@ -702,7 +702,7 @@ class ServerConfig(BaseSchema):
                 "Sends CPU and memory profiling data to a Pyroscope server for flame graph visualization."
             ),
             added_version="25.9.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 

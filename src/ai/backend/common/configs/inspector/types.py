@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from ai.backend.common.meta import ConfigExample
+    from ai.backend.common.meta import CompositeType, ConfigExample
 
 __all__ = (
     "FieldTypeInfo",
@@ -35,6 +35,17 @@ class FieldTypeInfo:
 
     secret: bool
     """Whether this field contains sensitive information that should be masked."""
+
+    composite_type: CompositeType | None = None
+    """Type of composite field structure, if this is a composite field.
+
+    - None: Simple field (not composite)
+    - FIELD: Single nested object (e.g., DatabaseConfig)
+    - DICT: Dictionary with string keys (e.g., dict[str, VolumeConfig])
+    - LIST: List of objects (e.g., list[EndpointConfig])
+
+    Used by generators to produce proper output format for nested structures.
+    """
 
 
 @dataclass(frozen=True)

@@ -4,7 +4,7 @@ from typing import Annotated, Optional
 
 from pydantic import AliasChoices, BaseModel, Field, field_serializer, field_validator
 
-from ai.backend.common.meta import BackendAIConfigMeta, ConfigExample
+from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import RedisHelperConfig as RedisHelperConfigDict
 from ai.backend.common.types import RedisProfileTarget, ValkeyProfileTarget, ValkeyTarget
@@ -181,7 +181,7 @@ class SingleRedisConfig(BaseModel):
                 "Adjust based on network conditions and reliability requirements."
             ),
             added_version="25.13.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     use_tls: Annotated[
@@ -291,7 +291,7 @@ class RedisConfig(SingleRedisConfig):
                 "Each key represents a context name, and the value is a complete Redis configuration."
             ),
             added_version="25.13.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 

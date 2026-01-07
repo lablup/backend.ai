@@ -15,7 +15,7 @@ from pydantic import (
     model_validator,
 )
 
-from ai.backend.common.meta import BackendAIConfigMeta, ConfigExample
+from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
 from ai.backend.common.typed_validators import AutoDirectoryPath
 
 from .exceptions import ConfigurationError
@@ -157,7 +157,7 @@ class LogstashConfig(BaseConfigModel):
                 local='{ host = "127.0.0.1", port = 5044 }',
                 prod='{ host = "logstash-server", port = 5044 }',
             ),
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     protocol: Annotated[
@@ -392,7 +392,7 @@ class LoggingConfig(BaseConfigModel):
         BackendAIConfigMeta(
             description="Console logging driver configuration.",
             added_version="24.09.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     file: Annotated[
@@ -401,7 +401,7 @@ class LoggingConfig(BaseConfigModel):
         BackendAIConfigMeta(
             description="File logging driver configuration.",
             added_version="24.09.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     logstash: Annotated[
@@ -410,7 +410,7 @@ class LoggingConfig(BaseConfigModel):
         BackendAIConfigMeta(
             description="Logstash logging driver configuration.",
             added_version="24.09.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     graylog: Annotated[
@@ -419,7 +419,7 @@ class LoggingConfig(BaseConfigModel):
         BackendAIConfigMeta(
             description="Graylog logging driver configuration.",
             added_version="24.09.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 

@@ -205,7 +205,7 @@ from ai.backend.common.configs.service_discovery import ServiceDiscoveryConfig
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
-from ai.backend.common.meta import BackendAIConfigMeta, ConfigExample
+from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     CommaSeparatedStrList,
@@ -1439,7 +1439,7 @@ class ReporterConfig(BaseConfigSchema):
                 "different notification types to different email destinations."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     action_monitors: Annotated[
@@ -1456,7 +1456,7 @@ class ReporterConfig(BaseConfigSchema):
                 "to configured reporters. Enables customizable alerting based on system events."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -1695,7 +1695,7 @@ class APIConfig(BaseConfigSchema):
                 "Controls how resource information is exposed to different user roles."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -1737,7 +1737,7 @@ class DockerConfig(BaseConfigSchema):
                 "Controls image pulling policies and registry interactions."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -1905,7 +1905,7 @@ class NetworkConfig(BaseConfigSchema):
                 "Important for distributed computing workloads."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     subnet: Annotated[
@@ -1917,7 +1917,7 @@ class NetworkConfig(BaseConfigSchema):
                 "Defines IP address ranges for agents and containers."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     rpc: Annotated[
@@ -1929,7 +1929,7 @@ class NetworkConfig(BaseConfigSchema):
                 "Controls timeouts and keepalive settings for manager-agent communication."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -2007,7 +2007,7 @@ class HangToleranceConfig(BaseConfigSchema):
                 "before the system considers them hung and takes recovery action."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -2027,7 +2027,7 @@ class SessionConfig(BaseConfigSchema):
                 "and what recovery actions to take. Essential for maintaining system health."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -2182,7 +2182,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "deployments, but may need adjustment for proxies with many volumes."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -2200,7 +2200,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "fast but may take longer on network-attached storage or when quotas need setup."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     delete_folder: Annotated[
@@ -2217,7 +2217,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "slow deletion performance."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     clone_folder: Annotated[
@@ -2233,7 +2233,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "and may take considerable time depending on the data size and storage performance."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     get_mount_path: Annotated[
@@ -2249,7 +2249,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "operation that returns the filesystem path used by agents to mount the folder."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -2267,7 +2267,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "underlying storage system for capacity and capability information."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     get_volume_performance_metric: Annotated[
@@ -2285,7 +2285,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "statistics from the storage system for monitoring purposes."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     get_fs_usage: Annotated[
@@ -2301,7 +2301,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "information for capacity monitoring and alerting."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -2319,7 +2319,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "configuration for a storage volume."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     update_volume_quota: Annotated[
@@ -2335,7 +2335,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "configuration for a storage volume."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     get_quota_scope: Annotated[
@@ -2351,7 +2351,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "at user or project level within a volume."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     update_quota_scope: Annotated[
@@ -2367,7 +2367,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "specific user or project within a volume."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     delete_quota_scope_quota: Annotated[
@@ -2383,7 +2383,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "user or project within a volume."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -2397,7 +2397,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "that creates a new directory in the storage backend."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     rename_file: Annotated[
@@ -2413,7 +2413,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "operation on most filesystems."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     delete_files: Annotated[
@@ -2429,7 +2429,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "waits for completion."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     delete_files_async: Annotated[
@@ -2445,7 +2445,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "background without waiting for completion."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     move_file: Annotated[
@@ -2461,7 +2461,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "across different storage volumes."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     upload_file: Annotated[
@@ -2477,7 +2477,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "or slow network connections."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     download_file: Annotated[
@@ -2493,7 +2493,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "or slow network connections."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     list_files: Annotated[
@@ -2509,7 +2509,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "with thousands of files."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     fetch_file: Annotated[
@@ -2525,7 +2525,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "without full download."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -2543,7 +2543,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "including all subfolders and files."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     get_used_bytes: Annotated[
@@ -2559,7 +2559,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "consumed by the folder."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -2577,7 +2577,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "models that can be imported from HuggingFace Hub."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     retrieve_huggingface_models: Annotated[
@@ -2595,7 +2595,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "information about a batch of HuggingFace models."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     retrieve_huggingface_model: Annotated[
@@ -2613,7 +2613,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "information about one specific HuggingFace model."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     import_huggingface_models: Annotated[
@@ -2629,7 +2629,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "HuggingFace Hub. May need significant timeout for large models."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     get_huggingface_model_commit_hash: Annotated[
@@ -2647,7 +2647,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "identifier for a model revision."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -2665,7 +2665,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "imports from the Backend.AI reservoir system."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -2683,7 +2683,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "storage operations."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     get_s3_presigned_download_url: Annotated[
@@ -2701,7 +2701,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "URLs for direct S3 downloads."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     get_s3_presigned_upload_url: Annotated[
@@ -2719,7 +2719,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "URLs for direct S3 uploads."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     delete_s3_object: Annotated[
@@ -2735,7 +2735,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "in S3 backend storage."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -2755,7 +2755,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "large file transfers from virtual filesystem backends."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     list_vfs_files: Annotated[
@@ -2771,7 +2771,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "in virtual filesystem backends."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -2877,7 +2877,7 @@ class VolumeProxyConfig(BaseConfigSchema):
                 "as file uploads/downloads or model imports."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -2897,7 +2897,7 @@ class VolumesConfig(BaseConfigSchema):
                 "users to store their personal data and session outputs."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     default_host: Annotated[
@@ -2948,7 +2948,7 @@ class VolumesConfig(BaseConfigSchema):
                 "for different storage backends or locations."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -3098,7 +3098,7 @@ class ReservoirConfig(BaseConfigSchema):
                 "storage backends."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     storage_step_selection: Annotated[
@@ -3202,7 +3202,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "users, sessions, resources, and audit logs."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     etcd: Annotated[
@@ -3216,7 +3216,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "all manager nodes."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     manager: Annotated[
@@ -3230,7 +3230,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "component itself."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     docker_registry: Annotated[
@@ -3250,7 +3250,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
             added_version="25.8.0",
             deprecated_version="25.10.0",
             deprecation_hint="Use container registry configuration through the API instead.",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     logging: Annotated[
@@ -3264,7 +3264,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "and monitoring."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     pyroscope: Annotated[
@@ -3278,7 +3278,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "production deployments."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     debug: Annotated[
@@ -3292,7 +3292,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "information."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     reporter: Annotated[
@@ -3306,7 +3306,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "can be independently configured."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -3321,7 +3321,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "the entire installation."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     api: Annotated[
@@ -3334,7 +3334,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "security settings. These settings affect how clients interact with Backend.AI."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     redis: Annotated[
@@ -3347,7 +3347,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "background task queuing. Configure connection details and authentication here."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     idle: Annotated[
@@ -3360,7 +3360,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "network timeout, resource utilization, and session lifetime checkers."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     docker: Annotated[
@@ -3373,7 +3373,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "runtime defaults."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     plugins: Annotated[
@@ -3386,7 +3386,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "manager functionality for custom scheduling, event handling, and hardware support."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     network: Annotated[
@@ -3399,7 +3399,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "network modes including overlay networks for multi-host deployments."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     watcher: Annotated[
@@ -3412,7 +3412,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "deployed alongside agents."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     auth: Annotated[
@@ -3425,7 +3425,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "password requirements in production environments."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     jwt: Annotated[
@@ -3438,7 +3438,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "Shared between manager and webserver for consistent token handling."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     session: Annotated[
@@ -3451,7 +3451,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "management parameters."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     metric: Annotated[
@@ -3464,7 +3464,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "and resource optimization."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     volumes: Annotated[
@@ -3477,7 +3477,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "storage proxy services for file operations."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     resource_slots: Annotated[
@@ -3490,7 +3490,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "and other specialized hardware."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     otel: Annotated[
@@ -3503,7 +3503,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "components. Useful for debugging and performance analysis."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     service_discovery: Annotated[
@@ -3516,7 +3516,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "mechanisms for different deployment scenarios."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     artifact_registry: Annotated[
@@ -3533,7 +3533,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "features in Backend.AI."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     reservoir: Annotated[
@@ -3546,7 +3546,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "storage backends and import workflows here."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     deployment: Annotated[
@@ -3559,7 +3559,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "and model definition handling."
             ),
             added_version="25.8.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 

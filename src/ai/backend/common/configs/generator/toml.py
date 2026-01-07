@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel
 
 from ai.backend.common.configs.inspector import ConfigInspector, FieldSchema
-from ai.backend.common.meta import ConfigEnvironment
+from ai.backend.common.meta import CompositeType, ConfigEnvironment
 
 from .formatter import CompositeFormatter, create_default_formatter
 from .types import FieldVisibility, GeneratorConfig
@@ -209,7 +209,6 @@ class TOMLGenerator:
         """
         lines: list[str] = []
         indent = self._get_indent(len(path))
-        section_path = path + [key]
 
         # Check visibility
         visibility = self._get_visibility(field)
@@ -223,6 +222,22 @@ class TOMLGenerator:
         if field.doc.description:
             comment_lines = self._wrap_comment(field.doc.description, indent)
             lines.append(comment_lines)
+
+        # Add version comment if configured
+        if self._config.include_version_comments:
+            lines.append(f"{indent}# Added in {field.doc.added_version}")
+            if field.doc.deprecated_version:
+                hint = field.doc.deprecation_hint or ""
+                lines.append(f"{indent}# DEPRECATED in {field.doc.deprecated_version}: {hint}")
+
+        # For DICT composite type, add a placeholder key
+        if field.type_info.composite_type == CompositeType.DICT:
+            section_path = path + [key, "<name>"]
+            lines.append(
+                f"{indent}# Replace <name> with your actual key (e.g., 'default', 'local')"
+            )
+        else:
+            section_path = path + [key]
 
         # Section header - sections are NOT prefixed with ## even if optional
         # Only leaf fields get the ## prefix for optional status
@@ -268,6 +283,13 @@ class TOMLGenerator:
         if field.doc.description:
             comment_lines = self._wrap_comment(field.doc.description, indent)
             lines.append(comment_lines)
+
+        # Add version comment if configured
+        if self._config.include_version_comments:
+            lines.append(f"{indent}# Added in {field.doc.added_version}")
+            if field.doc.deprecated_version:
+                hint = field.doc.deprecation_hint or ""
+                lines.append(f"{indent}# DEPRECATED in {field.doc.deprecated_version}: {hint}")
 
         # Array of tables header
         section_name = ".".join(section_path)
@@ -418,15 +440,16 @@ class TOMLGenerator:
         arrays: dict[str, FieldSchema] = {}
 
         for key, field in schema.items():
-            type_name = field.type_info.type_name.lower()
+            # Use composite_type from metadata for categorization
+            ct = field.type_info.composite_type
 
-            # Check if it's a composite field with children
-            if field.children is not None:
-                # Check if it's an array type
-                if "list" in type_name or "sequence" in type_name:
-                    arrays[key] = field
-                else:
-                    composite[key] = field
+            if ct == CompositeType.LIST:
+                arrays[key] = field
+            elif ct in (CompositeType.FIELD, CompositeType.DICT):
+                composite[key] = field
+            elif field.children is not None:
+                # Fallback for backward compatibility
+                composite[key] = field
             else:
                 simple[key] = field
 

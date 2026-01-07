@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 
 __all__ = (
     "ConfigEnvironment",
+    "CompositeType",
     "ConfigExample",
     "BackendAIFieldMeta",
     "BackendAIConfigMeta",
@@ -26,6 +27,24 @@ class ConfigEnvironment(enum.StrEnum):
 
     LOCAL = "local"
     PROD = "prod"
+
+
+class CompositeType(enum.StrEnum):
+    """Type of composite field structure.
+
+    Used to indicate how nested configuration fields should be handled
+    in various output formats (TOML, etcd, JSON Schema).
+    """
+
+    FIELD = "field"
+    """Single nested object (e.g., DatabaseConfig)."""
+
+    DICT = "dict"
+    """Dictionary with string keys (e.g., dict[str, VolumeConfig]).
+    Key type is always assumed to be str."""
+
+    LIST = "list"
+    """List of objects (e.g., list[EndpointConfig])."""
 
 
 @dataclass(frozen=True)
@@ -92,10 +111,17 @@ class BackendAIConfigMeta(BackendAIFieldMeta):
     """Whether this field contains sensitive information.
     When True, the value should be masked in logs, CLI output, and error messages."""
 
-    composite: bool = False
-    """Whether this field is a composite type with nested fields.
-    When True, example values are auto-generated from child field metadata
-    rather than specified directly."""
+    composite: CompositeType | None = None
+    """Type of composite field structure, or None for simple fields.
+
+    - None: Simple field (not composite)
+    - CompositeType.FIELD: Single nested object (e.g., DatabaseConfig)
+    - CompositeType.DICT: Dictionary with string keys (e.g., dict[str, VolumeConfig])
+    - CompositeType.LIST: List of objects (e.g., list[EndpointConfig])
+
+    When set, example values are auto-generated from child field metadata
+    rather than specified directly.
+    """
 
 
 @dataclass(frozen=True)

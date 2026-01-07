@@ -23,7 +23,7 @@ from ai.backend.common.configs import (
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.exception import GenericNotImplementedError, InvalidConfigError
-from ai.backend.common.meta import BackendAIConfigMeta, ConfigExample
+from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     GroupID,
@@ -328,7 +328,7 @@ class APIConfig(BaseConfigSchema):
                 "for file operations such as upload, download, and directory listing."
             ),
             added_version="22.06.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     manager: Annotated[
@@ -341,7 +341,7 @@ class APIConfig(BaseConfigSchema):
                 "operations such as volume management and quota enforcement."
             ),
             added_version="22.06.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -974,7 +974,7 @@ class ObjectStorageConfig(BaseConfigSchema):
                 "the storage-proxy, improving performance for large files."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     presigned_download: Annotated[
@@ -991,7 +991,7 @@ class ObjectStorageConfig(BaseConfigSchema):
                 "the storage-proxy, improving performance for large files."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     upload_chunk_size: Annotated[
@@ -1399,7 +1399,7 @@ class ArtifactRegistryStorageConfig(BaseConfigSchema):
                 "suitable for production deployments with large artifact collections."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     vfs_storage: Annotated[
@@ -1412,7 +1412,7 @@ class ArtifactRegistryStorageConfig(BaseConfigSchema):
                 "for development or single-node deployments."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -1460,7 +1460,7 @@ class LegacyArtifactRegistryConfig(BaseConfigSchema):
                 "which configuration schema to apply."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -1489,7 +1489,7 @@ class ArtifactRegistryConfig(BaseConfigSchema):
                 "ML models, datasets, and spaces."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     reservoir: Annotated[
@@ -1502,7 +1502,7 @@ class ArtifactRegistryConfig(BaseConfigSchema):
                 "managing ML models and datasets within your infrastructure."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -1537,7 +1537,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "and authentication secrets. This is the main configuration section."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     pyroscope: Annotated[
@@ -1550,7 +1550,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "profiling data and send to a Pyroscope server for analysis."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     logging: Annotated[
@@ -1563,7 +1563,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "and debugging storage-proxy in production environments."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     api: Annotated[
@@ -1576,7 +1576,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "Backend.AI Manager (manager API) including SSL and address settings."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     volume: Annotated[
@@ -1589,6 +1589,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "provide different storage backends (VFS, Pure Storage, CephFS, etc.)."
             ),
             added_version="25.12.0",
+            composite=CompositeType.DICT,
         ),
     ]
     debug: Annotated[
@@ -1601,7 +1602,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "Should be disabled in production for security and performance."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     service_discovery: Annotated[
@@ -1618,7 +1619,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "Essential for multi-node deployments and automatic failover."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     otel: Annotated[
@@ -1631,7 +1632,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "commercial APM solutions for request tracing across services."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     etcd: Annotated[
@@ -1644,7 +1645,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "Backend.AI. Required for multi-node deployments."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
     storages: Annotated[
@@ -1690,6 +1691,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "can be object storage (S3) or VFS depending on deployment requirements."
             ),
             added_version="25.12.0",
+            composite=CompositeType.DICT,
         ),
     ]
     artifact_registries: Annotated[
@@ -1706,6 +1708,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "Supports HuggingFace Hub and Backend.AI Reservoir registries."
             ),
             added_version="25.12.0",
+            composite=CompositeType.DICT,
         ),
     ]
     reservoir_client: Annotated[
@@ -1722,7 +1725,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "based on network conditions and expected transfer sizes."
             ),
             added_version="25.12.0",
-            composite=True,
+            composite=CompositeType.FIELD,
         ),
     ]
 
