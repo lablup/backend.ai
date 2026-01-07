@@ -27,7 +27,7 @@ import trafaret as t
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import foreign, load_only, relationship, selectinload
+from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship, selectinload
 
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
 from ai.backend.common.types import (
@@ -66,7 +66,6 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     EnumValueType,
-    IDColumn,
     QuotaScopeIDType,
     StrEnumType,
     metadata,
@@ -105,6 +104,7 @@ from ai.backend.manager.models.utils import (
 from ai.backend.manager.types import UserScope
 
 if TYPE_CHECKING:
+    from ai.backend.manager.models.endpoint import EndpointRow
     from ai.backend.manager.models.storage import StorageSessionManager
 
 __all__: Sequence[str] = (
@@ -279,53 +279,73 @@ class VFolderCloneInfo(NamedTuple):
     cloneable: bool
 
 
-vfolders = sa.Table(
-    "vfolders",
-    metadata,
-    IDColumn("id"),
+class VFolderRow(Base):
+    __tablename__ = "vfolders"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
     # host will be '' if vFolder is unmanaged
-    sa.Column("host", sa.String(length=128), nullable=False, index=True),
-    sa.Column("domain_name", sa.String(length=64), nullable=False, index=True),
-    sa.Column("quota_scope_id", QuotaScopeIDType, nullable=False),
-    sa.Column("name", sa.String(length=MODEL_VFOLDER_LENGTH_LIMIT), nullable=False, index=True),
-    sa.Column(
+    host: Mapped[str] = mapped_column("host", sa.String(length=128), nullable=False, index=True)
+    domain_name: Mapped[str] = mapped_column(
+        "domain_name", sa.String(length=64), nullable=False, index=True
+    )
+    quota_scope_id: Mapped[QuotaScopeID] = mapped_column(
+        "quota_scope_id", QuotaScopeIDType, nullable=False
+    )
+    name: Mapped[str] = mapped_column(
+        "name", sa.String(length=MODEL_VFOLDER_LENGTH_LIMIT), nullable=False, index=True
+    )
+    usage_mode: Mapped[VFolderUsageMode] = mapped_column(
         "usage_mode",
         EnumValueType(VFolderUsageMode),
         default=VFolderUsageMode.GENERAL,
         nullable=False,
         index=True,
-    ),
-    sa.Column(
+    )
+    permission: Mapped[VFolderPermission | None] = mapped_column(
         "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
-    ),  # legacy
-    sa.Column("max_files", sa.Integer(), default=1000),
-    sa.Column("max_size", sa.Integer(), default=None),  # in MBytes
-    sa.Column("num_files", sa.Integer(), default=0),
-    sa.Column("cur_size", sa.Integer(), default=0),  # in KBytes
-    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    sa.Column("last_used", sa.DateTime(timezone=True), nullable=True),
+    )  # legacy
+    max_files: Mapped[int | None] = mapped_column("max_files", sa.Integer(), default=1000)
+    max_size: Mapped[int | None] = mapped_column(
+        "max_size", sa.Integer(), default=None
+    )  # in MBytes
+    num_files: Mapped[int | None] = mapped_column("num_files", sa.Integer(), default=0)
+    cur_size: Mapped[int | None] = mapped_column("cur_size", sa.Integer(), default=0)  # in KBytes
+    created_at: Mapped[datetime | None] = mapped_column(
+        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+    last_used: Mapped[datetime | None] = mapped_column(
+        "last_used", sa.DateTime(timezone=True), nullable=True
+    )
     # creator is always set to the user who created vfolder (regardless user/project types)
-    sa.Column("creator", sa.String(length=128), nullable=True),
+    creator: Mapped[str | None] = mapped_column("creator", sa.String(length=128), nullable=True)
     # unmanaged vfolder represents the host-side absolute path instead of storage-based path.
-    sa.Column("unmanaged_path", sa.String(length=512), nullable=True),
-    sa.Column(
+    unmanaged_path: Mapped[str | None] = mapped_column(
+        "unmanaged_path", sa.String(length=512), nullable=True
+    )
+    ownership_type: Mapped[VFolderOwnershipType] = mapped_column(
         "ownership_type",
         EnumValueType(VFolderOwnershipType),
         default=VFolderOwnershipType.USER,
         nullable=False,
         index=True,
-    ),
-    sa.Column("user", GUID, nullable=True),  # owner if user vfolder
-    sa.Column("group", GUID, nullable=True),  # owner if project vfolder
-    sa.Column("cloneable", sa.Boolean, default=False, nullable=False),
-    sa.Column(
+    )
+    user: Mapped[uuid.UUID | None] = mapped_column(
+        "user", GUID, nullable=True
+    )  # owner if user vfolder
+    group: Mapped[uuid.UUID | None] = mapped_column(
+        "group", GUID, nullable=True
+    )  # owner if project vfolder
+    cloneable: Mapped[bool] = mapped_column("cloneable", sa.Boolean, default=False, nullable=False)
+    status: Mapped[VFolderOperationStatus] = mapped_column(
         "status",
         StrEnumType(VFolderOperationStatus),
         default=VFolderOperationStatus.READY,
         server_default=VFolderOperationStatus.READY,
         nullable=False,
         index=True,
-    ),
+    )
     # status_history records the most recent status changes for each status
     # e.g)
     # {
@@ -333,9 +353,12 @@ vfolders = sa.Table(
     #   "delete-pending": "2022-10-22T11:40:30",
     #   "delete-ongoing": "2022-10-25T10:22:30"
     # }
-    sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null()),
-    sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True, index=True),
-)
+    status_history: Mapped[dict | None] = mapped_column(
+        "status_history", pgsql.JSONB(), nullable=True, default=sa.null()
+    )
+    status_changed: Mapped[datetime | None] = mapped_column(
+        "status_changed", sa.DateTime(timezone=True), nullable=True, index=True
+    )
 
 
 vfolder_attachment = sa.Table(
@@ -425,19 +448,24 @@ def _get_group_join_condition():
 class VFolderRow(Base):
     __table__ = vfolders
 
-    endpoints = relationship("EndpointRow", back_populates="model_row")
-    user_row = relationship(
+    # Relationships
+    endpoints: Mapped[list[EndpointRow]] = relationship("EndpointRow", back_populates="model_row")
+    user_row: Mapped[UserRow | None] = relationship(
         "UserRow",
         back_populates="vfolder_rows",
         primaryjoin=_get_user_join_condition,
     )
-    group_row = relationship(
+    group_row: Mapped[GroupRow | None] = relationship(
         "GroupRow",
         back_populates="vfolder_rows",
         primaryjoin=_get_group_join_condition,
     )
-    permission_rows = relationship(VFolderPermissionRow, back_populates="vfolder_row")
-    invitation_rows = relationship(VFolderInvitationRow, back_populates="vfolder_row")
+    permission_rows: Mapped[list[VFolderPermissionRow]] = relationship(
+        "VFolderPermissionRow", back_populates="vfolder_row"
+    )
+    invitation_rows: Mapped[list[VFolderInvitationRow]] = relationship(
+        "VFolderInvitationRow", back_populates="vfolder_row"
+    )
 
     @classmethod
     async def get(
@@ -458,10 +486,10 @@ class VFolderRow(Base):
             raise ObjectNotFound(object_name="VFolder")
         return result
 
-    def __contains__(self, key) -> bool:
+    def __contains__(self, key: str) -> bool:
         return key in self.__dir__()
 
-    def __getitem__(self, item) -> Any:
+    def __getitem__(self, item: str) -> Any:
         try:
             return getattr(self, item)
         except AttributeError:
@@ -494,6 +522,97 @@ class VFolderRow(Base):
             cloneable=self.cloneable,
             status=self.status,
         )
+
+
+# NOTE: Deprecated legacy table reference for backward compatibility.
+# Use VFolderRow class directly for new code.
+vfolders = VFolderRow.__table__
+
+
+vfolder_attachment = sa.Table(
+    "vfolder_attachment",
+    metadata,
+    sa.Column(
+        "vfolder",
+        GUID,
+        sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.Column(
+        "kernel",
+        GUID,
+        sa.ForeignKey("kernels.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.PrimaryKeyConstraint("vfolder", "kernel"),
+)
+
+
+class VFolderInvitationRow(Base):
+    __tablename__ = "vfolder_invitations"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    permission: Mapped[VFolderPermission | None] = mapped_column(
+        "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
+    )
+    inviter: Mapped[str | None] = mapped_column("inviter", sa.String(length=256))  # email
+    invitee: Mapped[str] = mapped_column("invitee", sa.String(length=256), nullable=False)  # email
+    state: Mapped[VFolderInvitationState | None] = mapped_column(
+        "state", EnumValueType(VFolderInvitationState), default=VFolderInvitationState.PENDING
+    )
+    created_at: Mapped[datetime | None] = mapped_column(
+        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+    modified_at: Mapped[datetime | None] = mapped_column(
+        "modified_at",
+        sa.DateTime(timezone=True),
+        nullable=True,
+        onupdate=sa.func.current_timestamp(),
+    )
+    vfolder: Mapped[uuid.UUID] = mapped_column(
+        "vfolder",
+        GUID,
+        sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    # Relationships
+    vfolder_row: Mapped[VFolderRow] = relationship("VFolderRow", back_populates="invitation_rows")
+
+
+# NOTE: Deprecated legacy table reference for backward compatibility.
+# Use VFolderInvitationRow class directly for new code.
+vfolder_invitations = VFolderInvitationRow.__table__
+
+
+class VFolderPermissionRow(Base):
+    __tablename__ = "vfolder_permissions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    permission: Mapped[VFolderPermission | None] = mapped_column(
+        "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
+    )
+    vfolder: Mapped[uuid.UUID] = mapped_column(
+        "vfolder",
+        GUID,
+        sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user: Mapped[uuid.UUID] = mapped_column(
+        "user", GUID, sa.ForeignKey("users.uuid"), nullable=False
+    )
+
+    # Relationships
+    vfolder_row: Mapped[VFolderRow] = relationship("VFolderRow", back_populates="permission_rows")
+
+
+# NOTE: Deprecated legacy table reference for backward compatibility.
+# Use VFolderPermissionRow class directly for new code.
+vfolder_permissions = VFolderPermissionRow.__table__
 
 
 def is_unmanaged(unmanaged_path: Optional[str]) -> bool:
