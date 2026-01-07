@@ -108,7 +108,7 @@ class VFolderStorage(AbstractStorage):
         """
         try:
             target_path = self.resolve_path(filepath)
-            target_path.parent.mkdir(parents=True, exist_ok=True)
+            await aiofiles.os.makedirs(target_path.parent, exist_ok=True)
 
             total_size = 0
             async with aiofiles.open(target_path, "wb") as f:
