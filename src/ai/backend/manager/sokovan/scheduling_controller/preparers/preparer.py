@@ -157,6 +157,7 @@ class SessionPreparer:
             timeout=timeout,
             kernels=kernel_data_list,
             dependencies=spec.dependency_sessions or [],
+            startup_command=spec.startup_command,
         )
 
     def _determine_network_config(
