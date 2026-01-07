@@ -20,7 +20,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 @dataclass
 class VFolderStorageSetupResult:
-    """Result of VFolderStorageService.setup_for_import() for import operations."""
+    """Result of VFolderStorageService.setup() for import operations."""
 
     storage_step_mappings: dict[ArtifactStorageImportStep, str]
     cleanup_callback: Callable[[], None]
