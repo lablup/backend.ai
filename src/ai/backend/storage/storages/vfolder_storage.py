@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -211,9 +213,6 @@ class VFolderStorage(AbstractStorage):
         Args:
             filepath: Path to the file/directory to delete (relative to base_path)
         """
-        import asyncio
-        import shutil
-
         try:
             target_path = self.resolve_path(filepath)
 

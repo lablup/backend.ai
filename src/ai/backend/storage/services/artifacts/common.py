@@ -109,7 +109,9 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
 
         dst_storage = context.storage_pool.get_storage(dst_storage_name)
         if not isinstance(dst_storage, (VFSStorage, VFolderStorage)):
-            raise ArtifactVerifyStorageTypeInvalid("Verify step requires VFS storage type")
+            raise ArtifactVerifyStorageTypeInvalid(
+                "Verify step requires VFS or VFolder storage type"
+            )
         dst_storage = cast(VFSStorage | VFolderStorage, dst_storage)
 
         # Collect verification results from all verifiers
