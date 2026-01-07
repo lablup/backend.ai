@@ -229,6 +229,25 @@ class SessionLauncher:
         ]
         return ScheduleResult(scheduled_sessions=scheduled_data)
 
+    async def start_sessions_for_handler(
+        self,
+        sessions: list[SessionDataForStart],
+        image_configs: dict[str, ImageConfigData],
+    ) -> None:
+        """
+        Start sessions on agents for the given sessions.
+
+        Public method for SessionLifecycleHandler pattern.
+        Used by StartSessionsLifecycleHandler to start sessions
+        after coordinator queries sessions with user data.
+
+        Note: Status transition is handled by the Coordinator, not here.
+
+        :param sessions: List of sessions with full data for starting
+        :param image_configs: Image configurations indexed by image name
+        """
+        await self._start_sessions_concurrently(sessions, image_configs)
+
     async def _start_sessions_concurrently(
         self,
         sessions: list[SessionDataForStart],
