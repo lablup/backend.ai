@@ -46,10 +46,11 @@ jobs:
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
       if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
-      uses: ./actions/init-pants
+      uses: pantsbuild/actions/init-pants@v10
       # See: github.com/pantsbuild/actions/tree/main/init-pants/
       # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
       with:
+        gha-cache-key: v0
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Pants export

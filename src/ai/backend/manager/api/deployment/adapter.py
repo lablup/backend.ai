@@ -152,8 +152,10 @@ class DeploymentAdapter(BaseFilterAdapter):
         if filter.name is not None:
             condition = self.convert_string_filter(
                 filter.name,
-                equals_fn=DeploymentConditions.by_name_equals,
-                contains_fn=DeploymentConditions.by_name_contains,
+                contains_factory=DeploymentConditions.by_name_contains,
+                equals_factory=DeploymentConditions.by_name_equals,
+                starts_with_factory=DeploymentConditions.by_name_starts_with,
+                ends_with_factory=DeploymentConditions.by_name_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -162,8 +164,10 @@ class DeploymentAdapter(BaseFilterAdapter):
         if filter.domain_name is not None:
             condition = self.convert_string_filter(
                 filter.domain_name,
-                equals_fn=DeploymentConditions.by_domain_name_equals,
-                contains_fn=DeploymentConditions.by_domain_name_contains,
+                contains_factory=DeploymentConditions.by_domain_name_contains,
+                equals_factory=DeploymentConditions.by_domain_name_equals,
+                starts_with_factory=DeploymentConditions.by_domain_name_starts_with,
+                ends_with_factory=DeploymentConditions.by_domain_name_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -241,8 +245,10 @@ class RevisionAdapter(BaseFilterAdapter):
         if filter.name is not None:
             condition = self.convert_string_filter(
                 filter.name,
-                equals_fn=RevisionConditions.by_name_equals,
-                contains_fn=RevisionConditions.by_name_contains,
+                contains_factory=RevisionConditions.by_name_contains,
+                equals_factory=RevisionConditions.by_name_equals,
+                starts_with_factory=RevisionConditions.by_name_starts_with,
+                ends_with_factory=RevisionConditions.by_name_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)

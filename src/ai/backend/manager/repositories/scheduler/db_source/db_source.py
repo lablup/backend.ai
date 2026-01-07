@@ -1017,6 +1017,7 @@ class ScheduleDBSource:
                 bootstrap_script=session_data.bootstrap_script,
                 use_host_network=session_data.use_host_network,
                 timeout=session_data.timeout,
+                startup_command=session_data.startup_command,
             )
 
             # Create kernel rows

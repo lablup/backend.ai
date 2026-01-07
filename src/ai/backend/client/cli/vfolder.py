@@ -541,7 +541,7 @@ def mv(name, src, dst):
 
 @vfolder.command(aliases=["delete-file"])
 @click.argument("name", type=str)
-@click.argument("filenames", nargs=-1)
+@click.argument("filenames", nargs=-1, required=True)
 @click.option("-r", "--recursive", is_flag=True, help="Enable recursive deletion of directories.")
 def rm(name, filenames, recursive):
     """
@@ -553,7 +553,7 @@ def rm(name, filenames, recursive):
 
     \b
     NAME: Name of a virtual folder.
-    FILENAMES: Paths of the files to delete.
+    FILENAMES: Paths of the files to delete (at least one required).
     """
     with Session() as session:
         try:

@@ -43,7 +43,12 @@ def base_agent_config() -> AgentUnifiedConfig:
         agent=AgentConfig(backend=AgentBackend.DOCKER),
         container=ContainerConfig(scratch_type=ScratchType.HOSTDIR),
         resource=ResourceConfig(),
-        etcd=EtcdConfig(namespace="test", addr=HostPortPair(host="127.0.0.1", port=2379)),
+        etcd=EtcdConfig(
+            namespace="test",
+            addr=HostPortPair(host="127.0.0.1", port=2379),
+            user=None,
+            password=None,
+        ),
     )
 
 
@@ -73,7 +78,12 @@ def mock_agent_factory() -> Callable[[str, str], Mock]:
             agent=AgentConfig(backend=AgentBackend.DUMMY, scaling_group=scaling_group, id=agent_id),
             container=ContainerConfig(scratch_type=ScratchType.HOSTDIR),
             resource=ResourceConfig(),
-            etcd=EtcdConfig(namespace="test", addr=HostPortPair(host="127.0.0.1", port=2379)),
+            etcd=EtcdConfig(
+                namespace="test",
+                addr=HostPortPair(host="127.0.0.1", port=2379),
+                user=None,
+                password=None,
+            ),
         )
 
         # Use the real update_scaling_group method - capture agent in closure properly
@@ -131,7 +141,12 @@ class TestScalingGroupUpdates:
             agent=AgentConfig(backend=AgentBackend.DUMMY, scaling_group="default"),
             container=ContainerConfig(scratch_type=ScratchType.HOSTDIR),
             resource=ResourceConfig(),
-            etcd=EtcdConfig(namespace="test", addr=HostPortPair(host="127.0.0.1", port=2379)),
+            etcd=EtcdConfig(
+                namespace="test",
+                addr=HostPortPair(host="127.0.0.1", port=2379),
+                user=None,
+                password=None,
+            ),
         )
 
         AbstractAgent.update_scaling_group(mock_agent, "gpu")

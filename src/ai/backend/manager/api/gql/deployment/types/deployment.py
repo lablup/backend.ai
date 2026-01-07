@@ -450,6 +450,8 @@ class DeploymentFilter(GQLFilter):
             name_condition = self.name.build_query_condition(
                 contains_factory=DeploymentConditions.by_name_contains,
                 equals_factory=DeploymentConditions.by_name_equals,
+                starts_with_factory=DeploymentConditions.by_name_starts_with,
+                ends_with_factory=DeploymentConditions.by_name_ends_with,
             )
             if name_condition:
                 field_conditions.append(name_condition)
@@ -473,6 +475,8 @@ class DeploymentFilter(GQLFilter):
             tags_condition = self.tags.build_query_condition(
                 contains_factory=DeploymentConditions.by_tag_contains,
                 equals_factory=DeploymentConditions.by_tag_equals,
+                starts_with_factory=DeploymentConditions.by_tag_starts_with,
+                ends_with_factory=DeploymentConditions.by_tag_ends_with,
             )
             if tags_condition:
                 field_conditions.append(tags_condition)
@@ -482,6 +486,8 @@ class DeploymentFilter(GQLFilter):
             url_condition = self.endpoint_url.build_query_condition(
                 contains_factory=DeploymentConditions.by_url_contains,
                 equals_factory=DeploymentConditions.by_url_equals,
+                starts_with_factory=DeploymentConditions.by_url_starts_with,
+                ends_with_factory=DeploymentConditions.by_url_ends_with,
             )
             if url_condition:
                 field_conditions.append(url_condition)

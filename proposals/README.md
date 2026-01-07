@@ -9,13 +9,82 @@ Backend.AI Enhancement Proposals
    - Write and submit the draft.
 3. Discuss with other developers and maintainers in the PR.
 4. Submit multiple pull requests to modify and update your proposals.
-5. Once accepted, update the document status to "Accepted" with the target LTS release version.
+5. Once accepted, update the document status to "Accepted" with the target version.
    - You may further submit additional pull requests to revise the document when there are changes required found during actual implementation work.
+6. Once implementation is complete, update the status to "Implemented" with the actual version.
+
+## Status Lifecycle
+
+```
+Draft ──────→ Accepted ──→ Implemented
+  │              │
+  └─→ Rejected ←─┘
+```
+
+| Status | Description |
+|--------|-------------|
+| Draft | Initial proposal, under discussion |
+| Accepted | Approved for implementation, target version assigned |
+| Implemented | Implementation complete, actual version recorded |
+| Rejected | Proposal was rejected or cancelled |
+
+### Status Transition Rules
+
+| From | To | When | Required Actions |
+|------|-----|------|------------------|
+| Draft | Accepted | Proposal approved by maintainers | Set `Target-Version` |
+| Draft | Rejected | Proposal rejected after discussion | Document rejection reason |
+| Accepted | Implemented | Implementation merged to main | Set `Implemented-Version` |
+| Accepted | Rejected | Implementation cancelled | Document cancellation reason |
+
+## Version Fields
+
+BEP documents track three version milestones:
+
+| Field | When to Fill | Example |
+|-------|--------------|---------|
+| Created-Version | When first creating the BEP | 26.1.0 |
+| Target-Version | When status changes to Accepted | 26.2.0 |
+| Implemented-Version | When status changes to Implemented | 26.2.1 |
+
+Version format: `YY.Sprint.Patch` (e.g., 26.1.0 = Year 2026, Sprint 1, Patch 0)
+
+## Writing Guide
+
+### Section Guidelines
+
+| Section | Purpose | Tips |
+|---------|---------|------|
+| Related Issues | Link to JIRA/GitHub issues | Always include tracking issues |
+| Motivation | Explain why this change is needed | Focus on the problem, not the solution |
+| Current Design | Describe what exists today | Include code snippets if helpful |
+| Proposed Design | Describe the new design | Be specific, include interfaces |
+| Migration / Compatibility | Backward compatibility plan | List breaking changes explicitly |
+| Implementation Plan | Phased implementation steps | Break into manageable phases |
+| Open Questions | Unresolved items | Update as questions are resolved |
+| References | Related documents and links | Include related BEPs |
+
+### Best Practices
+
+1. **Be Specific**: Include code examples, interface definitions, and concrete details
+2. **Consider Compatibility**: Always document breaking changes and migration paths
+3. **Phase Implementation**: Break large changes into smaller, reviewable phases
+4. **Track Questions**: Keep Open Questions updated as discussions progress
+5. **Link Issues**: Always link related JIRA and GitHub issues
+
+### Template Examples
+
+The template (`BEP-0000-template.md`) includes examples for each section. When creating a new BEP:
+1. Copy the template
+2. Replace example content with your actual content
+3. Remove the "Example:" blocks after writing your content
 
 ## BEP Number Registry
 
 To prevent number conflicts, **always reserve your BEP number here first** before creating the document.
 When multiple people add entries simultaneously, Git merge conflicts will naturally prevent duplicate numbers.
+
+BEP numbers start from 1000.
 
 | Number | Title | Author | Status |
 |--------|-------|--------|--------|
@@ -38,6 +107,10 @@ When multiple people add entries simultaneously, Git merge conflicts will natura
 | [1017](BEP-1017-model-scanner-model-downloader.md) | Model Scanner and Downloader | Bokeum Kim | Accepted |
 | [1018](BEP-1018-local-cache-for-model-vfolders.md) | Local Cache for Model VFolders | Joongi Kim | Draft |
 | [1019](BEP-1019-minio-artifact-registry-storage.md) | MinIO Artifact Registry Storage | Gyubong Lee | Accepted |
+| 1020 | VFolder Destination Support for Artifact Import | Gyubong Lee | Draft |
+| [1021](BEP-1021-gql-string-filter-enhancement.md) | GQL StringFilter Enhancement | Hyeokjin Kim | Implemented |
+| [1022](BEP-1022-pydantic-field-annotations.md) | Pydantic Field Metadata Annotation | Hyeokjin Kim | Draft |
+| [1023](BEP-1023-unified-config-consolidation.md) | UnifiedConfig Consolidation & Loader/CLI | Hyeokjin Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
@@ -57,18 +130,3 @@ proposals/
 │   └── refs/
 └── BEP-1018-simple-proposal.md         # No supporting files needed
 ```
-
-## Rules for PR title
-
-Each PR either creates or updates the BEP documents with the squash-merge strategy.
-Please put the high-level summary of the update in the PR title as they will become the commit message of the main branch.
-Individual commits inside each PR may be freely titled.
-
-Examples:
-
-* "BEP-9999 (new): A shiny new feature" (with the document title)
-* "BEP-9999 (update): Change the implementation plan" (with the summary of change)
-* "BEP-9999 (update): Remove unnecessary API changes" (with the summary of change)
-* "BEP-9999 (accept): Planned for 25.9 LTS" (with the target version)
-* "BEP-9999 (reject): Decided to drop because ..." (with the short description of rejection)
-* "BEP-9999 (revise): Update integration with ZZZ subsytem" (with the summary of revision)

@@ -37,9 +37,13 @@ from ai.backend.agent.stats import StatModes
 from ai.backend.agent.types import AgentBackend
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.config import BaseConfigSchema
+from ai.backend.common.configs import (
+    EtcdConfig,
+    OTELConfig,
+    PyroscopeConfig,
+    ServiceDiscoveryConfig,
+)
 from ai.backend.common.configs.redis import RedisConfig
-from ai.backend.common.configs.validation_context import BaseConfigValidationContext
-from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     GroupID,
@@ -50,12 +54,12 @@ from ai.backend.common.types import (
     BinarySize,
     BinarySizeField,
     ResourceGroupType,
-    ServiceDiscoveryType,
     SlotName,
     SlotNameField,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
+from ai.backend.logging.validation_context import BaseConfigValidationContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -98,63 +102,6 @@ class SyncContainerLifecyclesConfig(BaseConfigSchema):
         ge=0,
         description="Synchronization interval in seconds",
         examples=[10.0, 30.0],
-    )
-
-
-class PyroscopeConfig(BaseConfigSchema):
-    enabled: bool = Field(
-        default=False,
-        description="Whether to enable Pyroscope profiling",
-        examples=[True, False],
-    )
-    app_name: Optional[str] = Field(
-        default=None,
-        description="Application name to use in Pyroscope",
-        examples=["backendai-agent"],
-        validation_alias=AliasChoices("app-name", "app_name"),
-        serialization_alias="app-name",
-    )
-    server_addr: Optional[str] = Field(
-        default=None,
-        description="Address of the Pyroscope server",
-        examples=["http://localhost:4040"],
-        validation_alias=AliasChoices("server-addr", "server_addr"),
-        serialization_alias="server-addr",
-    )
-    sample_rate: Optional[int] = Field(
-        default=None,
-        description="Sampling rate for Pyroscope profiling",
-        examples=[10, 100],
-        validation_alias=AliasChoices("sample-rate", "sample_rate"),
-        serialization_alias="sample-rate",
-    )
-
-
-class OTELConfig(BaseConfigSchema):
-    enabled: bool = Field(
-        default=False,
-        description="Whether to enable OpenTelemetry",
-        examples=[True, False],
-    )
-    log_level: str = Field(
-        default="INFO",
-        description="Log level for OpenTelemetry",
-        examples=["DEBUG", "INFO", "WARN", "ERROR"],
-        validation_alias=AliasChoices("log-level", "log_level"),
-        serialization_alias="log-level",
-    )
-    endpoint: str = Field(
-        default="http://127.0.0.1:4317",
-        description="OTLP endpoint for sending traces",
-        examples=["http://127.0.0.1:4317"],
-    )
-
-
-class ServiceDiscoveryConfig(BaseConfigSchema):
-    type: ServiceDiscoveryType = Field(
-        default=ServiceDiscoveryType.REDIS,
-        description="Type of service discovery to use",
-        examples=[item.value for item in ServiceDiscoveryType],
     )
 
 
@@ -1014,41 +961,6 @@ class ResourceConfig(BaseConfigSchema):
         return v
 
 
-class EtcdConfig(BaseConfigSchema):
-    namespace: str = Field(
-        description="Etcd namespace",
-        examples=["local", "backend"],
-    )
-    addr: HostPortPair | list[HostPortPair] = Field(
-        description="Etcd address and port",
-        examples=[
-            {"host": "127.0.0.1", "port": 2379},  # single endpoint
-            [
-                {"host": "127.0.0.4", "port": 2379},
-                {"host": "127.0.0.5", "port": 2379},
-            ],  # multiple endpoints
-        ],
-    )
-    user: Optional[str] = Field(
-        default=None,
-        description="Etcd username",
-        examples=["backend"],
-    )
-    password: Optional[str] = Field(
-        default=None,
-        description="Etcd password",
-        examples=["PASSWORD"],
-    )
-
-    def to_dataclass(self) -> EtcdConfigData:
-        return EtcdConfigData(
-            namespace=self.namespace,
-            addrs=self.addr if isinstance(self.addr, list) else [self.addr],
-            user=self.user,
-            password=self.password,
-        )
-
-
 class ContainerLogsConfig(BaseConfigSchema):
     max_length: BinarySizeField = Field(
         default=BinarySize.finite_from_str("10M"),
@@ -1142,7 +1054,7 @@ class AgentGlobalConfig(BaseConfigSchema):
 
     # Local config
     pyroscope: PyroscopeConfig = Field(
-        default_factory=PyroscopeConfig,
+        default_factory=PyroscopeConfig,  # type: ignore[arg-type]
         description="Pyroscope configuration",
     )
     logging: LoggingConfig = Field(
@@ -1150,11 +1062,11 @@ class AgentGlobalConfig(BaseConfigSchema):
         description="Logging configuration",
     )
     otel: OTELConfig = Field(
-        default_factory=OTELConfig,
+        default_factory=OTELConfig,  # type: ignore[arg-type]
         description="OpenTelemetry configuration",
     )
     service_discovery: ServiceDiscoveryConfig = Field(
-        default_factory=ServiceDiscoveryConfig,
+        default_factory=ServiceDiscoveryConfig,  # type: ignore[arg-type]
         description="Service discovery configuration",
         validation_alias=AliasChoices("service-discovery", "service_discovery"),
         serialization_alias="service-discovery",

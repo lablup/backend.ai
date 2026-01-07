@@ -25,19 +25,43 @@ from ai.backend.manager.errors.resource import (
     ScalingGroupNotFound,
     ScalingGroupSessionTypeNotAllowed,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForDomainRow,
+    ScalingGroupOpts,
+    ScalingGroupRow,
+)
 from ai.backend.manager.registry import check_scaling_group
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
-from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
-from ai.backend.manager.services.scaling_group.actions.create import (
-    CreateScalingGroupAction,
+from ai.backend.manager.repositories.scaling_group.creators import (
+    ScalingGroupCreatorSpec,
+    ScalingGroupForDomainCreatorSpec,
+)
+from ai.backend.manager.repositories.scaling_group.purgers import (
+    create_scaling_group_for_domain_purger,
+)
+from ai.backend.manager.repositories.scaling_group.updaters import (
+    ScalingGroupMetadataUpdaterSpec,
+    ScalingGroupStatusUpdaterSpec,
+    ScalingGroupUpdaterSpec,
+)
+from ai.backend.manager.services.scaling_group.actions.associate_with_domain import (
+    AssociateScalingGroupWithDomainsAction,
+)
+from ai.backend.manager.services.scaling_group.actions.create import CreateScalingGroupAction
+from ai.backend.manager.services.scaling_group.actions.disassociate_with_domain import (
+    DisassociateScalingGroupWithDomainsAction,
 )
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
 )
+from ai.backend.manager.services.scaling_group.actions.modify import (
+    ModifyScalingGroupAction,
+)
 from ai.backend.manager.services.scaling_group.service import ScalingGroupService
+from ai.backend.manager.types import OptionalState, TriState
 
 
 class TestScalingGroupService:
@@ -270,6 +294,8 @@ class TestScalingGroupService:
         assert result.scaling_groups == []
         assert result.total_count == 0
 
+    # Create Tests
+
     async def test_create_scaling_group_success(
         self,
         scaling_group_service: ScalingGroupService,
@@ -277,7 +303,7 @@ class TestScalingGroupService:
         sample_scaling_group: ScalingGroupData,
         scaling_group_creator_full: Creator[ScalingGroupRow],
     ) -> None:
-        """Test creating a scaling group with all fields specified"""
+        """Test creating a scaling group successfully"""
         mock_repository.create_scaling_group = AsyncMock(return_value=sample_scaling_group)
 
         action = CreateScalingGroupAction(creator=scaling_group_creator_full)
@@ -286,26 +312,112 @@ class TestScalingGroupService:
         assert result.scaling_group == sample_scaling_group
         mock_repository.create_scaling_group.assert_called_once_with(scaling_group_creator_full)
 
-    async def test_create_scaling_group_repository_error_propagates(
+    async def test_create_scaling_group_conflict(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+        scaling_group_creator_full: Creator[ScalingGroupRow],
+    ) -> None:
+        """Test that ScalingGroupConflict propagates through the service"""
+        mock_repository.create_scaling_group = AsyncMock(
+            side_effect=ScalingGroupConflict("Scaling group already exists: test-sgroup-full")
+        )
+
+        action = CreateScalingGroupAction(creator=scaling_group_creator_full)
+
+        with pytest.raises(ScalingGroupConflict):
+            await scaling_group_service.create_scaling_group(action)
+
+    # Modify Tests
+
+    async def test_modify_scaling_group_success(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+        sample_scaling_group: ScalingGroupData,
+    ) -> None:
+        """Test modifying a scaling group successfully"""
+        mock_repository.update_scaling_group = AsyncMock(return_value=sample_scaling_group)
+
+        spec = ScalingGroupUpdaterSpec(
+            status=ScalingGroupStatusUpdaterSpec(
+                is_active=OptionalState.update(False),
+            ),
+            metadata=ScalingGroupMetadataUpdaterSpec(
+                description=TriState.update("Updated description"),
+            ),
+        )
+        updater = Updater(spec=spec, pk_value="default")
+        action = ModifyScalingGroupAction(updater=updater)
+        result = await scaling_group_service.modify_scaling_group(action)
+
+        assert result.scaling_group == sample_scaling_group
+        mock_repository.update_scaling_group.assert_called_once_with(updater)
+
+    async def test_modify_scaling_group_not_found(
         self,
         scaling_group_service: ScalingGroupService,
         mock_repository: MagicMock,
     ) -> None:
-        """Test that repository errors propagate through the service"""
-        mock_repository.create_scaling_group = AsyncMock(
-            side_effect=ScalingGroupConflict("Scaling group already exists")
+        """Test that ScalingGroupNotFound propagates through the service"""
+        mock_repository.update_scaling_group = AsyncMock(
+            side_effect=ScalingGroupNotFound("Scaling group not found: nonexistent")
         )
 
-        spec = ScalingGroupCreatorSpec(
-            name="test-sgroup-conflict",
-            driver="static",
-            scheduler="fifo",
+        spec = ScalingGroupUpdaterSpec(
+            metadata=ScalingGroupMetadataUpdaterSpec(
+                description=TriState.update("Updated description"),
+            ),
         )
-        creator: Creator[ScalingGroupRow] = Creator(spec=spec)
-        action = CreateScalingGroupAction(creator=creator)
+        updater = Updater(spec=spec, pk_value="nonexistent")
+        action = ModifyScalingGroupAction(updater=updater)
 
-        with pytest.raises(ScalingGroupConflict):
-            await scaling_group_service.create_scaling_group(action)
+        with pytest.raises(ScalingGroupNotFound):
+            await scaling_group_service.modify_scaling_group(action)
+
+    # Associate Tests
+
+    async def test_associate_scaling_group_with_domains_success(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test associating a scaling group with domains"""
+        mock_repository.associate_scaling_group_with_domains = AsyncMock(return_value=None)
+
+        bulk_creator: BulkCreator[ScalingGroupForDomainRow] = BulkCreator(
+            specs=[
+                ScalingGroupForDomainCreatorSpec(
+                    scaling_group="test-sgroup",
+                    domain="test-domain",
+                )
+            ]
+        )
+        action = AssociateScalingGroupWithDomainsAction(bulk_creator=bulk_creator)
+        result = await scaling_group_service.associate_scaling_group_with_domains(action)
+
+        assert result is not None
+        mock_repository.associate_scaling_group_with_domains.assert_called_once_with(bulk_creator)
+
+    # Disassociate Tests
+
+    async def test_disassociate_scaling_group_with_domains_success(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test disassociating a scaling group from domains"""
+        mock_repository.disassociate_scaling_group_with_domains = AsyncMock(return_value=None)
+
+        purger = create_scaling_group_for_domain_purger(
+            scaling_group="test-sgroup",
+            domain="test-domain",
+        )
+        action = DisassociateScalingGroupWithDomainsAction(purger=purger)
+        result = await scaling_group_service.disassociate_scaling_group_with_domains(action)
+
+        assert result is not None
+        mock_repository.disassociate_scaling_group_with_domains.assert_called_once_with(purger)
 
 
 class TestCheckScalingGroup:

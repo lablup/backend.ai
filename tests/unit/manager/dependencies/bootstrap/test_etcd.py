@@ -27,6 +27,8 @@ class TestEtcdDependency:
         etcd_config = EtcdConfig(
             addr=HostPortPair(host=etcd_addr.host, port=etcd_addr.port),
             namespace=test_ns,
+            user=None,
+            password=None,
         )
 
         # Create a minimal BootstrapConfig with just etcd settings

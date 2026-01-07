@@ -196,9 +196,12 @@ from pydantic import (
 
 from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.configs.client import HttpTimeoutConfig
+from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.jwt import SharedJWTConfig
+from ai.backend.common.configs.otel import OTELConfig
+from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.configs.redis import RedisConfig
-from ai.backend.common.data.config.types import EtcdConfigData
+from ai.backend.common.configs.service_discovery import ServiceDiscoveryConfig
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
@@ -212,7 +215,6 @@ from ai.backend.common.typed_validators import (
     UserID,
     _TimeDurationPydanticAnnotation,
 )
-from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -361,59 +363,6 @@ class DistributedLockType(enum.StrEnum):
     redlock = "redlock"
     etcd = "etcd"
     etcetra = "etcetra"
-
-
-class EtcdConfig(BaseConfigSchema):
-    namespace: str = Field(
-        default="ETCD_NAMESPACE",
-        description="""
-        Namespace prefix for etcd keys used by Backend.AI.
-        Allows multiple Backend.AI clusters to share the same etcd cluster.
-        All Backend.AI related keys will be stored under this namespace.
-        """,
-        examples=["local", "backend"],
-    )
-    addr: HostPortPair | list[HostPortPair] = Field(
-        default=HostPortPair(host="127.0.0.1", port=2379),
-        description="""
-        Network address of the etcd server.
-        Default is the standard etcd port on localhost.
-        In production, should point to one or more etcd instance endpoint(s).
-        """,
-        examples=[
-            {"host": "127.0.0.1", "port": 2379},  # single endpoint
-            [
-                {"host": "127.0.0.4", "port": 2379},
-                {"host": "127.0.0.5", "port": 2379},
-            ],  # multiple endpoints
-        ],
-    )
-    user: Optional[str] = Field(
-        default=None,
-        description="""
-        Username for authenticating with etcd.
-        Optional if etcd doesn't require authentication.
-        Should be set along with password for secure deployments.
-        """,
-        examples=["backend", "manager"],
-    )
-    password: Optional[str] = Field(
-        default=None,
-        description="""
-        Password for authenticating with etcd.
-        Optional if etcd doesn't require authentication.
-        Can be a direct password or environment variable reference.
-        """,
-        examples=["develove", "ETCD_PASSWORD"],
-    )
-
-    def to_dataclass(self) -> EtcdConfigData:
-        return EtcdConfigData(
-            namespace=self.namespace,
-            addrs=self.addr if isinstance(self.addr, list) else [self.addr],
-            user=self.user,
-            password=self.password,
-        )
 
 
 class AuthConfig(BaseConfigSchema):
@@ -948,51 +897,6 @@ class DockerRegistryConfig(BaseConfigSchema):
         examples=[True, False],
         validation_alias=AliasChoices("ssl-verify", "ssl_verify"),
         serialization_alias="ssl-verify",
-    )
-
-
-class PyroscopeConfig(BaseConfigSchema):
-    enabled: bool = Field(
-        default=False,
-        description="""
-        Whether to enable Pyroscope profiling.
-        When enabled, performance profiling data will be sent to a Pyroscope server.
-        Useful for debugging performance issues, but adds some overhead.
-        """,
-        examples=[True, False],
-    )
-    app_name: Optional[str] = Field(
-        default=None,
-        description="""
-        Application name to use in Pyroscope.
-        This name will identify this manager instance in Pyroscope UI.
-        Required if Pyroscope is enabled.
-        """,
-        examples=["backendai-half-manager"],
-        validation_alias=AliasChoices("app-name", "app_name"),
-        serialization_alias="app-name",
-    )
-    server_addr: Optional[str] = Field(
-        default=None,
-        description="""
-        Address of the Pyroscope server.
-        Must include the protocol (http or https) and port if non-standard.
-        Required if Pyroscope is enabled.
-        """,
-        examples=["http://localhost:4040"],
-        validation_alias=AliasChoices("server-addr", "server_addr"),
-        serialization_alias="server-addr",
-    )
-    sample_rate: Optional[int] = Field(
-        default=None,
-        description="""
-        Sampling rate for Pyroscope profiling.
-        Higher values collect more data but increase overhead.
-        Balance based on your performance monitoring needs.
-        """,
-        examples=[10, 100, 1000],
-        validation_alias=AliasChoices("sample-rate", "sample_rate"),
-        serialization_alias="sample-rate",
     )
 
 
@@ -1982,45 +1886,6 @@ class ResourceSlotsConfig(BaseConfigSchema):
     )
 
 
-class OTELConfig(BaseConfigSchema):
-    enabled: bool = Field(
-        default=False,
-        description="""
-        Whether to enable OpenTelemetry for tracing or logging.
-        When enabled, traces or log will be collected and sent to the configured OTLP endpoint.
-        """,
-        examples=[True, False],
-    )
-    log_level: str = Field(
-        default="INFO",
-        description="""
-        Log level for OpenTelemetry.
-        Controls the verbosity of logs generated by OpenTelemetry.
-        Common levels include 'debug', 'info', 'warn', 'error'.
-        """,
-        examples=["INFO", "DEBUG", "WARN", "ERROR", "TRACE"],
-        alias="log-level",
-    )
-    endpoint: str = Field(
-        default="http://localhost:4317",
-        description="""
-        OTLP endpoint for sending traces.
-        Should include the host and port of the OTLP receiver.
-        """,
-        examples=["http://localhost:4317", "http://otel-collector:4317"],
-    )
-
-
-class ServiceDiscoveryConfig(BaseConfigSchema):
-    type: ServiceDiscoveryType = Field(
-        default=ServiceDiscoveryType.REDIS,
-        description="""
-        Type of service discovery to use.
-        """,
-        examples=[item.value for item in ServiceDiscoveryType],
-    )
-
-
 class ReservoirObjectStorageConfig(BaseConfigSchema):
     storage_type: Literal["object_storage"] = Field(
         default="object_storage",
@@ -2181,7 +2046,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
         """,
     )
     etcd: EtcdConfig = Field(
-        default_factory=EtcdConfig,
+        default_factory=EtcdConfig,  # type: ignore[arg-type]
         description="""
         Etcd configuration settings.
         Used for distributed coordination between manager instances.
@@ -2214,7 +2079,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
         """,
     )
     pyroscope: PyroscopeConfig = Field(
-        default_factory=PyroscopeConfig,
+        default_factory=PyroscopeConfig,  # type: ignore[arg-type]
         description="""
         Pyroscope profiling configuration.
         Controls integration with the Pyroscope performance profiling tool.
@@ -2339,14 +2204,14 @@ class ManagerUnifiedConfig(BaseConfigSchema):
         """,
     )
     otel: OTELConfig = Field(
-        default_factory=OTELConfig,
+        default_factory=OTELConfig,  # type: ignore[arg-type]
         description="""
         OpenTelemetry configuration.
         Controls how tracing and logging are handled with OpenTelemetry.
         """,
     )
     service_discovery: ServiceDiscoveryConfig = Field(
-        default_factory=ServiceDiscoveryConfig,
+        default_factory=ServiceDiscoveryConfig,  # type: ignore[arg-type]
         description="""
         Service discovery configuration.
         Controls how services are discovered and connected within the Backend.AI system.

@@ -663,6 +663,7 @@ class AgentRegistry:
                         route_id=route_id,
                         sudo_session_enabled=sudo_session_enabled,
                         network=network,
+                        startup_command=startup_command,
                     )
                 ),
             )
@@ -989,6 +990,7 @@ class AgentRegistry:
         route_id: Optional[uuid.UUID],
         sudo_session_enabled: bool,
         network: NetworkRow | None,
+        startup_command: str | None,
     ) -> SessionId:
         """Enqueue session using Sokovan scheduling controller."""
         kernel_enqueue_configs: list[KernelEnqueueingConfig] = session_enqueue_configs[
@@ -1020,6 +1022,7 @@ class AgentRegistry:
             designated_agent_list=list(agent_list) if agent_list else None,
             internal_data=internal_data,
             public_sgroup_only=public_sgroup_only,
+            startup_command=startup_command,
         )
 
         # Delegate to scheduling controller
@@ -1050,6 +1053,7 @@ class AgentRegistry:
         route_id: Optional[uuid.UUID] = None,
         sudo_session_enabled: bool = False,
         network: NetworkRow | None = None,
+        startup_command: str | None = None,
     ) -> SessionId:
         # Use sokovan scheduling controller if enabled
         if self._use_sokovan:
@@ -1076,6 +1080,7 @@ class AgentRegistry:
                 route_id=route_id,
                 sudo_session_enabled=sudo_session_enabled,
                 network=network,
+                startup_command=startup_command,
             )
 
         # Original implementation

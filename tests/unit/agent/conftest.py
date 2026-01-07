@@ -12,7 +12,6 @@ import aiodocker
 import pytest
 
 from ai.backend.agent.config.unified import AgentUnifiedConfig
-from ai.backend.agent.resources import ResourceAllocator
 from ai.backend.agent.runtime import AgentRuntime
 from ai.backend.common import config
 from ai.backend.common import validators as tx
@@ -57,35 +56,6 @@ def logging_config():
     logger = LocalLogger(config)
     with logger:
         yield config
-
-
-@pytest.fixture(scope="session", autouse=True)
-def patch_dummy_agent_config():
-    """Patch read_from_file to provide default config for DummyAgent in tests."""
-    from ai.backend.common import config as common_config
-
-    original_read_from_file = common_config.read_from_file
-
-    def patched_read_from_file(path, filesystem_type=""):
-        # Check if this is the dummy agent config file
-        if "agent.dummy.toml" in str(path):
-            # Return minimal config structure - trafaret will fill in defaults
-            return (
-                {
-                    "agent": {"delay": {}, "image": {}, "resource": {"cpu": {}, "memory": {}}},
-                    "kernel-creation-ctx": {"delay": {}},
-                    "kernel": {"delay": {}},
-                },
-                None,
-            )
-        # Otherwise use original function
-        return original_read_from_file(path, filesystem_type)
-
-    # Manual patching for session scope
-    common_config.read_from_file = patched_read_from_file
-    yield
-    # Restore original
-    common_config.read_from_file = original_read_from_file
 
 
 @pytest.fixture(scope="session")
@@ -278,59 +248,44 @@ async def create_container(test_id, docker):
 
 
 @pytest.fixture
-def mock_resource_allocator(mocker) -> AsyncMock:
-    """
-    Mock ResourceAllocator to avoid real resource scanning in tests.
-
-    This fixture patches ResourceAllocator.__new__ to return a mock that provides
-    empty computers and slots, suitable for testing agent initialization without
-    actual hardware resource detection and expensive plugin loading.
-
-    Returns the mock allocator instance for additional test customization.
-    """
-
-    mock_allocator = AsyncMock(spec=ResourceAllocator)
-    mock_allocator.get_computers.return_value = {}
-    mock_allocator.get_updated_slots.return_value = {}
-    mock_allocator.__aexit__ = AsyncMock()
-
-    # Patch __new__ to return our mock when ResourceAllocator() is called
-    mocker.patch.object(
-        ResourceAllocator,
-        "__new__",
-        return_value=mock_allocator,
-    )
-
-    return mock_allocator
-
-
-@pytest.fixture
 async def agent_runtime(
     local_config: AgentUnifiedConfig,
-    etcd,
     mocker,
-    mock_resource_allocator,
 ) -> AsyncIterator[AgentRuntime]:
     """
-    Create a real AgentRuntime instance for integration testing.
+    Create a mocked AgentRuntime instance for unit testing.
 
-    This fixture provides a fully initialized AgentRuntime with:
-    - Real etcd client
-    - Real agent configuration
-    - Mocked ResourceAllocator (to avoid hardware resource detection)
-    - Mocked stats and error monitors (external dependencies)
+    This fixture provides a minimal AgentRuntime with:
+    - Mocked agents and resource allocator
+    - No real backend or resource loading
     - Proper cleanup after tests
     """
+    from ai.backend.agent.agent import AbstractAgent
+    from ai.backend.agent.kernel import KernelRegistry
+    from ai.backend.common.types import AgentId
 
-    mock_stats_monitor = Mock()
-    mock_error_monitor = Mock()
+    # Create mock agents
+    mock_agent_id = AgentId(local_config.agent.defaulted_id)
+    mock_agent = AsyncMock(spec=AbstractAgent)
+    mock_agent.id = mock_agent_id
+    mock_agent.shutdown = AsyncMock()
 
-    runtime = await AgentRuntime.create_runtime(
-        local_config,
-        etcd,
-        mock_stats_monitor,
-        mock_error_monitor,
-        None,
+    # Create mock etcd view
+    mock_etcd_view = Mock()
+
+    # Create mock resource allocator
+    mock_resource_allocator = AsyncMock()
+    mock_resource_allocator.__aexit__ = AsyncMock()
+
+    # Create runtime using constructor directly (not create_runtime)
+    runtime = AgentRuntime(
+        local_config=local_config,
+        etcd_views={mock_agent_id: mock_etcd_view},
+        agents={mock_agent_id: mock_agent},
+        primary_agent=mock_agent,
+        kernel_registry=KernelRegistry(),
+        resource_allocator=mock_resource_allocator,
+        metadata_server=None,
     )
 
     try:

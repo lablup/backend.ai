@@ -13,11 +13,11 @@ from pydantic import (
     model_validator,
 )
 
-from ai.backend.common.configs.validation_context import BaseConfigValidationContext
 from ai.backend.common.typed_validators import AutoDirectoryPath
 
 from .exceptions import ConfigurationError
 from .types import LogFormat, LogLevel, MsgpackOptions
+from .validation_context import BaseConfigValidationContext
 
 default_pkg_ns = {
     "": LogLevel.WARNING,

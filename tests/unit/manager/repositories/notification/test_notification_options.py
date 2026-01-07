@@ -13,6 +13,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.types import BinarySize
+from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.data.notification import NotificationChannelType, NotificationRuleType
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -381,7 +382,9 @@ class TestNotificationOptions:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationChannelConditions.by_name_contains("Test", case_insensitive=False)
+                NotificationChannelConditions.by_name_contains(
+                    StringMatchSpec("Test", case_insensitive=False, negated=False)
+                )
             ],
             orders=[],
         )
@@ -402,7 +405,9 @@ class TestNotificationOptions:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationChannelConditions.by_name_contains("test", case_insensitive=True)
+                NotificationChannelConditions.by_name_contains(
+                    StringMatchSpec("test", case_insensitive=True, negated=False)
+                )
             ],
             orders=[],
         )
@@ -424,7 +429,9 @@ class TestNotificationOptions:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationChannelConditions.by_name_equals("Test Channel", case_insensitive=False)
+                NotificationChannelConditions.by_name_equals(
+                    StringMatchSpec("Test Channel", case_insensitive=False, negated=False)
+                )
             ],
             orders=[],
         )
@@ -445,7 +452,9 @@ class TestNotificationOptions:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationChannelConditions.by_name_equals("test channel", case_insensitive=True)
+                NotificationChannelConditions.by_name_equals(
+                    StringMatchSpec("test channel", case_insensitive=True, negated=False)
+                )
             ],
             orders=[],
         )
@@ -653,7 +662,9 @@ class TestNotificationOptions:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationRuleConditions.by_name_contains("Test", case_insensitive=False)
+                NotificationRuleConditions.by_name_contains(
+                    StringMatchSpec("Test", case_insensitive=False, negated=False)
+                )
             ],
             orders=[],
         )
@@ -673,7 +684,11 @@ class TestNotificationOptions:
         # sample_rules_for_filter creates rules with various names
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[NotificationRuleConditions.by_name_contains("test", case_insensitive=True)],
+            conditions=[
+                NotificationRuleConditions.by_name_contains(
+                    StringMatchSpec("test", case_insensitive=True, negated=False)
+                )
+            ],
             orders=[],
         )
         rules = await notification_repository.search_rules(querier=querier)
@@ -694,7 +709,9 @@ class TestNotificationOptions:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationRuleConditions.by_name_equals("Test Rule", case_insensitive=False)
+                NotificationRuleConditions.by_name_equals(
+                    StringMatchSpec("Test Rule", case_insensitive=False, negated=False)
+                )
             ],
             orders=[],
         )
@@ -715,7 +732,9 @@ class TestNotificationOptions:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationRuleConditions.by_name_equals("test rule", case_insensitive=True)
+                NotificationRuleConditions.by_name_equals(
+                    StringMatchSpec("test rule", case_insensitive=True, negated=False)
+                )
             ],
             orders=[],
         )
@@ -919,7 +938,11 @@ class TestNotificationOptions:
         """Test that searching for non-existent channel returns empty with total_count=0"""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[NotificationChannelConditions.by_name_equals("NonexistentChannelName")],
+            conditions=[
+                NotificationChannelConditions.by_name_equals(
+                    StringMatchSpec("NonexistentChannelName", case_insensitive=False, negated=False)
+                )
+            ],
             orders=[],
         )
         channels = await notification_repository.search_channels(querier=querier)
@@ -937,7 +960,11 @@ class TestNotificationOptions:
         """Test that searching for non-existent rule returns empty with total_count=0"""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[NotificationRuleConditions.by_name_equals("NonexistentRuleName")],
+            conditions=[
+                NotificationRuleConditions.by_name_equals(
+                    StringMatchSpec("NonexistentRuleName", case_insensitive=False, negated=False)
+                )
+            ],
             orders=[],
         )
         rules = await notification_repository.search_rules(querier=querier)

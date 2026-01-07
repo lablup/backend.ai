@@ -102,12 +102,14 @@ async def log_manager_api_entry(
                 params["dst_vfid"],
             )
         elif "relpaths" in params:
+            relpaths = params["relpaths"]
+            paths_summary = str(relpaths[0]) + "..." if relpaths else "(empty)"
             log.info(
                 "ManagerAPI::{}(v:{}, f:{}, p*:{})",
                 name.upper(),
                 params["volume"],
                 params["vfid"],
-                str(params["relpaths"][0]) + "...",
+                paths_summary,
             )
         elif "relpath" in params:
             log.info(
