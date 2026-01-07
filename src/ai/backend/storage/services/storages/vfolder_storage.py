@@ -45,7 +45,7 @@ class VFolderStorageService:
 
     async def setup(
         self,
-        vfid: VFolderID,
+        vfolder_id: VFolderID,
         storage_step_mappings: dict[ArtifactStorageImportStep, str],
     ) -> VFolderStorageSetupResult:
         """Setup VFolderStorage for import operations.
@@ -71,12 +71,12 @@ class VFolderStorageService:
             vfolder_storage = VFolderStorage(
                 name=vfolder_storage_name,
                 volume=volume,
-                vfid=vfid,
+                vfid=vfolder_id,
             )
             self._storage_pool.add_storage(vfolder_storage_name, vfolder_storage)
 
             log.info(
-                f"Created VFolderStorage: name={vfolder_storage_name}, vfid={vfid}, "
+                f"Created VFolderStorage: name={vfolder_storage_name}, vfid={vfolder_id}, "
                 f"volume={volume_name}"
             )
 

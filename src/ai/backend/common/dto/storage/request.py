@@ -277,7 +277,7 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
         """,
         examples=[{"download": "fast-storage", "archive": "long-term-storage"}],
     )
-    vfid: Optional[VFolderIDField] = Field(
+    vfolder_id: Optional[VFolderIDField] = Field(
         default=None,
         description="""
         Optional vfolder ID to use as the download destination.
@@ -348,7 +348,7 @@ class ReservoirImportModelsReq(BaseRequestModel):
     artifact_revision_ids: list[str] = Field(
         description="Artifact revision IDs corresponding to each model in the models list.",
     )
-    vfid: Optional[VFolderIDField] = Field(
+    vfolder_id: Optional[VFolderIDField] = Field(
         default=None,
         description="""
         Optional vfolder ID to use as the download destination.

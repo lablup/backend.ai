@@ -186,9 +186,9 @@ class HuggingFaceRegistryAPIHandler:
         cleanup_callback: Callable[[], None] | None = None
 
         # If vfid is provided, create VFolderStorage and register it
-        if body.parsed.vfid is not None:
+        if body.parsed.vfolder_id is not None:
             setup_result = await self._vfolder_storage_service.setup(
-                vfid=body.parsed.vfid,
+                vfolder_id=body.parsed.vfolder_id,
                 storage_step_mappings=storage_step_mappings,
             )
             storage_step_mappings = setup_result.storage_step_mappings
