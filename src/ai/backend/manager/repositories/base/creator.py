@@ -5,11 +5,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Generic, TypeVar
-
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from ai.backend.manager.models.base import Base
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 TRow = TypeVar("TRow", bound=Base)
 
