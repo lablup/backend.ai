@@ -1,59 +1,66 @@
 #! /bin/bash
+set -Eeuo pipefail
 
 # Make it interruptible.
-set -m  # Create a new process group
+PGID="$(ps -o pgid= $$ | tr -d ' ')"
 cleanup() {
-  echo "Pre-commit hook is interrupted."
-  local sig="${1:-SIGTERM}"
-  kill -s "$sig" 0
-  wait; exit 1
+  local sig="$1"
+  trap - SIGINT SIGTERM
+  echo -e "\nPre-commit hook is interrupted ($sig)."
+  kill "-${sig}" -- "-${PGID}"
+  wait
+  case "${sig}" in
+    INT)  exit 130 ;;
+    TERM) exit 143 ;;
+    *)    exit 1   ;;
+  esac
 }
-trap 'cleanup SIGINT'  SIGINT
-trap 'cleanup SIGTERM' SIGTERM
+trap 'cleanup INT' SIGINT
+trap 'cleanup TERM' SIGTERM
+trap 'cleanup TERM' SIGPIPE
 
-(
-  set -e  # Exit on error
-  BASE_PATH=$(cd "$(dirname "$0")"/.. && pwd)
-  cd "$BASE_PATH"
+# --- Hook Body ---
 
-  # Setup pants local execution directory
-  if [ -f .pants.rc ]; then
-    local_exec_root_dir=$(scripts/pyscript.sh scripts/tomltool.py -f .pants.rc get 'GLOBAL.local_execution_root_dir')
-    mkdir -p "$local_exec_root_dir"
-  fi
+BASE_PATH=$(cd "$(dirname "$0")"/.. && pwd)
+cd "$BASE_PATH"
 
-  EXIT_CODE=0
+# Setup pants local execution directory
+if [ -f .pants.rc ]; then
+  local_exec_root_dir=$(scripts/pyscript.sh scripts/tomltool.py -f .pants.rc get 'GLOBAL.local_execution_root_dir')
+  mkdir -p "$local_exec_root_dir"
+fi
 
-  # 1. Linting
-  echo "Running pre-commit checks..."
-  echo "✓ Linting..."
-  if ! pants lint --changed-since="HEAD"; then
-    echo "❌ Linting failed"
-    EXIT_CODE=1
-  fi
+EXIT_CODE=0
 
-  # 2. Type checking
-  echo "✓ Type checking..."
-  if ! pants check --changed-since="HEAD"; then
-    echo "❌ Type checking failed"
-    EXIT_CODE=1
-  fi
+# 1. Linting
+echo "Running pre-commit checks..."
+echo "✓ Linting..."
 
-  # 3. Direct tests (only tests that were directly changed)
-  echo "✓ Testing changed files..."
-  if ! pants test --changed-since="HEAD"; then
-    echo "❌ Tests failed"
-    EXIT_CODE=1
-  fi
+if ! pants lint --changed-since="HEAD"; then
+  echo "❌ Linting failed"
+  EXIT_CODE=1
+fi
 
-  if [ $EXIT_CODE -ne 0 ]; then
-    echo ""
-    echo "❌ Pre-commit checks failed. Please fix the issues above."
-    exit $EXIT_CODE
-  fi
+# 2. Type checking
+echo "✓ Type checking..."
+if ! pants check --changed-since="HEAD"; then
+  echo "❌ Type checking failed"
+  EXIT_CODE=1
+fi
 
+# 3. Direct tests (only tests that were directly changed)
+echo "✓ Testing changed files..."
+if ! pants test --changed-since="HEAD"; then
+  echo "❌ Tests failed"
+  EXIT_CODE=1
+fi
+
+if [ $EXIT_CODE -ne 0 ]; then
   echo ""
-  echo "✅ All pre-commit checks passed"
-  exit 0
-) &
-wait $!
+  echo "❌ Pre-commit checks failed. Please fix the issues above."
+  exit $EXIT_CODE
+fi
+
+echo ""
+echo "✅ All pre-commit checks passed"
+exit 0
