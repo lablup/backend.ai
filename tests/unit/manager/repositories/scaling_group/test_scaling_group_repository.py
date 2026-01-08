@@ -1121,7 +1121,7 @@ class TestScalingGroupRepositoryDB:
         )
         assert association_exists is True
 
-    async def test_disassociate_scaling_group_with_user_group_success(
+    async def test_disassociate_scaling_group_with_user_groups_success(
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_purge: str,
@@ -1157,7 +1157,7 @@ class TestScalingGroupRepositoryDB:
             scaling_group=sgroup_name,
             project=project_id,
         )
-        await scaling_group_repository.disassociate_scaling_group_with_user_group(purger)
+        await scaling_group_repository.disassociate_scaling_group_with_user_groups(purger)
 
         # Then: Association should no longer exist
         association_exists = (
@@ -1168,7 +1168,7 @@ class TestScalingGroupRepositoryDB:
         )
         assert association_exists is False
 
-    async def test_disassociate_nonexistent_scaling_group_with_user_group(
+    async def test_disassociate_nonexistent_scaling_group_with_user_groups(
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_purge: str,
@@ -1185,4 +1185,4 @@ class TestScalingGroupRepositoryDB:
             project=project_id,
         )
         # Then: Should not raise any error (BatchPurger deletes 0 rows silently)
-        await scaling_group_repository.disassociate_scaling_group_with_user_group(purger)
+        await scaling_group_repository.disassociate_scaling_group_with_user_groups(purger)
