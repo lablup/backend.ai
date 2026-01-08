@@ -67,17 +67,17 @@ class PermissionGroupRow(Base):
     role_row: RoleRow | None = relationship(
         "RoleRow",
         back_populates="permission_group_rows",
-        primaryjoin=_get_role_join_condition(),
+        primaryjoin=_get_role_join_condition,
     )
     mapped_entities: list[AssociationScopesEntitiesRow] = relationship(
         "AssociationScopesEntitiesRow",
-        primaryjoin=_get_association_scopes_entities_join_condition(),
+        primaryjoin=_get_association_scopes_entities_join_condition,
         viewonly=True,
     )
     permission_rows: list[PermissionRow] = relationship(
         "PermissionRow",
         back_populates="permission_group_row",
-        primaryjoin=_get_permission_join_condition(),
+        primaryjoin=_get_permission_join_condition,
     )
 
     def parsed_scope_id(self) -> ScopeId:

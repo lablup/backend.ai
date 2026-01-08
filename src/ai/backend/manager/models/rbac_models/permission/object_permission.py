@@ -48,7 +48,7 @@ class ObjectPermissionRow(Base):
     role_row: RoleRow | None = relationship(
         "RoleRow",
         back_populates="object_permission_rows",
-        primaryjoin=_get_role_join_condition(),
+        primaryjoin=_get_role_join_condition,
     )
 
     def object_id(self) -> ObjectId:

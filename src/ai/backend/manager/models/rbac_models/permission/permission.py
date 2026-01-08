@@ -46,7 +46,7 @@ class PermissionRow(Base):
     permission_group_row: PermissionGroupRow | None = relationship(
         "PermissionGroupRow",
         back_populates="permission_rows",
-        primaryjoin=_get_permission_group_join_condition(),
+        primaryjoin=_get_permission_group_join_condition,
     )
 
     @classmethod
