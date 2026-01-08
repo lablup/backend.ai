@@ -30,18 +30,19 @@ __all__: Sequence[str] = ("resource_presets",)
 
 
 # Type alias for statements that support .where() method
-type WhereableStatement = Select | Update | Delete
+type WhereableStatement[T] = Select[T] | Update | Delete
 
 
-def filter_by_name(name: str) -> Callable[[WhereableStatement], WhereableStatement]:
+def filter_by_name(name: str) -> Callable[[WhereableStatement[Any]], WhereableStatement[Any]]:
     return lambda query_stmt: query_stmt.where(ResourcePresetRow.name == name)
 
 
-def filter_by_id(id: UUID) -> Callable[[WhereableStatement], WhereableStatement]:
+def filter_by_id(id: UUID) -> Callable[[WhereableStatement[Any]], WhereableStatement[Any]]:
     return lambda query_stmt: query_stmt.where(ResourcePresetRow.id == id)
 
 
-QueryOption = Callable[[Any], Callable[[WhereableStatement], WhereableStatement]]
+# QueryOption is a function that takes a statement and returns a filtered statement
+type QueryOption = Callable[[WhereableStatement[Any]], WhereableStatement[Any]]
 
 
 def _get_scaling_group_join_condition():
@@ -97,11 +98,11 @@ class ResourcePresetRow(Base):
         *,
         db_session: AsyncSession,
     ) -> Self | None:
-        update_stmt = sa.update(ResourcePresetRow).values(data).returning(ResourcePresetRow)
-        update_stmt = query_option(update_stmt)
+        base_update_stmt = sa.update(ResourcePresetRow).values(data).returning(ResourcePresetRow)
+        filtered_stmt = query_option(base_update_stmt)
         stmt = (
             sa.select(ResourcePresetRow)
-            .from_statement(update_stmt)
+            .from_statement(filtered_stmt)
             .execution_options(populate_existing=True)
         )
         try:
@@ -116,9 +117,9 @@ class ResourcePresetRow(Base):
         *,
         db_session: AsyncSession,
     ) -> None:
-        delete_stmt = sa.delete(ResourcePresetRow)
-        delete_stmt = query_option(delete_stmt)
-        await db_session.execute(delete_stmt)
+        base_delete_stmt = sa.delete(ResourcePresetRow)
+        filtered_stmt = query_option(base_delete_stmt)
+        await db_session.execute(filtered_stmt)
 
     def to_dataclass(self) -> ResourcePresetData:
         return ResourcePresetData(

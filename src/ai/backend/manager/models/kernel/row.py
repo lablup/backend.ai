@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from collections.abc import AsyncIterator, Container, Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime, tzinfo
 from typing import (
@@ -651,12 +651,12 @@ class KernelRow(Base):
 
     @property
     def used_time(self) -> Optional[str]:
-        if self.terminated_at is not None:
+        if self.terminated_at is not None and self.created_at is not None:
             return str(self.terminated_at - self.created_at)
         return None
 
     def get_used_days(self, local_tz: tzinfo) -> Optional[int]:
-        if self.terminated_at is not None:
+        if self.terminated_at is not None and self.created_at is not None:
             return (
                 self.terminated_at.astimezone(local_tz).toordinal()
                 - self.created_at.astimezone(local_tz).toordinal()
@@ -670,12 +670,12 @@ class KernelRow(Base):
         conditions: Sequence[QueryCondition],
         *,
         db: ExtendedAsyncSAEngine,
-    ) -> list[Self]:
+    ) -> Sequence[Self]:
         query_stmt = sa.select(KernelRow)
         for cond in conditions:
             query_stmt = cond(query_stmt)
 
-        async def fetch(db_session: SASession) -> list[KernelRow]:
+        async def fetch(db_session: SASession) -> Sequence[KernelRow]:
             return (await db_session.scalars(query_stmt)).all()
 
         async with db.connect() as db_conn:
@@ -684,14 +684,14 @@ class KernelRow(Base):
     @staticmethod
     async def batch_load_by_session_id(
         session: SASession, session_ids: list[uuid.UUID]
-    ) -> list[KernelRow]:
+    ) -> Sequence[KernelRow]:
         query = sa.select(KernelRow).where(KernelRow.session_id.in_(session_ids))
         return (await session.execute(query)).scalars().all()
 
     @staticmethod
     async def batch_load_main_kernels_by_session_id(
         session: SASession, session_ids: list[uuid.UUID]
-    ) -> list[KernelRow]:
+    ) -> Sequence[KernelRow]:
         query = (
             sa.select(KernelRow)
             .where(KernelRow.session_id.in_(session_ids))
@@ -751,8 +751,8 @@ class KernelRow(Base):
     async def get_bulk_kernels_to_update_status(
         cls,
         db_session: SASession,
-        kernel_ids: Container[KernelId],
-    ) -> list[KernelRow]:
+        kernel_ids: Iterable[KernelId],
+    ) -> Sequence[KernelRow]:
         _stmt = sa.select(KernelRow).where(KernelRow.id.in_(kernel_ids))
         return (await db_session.scalars(_stmt)).all()
 

@@ -68,14 +68,13 @@ class ReservoirRegistryRow(Base):
         return self.__str__()
 
     def to_dataclass(self) -> ReservoirRegistryData:
-        try:
-            return ReservoirRegistryData(
-                id=self.id,
-                name=self.meta.name,
-                endpoint=self.endpoint,
-                access_key=self.access_key,
-                secret_key=self.secret_key,
-                api_version=self.api_version,
-            )
-        except Exception:
+        if self.meta is None:
             raise RelationNotLoadedError()
+        return ReservoirRegistryData(
+            id=self.id,
+            name=self.meta.name,
+            endpoint=self.endpoint,
+            access_key=self.access_key,
+            secret_key=self.secret_key,
+            api_version=self.api_version,
+        )

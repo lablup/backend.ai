@@ -161,19 +161,21 @@ class KeyPairRow(Base):
         )
 
     def to_data(self) -> KeyPairData:
+        if self.secret_key is None:
+            raise ValueError("secret_key is required for KeyPairData")
         return KeyPairData(
             user_id=self.user,
-            access_key=self.access_key,
-            secret_key=self.secret_key,
-            is_active=self.is_active,
-            is_admin=self.is_admin,
+            access_key=AccessKey(self.access_key),
+            secret_key=SecretKey(self.secret_key),
+            is_active=self.is_active if self.is_active is not None else True,
+            is_admin=self.is_admin if self.is_admin is not None else False,
             created_at=self.created_at,
             modified_at=self.modified_at,
             resource_policy_name=self.resource_policy,
-            rate_limit=self.rate_limit,
+            rate_limit=self.rate_limit if self.rate_limit is not None else 0,
             ssh_public_key=self.ssh_public_key,
             ssh_private_key=self.ssh_private_key,
-            dotfiles=self.dotfiles,
+            dotfiles=self.dotfiles.decode("utf-8") if self.dotfiles else "",
             bootstrap_script=self.bootstrap_script,
         )
 
@@ -338,6 +340,8 @@ async def query_owned_dotfiles(
         .where(KeyPairRow.access_key == access_key)
     )
     packed_dotfile = (await conn.execute(query)).scalar()
+    if packed_dotfile is None:
+        return [], MAXIMUM_DOTFILE_SIZE
     rows = msgpack.unpackb(packed_dotfile)
     return rows, MAXIMUM_DOTFILE_SIZE - len(packed_dotfile)
 
@@ -352,6 +356,8 @@ async def query_bootstrap_script(
         .where(KeyPairRow.access_key == access_key)
     )
     script = (await conn.execute(query)).scalar()
+    if script is None:
+        return "", MAXIMUM_DOTFILE_SIZE
     return script, MAXIMUM_DOTFILE_SIZE - len(script)
 
 

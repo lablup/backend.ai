@@ -109,17 +109,20 @@ class ArtifactRevisionRow(Base):
     )
 
     def __str__(self) -> str:
+        readme_display = self.readme[:15] if self.readme else None
+        created_at_str = self.created_at.isoformat() if self.created_at else None
+        updated_at_str = self.updated_at.isoformat() if self.updated_at else None
         return (
             f"ArtifactRevisionRow("
             f"id={self.id}, "
             f"artifact_id={self.artifact_id}, "
             f"version={self.version}, "
-            f"readme={self.readme[:15]}, "  # truncate for display
+            f"readme={readme_display}, "
             f"size={self.size}, "
             f"status={self.status}, "
             f"remote_status={self.remote_status}, "
-            f"created_at={self.created_at.isoformat()}, "
-            f"updated_at={self.updated_at.isoformat()}, "
+            f"created_at={created_at_str}, "
+            f"updated_at={updated_at_str}, "
             f"digest={self.digest}"
             f")"
         )

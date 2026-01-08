@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -151,7 +152,7 @@ class RoutingRow(Base):
         project: uuid.UUID | None = None,
         domain: str | None = None,
         user_uuid: uuid.UUID | None = None,
-    ) -> list[RoutingRow]:
+    ) -> Sequence[RoutingRow]:
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
         """

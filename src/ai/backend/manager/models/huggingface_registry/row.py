@@ -66,9 +66,8 @@ class HuggingFaceRegistryRow(Base):
         return self.__str__()
 
     def to_dataclass(self) -> HuggingFaceRegistryData:
-        try:
-            return HuggingFaceRegistryData(
-                id=self.id, name=self.meta.name, url=self.url, token=self.token
-            )
-        except Exception:
+        if self.meta is None:
             raise RelationNotLoadedError()
+        return HuggingFaceRegistryData(
+            id=self.id, name=self.meta.name, url=self.url, token=self.token
+        )

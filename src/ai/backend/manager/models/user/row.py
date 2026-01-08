@@ -8,7 +8,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Optional,
-    Self,
     cast,
 )
 from uuid import UUID
@@ -322,7 +321,7 @@ class UserRow(Base):
         options: Sequence[QueryOption] = tuple(),
         *,
         db: ExtendedAsyncSAEngine,
-    ) -> list[Self]:
+    ) -> Sequence[UserRow]:
         """
         Query user rows by condition.
         Args:
@@ -341,7 +340,7 @@ class UserRow(Base):
         for option in options:
             query_stmt = option(query_stmt)
 
-        async def fetch(db_session: SASession) -> list[Self]:
+        async def fetch(db_session: SASession) -> Sequence[UserRow]:
             return (await db_session.scalars(query_stmt)).all()
 
         async with db.connect() as db_conn:
@@ -357,7 +356,7 @@ class UserRow(Base):
         user_uuid: UUID,
         *,
         db: ExtendedAsyncSAEngine,
-    ) -> Self:
+    ) -> UserRow:
         """
         Query user row by UUID with related policies.
         Args:
@@ -421,9 +420,9 @@ class UserRow(Base):
             created_at=self.created_at,
             modified_at=self.modified_at,
             domain_name=self.domain_name,
-            role=self.role.value,
+            role=self.role,
             resource_policy=self.resource_policy,
-            allowed_client_ip=self.allowed_client_ip,
+            allowed_client_ip=[str(ip) for ip in self.allowed_client_ip] if self.allowed_client_ip else None,
             totp_activated=self.totp_activated,
             totp_activated_at=self.totp_activated_at,
             sudo_session_enabled=self.sudo_session_enabled,
