@@ -81,6 +81,13 @@ class ObjectPermissionRow(Base):
         uselist=True,
     )
 
+    scope_association_rows: list[AssociationScopesEntitiesRow] = relationship(
+        "AssociationScopesEntitiesRow",
+        primaryjoin=_get_scope_association_join_condition,
+        viewonly=True,
+        uselist=True,
+    )
+
     def object_id(self) -> ObjectId:
         return ObjectId(entity_type=self.entity_type, entity_id=self.entity_id)
 
