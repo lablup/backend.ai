@@ -984,6 +984,150 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             case ResourceGroupType.STORAGE:
                 return ("ttyd",)
 
+    def _schedule_cpu_boost_restoration(
+        self,
+        container_id: str,
+        resource_spec: KernelResourceSpec,
+    ) -> None:
+        """
+        Schedule a background task to restore CPU from boost after the configured duration.
+
+        This method extracts the original CPU allocation from the resource spec and
+        creates an asyncio task that will restore the container's CPU quota after
+        the boost duration expires.
+
+        Args:
+            container_id: ID of the container to schedule restoration for
+            resource_spec: Kernel resource specification containing CPU allocations
+        """
+        cpu_alloc = resource_spec.allocations.get(DeviceName("cpu"), {})
+        if not cpu_alloc:
+            log.debug(
+                "No CPU allocation found for container {}, skipping boost restoration",
+                container_id[:12],
+            )
+            return
+
+        # cpu_alloc is Mapping[SlotName, Mapping[DeviceId, Decimal]]
+        # Count the number of allocated CPU cores
+        original_cpus = len(cpu_alloc.get(SlotName("cpu"), {}))
+        boost_duration = self.local_config.container.cpu_boost_duration
+
+        # Lazily initialize the tracking structure for CPU boost restoration tasks.
+        tasks_by_container = getattr(self, "_cpu_boost_restore_tasks", None)
+        if tasks_by_container is None:
+            tasks_by_container = {}
+            setattr(self, "_cpu_boost_restore_tasks", tasks_by_container)
+
+        # Create a background task to restore CPU after boost_duration and track it.
+        task = asyncio.create_task(
+            self._restore_cpu_from_boost(
+                container_id,
+                original_cpus,
+                boost_duration,
+            )
+        )
+
+        container_tasks = tasks_by_container.setdefault(container_id, set())
+        container_tasks.add(task)
+
+        def _cleanup_task(t: asyncio.Task, cid: str = container_id) -> None:
+            # Remove the completed task from the tracking structure.
+            container_map = getattr(self, "_cpu_boost_restore_tasks", None)
+            if not isinstance(container_map, dict):
+                return
+            tasks = container_map.get(cid)
+            if tasks is None:
+                return
+            tasks.discard(t)
+            if not tasks:
+                container_map.pop(cid, None)
+
+        task.add_done_callback(_cleanup_task)
+        log.debug(
+            "Scheduled CPU boost restoration for container {} in {} seconds",
+            container_id[:12],
+            boost_duration,
+        )
+
+    async def _restore_cpu_from_boost(
+        self,
+        container_id: str,
+        original_cpus: int,
+        boost_duration: float,
+    ) -> None:
+        """
+        Restore container CPU allocation from boosted value to original value after a delay.
+
+        Args:
+            container_id: ID of the container to restore
+            original_cpus: Original number of CPU cores requested
+            boost_duration: Duration in seconds to wait before restoring
+        """
+        try:
+            await asyncio.sleep(boost_duration)
+            log.info(
+                "Restoring CPU from boost for container {}: reducing to {} cores",
+                container_id[:12],
+                original_cpus,
+            )
+            async with closing_async(Docker()) as docker:
+                container = docker.containers.container(container_id)
+
+                # Check if container still exists and is running
+                try:
+                    container_info = await container.show()
+                except DockerError as e:
+                    if e.status == 404:
+                        log.info(
+                            "Container {} no longer exists, skipping CPU boost restoration",
+                            container_id[:12],
+                        )
+                        return
+                    raise
+
+                # Only restore CPU if container is still running
+                container_state = container_info.get("State", {})
+                if not container_state.get("Running", False):
+                    log.info(
+                        "Container {} is not running (status: {}), skipping CPU boost restoration",
+                        container_id[:12],
+                        container_state.get("Status", "unknown"),
+                    )
+                    return
+
+                # Restore CPU to original allocation
+                # Docker update API doesn't support "Cpus" field, so we use CpuQuota
+                # CpuQuota = number_of_cpus * CpuPeriod (100_000 microseconds = 100ms)
+                # aiodocker doesn't have update method, so we call the API directly
+                update_config = {
+                    "CpuQuota": original_cpus * 100_000,
+                    "CpuPeriod": 100_000,
+                }
+                await docker._query_json(
+                    f"containers/{container_id}/update",
+                    method="POST",
+                    data=update_config,
+                )
+
+            log.info("CPU boost restoration completed for container {}", container_id[:12])
+        except asyncio.CancelledError:
+            log.debug("CPU boost restoration task cancelled for container {}", container_id[:12])
+            raise
+        except DockerError as e:
+            log.warning(
+                "Docker error while restoring CPU from boost for container {}: {} (status: {})",
+                container_id[:12],
+                e.message,
+                e.status,
+            )
+        except Exception as e:
+            log.warning(
+                "Failed to restore CPU from boost for container {}: {!r}",
+                container_id[:12],
+                e,
+            )
+
     async def _apply_seccomp_profile(self, container_config: MutableMapping[str, Any]) -> None:
         default_seccomp_path = self.resolve_krunner_filepath("runner/default-seccomp.json")
 
@@ -1282,6 +1426,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 await network.connect({"Container": container._id})
 
             kernel_obj.container_id = container._id
+
+            # Schedule CPU boost restoration task if enabled
+            if self.local_config.container.cpu_boost_enabled:
+                self._schedule_cpu_boost_restoration(cid, resource_spec)
+
             container_network_info: Optional[ContainerNetworkInfo] = None
             if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
                 try:
