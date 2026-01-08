@@ -14,4 +14,6 @@ headers:
           value: "localhost:8091"
       - insert:
           name: "X-Forwarded-URL"
-          value: "http://127.0.0.1:4000/"
+          # NOTE: When the host port and container port differ in Docker Compose, you must use the host port 
+          # NOTE: Trailing slash is required
+          value: "http://127.0.0.1:4000/" 
