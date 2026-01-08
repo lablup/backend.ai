@@ -6,7 +6,8 @@ cleanup() {
   jobs -p | xargs -r kill -s "$sig"
   wait; exit 1
 }
-trap cleanup SIGINT SIGTERM
+trap 'cleanup INT'  SIGINT
+trap 'cleanup TERM' SIGTERM
 
 # implementation: backend.ai monorepo standard pre-push hook
 BASE_PATH=$(cd "$(dirname "$0")"/.. && pwd)

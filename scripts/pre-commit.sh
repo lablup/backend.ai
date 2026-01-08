@@ -8,7 +8,8 @@ cleanup() {
   jobs -p | xargs -r kill -s "$sig"
   wait; exit 1
 }
-trap cleanup SIGINT SIGTERM
+trap 'cleanup INT'  SIGINT
+trap 'cleanup TERM' SIGTERM
 
 BASE_PATH=$(cd "$(dirname "$0")"/.. && pwd)
 cd "$BASE_PATH"
