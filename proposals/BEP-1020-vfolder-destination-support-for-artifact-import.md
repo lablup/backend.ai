@@ -91,44 +91,9 @@ Add an optional `vfolderId` parameter to the `import_artifacts` API.
 
 ### Architecture Changes
 
-#### 1. StorageTarget Class
+#### 1. VolumeStorageAdapter Class
 
-Introduce a `StorageTarget` class that wraps storage references, allowing them to be either:
-- A storage name (`str`) - resolved via StoragePool
-- A storage instance (`AbstractStorage`) - used directly
-
-```python
-class StorageTarget:
-    """
-    Wrapper for storage step mapping that can be either a storage name (str)
-    or a storage instance (AbstractStorage).
-
-    When str: resolved via storage_pool.get_storage(name)
-    When AbstractStorage: used directly (e.g., VolumeStorageAdapter for VFolder imports)
-    """
-
-    _value: str | AbstractStorage
-
-    def __init__(self, value: str | AbstractStorage) -> None:
-        self._value = value
-
-    @property
-    def name(self) -> str:
-        """Get the storage name from this mapping."""
-        if isinstance(self._value, str):
-            return self._value
-        return getattr(self._value, "name", str(id(self._value)))
-
-    def resolve(self, storage_pool: AbstractStoragePool) -> AbstractStorage:
-        """Resolve this mapping to an AbstractStorage instance."""
-        if isinstance(self._value, AbstractStorage):
-            return self._value
-        return storage_pool.get_storage(self._value)
-```
-
-#### 2. VolumeStorageAdapter Class
-
-Introduce a `VolumeStorageAdapter` class that implements `AbstractStorage` by wrapping `AbstractVolume`:
+To support vfolder destinations, we need a way to use `AbstractVolume` (the volume backend interface) as an artifact storage target. The existing import pipeline expects `AbstractStorage` interface, so we introduce `VolumeStorageAdapter` that bridges these two interfaces:
 
 ```python
 class VolumeStorageAdapter(AbstractStorage):
@@ -172,6 +137,43 @@ class VolumeStorageAdapter(AbstractStorage):
 - No StoragePool registration overhead
 - Works with backend-specific quota management
 - Delegates all operations to the volume, enabling backend-specific optimizations
+
+#### 2. StorageTarget Class
+
+With `VolumeStorageAdapter`, we can now use volumes as artifact storage. However, the existing import pipeline uses storage names (strings) to look up storages from `StoragePool`. We need a way to pass either:
+- A storage name (`str`) for pre-configured storages (existing behavior)
+- A `VolumeStorageAdapter` instance for vfolder destinations (new behavior)
+
+The `StorageTarget` class provides this unified interface:
+
+```python
+class StorageTarget:
+    """
+    Wrapper for storage step mapping that can be either a storage name (str)
+    or a storage instance (AbstractStorage).
+
+    When str: resolved via storage_pool.get_storage(name)
+    When AbstractStorage: used directly (e.g., VolumeStorageAdapter for VFolder imports)
+    """
+
+    _value: str | AbstractStorage
+
+    def __init__(self, value: str | AbstractStorage) -> None:
+        self._value = value
+
+    @property
+    def name(self) -> str:
+        """Get the storage name from this mapping."""
+        if isinstance(self._value, str):
+            return self._value
+        return getattr(self._value, "name", str(id(self._value)))
+
+    def resolve(self, storage_pool: AbstractStoragePool) -> AbstractStorage:
+        """Resolve this mapping to an AbstractStorage instance."""
+        if isinstance(self._value, AbstractStorage):
+            return self._value
+        return storage_pool.get_storage(self._value)
+```
 
 #### 3. Updated Import Step Context
 
