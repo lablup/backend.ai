@@ -1,14 +1,18 @@
 #! /bin/bash
-# implementation: backend.ai monorepo standard pre-commit hook
-set -e  # Exit on error
 
 # Make it interruptible.
+PGID="$(ps -o pgid= $$ | tr -d ' ')"
 cleanup() {
-  local sig="${1:-TERM}"
-  jobs -p | xargs -r kill -s "$sig"
-  wait; exit 1
+  local sig="$1"
+  trap - SIGINT SIGTERM
+  echo -e "Pre-commit hook is interrupted ($sig)." >&2
+  kill -s "${sig}" -- "-${PGID}"
 }
-trap cleanup SIGINT SIGTERM
+trap 'cleanup INT' SIGINT
+trap 'cleanup TERM' SIGTERM
+
+# --- Hook Body ---
+set -Eeuo pipefail
 
 BASE_PATH=$(cd "$(dirname "$0")"/.. && pwd)
 cd "$BASE_PATH"
@@ -24,6 +28,7 @@ EXIT_CODE=0
 # 1. Linting
 echo "Running pre-commit checks..."
 echo "✓ Linting..."
+
 if ! pants lint --changed-since="HEAD"; then
   echo "❌ Linting failed"
   EXIT_CODE=1
