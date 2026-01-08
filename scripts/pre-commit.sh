@@ -1,24 +1,18 @@
 #! /bin/bash
-set -Eeuo pipefail
 
 # Make it interruptible.
 PGID="$(ps -o pgid= $$ | tr -d ' ')"
 cleanup() {
   local sig="$1"
   trap - SIGINT SIGTERM
-  echo -e "\nPre-commit hook is interrupted ($sig)."
-  kill "-${sig}" -- "-${PGID}"
-  wait
-  case "${sig}" in
-    INT)  exit 130 ;;
-    TERM) exit 143 ;;
-    *)    exit 1   ;;
-  esac
+  echo -e "Pre-commit hook is interrupted ($sig)." >&2
+  kill -s "${sig}" -- "-${PGID}"
 }
 trap 'cleanup INT' SIGINT
 trap 'cleanup TERM' SIGTERM
 
 # --- Hook Body ---
+set -Eeuo pipefail
 
 BASE_PATH=$(cd "$(dirname "$0")"/.. && pwd)
 cd "$BASE_PATH"
