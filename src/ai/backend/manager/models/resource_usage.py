@@ -533,7 +533,7 @@ async def parse_resource_usage_groups(
             session_name=kern.session.name,
             domain_name=kern.session.domain_name,
             full_name=kern.session.user.full_name if kern.session.user is not None else None,
-            images={kern.image},
+            images={kern.image} if kern.image else set(),
             agents={kern.agent} if kern.agent else set(),
             status=kern.status.name,
             status_history=kern.status_history,

@@ -449,7 +449,7 @@ class GroupRepository:
             )
         )
         active_kernel_count = await session.scalar(query)
-        return active_kernel_count > 0
+        return (active_kernel_count or 0) > 0
 
     async def _delete_group_vfolders(self, group_id: uuid.UUID) -> int:
         """Delete all vfolders belonging to the group."""
@@ -484,13 +484,13 @@ class GroupRepository:
     async def _delete_group_kernels(self, session: SASession, group_id: uuid.UUID) -> int:
         """Delete all kernels belonging to the group."""
         query = sa.delete(kernels).where(kernels.c.group_id == group_id)
-        result = await session.execute(query)
+        result = cast(CursorResult, await session.execute(query))
         return result.rowcount
 
     async def _delete_group_sessions(self, session: SASession, group_id: uuid.UUID) -> int:
         """Delete all sessions belonging to the group."""
         stmt = sa.delete(SessionRow).where(SessionRow.group_id == group_id)
-        result = await session.execute(stmt)
+        result = cast(CursorResult, await session.execute(stmt))
         return result.rowcount
 
     async def _delete_group_endpoints(self, session: SASession, group_id: uuid.UUID) -> None:
@@ -579,7 +579,7 @@ class GroupRepository:
             await self._delete_group_sessions(session, group_id)
 
             # Finally delete the group itself
-            result = await session.execute(sa.delete(groups).where(groups.c.id == group_id))
+            result = cast(CursorResult, await session.execute(sa.delete(groups).where(groups.c.id == group_id)))
 
             if result.rowcount > 0:
                 return True
