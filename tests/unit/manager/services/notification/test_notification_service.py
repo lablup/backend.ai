@@ -11,16 +11,16 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.notification import (
+    NotificationChannelType,
+    NotificationRuleType,
     SessionStartedMessage,
     SessionTerminatedMessage,
+    WebhookConfig,
 )
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
-    NotificationChannelType,
     NotificationRuleData,
-    NotificationRuleType,
-    WebhookConfig,
 )
 from ai.backend.manager.repositories.base import BatchQuerier, Creator
 from ai.backend.manager.repositories.base.updater import Updater

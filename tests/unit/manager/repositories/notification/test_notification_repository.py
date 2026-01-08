@@ -11,10 +11,8 @@ from datetime import UTC, datetime
 
 import pytest
 
+from ai.backend.common.data.notification import NotificationRuleType
 from ai.backend.common.types import BinarySize
-from ai.backend.manager.data.notification import (
-    NotificationRuleType,
-)
 from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,
     NotificationRuleNotFound,
