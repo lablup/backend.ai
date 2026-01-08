@@ -30,11 +30,11 @@ echo $TARGET_VERSION > VERSION
 # Update the changelog
 LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]' pants.toml) ./py -m towncrier
 
-# Update sample config files
-./backend.ai mgr config generate-sample --overwrite
-./backend.ai ag config generate-sample --overwrite
-./backend.ai storage config generate-sample --overwrite
-./backend.ai web config generate-sample --overwrite
+# Update sample config files (unmask secrets to show actual default values)
+./backend.ai mgr config generate-sample --overwrite --unmask-secrets
+./backend.ai ag config generate-sample --overwrite --unmask-secrets
+./backend.ai storage config generate-sample --overwrite --unmask-secrets
+./backend.ai web config generate-sample --overwrite --unmask-secrets
 
 ./scripts/generate-graphql-schema.sh
 

@@ -69,20 +69,12 @@ class TestBackendAIConfigMeta:
             added_version="25.1.0",
             example=ConfigExample(local="local-value", prod="prod-value"),
             secret=True,
-            composite=False,
+            composite=None,
         )
         assert isinstance(meta.example, ConfigExample)
         assert meta.example.local == "local-value"
         assert meta.secret is True
-        assert meta.composite is False
-
-    def test_string_example(self) -> None:
-        meta = BackendAIConfigMeta(
-            description="Config field",
-            added_version="25.1.0",
-            example="simple-example",
-        )
-        assert meta.example == "simple-example"
+        assert meta.composite is None
 
     def test_defaults(self) -> None:
         meta = BackendAIConfigMeta(
@@ -91,7 +83,7 @@ class TestBackendAIConfigMeta:
         )
         assert meta.example is None
         assert meta.secret is False
-        assert meta.composite is False
+        assert meta.composite is None
 
 
 class TestBackendAIAPIMeta:
@@ -102,10 +94,12 @@ class TestBackendAIAPIMeta:
         meta = BackendAIAPIMeta(
             description="API field",
             added_version="25.1.0",
-            example="example-value",
+            example=ConfigExample(local="local-example", prod="prod-example"),
             composite=True,
         )
-        assert meta.example == "example-value"
+        assert isinstance(meta.example, ConfigExample)
+        assert meta.example.local == "local-example"
+        assert meta.example.prod == "prod-example"
         assert meta.composite is True
 
     def test_defaults(self) -> None:
@@ -203,14 +197,14 @@ class TestGenerateExample:
                 BackendAIAPIMeta(
                     description="Name",
                     added_version="25.1.0",
-                    example="sample-name",
+                    example=ConfigExample(local="sample-name", prod="sample-name-prod"),
                 ),
             ]
 
         example = generate_example(SampleModel, "name")
         assert example == "sample-name"
 
-    def test_config_example_returns_dict(self) -> None:
+    def test_config_example_returns_local_value(self) -> None:
         class SampleConfig(BaseModel):
             endpoint: Annotated[
                 str,
@@ -222,10 +216,11 @@ class TestGenerateExample:
                 ),
             ]
 
+        # Default env is LOCAL, so returns local value as string
         example = generate_example(SampleConfig, "endpoint")
-        assert example == {"local": "localhost:8080", "prod": "api.example.com"}
+        assert example == "localhost:8080"
 
-    def test_no_example(self) -> None:
+    def test_no_example_raises_error(self) -> None:
         class SampleModel(BaseModel):
             name: Annotated[
                 str,
@@ -236,27 +231,28 @@ class TestGenerateExample:
                 ),
             ]
 
-        example = generate_example(SampleModel, "name")
-        assert example == ""
+        with pytest.raises(ValueError, match="has no example defined"):
+            generate_example(SampleModel, "name")
 
-    def test_field_without_meta(self) -> None:
+    def test_field_without_meta_raises_error(self) -> None:
         class SampleModel(BaseModel):
             name: str = Field(default="value")
 
-        example = generate_example(SampleModel, "name")
-        assert example == ""
+        with pytest.raises(ValueError, match="has no BackendAI metadata"):
+            generate_example(SampleModel, "name")
 
-    def test_composite_example(self) -> None:
+    def test_composite_field_raises_error_without_example(self) -> None:
+        """Composite fields require generate_composite_example instead of generate_example."""
+
         class ChildConfig(BaseModel):
             cpu: Annotated[
                 int,
                 Field(),
-                BackendAIAPIMeta(description="CPU cores", added_version="25.1.0", example="4"),
-            ]
-            memory: Annotated[
-                str,
-                Field(),
-                BackendAIAPIMeta(description="Memory", added_version="25.1.0", example="8g"),
+                BackendAIAPIMeta(
+                    description="CPU cores",
+                    added_version="25.1.0",
+                    example=ConfigExample(local="4", prod="8"),
+                ),
             ]
 
         class ParentConfig(BaseModel):
@@ -270,8 +266,10 @@ class TestGenerateExample:
                 ),
             ]
 
-        example = generate_example(ParentConfig, "config")
-        assert example == {"cpu": "4", "memory": "8g"}
+        # generate_example raises error for composite fields without example
+        # Use generate_composite_example instead for composite types
+        with pytest.raises(ValueError, match="has no example defined"):
+            generate_example(ParentConfig, "config")
 
 
 class TestGenerateCompositeExample:
@@ -280,12 +278,20 @@ class TestGenerateCompositeExample:
             cpu: Annotated[
                 int,
                 Field(),
-                BackendAIAPIMeta(description="CPU cores", added_version="25.1.0", example="4"),
+                BackendAIAPIMeta(
+                    description="CPU cores",
+                    added_version="25.1.0",
+                    example=ConfigExample(local="4", prod="8"),
+                ),
             ]
             memory: Annotated[
                 str,
                 Field(),
-                BackendAIAPIMeta(description="Memory size", added_version="25.1.0", example="8g"),
+                BackendAIAPIMeta(
+                    description="Memory size",
+                    added_version="25.1.0",
+                    example=ConfigExample(local="8g", prod="32g"),
+                ),
             ]
 
         result = generate_composite_example(SessionConfig)
@@ -297,7 +303,9 @@ class TestGenerateCompositeExample:
                 str,
                 Field(),
                 BackendAIAPIMeta(
-                    description="Inner value", added_version="25.1.0", example="inner"
+                    description="Inner value",
+                    added_version="25.1.0",
+                    example=ConfigExample(local="inner", prod="inner-prod"),
                 ),
             ]
 
@@ -312,7 +320,11 @@ class TestGenerateCompositeExample:
             name: Annotated[
                 str,
                 Field(),
-                BackendAIAPIMeta(description="Name", added_version="25.1.0", example="outer-name"),
+                BackendAIAPIMeta(
+                    description="Name",
+                    added_version="25.1.0",
+                    example=ConfigExample(local="outer-name", prod="outer-name-prod"),
+                ),
             ]
 
         result = generate_composite_example(OuterConfig)
@@ -324,7 +336,9 @@ class TestGenerateCompositeExample:
                 str,
                 Field(),
                 BackendAIAPIMeta(
-                    description="With meta", added_version="25.1.0", example="has-meta"
+                    description="With meta",
+                    added_version="25.1.0",
+                    example=ConfigExample(local="has-meta", prod="has-meta-prod"),
                 ),
             ]
             without_meta: str = Field(default="no-meta")
@@ -345,8 +359,9 @@ class TestGenerateCompositeExample:
                 ),
             ]
 
+        # generate_composite_example returns the value from ConfigExample.get(env)
         result = generate_composite_example(EnvConfig)
-        assert result == {"endpoint": {"local": "localhost", "prod": "prod.example.com"}}
+        assert result == {"endpoint": "localhost"}
 
 
 class TestGenerateModelExample:
@@ -358,7 +373,7 @@ class TestGenerateModelExample:
                 BackendAIAPIMeta(
                     description="Session name",
                     added_version="25.1.0",
-                    example="my-session",
+                    example=ConfigExample(local="my-session", prod="my-session-prod"),
                 ),
             ]
             image: Annotated[
@@ -367,26 +382,36 @@ class TestGenerateModelExample:
                 BackendAIAPIMeta(
                     description="Container image",
                     added_version="25.1.0",
-                    example="python:3.11",
+                    example=ConfigExample(local="python:3.11", prod="python:3.11"),
                 ),
             ]
 
         result = generate_model_example(CreateSessionRequest)
         assert result == {"name": "my-session", "image": "python:3.11"}
 
-    def test_model_with_composite(self) -> None:
+    def test_model_with_composite_skips_composite_fields(self) -> None:
+        """generate_model_example skips composite fields - use generate_composite_example for them."""
+
         class ResourceConfig(BaseModel):
             cpu: Annotated[
                 int,
                 Field(),
-                BackendAIAPIMeta(description="CPU", added_version="25.1.0", example="2"),
+                BackendAIAPIMeta(
+                    description="CPU",
+                    added_version="25.1.0",
+                    example=ConfigExample(local="2", prod="8"),
+                ),
             ]
 
         class SessionRequest(BaseModel):
             name: Annotated[
                 str,
                 Field(),
-                BackendAIAPIMeta(description="Name", added_version="25.1.0", example="session-1"),
+                BackendAIAPIMeta(
+                    description="Name",
+                    added_version="25.1.0",
+                    example=ConfigExample(local="session-1", prod="session-prod"),
+                ),
             ]
             resources: Annotated[
                 ResourceConfig,
@@ -394,8 +419,14 @@ class TestGenerateModelExample:
                 BackendAIAPIMeta(description="Resources", added_version="25.1.0", composite=True),
             ]
 
+        # generate_model_example skips composite fields
         result = generate_model_example(SessionRequest)
-        assert result == {"name": "session-1", "resources": {"cpu": "2"}}
+        assert result == {"name": "session-1"}
+        assert "resources" not in result
+
+        # Use generate_composite_example for composite types
+        composite_result = generate_composite_example(SessionRequest)
+        assert composite_result == {"name": "session-1", "resources": {"cpu": "2"}}
 
     def test_empty_model(self) -> None:
         class EmptyModel(BaseModel):

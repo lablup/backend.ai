@@ -1,5 +1,5 @@
 """
-Configuration management CLI commands for Backend.AI Agent.
+Configuration management CLI commands for Backend.AI AppProxy Coordinator.
 
 This module provides CLI commands for generating and managing configuration files.
 """
@@ -9,7 +9,7 @@ import pathlib
 
 import click
 
-from ai.backend.agent.config.unified import AgentUnifiedConfig
+from ai.backend.appproxy.coordinator.config import ServerConfig
 from ai.backend.common.configs.generator import (
     GeneratorConfig,
     TOMLGenerator,
@@ -38,7 +38,7 @@ def cli() -> None:
         writable=True,
         path_type=pathlib.Path,
     ),
-    default="./configs/agent/sample.toml",
+    default="./configs/app-proxy-coordinator/sample.toml",
     help="Output path for the generated sample configuration file. (default: sample.toml)",
 )
 @click.option(
@@ -67,7 +67,7 @@ def generate_sample(
     unmask_secrets: bool,
 ) -> None:
     """
-    Generate a sample configuration file from the AgentUnifiedConfig schema.
+    Generate a sample configuration file from the ServerConfig schema.
 
     This command creates a TOML configuration file with environment-specific examples
     (local or prod), proper secret masking, and comprehensive documentation from
@@ -86,9 +86,9 @@ def generate_sample(
         return
 
     header_comment = f"""
-Backend.AI Agent Configuration ({env.upper()} Environment)
+Backend.AI AppProxy Coordinator Configuration ({env.upper()} Environment)
 
-This is a sample configuration file for the Backend.AI Agent.
+This is a sample configuration file for the Backend.AI AppProxy Coordinator.
 All configuration options are documented with their descriptions,
 default values, and environment-specific examples.
 
@@ -103,8 +103,8 @@ Generated using BackendAIConfigMeta annotations.
             include_version_comments=True,
         )
         generator = TOMLGenerator(env=config_env, config=generator_config)
-        generator.generate_to_file(AgentUnifiedConfig, output, header=header_comment.strip())
-        log.info("Sample configuration file generated successfully: {}", output)
+        generator.generate_to_file(ServerConfig, output, header=header_comment.strip())
+        log.info(f"Sample configuration file generated successfully: {output}")
     except Exception as e:
         raise click.ClickException(f"Failed to generate sample configuration: {e}")
 
