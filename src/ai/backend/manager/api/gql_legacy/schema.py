@@ -1515,7 +1515,7 @@ class Query(graphene.ObjectType):
         *,
         scope_id: Optional[ScopeType] = None,
         project_id: Optional[uuid.UUID] = None,
-        permission: VFolderRBACPermission,
+        permission: VFolderRBACPermission = VFolderRBACPermission.READ_ATTRIBUTE,
         filter: Optional[str] = None,
         order: Optional[str] = None,
         offset: Optional[int] = None,
