@@ -26,3 +26,22 @@ class TestEndpointType:
 
         result = await Endpoint.resolve_status(mock_endpoint, info=Mock())
         assert result == EndpointStatus.UNHEALTHY
+
+    async def test_status_degraded_when_healthy_and_degraded_routes_mixed(self) -> None:
+        """
+        When some routes are healthy and others are degraded/unhealthy,
+        the endpoint status should be DEGRADED.
+        """
+        mock_endpoint = Mock(spec=Endpoint)
+        mock_endpoint.lifecycle_stage = EndpointLifecycle.READY.name
+        mock_endpoint.retries = 0
+
+        healthy_route = Mock()
+        healthy_route.status = RouteStatus.HEALTHY.name
+        degraded_route = Mock()
+        degraded_route.status = RouteStatus.DEGRADED.name
+
+        mock_endpoint.routings = [healthy_route, degraded_route]
+
+        result = await Endpoint.resolve_status(mock_endpoint, info=Mock())
+        assert result == EndpointStatus.DEGRADED
