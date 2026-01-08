@@ -706,7 +706,7 @@ class Endpoint(graphene.ObjectType):
             created_user_email=creator.email if creator is not None else None,
             session_owner=row.session_owner,
             session_owner_id=row.session_owner,
-            session_owner_email=row.session_owner_row.email,
+            session_owner_email=row.session_owner_row.email if row.session_owner_row is not None else None,
             tag=row.tag,
             startup_command=row.startup_command,
             bootstrap_script=row.bootstrap_script,

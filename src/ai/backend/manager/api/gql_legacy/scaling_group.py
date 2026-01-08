@@ -18,7 +18,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import load_only
 
-from ai.backend.common.types import AccessKey, ResourceSlot
+from ai.backend.common.types import AccessKey, AgentId, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentStatus
@@ -316,7 +316,7 @@ class ScalingGroup(graphene.ObjectType):
             )
             for agent_row in agent_rows:
                 occupied_slots = await agent_row.get_occupied_slots(
-                    graph_ctx.db, agent_row.id, known_slot_types
+                    graph_ctx.db, AgentId(agent_row.id), known_slot_types
                 )
                 total_occupied_slots += occupied_slots
                 total_available_slots += agent_row.available_slots

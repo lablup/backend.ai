@@ -622,6 +622,7 @@ async def _query_domain_groups_by_ak(
     domain_name: str | None,
 ) -> tuple[str, list[uuid.UUID]]:
     kp_user_join = sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
+    group_join: sa.FromClause
     if domain_name is None:
         domain_query = (
             sa.select(users.c.uuid, users.c.domain_name)
@@ -629,9 +630,11 @@ async def _query_domain_groups_by_ak(
             .where(keypairs.c.access_key == access_key)
         )
         row = (await db_conn.execute(domain_query)).first()
+        if row is None:
+            raise ValueError(f"No user found for access_key: {access_key}")
         user_domain = row.domain_name
         user_id = row.uuid
-        group_join = AssocGroupUserRow
+        group_join = AssocGroupUserRow.__table__
         group_cond = AssocGroupUserRow.user_id == user_id
     else:
         user_domain = domain_name

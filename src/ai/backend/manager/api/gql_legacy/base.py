@@ -404,11 +404,11 @@ async def batch_result(
     for key in key_list:
         objs_per_key[key] = None
     if isinstance(db_conn, SASession):
-        stream_func = db_conn.stream_scalars
+        async for row in await db_conn.stream_scalars(query):
+            objs_per_key[key_getter(row)] = obj_type.from_row(graph_ctx, row)
     else:
-        stream_func = db_conn.stream
-    async for row in await stream_func(query):
-        objs_per_key[key_getter(row)] = obj_type.from_row(graph_ctx, row)
+        async for row in await db_conn.stream(query):
+            objs_per_key[key_getter(row)] = obj_type.from_row(graph_ctx, row)
     return [*objs_per_key.values()]
 
 
@@ -428,13 +428,11 @@ async def batch_multiresult(
     for key in key_list:
         objs_per_key[key] = list()
     if isinstance(db_conn, SASession):
-        stream_func = db_conn.stream_scalars
+        async for row in await db_conn.stream_scalars(query):
+            objs_per_key[key_getter(row)].append(obj_type.from_row(graph_ctx, row))
     else:
-        stream_func = db_conn.stream
-    async for row in await stream_func(query):
-        objs_per_key[key_getter(row)].append(
-            obj_type.from_row(graph_ctx, row),
-        )
+        async for row in await db_conn.stream(query):
+            objs_per_key[key_getter(row)].append(obj_type.from_row(graph_ctx, row))
     return [*objs_per_key.values()]
 
 
@@ -942,7 +940,7 @@ class _StmtWithConditions:
 
 def _apply_ordering(
     stmt: sa.sql.Select,
-    id_column: sa.Column,
+    id_column: sa.Column | InstrumentedAttribute,
     ordering_item_list: list[OrderingItem],
     pagination_order: ConnectionPaginationOrder | None,
 ) -> sa.sql.Select:
@@ -994,7 +992,7 @@ def _apply_filter_conditions(
 def _apply_cursor_pagination(
     info: graphene.ResolveInfo,
     stmt: sa.sql.Select,
-    id_column: sa.Column,
+    id_column: sa.Column | InstrumentedAttribute,
     ordering_item_list: list[OrderingItem],
     cursor_id: str,
     pagination_order: ConnectionPaginationOrder | None,
@@ -1013,7 +1011,7 @@ def _apply_cursor_pagination(
         cursor_row_id = cursor_row_id_str
 
     def subq_to_condition(
-        column_to_be_compared: InstrumentedAttribute,
+        column_to_be_compared: sa.Column | InstrumentedAttribute,
         subquery: ScalarSelect,
         direction: OrderDirection,
     ) -> WhereClauseType:
@@ -1071,7 +1069,7 @@ def _apply_cursor_pagination(
 def _build_sql_stmt_from_connection_args(
     info: graphene.ResolveInfo,
     orm_class,
-    id_column: sa.Column,
+    id_column: sa.Column | InstrumentedAttribute,
     filter_expr: FilterExprArg | None = None,
     order_expr: OrderExprArg | None = None,
     *,
@@ -1118,7 +1116,7 @@ def _build_sql_stmt_from_connection_args(
 def _build_sql_stmt_from_sql_arg(
     info: graphene.ResolveInfo,
     orm_class,
-    id_column: sa.Column,
+    id_column: sa.Column | InstrumentedAttribute,
     filter_expr: FilterExprArg | None = None,
     order_expr: OrderExprArg | None = None,
     *,

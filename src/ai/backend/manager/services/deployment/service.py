@@ -1,7 +1,7 @@
 """Deployment service for managing model deployments."""
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timezone
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
@@ -245,7 +245,7 @@ def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
         else ActivenessStatus.INACTIVE,
         weight=int(route.traffic_ratio * 100),  # Convert ratio to weight
         detail=route.error_data,
-        created_at=route.created_at,
+        created_at=route.created_at or datetime.now(tz=timezone.utc),
         live_stat={},  # Not available in RouteInfo
     )
 

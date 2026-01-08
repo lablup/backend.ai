@@ -68,7 +68,7 @@ class Route(Node):
     traffic_ratio: float = strawberry.field(
         description="The traffic ratio for load balancing.",
     )
-    created_at: datetime = strawberry.field(
+    created_at: Optional[datetime] = strawberry.field(
         description="The timestamp when the route was created.",
     )
     error_data: Optional[JSONString] = strawberry.field(

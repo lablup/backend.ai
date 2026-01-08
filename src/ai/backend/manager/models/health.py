@@ -87,8 +87,8 @@ async def get_sqlalchemy_connection_info(root_ctx: RootContext) -> SQLAlchemyCon
     return SQLAlchemyConnectionInfo(
         pool_type=type(pool).__name__,
         status_description=pool.status(),
-        num_checkedout_cxn=pool.checkedout(),
-        num_checkedin_cxn=pool.checkedin(),
+        num_checkedout_cxn=pool.checkedout(),  # type: ignore[attr-defined]
+        num_checkedin_cxn=pool.checkedin(),  # type: ignore[attr-defined]
     )
 
 

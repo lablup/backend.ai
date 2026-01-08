@@ -167,7 +167,7 @@ class AuthService:
             stream_response=None,
             authorization_result=AuthorizationResult(
                 access_key=main_keypair_row.access_key,
-                secret_key=main_keypair_row.secret_key,
+                secret_key=main_keypair_row.secret_key or "",
                 user_id=user["uuid"],
                 role=user["role"],
                 status=user["status"],

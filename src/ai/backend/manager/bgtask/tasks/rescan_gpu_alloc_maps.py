@@ -61,7 +61,7 @@ class RescanGPUAllocMapsHandler(BaseBackgroundTaskHandler[RescanGPUAllocMapsMani
             agent_data = await self._agent_repository.get_by_id(manifest.agent_id)
 
             # Get agent client from pool and scan GPU allocation map
-            agent_client = self._agent_pool.get_agent_client(agent_data.id)
+            agent_client = self._agent_pool.get_agent_client(AgentId(agent_data.id))
             alloc_map = await agent_client.scan_gpu_alloc_map()
 
             # Store result in cache via repository

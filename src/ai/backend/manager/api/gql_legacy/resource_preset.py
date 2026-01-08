@@ -12,6 +12,7 @@ from sqlalchemy.engine.row import Row
 
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
 from ai.backend.manager.models.resource_preset import ResourcePresetRow, resource_presets
@@ -68,10 +69,19 @@ class ResourcePreset(graphene.ObjectType):
     def from_row(
         cls,
         ctx: GraphQueryContext,
-        row: ResourcePresetRow | Row | None,
+        row: ResourcePresetRow | ResourcePresetData | Row | None,
     ) -> ResourcePreset | None:
         match row:
             case ResourcePresetRow():
+                shared_memory = str(row.shared_memory) if row.shared_memory is not None else None
+                return cls(
+                    id=row.id,
+                    name=row.name,
+                    resource_slots=row.resource_slots.to_json(),
+                    shared_memory=shared_memory,
+                    scaling_group_name=row.scaling_group_name,
+                )
+            case ResourcePresetData():
                 shared_memory = str(row.shared_memory) if row.shared_memory is not None else None
                 return cls(
                     id=row.id,

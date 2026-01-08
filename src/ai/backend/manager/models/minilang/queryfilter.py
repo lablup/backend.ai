@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any, Optional, TypeAlias
+from typing import Any, Optional, TypeAlias, TypeVar
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
@@ -57,10 +57,9 @@ _parser = Lark(
 )
 
 FilterableSQLQuery: TypeAlias = sa.sql.Select | sa.sql.Update | sa.sql.Delete
+_TQuery = TypeVar("_TQuery", sa.sql.Select, sa.sql.Update, sa.sql.Delete)
 FieldSpecType: TypeAlias = Mapping[str, FieldSpecItem] | None
-WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
-)
+WhereClauseType: TypeAlias = sa.sql.expression.ColumnElement[bool]
 
 
 class QueryFilterTransformer(Transformer):
@@ -233,9 +232,9 @@ class QueryFilterParser:
 
     def append_filter(
         self,
-        sa_query: FilterableSQLQuery,
+        sa_query: _TQuery,
         filter_expr: str,
-    ) -> FilterableSQLQuery:
+    ) -> _TQuery:
         """
         Parse the given filter expression and build the where clause based on the first target table from
         the given SQLAlchemy query object.

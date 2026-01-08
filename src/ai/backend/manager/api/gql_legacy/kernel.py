@@ -303,7 +303,7 @@ class ComputeContainer(graphene.ObjectType):
         }
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[ComputeContainer]:
+    def from_row(cls, ctx: GraphQueryContext, row: KernelRow | None) -> Optional[ComputeContainer]:
         if row is None:
             return None
         props = cls.parse_row(ctx, row)

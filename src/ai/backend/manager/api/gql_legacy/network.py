@@ -173,6 +173,7 @@ class NetworkNode(graphene.ObjectType):
             last=last,
         )
         async with graph_ctx.db.begin_readonly_session() as db_session:
+            additional_cond: sa.ColumnElement[bool]
             match graph_ctx.user["role"]:
                 case UserRole.SUPERADMIN:
                     additional_cond = sa.true()

@@ -373,7 +373,7 @@ class UserNode(graphene.ObjectType):
         if external_filters_to_apply and external_table_filter:
             user_table = cast(sa.Table, UserRow.__table__)
 
-            join_clause = user_table
+            join_clause: sa.Table | sa.sql.Join = user_table
             for spec in external_filters_to_apply.values():
                 join_clause = spec.join_builder(join_clause)
 
