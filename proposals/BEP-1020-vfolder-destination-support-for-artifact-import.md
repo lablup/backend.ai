@@ -11,7 +11,7 @@ Implemented-Version:
 
 ## Motivation
 
-Currently, when users import artifacts via the `import_artifacts` GraphQL mutation, the download destination is determined by the pre-configured `artifact_storage` in the system settings. This limits flexibility as users cannot choose where to store their imported models.
+Currently, when users import artifacts via the `import_artifacts` API, the download destination is determined by the pre-configured `artifact_storage` in the system settings. This limits flexibility as users cannot choose where to store their imported models.
 
 ### Current Structure
 
@@ -234,4 +234,3 @@ Task completes (success or failure)
 ```
 
 Using `request_id` in the adapter name ensures uniqueness and traceability.
-
