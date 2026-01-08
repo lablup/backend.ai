@@ -985,7 +985,9 @@ class SessionRow(Base):
             tag=self.tag,
             occupying_slots=self.occupying_slots,
             requested_slots=self.requested_slots,
-            vfolder_mounts=[mount.to_dataclass() for mount in self.vfolder_mounts] if self.vfolder_mounts else None,
+            vfolder_mounts=[mount.to_dataclass() for mount in self.vfolder_mounts]
+            if self.vfolder_mounts
+            else None,
             environ=self.environ,
             bootstrap_script=self.bootstrap_script,
             use_host_network=self.use_host_network,
@@ -1005,7 +1007,9 @@ class SessionRow(Base):
             last_stat=self.last_stat,
             network_type=self.network_type,
             network_id=self.network_id,
-            service_ports=str(self.main_kernel.service_ports) if self.main_kernel.service_ports else None,
+            service_ports=str(self.main_kernel.service_ports)
+            if self.main_kernel.service_ports
+            else None,
             owner=owner if owner is not None else None,
         )
 
@@ -1087,7 +1091,9 @@ class SessionRow(Base):
                 tag=self.tag,
             ),
             mounts=MountSpec(
-                vfolder_mounts=[m.to_json() for m in self.vfolder_mounts] if self.vfolder_mounts else None,
+                vfolder_mounts=[m.to_json() for m in self.vfolder_mounts]
+                if self.vfolder_mounts
+                else None,
             ),
             execution=SessionExecution(
                 environ=self.environ,
@@ -1783,12 +1789,8 @@ class SessionLifecycleManager:
                         await db_sess.commit()
                 status_info = session_row.main_kernel.status_info or ""
                 await self.event_producer.anycast_and_broadcast_event(
-                    SessionTerminatedAnycastEvent(
-                        session_row.id, status_info
-                    ),
-                    SessionTerminatedBroadcastEvent(
-                        session_row.id, status_info
-                    ),
+                    SessionTerminatedAnycastEvent(session_row.id, status_info),
+                    SessionTerminatedBroadcastEvent(session_row.id, status_info),
                 )
             case _:
                 pass

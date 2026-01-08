@@ -106,9 +106,7 @@ class ObjectStorageDBSource:
             result = await db_session.execute(delete_query)
             deleted_id = result.scalar()
             if deleted_id is None:
-                raise ObjectStorageNotFoundError(
-                    f"Object storage with ID {storage_id} not found."
-                )
+                raise ObjectStorageNotFoundError(f"Object storage with ID {storage_id} not found.")
             return deleted_id
 
     async def list_object_storages(self) -> list[ObjectStorageData]:

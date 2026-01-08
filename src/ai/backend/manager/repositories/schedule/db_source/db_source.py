@@ -8,8 +8,8 @@ from typing import Optional, cast
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy.engine import CursorResult
 from dateutil.tz import tzutc
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, selectinload
 

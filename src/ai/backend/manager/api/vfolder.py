@@ -90,6 +90,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderPermissionRow,
     VFolderPermissionSetAlias,
     VFolderPermissionValidator,
+    VFolderRow,
     VFolderStatusSet,
     delete_vfolder_relation_rows,
     ensure_host_permission_allowed,
@@ -103,7 +104,6 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
 from ai.backend.manager.services.vfolder.actions.base import (
@@ -194,7 +194,9 @@ def with_vfolder_status_checked(
 
     def _wrapper(
         handler: Callable[Concatenate[web.Request, Mapping[str, Any], P], Awaitable[web.Response]],
-    ) -> Callable[Concatenate[web.Request, Sequence[Mapping[str, Any]], P], Awaitable[web.Response]]:
+    ) -> Callable[
+        Concatenate[web.Request, Sequence[Mapping[str, Any]], P], Awaitable[web.Response]
+    ]:
         @functools.wraps(handler)
         async def _wrapped(
             request: web.Request,
@@ -1138,7 +1140,9 @@ async def create_download_session(
         t.Key("size"): t.ToInt,
     })
 )
-async def create_upload_session(request: web.Request, params: Any, row: Mapping[str, Any]) -> web.Response:
+async def create_upload_session(
+    request: web.Request, params: Any, row: Mapping[str, Any]
+) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     log.info(
         "VFOLDER.CREATE_UPLOAD_SESSION (email:{}, ak:{}, vf:{} (resolved-from:{!r}), path:{})",
@@ -1268,7 +1272,9 @@ async def delete_files(request: web.Request, params: Any, row: Mapping[str, Any]
         t.Key("recursive", default=False): t.Bool,
     })
 )
-async def delete_files_async(request: web.Request, params: Any, row: Mapping[str, Any]) -> web.Response:
+async def delete_files_async(
+    request: web.Request, params: Any, row: Mapping[str, Any]
+) -> web.Response:
     """Delete files asynchronously within a vfolder."""
     root_ctx: RootContext = request.app["_root.context"]
     log.info(

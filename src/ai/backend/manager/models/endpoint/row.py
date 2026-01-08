@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from collections import defaultdict
 from collections.abc import (
-    Container,
     Iterable,
     Mapping,
     Sequence,
 )
-import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import (
@@ -632,9 +631,7 @@ class EndpointRow(Base):
                 )
                 continue
             service_ports_list = cast(list[dict[str, Any]], kernel.service_ports)
-            num_inference_ports = len(
-                [*filter(lambda x: x["is_inference"], service_ports_list)]
-            )
+            num_inference_ports = len([*filter(lambda x: x["is_inference"], service_ports_list)])
             if num_inference_ports > 1:
                 log.warning(
                     "generate_route_info(): Multiple ({}) inference ports found. "
@@ -682,7 +679,7 @@ class EndpointRow(Base):
             cluster_mode=ClusterMode(self.cluster_mode),
             cluster_size=self.cluster_size,
             open_to_public=self.open_to_public if self.open_to_public is not None else False,
-            created_at=self.created_at or datetime.now(timezone.utc),
+            created_at=self.created_at or datetime.now(UTC),
             destroyed_at=self.destroyed_at,
             retries=self.retries,
             lifecycle_stage=self.lifecycle_stage,
@@ -826,7 +823,9 @@ class EndpointRow(Base):
                         bootstrap_script=revision.bootstrap_script,
                         environ=revision.environ,
                         runtime_variant=revision.runtime_variant,
-                        callback_url=yarl.URL(revision.callback_url) if revision.callback_url else None,
+                        callback_url=yarl.URL(revision.callback_url)
+                        if revision.callback_url
+                        else None,
                     ),
                 ),
             ],
@@ -1007,7 +1006,7 @@ class EndpointTokenRow(Base):
             domain=self.domain,
             project=self.project,
             session_owner=self.session_owner,
-            created_at=self.created_at or datetime.now(timezone.utc),
+            created_at=self.created_at or datetime.now(UTC),
         )
 
 
@@ -1104,8 +1103,8 @@ class EndpointAutoScalingRuleRow(Base):
             cooldown_seconds=self.cooldown_seconds,
             min_replicas=self.min_replicas or 0,
             max_replicas=self.max_replicas or 0,
-            created_at=self.created_at or datetime.now(timezone.utc),
-            last_triggered_at=self.last_triggered_at or datetime.now(timezone.utc),
+            created_at=self.created_at or datetime.now(UTC),
+            last_triggered_at=self.last_triggered_at or datetime.now(UTC),
             endpoint=self.endpoint,
         )
 
@@ -1139,7 +1138,7 @@ class EndpointAutoScalingRuleRow(Base):
                 min_replicas=self.min_replicas,
                 max_replicas=self.max_replicas,
             ),
-            created_at=self.created_at or datetime.now(timezone.utc),
+            created_at=self.created_at or datetime.now(UTC),
             last_triggered_at=self.last_triggered_at,
         )
 
@@ -1200,8 +1199,8 @@ class EndpointAutoScalingRuleRow(Base):
             time_window=self.cooldown_seconds,  # Map cooldown_seconds to time_window
             min_replicas=self.min_replicas,
             max_replicas=self.max_replicas,
-            created_at=self.created_at or datetime.now(timezone.utc),
-            last_triggered_at=self.last_triggered_at or datetime.now(timezone.utc),
+            created_at=self.created_at or datetime.now(UTC),
+            last_triggered_at=self.last_triggered_at or datetime.now(UTC),
         )
 
     def apply_model_deployment_modifier(

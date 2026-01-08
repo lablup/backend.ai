@@ -859,7 +859,9 @@ class ScheduleDBSource:
                 terminating_sessions.append(
                     TerminatingSessionData(
                         session_id=session_row.id,
-                        access_key=AccessKey(session_row.access_key) if session_row.access_key else AccessKey(""),
+                        access_key=AccessKey(session_row.access_key)
+                        if session_row.access_key
+                        else AccessKey(""),
                         creation_id=session_row.creation_id or "",
                         status=session_row.status,
                         status_info=session_row.status_info or "UNKNOWN",
@@ -2482,7 +2484,9 @@ class ScheduleDBSource:
                     network_type=session.network_type,
                     network_id=session.network_id,
                     session_type=session.session_type,
-                    access_key=AccessKey(session.access_key) if session.access_key else AccessKey(""),
+                    access_key=AccessKey(session.access_key)
+                    if session.access_key
+                    else AccessKey(""),
                     cluster_mode=ClusterMode(session.cluster_mode),
                     kernels=kernel_data,
                     batch_timeout=session.batch_timeout,
@@ -2773,7 +2777,9 @@ class ScheduleDBSource:
                 ScheduledSessionData(
                     session_id=session.id,
                     creation_id=session.creation_id or "",
-                    access_key=AccessKey(session.access_key) if session.access_key else AccessKey(""),
+                    access_key=AccessKey(session.access_key)
+                    if session.access_key
+                    else AccessKey(""),
                     reason="triggered-by-scheduler",
                 )
             )

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid as uuid_mod
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
@@ -16,6 +16,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, joinedload, mapped_column, relationship, selectinload
+from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
@@ -37,7 +38,6 @@ from ai.backend.manager.models.types import (
     QueryOption,
     load_related_field,
 )
-from sqlalchemy.orm.strategy_options import _AbstractLoad
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
@@ -422,7 +422,9 @@ class UserRow(Base):
             domain_name=self.domain_name,
             role=self.role,
             resource_policy=self.resource_policy,
-            allowed_client_ip=[str(ip) for ip in self.allowed_client_ip] if self.allowed_client_ip else None,
+            allowed_client_ip=[str(ip) for ip in self.allowed_client_ip]
+            if self.allowed_client_ip
+            else None,
             totp_activated=self.totp_activated,
             totp_activated_at=self.totp_activated_at,
             sudo_session_enabled=self.sudo_session_enabled,

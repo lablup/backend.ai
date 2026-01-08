@@ -3,9 +3,8 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any, Optional, cast
 
-from sqlalchemy.engine import CursorResult
-
 import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 

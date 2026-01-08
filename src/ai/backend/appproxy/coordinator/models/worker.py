@@ -1,8 +1,9 @@
 import logging
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -31,7 +32,7 @@ from ai.backend.appproxy.common.types import (
 from ai.backend.appproxy.coordinator.errors import MissingFrontendConfigError
 from ai.backend.logging import BraceStyleAdapter
 
-from .base import Base, BaseMixin, EnumType, GUID, StrEnumType
+from .base import GUID, Base, BaseMixin, EnumType, StrEnumType
 from .circuit import Circuit
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -54,7 +55,9 @@ class WorkerStatus(StrEnum):
 class Worker(Base, BaseMixin):
     __tablename__ = "workers"
 
-    id: Mapped[UUID] = mapped_column(GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
+    id: Mapped[UUID] = mapped_column(
+        GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
 
     authority: Mapped[str] = mapped_column(
         sa.String(length=255), nullable=False, unique=True
@@ -62,7 +65,9 @@ class Worker(Base, BaseMixin):
     frontend_mode: Mapped[FrontendMode] = mapped_column(
         EnumType(FrontendMode), nullable=False
     )  # will be fixed as `port` when `protocol` is set to `tcp`
-    protocol: Mapped[ProxyProtocol] = mapped_column(EnumType(ProxyProtocol), nullable=False)  # type of traffic to procy
+    protocol: Mapped[ProxyProtocol] = mapped_column(
+        EnumType(ProxyProtocol), nullable=False
+    )  # type of traffic to procy
 
     hostname: Mapped[str] = mapped_column(
         sa.String(length=1024), nullable=False
@@ -82,7 +87,9 @@ class Worker(Base, BaseMixin):
     occupied_slots: Mapped[int] = mapped_column(sa.Integer(), default=0, nullable=False)
 
     # Only set if `frontend_mode` is `port`
-    port_range: Mapped[tuple[int, int] | None] = mapped_column(pgsql.ARRAY(sa.Integer), nullable=True)
+    port_range: Mapped[tuple[int, int] | None] = mapped_column(
+        pgsql.ARRAY(sa.Integer), nullable=True
+    )
 
     # Only set if `frontend_mode` is `wildcard`
     # .example.com
@@ -92,13 +99,21 @@ class Worker(Base, BaseMixin):
 
     nodes: Mapped[int] = mapped_column(sa.Integer(), default=1, nullable=False)
 
-    accepted_traffics: Mapped[list[AppMode]] = mapped_column(pgsql.ARRAY(EnumType(AppMode)), nullable=False)
+    accepted_traffics: Mapped[list[AppMode]] = mapped_column(
+        pgsql.ARRAY(EnumType(AppMode)), nullable=False
+    )
     filtered_apps_only: Mapped[bool] = mapped_column(sa.Boolean(), default=False, nullable=False)
 
-    traefik_last_used_marker_path: Mapped[str | None] = mapped_column(sa.String(length=1024), nullable=True)
+    traefik_last_used_marker_path: Mapped[str | None] = mapped_column(
+        sa.String(length=1024), nullable=True
+    )
 
-    created_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), server_default=sa.func.now())
-    updated_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), server_default=sa.func.now())
+    created_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
 
     status: Mapped[WorkerStatus] = mapped_column(
         StrEnumType(WorkerStatus),
@@ -277,7 +292,9 @@ class Worker(Base, BaseMixin):
 class WorkerAppFilter(Base, BaseMixin):
     __tablename__ = "worker_app_filters"
 
-    id: Mapped[UUID] = mapped_column(GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
+    id: Mapped[UUID] = mapped_column(
+        GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
 
     property_name: Mapped[str] = mapped_column(sa.VARCHAR(96), nullable=False)
     property_value: Mapped[str] = mapped_column(sa.VARCHAR(1024), nullable=False)

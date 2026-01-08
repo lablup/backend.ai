@@ -864,7 +864,10 @@ class AgentRegistry:
                         .where(domains.c.name == user_scope.domain_name)
                     )
                     allowed_registries = await conn.scalar(query)
-                    if allowed_registries is None or requested_image_ref.registry not in allowed_registries:
+                    if (
+                        allowed_registries is None
+                        or requested_image_ref.registry not in allowed_registries
+                    ):
                         raise AliasResolutionFailed
                     kernel_config["image_ref"] = requested_image_ref
             except AliasResolutionFailed:
@@ -1744,7 +1747,10 @@ class AgentRegistry:
                     raise InvalidAPIParameters("Network ID is required for persistent network")
                 async with self.db.begin_readonly_session() as db_sess:
                     import uuid as uuid_module
-                    network = await NetworkRow.get(db_sess, uuid_module.UUID(scheduled_session.network_id))
+
+                    network = await NetworkRow.get(
+                        db_sess, uuid_module.UUID(scheduled_session.network_id)
+                    )
                     network_name = network.ref_name
                     network_config = {"mode": network.driver, **network.options}
             case NetworkType.VOLATILE:
@@ -2023,7 +2029,9 @@ class AgentRegistry:
                         "main_gid": binding.kernel.main_gid,
                         "supplementary_gids": binding.kernel.gids or [],
                         "idle_timeout": int(idle_timeout),
-                        "mounts": [item.to_json() for item in scheduled_session.vfolder_mounts or []],
+                        "mounts": [
+                            item.to_json() for item in scheduled_session.vfolder_mounts or []
+                        ],
                         "environ": {
                             # inherit per-session environment variables
                             **(scheduled_session.environ or {}),
@@ -2571,7 +2579,9 @@ class AgentRegistry:
                         target_session.status,
                     )
                     await _decrease_concurrency_used(
-                        AccessKey(target_session.access_key) if target_session.access_key else AccessKey(""),
+                        AccessKey(target_session.access_key)
+                        if target_session.access_key
+                        else AccessKey(""),
                         target_session.is_private,
                     )
                     if user_role == UserRole.SUPERADMIN:
@@ -2596,7 +2606,9 @@ class AgentRegistry:
                     )
                 case _:
                     await _decrease_concurrency_used(
-                        AccessKey(target_session.access_key) if target_session.access_key else AccessKey(""),
+                        AccessKey(target_session.access_key)
+                        if target_session.access_key
+                        else AccessKey(""),
                         target_session.is_private,
                     )
                     await SessionRow.set_session_status(
@@ -4285,9 +4297,7 @@ async def handle_check_agent_resource(
     context: AgentRegistry, source: AgentId, event: DoAgentResourceCheckEvent
 ) -> None:
     async with context.db.begin_readonly() as conn:
-        query = (
-            sa.select(agents.c.occupied_slots).select_from(agents).where(agents.c.id == source)
-        )
+        query = sa.select(agents.c.occupied_slots).select_from(agents).where(agents.c.id == source)
         result = await conn.execute(query)
         row = result.first()
         if not row:

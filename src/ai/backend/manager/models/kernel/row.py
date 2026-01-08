@@ -1035,7 +1035,9 @@ class KernelRow(Base):
                 environ=self.environ,
                 mounts=self.mounts,
                 mount_map=self.mount_map,
-                vfolder_mounts=[m.to_json() for m in self.vfolder_mounts] if self.vfolder_mounts else None,
+                vfolder_mounts=[m.to_json() for m in self.vfolder_mounts]
+                if self.vfolder_mounts
+                else None,
                 bootstrap_script=self.bootstrap_script,
                 startup_command=self.startup_command,
             ),

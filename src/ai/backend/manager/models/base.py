@@ -548,7 +548,8 @@ class VFolderHostPermissionColumn(TypeDecorator):
         if value is None:
             return VFolderHostPermissionMap()
         return VFolderHostPermissionMap({
-            host: self.perm_col.process_result_value(perms, dialect) for host, perms in value.items()
+            host: self.perm_col.process_result_value(perms, dialect)
+            for host, perms in value.items()
         })
 
 

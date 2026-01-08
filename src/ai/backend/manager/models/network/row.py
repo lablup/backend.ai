@@ -123,7 +123,7 @@ class NetworkRow(Base):
         network_id: uuid.UUID,
         load_project=False,
         load_domain=False,
-    ) -> "NetworkRow":
+    ) -> NetworkRow:
         query = sa.select(NetworkRow).filter(NetworkRow.id == network_id)
         if load_project:
             query = query.options(selectinload(cls.project_row))

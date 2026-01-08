@@ -5,9 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
-from sqlalchemy.engine import CursorResult
-
 import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import selectinload
 
 from ai.backend.manager.data.notification import (

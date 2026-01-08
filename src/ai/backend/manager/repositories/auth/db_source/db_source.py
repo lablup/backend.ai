@@ -200,9 +200,7 @@ class AuthDBSource:
     async def fetch_ssh_public_key(self, access_key: str) -> Optional[str]:
         """Fetch SSH public key for an access key from database."""
         async with self._db.begin() as conn:
-            query = sa.select(keypairs.c.ssh_public_key).where(
-                keypairs.c.access_key == access_key
-            )
+            query = sa.select(keypairs.c.ssh_public_key).where(keypairs.c.access_key == access_key)
             return await conn.scalar(query)
 
     @auth_db_source_resilience.apply()

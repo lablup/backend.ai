@@ -48,7 +48,9 @@ class SlotResponseModel(BaseModel):
     circuit__arguments: Annotated[
         str | None, Field(default=None, description="Arguments for the circuit.")
     ]
-    circuit__created: Annotated[datetime | None, Field(default=None, description="Creation time of the circuit.")]
+    circuit__created: Annotated[
+        datetime | None, Field(default=None, description="Creation time of the circuit.")
+    ]
     circuit__modified: Annotated[
         datetime | None, Field(default=None, description="Last modification time of the circuit.")
     ]

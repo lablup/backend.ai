@@ -579,7 +579,10 @@ class GroupRepository:
             await self._delete_group_sessions(session, group_id)
 
             # Finally delete the group itself
-            result = cast(CursorResult, await session.execute(sa.delete(groups).where(groups.c.id == group_id)))
+            result = cast(
+                CursorResult,
+                await session.execute(sa.delete(groups).where(groups.c.id == group_id)),
+            )
 
             if result.rowcount > 0:
                 return True

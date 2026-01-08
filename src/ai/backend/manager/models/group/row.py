@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Callable, Container, Iterable, Sequence
+from collections.abc import Container, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import (
@@ -440,7 +440,9 @@ class ProjectModel(RBACModel[ProjectPermission]):
         )
 
 
-def _build_group_query(cond: sa.sql.expression.BinaryExpression[Any], domain_name: str) -> sa.sql.Select[Any]:
+def _build_group_query(
+    cond: sa.sql.expression.BinaryExpression[Any], domain_name: str
+) -> sa.sql.Select[Any]:
     return (
         sa.select(groups.c.id)
         .select_from(groups)
@@ -546,7 +548,9 @@ PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ProjectPermission] = frozenset([
 MEMBER_PERMISSIONS: frozenset[ProjectPermission] = frozenset([ProjectPermission.READ_ATTRIBUTE])
 
 WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList | sa.sql.elements.ColumnElement[bool]
+    sa.sql.expression.BinaryExpression[Any]
+    | sa.sql.expression.BooleanClauseList
+    | sa.sql.elements.ColumnElement[bool]
 )
 
 

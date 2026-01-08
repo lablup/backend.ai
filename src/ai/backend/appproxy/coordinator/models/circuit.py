@@ -52,7 +52,9 @@ class Circuit(Base, BaseMixin):
     port-based TCP and/or websocket proxy server.
     """
 
-    id: Mapped[UUID] = mapped_column(GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
+    id: Mapped[UUID] = mapped_column(
+        GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
 
     app: Mapped[str | None] = mapped_column(sa.String(length=255), nullable=True)
     protocol: Mapped[ProxyProtocol] = mapped_column(EnumType(ProxyProtocol), nullable=False)
@@ -71,7 +73,9 @@ class Circuit(Base, BaseMixin):
     open_to_public: Mapped[bool] = mapped_column(sa.Boolean(), nullable=False, default=False)
     allowed_client_ips: Mapped[str | None] = mapped_column(sa.String(length=255), nullable=True)
 
-    user_id: Mapped[UUID | None] = mapped_column(GUID, nullable=True)  # null if `app_mode` is set to `INFERENCE`
+    user_id: Mapped[UUID | None] = mapped_column(
+        GUID, nullable=True
+    )  # null if `app_mode` is set to `INFERENCE`
     endpoint_id: Mapped[UUID | None] = mapped_column(GUID, nullable=True)
     # null if `app_mode` is set to `INTERACTIVE`
     runtime_variant: Mapped[RuntimeVariant | None] = mapped_column(
@@ -83,10 +87,16 @@ class Circuit(Base, BaseMixin):
         nullable=False,
         default=[],
     )
-    route_info: Mapped[list[RouteInfo]] = mapped_column(StructuredJSONObjectListColumn(RouteInfo), nullable=False, default=[])
+    route_info: Mapped[list[RouteInfo]] = mapped_column(
+        StructuredJSONObjectListColumn(RouteInfo), nullable=False, default=[]
+    )
 
-    created_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), server_default=sa.func.now())
-    updated_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), server_default=sa.func.now())
+    created_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
 
     worker_row = relationship("Worker", back_populates="circuits")
     endpoint_row = relationship(

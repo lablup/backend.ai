@@ -16,7 +16,9 @@ __all__ = [
 class Token(Base, BaseMixin):
     __tablename__ = "tokens"
 
-    id: Mapped[UUID] = mapped_column(GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
+    id: Mapped[UUID] = mapped_column(
+        GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
     login_session_token: Mapped[str | None] = mapped_column(sa.VARCHAR(127), nullable=True)
     kernel_host: Mapped[str] = mapped_column(sa.VARCHAR(255), nullable=False)
     kernel_port: Mapped[int] = mapped_column(sa.INTEGER, nullable=False)

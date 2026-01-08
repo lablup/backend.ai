@@ -117,7 +117,9 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
 
             # Resolve base image
             if not session.main_kernel.image or not session.main_kernel.architecture:
-                error_msg = f"Session {manifest.session_id} main kernel has no image or architecture"
+                error_msg = (
+                    f"Session {manifest.session_id} main kernel has no image or architecture"
+                )
                 log.error(error_msg)
                 return CommitSessionResult(error_message=error_msg)
             image_row = await self._session_repository.resolve_image([

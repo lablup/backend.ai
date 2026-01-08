@@ -8,10 +8,9 @@ Addresses BA-3054: Wrong parse of inference metrics.
 """
 
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
-from collections.abc import Mapping
 from typing import Any, Optional
 from unittest.mock import AsyncMock, MagicMock
 

@@ -21,9 +21,7 @@ from .types import (
 )
 
 
-def insert_if_data_exists(
-    db_conn: Connection, row_type, data: Collection[dict[str, Any]]
-) -> None:
+def insert_if_data_exists(db_conn: Connection, row_type, data: Collection[dict[str, Any]]) -> None:
     if data:
         db_conn.execute(sa.insert(row_type), list(data))
 

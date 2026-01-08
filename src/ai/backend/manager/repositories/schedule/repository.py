@@ -363,7 +363,9 @@ class ScheduleRepository:
                 await session.scalars(
                     sa.select(RoutingRow)
                     .options(
-                        selectinload(RoutingRow.session_row).options(selectinload(SessionRow.kernels))
+                        selectinload(RoutingRow.session_row).options(
+                            selectinload(SessionRow.kernels)
+                        )
                     )
                     .where(
                         RoutingRow.endpoint == endpoint_id,
@@ -500,7 +502,9 @@ class ScheduleRepository:
         sess_row: SessionRow,
     ) -> None:
         if sess_row.access_key:
-            await recalc_concurrency_used(session, sched_ctx.registry.valkey_stat, AccessKey(sess_row.access_key))
+            await recalc_concurrency_used(
+                session, sched_ctx.registry.valkey_stat, AccessKey(sess_row.access_key)
+            )
 
     async def _fetch_session_statuses(
         self,
@@ -755,7 +759,9 @@ class ScheduleRepository:
                 terminating_sessions.append(
                     TerminatingSessionData(
                         session_id=session_row.id,
-                        access_key=AccessKey(session_row.access_key) if session_row.access_key else AccessKey(""),
+                        access_key=AccessKey(session_row.access_key)
+                        if session_row.access_key
+                        else AccessKey(""),
                         creation_id=session_row.creation_id or "",
                         status=session_row.status,
                         status_info=session_row.status_info or "UNKNOWN",
@@ -1322,7 +1328,9 @@ class ScheduleRepository:
                 .where(EndpointRow.id.in_([e.id for e in endpoints_to_mark_terminated]))
             )
             await session.execute(query)
-            delete_stmt = sa.delete(RoutingRow).where(RoutingRow.session.in_(already_destroyed_sessions))
+            delete_stmt = sa.delete(RoutingRow).where(
+                RoutingRow.session.in_(already_destroyed_sessions)
+            )
             await session.execute(delete_stmt)
 
     @schedule_repository_resilience.apply()
@@ -1350,7 +1358,9 @@ class ScheduleRepository:
         endpoints = await EndpointRow.batch_load(
             session, [EndpointId(rule.endpoint) for rule in rules], load_routes=True
         )
-        endpoint_by_id: dict[uuid.UUID, EndpointRow] = {endpoint.id: endpoint for endpoint in endpoints}
+        endpoint_by_id: dict[uuid.UUID, EndpointRow] = {
+            endpoint.id: endpoint for endpoint in endpoints
+        }
         metric_requested_sessions: list[uuid.UUID] = []
         metric_requested_kernels: list[KernelId] = []
         metric_requested_endpoints: list[uuid.UUID] = []

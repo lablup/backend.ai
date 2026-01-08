@@ -125,9 +125,7 @@ async def list_logs(request: web.Request, params: Any) -> web.Response:
         elif user_role == UserRole.ADMIN or user_role == "admin":
             j = groups.join(agus, groups.c.id == agus.c.group_id)
             usr_query = (
-                sa.select(agus.c.user_id)
-                .select_from(j)
-                .where(groups.c.domain_name == domain_name)
+                sa.select(agus.c.user_id).select_from(j).where(groups.c.domain_name == domain_name)
             )
             result = await conn.execute(usr_query)
             usrs = result.fetchall()
@@ -190,9 +188,7 @@ async def mark_cleared(request: web.Request) -> web.Response:
         elif user_role == UserRole.ADMIN or user_role == "admin":
             j = groups.join(agus, groups.c.id == agus.c.group_id)
             usr_query = (
-                sa.select(agus.c.user_id)
-                .select_from(j)
-                .where(groups.c.domain_name == domain_name)
+                sa.select(agus.c.user_id).select_from(j).where(groups.c.domain_name == domain_name)
             )
             result = await conn.execute(usr_query)
             usrs = result.fetchall()

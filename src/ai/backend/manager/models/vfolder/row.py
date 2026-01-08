@@ -4,10 +4,10 @@ import enum
 import logging
 import os.path
 import uuid
-from collections.abc import Callable, Container, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from dataclasses import dataclass
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from typing import (
     TYPE_CHECKING,
@@ -512,7 +512,7 @@ class VFolderRow(Base):
             max_size=self.max_size,
             num_files=self.num_files or 0,
             cur_size=self.cur_size or 0,
-            created_at=self.created_at or datetime.now(timezone.utc),
+            created_at=self.created_at or datetime.now(UTC),
             last_used=self.last_used,
             creator=self.creator,
             unmanaged_path=self.unmanaged_path,
@@ -716,9 +716,11 @@ async def query_accessible_vfolders(
     if "user" in allowed_vfolder_types:
         # Scan vfolders on requester's behalf.
         j = vfolders.join(users, vfolders.c.user == users.c.uuid)
-        query = sa.select(
-            *vfolders_selectors, vfolders.c.permission, users.c.email
-        ).set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL).select_from(j)
+        query = (
+            sa.select(*vfolders_selectors, vfolders.c.permission, users.c.email)
+            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
+            .select_from(j)
+        )
         if allowed_status_set is not None:
             query = query.where(vfolders.c.status.in_(vfolder_status_map[allowed_status_set]))
         else:
@@ -740,9 +742,7 @@ async def query_accessible_vfolders(
             isouter=True,
         )
         query = (
-            sa.select(
-                *vfolders_selectors, vfolder_permissions.c.permission, users.c.email
-            )
+            sa.select(*vfolders_selectors, vfolder_permissions.c.permission, users.c.email)
             .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
             .select_from(j)
             .where(
@@ -778,9 +778,11 @@ async def query_accessible_vfolders(
             grps = result.fetchall()
             group_ids = [g.group_id for g in grps]
         j = vfolders.join(groups, vfolders.c.group == groups.c.id)
-        query = sa.select(
-            *vfolders_selectors, vfolders.c.permission, groups.c.name
-        ).set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL).select_from(j)
+        query = (
+            sa.select(*vfolders_selectors, vfolders.c.permission, groups.c.name)
+            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
+            .select_from(j)
+        )
         if user_role != UserRole.SUPERADMIN and user_role != "superadmin":
             query = query.where(vfolders.c.group.in_(group_ids))
         if extra_vf_group_conds is not None:

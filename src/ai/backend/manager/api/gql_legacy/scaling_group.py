@@ -496,9 +496,7 @@ class ScalingGroup(graphene.ObjectType):
             sgroups_for_groups,
             scaling_groups.c.name == sgroups_for_groups.c.scaling_group,
         )
-        query = (
-            sa.select(scaling_groups).select_from(j).where(sgroups_for_groups.c.group == group)
-        )
+        query = sa.select(scaling_groups).select_from(j).where(sgroups_for_groups.c.group == group)
         if is_active is not None:
             query = query.where(scaling_groups.c.is_active == is_active)
         async with ctx.db.begin_readonly() as conn:

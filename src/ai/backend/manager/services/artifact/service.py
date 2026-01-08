@@ -369,7 +369,9 @@ class ArtifactService:
             ordering=action.ordering,
             filters=action.filters,
         )
-        return ListArtifactsWithRevisionsActionResult(data=artifacts_data, total_count=total_count or 0)
+        return ListArtifactsWithRevisionsActionResult(
+            data=artifacts_data, total_count=total_count or 0
+        )
 
     async def search_with_revisions(
         self, action: SearchArtifactsWithRevisionsAction

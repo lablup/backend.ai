@@ -173,9 +173,7 @@ class AgentEventHandler:
     ) -> None:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select(agents.c.occupied_slots)
-                .select_from(agents)
-                .where(agents.c.id == source)
+                sa.select(agents.c.occupied_slots).select_from(agents).where(agents.c.id == source)
             )
             result = await conn.execute(query)
             row = result.first()

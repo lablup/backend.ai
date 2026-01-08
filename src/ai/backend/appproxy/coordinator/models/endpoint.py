@@ -33,12 +33,18 @@ class Endpoint(Base, BaseMixin):
     Store model service endpoint information and health check configuration
     """
 
-    id: Mapped[UUID] = mapped_column(GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
+    id: Mapped[UUID] = mapped_column(
+        GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
 
     health_check_enabled: Mapped[bool] = mapped_column(sa.Boolean(), nullable=False, default=False)
-    health_check_config: Mapped[ModelHealthCheck | None] = mapped_column(StructuredJSONObjectColumn(ModelHealthCheck), nullable=True)
+    health_check_config: Mapped[ModelHealthCheck | None] = mapped_column(
+        StructuredJSONObjectColumn(ModelHealthCheck), nullable=True
+    )
 
-    created_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), server_default=sa.func.now())
+    created_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
     updated_at: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True), server_default=sa.func.now(), onupdate=sa.func.now()
     )

@@ -14,12 +14,18 @@ __all__: tuple[str, ...] = ("UserProfileRow",)
 
 class UserProfileRow(Base):
     __tablename__ = "user_profiles"
-    id: Mapped[UUID] = mapped_column(GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
+    id: Mapped[UUID] = mapped_column(
+        GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
     user_id: Mapped[UUID] = mapped_column("user_id", GUID, nullable=False)
-    username: Mapped[str] = mapped_column("username", sa.String(length=64), index=True, nullable=False, unique=True)
+    username: Mapped[str] = mapped_column(
+        "username", sa.String(length=64), index=True, nullable=False, unique=True
+    )
     email: Mapped[str] = mapped_column("email", sa.String(length=64), index=True, nullable=False)
     password: Mapped[str] = mapped_column("password", PasswordColumn(), nullable=False)
-    need_password_change: Mapped[bool | None] = mapped_column("need_password_change", sa.Boolean, server_default=sa.false())
+    need_password_change: Mapped[bool | None] = mapped_column(
+        "need_password_change", sa.Boolean, server_default=sa.false()
+    )
     password_changed_at: Mapped[datetime | None] = mapped_column(
         "password_changed_at",
         sa.DateTime(timezone=True),

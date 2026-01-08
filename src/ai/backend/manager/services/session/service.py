@@ -1089,7 +1089,9 @@ class SessionService:
             architecture=sess.main_kernel.architecture or "",
             registry=sess.main_kernel.registry,
             tag=sess.tag,
-            container_id=uuid.UUID(sess.main_kernel.container_id) if sess.main_kernel.container_id else uuid.uuid4(),
+            container_id=uuid.UUID(sess.main_kernel.container_id)
+            if sess.main_kernel.container_id
+            else uuid.uuid4(),
             occupied_slots=str(sess.main_kernel.occupied_slots),  # legacy
             occupying_slots=str(sess.occupying_slots),
             requested_slots=str(sess.requested_slots),
@@ -1271,7 +1273,9 @@ class SessionService:
             kernel_host = urlparse(session.main_kernel.agent_addr).hostname
         else:
             kernel_host = session.main_kernel.kernel_host
-        service_ports: list[dict[str, Any]] = cast(list[dict[str, Any]], session.main_kernel.service_ports or [])
+        service_ports: list[dict[str, Any]] = cast(
+            list[dict[str, Any]], session.main_kernel.service_ports or []
+        )
         sport: dict[str, Any] = {}
         for sport in service_ports:
             if sport["name"] == service:

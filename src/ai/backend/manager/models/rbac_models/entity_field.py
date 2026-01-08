@@ -7,8 +7,8 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.manager.models.base import (
-    Base,
     GUID,
+    Base,
 )
 
 
