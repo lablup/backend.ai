@@ -39,10 +39,10 @@ def mock_etcd() -> Mock:
 @pytest.fixture
 def base_agent_config() -> AgentUnifiedConfig:
     """Create a base agent configuration for testing."""
-    return AgentUnifiedConfig(
-        agent=AgentConfig(backend=AgentBackend.DOCKER),
-        container=ContainerConfig(scratch_type=ScratchType.HOSTDIR),
-        resource=ResourceConfig(),
+    return AgentUnifiedConfig(  # type: ignore[call-arg]
+        agent=AgentConfig(backend=AgentBackend.DOCKER),  # type: ignore[call-arg]
+        container=ContainerConfig(scratch_type=ScratchType.HOSTDIR),  # type: ignore[call-arg]
+        resource=ResourceConfig(),  # type: ignore[call-arg]
         etcd=EtcdConfig(
             namespace="test",
             addr=HostPortPair(host="127.0.0.1", port=2379),
@@ -75,16 +75,16 @@ def mock_agent_factory() -> Callable[[str, str], Mock]:
         mock_agent = Mock(spec=DummyAgent)
         mock_agent.id = AgentId(agent_id)
         mock_agent.local_config = AgentUnifiedConfig(
-            agent=AgentConfig(backend=AgentBackend.DUMMY, scaling_group=scaling_group, id=agent_id),
-            container=ContainerConfig(scratch_type=ScratchType.HOSTDIR),
-            resource=ResourceConfig(),
+            agent=AgentConfig(backend=AgentBackend.DUMMY, scaling_group=scaling_group, id=agent_id),  # type: ignore[call-arg]
+            container=ContainerConfig(scratch_type=ScratchType.HOSTDIR),  # type: ignore[call-arg]
+            resource=ResourceConfig(),  # type: ignore[call-arg]
             etcd=EtcdConfig(
                 namespace="test",
                 addr=HostPortPair(host="127.0.0.1", port=2379),
                 user=None,
                 password=None,
             ),
-        )
+        )  # type: ignore[call-arg]
 
         # Use the real update_scaling_group method - capture agent in closure properly
         def update_sg(sg: str) -> None:
@@ -138,16 +138,16 @@ class TestScalingGroupUpdates:
         """Test that update_scaling_group modifies the in-memory config."""
         mock_agent = Mock(spec=DummyAgent)
         mock_agent.local_config = AgentUnifiedConfig(
-            agent=AgentConfig(backend=AgentBackend.DUMMY, scaling_group="default"),
-            container=ContainerConfig(scratch_type=ScratchType.HOSTDIR),
-            resource=ResourceConfig(),
+            agent=AgentConfig(backend=AgentBackend.DUMMY, scaling_group="default"),  # type: ignore[call-arg]
+            container=ContainerConfig(scratch_type=ScratchType.HOSTDIR),  # type: ignore[call-arg]
+            resource=ResourceConfig(),  # type: ignore[call-arg]
             etcd=EtcdConfig(
                 namespace="test",
                 addr=HostPortPair(host="127.0.0.1", port=2379),
                 user=None,
                 password=None,
             ),
-        )
+        )  # type: ignore[call-arg]
 
         AbstractAgent.update_scaling_group(mock_agent, "gpu")
 

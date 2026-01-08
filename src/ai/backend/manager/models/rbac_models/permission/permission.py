@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Optional, Self
+from typing import TYPE_CHECKING, Self
 
 import sqlalchemy as sa
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import foreign, relationship
 
 from ai.backend.manager.data.permission.permission import PermissionCreator, PermissionData
 from ai.backend.manager.data.permission.types import (
@@ -22,6 +22,14 @@ if TYPE_CHECKING:
     from .permission_group import PermissionGroupRow
 
 
+def _get_permission_group_join_condition():
+    from ai.backend.manager.models.rbac_models.permission.permission_group import (
+        PermissionGroupRow,
+    )
+
+    return PermissionGroupRow.id == foreign(PermissionRow.permission_group_id)
+
+
 class PermissionRow(Base):
     __tablename__ = "permissions"
     __table_args__ = (sa.Index("ix_id_permission_group_id", "id", "permission_group_id"),)
@@ -35,10 +43,10 @@ class PermissionRow(Base):
         "operation", StrEnumType(OperationType, length=32), nullable=False
     )
 
-    permission_group_row: Optional[PermissionGroupRow] = relationship(
+    permission_group_row: PermissionGroupRow | None = relationship(
         "PermissionGroupRow",
         back_populates="permission_rows",
-        primaryjoin="PermissionGroupRow.id == foreign(PermissionRow.permission_group_id)",
+        primaryjoin=_get_permission_group_join_condition,
     )
 
     @classmethod

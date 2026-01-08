@@ -138,5 +138,10 @@ def health():
     """Command set for health checking."""
 
 
+@main.group(cls=LazyGroup, import_name="ai.backend.appproxy.worker.cli.config:cli")
+def config():
+    """Configuration management commands."""
+
+
 if __name__ == "__main__":
     main()

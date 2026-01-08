@@ -21,7 +21,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
+from sqlalchemy.orm import foreign, joinedload, load_only, relationship, selectinload
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common import validators as tx
@@ -234,6 +234,12 @@ class ScalingGroupForKeypairsRow(Base):
 sgroups_for_keypairs = ScalingGroupForKeypairsRow.__table__
 
 
+def _get_resource_preset_join_condition():
+    from ai.backend.manager.models.resource_preset import ResourcePresetRow
+
+    return ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)
+
+
 class ScalingGroupRow(Base):
     __tablename__ = "scaling_groups"
     name = sa.Column("name", sa.String(length=64), primary_key=True)
@@ -274,7 +280,7 @@ class ScalingGroupRow(Base):
     resource_preset_rows = relationship(
         "ResourcePresetRow",
         back_populates="scaling_group_row",
-        primaryjoin="ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)",
+        primaryjoin=_get_resource_preset_join_condition,
     )
 
     def to_dataclass(self) -> ScalingGroupData:

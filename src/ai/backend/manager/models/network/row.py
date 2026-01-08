@@ -6,7 +6,7 @@ from typing import Any, Final
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import relationship, selectinload
+from sqlalchemy.orm import foreign, relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.manager.models.base import (
@@ -26,6 +26,18 @@ class NetworkType(enum.StrEnum):
     VOLATILE = "volatile"
     PERSISTENT = "persistent"
     HOST = "host"
+
+
+def _get_project_join_condition():
+    from ai.backend.manager.models.group import GroupRow
+
+    return GroupRow.id == foreign(NetworkRow.project)
+
+
+def _get_domain_join_condition():
+    from ai.backend.manager.models.domain import DomainRow
+
+    return DomainRow.name == foreign(NetworkRow.domain_name)
 
 
 class NetworkRow(Base):
@@ -68,12 +80,12 @@ class NetworkRow(Base):
     project_row = relationship(
         "GroupRow",
         back_populates="networks",
-        primaryjoin="GroupRow.id==foreign(NetworkRow.project)",
+        primaryjoin=_get_project_join_condition,
     )
     domain_row = relationship(
         "DomainRow",
         back_populates="networks",
-        primaryjoin="DomainRow.name==foreign(NetworkRow.domain_name)",
+        primaryjoin=_get_domain_join_condition,
     )
 
     def __init__(

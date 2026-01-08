@@ -4,7 +4,7 @@ import logging
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import foreign, relationship
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.base import GUID, Base, IDColumn
@@ -12,6 +12,18 @@ from ai.backend.manager.models.base import GUID, Base, IDColumn
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 __all__: Sequence[str] = ("AssociationContainerRegistriesGroupsRow",)
+
+
+def _get_container_registry_join_condition():
+    from ai.backend.manager.models.container_registry import ContainerRegistryRow
+
+    return ContainerRegistryRow.id == foreign(AssociationContainerRegistriesGroupsRow.registry_id)
+
+
+def _get_group_join_condition():
+    from ai.backend.manager.models.group import GroupRow
+
+    return GroupRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)
 
 
 class AssociationContainerRegistriesGroupsRow(Base):
@@ -36,11 +48,11 @@ class AssociationContainerRegistriesGroupsRow(Base):
     container_registry_row = relationship(
         "ContainerRegistryRow",
         back_populates="association_container_registries_groups_rows",
-        primaryjoin="ContainerRegistryRow.id == foreign(AssociationContainerRegistriesGroupsRow.registry_id)",
+        primaryjoin=_get_container_registry_join_condition,
     )
 
     group_row = relationship(
         "GroupRow",
         back_populates="association_container_registries_groups_rows",
-        primaryjoin="GroupRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)",
+        primaryjoin=_get_group_join_condition,
     )

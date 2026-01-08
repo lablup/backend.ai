@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 import sqlalchemy as sa
 import yarl
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, relationship
+from sqlalchemy.orm import foreign, load_only, relationship
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.container_registry import ContainerRegistryType
@@ -91,6 +91,20 @@ class ContainerRegistryValidator:
                 pass
 
 
+def _get_image_join_condition():
+    from ai.backend.manager.models.image import ImageRow
+
+    return ContainerRegistryRow.id == foreign(ImageRow.registry_id)
+
+
+def _get_association_join_condition():
+    from ai.backend.manager.models.association_container_registries_groups import (
+        AssociationContainerRegistriesGroupsRow,
+    )
+
+    return ContainerRegistryRow.id == foreign(AssociationContainerRegistriesGroupsRow.registry_id)
+
+
 class ContainerRegistryRow(Base):
     __tablename__ = "container_registries"
     id = IDColumn()
@@ -118,13 +132,13 @@ class ContainerRegistryRow(Base):
     image_rows = relationship(
         "ImageRow",
         back_populates="registry_row",
-        primaryjoin="ContainerRegistryRow.id == foreign(ImageRow.registry_id)",
+        primaryjoin=_get_image_join_condition,
     )
 
     association_container_registries_groups_rows = relationship(
         "AssociationContainerRegistriesGroupsRow",
         back_populates="container_registry_row",
-        primaryjoin="ContainerRegistryRow.id == foreign(AssociationContainerRegistriesGroupsRow.registry_id)",
+        primaryjoin=_get_association_join_condition,
     )
 
     def __init__(

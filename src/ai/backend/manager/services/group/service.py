@@ -20,7 +20,6 @@ from ai.backend.manager.models.resource_usage import (
     parse_total_resource_group,
 )
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.repositories.group.admin_repository import AdminGroupRepository
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.services.group.actions.create_group import (
@@ -56,7 +55,6 @@ class GroupService:
     _valkey_stat_client: ValkeyStatClient
     _storage_manager: StorageSessionManager
     _group_repository: GroupRepository
-    _admin_group_repository: AdminGroupRepository
 
     def __init__(
         self,
@@ -69,7 +67,6 @@ class GroupService:
         self._config_provider = config_provider
         self._valkey_stat_client = valkey_stat_client
         self._group_repository = group_repositories.repository
-        self._admin_group_repository = group_repositories.admin_repository
 
     async def create_group(self, action: CreateGroupAction) -> CreateGroupActionResult:
         group_data = await self._group_repository.create(action.creator)
@@ -98,7 +95,7 @@ class GroupService:
         return DeleteGroupActionResult(group_id=action.group_id)
 
     async def purge_group(self, action: PurgeGroupAction) -> PurgeGroupActionResult:
-        await self._admin_group_repository.purge_group_force(action.group_id)
+        await self._group_repository.purge_group(action.group_id)
         return PurgeGroupActionResult(group_id=action.group_id)
 
     async def _get_project_stats_for_period(

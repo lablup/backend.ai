@@ -9,9 +9,6 @@ from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.manager.api.gql_legacy.schema import GraphQueryContext, Mutation, Query
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.container_registry.admin_repository import (
-    AdminContainerRegistryRepository,
-)
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
@@ -87,13 +84,9 @@ def container_registry_processor(
     repository = ContainerRegistryRepository(
         db=database_engine,
     )
-    admin_repository = AdminContainerRegistryRepository(
-        db=database_engine,
-    )
     container_registry_service = ContainerRegistryService(
         db=database_engine,
         container_registry_repository=repository,
-        admin_container_registry_repository=admin_repository,
     )
     return ContainerRegistryProcessors(container_registry_service, [])
 

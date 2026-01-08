@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import foreign, relationship
 
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
 from ai.backend.logging import BraceStyleAdapter
@@ -26,6 +26,12 @@ if TYPE_CHECKING:
 __all__ = ("DeploymentAutoScalingPolicyRow",)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+
+
+def _get_endpoint_join_condition():
+    from ai.backend.manager.models.endpoint import EndpointRow
+
+    return foreign(DeploymentAutoScalingPolicyRow.endpoint) == EndpointRow.id
 
 
 class DeploymentAutoScalingPolicyRow(Base):
@@ -104,7 +110,7 @@ class DeploymentAutoScalingPolicyRow(Base):
     endpoint_row = relationship(
         "EndpointRow",
         back_populates="auto_scaling_policy",
-        primaryjoin="foreign(DeploymentAutoScalingPolicyRow.endpoint) == EndpointRow.id",
+        primaryjoin=_get_endpoint_join_condition,
         uselist=False,
     )
 

@@ -65,9 +65,10 @@ search_path = ["<PYENV>"]
 [python-infer]
 use_rust_parser = true
 
-[python-repos]
-indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
-find_links = ["file://%(buildroot)s/wheelhouse"]
+# This slows down `generate-lockfiles` severely. Enable only when strictly needed.
+# [python-repos]
+# indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
+# find_links = ["file://%(buildroot)s/wheelhouse"]
 
 [python.resolves]
 python-default = "python.lock"

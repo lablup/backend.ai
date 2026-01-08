@@ -4,11 +4,11 @@ import uuid
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
-    Optional,
 )
 
 import sqlalchemy as sa
 from sqlalchemy.orm import (
+    foreign,
     relationship,
 )
 
@@ -32,13 +32,31 @@ if TYPE_CHECKING:
     from .user_role import UserRoleRow
 
 
+def _get_mapped_user_role_rows_join_condition():
+    from .user_role import UserRoleRow
+
+    return RoleRow.id == foreign(UserRoleRow.role_id)
+
+
+def _get_object_permission_rows_join_condition():
+    from .permission.object_permission import ObjectPermissionRow
+
+    return RoleRow.id == foreign(ObjectPermissionRow.role_id)
+
+
+def _get_permission_group_rows_join_condition():
+    from .permission.permission_group import PermissionGroupRow
+
+    return RoleRow.id == foreign(PermissionGroupRow.role_id)
+
+
 class RoleRow(Base):
     __tablename__ = "roles"
     __table_args__ = (sa.Index("ix_id_status", "id", "status"),)
 
     id: uuid.UUID = IDColumn()
     name: str = sa.Column("name", sa.String(64), nullable=False)
-    description: Optional[str] = sa.Column("description", sa.Text, nullable=True)
+    description: str | None = sa.Column("description", sa.Text, nullable=True)
     source: RoleSource = sa.Column(
         "source",
         StrEnumType(RoleSource, length=16),
@@ -56,27 +74,23 @@ class RoleRow(Base):
     created_at: datetime = sa.Column(
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
-    updated_at: Optional[datetime] = sa.Column(
-        "updated_at", sa.DateTime(timezone=True), nullable=True
-    )
-    deleted_at: Optional[datetime] = sa.Column(
-        "deleted_at", sa.DateTime(timezone=True), nullable=True
-    )
+    updated_at: datetime | None = sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True)
+    deleted_at: datetime | None = sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True)
 
     mapped_user_role_rows: list[UserRoleRow] = relationship(
         "UserRoleRow",
         back_populates="role_row",
-        primaryjoin="RoleRow.id == foreign(UserRoleRow.role_id)",
+        primaryjoin=_get_mapped_user_role_rows_join_condition,
     )
     object_permission_rows: list[ObjectPermissionRow] = relationship(
         "ObjectPermissionRow",
         back_populates="role_row",
-        primaryjoin="RoleRow.id == foreign(ObjectPermissionRow.role_id)",
+        primaryjoin=_get_object_permission_rows_join_condition,
     )
     permission_group_rows: list[PermissionGroupRow] = relationship(
         "PermissionGroupRow",
         back_populates="role_row",
-        primaryjoin="RoleRow.id == foreign(PermissionGroupRow.role_id)",
+        primaryjoin=_get_permission_group_rows_join_condition,
     )
 
     def to_data(self) -> RoleData:
