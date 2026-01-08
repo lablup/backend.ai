@@ -992,9 +992,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         """
         Schedule a background task to restore CPU from boost after the configured duration.
 
-        This method extracts the original CPU allocation from the resource spec and
-        creates an asyncio task that will restore the container's CPU quota after
-        the boost duration expires.
+        This method extracts the original CPU allocation (both count and core IDs) from
+        the resource spec and creates an asyncio task that will restore the container's
+        CPU quota and CPU affinity (CpusetCpus) after the boost duration expires.
 
         Args:
             container_id: ID of the container to schedule restoration for
@@ -1009,8 +1009,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             return
 
         # cpu_alloc is Mapping[SlotName, Mapping[DeviceId, Decimal]]
-        # Count the number of allocated CPU cores
-        original_cpus = len(cpu_alloc.get(SlotName("cpu"), {}))
+        # Extract CPU core IDs and count the number of allocated CPU cores
+        cpu_cores_map = cpu_alloc.get(SlotName("cpu"), {})
+        original_cpus = len(cpu_cores_map)
+        cpu_core_ids = sorted([str(core_id) for core_id in cpu_cores_map.keys()])
         boost_duration = self.local_config.container.cpu_boost_duration
 
         # Lazily initialize the tracking structure for CPU boost restoration tasks.
@@ -1024,6 +1026,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             self._restore_cpu_from_boost(
                 container_id,
                 original_cpus,
+                cpu_core_ids,
                 boost_duration,
             )
         )
@@ -1054,22 +1057,28 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self,
         container_id: str,
         original_cpus: int,
+        cpu_core_ids: list[str],
         boost_duration: float,
     ) -> None:
         """
         Restore container CPU allocation from boosted value to original value after a delay.
 
+        This method restores both the CPU quota (number of cores) and CPU affinity
+        (which specific cores the container can use) to their original values.
+
         Args:
             container_id: ID of the container to restore
             original_cpus: Original number of CPU cores requested
+            cpu_core_ids: List of CPU core IDs to restore affinity to
             boost_duration: Duration in seconds to wait before restoring
         """
         try:
             await asyncio.sleep(boost_duration)
             log.info(
-                "Restoring CPU from boost for container {}: reducing to {} cores",
+                "Restoring CPU from boost for container {}: reducing to {} cores (affinity: {})",
                 container_id[:12],
                 original_cpus,
+                ",".join(cpu_core_ids),
             )
             async with closing_async(Docker()) as docker:
                 container = docker.containers.container(container_id)
@@ -1097,12 +1106,14 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     return
 
                 # Restore CPU to original allocation
-                # Docker update API doesn't support "Cpus" field, so we use CpuQuota
+                # Docker update API doesn't support "Cpus" field, so we use CpuQuota and CpusetCpus
                 # CpuQuota = number_of_cpus * CpuPeriod (100_000 microseconds = 100ms)
+                # CpusetCpus = comma-separated list of CPU core IDs for CPU affinity
                 # aiodocker doesn't have update method, so we call the API directly
                 update_config = {
                     "CpuQuota": original_cpus * 100_000,
                     "CpuPeriod": 100_000,
+                    "CpusetCpus": ",".join(cpu_core_ids),
                 }
                 await docker._query_json(
                     f"containers/{container_id}/update",
@@ -1110,7 +1121,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     data=update_config,
                 )
 
-            log.info("CPU boost restoration completed for container {}", container_id[:12])
+            log.info(
+                "CPU boost restoration completed for container {}: restored to {} cores on CPUs {}",
+                container_id[:12],
+                original_cpus,
+                ",".join(cpu_core_ids),
+            )
         except asyncio.CancelledError:
             log.debug("CPU boost restoration task cancelled for container {}", container_id[:12])
             raise

@@ -446,11 +446,38 @@ class CPUPlugin(AbstractComputePlugin):
         boost_factor = self.local_config["container"].get("cpu-boost-factor", 2.0)
         boosted_cores = self.apply_cpu_boost(num_cores, boost_enabled, boost_factor)
 
+        if boost_enabled and boosted_cores > num_cores:
+            # Boost mode: Extend CpusetCpus to allow temporary CPU oversubscription
+            # This ensures os.cpu_count() returns the boosted value
+            # The additional CPUs may overlap with other containers temporarily (60s)
+            max_core_id = max(cores)
+            additional_cores_needed = boosted_cores - num_cores
+
+            # Add next sequential CPU IDs for oversubscription
+            boosted_core_list = cores + [
+                max_core_id + i + 1 for i in range(additional_cores_needed)
+            ]
+            boosted_core_ids = [*map(str, sorted(boosted_core_list))]
+
+            log.info(
+                "CPU boost active: {} cores → {} cores (affinity: {} → {})",
+                num_cores,
+                boosted_cores,
+                ",".join(sorted_core_ids),
+                ",".join(boosted_core_ids),
+            )
+            return {
+                "HostConfig": {
+                    "Cpus": boosted_cores,
+                    "CpusetCpus": ",".join(boosted_core_ids),
+                },
+            }
+
+        # Normal mode: Use CpusetCpus for CPU affinity
         return {
             "HostConfig": {
-                "Cpus": boosted_cores,
+                "Cpus": num_cores,
                 "CpusetCpus": ",".join(sorted_core_ids),
-                # 'CpusetMems': f'{resource_spec.numa_node}',
             },
         }
 
