@@ -1,4 +1,4 @@
-from ai.backend.manager.data.notification import NotificationChannelType, WebhookConfig
+from ai.backend.common.data.notification import NotificationChannelType, WebhookConfig
 
 from .row import NotificationChannelRow, NotificationRuleRow
 

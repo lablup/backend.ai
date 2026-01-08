@@ -7,12 +7,14 @@ from typing import TYPE_CHECKING, Any
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
-from ai.backend.manager.data.notification import (
-    NotificationChannelData,
+from ai.backend.common.data.notification import (
     NotificationChannelType,
-    NotificationRuleData,
     NotificationRuleType,
     WebhookConfig,
+)
+from ai.backend.manager.data.notification import (
+    NotificationChannelData,
+    NotificationRuleData,
 )
 from ai.backend.manager.models.base import (
     GUID,
