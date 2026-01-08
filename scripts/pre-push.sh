@@ -6,7 +6,7 @@ PGID="$(ps -o pgid= $$ | tr -d ' ')"
 cleanup() {
   local sig="$1"
   trap - SIGINT SIGTERM
-  echo -e "\nPre-commit hook is interrupted ($sig)."
+  echo -e "\nPre-push hook is interrupted ($sig)."
   kill "-${sig}" -- "-${PGID}"
   wait
   case "${sig}" in
@@ -17,7 +17,6 @@ cleanup() {
 }
 trap 'cleanup INT' SIGINT
 trap 'cleanup TERM' SIGTERM
-trap 'cleanup TERM' SIGPIPE
 
 # --- Hook Body ---
 
@@ -35,7 +34,7 @@ if ! command -v gh &> /dev/null; then
   pants lint check ::
 else
   # Get the base branch name from GitHub if we are on a pull request.
-  BASE_BRANCH=$(gh pr view "$CURRENT_BRANCH" --json baseRefName -q '.baseRefName' 2>/dev/null)
+  BASE_BRANCH=$(gh pr view "$CURRENT_BRANCH" --json baseRefName -q '.baseRefName' 2>/dev/null || true)
   if [[ -z "$BASE_BRANCH" ]]; then
     if [ -n "$(echo "$CURRENT_BRANCH" | sed -n '/^[[:digit:]]\{1,\}\.[[:digit:]]\{1,\}/p')" ]; then
       # if we are on the release branch, use it as the base branch.

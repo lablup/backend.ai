@@ -17,7 +17,6 @@ cleanup() {
 }
 trap 'cleanup INT' SIGINT
 trap 'cleanup TERM' SIGTERM
-trap 'cleanup TERM' SIGPIPE
 
 # --- Hook Body ---
 
