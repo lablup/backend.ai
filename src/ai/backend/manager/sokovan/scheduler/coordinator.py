@@ -48,7 +48,7 @@ from .handlers import (
     TerminateSessionsLifecycleHandler,
 )
 from .kernel import KernelStateEngine
-from .recorder import RecorderContext
+from .recorder import SessionRecorderContext
 from .results import SessionExecutionResult
 from .types import KernelCreationInfo
 
@@ -216,7 +216,7 @@ class ScheduleCoordinator:
         This method processes each scaling group independently:
         1. Iterates over all schedulable scaling groups
         2. For each scaling group:
-           - Creates a RecorderContext for the scaling group
+           - Creates a SessionRecorderContext for the scaling group
            - Queries sessions based on handler's target_statuses() and target_kernel_statuses()
            - Executes handler logic
            - Applies status transitions immediately
@@ -292,7 +292,7 @@ class ScheduleCoordinator:
         """Process a single scaling group for the given handler.
 
         This method handles all processing for one scaling group:
-        - Creates a RecorderContext scoped to this scaling group
+        - Creates a SessionRecorderContext scoped to this scaling group
         - Queries and processes sessions
         - Applies status transitions
         - Emits metrics
@@ -315,7 +315,7 @@ class ScheduleCoordinator:
 
         # Create recorder scoped to this scaling group
         recorder_scope = f"{schedule_type.value}:{scaling_group}"
-        with RecorderContext.scope(recorder_scope) as recorder:
+        with SessionRecorderContext.scope(recorder_scope) as recorder:
             # Execute handler logic
             result = await handler.execute(scaling_group, sessions)
 

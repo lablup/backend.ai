@@ -23,7 +23,6 @@ from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.sokovan.scheduler.types import (
     AllocationBatch,
     KeypairOccupancy,
-    SchedulingConfig,
     SchedulingFailure,
     SchedulingPredicate,
     SessionAllocation,
@@ -138,26 +137,18 @@ class SessionProvisioner:
         """
         Schedule sessions for a specific scaling group.
 
+        This method orchestrates the full provisioning pipeline using pre-fetched data:
+        1. Sequencing: Order workloads using configured sequencer (FIFO/LIFO/DRF)
+        2. Validation: Check quotas and constraints for each workload
+        3. Agent selection: Select agents using configured strategy
+        4. Allocation: Persist allocations to database
+
         Args:
             scaling_group: The scaling group to schedule for.
             scheduling_data: Pre-fetched scheduling data from Handler.
 
         Returns:
-            ScheduleResult containing count and session data
-        """
-        # Schedule using the scheduling data - no more DB calls needed
-        return await self._schedule_queued_sessions_with_data(scaling_group, scheduling_data)
-
-    async def _schedule_queued_sessions_with_data(
-        self, scaling_group: str, scheduling_data: SchedulingData
-    ) -> ScheduleResult:
-        """
-        Schedule all queued sessions using pre-fetched scheduling data.
-        No database calls are made in this method - all data comes from scheduling_data.
-
-        :param scaling_group: The scaling group to schedule for
-        :param scheduling_data: Pre-fetched data containing all necessary information
-        :return: The number of sessions successfully scheduled
+            ScheduleResult containing scheduled session data
         """
         # Use data from scheduling_data instead of making DB calls
         # Convert PendingSessionData to SessionWorkload
@@ -175,15 +166,10 @@ class SessionProvisioner:
             scheduling_data.spec.known_slot_types, scheduling_data.total_capacity
         )
 
-        # Create scheduling config from spec and scaling group opts
-        config = SchedulingConfig(
-            max_container_count_per_agent=scheduling_data.spec.max_container_count,
-            enforce_spreading_endpoint_replica=sg_info.scheduler_opts.enforce_spreading_endpoint_replica,
-        )
-
+        # Create agent selection config directly from spec and scaling group opts
         selection_config = AgentSelectionConfig(
-            max_container_count=config.max_container_count_per_agent,
-            enforce_spreading_endpoint_replica=config.enforce_spreading_endpoint_replica,
+            max_container_count=scheduling_data.spec.max_container_count,
+            enforce_spreading_endpoint_replica=sg_info.scheduler_opts.enforce_spreading_endpoint_replica,
         )
         # Add sequencing predicate to track in passed predicates
         with self._phase_metrics.measure_phase(
@@ -199,21 +185,7 @@ class SessionProvisioner:
             else {}
         )
         mutable_agents = [
-            AgentInfo(
-                agent_id=agent.id,
-                agent_addr=agent.addr,
-                architecture=agent.architecture,
-                scaling_group=agent.scaling_group,
-                available_slots=agent.available_slots,
-                occupied_slots=(
-                    agent_occupancy[agent.id].occupied_slots
-                    if agent.id in agent_occupancy
-                    else ResourceSlot()
-                ),
-                container_count=(
-                    agent_occupancy[agent.id].container_count if agent.id in agent_occupancy else 0
-                ),
-            )
+            AgentInfo.from_meta_and_occupancy(agent, agent_occupancy)
             for agent in scheduling_data.agents
         ]
         session_allocations: list[SessionAllocation] = []
