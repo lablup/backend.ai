@@ -14,11 +14,11 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
+from ai.backend.manager.data.auth.types import CredentialData, GroupMembershipData, UserData
 from ai.backend.manager.errors.auth import GroupMembershipNotFoundError, UserCreationError
 from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.user import (
     UserRole,
     UserRow,
@@ -291,3 +291,43 @@ class AuthDBSource:
             result = await db_conn.scalar(sa.select(sa.func.now()))
             assert result is not None
             return result
+
+    @auth_db_source_resilience.apply()
+    async def fetch_credential_by_access_key(self, access_key: str) -> Optional[CredentialData]:
+        """
+        Fetch user credential data by access key.
+
+        Queries keypair with user and resource policies using ORM relationships.
+        Returns None if access key not found or inactive.
+
+        Args:
+            access_key: The access key to look up.
+
+        Returns:
+            CredentialData containing user, keypair, and resource policies,
+            or None if not found.
+        """
+        async with self._db.begin_session() as db_session:
+            query = (
+                sa.select(KeyPairRow)
+                .where((KeyPairRow.access_key == access_key) & (KeyPairRow.is_active.is_(True)))
+                .options(
+                    joinedload(KeyPairRow.resource_policy_row),
+                    joinedload(KeyPairRow.user_row).joinedload(UserRow.resource_policy_row),
+                )
+            )
+            keypair_row = await db_session.scalar(query)
+
+            if keypair_row is None:
+                return None
+
+            user_row = keypair_row.user_row
+            if user_row is None:
+                return None
+
+            return CredentialData(
+                user=user_row.to_data(),
+                user_resource_policy=user_row.resource_policy_row.to_dataclass(),
+                keypair=keypair_row.to_data(),
+                keypair_resource_policy=keypair_row.resource_policy_row.to_dataclass(),
+            )
