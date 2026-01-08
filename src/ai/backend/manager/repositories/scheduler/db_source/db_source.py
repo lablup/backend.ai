@@ -23,6 +23,7 @@ from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    ClusterMode,
     ResourceSlot,
     SessionId,
     SessionTypes,
@@ -723,7 +724,7 @@ class ScheduleDBSource:
                 status_info=reason,
                 terminated_at=now,
                 status_history=sql_json_merge(
-                    SessionRow.status_history,
+                    SessionRow.__table__.c.status_history,
                     (),
                     {SessionStatus.CANCELLED.name: now.isoformat()},
                 ),
@@ -746,7 +747,7 @@ class ScheduleDBSource:
                     status_changed=now,
                     terminated_at=now,
                     status_history=sql_json_merge(
-                        KernelRow.status_history,
+                        KernelRow.__table__.c.status_history,
                         (),
                         {KernelStatus.CANCELLED.name: now.isoformat()},
                     ),
@@ -767,7 +768,7 @@ class ScheduleDBSource:
                 status=SessionStatus.TERMINATING,
                 status_info=reason,
                 status_history=sql_json_merge(
-                    SessionRow.status_history,
+                    SessionRow.__table__.c.status_history,
                     (),
                     {SessionStatus.TERMINATING.name: now.isoformat()},
                 ),
@@ -791,7 +792,7 @@ class ScheduleDBSource:
                     status=KernelStatus.TERMINATING,
                     status_info=reason,
                     status_history=sql_json_merge(
-                        KernelRow.status_history,
+                        KernelRow.__table__.c.status_history,
                         (),
                         {KernelStatus.TERMINATING.name: now.isoformat()},
                     ),
@@ -848,7 +849,7 @@ class ScheduleDBSource:
                         kernel_id=str(kernel.id),
                         status=kernel.status,
                         container_id=kernel.container_id,
-                        agent_id=kernel.agent,
+                        agent_id=AgentId(kernel.agent) if kernel.agent else None,
                         agent_addr=kernel.agent_addr,
                         occupied_slots=kernel.occupied_slots,
                     )
@@ -858,8 +859,8 @@ class ScheduleDBSource:
                 terminating_sessions.append(
                     TerminatingSessionData(
                         session_id=session_row.id,
-                        access_key=session_row.access_key,
-                        creation_id=session_row.creation_id,
+                        access_key=AccessKey(session_row.access_key) if session_row.access_key else AccessKey(""),
+                        creation_id=session_row.creation_id or "",
                         status=session_row.status,
                         status_info=session_row.status_info or "UNKNOWN",
                         session_type=session_row.session_type,
@@ -1299,7 +1300,7 @@ class ScheduleDBSource:
         from ai.backend.manager.models.vfolder import prepare_vfolder_mounts
 
         # Convert the async session to sync connection for legacy code
-        conn = db_sess.bind
+        conn = cast(SAConnection, db_sess.bind)
 
         vfolder_mounts = await prepare_vfolder_mounts(
             conn,
@@ -1326,7 +1327,7 @@ class ScheduleDBSource:
         from ai.backend.manager.models.dotfile import prepare_dotfiles
 
         # Convert the async session to sync connection for legacy code
-        conn = db_sess.bind
+        conn = cast(SAConnection, db_sess.bind)
 
         dotfile_data = await prepare_dotfiles(
             conn,
@@ -1352,7 +1353,7 @@ class ScheduleDBSource:
         return ContainerUserInfo(
             uid=user_row.container_uid,
             main_gid=user_row.container_main_gid,
-            supplementary_gids=user_row.container_gids,
+            supplementary_gids=user_row.container_gids or [],
         )
 
     async def prepare_vfolder_mounts(
@@ -1423,8 +1424,10 @@ class ScheduleDBSource:
         Returns:
             List of AllowedScalingGroup objects
         """
+        # query_allowed_sgroups expects AsyncConnection, get it from session
+        conn = await db_sess.connection()
         allowed_sgroups = await query_allowed_sgroups(
-            db_sess,
+            conn,
             domain_name,
             UUID(group_id),
             access_key,
@@ -1569,7 +1572,7 @@ class ScheduleDBSource:
                 status_info="scheduled",
                 status_data={},
                 status_history=sql_json_merge(
-                    SessionRow.status_history,
+                    SessionRow.__table__.c.status_history,
                     (),
                     {SessionStatus.SCHEDULED.name: now.isoformat()},
                 ),
@@ -1603,7 +1606,7 @@ class ScheduleDBSource:
                     status_data={},
                     status_changed=now,
                     status_history=sql_json_merge(
-                        KernelRow.status_history,
+                        KernelRow.__table__.c.status_history,
                         (),
                         {KernelStatus.SCHEDULED.name: now.isoformat()},
                     ),
@@ -1644,7 +1647,7 @@ class ScheduleDBSource:
             .values(
                 status_info=failure.msg,
                 status_data=sql_json_merge(
-                    SessionRow.status_data,
+                    SessionRow.__table__.c.status_data,
                     ("scheduler",),
                     obj=status_data,
                 ),
@@ -1671,7 +1674,7 @@ class ScheduleDBSource:
             )
             .values(
                 status_data=sql_json_merge(
-                    KernelRow.status_data,
+                    KernelRow.__table__.c.status_data,
                     ("scheduler",),
                     obj=status_data,
                 ),
@@ -1726,7 +1729,7 @@ class ScheduleDBSource:
                             status_changed=now,
                             terminated_at=now,
                             status_history=sql_json_merge(
-                                KernelRow.status_history,
+                                KernelRow.__table__.c.status_history,
                                 (),
                                 {KernelStatus.TERMINATED.name: now.isoformat()},
                             ),
@@ -1748,7 +1751,7 @@ class ScheduleDBSource:
                             status=SessionStatus.TERMINATED,
                             status_info=session_result.reason,
                             status_history=sql_json_merge(
-                                SessionRow.status_history,
+                                SessionRow.__table__.c.status_history,
                                 (),
                                 {SessionStatus.TERMINATED.name: now.isoformat()},
                             ),
@@ -1805,7 +1808,7 @@ class ScheduleDBSource:
                     status_changed=now,
                     terminated_at=now,
                     status_history=sql_json_merge(
-                        KernelRow.status_history,
+                        KernelRow.__table__.c.status_history,
                         (),
                         {KernelStatus.TERMINATED.name: now.isoformat()},
                     ),
@@ -1933,7 +1936,7 @@ class ScheduleDBSource:
                     status_info=reason,
                     status_changed=now,
                     status_history=sql_json_merge(
-                        KernelRow.status_history,
+                        KernelRow.__table__.c.status_history,
                         (),
                         {KernelStatus.PULLING.name: now.isoformat()},
                     ),
@@ -1967,7 +1970,7 @@ class ScheduleDBSource:
                     status_info=reason,
                     status_changed=now,
                     status_history=sql_json_merge(
-                        KernelRow.status_history,
+                        KernelRow.__table__.c.status_history,
                         (),
                         {KernelStatus.CREATING.name: now.isoformat()},
                     ),
@@ -2013,7 +2016,7 @@ class ScheduleDBSource:
                     service_ports=creation_info.service_ports,
                     kernel_host=creation_info.kernel_host,
                     status_history=sql_json_merge(
-                        KernelRow.status_history,
+                        KernelRow.__table__.c.status_history,
                         (),
                         {KernelStatus.RUNNING.name: now.isoformat()},
                     ),
@@ -2046,7 +2049,7 @@ class ScheduleDBSource:
                     status_info="preparing",
                     status_changed=now,
                     status_history=sql_json_merge(
-                        KernelRow.status_history,
+                        KernelRow.__table__.c.status_history,
                         (),
                         {KernelStatus.PREPARING.name: now.isoformat()},
                     ),
@@ -2087,7 +2090,7 @@ class ScheduleDBSource:
                     status_changed=now,
                     terminated_at=now,
                     status_history=sql_json_merge(
-                        KernelRow.status_history,
+                        KernelRow.__table__.c.status_history,
                         (),
                         {KernelStatus.CANCELLED.name: now.isoformat()},
                     ),
@@ -2122,12 +2125,12 @@ class ScheduleDBSource:
                     status_changed=now,
                     terminated_at=now,
                     status_data=sql_json_merge(
-                        KernelRow.status_data,
+                        KernelRow.__table__.c.status_data,
                         ("kernel",),
                         {"exit_code": exit_code},
                     ),
                     status_history=sql_json_merge(
-                        KernelRow.status_history,
+                        KernelRow.__table__.c.status_history,
                         (),
                         {KernelStatus.TERMINATED.name: now.isoformat()},
                     ),
@@ -2160,7 +2163,7 @@ class ScheduleDBSource:
                     status_changed=now,
                     terminated_at=now,
                     status_history=sql_json_merge(
-                        KernelRow.status_history,
+                        KernelRow.__table__.c.status_history,
                         (),
                         {KernelStatus.TERMINATED.name: now.isoformat()},
                     ),
@@ -2223,7 +2226,7 @@ class ScheduleDBSource:
                 .values(
                     status=KernelStatus.PULLING,
                     status_history=sql_json_merge(
-                        KernelRow.status_history,
+                        KernelRow.__table__.c.status_history,
                         (),
                         {KernelStatus.PULLING.name: now.isoformat()},
                     ),
@@ -2265,7 +2268,7 @@ class ScheduleDBSource:
                 .values(
                     status=KernelStatus.PREPARED,
                     status_history=sql_json_merge(
-                        KernelRow.status_history,
+                        KernelRow.__table__.c.status_history,
                         (),
                         {KernelStatus.PREPARED.name: now.isoformat()},
                     ),
@@ -2308,7 +2311,7 @@ class ScheduleDBSource:
                     status=KernelStatus.CANCELLED,
                     status_info=f"Image pull failed: {error_msg}",
                     status_history=sql_json_merge(
-                        KernelRow.status_history,
+                        KernelRow.__table__.c.status_history,
                         (),
                         {KernelStatus.CANCELLED.name: now.isoformat()},
                     ),
@@ -2357,7 +2360,7 @@ class ScheduleDBSource:
                         status=SessionStatus.CANCELLED,
                         status_info="All kernels cancelled",
                         status_history=sql_json_merge(
-                            SessionRow.status_history,
+                            SessionRow.__table__.c.status_history,
                             (),
                             {SessionStatus.CANCELLED.name: now.isoformat()},
                         ),
@@ -2392,7 +2395,7 @@ class ScheduleDBSource:
                     .where(domains.c.name == domain)
                 )
                 allowed_registries = await db_sess.scalar(query)
-                if image_row.registry not in allowed_registries:
+                if allowed_registries is None or image_row.registry not in allowed_registries:
                     raise ImageNotFound
 
     async def update_sessions_to_prepared(self, session_ids: list[SessionId]) -> None:
@@ -2419,7 +2422,7 @@ class ScheduleDBSource:
                     status=SessionStatus.PREPARED,
                     status_info=None,  # Clear any previous error status
                     status_history=sql_json_merge(
-                        SessionRow.status_history,
+                        SessionRow.__table__.c.status_history,
                         (),
                         {SessionStatus.PREPARED.name: now.isoformat()},
                     ),
@@ -2460,8 +2463,8 @@ class ScheduleDBSource:
                 kernel_data = [
                     KernelTransitionData(
                         kernel_id=str(kernel.id),
-                        agent_id=kernel.agent,
-                        agent_addr=kernel.agent_addr,
+                        agent_id=AgentId(kernel.agent) if kernel.agent else AgentId(""),
+                        agent_addr=kernel.agent_addr or "",
                         cluster_role=kernel.cluster_role,
                         container_id=kernel.container_id,
                         startup_command=kernel.startup_command,
@@ -2474,13 +2477,13 @@ class ScheduleDBSource:
                 # Build session transition data
                 session_data = SessionTransitionData(
                     session_id=session.id,
-                    creation_id=session.creation_id,
-                    session_name=session.name,
+                    creation_id=session.creation_id or "",
+                    session_name=session.name or "",
                     network_type=session.network_type,
                     network_id=session.network_id,
                     session_type=session.session_type,
-                    access_key=session.access_key,
-                    cluster_mode=session.cluster_mode,
+                    access_key=AccessKey(session.access_key) if session.access_key else AccessKey(""),
+                    cluster_mode=ClusterMode(session.cluster_mode),
                     kernels=kernel_data,
                     batch_timeout=session.batch_timeout,
                     status_info=session.status_info,
@@ -2541,7 +2544,7 @@ class ScheduleDBSource:
                         status_info=None,  # Clear any previous error status
                         occupying_slots=session_data.occupying_slots,
                         status_history=sql_json_merge(
-                            SessionRow.status_history,
+                            SessionRow.__table__.c.status_history,
                             (),
                             {SessionStatus.RUNNING.name: now.isoformat()},
                         ),
@@ -2598,7 +2601,7 @@ class ScheduleDBSource:
                     terminated_at=now,
                     # Keep status_info if it contains termination reason, otherwise clear
                     status_history=sql_json_merge(
-                        SessionRow.status_history,
+                        SessionRow.__table__.c.status_history,
                         (),
                         {SessionStatus.TERMINATED.name: now.isoformat()},
                     ),
@@ -2710,11 +2713,11 @@ class ScheduleDBSource:
             for kernel in session.kernels:
                 kernel_data = KernelBindingData(
                     kernel_id=kernel.id,
-                    agent_id=kernel.agent,
+                    agent_id=AgentId(kernel.agent) if kernel.agent else None,
                     agent_addr=kernel.agent_addr,
-                    scaling_group=kernel.scaling_group,
-                    image=kernel.image,
-                    architecture=kernel.architecture,
+                    scaling_group=kernel.scaling_group or "",
+                    image=kernel.image or "",
+                    architecture=kernel.architecture or "",
                     status=kernel.status,
                     status_changed=kernel.status_changed.timestamp()
                     if kernel.status_changed
@@ -2724,8 +2727,8 @@ class ScheduleDBSource:
 
             scheduled_session = ScheduledSessionData(
                 session_id=session.id,
-                creation_id=session.creation_id,
-                access_key=session.access_key,
+                creation_id=session.creation_id or "",
+                access_key=AccessKey(session.access_key) if session.access_key else AccessKey(""),
                 reason="triggered-by-scheduler",
             )
             scheduled_sessions.append(scheduled_session)
@@ -2769,8 +2772,8 @@ class ScheduleDBSource:
             scheduled_sessions.append(
                 ScheduledSessionData(
                     session_id=session.id,
-                    creation_id=session.creation_id,
-                    access_key=session.access_key,
+                    creation_id=session.creation_id or "",
+                    access_key=AccessKey(session.access_key) if session.access_key else AccessKey(""),
                     reason="triggered-by-scheduler",
                 )
             )
@@ -3141,7 +3144,7 @@ class ScheduleDBSource:
                     status=SessionStatus.PREPARING,
                     status_info=None,  # Clear any previous error status
                     status_history=sql_json_merge(
-                        SessionRow.status_history,
+                        SessionRow.__table__.c.status_history,
                         (),
                         {SessionStatus.PREPARING.name: now.isoformat()},
                     ),
@@ -3189,7 +3192,7 @@ class ScheduleDBSource:
                     status=SessionStatus.CREATING,
                     status_info=None,  # Clear any previous error status
                     status_history=sql_json_merge(
-                        SessionRow.status_history,
+                        SessionRow.__table__.c.status_history,
                         (),
                         {SessionStatus.CREATING.name: now.isoformat()},
                     ),
@@ -3292,7 +3295,7 @@ class ScheduleDBSource:
                 .values(
                     status=SessionStatus.PENDING,
                     status_data=sql_json_merge(
-                        SessionRow.status_data,
+                        SessionRow.__table__.c.status_data,
                         ("scheduler",),
                         obj=status_data,
                     ),
@@ -3314,7 +3317,7 @@ class ScheduleDBSource:
                     agent_addr=None,
                     status=KernelStatus.PENDING,
                     status_data=sql_json_merge(
-                        KernelRow.status_data,
+                        KernelRow.__table__.c.status_data,
                         ("scheduler",),
                         obj=status_data,
                     ),
@@ -3335,7 +3338,7 @@ class ScheduleDBSource:
             .where(SessionRow.id == session_id)
             .values(
                 status_data=sql_json_merge(
-                    SessionRow.status_data,
+                    SessionRow.__table__.c.status_data,
                     ("scheduler",),
                     obj=status_data,
                 ),
@@ -3387,7 +3390,7 @@ class ScheduleDBSource:
                 .where(SessionRow.id == session_id)
                 .values(
                     status_data=sql_json_merge(
-                        SessionRow.status_data,
+                        SessionRow.__table__.c.status_data,
                         ("error",),
                         obj=error_info,
                     ),
@@ -3401,7 +3404,7 @@ class ScheduleDBSource:
                 .where(KernelRow.session_id == session_id)
                 .values(
                     status_data=sql_json_merge(
-                        KernelRow.status_data,
+                        KernelRow.__table__.c.status_data,
                         ("error",),
                         obj=error_info,
                     ),
