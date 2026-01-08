@@ -114,7 +114,7 @@ class NetworkRow(Base):
         self.driver = driver
         self.domain_name = domain
         self.project = project
-        self.options = options
+        self.options = options or {}
 
     @classmethod
     async def get(

@@ -132,6 +132,8 @@ async def query_userinfo(
         )
         result = await conn.execute(query)
         row = result.first()
+        if row is None:
+            raise ValueError("Unknown owner access key")
         owner_domain = row.domain_name
         owner_uuid = row.user
         owner_role = row.role
@@ -141,13 +143,14 @@ async def query_userinfo(
             .where(keypair_resource_policies.c.name == row.resource_policy)
         )
         result = await conn.execute(query)
-        resource_policy = result.first()
+        _resource_policy = result.first()
+        resource_policy = dict(_resource_policy._mapping) if _resource_policy else {}
     else:
         # Normal case when the user is creating her/his own session.
         owner_domain = requester_domain
         owner_uuid = requester_uuid
         owner_role = UserRole.USER
-        resource_policy = keypair_resource_policy
+        resource_policy = keypair_resource_policy or {}
 
     query = (
         sa.select(domains.c.name)
@@ -267,6 +270,8 @@ async def query_userinfo_from_session(
         )
         result = await db_sess.execute(query)
         row = result.first()
+        if row is None:
+            raise ValueError("Unknown owner access key")
         owner_domain = row.domain_name
         owner_uuid = row.user
         owner_role = row.role
@@ -276,13 +281,14 @@ async def query_userinfo_from_session(
             .where(keypair_resource_policies.c.name == row.resource_policy)
         )
         result = await db_sess.execute(query)
-        resource_policy = result.first()
+        _resource_policy = result.first()
+        resource_policy = dict(_resource_policy._mapping) if _resource_policy else {}
     else:
         # Normal case when the user is creating her/his own session.
         owner_domain = requester_domain
         owner_uuid = requester_uuid
         owner_role = UserRole.USER
-        resource_policy = keypair_resource_policy
+        resource_policy = keypair_resource_policy or {}
 
     query = (
         sa.select(domains.c.name)

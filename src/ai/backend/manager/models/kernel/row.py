@@ -789,13 +789,17 @@ class KernelRow(Base):
         self.status_changed = now
         self.status = status
         self.status_history = {
-            **self.status_history,
+            **(self.status_history or {}),
             status.name: now.isoformat(),
         }
         if status_info is not None:
             self.status_info = status_info
         if status_data is not None:
-            self.status_data = status_data
+            if not isinstance(status_data, Mapping):
+                # It's a JSONCoalesceExpr, cannot assign directly to ORM attribute
+                pass
+            else:
+                self.status_data = dict(status_data)
 
     def delegate_ownership(self, user_uuid: uuid.UUID, access_key: AccessKey) -> None:
         self.user_uuid = user_uuid
@@ -822,7 +826,7 @@ class KernelRow(Base):
             now = datetime.now(tzutc())
         else:
             now = status_changed_at
-        data = {
+        data: dict[str, Any] = {
             "status": status,
             "status_changed": now,
             "status_history": sql_json_merge(
@@ -869,15 +873,17 @@ class KernelRow(Base):
                     )
                 )
                 kernel_row = (await db_session.scalars(kernel_query)).first()
+                if kernel_row is None:
+                    return False
 
                 if new_status not in KERNEL_STATUS_TRANSITION_MAP[kernel_row.status]:
                     # TODO: log or raise error
                     return False
                 if update_data is None:
-                    update_values = {
+                    update_values: dict[str, Any] = {
                         "status": new_status,
                         "status_history": sql_json_merge(
-                            KernelRow.status_history,
+                            kernels.c.status_history,
                             (),
                             {
                                 new_status.name: now.isoformat(),
@@ -978,7 +984,7 @@ class KernelRow(Base):
             ),
             user_permission=UserPermission(
                 user_uuid=self.user_uuid,
-                access_key=self.access_key,
+                access_key=self.access_key or "",
                 domain_name=self.domain_name,
                 group_id=self.group_id,
                 uid=self.uid,
@@ -988,7 +994,7 @@ class KernelRow(Base):
             image=ImageInfo(
                 identifier=ImageIdentifier(
                     canonical=self.image,
-                    architecture=self.architecture,
+                    architecture=self.architecture or "",
                 )
                 if self.image
                 else None,
@@ -1022,14 +1028,14 @@ class KernelRow(Base):
                 occupied_slots=self.occupied_slots,
                 requested_slots=self.requested_slots,
                 occupied_shares=self.occupied_shares,
-                attached_devices=self.attached_devices,
-                resource_opts=self.resource_opts,
+                attached_devices=self.attached_devices or {},
+                resource_opts=self.resource_opts or {},
             ),
             runtime=RuntimeConfig(
                 environ=self.environ,
                 mounts=self.mounts,
                 mount_map=self.mount_map,
-                vfolder_mounts=self.vfolder_mounts,
+                vfolder_mounts=[m.to_json() for m in self.vfolder_mounts] if self.vfolder_mounts else None,
                 bootstrap_script=self.bootstrap_script,
                 startup_command=self.startup_command,
             ),
@@ -1046,12 +1052,12 @@ class KernelRow(Base):
                 last_seen=self.last_seen,
             ),
             metrics=Metrics(
-                num_queries=self.num_queries,
+                num_queries=self.num_queries or 0,
                 last_stat=self.last_stat,
                 container_log=self.container_log,
             ),
             metadata=Metadata(
-                callback_url=self.callback_url,
+                callback_url=str(self.callback_url) if self.callback_url else None,
                 internal_data=self.internal_data,
             ),
         )
@@ -1113,7 +1119,6 @@ async def recalc_concurrency_used(
     valkey_stat_client: ValkeyStatClient,
     access_key: AccessKey,
 ) -> None:
-    concurrency_used: int
     from ai.backend.manager.models.session import PRIVATE_SESSION_TYPES
 
     async with db_sess.begin_nested():
@@ -1126,7 +1131,7 @@ async def recalc_concurrency_used(
                 & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
             ),
         )
-        concurrency_used = result.scalar()
+        _concurrency_used = result.scalar()
         result = await db_sess.execute(
             sa.select(sa.func.count())
             .select_from(KernelRow)
@@ -1136,15 +1141,17 @@ async def recalc_concurrency_used(
                 & (KernelRow.session_type.in_(PRIVATE_SESSION_TYPES))
             ),
         )
-        sftp_concurrency_used = result.scalar()
-        if not isinstance(concurrency_used, int):
+        _sftp_concurrency_used = result.scalar()
+        if not isinstance(_concurrency_used, int):
             raise DataTransformationFailed(
-                f"Expected int for concurrency_used, got {type(concurrency_used).__name__}"
+                f"Expected int for concurrency_used, got {type(_concurrency_used).__name__}"
             )
-        if not isinstance(sftp_concurrency_used, int):
+        if not isinstance(_sftp_concurrency_used, int):
             raise DataTransformationFailed(
-                f"Expected int for sftp_concurrency_used, got {type(sftp_concurrency_used).__name__}"
+                f"Expected int for sftp_concurrency_used, got {type(_sftp_concurrency_used).__name__}"
             )
+        concurrency_used: int = _concurrency_used
+        sftp_concurrency_used: int = _sftp_concurrency_used
 
     await valkey_stat_client.set_keypair_concurrency(
         access_key=str(access_key),

@@ -42,6 +42,8 @@ async def prepare_dotfiles(
     )
     result = await conn.execute(query)
     row = result.first()
+    if row is None:
+        return internal_data
     dotfiles = msgpack.unpackb(row.dotfiles)
     internal_data.update({"dotfiles": dotfiles})
     if row.ssh_public_key and row.ssh_private_key:

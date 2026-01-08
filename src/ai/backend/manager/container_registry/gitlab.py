@@ -22,7 +22,8 @@ class GitLabRegistry(BaseContainerRegistry):
             raise ContainerRegistryProjectEmpty(self.registry_info.type, self.registry_info.project)
 
         access_token = self.registry_info.password
-        api_endpoint = self.registry_info.extra.get("api_endpoint", None)
+        extra = self.registry_info.extra or {}
+        api_endpoint = extra.get("api_endpoint", None)
 
         if api_endpoint is None:
             raise RuntimeError('"api_endpoint" is not provided for GitLab registry!')

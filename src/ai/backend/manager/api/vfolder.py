@@ -177,7 +177,7 @@ async def check_vfolder_status(
     available_vf_statuses = vfolder_status_map.get(status)
     if not available_vf_statuses:
         raise VFolderFilterStatusNotAvailable
-    if folder_row.status not in available_vf_statuses:
+    if folder_row["status"] not in available_vf_statuses:
         raise VFolderFilterStatusFailed
 
 

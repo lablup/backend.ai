@@ -972,7 +972,7 @@ class SessionRow(Base):
             name=self.name,
             session_type=self.session_type,
             priority=self.priority,
-            cluster_mode=self.cluster_mode,
+            cluster_mode=ClusterMode(self.cluster_mode),
             cluster_size=self.cluster_size,
             agent_ids=self.agent_ids,
             scaling_group_name=self.scaling_group_name,
@@ -980,32 +980,32 @@ class SessionRow(Base):
             domain_name=self.domain_name,
             group_id=self.group_id,
             user_uuid=self.user_uuid,
-            access_key=self.access_key,
+            access_key=AccessKey(self.access_key) if self.access_key else None,
             images=self.images,
             tag=self.tag,
             occupying_slots=self.occupying_slots,
             requested_slots=self.requested_slots,
-            vfolder_mounts=[mount.to_dataclass() for mount in self.vfolder_mounts],
+            vfolder_mounts=[mount.to_dataclass() for mount in self.vfolder_mounts] if self.vfolder_mounts else None,
             environ=self.environ,
             bootstrap_script=self.bootstrap_script,
             use_host_network=self.use_host_network,
             timeout=self.timeout,
             batch_timeout=self.batch_timeout,
-            created_at=self.created_at,
+            created_at=self.created_at or datetime.now(tzutc()),
             terminated_at=self.terminated_at,
             starts_at=self.starts_at,
             status=self.status,
             status_info=self.status_info,
             status_data=self.status_data,
             status_history=self.status_history,
-            callback_url=self.callback_url,
+            callback_url=str(self.callback_url) if self.callback_url else None,
             startup_command=self.startup_command,
             result=self.result,
-            num_queries=self.num_queries,
+            num_queries=self.num_queries or 0,
             last_stat=self.last_stat,
             network_type=self.network_type,
             network_id=self.network_id,
-            service_ports=self.main_kernel.service_ports,
+            service_ports=str(self.main_kernel.service_ports) if self.main_kernel.service_ports else None,
             owner=owner if owner is not None else None,
         )
 
@@ -1057,17 +1057,17 @@ class SessionRow(Base):
         return SessionInfo(
             identity=SessionIdentity(
                 id=self.id,
-                creation_id=self.creation_id,
-                name=self.name,
+                creation_id=self.creation_id or "",
+                name=self.name or "",
                 session_type=self.session_type,
                 priority=self.priority,
             ),
             metadata=SessionMetadata(
-                name=self.name,
+                name=self.name or "",
                 domain_name=self.domain_name,
                 group_id=self.group_id,
                 user_uuid=self.user_uuid,
-                access_key=self.access_key,
+                access_key=self.access_key or "",
                 session_type=self.session_type,
                 priority=self.priority,
                 created_at=self.created_at,
@@ -1087,14 +1087,14 @@ class SessionRow(Base):
                 tag=self.tag,
             ),
             mounts=MountSpec(
-                vfolder_mounts=self.vfolder_mounts,
+                vfolder_mounts=[m.to_json() for m in self.vfolder_mounts] if self.vfolder_mounts else None,
             ),
             execution=SessionExecution(
                 environ=self.environ,
                 bootstrap_script=self.bootstrap_script,
                 startup_command=self.startup_command,
                 use_host_network=self.use_host_network,
-                callback_url=self.callback_url,
+                callback_url=str(self.callback_url) if self.callback_url else None,
             ),
             lifecycle=SessionLifecycle(
                 status=self.status,
@@ -1109,7 +1109,7 @@ class SessionRow(Base):
                 status_history=self.status_history,
             ),
             metrics=SessionMetrics(
-                num_queries=self.num_queries,
+                num_queries=self.num_queries or 0,
                 last_stat=self.last_stat,
             ),
             network=SessionNetwork(
@@ -1121,6 +1121,8 @@ class SessionRow(Base):
     @property
     def vfolders_sorted_by_id(self) -> list[VFolderMount]:
         # TODO: Remove this after ComputeSessionNode and ComputeSession deprecates vfolder_mounts field
+        if self.vfolder_mounts is None:
+            return []
         return sorted(self.vfolder_mounts, key=lambda row: row.vfid.folder_id)
 
     @property
@@ -1176,7 +1178,7 @@ class SessionRow(Base):
     @classmethod
     async def get_session_id_by_kernel(
         cls, db: ExtendedAsyncSAEngine, kernel_id: KernelId
-    ) -> SessionId:
+    ) -> SessionId | None:
         query = sa.select(KernelRow.session_id).where(KernelRow.id == kernel_id)
         async with db.begin_readonly_session() as db_session:
             return await db_session.scalar(query)
@@ -1195,7 +1197,7 @@ class SessionRow(Base):
                 joinedload(KernelRow.image_row).options(joinedload(ImageRow.registry_row))
             )
         stmt = sa.select(SessionRow).where(SessionRow.status == status).options(load_options)
-        return (await db_session.scalars(stmt)).all()
+        return list((await db_session.scalars(stmt)).all())
 
     @classmethod
     async def get_session_to_determine_status(
@@ -1248,7 +1250,7 @@ class SessionRow(Base):
             stmt = option(stmt)
 
         async def fetch(db_session: SASession) -> list[SessionRow]:
-            return (await db_session.scalars(stmt)).all()
+            return list((await db_session.scalars(stmt)).all())
 
         async with db.connect() as db_conn:
             return await execute_with_txn_retry(fetch, db.begin_readonly_session, db_conn)
@@ -1268,11 +1270,15 @@ class SessionRow(Base):
             self.terminated_at = now
         self.status = status
         self.status_history = {
-            **self.status_history,
+            **(self.status_history or {}),
             status.name: now.isoformat(),
         }
         if status_data is not None:
-            self.status_data = status_data
+            if not isinstance(status_data, Mapping):
+                # It's a JSONCoalesceExpr, cannot assign directly to ORM attribute
+                pass
+            else:
+                self.status_data = dict(status_data)
 
         _status_info: str | None = None
         if status_info is None:
@@ -1307,10 +1313,10 @@ class SessionRow(Base):
             now = datetime.now(tzutc())
         else:
             now = status_changed_at
-        data = {
+        data: dict[str, Any] = {
             "status": status,
             "status_history": sql_json_merge(
-                SessionRow.status_history,
+                sessions.c.status_history,
                 (),
                 {
                     status.name: datetime.now(tzutc()).isoformat(),
@@ -1590,7 +1596,7 @@ class SessionRow(Base):
             )
         )
         result = await db_sess.execute(query)
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     async def get_network_ref(self, db_sess: SASession) -> str | None:
         if not self.network_id or not self.network_type:
@@ -1739,14 +1745,15 @@ class SessionLifecycleManager:
             case SessionStatus.PREPARED:
                 await self.event_producer.anycast_event(DoStartSessionEvent())
             case SessionStatus.RUNNING:
+                creation_id = session_row.creation_id or ""
                 log.debug(
                     "Producing SessionStartedEvent({}, {})",
                     session_row.id,
-                    session_row.creation_id,
+                    creation_id,
                 )
                 await self.event_producer.anycast_and_broadcast_event(
-                    SessionStartedAnycastEvent(session_row.id, session_row.creation_id),
-                    SessionStartedBroadcastEvent(session_row.id, session_row.creation_id),
+                    SessionStartedAnycastEvent(session_row.id, creation_id),
+                    SessionStartedBroadcastEvent(session_row.id, creation_id),
                 )
                 await self.hook_plugin_ctx.notify(
                     "POST_START_SESSION",
@@ -1774,12 +1781,13 @@ class SessionLifecycleManager:
                         query = sa.delete(RoutingRow).where(RoutingRow.session == session_row.id)
                         await db_sess.execute(query)
                         await db_sess.commit()
+                status_info = session_row.main_kernel.status_info or ""
                 await self.event_producer.anycast_and_broadcast_event(
                     SessionTerminatedAnycastEvent(
-                        session_row.id, session_row.main_kernel.status_info
+                        session_row.id, status_info
                     ),
                     SessionTerminatedBroadcastEvent(
-                        session_row.id, session_row.main_kernel.status_info
+                        session_row.id, status_info
                     ),
                 )
             case _:

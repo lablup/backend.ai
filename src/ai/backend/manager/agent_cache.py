@@ -96,7 +96,7 @@ class AgentRPCCache:
         if cached_args:
             return cached_args
 
-        async def _fetch_agent() -> Row:
+        async def _fetch_agent() -> Row | None:
             async with self.db.begin_readonly() as conn:
                 query = (
                     sa.select(agents.c.addr, agents.c.public_key)
@@ -109,6 +109,8 @@ class AgentRPCCache:
                 return result.first()
 
         agent = await execute_with_retry(_fetch_agent)
+        if agent is None:
+            raise ValueError(f"Agent not found: {agent_id}")
         return agent.addr, agent.public_key
 
     @actxmgr

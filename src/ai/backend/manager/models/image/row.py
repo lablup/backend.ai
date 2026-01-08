@@ -40,7 +40,9 @@ from ai.backend.common.types import (
     AutoPullBehavior,
     BinarySize,
     ImageAlias,
+    ImageCanonical,
     ImageConfig,
+    ImageID,
     ImageRegistry,
     ResourceSlot,
     SlotName,
@@ -500,7 +502,7 @@ class ImageRow(Base):
         query = _apply_loading_option(query, loading_options)
 
         result = await session.execute(query)
-        candidates: list[ImageRow] = result.scalars().all()
+        candidates = list(result.scalars().all())
 
         if len(candidates) <= 0:
             raise UnknownImageReference(identifier.canonical)
@@ -536,7 +538,7 @@ class ImageRow(Base):
         query = _apply_loading_option(query, loading_options)
 
         result = await session.execute(query)
-        candidates: list[ImageRow] = result.scalars().all()
+        candidates = list(result.scalars().all())
 
         if len(candidates) == 0:
             raise UnknownImageReference(ref)
@@ -730,7 +732,7 @@ class ImageRow(Base):
             query = query.where(ImageRow.status.in_(filter_by_statuses))
 
         result = await session.execute(query)
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     def __str__(self) -> str:
         return self.image_ref.canonical + f" ({self.image_ref.architecture})"
@@ -745,7 +747,8 @@ class ImageRow(Base):
 
         merged_resources: dict[str, Any] = {}
 
-        for label_key in {*custom_resources.keys(), *label_resources.keys()}:
+        all_keys: set[str] = {*custom_resources.keys(), *label_resources.keys()}
+        for label_key in all_keys:
             custom_spec = custom_resources.get(label_key, {})
             label_spec = label_resources.get(label_key, {})
 
@@ -880,8 +883,8 @@ class ImageRow(Base):
         from ai.backend.manager.data.image.types import ImageData
 
         return ImageData(
-            id=self.id,
-            name=self.name,
+            id=ImageID(self.id),
+            name=ImageCanonical(self.name),
             project=self.project,
             image=self.image,
             created_at=self.created_at,
@@ -902,11 +905,11 @@ class ImageRow(Base):
     def to_detailed_dataclass(self) -> ImageDataWithDetails:
         version, ptag_set = self.image_ref.tag_set
         return ImageDataWithDetails(
-            id=self.id,
-            name=self.image,
+            id=ImageID(self.id),
+            name=ImageCanonical(self.image),
             namespace=self.image,
             base_image_name=self.image_ref.name,
-            project=self.project,
+            project=self.project or "",
             humanized_name=self.image,
             tag=self.tag,
             tags=[KVPair(key=k, value=v) for k, v in ptag_set.items()],
@@ -917,8 +920,8 @@ class ImageRow(Base):
             architecture=self.architecture,
             is_local=self.is_local,
             digest=self.trimmed_digest or None,
-            labels=[KVPair(key=k, value=v) for k, v in self.labels.items()],
-            aliases=[alias_row.alias for alias_row in self.aliases],
+            labels=[KVPair(key=k, value=v) for k, v in self.labels.items() if v is not None],
+            aliases=[alias_row.alias for alias_row in self.aliases if alias_row.alias is not None],
             size_bytes=self.size_bytes,
             status=self.status,
             resource_limits=[
@@ -940,7 +943,9 @@ class ImageRow(Base):
 
         query = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == self.registry_id)
 
-        registry_info: ContainerRegistryRow = (await session.execute(query)).scalar()
+        registry_info = (await session.execute(query)).scalar()
+        if registry_info is None:
+            raise RuntimeError(f"Registry not found for image {self.name}")
         if registry_info.type != ContainerRegistryType.HARBOR2:
             raise NotImplementedError("This feature is only supported for Harbor 2 registries")
 
@@ -1034,7 +1039,7 @@ class ImageAliasRow(Base):
         return cls(id=alias_data.id, alias=alias_data.alias, image_id=image_id)
 
     def to_dataclass(self) -> ImageAliasData:
-        return ImageAliasData(id=self.id, alias=self.alias)
+        return ImageAliasData(id=self.id, alias=self.alias or "")
 
 
 WhereClauseType: TypeAlias = (
@@ -1233,6 +1238,8 @@ class ImagePermissionContextBuilder(
         user_row = cast(Optional[UserRow], await self.db_session.scalar(user_query_stmt))
         if user_row is None:
             raise InvalidScope(f"User not found (id:{user_id})")
+        if user_row.domain is None:
+            raise InvalidScope(f"User domain not found (id:{user_id})")
         return set(user_row.domain.allowed_docker_registries)
 
     def _get_effective_user_id_in_user_scope(self, ctx: ClientContext, scope: UserScope) -> UUID:

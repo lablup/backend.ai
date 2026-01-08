@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable, Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -325,16 +325,16 @@ class ScalingGroupRow(Base):
         return ScalingGroupData(
             name=self.name,
             status=ScalingGroupStatus(
-                is_active=self.is_active,
+                is_active=self.is_active if self.is_active is not None else True,
                 is_public=self.is_public,
             ),
             metadata=ScalingGroupMetadata(
-                description=self.description,
-                created_at=self.created_at,
+                description=self.description or "",
+                created_at=self.created_at or datetime.now(timezone.utc),
             ),
             network=ScalingGroupNetworkConfig(
-                wsproxy_addr=self.wsproxy_addr,
-                wsproxy_api_token=self.wsproxy_api_token,
+                wsproxy_addr=self.wsproxy_addr or "",
+                wsproxy_api_token=self.wsproxy_api_token or "",
                 use_host_network=self.use_host_network,
             ),
             driver=ScalingGroupDriverConfig(
@@ -367,7 +367,7 @@ class ScalingGroupRow(Base):
         for cond in conditions:
             stmt = cond(stmt)
         async with db.begin_readonly_session() as db_session:
-            return await db_session.scalars(stmt)
+            return list((await db_session.scalars(stmt)).all())
 
 
 def and_names(names: Iterable[str]) -> Callable[..., sa.sql.Select]:
@@ -406,9 +406,9 @@ class ScalingGroupModel(RBACModel[ScalingGroupPermission]):
         return cls(
             name=row.name,
             description=row.description,
-            is_active=row.is_active,
+            is_active=row.is_active if row.is_active is not None else True,
             is_public=row.is_public,
-            created_at=row.created_at,
+            created_at=row.created_at or datetime.now(timezone.utc),
             wsproxy_addr=row.wsproxy_addr,
             wsproxy_api_token=row.wsproxy_api_token,
             driver=row.driver,
