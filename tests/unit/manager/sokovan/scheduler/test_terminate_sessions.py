@@ -1,7 +1,9 @@
 """
-Tests for Scheduler.terminate_sessions method.
+Tests for SessionTerminator.terminate_sessions method.
 Tests the batch termination of sessions marked with TERMINATING status.
 """
+
+from __future__ import annotations
 
 import asyncio
 from decimal import Decimal
@@ -25,16 +27,7 @@ from ai.backend.manager.repositories.schedule.repository import (
     TerminatingKernelData,
     TerminatingSessionData,
 )
-from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
-    SessionLauncher,
-    SessionLauncherArgs,
-)
-from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
-    SessionProvisioner,
-    SessionProvisionerArgs,
-)
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
-from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler, SchedulerArgs
 from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
     SessionTerminator,
     SessionTerminatorArgs,
@@ -72,67 +65,32 @@ def mock_repository():
 
 
 @pytest.fixture
-def scheduler(mock_repository, mock_agent_pool):
-    """Create Scheduler instance with mocked dependencies."""
-    mock_config_provider = MagicMock()
+def terminator(mock_repository: MagicMock, mock_agent_pool: MagicMock) -> SessionTerminator:
+    """Create SessionTerminator instance with mocked dependencies."""
     mock_valkey_schedule = MagicMock()
-    provisioner = SessionProvisioner(
-        SessionProvisionerArgs(
-            validator=MagicMock(),
-            default_sequencer=MagicMock(),
-            default_agent_selector=MagicMock(),
-            allocator=MagicMock(),
-            repository=mock_repository,
-            config_provider=mock_config_provider,
-            valkey_schedule=mock_valkey_schedule,
-        )
-    )
-    launcher = SessionLauncher(
-        SessionLauncherArgs(
-            repository=mock_repository,
-            agent_pool=mock_agent_pool,
-            network_plugin_ctx=MagicMock(),
-            config_provider=mock_config_provider,
-            valkey_schedule=mock_valkey_schedule,
-        )
-    )
-    terminator = SessionTerminator(
+    return SessionTerminator(
         SessionTerminatorArgs(
             repository=mock_repository,
             agent_pool=mock_agent_pool,
             valkey_schedule=mock_valkey_schedule,
         )
     )
-    args = SchedulerArgs(
-        provisioner=provisioner,
-        launcher=launcher,
-        terminator=terminator,
-        repository=mock_repository,
-        deployment_repository=MagicMock(),
-        config_provider=mock_config_provider,
-        lock_factory=MagicMock(),
-        agent_pool=mock_agent_pool,
-        network_plugin_ctx=MagicMock(),
-        event_producer=MagicMock(),
-        valkey_schedule=mock_valkey_schedule,
-    )
-    return Scheduler(args)
 
 
 class TestTerminateSessions:
-    """Test cases for session termination in Scheduler."""
+    """Test cases for session termination in SessionTerminator."""
 
     async def test_terminate_sessions_no_sessions(
         self,
-        scheduler: Scheduler,
-        mock_repository,
-    ):
+        terminator: SessionTerminator,
+        mock_repository: MagicMock,
+    ) -> None:
         """Test terminate_sessions when no sessions need termination."""
         # Setup - no terminating sessions
         mock_repository.get_terminating_sessions.return_value = []
 
         # Execute
-        result = await scheduler.terminate_sessions()
+        result = await terminator.terminate_sessions()
 
         # Verify
         assert isinstance(result, ScheduleResult)
@@ -140,10 +98,10 @@ class TestTerminateSessions:
 
     async def test_terminate_sessions_single_success(
         self,
-        scheduler: Scheduler,
-        mock_repository,
-        mock_agent_pool,
-    ):
+        terminator: SessionTerminator,
+        mock_repository: MagicMock,
+        mock_agent_pool: MagicMock,
+    ) -> None:
         """Test successful termination RPC call for a single session."""
         # Setup
         session_id = SessionId(uuid4())
@@ -176,7 +134,7 @@ class TestTerminateSessions:
         mock_agent.destroy_kernel.return_value = None  # Success
 
         # Execute
-        result = await scheduler.terminate_sessions()
+        result = await terminator.terminate_sessions()
 
         # Verify
         # Returns empty result (status updates handled by events/sweep)
@@ -193,10 +151,10 @@ class TestTerminateSessions:
 
     async def test_terminate_sessions_multiple_kernels(
         self,
-        scheduler: Scheduler,
-        mock_repository,
-        mock_agent_pool,
-    ):
+        terminator: SessionTerminator,
+        mock_repository: MagicMock,
+        mock_agent_pool: MagicMock,
+    ) -> None:
         """Test termination RPC calls for a session with multiple kernels."""
         # Setup
         session_id = SessionId(uuid4())
@@ -226,7 +184,7 @@ class TestTerminateSessions:
         mock_repository.get_terminating_sessions.return_value = [terminating_session]
 
         # Execute
-        result = await scheduler.terminate_sessions()
+        result = await terminator.terminate_sessions()
 
         # Verify
         # Returns empty result (status updates handled by events/sweep)
@@ -245,10 +203,10 @@ class TestTerminateSessions:
 
     async def test_terminate_sessions_partial_failure(
         self,
-        scheduler: Scheduler,
-        mock_repository,
-        mock_agent_pool,
-    ):
+        terminator: SessionTerminator,
+        mock_repository: MagicMock,
+        mock_agent_pool: MagicMock,
+    ) -> None:
         """Test partial failure in kernel termination."""
         # Setup
         session_id = SessionId(uuid4())
@@ -292,7 +250,7 @@ class TestTerminateSessions:
         mock_agent2.destroy_kernel.side_effect = Exception("Agent connection failed")
 
         # Execute
-        result = await scheduler.terminate_sessions()
+        result = await terminator.terminate_sessions()
 
         # Verify
         # Session should not be counted as terminated due to partial failure
@@ -300,10 +258,10 @@ class TestTerminateSessions:
 
     async def test_terminate_sessions_concurrent_execution(
         self,
-        scheduler: Scheduler,
-        mock_repository,
-        mock_agent_pool,
-    ):
+        terminator: SessionTerminator,
+        mock_repository: MagicMock,
+        mock_agent_pool: MagicMock,
+    ) -> None:
         """Test that kernel termination RPC calls are executed concurrently."""
         # Setup multiple sessions
         sessions = []
@@ -357,7 +315,7 @@ class TestTerminateSessions:
         import time
 
         start_time = time.time()
-        result = await scheduler.terminate_sessions()
+        result = await terminator.terminate_sessions()
         elapsed = time.time() - start_time
 
         # Verify
@@ -376,9 +334,9 @@ class TestTerminateSessions:
 
     async def test_terminate_sessions_empty_kernel_list(
         self,
-        scheduler: Scheduler,
-        mock_repository,
-    ):
+        terminator: SessionTerminator,
+        mock_repository: MagicMock,
+    ) -> None:
         """Test session with no kernels."""
         # Setup
         session_id = SessionId(uuid4())
@@ -396,7 +354,7 @@ class TestTerminateSessions:
         mock_repository.get_terminating_sessions.return_value = [terminating_session]
 
         # Execute
-        result = await scheduler.terminate_sessions()
+        result = await terminator.terminate_sessions()
 
         # Verify
         # Session without kernels cannot be terminated
