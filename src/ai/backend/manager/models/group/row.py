@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, foreign, joinedload, load_only, mapped_column, relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common import msgpack
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
@@ -284,7 +285,7 @@ class GroupRow(Base):
         return row
 
     @classmethod
-    def load_resource_policy(cls) -> Callable:
+    def load_resource_policy(cls) -> _AbstractLoad:
         return joinedload(GroupRow.resource_policy_row)
 
     @classmethod
@@ -294,7 +295,7 @@ class GroupRow(Base):
         options: Sequence[QueryOption] = tuple(),
         *,
         db: ExtendedAsyncSAEngine,
-    ) -> list[Self]:
+    ) -> Sequence[GroupRow]:
         """
         Args:
             condition: QueryCondition.
@@ -312,7 +313,7 @@ class GroupRow(Base):
         for option in options:
             query_stmt = option(query_stmt)
 
-        async def fetch(db_session: AsyncSession) -> list[Self]:
+        async def fetch(db_session: AsyncSession) -> Sequence[GroupRow]:
             return (await db_session.scalars(query_stmt)).all()
 
         async with db.connect() as db_conn:
@@ -341,7 +342,7 @@ class GroupRow(Base):
         """
         rows = await cls.query_by_condition(
             [by_id(project_id)],
-            [load_related_field(cls.load_resource_policy)],
+            [load_related_field(cls.load_resource_policy())],
             db=db,
         )
         if not rows:
@@ -368,18 +369,18 @@ class ProjectModel(RBACModel[ProjectPermission]):
     id: uuid.UUID
     name: str
     description: Optional[str]
-    is_active: bool
-    created_at: datetime
-    modified_at: datetime
+    is_active: bool | None
+    created_at: datetime | None
+    modified_at: datetime | None
     domain_name: str
     type: str
 
-    _integration_id: str
-    _total_resource_slots: dict
-    _allowed_vfolder_hosts: dict
-    _dotfiles: str
+    _integration_id: str | None
+    _total_resource_slots: ResourceSlot
+    _allowed_vfolder_hosts: VFolderHostPermissionMap
+    _dotfiles: bytes
     _resource_policy: str
-    _container_registry: dict
+    _container_registry: dict[str, str] | None
 
     _permissions: frozenset[ProjectPermission] = field(default_factory=frozenset)
 
@@ -389,22 +390,22 @@ class ProjectModel(RBACModel[ProjectPermission]):
 
     @property
     @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
-    def integration_id(self) -> str:
+    def integration_id(self) -> str | None:
         return self._integration_id
 
     @property
     @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
-    def total_resource_slots(self) -> dict:
+    def total_resource_slots(self) -> ResourceSlot:
         return self._total_resource_slots
 
     @property
     @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
-    def allowed_vfolder_hosts(self) -> dict:
+    def allowed_vfolder_hosts(self) -> VFolderHostPermissionMap:
         return self._allowed_vfolder_hosts
 
     @property
     @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
-    def dotfiles(self) -> str:
+    def dotfiles(self) -> bytes:
         return self._dotfiles
 
     @property
@@ -414,7 +415,7 @@ class ProjectModel(RBACModel[ProjectPermission]):
 
     @property
     @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
-    def container_registry(self) -> dict:
+    def container_registry(self) -> dict | None:
         return self._container_registry
 
     @classmethod
@@ -438,7 +439,7 @@ class ProjectModel(RBACModel[ProjectPermission]):
         )
 
 
-def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:
+def _build_group_query(cond: sa.sql.expression.BinaryExpression[Any], domain_name: str) -> sa.sql.Select[Any]:
     return (
         sa.select(groups.c.id)
         .select_from(groups)
@@ -521,7 +522,7 @@ async def query_group_dotfiles(
 async def query_group_domain(
     db_conn: SAConnection,
     group_id: GUID | uuid.UUID,
-) -> str:
+) -> str | None:
     query = sa.select(groups.c.domain_name).select_from(groups).where(groups.c.id == group_id)
     return await db_conn.scalar(query)
 
@@ -544,7 +545,7 @@ PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ProjectPermission] = frozenset([
 MEMBER_PERMISSIONS: frozenset[ProjectPermission] = frozenset([ProjectPermission.READ_ATTRIBUTE])
 
 WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+    sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList[Any] | sa.sql.elements.ColumnElement[bool]
 )
 
 
@@ -560,7 +561,7 @@ class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, Grou
 
         def _OR_coalesce(
             base_cond: WhereClauseType | None,
-            _cond: sa.sql.expression.BinaryExpression,
+            _cond: WhereClauseType,
         ) -> WhereClauseType:
             return base_cond | _cond if base_cond is not None else _cond
 

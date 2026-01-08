@@ -251,6 +251,8 @@ class ContainerRegistryRow(Base):
         result: MutableMapping[str, MutableMapping[str, yarl.URL]] = {}
         for registry_row in registries:
             project = registry_row.project
+            if project is None:
+                continue
             registry_name = registry_row.registry_name
             url = registry_row.url
             if project not in result:

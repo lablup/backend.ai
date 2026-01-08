@@ -55,14 +55,14 @@ class AgentDataForHeartbeatUpdate:
     public_host: Optional[str]
     version: str
     architecture: str
-    compute_plugins: list[str]
+    compute_plugins: Mapping[str, Any]
     public_key: Optional[PublicKey]
     auto_terminate_abusing_kernel: bool
 
 
 @dataclass
 class AgentData:
-    id: AgentId
+    id: AgentId | str
     status: AgentStatus
     status_changed: Optional[datetime]
     region: str
@@ -73,11 +73,11 @@ class AgentData:
     actual_occupied_slots: ResourceSlot
     addr: str
     public_host: Optional[str]
-    first_contact: datetime
+    first_contact: datetime | None
     lost_at: Optional[datetime]
     version: str
     architecture: str
-    compute_plugins: list[str]
+    compute_plugins: Mapping[str, Any]
     public_key: Optional[PublicKey]
     auto_terminate_abusing_kernel: bool
 

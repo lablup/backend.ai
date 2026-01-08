@@ -208,7 +208,7 @@ class DeploymentRevisionRow(Base):
             extra_vfolder_mounts=[
                 ExtraVFolderMountData(
                     vfolder_id=mount.vfid.folder_id,
-                    mount_destination=mount.kernel_path,
+                    mount_destination=str(mount.kernel_path),
                 )
                 for mount in (self.extra_mounts or [])
             ],

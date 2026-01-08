@@ -407,15 +407,15 @@ class ModelRuntimeConfigData:
 
 @dataclass
 class ModelMountConfigData:
-    vfolder_id: UUID
-    mount_destination: str
+    vfolder_id: UUID | None
+    mount_destination: str | None
     definition_path: str
 
 
 @dataclass
 class ExtraVFolderMountData:
     vfolder_id: UUID
-    mount_destination: str
+    mount_destination: str  # PurePosixPath should be converted to str
 
 
 @dataclass

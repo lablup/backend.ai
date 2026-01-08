@@ -173,12 +173,12 @@ class AgentRow(Base):
     @classmethod
     async def get_agents_by_condition(
         cls, conditions: Sequence[QueryCondition], *, db: ExtendedAsyncSAEngine
-    ) -> list[Self]:
+    ) -> Sequence[AgentRow]:
         query_stmt = sa.select(AgentRow)
         for cond in conditions:
             query_stmt = cond(query_stmt)
 
-        async def fetch(db_session: SASession) -> list[AgentRow]:
+        async def fetch(db_session: SASession) -> Sequence[AgentRow]:
             return (await db_session.scalars(query_stmt)).all()
 
         async with db.connect() as db_conn:
@@ -187,7 +187,7 @@ class AgentRow(Base):
     @classmethod
     async def get_schedulable_agents_by_sgroup(
         cls, sgroup_name: str, *, db: ExtendedAsyncSAEngine
-    ) -> list[Self]:
+    ) -> Sequence[AgentRow]:
         return await cls.get_agents_by_condition(
             [
                 by_scaling_group(sgroup_name),
@@ -226,8 +226,8 @@ def by_scaling_group(
     scaling_group: str,
 ) -> QueryCondition:
     def _by_scaling_group(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.expression.BinaryExpression:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(AgentRow.scaling_group == scaling_group)
 
     return _by_scaling_group
@@ -237,8 +237,8 @@ def by_status(
     status: AgentStatus,
 ) -> QueryCondition:
     def _by_status(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.expression.BinaryExpression:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(AgentRow.status == status)
 
     return _by_status
@@ -248,8 +248,8 @@ def by_schedulable(
     schedulable: bool,
 ) -> QueryCondition:
     def _by_schedulable(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.expression.BinaryExpression:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         schedulable_ = true() if schedulable else false()
         return query_stmt.where(AgentRow.schedulable == schedulable_)
 
@@ -453,7 +453,7 @@ class AgentPermissionContextBuilder(
         for row in await self.db_session.scalars(_stmt):
             sg_row = cast(ScalingGroupRow, row.sgroup_row)
             for ag in sg_row.agents:
-                aid_permission_map[ag.id] = permissions
+                aid_permission_map[AgentId(ag.id)] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
 
     @override
@@ -482,7 +482,7 @@ class AgentPermissionContextBuilder(
         for row in await self.db_session.scalars(_stmt):
             sg_row = cast(ScalingGroupRow, row.sgroup_row)
             for ag in sg_row.agents:
-                aid_permission_map[ag.id] = permissions
+                aid_permission_map[AgentId(ag.id)] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
 
     @override
@@ -519,7 +519,7 @@ class AgentPermissionContextBuilder(
         for row in await self.db_session.scalars(_stmt):
             sg_row = cast(ScalingGroupRow, row.sgroup_row)
             for ag in sg_row.agents:
-                aid_permission_map[ag.id] = permissions
+                aid_permission_map[AgentId(ag.id)] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
 
     @override

@@ -14,7 +14,6 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, joinedload, mapped_column, relationship, selectinload
 
@@ -38,6 +37,7 @@ from ai.backend.manager.models.types import (
     QueryOption,
     load_related_field,
 )
+from sqlalchemy.orm.strategy_options import _AbstractLoad
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
@@ -299,19 +299,19 @@ class UserRow(Base):
     )
 
     @classmethod
-    def load_keypairs(cls) -> Callable:
+    def load_keypairs(cls) -> _AbstractLoad:
         from ai.backend.manager.models.keypair import KeyPairRow
 
         return selectinload(UserRow.keypairs).options(joinedload(KeyPairRow.resource_policy_row))
 
     @classmethod
-    def load_main_keypair(cls) -> Callable:
+    def load_main_keypair(cls) -> _AbstractLoad:
         from ai.backend.manager.models.keypair import KeyPairRow
 
         return joinedload(UserRow.main_keypair).options(joinedload(KeyPairRow.resource_policy_row))
 
     @classmethod
-    def load_resource_policy(cls) -> Callable:
+    def load_resource_policy(cls) -> _AbstractLoad:
         return joinedload(UserRow.resource_policy_row)
 
     @classmethod
@@ -370,9 +370,9 @@ class UserRow(Base):
         rows = await cls.query_by_condition(
             [by_user_uuid(user_uuid)],
             [
-                load_related_field(cls.load_keypairs),
-                load_related_field(cls.load_main_keypair),
-                load_related_field(cls.load_resource_policy),
+                load_related_field(cls.load_keypairs()),
+                load_related_field(cls.load_main_keypair()),
+                load_related_field(cls.load_resource_policy()),
             ],
             db=db,
         )
@@ -485,11 +485,11 @@ def compare_to_hashed_password(raw_password: str, hashed_password: str) -> bool:
 
 
 async def check_credential_with_migration(
-    db: SAEngine,
+    db: ExtendedAsyncSAEngine,
     domain: str,
     email: str,
     target_password_info: PasswordInfo,
-) -> dict:
+) -> dict[str, Any]:
     """
     Check user credentials and optionally migrate password hash if needed.
 
@@ -546,7 +546,7 @@ async def check_credential_with_migration(
 
 
 async def check_credential(
-    db: SAEngine,
+    db: ExtendedAsyncSAEngine,
     domain: str,
     email: str,
     password: str,
