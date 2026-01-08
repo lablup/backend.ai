@@ -5,7 +5,7 @@ Tests the coordinator that manages scheduling operations and termination marking
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import AsyncMock, MagicMock, call
 from uuid import uuid4
 
 import pytest
@@ -847,9 +847,7 @@ class TestImageUpdateMethods:
         image_ref = "registry.example.com/python:3.9"
 
         # Execute
-        await schedule_coordinator.update_kernels_to_pulling_for_image(
-            agent_id, image, image_ref
-        )
+        await schedule_coordinator.update_kernels_to_pulling_for_image(agent_id, image, image_ref)
 
         # Verify
         mock_kernel_state_engine.update_kernels_to_pulling_for_image.assert_called_once_with(

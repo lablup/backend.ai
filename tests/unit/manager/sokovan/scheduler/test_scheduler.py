@@ -255,7 +255,9 @@ class TestProvisionerAllocation:
             )
         )
 
-    async def test_allocate_single_node_session_success(self, provisioner: SessionProvisioner) -> None:
+    async def test_allocate_single_node_session_success(
+        self, provisioner: SessionProvisioner
+    ) -> None:
         """Test successful allocation of a single-node session."""
         # Create session workload with 3 kernels
         kernels = [
@@ -333,7 +335,9 @@ class TestProvisionerAllocation:
                 "mem": Decimal("3072"),
             })
 
-    async def test_allocate_multi_node_session_success(self, provisioner: SessionProvisioner) -> None:
+    async def test_allocate_multi_node_session_success(
+        self, provisioner: SessionProvisioner
+    ) -> None:
         """Test successful allocation of a multi-node session."""
         # Create session workload with 3 kernels
         kernels = [
@@ -398,7 +402,9 @@ class TestProvisionerAllocation:
         })  # 1 + 2
         assert agents[1].container_count == 1  # 0 + 1 kernel
 
-    async def test_agent_state_updates_affect_selection(self, provisioner: SessionProvisioner) -> None:
+    async def test_agent_state_updates_affect_selection(
+        self, provisioner: SessionProvisioner
+    ) -> None:
         """Test that agent state updates affect subsequent selections."""
         # Create session with 3 kernels requiring 2 CPU each
         kernels = [
