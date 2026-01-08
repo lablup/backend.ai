@@ -6,7 +6,7 @@ from typing import Optional, cast
 
 from aiohttp import web
 
-from ai.backend.common.dto.manager.auth.field import AuthTokenType
+from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
 from ai.backend.logging.utils import BraceStyleAdapter
