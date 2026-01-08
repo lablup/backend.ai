@@ -223,12 +223,6 @@ class UUIDFilter:
     not_equals: uuid.UUID | None = None
     not_in: list[uuid.UUID] | None = None
 
-    # Case-insensitive operations
-    i_equals: uuid.UUID | None = None
-
-    # Case-insensitive NOT operations
-    i_not_equals: uuid.UUID | None = None
-
     def build_query_condition(
         self,
         factory: Callable[[UUIDMatchSpec], QueryCondition],
@@ -252,29 +246,11 @@ class UUIDFilter:
                     is_list_operation=False,
                 )
             )
-        if self.i_equals:
-            return factory(
-                UUIDMatchSpec(
-                    value=self.i_equals,
-                    case_insensitive=True,
-                    negated=False,
-                    is_list_operation=False,
-                )
-            )
         if self.not_equals:
             return factory(
                 UUIDMatchSpec(
                     value=self.not_equals,
                     case_insensitive=False,
-                    negated=True,
-                    is_list_operation=False,
-                )
-            )
-        if self.i_not_equals:
-            return factory(
-                UUIDMatchSpec(
-                    value=self.i_not_equals,
-                    case_insensitive=True,
                     negated=True,
                     is_list_operation=False,
                 )
