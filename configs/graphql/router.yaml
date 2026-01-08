@@ -9,14 +9,14 @@ headers:
     request:
       - propagate:
           matching: ".*"
-      # NOTE: Inserting Headers required for making credentials required when communicating with Manager
+      # NOTE: Headers required for authentication when communicating with Manager
       - insert:
           name: "host"
-          # NOTE: localhost must be changed to the IP or hostname of manager
+         # NOTE: localhost must be changed to the IP or hostname of the Manager
           value: "localhost:8091"
       - insert:
           name: "X-Forwarded-URL"
           # NOTE: When using Docker Compose with port mapping (e.g., 5000:4000), use the host port (5000), not the container port.
           # NOTE: Current value assumes host port equals container port (4000:4000).
           # NOTE: Trailing slash is required
-          value: "http://127.0.0.1:4000/" 
+          value: "http://127.0.0.1:4000/"
