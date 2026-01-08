@@ -2,6 +2,14 @@
 # implementation: backend.ai monorepo standard pre-commit hook
 set -e  # Exit on error
 
+# Make it interruptible.
+cleanup() {
+  local sig="${1:-TERM}"
+  jobs -p | xargs -r kill -s "$sig"
+  wait; exit 1
+}
+trap cleanup SIGINT SIGTERM
+
 BASE_PATH=$(cd "$(dirname "$0")"/.. && pwd)
 cd "$BASE_PATH"
 
