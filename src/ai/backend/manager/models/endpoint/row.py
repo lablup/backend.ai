@@ -4,10 +4,12 @@ import logging
 from collections import defaultdict
 from collections.abc import (
     Container,
+    Iterable,
     Mapping,
     Sequence,
 )
-from datetime import datetime
+import uuid
+from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import (
@@ -413,7 +415,7 @@ class EndpointRow(Base):
         load_tokens: bool = False,
         load_created_user: bool = False,
         load_session_owner: bool = False,
-        status_filter: Container[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
+        status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
     ) -> list[Self]:
         query = (
             sa.select(EndpointRow)
@@ -437,7 +439,7 @@ class EndpointRow(Base):
         if user_uuid:
             query = query.filter(EndpointRow.session_owner == user_uuid)
         result = await session.execute(query)
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     @classmethod
     async def batch_load(
@@ -452,7 +454,7 @@ class EndpointRow(Base):
         load_tokens: bool = False,
         load_created_user: bool = False,
         load_session_owner: bool = False,
-        status_filter: Container[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
+        status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
     ) -> Sequence[Self]:
         query = (
             sa.select(EndpointRow)
@@ -493,7 +495,7 @@ class EndpointRow(Base):
         load_tokens: bool = False,
         load_created_user: bool = False,
         load_session_owner: bool = False,
-        status_filter: Container[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
+        status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
     ) -> Sequence[Self]:
         query = (
             sa.select(EndpointRow)
@@ -587,7 +589,8 @@ class EndpointRow(Base):
                 token_row.delegate_ownership(target_user_uuid)
             for routing_row in cast(list[RoutingRow], row.routings):
                 routing_row.delegate_ownership(target_user_uuid)
-                session_ids.append(routing_row.session)
+                if routing_row.session is not None:
+                    session_ids.append(routing_row.session)
         session_rows = await SessionRow.list_sessions(
             db_session, session_ids, kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS
         )
@@ -608,6 +611,7 @@ class EndpointRow(Base):
                 for r in active_routes
                 if r.status in RouteStatus.active_route_statuses()
                 and r.session
+                and r.session_row is not None
                 and r.session_row.status in [SessionStatus.RUNNING, SessionStatus.CREATING]
             ],
         )
@@ -627,7 +631,10 @@ class EndpointRow(Base):
                     kernel.id,
                 )
                 continue
-            num_inference_ports = len([*filter(lambda x: x["is_inference"], kernel.service_ports)])
+            service_ports_list = cast(list[dict[str, Any]], kernel.service_ports)
+            num_inference_ports = len(
+                [*filter(lambda x: x["is_inference"], service_ports_list)]
+            )
             if num_inference_ports > 1:
                 log.warning(
                     "generate_route_info(): Multiple ({}) inference ports found. "
@@ -635,7 +642,7 @@ class EndpointRow(Base):
                     num_inference_ports,
                     self.id,
                 )
-            for port_info in kernel.service_ports:
+            for port_info in service_ports_list:
                 if port_info["is_inference"]:
                     connection_info[port_info["name"]].append({
                         "session_id": str(kernel.session_id),
@@ -655,8 +662,8 @@ class EndpointRow(Base):
             project=self.project,
             resource_group=self.resource_group,
             resource_slots=self.resource_slots,
-            url=self.url,
-            model=self.model,
+            url=self.url or "",
+            model=self.model or uuid.UUID(int=0),
             model_definition_path=self.model_definition_path,
             model_mount_destination=self.model_mount_destination,
             created_user_id=self.created_user,
@@ -674,8 +681,8 @@ class EndpointRow(Base):
             replicas=self.replicas,
             cluster_mode=ClusterMode(self.cluster_mode),
             cluster_size=self.cluster_size,
-            open_to_public=self.open_to_public,
-            created_at=self.created_at,
+            open_to_public=self.open_to_public if self.open_to_public is not None else False,
+            created_at=self.created_at or datetime.now(timezone.utc),
             destroyed_at=self.destroyed_at,
             retries=self.retries,
             lifecycle_stage=self.lifecycle_stage,
@@ -796,7 +803,7 @@ class EndpointRow(Base):
                 desired_replica_count=self.desired_replicas,
             ),
             network=DeploymentNetworkSpec(
-                open_to_public=self.open_to_public,
+                open_to_public=self.open_to_public if self.open_to_public is not None else False,
                 url=self.url,
             ),
             model_revisions=[
@@ -809,7 +816,7 @@ class EndpointRow(Base):
                         resource_opts=revision.resource_opts,
                     ),
                     mounts=MountMetadata(
-                        model_vfolder_id=revision.model,
+                        model_vfolder_id=revision.model or uuid.UUID(int=0),
                         model_definition_path=revision.model_definition_path,
                         model_mount_destination=revision.model_mount_destination,
                         extra_mounts=revision.extra_mounts or [],
@@ -819,7 +826,7 @@ class EndpointRow(Base):
                         bootstrap_script=revision.bootstrap_script,
                         environ=revision.environ,
                         runtime_variant=revision.runtime_variant,
-                        callback_url=revision.callback_url,
+                        callback_url=yarl.URL(revision.callback_url) if revision.callback_url else None,
                     ),
                 ),
             ],
@@ -829,6 +836,8 @@ class EndpointRow(Base):
     def _to_deployment_info_legacy(self) -> DeploymentInfo:
         """Build DeploymentInfo using endpoint-level fields (legacy fallback)."""
         # Create ImageIdentifier from endpoint's image_row
+        if self.image_row is None:
+            raise ValueError("image_row is not loaded")
         image_identifier = ImageIdentifier(
             canonical=self.image_row.name,
             architecture=self.image_row.architecture,
@@ -855,20 +864,20 @@ class EndpointRow(Base):
                 desired_replica_count=self.desired_replicas,
             ),
             network=DeploymentNetworkSpec(
-                open_to_public=self.open_to_public,
+                open_to_public=self.open_to_public if self.open_to_public is not None else False,
                 url=self.url,
             ),
             model_revisions=[
                 ModelRevisionSpec(
                     image_identifier=image_identifier,
                     resource_spec=ResourceSpec(
-                        cluster_mode=self.cluster_mode,
+                        cluster_mode=ClusterMode(self.cluster_mode),
                         cluster_size=self.cluster_size,
                         resource_slots=self.resource_slots,
                         resource_opts=self.resource_opts,
                     ),
                     mounts=MountMetadata(
-                        model_vfolder_id=self.model,
+                        model_vfolder_id=self.model or uuid.UUID(int=0),
                         model_definition_path=self.model_definition_path,
                         model_mount_destination=self.model_mount_destination,
                         extra_mounts=self.extra_mounts,
@@ -878,7 +887,7 @@ class EndpointRow(Base):
                         bootstrap_script=self.bootstrap_script,
                         environ=self.environ,
                         runtime_variant=self.runtime_variant,
-                        callback_url=self.callback_url,
+                        callback_url=yarl.URL(self.callback_url) if self.callback_url else None,
                     ),
                 ),
             ],
@@ -994,11 +1003,11 @@ class EndpointTokenRow(Base):
         return EndpointTokenData(
             id=self.id,
             token=self.token,
-            endpoint=self.endpoint,
+            endpoint=self.endpoint or uuid.UUID(int=0),
             domain=self.domain,
             project=self.project,
             session_owner=self.session_owner,
-            created_at=self.created_at,
+            created_at=self.created_at or datetime.now(timezone.utc),
         )
 
 
@@ -1051,7 +1060,7 @@ class EndpointAutoScalingRuleRow(Base):
     async def list(
         cls,
         session: AsyncSession,
-        endpoint_status_filter: Container[EndpointLifecycle] = frozenset([
+        endpoint_status_filter: Iterable[EndpointLifecycle] = frozenset([
             EndpointLifecycle.CREATED
         ]),
     ) -> Sequence[Self]:
@@ -1089,14 +1098,14 @@ class EndpointAutoScalingRuleRow(Base):
             id=self.id,
             metric_source=self.metric_source,
             metric_name=self.metric_name,
-            threshold=self.threshold,
+            threshold=str(self.threshold),
             comparator=self.comparator,
             step_size=self.step_size,
             cooldown_seconds=self.cooldown_seconds,
-            min_replicas=self.min_replicas,
-            max_replicas=self.max_replicas,
-            created_at=self.created_at,
-            last_triggered_at=self.last_triggered_at,
+            min_replicas=self.min_replicas or 0,
+            max_replicas=self.max_replicas or 0,
+            created_at=self.created_at or datetime.now(timezone.utc),
+            last_triggered_at=self.last_triggered_at or datetime.now(timezone.utc),
             endpoint=self.endpoint,
         )
 
@@ -1121,7 +1130,7 @@ class EndpointAutoScalingRuleRow(Base):
             condition=AutoScalingCondition(
                 metric_source=self.metric_source,
                 metric_name=self.metric_name,
-                threshold=self.threshold,
+                threshold=str(self.threshold),
                 comparator=self.comparator,
             ),
             action=AutoScalingAction(
@@ -1130,7 +1139,7 @@ class EndpointAutoScalingRuleRow(Base):
                 min_replicas=self.min_replicas,
                 max_replicas=self.max_replicas,
             ),
-            created_at=self.created_at,
+            created_at=self.created_at or datetime.now(timezone.utc),
             last_triggered_at=self.last_triggered_at,
         )
 
@@ -1191,8 +1200,8 @@ class EndpointAutoScalingRuleRow(Base):
             time_window=self.cooldown_seconds,  # Map cooldown_seconds to time_window
             min_replicas=self.min_replicas,
             max_replicas=self.max_replicas,
-            created_at=self.created_at,
-            last_triggered_at=self.last_triggered_at,
+            created_at=self.created_at or datetime.now(timezone.utc),
+            last_triggered_at=self.last_triggered_at or datetime.now(timezone.utc),
         )
 
     def apply_model_deployment_modifier(
@@ -1257,6 +1266,8 @@ class ModelServiceHelper:
 
         result = await conn.execute(query)
         sgroup = result.first()
+        if sgroup is None:
+            raise ServiceUnavailable("Scaling group not found")
         wsproxy_addr = sgroup.wsproxy_addr
         if not wsproxy_addr:
             raise ServiceUnavailable("No coordinator configured for this resource group")

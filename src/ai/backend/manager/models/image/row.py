@@ -747,9 +747,12 @@ class ImageRow(Base):
 
         merged_resources: dict[str, Any] = {}
 
-        all_keys: set[str] = {*custom_resources.keys(), *label_resources.keys()}
+        all_keys: set[SlotName] = {
+            *(SlotName(k) for k in custom_resources.keys()),
+            *label_resources.keys(),
+        }
         for label_key in all_keys:
-            custom_spec = custom_resources.get(label_key, {})
+            custom_spec = custom_resources.get(str(label_key), {})
             label_spec = label_resources.get(label_key, {})
 
             merged_spec = dict(custom_spec)
@@ -757,16 +760,17 @@ class ImageRow(Base):
                 merged_spec.setdefault(label_spec_key, value)
 
             # TODO: Consider other slot types
-            if label_key in INTRINSIC_SLOTS.keys():
+            label_key_str = str(label_key)
+            if label_key_str in INTRINSIC_SLOTS.keys():
                 mins = [m for m in (custom_spec.get("min"), label_spec.get("min")) if m is not None]
                 if mins:
-                    match label_key:
+                    match label_key_str:
                         case "cpu":
                             merged_spec["min"] = max(mins)
                         case "mem":
                             merged_spec["min"] = max(mins, key=BinarySize.from_str)
 
-            merged_resources[label_key] = merged_spec
+            merged_resources[label_key_str] = merged_spec
         return ImageRow._resources.type._schema.check(merged_resources)
 
     def get_resources_from_labels(self) -> Resources:

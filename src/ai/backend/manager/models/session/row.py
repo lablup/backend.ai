@@ -962,7 +962,7 @@ class SessionRow(Base):
             terminated_at=session_data.terminated_at,
             starts_at=session_data.starts_at,
         )
-        instance.id = session_data.id
+        instance.id = SessionId(session_data.id)
         return instance
 
     def to_dataclass(self, owner: Optional[UserData] = None) -> SessionData:
@@ -1316,7 +1316,7 @@ class SessionRow(Base):
         data: dict[str, Any] = {
             "status": status,
             "status_history": sql_json_merge(
-                sessions.c.status_history,
+                SessionRow.__table__.c.status_history,
                 (),
                 {
                     status.name: datetime.now(tzutc()).isoformat(),
@@ -1425,7 +1425,7 @@ class SessionRow(Base):
             )
             if not rows:
                 continue
-            return rows
+            return list(rows)
         return []
 
     @classmethod

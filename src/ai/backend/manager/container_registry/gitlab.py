@@ -31,10 +31,11 @@ class GitLabRegistry(BaseContainerRegistry):
         encoded_project_id = urllib.parse.quote(self.registry_info.project, safe="")
         repo_list_url = f"{api_endpoint}/api/v4/projects/{encoded_project_id}/registry/repositories"
 
-        headers = {
+        headers: dict[str, str] = {
             "Accept": "application/json",
-            "PRIVATE-TOKEN": access_token,
         }
+        if access_token:
+            headers["PRIVATE-TOKEN"] = access_token
         page = 1
 
         while True:

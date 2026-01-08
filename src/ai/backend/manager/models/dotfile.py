@@ -30,7 +30,7 @@ async def prepare_dotfiles(
     vfolder_mounts: Sequence[VFolderMount],
 ) -> Mapping[str, Any]:
     # Feed SSH keypair and dotfiles if exists.
-    internal_data = {}
+    internal_data: dict[str, Any] = {}
     query = (
         sa.select(
             keypairs.c.ssh_public_key,

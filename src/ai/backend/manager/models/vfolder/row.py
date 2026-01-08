@@ -7,7 +7,7 @@ import uuid
 from collections.abc import Callable, Container, Iterable, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timezone
 from pathlib import PurePosixPath
 from typing import (
     TYPE_CHECKING,
@@ -508,11 +508,11 @@ class VFolderRow(Base):
             usage_mode=self.usage_mode,
             permission=self.permission,
             host=self.host,
-            max_files=self.max_files,
+            max_files=self.max_files or 0,
             max_size=self.max_size,
-            num_files=self.num_files,
-            cur_size=self.cur_size,
-            created_at=self.created_at,
+            num_files=self.num_files or 0,
+            cur_size=self.cur_size or 0,
+            created_at=self.created_at or datetime.now(timezone.utc),
             last_used=self.last_used,
             creator=self.creator,
             unmanaged_path=self.unmanaged_path,
@@ -717,8 +717,8 @@ async def query_accessible_vfolders(
         # Scan vfolders on requester's behalf.
         j = vfolders.join(users, vfolders.c.user == users.c.uuid)
         query = sa.select(
-            vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True
-        ).select_from(j)
+            *vfolders_selectors, vfolders.c.permission, users.c.email
+        ).set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL).select_from(j)
         if allowed_status_set is not None:
             query = query.where(vfolders.c.status.in_(vfolder_status_map[allowed_status_set]))
         else:
@@ -741,9 +741,9 @@ async def query_accessible_vfolders(
         )
         query = (
             sa.select(
-                vfolders_selectors + [vfolder_permissions.c.permission, users.c.email],
-                use_labels=True,
+                *vfolders_selectors, vfolder_permissions.c.permission, users.c.email
             )
+            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
             .select_from(j)
             .where(
                 (vfolder_permissions.c.user == user_uuid)
@@ -779,8 +779,8 @@ async def query_accessible_vfolders(
             group_ids = [g.group_id for g in grps]
         j = vfolders.join(groups, vfolders.c.group == groups.c.id)
         query = sa.select(
-            vfolders_selectors + [vfolders.c.permission, groups.c.name], use_labels=True
-        ).select_from(j)
+            *vfolders_selectors, vfolders.c.permission, groups.c.name
+        ).set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL).select_from(j)
         if user_role != UserRole.SUPERADMIN and user_role != "superadmin":
             query = query.where(vfolders.c.group.in_(group_ids))
         if extra_vf_group_conds is not None:
@@ -1250,7 +1250,7 @@ async def update_vfolder_status(
                 "status": update_status,
                 "status_changed": now,
                 "status_history": sql_json_merge(
-                    VFolderRow.status_history,
+                    vfolders.c.status_history,
                     (),
                     {
                         update_status.name: now.isoformat(),
@@ -1452,7 +1452,7 @@ async def ensure_quota_scope_accessible_by_user(
 
 async def get_sessions_by_mounted_folder(
     db_session: SASession, vfolder_id: VFolderID
-) -> tuple[SessionId]:
+) -> tuple[SessionId, ...]:
     """
     Return a tuple of sessions.id that the give folder is mounted on.
     """
@@ -1627,8 +1627,10 @@ class VFolderPermissionContext(
             permissions = set(overriding_perm)
         else:
             permissions |= self.object_id_to_additional_permission_map.get(vfolder_id, set())
-            permissions |= self.user_id_to_permission_map.get(vfolder_row.user, set())
-            permissions |= self.project_id_to_permission_map.get(vfolder_row.group, set())
+            if vfolder_row.user is not None:
+                permissions |= self.user_id_to_permission_map.get(vfolder_row.user, set())
+            if vfolder_row.group is not None:
+                permissions |= self.project_id_to_permission_map.get(vfolder_row.group, set())
             permissions |= self.domain_name_to_permission_map.get(vfolder_row.domain_name, set())
 
         if self.host_permission_ctx is not None:
@@ -1785,6 +1787,7 @@ class VFolderPermissionContextBuilder(
         object_id_to_permission_map = {
             row.vfolder: LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
             for row in await self.db_session.scalars(_stmt)
+            if row.permission is not None
         }
         if ctx.user_role in (UserRole.SUPERADMIN, UserRole.ADMIN):
             ctx_to_merge = VFolderPermissionContext(
@@ -1818,6 +1821,7 @@ class VFolderPermissionContextBuilder(
         object_id_to_permission_map = {
             row.vfolder: LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
             for row in await self.db_session.scalars(_stmt)
+            if row.permission is not None
         }
         if ctx.user_role in (UserRole.ADMIN, UserRole.SUPERADMIN):
             result.object_id_to_additional_permission_map = object_id_to_permission_map
@@ -1846,6 +1850,7 @@ class VFolderPermissionContextBuilder(
         object_id_to_permission_map = {
             row.vfolder: LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
             for row in await self.db_session.scalars(_stmt)
+            if row.permission is not None
         }
         if ctx.user_role in (UserRole.SUPERADMIN, UserRole.ADMIN):
             result.object_id_to_additional_permission_map = object_id_to_permission_map
@@ -1904,8 +1909,8 @@ async def get_vfolders(
     vfolder_id: uuid.UUID | None = None,
     vfolder_name: str | None = None,
     usage_mode: VFolderUsageMode | None = None,
-    allowed_status: Container[VFolderOperationStatus] | None = None,
-    blocked_status: Container[VFolderOperationStatus] | None = None,
+    allowed_status: Iterable[VFolderOperationStatus] | None = None,
+    blocked_status: Iterable[VFolderOperationStatus] | None = None,
 ) -> list[VFolderWithPermissionSet]:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         host_permission = _VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP[requested_permission]
