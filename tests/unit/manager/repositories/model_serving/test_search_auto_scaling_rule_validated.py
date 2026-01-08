@@ -1,5 +1,5 @@
 """
-Tests for search_auto_scaling_rules_validated functionality.
+Tests for search_auto_scaling_rules functionality.
 Tests the repository layer for searching auto scaling rules with real database.
 """
 
@@ -58,7 +58,7 @@ from ai.backend.testutils.db import with_tables
 
 
 class TestSearchAutoScalingRulesValidated:
-    """Test cases for search_auto_scaling_rules_validated in ModelServingRepository."""
+    """Test cases for search_auto_scaling_rules in ModelServingRepository."""
 
     # =========================================================================
     # Fixtures
@@ -404,7 +404,7 @@ class TestSearchAutoScalingRulesValidated:
             orders=[],
         )
 
-        result = await model_serving_repository.search_auto_scaling_rules_validated(
+        result = await model_serving_repository.search_auto_scaling_rules(
             querier=querier,
         )
 
@@ -425,7 +425,7 @@ class TestSearchAutoScalingRulesValidated:
             orders=[],
         )
 
-        result = await model_serving_repository.search_auto_scaling_rules_validated(
+        result = await model_serving_repository.search_auto_scaling_rules(
             querier=querier,
         )
 
@@ -449,7 +449,7 @@ class TestSearchAutoScalingRulesValidated:
             orders=[],
         )
 
-        result = await model_serving_repository.search_auto_scaling_rules_validated(
+        result = await model_serving_repository.search_auto_scaling_rules(
             querier=querier,
         )
 
@@ -470,7 +470,7 @@ class TestSearchAutoScalingRulesValidated:
             orders=[],
         )
 
-        result = await model_serving_repository.search_auto_scaling_rules_validated(
+        result = await model_serving_repository.search_auto_scaling_rules(
             querier=querier,
         )
 
@@ -491,7 +491,7 @@ class TestSearchAutoScalingRulesValidated:
             orders=[],
         )
 
-        result = await model_serving_repository.search_auto_scaling_rules_validated(
+        result = await model_serving_repository.search_auto_scaling_rules(
             querier=querier,
         )
 
@@ -516,7 +516,7 @@ class TestSearchAutoScalingRulesValidated:
             orders=[EndpointAutoScalingRuleRow.threshold.asc()],
         )
 
-        result = await model_serving_repository.search_auto_scaling_rules_validated(
+        result = await model_serving_repository.search_auto_scaling_rules(
             querier=querier,
         )
 
@@ -535,7 +535,7 @@ class TestSearchAutoScalingRulesValidated:
             orders=[EndpointAutoScalingRuleRow.metric_name.desc()],
         )
 
-        result = await model_serving_repository.search_auto_scaling_rules_validated(
+        result = await model_serving_repository.search_auto_scaling_rules(
             querier=querier,
         )
 
