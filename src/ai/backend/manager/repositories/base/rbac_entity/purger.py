@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from collections.abc import Collection
 from dataclasses import dataclass
 from uuid import UUID
@@ -49,7 +48,7 @@ async def _get_related_roles(
 ) -> list[RoleRow]:
     """
     Get all roles related to the given entity as object permissions.
-    Loads all object_permissions, permission_groups, and permission_rows for each role.
+    Loads object_permissions with their scope_associations, and permission_groups with permissions.
     """
     role_scalars = await db_sess.scalars(
         sa.select(RoleRow)
@@ -61,7 +60,9 @@ async def _get_related_roles(
             )
         )
         .options(
-            selectinload(RoleRow.object_permission_rows),
+            selectinload(RoleRow.object_permission_rows).selectinload(
+                ObjectPermissionRow.scope_association_rows
+            ),
             selectinload(RoleRow.permission_group_rows).selectinload(
                 PermissionGroupRow.permission_rows
             ),
@@ -70,41 +71,8 @@ async def _get_related_roles(
     return role_scalars.unique().all()
 
 
-async def _get_entity_scopes(
-    db_sess: SASession,
-    entities: Collection[ObjectId],
-) -> dict[ObjectId, set[ScopeId]]:
-    """
-    Get all scopes for a list of entities in a single query.
-
-    Returns:
-        Mapping of ObjectId -> set of ScopeId
-    """
-    if not entities:
-        return {}
-
-    entity_tuples = [(e.entity_type, e.entity_id) for e in entities]
-    assoc_scalars = await db_sess.scalars(
-        sa.select(AssociationScopesEntitiesRow).where(
-            sa.tuple_(
-                AssociationScopesEntitiesRow.entity_type,
-                AssociationScopesEntitiesRow.entity_id,
-            ).in_(entity_tuples)
-        )
-    )
-
-    result: defaultdict[ObjectId, set[ScopeId]] = defaultdict(set)
-    assoc_rows: list[AssociationScopesEntitiesRow] = assoc_scalars.all()
-    for assoc in assoc_rows:
-        key = assoc.object_id()
-        scope = assoc.parsed_scope_id()
-        result[key].add(scope)
-    return result
-
-
 def _perm_group_ids_to_delete_in_role(
     role_row: RoleRow,
-    entity_scopes: dict[ObjectId, set[ScopeId]],
     entity_to_delete: ObjectId,
 ) -> list[UUID]:
     """
@@ -118,13 +86,13 @@ def _perm_group_ids_to_delete_in_role(
     if not role_row.permission_group_rows:
         return perm_group_ids
 
+    # Collect scopes from remaining entities (via eagerly loaded scope_association_rows)
     remaining_scopes: set[ScopeId] = set()
     for object_permission_row in role_row.object_permission_rows:
-        object_id = object_permission_row.object_id()
-        if object_id == entity_to_delete:
+        if object_permission_row.object_id() == entity_to_delete:
             continue
-        scopes = entity_scopes.get(object_id, set())
-        remaining_scopes.update(scopes)
+        for assoc in object_permission_row.scope_association_rows:
+            remaining_scopes.add(assoc.parsed_scope_id())
 
     for perm_group_row in role_row.permission_group_rows:
         # Skip permission groups that have remaining permissions
@@ -138,23 +106,13 @@ def _perm_group_ids_to_delete_in_role(
 
 def _perm_group_ids_to_delete(
     role_rows: Collection[RoleRow],
-    entity_scopes: dict[ObjectId, set[ScopeId]],
     entity_to_delete: ObjectId,
 ) -> list[UUID]:
-    # all_entites = _all_object_permission_entities_in_roles(role_rows)
-    # if not all_entites:
-    #     all_entites.add(entity_to_delete)
-    # entity_scopes = await _get_entity_scopes(db_sess, all_entites)
-
     if not role_rows:
         return []
     permission_group_ids: list[UUID] = []
     for role_row in role_rows:
-        perm_group_ids = _perm_group_ids_to_delete_in_role(
-            role_row,
-            entity_scopes,
-            entity_to_delete,
-        )
+        perm_group_ids = _perm_group_ids_to_delete_in_role(role_row, entity_to_delete)
         permission_group_ids.extend(perm_group_ids)
     return permission_group_ids
 
@@ -172,17 +130,6 @@ def _object_permission_ids_to_delete(
             if object_id == entity_to_delete:
                 object_permission_ids.append(object_permission_row.id)
     return object_permission_ids
-
-
-def _all_object_permission_entities_in_roles(
-    role_rows: Collection[RoleRow],
-) -> set[ObjectId]:
-    object_ids: set[ObjectId] = set()
-    for role_row in role_rows:
-        for object_permission_row in role_row.object_permission_rows:
-            object_id = object_permission_row.object_id()
-            object_ids.add(object_id)
-    return object_ids
 
 
 async def _delete_main_object_row(
@@ -226,16 +173,10 @@ async def _delete_rbac_entity(
     db_sess: SASession,
     entity_id: ObjectId,
 ) -> None:
-    # Get all roles associated with the entity as object permission
+    # Get all roles with object_permissions and their scope_associations eagerly loaded
     role_rows = await _get_related_roles(db_sess, entity_id)
     object_permission_ids = _object_permission_ids_to_delete(role_rows, entity_id)
-    all_entites = _all_object_permission_entities_in_roles(role_rows)
-    if not all_entites:
-        all_entites.add(entity_id)
-    entity_scopes = await _get_entity_scopes(db_sess, all_entites)
-
-    # Determine which object_permissions and permission_groups to delete
-    permission_group_ids = _perm_group_ids_to_delete(role_rows, entity_scopes, entity_id)
+    permission_group_ids = _perm_group_ids_to_delete(role_rows, entity_id)
 
     # Execute deletions
     if object_permission_ids:
