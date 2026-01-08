@@ -21,9 +21,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.model_serving import EndpointCreatorSpec
-from ai.backend.manager.repositories.model_serving.admin_repository import (
-    AdminModelServingRepository,
-)
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 
 
@@ -50,12 +47,6 @@ def mock_db_engine():
 def model_serving_repository(mock_db_engine):
     """Create a ModelServingRepository instance with mocked database."""
     return ModelServingRepository(db=mock_db_engine)
-
-
-@pytest.fixture
-def admin_model_serving_repository(mock_db_engine):
-    """Create an AdminModelServingRepository instance with mocked database."""
-    return AdminModelServingRepository(db=mock_db_engine)
 
 
 @pytest.fixture
