@@ -135,6 +135,7 @@ class DBConfig(BaseSchema):
             ),
             added_version="25.9.0",
             secret=True,
+            example=ConfigExample(local="DB_PASSWORD", prod="DB_PASSWORD"),
         ),
     ]
     pool_size: Annotated[
@@ -206,7 +207,7 @@ class ProxyCoordinatorConfig(BaseSchema):
                 "performance and is recommended for production deployments."
             ),
             added_version="25.9.0",
-            example=ConfigExample(local="asyncio", prod="uvloop"),
+            example=ConfigExample(local="asyncio", prod="asyncio"),
         ),
     ]
     pid_file: Annotated[

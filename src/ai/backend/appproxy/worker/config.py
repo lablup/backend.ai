@@ -392,7 +392,7 @@ class ProxyWorkerConfig(BaseSchema):
                 "if uvloop is not available."
             ),
             added_version="25.9.0",
-            example=ConfigExample(local="uvloop", prod="uvloop"),
+            example=ConfigExample(local="asyncio", prod="asyncio"),
         ),
     ]
     pid_file: Annotated[

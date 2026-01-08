@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import textwrap
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
 from ai.backend.common.configs.inspector import ConfigInspector, FieldSchema
-from ai.backend.common.meta import CompositeType, ConfigEnvironment
+from ai.backend.common.meta import CompositeType, ConfigEnvironment, ConfigExample
 
 from .formatter import CompositeFormatter, create_default_formatter
 from .types import FieldVisibility, GeneratorConfig
@@ -296,9 +296,17 @@ class TOMLGenerator:
         lines.append(f"{indent}[[{section_name}]]")
         lines.append(f"{indent}# Add multiple [[{section_name}]] sections as needed")
 
-        # Child fields
+        # Child fields - try to use parent's example for the first item
         if field.children:
-            child_lines = self._generate_schema(field.children, section_path)
+            # Check if parent has an example we can use for child fields
+            parent_example = self._parse_array_item_example(field)
+            if parent_example:
+                # Generate child fields with examples from parent
+                child_lines = self._generate_array_children_with_example(
+                    field.children, section_path, parent_example
+                )
+            else:
+                child_lines = self._generate_schema(field.children, section_path)
             lines.extend(child_lines)
 
         return lines
@@ -322,64 +330,170 @@ class TOMLGenerator:
 
         return FieldVisibility.REQUIRED
 
-    def _get_field_value(self, field: FieldSchema) -> str:
+    def _get_field_value(self, field: FieldSchema) -> Any:
         """Get the value to use for a field.
 
-        Priority: example value > default > placeholder
+        Priority: example value > default value > None (placeholder)
+
+        Example values are preferred for sample.toml generation.
+        Since example values are strings, they are converted to proper types
+        based on the field's type information.
 
         Args:
             field: The field schema.
 
         Returns:
-            The value string to use in output.
+            The value to use in output, or None if formatter should generate placeholder.
         """
         # Handle secrets
         if field.type_info.secret and self._config.mask_secrets:
             return self._config.secret_placeholder
 
-        # Try example value first
-        example = self._inspector.get_example_value(field)
-        if example is not None:
-            return example
+        # Use example value first (preferred for sample.toml)
+        if field.doc.example is not None:
+            example_str = self._get_example_value(field.doc.example)
+            # Convert string example to proper type
+            return self._convert_example_to_type(example_str, field.type_info.type_name)
 
-        # Fall back to default
+        # Fallback to default value
         if field.type_info.default is not None:
             return field.type_info.default
 
-        # Placeholder based on type
-        return self._get_type_placeholder(field.type_info.type_name)
+        # Return None - formatter will generate type-appropriate placeholder
+        return None
 
-    def _get_type_placeholder(self, type_name: str) -> str:
-        """Get a placeholder value for a type.
+    def _get_example_value(self, example: ConfigExample) -> str:
+        """Get example value based on current environment.
 
         Args:
-            type_name: The type name.
+            example: The ConfigExample object.
 
         Returns:
-            A placeholder string for the type.
+            The example value for the current environment.
         """
+        if self.env == ConfigEnvironment.LOCAL:
+            return example.local
+        return example.prod
+
+    def _convert_example_to_type(self, example: str, type_name: str) -> Any:
+        """Convert string example value to proper type based on type name.
+
+        Args:
+            example: The example value as string.
+            type_name: The type name from field schema.
+
+        Returns:
+            The converted value with proper type.
+        """
+        import json
+
         type_lower = type_name.lower()
 
-        if "str" in type_lower:
-            return "..."
-        if "int" in type_lower:
-            return "0"
-        if "float" in type_lower:
-            return "0.0"
-        if "bool" in type_lower:
-            return "false"
+        # List conversion - parse JSON array string like '["a", "b"]'
         if "list" in type_lower or "sequence" in type_lower:
-            return "[]"
-        if "dict" in type_lower or "mapping" in type_lower:
-            return "{}"
-        if "path" in type_lower:
-            return "/path/to/file"
-        if "binarysize" in type_lower:
-            return "1G"
-        if "hostportpair" in type_lower:
-            return '{ host = "localhost", port = 0 }'
+            if example.startswith("["):
+                try:
+                    return json.loads(example)
+                except json.JSONDecodeError:
+                    return example
+            return example
 
-        return "..."
+        # Dict conversion - parse JSON object string like '{"key": "value"}'
+        if "dict" in type_lower or "mapping" in type_lower:
+            if example.startswith("{"):
+                try:
+                    return json.loads(example)
+                except json.JSONDecodeError:
+                    return example
+            return example
+
+        # Boolean conversion
+        if "bool" in type_lower:
+            return example.lower() in ("true", "1", "yes")
+
+        # Integer conversion
+        if "int" in type_lower and "port" not in type_lower:
+            try:
+                return int(example)
+            except ValueError:
+                return example
+
+        # Float conversion
+        if "float" in type_lower or "decimal" in type_lower:
+            try:
+                return float(example)
+            except ValueError:
+                return example
+
+        # Keep as string for other types (str, HostPortPair, BinarySize, etc.)
+        # Formatters will handle these appropriately
+        return example
+
+    def _parse_array_item_example(self, field: FieldSchema) -> dict[str, str] | None:
+        """Parse first item example from parent's array example.
+
+        For arrays like list[HostPortPair], the parent example might be
+        "host1:port1,host2:port2". This extracts the first item.
+
+        Args:
+            field: The array field schema.
+
+        Returns:
+            Dictionary mapping child field names to example values, or None.
+        """
+        if field.doc.example is None:
+            return None
+
+        example_str = self._get_example_value(field.doc.example)
+        if not example_str:
+            return None
+
+        # Try to parse as comma-separated host:port pairs
+        if ":" in example_str:
+            # Take first item if comma-separated
+            first_item = example_str.split(",")[0].strip()
+            if ":" in first_item:
+                parts = first_item.rsplit(":", 1)
+                if len(parts) == 2:
+                    return {"host": parts[0], "port": parts[1]}
+
+        return None
+
+    def _generate_array_children_with_example(
+        self,
+        children: Mapping[str, FieldSchema],
+        path: list[str],
+        example_values: dict[str, str],
+    ) -> list[str]:
+        """Generate child fields with overridden examples from parent.
+
+        Args:
+            children: Child field schemas.
+            path: Current path in hierarchy.
+            example_values: Mapping of field names to example values.
+
+        Returns:
+            List of TOML lines.
+        """
+        from dataclasses import replace
+
+        # Create modified children with injected examples
+        modified_children: dict[str, FieldSchema] = {}
+        for key, child_field in children.items():
+            if key in example_values:
+                # Create a new example and inject it
+                new_example = ConfigExample(
+                    local=example_values[key],
+                    prod=example_values[key],
+                )
+                new_doc = replace(child_field.doc, example=new_example)
+                modified_child = replace(child_field, doc=new_doc)
+                modified_children[key] = modified_child
+            else:
+                modified_children[key] = child_field
+
+        # Generate using the modified schema
+        return self._generate_schema(modified_children, path)
 
     def _get_indent(self, level: int) -> str:
         """Get indentation string for a nesting level.
@@ -461,9 +575,9 @@ def generate_sample_toml(
     output_path: str | Path | None = None,
     header: str | None = None,
 ) -> str:
-    """Generate sample.toml with PROD environment examples.
+    """Generate sample.toml with LOCAL (dev) environment examples.
 
-    Convenience function for generating production configuration samples.
+    Convenience function for generating development configuration samples.
 
     Args:
         model: The Pydantic model class.
@@ -473,7 +587,7 @@ def generate_sample_toml(
     Returns:
         The generated TOML content.
     """
-    generator = TOMLGenerator(env=ConfigEnvironment.PROD)
+    generator = TOMLGenerator(env=ConfigEnvironment.LOCAL)
     content = generator.generate(model)
 
     if output_path:

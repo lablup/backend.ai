@@ -561,7 +561,7 @@ class CommonAgentConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             secret=True,
-            example=ConfigExample(local="", prod="/etc/backend.ai/ssl/agent.crt"),
+            example=ConfigExample(local="/path/to/cert.pem", prod="/etc/backend.ai/ssl/agent.crt"),
         ),
     ]
     ssl_key: Annotated[
@@ -579,7 +579,7 @@ class CommonAgentConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             secret=True,
-            example=ConfigExample(local="", prod="/etc/backend.ai/ssl/agent.key"),
+            example=ConfigExample(local="/path/to/key.pem", prod="/etc/backend.ai/ssl/agent.key"),
         ),
     ]
     advertised_rpc_addr: Annotated[
@@ -596,7 +596,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "differs from the externally reachable address. If not set, uses rpc_listen_addr."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="", prod="192.168.1.100:6001"),
+            example=ConfigExample(local="192.168.1.100:6001", prod="192.168.1.100:6001"),
         ),
     ]
     rpc_auth_manager_public_key: Annotated[
@@ -616,7 +616,9 @@ class CommonAgentConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             secret=True,
-            example=ConfigExample(local="", prod="/etc/backend.ai/keys/manager.pub"),
+            example=ConfigExample(
+                local="/path/to/public.key", prod="/etc/backend.ai/keys/manager.pub"
+            ),
         ),
     ]
     rpc_auth_agent_keypair: Annotated[
@@ -634,7 +636,9 @@ class CommonAgentConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             secret=True,
-            example=ConfigExample(local="", prod="/etc/backend.ai/keys/agent.keypair"),
+            example=ConfigExample(
+                local="/path/to/keypair.key", prod="/etc/backend.ai/keys/agent.keypair"
+            ),
         ),
     ]
     ipc_base_path: Annotated[
@@ -685,7 +689,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Should be on a filesystem with sufficient space for user data."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="", prod="/mnt/backend.ai"),
+            example=ConfigExample(local="/mnt/backend.ai", prod="/mnt/backend.ai"),
         ),
     ]
     cohabiting_storage_proxy: Annotated[
@@ -719,7 +723,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "running on this agent, such as web terminals or application proxies."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="", prod="compute1.backend.ai"),
+            example=ConfigExample(local="backend.ai", prod="compute1.backend.ai"),
         ),
     ]
     region: Annotated[
@@ -732,7 +736,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Use standard region codes like 'us-east-1', 'eu-west-1', or custom identifiers."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="", prod="us-east-1"),
+            example=ConfigExample(local="us-east-1", prod="us-east-1"),
         ),
     ]
     instance_type: Annotated[
@@ -749,7 +753,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Use cloud provider's instance type names like 'm5.large' or 'n1-standard-4'."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="", prod="m5.xlarge"),
+            example=ConfigExample(local="m5.large", prod="m5.xlarge"),
         ),
     ]
     pid_file: Annotated[
@@ -783,7 +787,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "'uvloop' uses a faster libuv-based implementation (better performance, Linux only)."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="asyncio", prod="uvloop"),
+            example=ConfigExample(local="asyncio", prod="asyncio"),
         ),
     ]
     skip_manager_detection: Annotated[
@@ -894,7 +898,9 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Plugin names use Python package notation (e.g., 'ai.backend.accelerator.cuda')."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="", prod=""),
+            example=ConfigExample(
+                local="", prod='["ai.backend.accelerator.cuda", "ai.backend.accelerator.rocm"]'
+            ),
         ),
     ]
     block_compute_plugins: Annotated[
@@ -911,7 +917,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Use to disable specific accelerators or features on certain nodes."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="", prod=""),
+            example=ConfigExample(local="", prod='["ai.backend.accelerator.mock"]'),
         ),
     ]
     allow_network_plugins: Annotated[
@@ -928,7 +934,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "If set, only plugins in this list are loaded."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="", prod=""),
+            example=ConfigExample(local="", prod='["ai.backend.network.overlay"]'),
         ),
     ]
     block_network_plugins: Annotated[
@@ -944,7 +950,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "Use to disable specific network configurations on certain nodes."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="", prod=""),
+            example=ConfigExample(local="", prod='["ai.backend.network.legacy"]'),
         ),
     ]
     image_commit_path: Annotated[
@@ -1260,7 +1266,7 @@ class CommonContainerConfig(BaseConfigSchema):
                 "and should not normally be configured manually."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="", prod=""),
+            example=ConfigExample(local="", prod='{ "/opt/krunner": "/opt/backend.ai/krunner" }'),
         ),
     ]
 
@@ -1376,7 +1382,7 @@ class OverridableContainerConfig(BaseConfigSchema):
                 "Use to customize jail behavior like mount points or resource limits."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="", prod=""),
+            example=ConfigExample(local="", prod='["--mount=/data", "--limit-mem=4G"]'),
         ),
     ]
     scratch_type: Annotated[

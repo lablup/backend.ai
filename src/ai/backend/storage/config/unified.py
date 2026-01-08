@@ -179,6 +179,7 @@ class ClientAPIConfig(BaseConfigSchema):
             ),
             added_version="22.06.0",
             secret=True,
+            example=ConfigExample(local="", prod="/etc/ssl/private/storage-proxy.key"),
         ),
     ]
 
@@ -300,6 +301,7 @@ class ManagerAPIConfig(BaseConfigSchema):
             ),
             added_version="22.06.0",
             secret=True,
+            example=ConfigExample(local="", prod="/etc/ssl/private/storage-proxy.key"),
         ),
     ]
     secret: Annotated[
@@ -313,6 +315,7 @@ class ManagerAPIConfig(BaseConfigSchema):
             ),
             added_version="22.03.0",
             secret=True,
+            example=ConfigExample(local="MANAGER_API_SECRET", prod="MANAGER_API_SECRET"),
         ),
     ]
 
@@ -495,7 +498,7 @@ class StorageProxyConfig(BaseConfigSchema):
                 "alternative built on libuv but may have compatibility issues with some extensions."
             ),
             added_version="22.06.0",
-            example=ConfigExample(local="asyncio", prod="uvloop"),
+            example=ConfigExample(local="asyncio", prod="asyncio"),
         ),
     ]
     scandir_limit: Annotated[
@@ -544,6 +547,7 @@ class StorageProxyConfig(BaseConfigSchema):
             ),
             added_version="22.03.0",
             secret=True,
+            example=ConfigExample(local="JWT_SECRET", prod="JWT_SECRET"),
         ),
     ]
     session_expire: Annotated[
@@ -916,6 +920,9 @@ class ObjectStorageConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             secret=True,
+            example=ConfigExample(
+                local="OBJECT_STORAGE_ACCESS_KEY", prod="OBJECT_STORAGE_ACCESS_KEY"
+            ),
         ),
     ]
     secret_key: Annotated[
@@ -932,6 +939,9 @@ class ObjectStorageConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             secret=True,
+            example=ConfigExample(
+                local="OBJECT_STORAGE_SECRET_KEY", prod="OBJECT_STORAGE_SECRET_KEY"
+            ),
         ),
     ]
     buckets: Annotated[
@@ -1091,6 +1101,7 @@ class HuggingfaceConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             secret=True,
+            example=ConfigExample(local="", prod="HUGGINGFACE_TOKEN"),
         ),
     ]
     download_chunk_size: Annotated[
@@ -1160,6 +1171,7 @@ class ReservoirConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             secret=True,
+            example=ConfigExample(local="", prod="OBJECT_STORAGE_ACCESS_KEY"),
         ),
     ]
     object_storage_secret_key: Annotated[
@@ -1177,6 +1189,7 @@ class ReservoirConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             secret=True,
+            example=ConfigExample(local="", prod="OBJECT_STORAGE_SECRET_KEY"),
         ),
     ]
     object_storage_region: Annotated[
@@ -1229,6 +1242,7 @@ class ReservoirConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             secret=True,
+            example=ConfigExample(local="", prod="MANAGER_ACCESS_KEY"),
         ),
     ]
     manager_secret_key: Annotated[
@@ -1246,6 +1260,7 @@ class ReservoirConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             secret=True,
+            example=ConfigExample(local="", prod="MANAGER_SECRET_KEY"),
         ),
     ]
     manager_api_version: Annotated[

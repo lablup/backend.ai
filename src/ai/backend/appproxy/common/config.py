@@ -46,6 +46,7 @@ class PermitHashConfig(BaseSchema):
             description="Secret string used for creating permit hash.",
             added_version="25.13.0",
             secret=True,
+            example=ConfigExample(local="PERMIT_HASH_SECRET", prod="PERMIT_HASH_SECRET"),
         ),
     ]
     digest_mod: Annotated[
@@ -168,6 +169,7 @@ class RedisConfig(BaseSchema):
             description="Redis password.",
             added_version="25.13.0",
             secret=True,
+            example=ConfigExample(local="", prod="REDIS_PASSWORD"),
         ),
     ]
     redis_helper_config: Annotated[
@@ -368,6 +370,7 @@ class SecretConfig(BaseSchema):
             ),
             added_version="25.13.0",
             secret=True,
+            example=ConfigExample(local="JWT_SECRET", prod="JWT_SECRET"),
         ),
     ]
     api_secret: Annotated[
@@ -380,6 +383,7 @@ class SecretConfig(BaseSchema):
             ),
             added_version="25.13.0",
             secret=True,
+            example=ConfigExample(local="API_SECRET", prod="API_SECRET"),
         ),
     ]
 

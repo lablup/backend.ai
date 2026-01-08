@@ -708,6 +708,7 @@ class ManagerConfig(BaseConfigSchema):
             ),
             added_version="25.8.0",
             secret=True,
+            example=ConfigExample(local="XXXXXXXXXXXXXX", prod="<generate-secure-random-string>"),
         ),
     ]
     ssl_enabled: Annotated[
@@ -777,7 +778,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Use uvloop for better performance in high-throughput scenarios."
             ),
             added_version="25.8.0",
-            example=ConfigExample(local="asyncio", prod="uvloop"),
+            example=ConfigExample(local="asyncio", prod="asyncio"),
         ),
     ]
     distributed_lock: Annotated[
@@ -953,6 +954,10 @@ class ManagerConfig(BaseConfigSchema):
                 "Leave as None to load all available plugins except disabled_plugins."
             ),
             added_version="25.8.0",
+            example=ConfigExample(
+                local='["example.plugin.what.you.want"]',
+                prod='["example.plugin.what.you.want"]',
+            ),
         ),
     ]
     disabled_plugins: Annotated[
@@ -969,6 +974,10 @@ class ManagerConfig(BaseConfigSchema):
                 "Useful for disabling problematic or unwanted plugins without uninstalling."
             ),
             added_version="25.8.0",
+            example=ConfigExample(
+                local='["example.plugin.what.you.want"]',
+                prod='["example.plugin.what.you.want"]',
+            ),
         ),
     ]
     hide_agents: Annotated[
@@ -1006,8 +1015,8 @@ class ManagerConfig(BaseConfigSchema):
             ),
             added_version="25.8.0",
             example=ConfigExample(
-                local="cuda,rocm,tpu,cpu,mem",
-                prod="cuda,rocm,tpu,cpu,mem",
+                local='["cuda", "rocm", "tpu", "cpu", "mem"]',
+                prod='["cuda", "rocm", "tpu", "cpu", "mem"]',
             ),
         ),
     ]
@@ -1326,7 +1335,10 @@ class SMTPReporterConfig(BaseConfigSchema):
                 "All recipients will receive the same notification content."
             ),
             added_version="25.8.0",
-            example=ConfigExample(local="admin@localhost", prod="ops-team@example.com"),
+            example=ConfigExample(
+                local='["admin@localhost"]',
+                prod='["ops-team@example.com"]',
+            ),
         ),
     ]
     use_tls: Annotated[
@@ -1837,6 +1849,7 @@ class InterContainerNetworkConfig(BaseConfigSchema):
                 "Allows custom network plugin settings for advanced networking scenarios."
             ),
             added_version="25.8.0",
+            example=ConfigExample(local="{}", prod="{}"),
         ),
     ]
 
@@ -1946,6 +1959,7 @@ class WatcherConfig(BaseConfigSchema):
             ),
             added_version="25.8.0",
             secret=True,
+            example=ConfigExample(local="", prod="WATCHER_TOKEN"),
         ),
     ]
     file_io_timeout: Annotated[

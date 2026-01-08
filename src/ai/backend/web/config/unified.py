@@ -52,7 +52,9 @@ class WebSocketProxyConfig(BaseConfigSchema):
                 "to another service. Leave empty to disable WebSocket proxying."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="", prod="ws://wsproxy.example.com:8080"),
+            example=ConfigExample(
+                local="ws://localhost:8080", prod="ws://wsproxy.example.com:8080"
+            ),
         ),
     ]
 
@@ -128,7 +130,9 @@ class ServiceConfig(BaseConfigSchema):
                 "certificates for proper validation by browsers."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="", prod="/etc/ssl/certs/webserver.crt"),
+            example=ConfigExample(
+                local="fixtures/webserver/webserver.crt", prod="/etc/ssl/certs/webserver.crt"
+            ),
         ),
     ]
     ssl_privkey: Annotated[
@@ -179,7 +183,7 @@ class ServiceConfig(BaseConfigSchema):
                 "'https' if the proxy handles SSL but the webserver runs on HTTP."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="", prod="https"),
+            example=ConfigExample(local="http", prod="https"),
         ),
     ]
     mode: Annotated[
@@ -371,7 +375,7 @@ class ServiceConfig(BaseConfigSchema):
                 "disable SSO and use only local authentication."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="", prod="google,keycloak"),
+            example=ConfigExample(local="google", prod="google,keycloak"),
         ),
     ]
     sso_realm_name: Annotated[
@@ -388,7 +392,7 @@ class ServiceConfig(BaseConfigSchema):
                 "if not using realm-based SSO."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="", prod="backend-ai"),
+            example=ConfigExample(local="backend-ai-dev", prod="backend-ai"),
         ),
     ]
     enable_container_commit: Annotated[
@@ -1796,7 +1800,7 @@ class WebServerConfig(BaseConfigSchema):
                 "implementation, which may be more compatible in some environments."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="uvloop", prod="uvloop"),
+            example=ConfigExample(local="asyncio", prod="asyncio"),
         ),
     ]
     ipc_base_path: Annotated[

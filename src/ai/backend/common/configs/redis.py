@@ -114,9 +114,10 @@ class SingleRedisConfig(BaseModel):
                 "When using Sentinel, the addr field is ignored and service_name is required."
             ),
             added_version="25.13.0",
+            composite=CompositeType.LIST,
             example=ConfigExample(
                 local="",
-                prod="redis-sentinel:26379,redis-sentinel:26380",
+                prod="redis-sentinel:26379",
             ),
         ),
     ]
@@ -148,6 +149,7 @@ class SingleRedisConfig(BaseModel):
             ),
             added_version="25.13.0",
             secret=True,
+            example=ConfigExample(local="", prod="REDIS_PASSWORD"),
         ),
     ]
     request_timeout: Annotated[

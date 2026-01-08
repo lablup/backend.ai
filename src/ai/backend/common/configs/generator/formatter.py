@@ -69,15 +69,38 @@ class DefaultFormatter:
         return True
 
     def format(self, value: Any, field: FieldSchema) -> FormattedValue:
-        formatted = self._format_value(value)
+        if value is None:
+            # Generate type-based placeholder
+            formatted = self._get_type_placeholder(field.type_info.type_name)
+        else:
+            formatted = self._format_value(value)
         return FormattedValue(value=formatted)
+
+    def _get_type_placeholder(self, type_name: str) -> str:
+        """Get placeholder value based on type name."""
+        type_lower = type_name.lower()
+
+        if "path" in type_lower:
+            return '"/path/to/file"'
+        if "list" in type_lower or "sequence" in type_lower:
+            return "[]"
+        if "dict" in type_lower or "mapping" in type_lower:
+            return "{}"
+        if "int" in type_lower:
+            return "0"
+        if "float" in type_lower:
+            return "0.0"
+        if "bool" in type_lower:
+            return "false"
+        # Default to empty string for str and unknown types
+        return '"..."'
 
     def _format_value(self, value: Any) -> str:
         """Convert a Python value to TOML string representation."""
         match value:
             case None:
-                # TOML doesn't have null, use empty string as placeholder
-                return '""'
+                # Should not reach here if format() handles None
+                return '"..."'
             case bool():
                 return "true" if value else "false"
             case int() | float():
@@ -132,6 +155,9 @@ class BinarySizeFormatter:
 
     def _format_binary_size(self, value: Any) -> str:
         """Convert bytes to human-readable size string."""
+        if value is None:
+            # Default placeholder for BinarySize
+            return "0B"
         if isinstance(value, str):
             # Already formatted (e.g., "1G")
             return value.upper()
@@ -169,6 +195,9 @@ class HostPortPairFormatter:
 
     def _format_host_port(self, value: Any) -> str:
         """Format HostPortPair as TOML inline table."""
+        if value is None:
+            # Default placeholder for HostPortPair
+            return '{ host = "localhost", port = 0 }'
         if isinstance(value, dict):
             host = value.get("host", "localhost")
             port = value.get("port", 0)
@@ -188,7 +217,7 @@ class HostPortPairFormatter:
             host = value.host
             port = value.port
         else:
-            return str(value)
+            return '{ host = "localhost", port = 0 }'
 
         return f'{{ host = "{host}", port = {port} }}'
 

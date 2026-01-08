@@ -69,6 +69,7 @@ class EtcdConfig(BaseConfigSchema):
             ),
             added_version="22.03.0",
             secret=True,
+            example=ConfigExample(local="", prod="ETCD_PASSWORD"),
         ),
     ]
 

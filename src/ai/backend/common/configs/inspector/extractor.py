@@ -307,6 +307,17 @@ class ConfigInspector:
 
     def _unwrap_optional(self, annotation: type) -> type:
         """Unwrap Optional[T] to get T."""
+        import types
+
+        # Handle Python 3.10+ UnionType (X | None syntax)
+        if isinstance(annotation, types.UnionType):
+            args = annotation.__args__
+            non_none = [a for a in args if a is not type(None)]
+            if len(non_none) == 1:
+                return non_none[0]
+            return annotation
+
+        # Handle typing.Union (Optional[X] syntax)
         origin = getattr(annotation, "__origin__", None)
         if origin is not None:
             args = getattr(annotation, "__args__", ())
