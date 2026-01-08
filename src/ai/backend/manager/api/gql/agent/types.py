@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Optional, Self
+from typing import Self
 
 import strawberry
 from strawberry import ID
@@ -65,22 +65,22 @@ class AgentOrderFieldGQL(StrEnum):
     """),
 )
 class AgentStatusFilterGQL:
-    in_: Optional[list[AgentStatus]] = strawberry.field(name="in", default=None)
-    equals: Optional[AgentStatus] = None
+    in_: list[AgentStatus] | None = strawberry.field(name="in", default=None)
+    equals: AgentStatus | None = None
 
 
 @strawberry.input(
     name="AgentFilter", description="Added in 26.1.0. Filter options for querying agents"
 )
 class AgentFilterGQL(GQLFilter):
-    id: Optional[StringFilter] = None
-    status: Optional[AgentStatusFilterGQL] = None
-    schedulable: Optional[bool] = None
-    scaling_group: Optional[StringFilter] = None
+    id: StringFilter | None = None
+    status: AgentStatusFilterGQL | None = None
+    schedulable: bool | None = None
+    scaling_group: StringFilter | None = None
 
-    AND: Optional[list[AgentFilterGQL]] = None
-    OR: Optional[list[AgentFilterGQL]] = None
-    NOT: Optional[list[AgentFilterGQL]] = None
+    AND: list[AgentFilterGQL] | None = None
+    OR: list[AgentFilterGQL] | None = None
+    NOT: list[AgentFilterGQL] | None = None
 
     def build_conditions(self) -> list[QueryCondition]:
         field_conditions: list[QueryCondition] = []
@@ -196,7 +196,7 @@ class AgentStatusInfoGQL:
             TERMINATED (intentionally stopped), or RESTARTING (in recovery process).
         """)
     )
-    status_changed: Optional[datetime] = strawberry.field(
+    status_changed: datetime | None = strawberry.field(
         description=dedent_strip("""
             Timestamp when the agent last changed its status.
             Updated whenever the agent transitions between different status states
@@ -211,7 +211,7 @@ class AgentStatusInfoGQL:
             to track the agent's age or identify when it was initially deployed.
         """)
     )
-    lost_at: Optional[datetime] = strawberry.field(
+    lost_at: datetime | None = strawberry.field(
         description=dedent_strip("""
             Timestamp when the agent was marked as lost or unreachable.
             Set when the manager detects the agent has stopped sending heartbeats.
@@ -221,8 +221,8 @@ class AgentStatusInfoGQL:
     schedulable: bool = strawberry.field(
         description=dedent_strip("""
             Indicates whether the agent is available for scheduling new compute sessions.
-            An agent may be non-schedulable if it's being drained, under maintenance,
-            or manually disabled by administrators while remaining in ALIVE status.
+            An agent can be non-schedulable due to maintenance mode, resource constraints or other operational reasons by admin.
+            When false, no new sessions will be assigned to this agent.
         """)
     )
 
