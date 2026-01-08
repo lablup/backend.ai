@@ -34,12 +34,19 @@ class StringMatchSpec:
 
 
 @dataclass(frozen=True)
-class UUIDMatchSpec:
-    """Specification for UUID matching operations in query conditions."""
+class UUIDEqualMatchSpec:
+    """Specification for UUID equality operations (=, !=)."""
 
-    value: uuid.UUID | list[uuid.UUID]
+    value: uuid.UUID
     negated: bool
-    is_list_operation: bool = False
+
+
+@dataclass(frozen=True)
+class UUIDInMatchSpec:
+    """Specification for UUID IN operations (IN, NOT IN)."""
+
+    values: list[uuid.UUID]
+    negated: bool
 
 
 @strawberry.scalar
@@ -224,50 +231,47 @@ class UUIDFilter:
 
     def build_query_condition(
         self,
-        factory: Callable[[UUIDMatchSpec], QueryCondition],
+        equals_factory: Callable[[UUIDEqualMatchSpec], QueryCondition],
+        in_factory: Callable[[UUIDInMatchSpec], QueryCondition],
     ) -> QueryCondition | None:
-        """Build a query condition from this filter using the provided factory callable.
+        """Build a query condition from this filter using the provided factory callables.
 
         Args:
-            factory: Factory function that creates QueryCondition from UUIDMatchSpec.
-                    The spec's is_list_operation flag indicates whether it's an IN operation.
+            equals_factory: Factory function for equality operations (=, !=)
+            in_factory: Factory function for IN operations (IN, NOT IN)
 
         Returns:
             QueryCondition if any filter field is set, None otherwise
         """
-        # equals operations
+        # Equality operations
         if self.equals:
-            return factory(
-                UUIDMatchSpec(
+            return equals_factory(
+                UUIDEqualMatchSpec(
                     value=self.equals,
                     negated=False,
-                    is_list_operation=False,
                 )
             )
         if self.not_equals:
-            return factory(
-                UUIDMatchSpec(
+            return equals_factory(
+                UUIDEqualMatchSpec(
                     value=self.not_equals,
                     negated=True,
-                    is_list_operation=False,
                 )
             )
 
-        # in operations
+        # IN operations
         if self.in_:
-            return factory(
-                UUIDMatchSpec(
-                    value=self.in_,
+            return in_factory(
+                UUIDInMatchSpec(
+                    values=self.in_,
                     negated=False,
-                    is_list_operation=True,
                 )
             )
         if self.not_in:
-            return factory(
-                UUIDMatchSpec(
-                    value=self.not_in,
+            return in_factory(
+                UUIDInMatchSpec(
+                    values=self.not_in,
                     negated=True,
-                    is_list_operation=True,
                 )
             )
 
