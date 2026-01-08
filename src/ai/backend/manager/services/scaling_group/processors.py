@@ -20,8 +20,8 @@ from ai.backend.manager.services.scaling_group.actions.disassociate_with_domain 
     DisassociateScalingGroupWithDomainsActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.disassociate_with_user_group import (
-    DisassociateScalingGroupWithUserGroupAction,
-    DisassociateScalingGroupWithUserGroupActionResult,
+    DisassociateScalingGroupWithUserGroupsAction,
+    DisassociateScalingGroupWithUserGroupsActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
@@ -54,9 +54,9 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
     associate_scaling_group_with_user_groups: ActionProcessor[
         AssociateScalingGroupWithUserGroupsAction, AssociateScalingGroupWithUserGroupsActionResult
     ]
-    disassociate_scaling_group_with_user_group: ActionProcessor[
-        DisassociateScalingGroupWithUserGroupAction,
-        DisassociateScalingGroupWithUserGroupActionResult,
+    disassociate_scaling_group_with_user_groups: ActionProcessor[
+        DisassociateScalingGroupWithUserGroupsAction,
+        DisassociateScalingGroupWithUserGroupsActionResult,
     ]
 
     def __init__(self, service: ScalingGroupService, action_monitors: list[ActionMonitor]) -> None:
@@ -73,8 +73,8 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         self.associate_scaling_group_with_user_groups = ActionProcessor(
             service.associate_scaling_group_with_user_groups, action_monitors
         )
-        self.disassociate_scaling_group_with_user_group = ActionProcessor(
-            service.disassociate_scaling_group_with_user_group, action_monitors
+        self.disassociate_scaling_group_with_user_groups = ActionProcessor(
+            service.disassociate_scaling_group_with_user_groups, action_monitors
         )
 
     @override
@@ -87,5 +87,5 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
             AssociateScalingGroupWithDomainsAction.spec(),
             DisassociateScalingGroupWithDomainsAction.spec(),
             AssociateScalingGroupWithUserGroupsAction.spec(),
-            DisassociateScalingGroupWithUserGroupAction.spec(),
+            DisassociateScalingGroupWithUserGroupsAction.spec(),
         ]

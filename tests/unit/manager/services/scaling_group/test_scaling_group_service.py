@@ -63,7 +63,7 @@ from ai.backend.manager.services.scaling_group.actions.disassociate_with_domain 
     DisassociateScalingGroupWithDomainsAction,
 )
 from ai.backend.manager.services.scaling_group.actions.disassociate_with_user_group import (
-    DisassociateScalingGroupWithUserGroupAction,
+    DisassociateScalingGroupWithUserGroupsAction,
 )
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
@@ -474,11 +474,11 @@ class TestScalingGroupService:
             scaling_group=scaling_group_name,
             project=project_id,
         )
-        action = DisassociateScalingGroupWithUserGroupAction(purger=purger)
-        result = await scaling_group_service.disassociate_scaling_group_with_user_group(action)
+        action = DisassociateScalingGroupWithUserGroupsAction(purger=purger)
+        result = await scaling_group_service.disassociate_scaling_group_with_user_groups(action)
 
         assert result is not None
-        mock_repository.disassociate_scaling_group_with_user_group.assert_called_once_with(purger)
+        mock_repository.disassociate_scaling_group_with_user_groups.assert_called_once_with(purger)
 
 
 class TestCheckScalingGroup:
