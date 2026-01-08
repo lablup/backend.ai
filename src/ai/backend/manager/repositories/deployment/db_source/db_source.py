@@ -5,7 +5,7 @@ from collections import Counter, defaultdict
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional, cast
 
 import sqlalchemy as sa
@@ -426,7 +426,7 @@ class DeploymentDBSource:
             )
         )
         result = await db_sess.execute(query)
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     async def list_endpoints_by_name(
         self,
@@ -733,7 +733,7 @@ class DeploymentDBSource:
                     session_id=SessionId(row.session) if row.session else None,
                     status=row.status,
                     traffic_ratio=row.traffic_ratio,
-                    created_at=row.created_at,
+                    created_at=row.created_at or datetime.now(tz=timezone.utc),
                     error_data=row.error_data or {},
                 )
                 for row in rows
@@ -1022,7 +1022,7 @@ class DeploymentDBSource:
 
         return EndpointWithRoutesRawData(
             endpoint_row=endpoint_row,
-            route_rows=route_rows,
+            route_rows=list(route_rows),
         )
 
     # Additional methods for DeploymentExecutor
@@ -1302,7 +1302,7 @@ class DeploymentDBSource:
                     session_id=SessionId(row.session) if row.session else None,
                     status=row.status,
                     traffic_ratio=row.traffic_ratio,
-                    created_at=row.created_at,
+                    created_at=row.created_at or datetime.now(tz=timezone.utc),
                     error_data=row.error_data or {},
                 )
                 route_data_list.append(route_data)
@@ -1608,6 +1608,8 @@ class DeploymentDBSource:
                 raise EndpointNotFound(str(endpoint_id))
 
             # Get model vfolder for health check config
+            if endpoint.model is None:
+                return None
             model = await VFolderRow.get(db_sess, endpoint.model)
             if not model:
                 return None

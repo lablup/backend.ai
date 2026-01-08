@@ -631,9 +631,9 @@ class PermissionDBSource:
 
     async def get_entity_mapped_scopes(
         self, target_object_id: ObjectId
-    ) -> list[uuid.UUID]:
+    ) -> list[AssociationScopesEntitiesRow]:
         async with self._db.begin_readonly_session() as db_session:
-            stmt = sa.select(AssociationScopesEntitiesRow.scope_id).where(
+            stmt = sa.select(AssociationScopesEntitiesRow).where(
                 AssociationScopesEntitiesRow.entity_id == target_object_id.entity_id,
                 AssociationScopesEntitiesRow.entity_type == target_object_id.entity_type.value,
             )

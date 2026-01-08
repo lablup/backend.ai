@@ -60,8 +60,9 @@ class DRFScheduler(AbstractScheduler):
                 slot_share = Decimal(value) / slot_cap
                 if dominant_share < slot_share:
                     dominant_share = slot_share
-            access_key = existing_sess.access_key
-            if access_key is not None:
+            raw_access_key = existing_sess.access_key
+            if raw_access_key is not None:
+                access_key = AccessKey(raw_access_key)
                 if self.per_user_dominant_share[access_key] < dominant_share:
                     self.per_user_dominant_share[access_key] = dominant_share
         log.debug("per-user dominant share: {}", dict(self.per_user_dominant_share))

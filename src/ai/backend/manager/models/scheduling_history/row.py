@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHistoryData,
     RouteHistoryData,
@@ -84,7 +85,7 @@ class SessionSchedulingHistoryRow(Base):
             sub_steps = [SubStepResult.model_validate(s) for s in self.sub_steps]
         return SessionSchedulingHistoryData(
             id=self.id,
-            session_id=self.session_id,
+            session_id=SessionId(self.session_id),
             phase=self.phase,
             from_status=SessionStatus(self.from_status) if self.from_status else None,
             to_status=SessionStatus(self.to_status) if self.to_status else None,
@@ -145,8 +146,8 @@ class KernelSchedulingHistoryRow(Base):
     def to_data(self) -> KernelSchedulingHistoryData:
         return KernelSchedulingHistoryData(
             id=self.id,
-            kernel_id=self.kernel_id,
-            session_id=self.session_id,
+            kernel_id=KernelId(self.kernel_id),
+            session_id=SessionId(self.session_id),
             phase=self.phase,
             from_status=KernelSchedulingPhase(self.from_status) if self.from_status else None,
             to_status=KernelSchedulingPhase(self.to_status) if self.to_status else None,

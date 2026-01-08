@@ -61,7 +61,7 @@ async def check_concurrency(
             KeyPairResourcePolicyRow.name == resouce_policy_q.scalar_subquery()
         )
         result = await db_sess.execute(select_query)
-        return result.scalar()
+        return result.scalar() or 0
 
     max_concurrent_sessions = await execute_with_retry(_get_max_concurrent_sessions) or 0
     if sess_ctx.is_private:

@@ -510,7 +510,9 @@ class ResourcePresetDBSource:
             )
 
         # Get scaling groups
-        sgroups = await query_allowed_sgroups(conn, domain_name, group_id, str(access_key))
+        # query_allowed_sgroups expects AsyncConnection, get it from session
+        db_conn = await conn.connection()
+        sgroups = await query_allowed_sgroups(db_conn, domain_name, group_id, str(access_key))
         sgroup_names = [sg.name for sg in sgroups]
         if scaling_group is not None:
             if scaling_group not in sgroup_names:

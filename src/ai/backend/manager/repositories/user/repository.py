@@ -8,7 +8,7 @@ from uuid import UUID
 import msgpack
 import sqlalchemy as sa
 from dateutil.tz import tzutc
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession as SASession
 from sqlalchemy.orm import joinedload, load_only, noload
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -161,9 +161,10 @@ class UserRepository:
             created_user.main_access_key = kp_data.access_key
 
             # Add user to groups including model store project
-            await self._add_user_to_groups(
-                db_session, created_user.uuid, created_user.domain_name, group_ids or []
-            )
+            if created_user.domain_name:
+                await self._add_user_to_groups(
+                    db_session, created_user.uuid, created_user.domain_name, group_ids or []
+                )
 
             role = await self._role_manager.create_system_role(db_session, created_user)
             user_role_creator = Creator(
@@ -276,13 +277,17 @@ class UserRepository:
                 .where(users.c.email == email)
             )
 
-    async def _check_domain_exists(self, session: SASession, domain_name: str) -> bool:
+    async def _check_domain_exists(
+        self, session: SASession | AsyncConnection, domain_name: str
+    ) -> bool:
         query = sa.select(DomainRow.name).where(DomainRow.name == domain_name)
         result = await session.scalar(query)
         result = cast(Optional[str], result)
         return result is not None
 
-    async def _check_resource_policy_exists(self, session: SASession, policy_name: str) -> bool:
+    async def _check_resource_policy_exists(
+        self, session: SASession | AsyncConnection, policy_name: str
+    ) -> bool:
         """Check if the resource policy exists."""
         query = sa.select(UserResourcePolicyRow.name).where(
             UserResourcePolicyRow.name == policy_name
@@ -302,7 +307,7 @@ class UserRepository:
         return result is not None
 
     async def _check_username_exists_for_other_user(
-        self, conn: SASession, *, username: str, exclude_email: str
+        self, conn: AsyncConnection, *, username: str, exclude_email: str
     ) -> bool:
         """Check if the username is already taken by another user."""
         query = sa.select(UserRow.uuid).where(

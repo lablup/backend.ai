@@ -206,7 +206,7 @@ class VfolderRepository:
         user_role: UserRole,
         domain_name: str,
         allowed_vfolder_types: list[str],
-        extra_conditions: Optional[sa.sql.expression.BinaryExpression] = None,
+        extra_conditions: Optional[sa.sql.elements.ColumnElement[bool]] = None,
     ) -> VFolderListResult:
         """
         List all VFolders accessible to a user.
