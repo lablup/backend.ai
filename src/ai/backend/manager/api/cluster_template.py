@@ -75,6 +75,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
             )
             result = await conn.execute(query)
             row = result.first()
+            if row is None:
+                raise InvalidAPIParameters("Owner access key not found")
             owner_domain = row.domain_name
             owner_uuid = row.user
             owner_role = row.role
@@ -157,7 +159,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "id": template_id,
             "user": user_uuid.hex,
         }
-        query = session_templates.insert().values({
+        insert_query = session_templates.insert().values({
             "id": template_id,
             "domain_name": params["domain"],
             "group_id": group_id,
@@ -166,7 +168,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "template": template_data,
             "type": TemplateType.CLUSTER,
         })
-        result = await conn.execute(query)
+        result = await conn.execute(insert_query)
         if result.rowcount != 1:
             raise DBOperationFailed(f"Failed to create cluster template: {template_id}")
     return web.json_response(resp)
@@ -315,7 +317,7 @@ async def put(request: web.Request, params: Any) -> web.Response:
     )
 
     async with root_ctx.db.begin() as conn:
-        query = (
+        select_query = (
             sa.select(session_templates.c.id)
             .select_from(session_templates)
             .where(
@@ -324,7 +326,7 @@ async def put(request: web.Request, params: Any) -> web.Response:
                 & (session_templates.c.type == TemplateType.CLUSTER),
             )
         )
-        result = await conn.scalar(query)
+        result = await conn.scalar(select_query)
         if not result:
             raise TaskTemplateNotFound
         try:
@@ -334,12 +336,12 @@ async def put(request: web.Request, params: Any) -> web.Response:
         except (yaml.YAMLError, yaml.MarkedYAMLError):
             raise InvalidAPIParameters("Malformed payload")
         template_data = check_cluster_template(body)
-        query = (
+        update_query = (
             sa.update(session_templates)
             .values(template=template_data, name=template_data["metadata"]["name"])
             .where(session_templates.c.id == template_id)
         )
-        result = await conn.execute(query)
+        result = await conn.execute(update_query)
         if result.rowcount != 1:
             raise DBOperationFailed(f"Failed to update cluster template: {template_id}")
 
@@ -365,7 +367,7 @@ async def delete(request: web.Request, params: Any) -> web.Response:
     )
 
     async with root_ctx.db.begin() as conn:
-        query = (
+        select_query = (
             sa.select(session_templates.c.id)
             .select_from(session_templates)
             .where(
@@ -374,16 +376,16 @@ async def delete(request: web.Request, params: Any) -> web.Response:
                 & (session_templates.c.type == TemplateType.CLUSTER),
             )
         )
-        result = await conn.scalar(query)
+        result = await conn.scalar(select_query)
         if not result:
             raise TaskTemplateNotFound
 
-        query = (
+        update_query = (
             sa.update(session_templates)
             .values(is_active=False)
             .where(session_templates.c.id == template_id)
         )
-        result = await conn.execute(query)
+        result = await conn.execute(update_query)
         if result.rowcount != 1:
             raise DBOperationFailed(f"Failed to delete cluster template: {template_id}")
 

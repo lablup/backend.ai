@@ -129,8 +129,10 @@ async def is_user_allowed_to_access_resource(
         query = sa.select(UserRow).filter(UserRow.uuid == resource_owner)
         result = await db_sess.execute(query)
         user = result.scalar()
+        if user is None:
+            return False
         return user.domain_name == request["user"]["domain_name"]
-    return request["user"]["uyud"] == resource_owner
+    return request["user"]["uuid"] == resource_owner
 
 
 class ListServeRequestModel(LegacyBaseRequestModel):
@@ -665,10 +667,10 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         if len(matched_vfolders) == 0:
             raise VFolderNotFound
         folder_row = matched_vfolders[0]
-        if folder_row.usage_mode != VFolderUsageMode.MODEL:
+        if folder_row["usage_mode"] != VFolderUsageMode.MODEL:
             raise InvalidAPIParameters("Selected VFolder is not a model folder")
 
-        model_id = folder_row.id
+        model_id = folder_row["id"]
 
         vfolder_mounts = await ModelServiceHelper.check_extra_mounts(
             conn,
@@ -687,16 +689,16 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         )
 
     if params.runtime_variant == RuntimeVariant.CUSTOM:
-        vfid = VFolderID(folder_row.quota_scope_id, folder_row.id)
+        vfid = VFolderID(folder_row["quota_scope_id"], folder_row["id"])
         yaml_path = await ModelServiceHelper.validate_model_definition_file_exists(
             root_ctx.storage_manager,
-            folder_row.host,
+            folder_row["host"],
             vfid,
             params.config.model_definition_path,
         )
         await ModelServiceHelper.validate_model_definition(
             root_ctx.storage_manager,
-            folder_row.host,
+            folder_row["host"],
             vfid,
             yaml_path,
         )

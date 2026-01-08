@@ -103,6 +103,8 @@ class AuthDBSource:
             user_query = users.select().where(users.c.email == user_data["email"])
             result = await conn.execute(user_query)
             user_row = result.first()
+            if user_row is None:
+                raise UserCreationError("Failed to retrieve created user")
 
             # Create keypair
             keypair_data["user"] = user_row.uuid
@@ -172,7 +174,10 @@ class AuthDBSource:
                 .returning(users.c.password_changed_at)
             )
             result = await conn.execute(query)
-            return result.scalar()
+            password_changed_at = result.scalar()
+            if password_changed_at is None:
+                raise UserNotFound(extra_data={"user_uuid": str(user_uuid)})
+            return password_changed_at
 
     @auth_db_source_resilience.apply()
     async def mark_user_and_keypairs_inactive(self, email: str) -> None:
@@ -284,4 +289,6 @@ class AuthDBSource:
     async def fetch_current_time(self) -> datetime:
         """Fetch current time from database."""
         async with self._db.begin_readonly() as db_conn:
-            return await db_conn.scalar(sa.select(sa.func.now()))
+            result = await db_conn.scalar(sa.select(sa.func.now()))
+            assert result is not None
+            return result

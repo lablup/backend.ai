@@ -325,7 +325,7 @@ class SessionRepository:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
             session_row = cast(SessionRow, session_row)
 
-            if session_name:
+            if session_name and session_row.access_key is not None:
                 # Check the owner of the target session has any session with the same name
                 try:
                     sess = await SessionRow.get_session(

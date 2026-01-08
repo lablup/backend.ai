@@ -43,6 +43,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import DeclarativeMeta
+from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -717,15 +718,19 @@ async def gql_mutation_wrapper(
 async def simple_db_mutate(
     result_cls: type[ResultType],
     graph_ctx: GraphQueryContext,
-    mutation_query: sa.sql.Update | sa.sql.Insert | Callable[[], sa.sql.Update | sa.sql.Insert],
+    mutation_query: sa.sql.Update
+    | sa.sql.Insert
+    | sa.sql.Delete
+    | Callable[[], sa.sql.Update | sa.sql.Insert | sa.sql.Delete],
     *,
     pre_func: Callable[[SAConnection], Awaitable[None]] | None = None,
     post_func: Callable[[SAConnection, Result], Awaitable[None]] | None = None,
 ) -> ResultType:
     """
     Performs a database mutation based on the given
-    :class:`sqlalchemy.sql.Update` or :class:`sqlalchemy.sql.Insert` query,
-    and return the wrapped result as the GraphQL object type given as **result_cls**.
+    :class:`sqlalchemy.sql.Update`, :class:`sqlalchemy.sql.Insert`, or
+    :class:`sqlalchemy.sql.Delete` query, and return the wrapped result as the
+    GraphQL object type given as **result_cls**.
     **result_cls** should have two initialization arguments: success (bool)
     and message (str).
 
@@ -1168,7 +1173,7 @@ class OrderExprArg(NamedTuple):
 def generate_sql_info_for_gql_connection(
     info: graphene.ResolveInfo,
     orm_class,
-    id_column: sa.Column,
+    id_column: sa.Column[Any] | InstrumentedAttribute[Any],
     filter_expr: FilterExprArg | None = None,
     order_expr: OrderExprArg | None = None,
     offset: int | None = None,

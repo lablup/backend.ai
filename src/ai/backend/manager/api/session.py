@@ -1352,18 +1352,16 @@ async def _find_dependency_sessions(
         .where(kernels.c.session_id == session_id)
     )
 
-    dependency_session_ids: list[SessionDependencyRow] = (
-        await db_session.execute(
-            sa.select(SessionDependencyRow.depends_on).where(
-                SessionDependencyRow.session_id == session_id
-            )
+    dependency_result = await db_session.execute(
+        sa.select(SessionDependencyRow.depends_on).where(
+            SessionDependencyRow.session_id == session_id
         )
-    ).first()
-
-    if not dependency_session_ids:
-        dependency_session_ids = []
+    )
+    dependency_session_ids = [row[0] for row in dependency_result.fetchall()]
 
     kernel_query_result = (await db_session.execute(kernel_query)).first()
+    if kernel_query_result is None:
+        raise ValueError(f"Kernel not found for session {session_id}")
 
     session_info: dict[str, list | str] = {
         "session_id": session_id,

@@ -240,7 +240,7 @@ async def put(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin() as conn:
         user_uuid, group_id, _ = await query_userinfo(request, params, conn)
-        query = (
+        select_query = (
             sa.select(session_templates.c.id)
             .select_from(session_templates)
             .where(
@@ -249,7 +249,7 @@ async def put(request: web.Request, params: Any) -> web.Response:
                 & (session_templates.c.type == TemplateType.TASK),
             )
         )
-        result = await conn.scalar(query)
+        result = await conn.scalar(select_query)
         if not result:
             raise TaskTemplateNotFound
         try:
@@ -265,7 +265,7 @@ async def put(request: web.Request, params: Any) -> web.Response:
                 group_id = st["group_id"]
             if "user_uuid" in st:
                 user_uuid = st["user_uuid"]
-            query = (
+            update_query = (
                 sa.update(session_templates)
                 .values({
                     "group_id": group_id,
@@ -275,7 +275,7 @@ async def put(request: web.Request, params: Any) -> web.Response:
                 })
                 .where(session_templates.c.id == template_id)
             )
-            result = await conn.execute(query)
+            result = await conn.execute(update_query)
             if result.rowcount != 1:
                 raise DBOperationFailed(f"Failed to update session template: {template_id}")
         return web.json_response({"success": True})
@@ -298,7 +298,7 @@ async def delete(request: web.Request, params: Any) -> web.Response:
     )
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin() as conn:
-        query = (
+        select_query = (
             sa.select(session_templates.c.id)
             .select_from(session_templates)
             .where(
@@ -307,15 +307,15 @@ async def delete(request: web.Request, params: Any) -> web.Response:
                 & (session_templates.c.type == TemplateType.TASK),
             )
         )
-        result = await conn.scalar(query)
+        result = await conn.scalar(select_query)
         if not result:
             raise TaskTemplateNotFound
-        query = (
+        update_query = (
             sa.update(session_templates)
             .values(is_active=False)
             .where(session_templates.c.id == template_id)
         )
-        result = await conn.execute(query)
+        result = await conn.execute(update_query)
         if result.rowcount != 1:
             raise DBOperationFailed(f"Failed to delete session template: {template_id}")
 
