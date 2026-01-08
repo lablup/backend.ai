@@ -534,7 +534,7 @@ JSONCoalesceExpr: TypeAlias = sa.sql.elements.ColumnElement[Any]
 
 
 def sql_json_merge(
-    col: sa.sql.elements.ColumnElement[Any],
+    col: sa.sql.elements.ColumnElement[Any] | sa.orm.attributes.InstrumentedAttribute[Any],
     key: tuple[str, ...],
     obj: Mapping[str, Any],
     *,
@@ -569,7 +569,7 @@ def sql_json_merge(
 
 
 def sql_json_increment(
-    col: sa.sql.elements.ColumnElement[Any],
+    col: sa.sql.elements.ColumnElement[Any] | sa.orm.attributes.InstrumentedAttribute[Any],
     key: tuple[str, ...],
     *,
     parent_updates: Optional[Mapping[str, Any]] = None,

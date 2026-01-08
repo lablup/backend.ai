@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from typing import Any, Optional, cast
 
 from sqlalchemy.engine import CursorResult
@@ -14,7 +15,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import VFolderHostPermission, VFolderID
+from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap, VFolderID
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import EntityType, OperationType, ScopeType
 from ai.backend.manager.data.vfolder.types import (
@@ -23,6 +24,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderInvitationData,
     VFolderListResult,
+    VFolderMountPermission,
     VFolderPermissionData,
 )
 from ai.backend.manager.errors.common import ObjectNotFound
@@ -107,8 +109,9 @@ class VfolderRepository:
 
             # Check if user has access to this vfolder
             allowed_vfolder_types = ["user", "group"]  # TODO: get from config
+            conn = await session.connection()
             vfolder_dicts = await query_accessible_vfolders(
-                session.bind,
+                conn,
                 user_id,
                 allow_privileged_access=True,
                 user_role=user_row.role,
@@ -137,7 +140,7 @@ class VfolderRepository:
     @vfolder_repository_resilience.apply()
     async def get_allowed_vfolder_hosts(
         self, user_uuid: uuid.UUID, group_uuid: Optional[uuid.UUID]
-    ) -> str:
+    ) -> VFolderHostPermissionMap:
         """
         Get the allowed VFolder hosts for a user.
         """
@@ -160,6 +163,10 @@ class VfolderRepository:
             )
             if user_row is None:
                 raise UserNotFound(f"User with UUID {user_uuid} not found.")
+            if user_row.main_keypair is None:
+                raise ObjectNotFound(object_name="User keypair")
+            if user_row.main_keypair.resource_policy_row is None:
+                raise ObjectNotFound(object_name="User keypair resource policy")
 
             return user_row.main_keypair.resource_policy_row.allowed_vfolder_hosts
 
@@ -206,8 +213,9 @@ class VfolderRepository:
         Returns VFolderListResult with access information.
         """
         async with self._db.begin_session() as session:
+            conn = await session.connection()
             vfolder_dicts = await query_accessible_vfolders(
-                session.bind,
+                conn,
                 user_id,
                 user_role=user_role,
                 domain_name=domain_name,
@@ -431,7 +439,7 @@ class VfolderRepository:
                     id=row.id,
                     vfolder=row.vfolder,
                     user=row.user,
-                    permission=row.permission,
+                    permission=row.permission or VFolderMountPermission.READ_ONLY,
                 )
                 for row in permission_rows
             ]
@@ -528,10 +536,10 @@ class VfolderRepository:
                 VFolderInvitationData(
                     id=row.id,
                     vfolder=row.vfolder,
-                    inviter=row.inviter,
+                    inviter=row.inviter or "",
                     invitee=row.invitee,
-                    permission=row.permission,
-                    created_at=row.created_at,
+                    permission=row.permission or VFolderMountPermission.READ_ONLY,
+                    created_at=row.created_at or datetime.now(UTC),
                     modified_at=row.modified_at,
                 )
                 for row in invitation_rows
@@ -594,8 +602,9 @@ class VfolderRepository:
                 (VFolderRow.status.not_in(HARD_DELETED_VFOLDER_STATUSES)),
             )
 
+            conn = await session.connection()
             vfolder_dicts = await query_accessible_vfolders(
-                session.bind,
+                conn,
                 user_id,
                 user_role=user_role,
                 domain_name=domain_name,
@@ -614,6 +623,8 @@ class VfolderRepository:
         async with self._db.begin_session() as session:
             user_row = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_id))
             if not user_row:
+                return None
+            if user_row.role is None or user_row.domain_name is None:
                 return None
             return user_row.role, user_row.domain_name
 
@@ -752,11 +763,11 @@ class VfolderRepository:
             quota_scope_id=row.quota_scope_id,
             usage_mode=row.usage_mode,
             permission=row.permission,
-            max_files=row.max_files,
+            max_files=row.max_files or 0,
             max_size=row.max_size,
-            num_files=row.num_files,
-            cur_size=row.cur_size,
-            created_at=row.created_at,
+            num_files=row.num_files or 0,
+            cur_size=row.cur_size or 0,
+            created_at=row.created_at or datetime.now(UTC),
             last_used=row.last_used,
             creator=row.creator,
             unmanaged_path=row.unmanaged_path,
@@ -796,7 +807,7 @@ class VfolderRepository:
                 )
             )
             count = await session.scalar(count_query)
-            return count > 0
+            return (count or 0) > 0
 
     @vfolder_repository_resilience.apply()
     async def get_user_by_email(self, email: str) -> Optional[tuple[uuid.UUID, str]]:
@@ -807,6 +818,8 @@ class VfolderRepository:
         async with self._db.begin_session() as session:
             user_row = await session.scalar(sa.select(UserRow).where(UserRow.email == email))
             if not user_row:
+                return None
+            if user_row.domain_name is None:
                 return None
             return user_row.uuid, user_row.domain_name
 
@@ -873,7 +886,7 @@ class VfolderRepository:
                 )
             )
             result = await session.scalar(query)
-            return result > 0
+            return (result or 0) > 0
 
     @vfolder_repository_resilience.apply()
     async def create_vfolder_invitation(
@@ -890,15 +903,12 @@ class VfolderRepository:
         from sqlalchemy import exc as sa_exc
 
         async with self._db.begin_session() as session:
-            query = sa.insert(
-                VFolderInvitationRow,
-                {
-                    "permission": permission,
-                    "vfolder": vfolder_id,
-                    "inviter": inviter_email,
-                    "invitee": invitee_email,
-                    "state": VFolderInvitationState.PENDING,
-                },
+            query = sa.insert(VFolderInvitationRow).values(
+                permission=permission,
+                vfolder=vfolder_id,
+                inviter=inviter_email,
+                invitee=invitee_email,
+                state=VFolderInvitationState.PENDING,
             )
             try:
                 await session.execute(query)
@@ -926,10 +936,10 @@ class VfolderRepository:
             return VFolderInvitationData(
                 id=invitation_row.id,
                 vfolder=invitation_row.vfolder,
-                inviter=invitation_row.inviter,
+                inviter=invitation_row.inviter or "",
                 invitee=invitation_row.invitee,
-                permission=invitation_row.permission,
-                created_at=invitation_row.created_at,
+                permission=invitation_row.permission or VFolderMountPermission.READ_ONLY,
+                created_at=invitation_row.created_at or datetime.now(UTC),
                 modified_at=invitation_row.modified_at,
             )
 
@@ -1016,18 +1026,18 @@ class VfolderRepository:
                     contains_eager(VFolderInvitationRow.vfolder_row),
                 )
             )
-            invitation_rows = await session.scalars(query)
-            invitation_rows = invitation_rows.all()
+            result = await session.scalars(query)
+            invitation_rows = list(result.all())
 
             results = []
             for inv_row in invitation_rows:
                 invitation_data = VFolderInvitationData(
                     id=inv_row.id,
                     vfolder=inv_row.vfolder,
-                    inviter=inv_row.inviter,
+                    inviter=inv_row.inviter or "",
                     invitee=inv_row.invitee,
-                    permission=inv_row.permission,
-                    created_at=inv_row.created_at,
+                    permission=inv_row.permission or VFolderMountPermission.READ_ONLY,
+                    created_at=inv_row.created_at or datetime.now(UTC),
                     modified_at=inv_row.modified_at,
                 )
                 vfolder_data = self._vfolder_row_to_data(inv_row.vfolder_row)
