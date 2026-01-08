@@ -1376,7 +1376,7 @@ class SessionService:
                         raise InvalidAPIParameters("Too large file")
                     chunks.append(chunk)
                     recv_size += chunk_size
-                data = file.decode(b"".join(chunks))
+                data = await file.decode(b"".join(chunks))
                 log.debug("received file: {0} ({1:,} bytes)", file_name, recv_size)
                 ts.create_task(self._agent_registry.upload_file(session, file_name, data))
 
