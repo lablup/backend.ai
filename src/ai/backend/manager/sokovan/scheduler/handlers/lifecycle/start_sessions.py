@@ -19,67 +19,17 @@ from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.repositories.scheduler.options import SessionConditions
-from ai.backend.manager.sokovan.scheduler.handlers.base import (
-    SchedulerHandler,
-    SessionLifecycleHandler,
-)
+from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
     ScheduledSessionData,
-    ScheduleResult,
     SessionExecutionResult,
 )
-from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
-
-
-class StartSessionsHandler(SchedulerHandler):
-    """Handler for starting sessions.
-
-    DEPRECATED: Use StartSessionsLifecycleHandler instead.
-    """
-
-    def __init__(
-        self,
-        scheduler: Scheduler,
-        event_producer: EventProducer,
-    ) -> None:
-        self._scheduler = scheduler
-        self._event_producer = event_producer
-
-    @classmethod
-    def name(cls) -> str:
-        """Get the name of the handler."""
-        return "start-sessions"
-
-    @property
-    def lock_id(self) -> Optional[LockID]:
-        """Lock for operations targeting CREATING sessions."""
-        return LockID.LOCKID_SOKOVAN_TARGET_CREATING
-
-    async def execute(self) -> ScheduleResult:
-        """Start sessions that passed precondition checks."""
-        return await self._scheduler.start_sessions()
-
-    async def post_process(self, result: ScheduleResult) -> None:
-        """Log the number of started sessions and broadcast event."""
-        log.info("Started {} sessions", len(result.scheduled_sessions))
-
-        # Broadcast batch event for started sessions
-        events: list[AbstractBroadcastEvent] = [
-            SchedulingBroadcastEvent(
-                session_id=event_data.session_id,
-                creation_id=event_data.creation_id,
-                status_transition=str(SessionStatus.CREATING),
-                reason=event_data.reason,
-            )
-            for event_data in result.scheduled_sessions
-        ]
-        await self._event_producer.broadcast_events_batch(events)
 
 
 class StartSessionsLifecycleHandler(SessionLifecycleHandler):

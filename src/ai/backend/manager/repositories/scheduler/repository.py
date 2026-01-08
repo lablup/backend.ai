@@ -37,7 +37,6 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionRunningData,
     SessionsForPullWithImages,
     SessionsForStartWithImages,
-    SessionTransitionData,
     SessionWithKernels,
 )
 
@@ -405,32 +404,6 @@ class SchedulerRepository:
         These sessions are ready to transition to RUNNING state.
         """
         return await self._db_source.get_sessions_ready_to_run()
-
-    @scheduler_repository_resilience.apply()
-    async def get_sessions_for_transition(
-        self,
-        session_statuses: list[SessionStatus],
-        kernel_statuses: list[KernelStatus],
-    ) -> list[SessionTransitionData]:
-        """
-        Get sessions ready for state transition based on current session and kernel status.
-
-        :param session_statuses: List of current session statuses to filter by
-        :param kernel_statuses: List of current kernel statuses to filter by
-        :return: List of sessions ready for transition with detailed information
-        """
-        return await self._db_source.get_sessions_for_transition(session_statuses, kernel_statuses)
-
-    @scheduler_repository_resilience.apply()
-    async def get_sessions_for_transition_by_ids(
-        self,
-        session_ids: list[SessionId],
-    ) -> list[SessionTransitionData]:
-        """
-        Get sessions ready for state transition from given session IDs.
-        Used by SweepStaleKernelsLifecycleHandler for scaling group based processing.
-        """
-        return await self._db_source.get_sessions_for_transition_by_ids(session_ids)
 
     @scheduler_repository_resilience.apply()
     async def update_sessions_to_running(self, sessions_data: list[SessionRunningData]) -> None:

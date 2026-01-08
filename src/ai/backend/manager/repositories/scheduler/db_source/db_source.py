@@ -102,7 +102,6 @@ from ai.backend.manager.sokovan.scheduler.types import (
     ImageConfigData,
     KernelBindingData,
     KernelCreationInfo,
-    KernelTransitionData,
     KeypairOccupancy,
     KeyPairResourcePolicy,
     ResourceOccupancySnapshot,
@@ -115,7 +114,6 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionRunningData,
     SessionsForPullWithImages,
     SessionsForStartWithImages,
-    SessionTransitionData,
     SessionWithKernels,
     UserResourcePolicy,
 )

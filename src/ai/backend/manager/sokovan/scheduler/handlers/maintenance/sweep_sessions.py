@@ -12,58 +12,17 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.sokovan.scheduler.handlers.base import (
-    SchedulerHandler,
-    SessionLifecycleHandler,
-)
+from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
     ScheduledSessionData,
-    ScheduleResult,
     SessionExecutionResult,
 )
-from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.terminator.terminator import SessionTerminator
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
-
-
-class SweepSessionsHandler(SchedulerHandler):
-    """Handler for sweeping stale sessions (maintenance operation)."""
-
-    def __init__(
-        self,
-        scheduler: Scheduler,
-        repository: SchedulerRepository,
-    ) -> None:
-        self._scheduler = scheduler
-        self._repository = repository
-
-    @classmethod
-    def name(cls) -> str:
-        """Get the name of the handler."""
-        return "sweep-sessions"
-
-    @property
-    def lock_id(self) -> Optional[LockID]:
-        """No lock needed for sweeping stale sessions."""
-        return None
-
-    async def execute(self) -> ScheduleResult:
-        """Sweep stale sessions including those with pending timeout."""
-        return await self._scheduler.sweep_stale_sessions()
-
-    async def post_process(self, result: ScheduleResult) -> None:
-        """Log the number of swept sessions."""
-        log.info("Swept {} stale sessions", len(result.scheduled_sessions))
-        # Invalidate cache for affected access keys
-        affected_keys: set[AccessKey] = {
-            event_data.access_key for event_data in result.scheduled_sessions
-        }
-        await self._repository.invalidate_kernel_related_cache(list(affected_keys))
-        log.debug("Invalidated kernel-related cache for {} access keys", len(affected_keys))
 
 
 class SweepSessionsLifecycleHandler(SessionLifecycleHandler):

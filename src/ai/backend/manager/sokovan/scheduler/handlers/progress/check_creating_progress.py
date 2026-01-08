@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.session.broadcast import (
@@ -19,72 +19,16 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.types import ScheduleType
-from ai.backend.manager.sokovan.scheduler.handlers.base import (
-    SchedulerHandler,
-    SessionLifecycleHandler,
-)
+from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.hooks.registry import HookRegistry
 from ai.backend.manager.sokovan.scheduler.results import (
     ScheduledSessionData,
-    ScheduleResult,
     SessionExecutionResult,
 )
-from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 from ai.backend.manager.sokovan.scheduler.types import SessionRunningData, SessionWithKernels
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
-if TYPE_CHECKING:
-    pass
-
 log = BraceStyleAdapter(logging.getLogger(__name__))
-
-
-class CheckCreatingProgressHandler(SchedulerHandler):
-    """Handler for checking if CREATING sessions are ready to transition to RUNNING.
-
-    DEPRECATED: Use CheckCreatingProgressLifecycleHandler instead.
-    """
-
-    def __init__(
-        self,
-        scheduler: Scheduler,
-        scheduling_controller: SchedulingController,
-        event_producer: EventProducer,
-    ) -> None:
-        self._scheduler = scheduler
-        self._scheduling_controller = scheduling_controller
-        self._event_producer = event_producer
-
-    @classmethod
-    def name(cls) -> str:
-        """Get the name of the handler."""
-        return "check-creating-progress"
-
-    @property
-    def lock_id(self) -> Optional[LockID]:
-        """Lock for operations targeting CREATING sessions."""
-        return LockID.LOCKID_SOKOVAN_TARGET_CREATING
-
-    async def execute(self) -> ScheduleResult:
-        """Check if sessions in CREATING state have all kernels running."""
-        return await self._scheduler.check_creating_progress()
-
-    async def post_process(self, result: ScheduleResult) -> None:
-        """Log the number of sessions that transitioned to RUNNING."""
-        await self._scheduling_controller.mark_scheduling_needed(ScheduleType.START)
-        log.info("{} sessions transitioned to RUNNING state", len(result.scheduled_sessions))
-
-        # Broadcast batch event for sessions that transitioned to RUNNING
-        events: list[AbstractBroadcastEvent] = [
-            SchedulingBroadcastEvent(
-                session_id=event_data.session_id,
-                creation_id=event_data.creation_id,
-                status_transition=str(SessionStatus.RUNNING),
-                reason=event_data.reason,
-            )
-            for event_data in result.scheduled_sessions
-        ]
-        await self._event_producer.broadcast_events_batch(events)
 
 
 class CheckCreatingProgressLifecycleHandler(SessionLifecycleHandler):
@@ -156,7 +100,7 @@ class CheckCreatingProgressLifecycleHandler(SessionLifecycleHandler):
 
         This handler needs to:
         1. Use provided SessionWithKernels data for hook execution
-        2. Execute hooks (on_transition_to_running_v2)
+        2. Execute hooks (on_transition_to_running)
         3. Calculate occupied_slots from all kernels
         4. Update sessions with occupying_slots (via repository)
         5. Return successes for status transition
@@ -172,7 +116,7 @@ class CheckCreatingProgressLifecycleHandler(SessionLifecycleHandler):
         hook_coroutines = [
             self._hook_registry.get_hook(
                 session.session_info.metadata.session_type
-            ).on_transition_to_running_v2(session)
+            ).on_transition_to_running(session)
             for session in sessions
         ]
 
