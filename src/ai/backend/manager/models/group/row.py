@@ -20,7 +20,7 @@ import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
+from sqlalchemy.orm import foreign, joinedload, load_only, relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import msgpack
@@ -173,6 +173,27 @@ groups = sa.Table(
 )
 
 
+# Defined for avoiding circular import
+def _get_network_join_condition():
+    from ai.backend.manager.models.network import NetworkRow
+
+    return GroupRow.id == foreign(NetworkRow.project)
+
+
+def _get_vfolder_join_condition():
+    from ai.backend.manager.models.vfolder import VFolderRow
+
+    return GroupRow.id == foreign(VFolderRow.group)
+
+
+def _get_association_container_registries_groups_join_condition():
+    from ai.backend.manager.models.association_container_registries_groups import (
+        AssociationContainerRegistriesGroupsRow,
+    )
+
+    return GroupRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)
+
+
 class GroupRow(Base):
     __table__ = groups
     sessions = relationship("SessionRow", back_populates="group")
@@ -184,17 +205,17 @@ class GroupRow(Base):
     networks = relationship(
         "NetworkRow",
         back_populates="project_row",
-        primaryjoin="GroupRow.id==foreign(NetworkRow.project)",
+        primaryjoin=_get_network_join_condition,
     )
     vfolder_rows = relationship(
         "VFolderRow",
         back_populates="group_row",
-        primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
+        primaryjoin=_get_vfolder_join_condition,
     )
     association_container_registries_groups_rows = relationship(
         "AssociationContainerRegistriesGroupsRow",
         back_populates="group_row",
-        primaryjoin="GroupRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)",
+        primaryjoin=_get_association_container_registries_groups_join_condition,
     )
 
     def to_data(self) -> GroupData:

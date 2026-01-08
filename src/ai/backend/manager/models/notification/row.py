@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import foreign, relationship
 
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
@@ -31,6 +31,18 @@ __all__ = (
 
 
 # ========== ORM Models ==========
+
+
+def _get_notification_channel_rules_join_condition():
+    from ai.backend.manager.models.notification import NotificationRuleRow
+
+    return NotificationChannelRow.id == foreign(NotificationRuleRow.channel_id)
+
+
+def _get_notification_channel_creator_join_condition():
+    from ai.backend.manager.models.user import UserRow
+
+    return foreign(NotificationChannelRow.created_by) == UserRow.uuid
 
 
 class NotificationChannelRow(Base):
@@ -69,12 +81,12 @@ class NotificationChannelRow(Base):
     rules = relationship(
         "NotificationRuleRow",
         back_populates="channel",
-        primaryjoin="NotificationChannelRow.id == foreign(NotificationRuleRow.channel_id)",
+        primaryjoin=_get_notification_channel_rules_join_condition,
         foreign_keys=[id],
     )
     creator = relationship(
         "UserRow",
-        primaryjoin="foreign(NotificationChannelRow.created_by) == UserRow.uuid",
+        primaryjoin=_get_notification_channel_creator_join_condition,
         foreign_keys=[created_by],
         uselist=False,
     )
@@ -102,6 +114,18 @@ class NotificationChannelRow(Base):
             created_at=self.created_at,
             updated_at=self.updated_at,
         )
+
+
+def _get_notification_rule_channel_join_condition():
+    from ai.backend.manager.models.notification import NotificationChannelRow
+
+    return foreign(NotificationRuleRow.channel_id) == NotificationChannelRow.id
+
+
+def _get_notification_rule_creator_join_condition():
+    from ai.backend.manager.models.user import UserRow
+
+    return foreign(NotificationRuleRow.created_by) == UserRow.uuid
 
 
 class NotificationRuleRow(Base):
@@ -133,12 +157,12 @@ class NotificationRuleRow(Base):
     channel = relationship(
         "NotificationChannelRow",
         back_populates="rules",
-        primaryjoin="foreign(NotificationRuleRow.channel_id) == NotificationChannelRow.id",
+        primaryjoin=_get_notification_rule_channel_join_condition,
         foreign_keys=[channel_id],
     )
     creator = relationship(
         "UserRow",
-        primaryjoin="foreign(NotificationRuleRow.created_by) == UserRow.uuid",
+        primaryjoin=_get_notification_rule_creator_join_condition,
         foreign_keys=[created_by],
         uselist=False,
     )

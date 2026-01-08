@@ -36,6 +36,12 @@ __all__ = ("RouteStatus", "RoutingRow")
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
+def _get_deployment_revision_join_condition():
+    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+
+    return RoutingRow.revision == DeploymentRevisionRow.id
+
+
 class RoutingRow(Base):
     __tablename__ = "routings"
     __table_args__ = (
@@ -95,7 +101,7 @@ class RoutingRow(Base):
     session_row = relationship("SessionRow", back_populates="routing")
     revision_row: DeploymentRevisionRow = relationship(
         "DeploymentRevisionRow",
-        primaryjoin="RoutingRow.revision == DeploymentRevisionRow.id",
+        primaryjoin=_get_deployment_revision_join_condition,
         foreign_keys="RoutingRow.revision",
         viewonly=True,
     )

@@ -27,7 +27,7 @@ import trafaret as t
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import load_only, relationship, selectinload
+from sqlalchemy.orm import foreign, load_only, relationship, selectinload
 
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
 from ai.backend.common.types import (
@@ -410,6 +410,18 @@ class VFolderPermissionRow(Base):
     vfolder_row = relationship("VFolderRow", back_populates="permission_rows")
 
 
+def _get_user_join_condition():
+    from ai.backend.manager.models.user import UserRow
+
+    return UserRow.uuid == foreign(VFolderRow.user)
+
+
+def _get_group_join_condition():
+    from ai.backend.manager.models.group import GroupRow
+
+    return GroupRow.id == foreign(VFolderRow.group)
+
+
 class VFolderRow(Base):
     __table__ = vfolders
 
@@ -417,12 +429,12 @@ class VFolderRow(Base):
     user_row = relationship(
         "UserRow",
         back_populates="vfolder_rows",
-        primaryjoin="UserRow.uuid == foreign(VFolderRow.user)",
+        primaryjoin=_get_user_join_condition,
     )
     group_row = relationship(
         "GroupRow",
         back_populates="vfolder_rows",
-        primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
+        primaryjoin=_get_group_join_condition,
     )
     permission_rows = relationship(VFolderPermissionRow, back_populates="vfolder_row")
     invitation_rows = relationship(VFolderInvitationRow, back_populates="vfolder_row")

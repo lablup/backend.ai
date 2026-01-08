@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Optional, Self
+from typing import TYPE_CHECKING, Self
 
 import sqlalchemy as sa
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import foreign, relationship
 
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
@@ -23,6 +23,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.rbac_models.role import RoleRow
 
 
+def _get_role_join_condition():
+    from ai.backend.manager.models.rbac_models.role import RoleRow
+
+    return RoleRow.id == foreign(ObjectPermissionRow.role_id)
+
+
 class ObjectPermissionRow(Base):
     __tablename__ = "object_permissions"
     __table_args__ = (sa.Index("ix_id_role_id_entity_id", "id", "role_id", "entity_id"),)
@@ -39,10 +45,10 @@ class ObjectPermissionRow(Base):
         "operation", StrEnumType(OperationType, length=32), nullable=False
     )
 
-    role_row: Optional[RoleRow] = relationship(
+    role_row: RoleRow | None = relationship(
         "RoleRow",
         back_populates="object_permission_rows",
-        primaryjoin="RoleRow.id == foreign(ObjectPermissionRow.role_id)",
+        primaryjoin=_get_role_join_condition,
     )
 
     def object_id(self) -> ObjectId:
