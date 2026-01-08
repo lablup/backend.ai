@@ -82,7 +82,7 @@ class QueryFilterTransformer(Transformer):
 
     array = list
 
-    def atom(self, token: list[Token]) -> type[sa.sql.elements.SingletonConstant]:
+    def atom(self, token: list[Token]) -> sa.sql.elements.ColumnElement[Any]:
         a = token[0]
         if a.value == "null":
             return sa.null()
@@ -110,13 +110,13 @@ class QueryFilterTransformer(Transformer):
             val = self._transform_val_leaf(col_name, op, value)
         return val
 
-    def binary_expr(self, *args) -> sa.sql.elements.BinaryExpression:
+    def binary_expr(self, *args: Any) -> sa.sql.elements.ColumnElement[Any]:
         children: list[Token] = args[0]
         col_name = children[0].value
         op = children[1].value
         val = self._transform_val(col_name, op, children[2])
 
-        def build_expr(op: str, col, val):
+        def build_expr(op: str, col: Any, val: Any) -> sa.sql.elements.ColumnElement[Any]:
             match op:
                 case "==":
                     expr = col == val
@@ -143,9 +143,10 @@ class QueryFilterTransformer(Transformer):
                 case "ilike":
                     expr = col.ilike(val)
                 case _:
-                    expr = args
+                    raise ValueError(f"Unknown operator: {op}")
             return expr
 
+        expr: sa.sql.elements.ColumnElement[Any]
         try:
             if self._fieldspec is not None:
                 match self._fieldspec[children[0].value][0]:
@@ -154,7 +155,7 @@ class QueryFilterTransformer(Transformer):
                         # and select the row if anyone makes the result true.
                         col = get_col_from_table(self._sa_table, col_name)
                         unnested_col = sa.func.unnest(col).alias("item")
-                        subq = (
+                        subq: sa.sql.Select[Any] = (
                             sa.select(sa.column("item"))
                             .select_from(unnested_col)
                             .where(build_expr(op, sa.column("item"), val))

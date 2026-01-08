@@ -39,6 +39,7 @@ from sqlalchemy.orm import (
     relationship,
     selectinload,
 )
+from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
@@ -557,8 +558,9 @@ async def _match_sessions_by_id(
     allow_stale: bool = True,
     for_update: bool = False,
     max_matches: Optional[int] = None,
-    eager_loading_op: Optional[Sequence] = None,
-) -> list[SessionRow]:
+    eager_loading_op: Optional[Sequence[_AbstractLoad]] = None,
+) -> Sequence[SessionRow]:
+    cond: sa.sql.elements.ColumnElement[bool]
     if isinstance(session_id_or_list, list):
         cond = SessionRow.id.in_(session_id_or_list)
     else:
@@ -588,8 +590,9 @@ async def _match_sessions_by_name(
     allow_stale: bool = True,
     for_update: bool = False,
     max_matches: Optional[int] = None,
-    eager_loading_op: Optional[Sequence] = None,
-) -> list[SessionRow]:
+    eager_loading_op: Optional[Sequence[_AbstractLoad]] = None,
+) -> Sequence[SessionRow]:
+    cond: sa.sql.elements.ColumnElement[bool]
     if allow_prefix:
         cond = sa.sql.expression.cast(SessionRow.name, sa.String).like(f"{session_name}%")
     else:
@@ -902,15 +905,15 @@ class SessionRow(Base):
     )
 
     @classmethod
-    def kernel_load_option(cls, already_joined: bool = False) -> sa.orm.Load:
+    def kernel_load_option(cls, already_joined: bool = False) -> _AbstractLoad:
         return selectinload(cls.kernels) if not already_joined else contains_eager(cls.kernels)
 
     @classmethod
-    def user_load_option(cls, already_joined: bool = False) -> sa.orm.Load:
+    def user_load_option(cls, already_joined: bool = False) -> _AbstractLoad:
         return joinedload(cls.user) if not already_joined else contains_eager(cls.user)
 
     @classmethod
-    def project_load_option(cls, already_joined: bool = False) -> sa.orm.Load:
+    def project_load_option(cls, already_joined: bool = False) -> _AbstractLoad:
         return joinedload(cls.group) if not already_joined else contains_eager(cls.group)
 
     @classmethod

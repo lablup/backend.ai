@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
+    Any,
     Optional,
     Self,
     TypeAlias,
@@ -545,7 +546,7 @@ PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ProjectPermission] = frozenset([
 MEMBER_PERMISSIONS: frozenset[ProjectPermission] = frozenset([ProjectPermission.READ_ATTRIBUTE])
 
 WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList[Any] | sa.sql.elements.ColumnElement[bool]
+    sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList | sa.sql.elements.ColumnElement[bool]
 )
 
 

@@ -171,7 +171,7 @@ async def execute_batch_purger(
     """
     # Extract table and PK columns from the subquery
     base_subquery = purger.spec.build_subquery()
-    table = base_subquery.froms[0]
+    table = cast(sa.Table, base_subquery.froms[0])
     pk_columns = list(table.primary_key.columns)
 
     total_deleted = 0
