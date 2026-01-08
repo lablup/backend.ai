@@ -178,9 +178,7 @@ class Services:
         app_config_service = AppConfigService(
             app_config_repository=repositories.app_config.repository,
         )
-        domain_service = DomainService(
-            repositories.domain.repository, repositories.domain.admin_repository
-        )
+        domain_service = DomainService(repositories.domain.repository)
         group_service = GroupService(
             args.storage_manager,
             args.config_provider,
